@@ -196,20 +196,42 @@ TEST(baseNameOf, absoluteNothingSlashNothing)
 
 TEST(isInDir, trivialCase)
 {
-    auto p1 = isInDir("/foo/bar", "/foo");
-    ASSERT_EQ(p1, true);
+    EXPECT_TRUE(isInDir("/foo/bar", "/foo"));
 }
 
 TEST(isInDir, notInDir)
 {
-    auto p1 = isInDir("/zes/foo/bar", "/foo");
-    ASSERT_EQ(p1, false);
+    EXPECT_FALSE(isInDir("/zes/foo/bar", "/foo"));
 }
 
 TEST(isInDir, emptyDir)
 {
-    auto p1 = isInDir("/zes/foo/bar", "");
-    ASSERT_EQ(p1, false);
+    EXPECT_FALSE(isInDir("/zes/foo/bar", ""));
+}
+
+TEST(isInDir, hiddenSubdirectory)
+{
+    EXPECT_TRUE(isInDir("/foo/.ssh", "/foo"));
+}
+
+TEST(isInDir, ellipsisEntry)
+{
+    EXPECT_TRUE(isInDir("/foo/...", "/foo"));
+}
+
+TEST(isInDir, sameDir)
+{
+    EXPECT_FALSE(isInDir("/foo", "/foo"));
+}
+
+TEST(isInDir, sameDirDot)
+{
+    EXPECT_FALSE(isInDir("/foo/.", "/foo"));
+}
+
+TEST(isInDir, dotDotPrefix)
+{
+    EXPECT_FALSE(isInDir("/foo/../bar", "/foo"));
 }
 
 /* ----------------------------------------------------------------------------
