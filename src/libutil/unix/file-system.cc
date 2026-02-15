@@ -23,9 +23,9 @@
 
 namespace nix {
 
-Descriptor openDirectory(const std::filesystem::path & path)
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink)
 {
-    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (followFinalSymlink ? 0 : O_NOFOLLOW));
 }
 
 Descriptor openFileReadonly(const std::filesystem::path & path)
@@ -74,6 +74,14 @@ std::filesystem::path descriptorToPath(Descriptor fd)
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
+}
+
+PosixStat lstat(const std::filesystem::path & path)
+{
+    PosixStat st;
+    if (::lstat(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
 }
 
 void setWriteTime(

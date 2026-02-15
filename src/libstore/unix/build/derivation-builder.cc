@@ -758,7 +758,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* The TOCTOU between the previous mkdir call and this open call is unavoidable due to
        POSIX semantics.*/
-    tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+    tmpDirFd = openDirectory(tmpDir, /*followFinalSymlink=*/false);
     if (!tmpDirFd)
         throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
@@ -1269,7 +1269,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
         openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
-    writeFile(fd, path, contents);
+    writeFile(fd.get(), contents);
     chownToBuilder(fd.get(), path);
 }
 

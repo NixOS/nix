@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
@@ -205,6 +206,19 @@ void unix::closeOnExec(int fd)
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 || fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
         throw SysError("setting close-on-exec flag");
+}
+
+void syncDescriptor(Descriptor fd)
+{
+    int result =
+#if defined(__APPLE__)
+        ::fcntl(fd, F_FULLFSYNC)
+#else
+        ::fsync(fd)
+#endif
+        ;
+    if (result == -1)
+        throw NativeSysError("fsync file descriptor %1%", fd);
 }
 
 } // namespace nix

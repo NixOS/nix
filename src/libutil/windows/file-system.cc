@@ -23,7 +23,7 @@ void setWriteTime(
     warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
-Descriptor openDirectory(const std::filesystem::path & path)
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink)
 {
     return CreateFileW(
         path.c_str(),
@@ -31,7 +31,7 @@ Descriptor openDirectory(const std::filesystem::path & path)
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_BACKUP_SEMANTICS | (followFinalSymlink ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr);
 }
 
@@ -103,6 +103,69 @@ std::filesystem::path descriptorToPath(Descriptor handle)
         dw -= 1;
     }
     return std::filesystem::path{std::wstring{buf.data(), dw}};
+}
+
+time_t windows::fileTimeToUnixTime(const FILETIME & ft)
+{
+    /* FILETIME is 100-nanosecond intervals since January 1, 1601 UTC.
+       Unix time is seconds since January 1, 1970 UTC.
+       Difference is 11644473600 seconds. */
+    ULARGE_INTEGER ull;
+    ull.LowPart = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+    return static_cast<time_t>(ull.QuadPart / 10000000ULL - 11644473600ULL);
+}
+
+void windows::statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks)
+{
+    memset(&st, 0, sizeof(st));
+
+    /* Determine file type */
+    if (dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        st.st_mode = S_IFLNK | 0777;
+    } else if (dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        st.st_mode = S_IFDIR | 0755;
+    } else {
+        st.st_mode = S_IFREG | 0644;
+    }
+
+    /* File size (only meaningful for regular files) */
+    st.st_size = (static_cast<int64_t>(nFileSizeHigh) << 32) | nFileSizeLow;
+
+    /* Timestamps */
+    st.st_atime = fileTimeToUnixTime(ftLastAccessTime);
+    st.st_mtime = fileTimeToUnixTime(ftLastWriteTime);
+    st.st_ctime = fileTimeToUnixTime(ftCreationTime);
+
+    st.st_nlink = nNumberOfLinks;
+    st.st_uid = 0;
+    st.st_gid = 0;
+}
+
+PosixStat lstat(const std::filesystem::path & path)
+{
+    WIN32_FILE_ATTRIBUTE_DATA attrData;
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attrData))
+        throw WinError("getting status of %s", PathFmt(path));
+
+    PosixStat st;
+    windows::statFromFileInfo(
+        st,
+        attrData.dwFileAttributes,
+        attrData.ftCreationTime,
+        attrData.ftLastAccessTime,
+        attrData.ftLastWriteTime,
+        attrData.nFileSizeHigh,
+        attrData.nFileSizeLow);
+    return st;
 }
 
 } // namespace nix

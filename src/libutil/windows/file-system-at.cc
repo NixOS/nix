@@ -4,8 +4,9 @@
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
 
+#include <span>
+
 #include <fileapi.h>
-#include <error.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winioctl.h>
@@ -88,8 +89,8 @@ HANDLE openSymlinkAt(Descriptor dirFd, const CanonPath & path)
     assert(!path.isRoot());
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
 
-    std::wstring wpath = string_to_os_string(path.rel());
-    return ntOpenAt(dirFd, wpath, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+    return ntOpenAt(dirFd, wpath.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
 }
 
 /**
@@ -192,6 +193,54 @@ OsString readSymlinkTarget(HANDLE linkHandle)
 }
 
 /**
+ * Write symlink target to an open file handle using reparse point.
+ *
+ * @param handle Open file handle (must have GENERIC_WRITE access)
+ * @param target The symlink target (what it points to)
+ */
+void writeSymlinkTarget(HANDLE handle, const std::filesystem::path & target)
+{
+    /* Build the reparse data buffer for a symbolic link.
+       Layout: SubstituteName and PrintName stored consecutively in PathBuffer.
+       We use the same string for both. */
+    size_t targetBytes = target.native().size() * sizeof(wchar_t);
+    size_t bufSize = offsetof(ReparseDataBuffer, SymbolicLinkReparseBuffer.PathBuffer) + targetBytes * 2;
+    std::vector<uint8_t> buf(bufSize, 0);
+
+    auto * reparse = reinterpret_cast<ReparseDataBuffer *>(buf.data());
+    reparse->ReparseTag = IO_REPARSE_TAG_SYMLINK;
+    reparse->ReparseDataLength =
+        static_cast<unsigned short>(bufSize - offsetof(ReparseDataBuffer, SymbolicLinkReparseBuffer));
+    reparse->Reserved = 0;
+
+    auto & symlink = reparse->SymbolicLinkReparseBuffer;
+    /* SubstituteName comes first */
+    symlink.SubstituteNameOffset = 0;
+    symlink.SubstituteNameLength = static_cast<unsigned short>(targetBytes);
+    /* PrintName follows SubstituteName */
+    symlink.PrintNameOffset = static_cast<unsigned short>(targetBytes);
+    symlink.PrintNameLength = static_cast<unsigned short>(targetBytes);
+    /* SYMLINK_FLAG_RELATIVE = 1 for relative symlinks, 0 for absolute */
+    symlink.Flags = target.is_relative() ? 1 : 0;
+
+    /* Copy target into PathBuffer twice (SubstituteName and PrintName) */
+    memcpy(symlink.PathBuffer, target.c_str(), targetBytes);
+    memcpy(reinterpret_cast<char *>(symlink.PathBuffer) + targetBytes, target.c_str(), targetBytes);
+
+    DWORD bytesReturned;
+    if (!DeviceIoControl(
+            handle,
+            FSCTL_SET_REPARSE_POINT,
+            buf.data(),
+            static_cast<DWORD>(bufSize),
+            nullptr,
+            0,
+            &bytesReturned,
+            nullptr))
+        throw WinError("setting reparse point for symlink");
+}
+
+/**
  * Check if a handle refers to a reparse point (e.g., symlink).
  *
  * @param handle Open file/directory handle
@@ -209,6 +258,115 @@ bool isReparsePoint(HANDLE handle)
 } // anonymous namespace
 
 } // namespace windows
+
+OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
+{
+    AutoCloseFD linkHandle(openSymlinkAt(dirFd, path));
+    return readSymlinkTarget(linkHandle.get());
+}
+
+void createFileSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+
+    /* Create the file that will become the symlink */
+    AutoCloseFD handle(ntOpenAt(
+        dirFd, wpath.c_str(), GENERIC_WRITE | DELETE, FILE_NON_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE));
+
+    writeSymlinkTarget(handle.get(), target);
+}
+
+void createDirectorySymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+
+    /* Create the directory that will become the symlink */
+    AutoCloseFD handle(ntOpenAt(
+        dirFd, wpath.c_str(), GENERIC_WRITE | DELETE, FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE));
+
+    writeSymlinkTarget(handle.get(), target);
+}
+
+void createUnknownSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+
+    /* Resolve target path to determine if it's a directory.
+       Target is relative to the symlink's parent directory. */
+    std::filesystem::path targetPath(target);
+    std::filesystem::path resolvedTarget;
+
+    if (targetPath.is_absolute()) {
+        resolvedTarget = targetPath;
+    } else {
+        /* Get the symlink's parent directory path and resolve target relative to it */
+        auto symlinkDir = descriptorToPath(dirFd);
+        if (auto parent = path.parent())
+            symlinkDir /= parent->rel();
+        resolvedTarget = symlinkDir / targetPath;
+    }
+
+    /* Check if target is a directory. If we can't stat it (e.g., dangling symlink),
+       fall back to file symlink. */
+    std::error_code ec;
+    auto status = std::filesystem::status(resolvedTarget, ec);
+    bool isDirectory = !ec && std::filesystem::is_directory(status);
+
+    if (isDirectory)
+        createDirectorySymlinkAt(dirFd, path, target);
+    else
+        createFileSymlinkAt(dirFd, path, target);
+}
+
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+
+    /* Create the directory. The handle is immediately closed. */
+    AutoCloseFD handle(ntOpenAt(dirFd, wpath.c_str(), FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE, FILE_CREATE));
+}
+
+PosixStat fstat(Descriptor fd)
+{
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(fd, &info))
+        throw WinError("getting file information for %s", PathFmt(descriptorToPath(fd)));
+
+    PosixStat st;
+    windows::statFromFileInfo(
+        st,
+        info.dwFileAttributes,
+        info.ftCreationTime,
+        info.ftLastAccessTime,
+        info.ftLastWriteTime,
+        info.nFileSizeHigh,
+        info.nFileSizeLow,
+        info.nNumberOfLinks);
+
+    return st;
+}
+
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+
+    /* Open the file without following symlinks */
+    AutoCloseFD handle(ntOpenAt(dirFd, wpath.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT));
+
+    return fstat(handle.get());
+}
 
 Descriptor openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
@@ -299,12 +457,6 @@ Descriptor openFileEnsureBeneathNoSymlinks(
         throw SymlinkNotAllowed(path);
 
     return finalHandle;
-}
-
-OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
-{
-    AutoCloseFD linkHandle(windows::openSymlinkAt(dirFd, path));
-    return windows::readSymlinkTarget(linkHandle.get());
 }
 
 } // namespace nix

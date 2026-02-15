@@ -134,6 +134,11 @@ std::string readLine(Descriptor fd, bool eofOk = false, char terminator = '\n');
 void writeLine(Descriptor fd, std::string s);
 
 /**
+ * Perform a blocking fsync operation on a file descriptor.
+ */
+void syncDescriptor(Descriptor fd);
+
+/**
  * Options for draining a file descriptor to a sink.
  */
 struct DrainFdSinkOpts
@@ -253,7 +258,11 @@ public:
     /**
      * Perform a blocking fsync operation.
      */
-    void fsync() const;
+    void fsync() const
+    {
+        if (fd != INVALID_DESCRIPTOR)
+            nix::syncDescriptor(fd);
+    }
 
     /**
      * Asynchronously flush to disk without blocking, if available on

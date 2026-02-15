@@ -23,6 +23,8 @@
 #  define HAVE_FCHMODAT2 0
 #endif
 
+#include "util-unix-config-private.hh"
+
 namespace nix {
 
 #ifdef __linux__
@@ -90,10 +92,9 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
             PathFmt(descriptorToPath(dirFd) / path.rel()));
     }
 
-    struct ::stat st;
-    /* Possible since https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
-    if (::fstat(pathFd.get(), &st) == -1)
-        throw SysError("statting '%s' relative to parent directory via O_PATH file descriptor", path.rel());
+    /* Possible to use with O_PATH fd since
+     * https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
+    auto st = fstat(pathFd.get());
 
     if (S_ISLNK(st.st_mode))
         throw SysError(EOPNOTSUPP, "can't change mode of symlink %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
@@ -171,8 +172,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             });
 
             if (errno == ENOTDIR) /* Path component might be a symlink. */ {
-                struct ::stat st;
-                if (::fstatat(getParentFd(), component.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(st.st_mode))
+                if (auto st = maybeFstatat(getParentFd(), CanonPath(component)); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
             } else if (errno == ELOOP) {
@@ -222,6 +222,63 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
         } else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
     }
+}
+
+static void symlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::symlinkat(target.c_str(), dirFd, path.rel_c_str()) == -1) {
+        auto savedErrno = errno;
+        throw SysError(
+            savedErrno, "creating symlink %1% -> %2%", PathFmt(descriptorToPath(dirFd) / path.rel()), target);
+    }
+}
+
+void createFileSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createDirectorySymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createUnknownSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target)
+{
+    symlinkAt(dirFd, path, target);
+}
+
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    if (::mkdirat(dirFd, path.rel_c_str(), 0777) == -1) {
+        auto savedErrno = errno;
+        throw SysError(savedErrno, "creating directory %1%", PathFmt(descriptorToPath(dirFd) / path.rel()));
+    }
+}
+
+PosixStat fstat(Descriptor fd)
+{
+    PosixStat st;
+    if (::fstat(fd, &st)) {
+        auto savedErrno = errno;
+        throw SysError(savedErrno, "getting status of %s", PathFmt(descriptorToPath(fd)));
+    }
+    return st;
+}
+
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+    PosixStat st;
+    if (::fstatat(dirFd, path.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW)) {
+        auto savedErrno = errno;
+        throw SysError(savedErrno, "getting status of %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
+    }
+    return st;
 }
 
 } // namespace nix

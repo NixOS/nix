@@ -15,6 +15,7 @@
  */
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 
 #include <optional>
 
@@ -32,6 +33,90 @@ namespace nix {
  * @throws Interrupted if interrupted.
  */
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Create a symlink to a file relative to a directory file descriptor.
+ *
+ * On Windows, creates a file symlink. On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createFileSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target);
+
+/**
+ * Create a symlink to a directory relative to a directory file descriptor.
+ *
+ * On Windows, creates a directory symlink. On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createDirectorySymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target);
+
+/**
+ * Create a symlink relative to a directory file descriptor, detecting target type.
+ *
+ * On Windows, stats the target to determine whether to create a file or
+ * directory symlink. Falls back to file symlink if the target does not exist.
+ * On Unix, equivalent to symlinkat.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createUnknownSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target);
+
+/**
+ * Create a directory relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new directory
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of an open file/directory handle.
+ *
+ * @param fd File descriptor/handle
+ * @throws SystemError on I/O errors.
+ */
+PosixStat fstat(Descriptor fd);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @return nullopt if the path does not exist.
+ * @throws SystemError on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @throws SystemError if the path does not exist or on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path);
 
 /**
  * Safe(r) function to open a file relative to dirFd, while
