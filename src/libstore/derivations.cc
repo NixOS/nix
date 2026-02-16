@@ -136,6 +136,12 @@ StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
+    /* In case the derivation is already valid, we bail out early since that's
+       faster. But we need to make sure that the derivation has a corresponding
+       temproot. It is added by the remote in addToStoreFromDump, but we'd like
+       to avoid sending a lot of drv contents to the daemon. */
+    addTempRoot(path);
+
     if (isValidPath(path) && !repair)
         return path;
 
