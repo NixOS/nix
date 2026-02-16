@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/processes.hh"

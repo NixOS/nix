@@ -53,6 +53,7 @@ sources += files(
   'environment-variables.cc',
   'file-descriptor.cc',
   'file-path.cc',
+  'file-system-at.cc',
   'file-system.cc',
   'muxable-pipe.cc',
   'os-string.cc',
