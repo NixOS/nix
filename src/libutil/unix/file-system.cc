@@ -14,6 +14,7 @@
 #endif
 
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"

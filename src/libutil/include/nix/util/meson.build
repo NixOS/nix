@@ -38,6 +38,7 @@ headers = files(
   'file-descriptor.hh',
   'file-path-impl.hh',
   'file-path.hh',
+  'file-system-at.hh',
   'file-system.hh',
   'finally.hh',
   'fmt.hh',

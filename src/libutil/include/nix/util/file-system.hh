@@ -2,7 +2,10 @@
 /**
  * @file
  *
- * Utilities for working with the file system and file paths.
+ * @brief Utilities for working with the file system and file paths.
+ *
+ * Please try to use @ref file-system-at.hh instead of this where
+ * possible, for the reasons given in the documentation of that header.
  */
 
 #include "nix/util/types.hh"
