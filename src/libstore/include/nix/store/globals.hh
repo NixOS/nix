@@ -104,8 +104,6 @@ public:
 
     Settings();
 
-    using ExternalBuilders = std::vector<ExternalBuilder>;
-
     /**
      * Get the local store settings.
      */
@@ -409,12 +407,6 @@ public:
           Default is 0, which disables the warning.
           Set it to 1 to warn on all paths.
         )"};
-
-    /**
-     * Finds the first external derivation builder that supports this
-     * derivation, or else returns a null pointer.
-     */
-    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 
     /**
      * Get the options needed for profile directory functions.

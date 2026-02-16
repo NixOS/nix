@@ -15,6 +15,7 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/globals.hh"
 
+#include <algorithm>
 #include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -184,6 +185,82 @@ struct LogFile
     ~LogFile();
 };
 
+struct LocalBuildRejection
+{
+    bool maxJobsZero = false;
+
+    struct NoLocalStore
+    {};
+
+    /**
+     * We have a local store, but we don't have an external derivation builder (which is fine), if we did, it'd be
+     * fine because we would not care about platforms and features then. Since we don't, we either have the wrong
+     * platform, or we are missing some system features.
+     */
+    struct WrongLocalStore
+    {
+        template<typename T>
+        struct Pair
+        {
+            T derivation;
+            T localStore;
+        };
+
+        std::optional<Pair<std::string>> badPlatform;
+        std::optional<Pair<StringSet>> missingFeatures;
+    };
+
+    std::variant<NoLocalStore, WrongLocalStore> rejection;
+};
+
+static BuildError reject(const LocalBuildRejection & rejection, std::string_view thingCannotBuild)
+{
+    if (std::get_if<LocalBuildRejection::NoLocalStore>(&rejection.rejection))
+        return BuildError(
+            BuildResult::Failure::InputRejected,
+            "Unable to build with a primary store that isn't a local store; "
+            "either pass a different '--store' or enable remote builds.\n\n"
+            "For more information check 'man nix.conf' and search for '/machines'.");
+
+    auto & wrongStore = std::get<LocalBuildRejection::WrongLocalStore>(rejection.rejection);
+
+    std::string msg = fmt("Cannot build '%s'.", Magenta(thingCannotBuild));
+
+    if (rejection.maxJobsZero)
+        msg += "\nReason: " ANSI_RED "local builds are disabled" ANSI_NORMAL
+               " (max-jobs = 0)"
+               "\nHint: set 'max-jobs' to a non-zero value to enable local builds, "
+               "or configure remote builders via 'builders'";
+
+    if (wrongStore.badPlatform)
+        msg +=
+            fmt("\nReason: " ANSI_RED "platform mismatch" ANSI_NORMAL
+                "\nRequired system: '%s'"
+                "\nCurrent system: '%s'",
+                Magenta(wrongStore.badPlatform->derivation),
+                Magenta(wrongStore.badPlatform->localStore));
+
+    if (wrongStore.missingFeatures)
+        msg +=
+            fmt("\nReason: " ANSI_RED "missing system features" ANSI_NORMAL
+                "\nRequired features: {%s}"
+                "\nAvailable features: {%s}",
+                concatStringsSep(", ", wrongStore.missingFeatures->derivation),
+                concatStringsSep<StringSet>(", ", wrongStore.missingFeatures->localStore));
+
+    if (wrongStore.badPlatform || wrongStore.missingFeatures) {
+        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their
+        // hardware - we should tell them to run the command to install Rosetta
+        if (wrongStore.badPlatform && wrongStore.badPlatform->derivation == "x86_64-darwin"
+            && wrongStore.badPlatform->localStore == "aarch64-darwin")
+            msg +=
+                fmt("\nNote: run `%s` to run programs for x86_64-darwin",
+                    Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
+    }
+
+    return BuildError(BuildResult::Failure::InputRejected, std::move(msg));
+}
+
 Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
     auto drvOptions = [&] {
@@ -245,6 +322,46 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     }
     checkPathValidity(initialOutputs);
 
+    auto localBuildResult = [&]() -> std::variant<LocalBuildCapability, LocalBuildRejection> {
+        bool maxJobsZero = worker.settings.maxBuildJobs.get() == 0;
+
+        auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+        if (!localStoreP)
+            return LocalBuildRejection{.maxJobsZero = maxJobsZero, .rejection = LocalBuildRejection::NoLocalStore{}};
+
+        /**
+         * Now that we've decided we can't / won't do a remote build, check
+         * that we can in fact build locally. First see if there is an
+         * external builder for a "semi-local build". If there is, prefer to
+         * use that. If there is not, then check if we can do a "true" local
+         * build.
+         */
+        auto * ext = settings.getLocalSettings().findExternalDerivationBuilderIfSupported(*drv);
+
+        if (ext)
+            return LocalBuildCapability{*localStoreP, ext};
+
+        using WrongLocalStore = LocalBuildRejection::WrongLocalStore;
+
+        WrongLocalStore wrongStore;
+
+        if (drv->platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv->platform)
+            && !drv->isBuiltin())
+            wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
+
+        {
+            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto & available = worker.store.config.systemFeatures.get();
+            if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
+                wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
+        }
+
+        if (maxJobsZero || wrongStore.badPlatform || wrongStore.missingFeatures)
+            return LocalBuildRejection{.maxJobsZero = maxJobsZero, .rejection = std::move(wrongStore)};
+
+        return LocalBuildCapability{*localStoreP, ext};
+    }();
+
     /**
      * Activity that denotes waiting for a lock.
      */
@@ -254,10 +371,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
      * Locks on (fixed) output paths.
      */
     PathLocks outputLocks;
-
-    bool useHook;
-
-    const ExternalBuilder * externalBuilder = nullptr;
 
     while (true) {
         trace("trying to build");
@@ -326,35 +439,35 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             }
         }
 
-        bool canBuildLocally = [&] {
-            if (drv->platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv->platform)
-                && !drv->isBuiltin())
-                return false;
-
-            if (worker.settings.maxBuildJobs.get() == 0 && !drv->isBuiltin())
-                return false;
-
-            for (auto & feature : drvOptions.getRequiredSystemFeatures(*drv))
-                if (!worker.store.config.systemFeatures.get().count(feature))
-                    return false;
-
-            return true;
-        }();
-
-        /* Don't do a remote build if the derivation has the attribute
-           `preferLocalBuild' set.  Also, check and repair modes are only
-           supported for local builds. */
-        bool buildLocally = (buildMode != bmNormal || (drvOptions.preferLocalBuild && canBuildLocally))
-                            && worker.settings.maxBuildJobs.get() != 0;
-
-        if (buildLocally) {
-            useHook = false;
+        // Check and repair modes are only supported for local builds.
+        if (buildMode != bmNormal) {
+            // can try hook: false
+            // can try local: true
+            // preference: doesn't matter because it's only one option
+            break;
         } else {
+            // can try hook: true
+            // can try local: true
+            // preference: unknown
+
+            if (drvOptions.preferLocalBuild) {
+                // preference: local
+                if (std::holds_alternative<LocalBuildCapability>(localBuildResult)) {
+                    // Can build locally as preferred, so do it.
+                    break;
+                }
+                // We cannot build locally, but we can maybe do the hook.
+            }
+
+            // If we don't prefer a local build, OR we do but the local build was rejected, then we try the hook if
+            // possible.
             switch (tryBuildHook(drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
-                useHook = true;
+                actLock.reset();
+                co_return buildWithHook(
+                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
                 break;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
@@ -369,68 +482,27 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 co_await waitForAWhile();
                 continue;
             case rpDecline:
-                /* We should do it ourselves.
-
-                   Now that we've decided we can't / won't do a remote build, check
-                   that we can in fact build locally. First see if there is an
-                   external builder for a "semi-local build". If there is, prefer to
-                   use that. If there is not, then check if we can do a "true" local
-                   build. */
-
-                externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
-
-                if (!externalBuilder && !canBuildLocally) {
-                    auto msg =
-                        fmt("Cannot build '%s'.\n"
-                            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
-                            "\n"
-                            "Required system: '%s' with features {%s}\n"
-                            "Current system: '%s' with features {%s}",
-                            Magenta(worker.store.printStorePath(drvPath)),
-                            Magenta(drv->platform),
-                            concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(*drv)),
-                            Magenta(settings.thisSystem),
-                            concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
-
-                    // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
-                    // we should tell them to run the command to install Darwin 2
-                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-                        msg += fmt(
-                            "\nNote: run `%s` to run programs for x86_64-darwin",
-                            Magenta(
-                                "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
-
-                    outputLocks.unlock();
-                    co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
-                }
-                useHook = false;
+                // We should do it ourselves.
                 break;
             }
         }
+
         break;
     }
 
+    // can do hook: false (either we can't try, or we tried and were declined)
+    // can try local: true
+    // preference: doesn't matter
+
     actLock.reset();
 
-    if (useHook) {
-        co_return buildWithHook(
-            std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
-    } else if (auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store)) {
+    if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
         co_return buildLocally(
-            *localStoreP,
-            std::move(inputPaths),
-            std::move(initialOutputs),
-            std::move(drvOptions),
-            std::move(outputLocks),
-            externalBuilder);
+            *cap, std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
     } else {
-        throw Error(
-            R"(
-            Unable to build with a primary store that isn't a local store;
-            either pass a different '--store' or enable remote builds.
-
-            For more information check 'man nix.conf' and search for '/machines'.
-            )");
+        outputLocks.unlock();
+        std::string storePath = worker.store.printStorePath(drvPath);
+        co_return doneFailure(reject(std::get<LocalBuildRejection>(localBuildResult), storePath));
     }
 }
 
@@ -639,12 +711,11 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 }
 
 Goal::Co DerivationBuildingGoal::buildLocally(
-    LocalStore & localStore,
+    LocalBuildCapability localBuildCap,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
-    PathLocks outputLocks,
-    const ExternalBuilder * externalBuilder)
+    PathLocks outputLocks)
 {
     co_await yield();
 
@@ -728,7 +799,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             };
 
             decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot =
-                localStore.config->getLocalSettings().sandboxPaths.get();
+                localBuildCap.localStore.config->getLocalSettings().sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
             /* Add the closure of store paths to the chroot. */
@@ -770,14 +841,14 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
-            builder = externalBuilder
+            builder = localBuildCap.externalBuilder
                           ? makeExternalDerivationBuilder(
-                                localStore,
+                                localBuildCap.localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params),
-                                *externalBuilder)
+                                *localBuildCap.externalBuilder)
                           : makeDerivationBuilder(
-                                localStore,
+                                localBuildCap.localStore,
                                 std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params));
         }

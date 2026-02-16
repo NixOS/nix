@@ -279,7 +279,7 @@ bool Settings::isWSL1()
 #endif
 }
 
-const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
+const ExternalBuilder * LocalSettings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
 {
     if (auto it = std::ranges::find_if(
             externalBuilders.get(), [&](const auto & handler) { return handler.systems.contains(drv.platform); });
@@ -429,17 +429,17 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 }
 
 template<>
-Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+LocalSettings::ExternalBuilders BaseSetting<LocalSettings::ExternalBuilders>::parse(const std::string & str) const
 {
     try {
-        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+        return nlohmann::json::parse(str).template get<LocalSettings::ExternalBuilders>();
     } catch (std::exception & e) {
         throw UsageError("parsing setting '%s': %s", name, e.what());
     }
 }
 
 template<>
-std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+std::string BaseSetting<LocalSettings::ExternalBuilders>::to_string() const
 {
     return nlohmann::json(value).dump();
 }

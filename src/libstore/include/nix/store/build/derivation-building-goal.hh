@@ -64,6 +64,12 @@ private:
 
     std::string key() override;
 
+    struct LocalBuildCapability
+    {
+        LocalStore & localStore;
+        const ExternalBuilder * externalBuilder;
+    };
+
     /**
      * The states.
      */
@@ -75,12 +81,11 @@ private:
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
     Co buildLocally(
-        LocalStore & localStore,
+        LocalBuildCapability localBuildCap,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
-        PathLocks outputLocks,
-        const ExternalBuilder * externalBuilder);
+        PathLocks outputLocks);
 
     /**
      * Is the build hook willing to perform the build?
