@@ -40,8 +40,8 @@ void sigintHandler(int signo)
 static detail::ReplCompleterMixin * curRepl; // ugly
 
 #if !USE_READLINE
-static char * completionCallback(char * s, int * match)
-{
+static char * completionCallback(char * s, int * match) noexcept
+try {
     auto possible = curRepl->completePrefix(s);
     if (possible.size() == 1) {
         *match = 1;
@@ -73,10 +73,12 @@ static char * completionCallback(char * s, int * match)
 
     *match = 0;
     return nullptr;
+} catch (...) {
+    return nullptr;
 }
 
-static int listPossibleCallback(char * s, char *** avp)
-{
+static int listPossibleCallback(char * s, char *** avp) noexcept
+try {
     auto possible = curRepl->completePrefix(s);
 
     if (possible.size() > (std::numeric_limits<int>::max() / sizeof(char *)))
@@ -105,6 +107,9 @@ static int listPossibleCallback(char * s, char *** avp)
     *avp = vp;
 
     return ac;
+} catch (...) {
+    *avp = nullptr;
+    return 0;
 }
 #endif
 
