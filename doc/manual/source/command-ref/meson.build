@@ -18,6 +18,26 @@ experimental_features_shortlist_md = custom_target(
   env : nix_env_for_docs,
 )
 
+dp_features_json = custom_target(
+  command : [ nix, '__dump-dp-features' ],
+  capture : true,
+  output : 'dp-features.json',
+  env : nix_env_for_docs,
+)
+
+deprecated_features_shortlist_md = custom_target(
+  command : nix_eval_for_docs + [
+    '--expr', 'import @INPUT0@ (builtins.fromJSON (builtins.readFile ./@INPUT1@))',
+  ],
+  input : [
+    '../../generate-dp-features-shortlist.nix',
+    dp_features_json,
+  ],
+  output : 'deprecated-features-shortlist.md',
+  capture : true,
+  env : nix_env_for_docs,
+)
+
 nix3_cli_files = custom_target(
   command : [ python.full_path(), '@INPUT0@', '@OUTPUT@', '--' ] + nix_eval_for_docs + [
     '--expr', 'import @INPUT1@ true (builtins.readFile ./@INPUT2@)',

@@ -23,6 +23,7 @@
 #include "nix/flake/flake.hh"
 #include "nix/flake/settings.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/deprecated-features.hh"
 
 #include "self-exe.hh"
 #include "crash-handler.hh"
@@ -488,6 +489,11 @@ void mainWrapped(int argc, char ** argv)
 
     if (argc == 2 && std::string(argv[1]) == "__dump-xp-features") {
         logger->cout(documentExperimentalFeatures().dump());
+        return;
+    }
+
+    if (argc == 2 && std::string(argv[1]) == "__dump-dp-features") {
+        logger->cout(documentDeprecatedFeatures().dump());
         return;
     }
 

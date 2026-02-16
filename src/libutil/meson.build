@@ -132,6 +132,7 @@ sources = [ config_priv_h ] + files(
   'config-global.cc',
   'configuration.cc',
   'current-process.cc',
+  'deprecated-features.cc',
   'english.cc',
   'environment-variables.cc',
   'error.cc',
