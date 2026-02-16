@@ -39,6 +39,17 @@ jobs:
           role-to-assume: "arn:aws:iam::080433136561:role/nix-release"
           role-session-name: nix-release-oidc-${{ github.run_id }}
           aws-region: eu-west-1
+      - name: Disable containerd image store
+        run: |
+          # Docker 28+ defaults to the containerd image store, which
+          # pushes layers uncompressed instead of gzip. OCI clients
+          # that only support gzip (e.g. go-containerregistry) fail
+          # with "gzip: invalid header". Disabling the containerd
+          # snapshotter restores the classic storage driver, which
+          # preserves gzip-compressed layers through the
+          # `docker load` / `docker push` pipeline.
+          echo '{"features":{"containerd-snapshotter":false}}' | sudo tee /etc/docker/daemon.json > /dev/null
+          sudo systemctl restart docker
       - name: Login to Docker Hub
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
