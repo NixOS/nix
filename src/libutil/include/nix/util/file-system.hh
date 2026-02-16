@@ -177,6 +177,13 @@ Descriptor openDirectory(const std::filesystem::path & path);
  */
 Descriptor openFileReadonly(const std::filesystem::path & path);
 
+/**
+ * Like @ref openFileReadonly, but returns a falsy `AutoCloseFD` if
+ * the file does not exist instead of failing. Throws on all other
+ * errors (permission denied, I/O error, etc.).
+ */
+AutoCloseFD maybeOpenFileReadonly(const std::filesystem::path & path);
+
 struct OpenNewFileForWriteParams
 {
     /**
