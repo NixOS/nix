@@ -26,6 +26,7 @@ headers = files(
   'config-impl.hh',
   'configuration.hh',
   'current-process.hh',
+  'demangle.hh',
   'english.hh',
   'environment-variables.hh',
   'error.hh',

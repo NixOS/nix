@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <type_traits>
 
+#include "nix/util/demangle.hh"
 #include "nix/util/ref.hh"
 
 namespace nix {
@@ -55,9 +56,17 @@ TEST(ref, explicit_downcast_with_cast)
 
 TEST(ref, invalid_cast_throws)
 {
-    // .cast() throws on invalid downcast (unlike .dynamic_pointer_cast() which returns nullptr)
+    // .cast() throws bad_ref_cast (a std::bad_cast subclass) with type info on invalid downcast
+    // (unlike .dynamic_pointer_cast() which returns nullptr)
     auto base = make_ref<Base>();
-    EXPECT_THROW(base.cast<Derived>(), std::invalid_argument);
+    try {
+        base.cast<Derived>();
+        FAIL() << "Expected bad_ref_cast";
+    } catch (const bad_ref_cast & e) {
+        std::string expected = "ref<" + demangle(typeid(Base).name()) + "> cannot be cast to ref<"
+                               + demangle(typeid(Derived).name()) + ">";
+        EXPECT_EQ(e.what(), expected);
+    }
 }
 
 TEST(ref, explicit_downcast_with_dynamic_pointer_cast)
