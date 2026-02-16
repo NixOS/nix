@@ -7,6 +7,19 @@
 namespace nix {
 
 /**
+ * Concept for implicit ref covariance: From* must be implicitly convertible to To*.
+ *
+ * This allows implicit upcasts (Derived -> Base) but rejects downcasts.
+ */
+// Design note: This named concept is technically redundant but provides a readable hint
+// in error messages. Alternative: static_assert can have custom messages, but doesn't
+// participate in SFINAE, so std::is_convertible_v<ref<Base>, ref<Derived>> would
+// incorrectly return true (the conversion would exist but fail at instantiation
+// rather than being excluded).
+template<typename From, typename To>
+concept RefImplicitlyUpcastableTo = std::is_convertible_v<From *, To *>;
+
+/**
  * A simple non-nullable reference-counted pointer. Actually a wrapper
  * around std::shared_ptr that prevents null constructions.
  */
@@ -85,10 +98,15 @@ public:
         return std::dynamic_pointer_cast<T2>(p);
     }
 
+    /**
+     * Implicit conversion to ref of base type (covariance).
+     * Downcasts are rejected; use .cast() (throws) or .dynamic_pointer_cast() (returns nullptr) instead.
+     */
     template<typename T2>
+        requires RefImplicitlyUpcastableTo<T, T2>
     operator ref<T2>() const
     {
-        return ref<T2>((std::shared_ptr<T2>) p);
+        return ref<T2>(p);
     }
 
     bool operator==(const ref<T> & other) const

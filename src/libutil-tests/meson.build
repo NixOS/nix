@@ -75,6 +75,7 @@ sources = files(
   'pool.cc',
   'position.cc',
   'processes.cc',
+  'ref.cc',
   'sort.cc',
   'source-accessor.cc',
   'spawn.cc',
