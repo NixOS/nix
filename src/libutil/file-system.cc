@@ -195,71 +195,41 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
     return path == dir || isInDir(path, dir);
 }
 
-#ifdef _WIN32
-#  define STAT _wstat64
-#else
-#  define STAT stat
-#endif
-
 PosixStat stat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (STAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-#ifndef _WIN32
-PosixStat lstat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (::lstat(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-#endif
-
-PosixStat fstat(int fd)
 {
     PosixStat st;
     if (
 #ifdef _WIN32
-        _fstat64
+        _wstat64
 #else
-        ::fstat
+        ::stat
 #endif
-        (fd, &st))
-        throw SysError("getting status of fd %d", fd);
+        (path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
     return st;
 }
 
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (STAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+    try {
+        return stat(path);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory))
+            return std::nullopt;
+        throw;
     }
-    return st;
 }
 
-#ifndef _WIN32
 std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (::lstat(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+    try {
+        return lstat(path);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory))
+            return std::nullopt;
+        throw;
     }
-    return st;
 }
-#endif
-
-#undef STAT
 
 bool pathExists(const std::filesystem::path & path)
 {

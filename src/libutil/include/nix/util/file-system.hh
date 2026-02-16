@@ -134,6 +134,38 @@ using PosixStat =
 #endif
     ;
 
+#ifdef _WIN32
+namespace windows {
+
+/**
+ * Convert Windows FILETIME to Unix time_t.
+ */
+time_t fileTimeToUnixTime(const FILETIME & ft);
+
+/**
+ * Fill a PosixStat structure from file attributes and timestamps.
+ *
+ * @param dwFileAttributes File attributes (FILE_ATTRIBUTE_*)
+ * @param ftCreationTime Creation time
+ * @param ftLastAccessTime Last access time
+ * @param ftLastWriteTime Last write time
+ * @param nFileSizeHigh High 32 bits of file size
+ * @param nFileSizeLow Low 32 bits of file size
+ * @param nNumberOfLinks Number of hard links (default 1)
+ */
+void statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks = 1);
+
+} // namespace windows
+#endif
+
 /**
  * Get status of `path`.
  */
@@ -142,10 +174,6 @@ PosixStat lstat(const std::filesystem::path & path);
  * Get status of `path` following symlinks.
  */
 PosixStat stat(const std::filesystem::path & path);
-/**
- * Get status of an open file descriptor.
- */
-PosixStat fstat(int fd);
 /**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise

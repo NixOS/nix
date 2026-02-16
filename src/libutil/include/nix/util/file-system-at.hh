@@ -15,6 +15,7 @@
  */
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 
 #include <optional>
 
@@ -53,6 +54,39 @@ void createSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & 
  * @throws SystemError on any I/O errors.
  */
 void createDirectoryAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of an open file/directory handle.
+ *
+ * @param fd File descriptor/handle
+ * @throws SystemError on I/O errors.
+ */
+PosixStat fstat(Descriptor fd);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @return nullopt if the path does not exist.
+ * @throws SystemError on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @throws SystemError if the path does not exist or on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path);
 
 /**
  * Safe(r) function to open a file relative to dirFd, while

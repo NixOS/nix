@@ -290,6 +290,38 @@ void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
     AutoCloseFD handle(ntOpenAt(dirFd, wpath.c_str(), FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE, FILE_CREATE));
 }
 
+PosixStat fstat(Descriptor fd)
+{
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(fd, &info))
+        throw WinError("getting file information for %s", PathFmt(descriptorToPath(fd)));
+
+    PosixStat st;
+    windows::statFromFileInfo(
+        st,
+        info.dwFileAttributes,
+        info.ftCreationTime,
+        info.ftLastAccessTime,
+        info.ftLastWriteTime,
+        info.nFileSizeHigh,
+        info.nFileSizeLow,
+        info.nNumberOfLinks);
+
+    return st;
+}
+
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path)
+{
+    assert(!path.isRoot());
+
+    auto wpath = std::filesystem::path(path.rel()).make_preferred();
+
+    /* Open the file without following symlinks */
+    AutoCloseFD handle(ntOpenAt(dirFd, wpath.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT));
+
+    return fstat(handle.get());
+}
+
 Descriptor openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
 {
