@@ -10,6 +10,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/flake/lockfile.hh"
 
 namespace nix {
 
@@ -148,6 +149,16 @@ INSTANTIATE_TEST_SUITE_P(
             .description = "basic_indirect",
         },
         InputFromURLTestCase{
+            .url = "_foo",
+            .attrs =
+                {
+                    {"id", Attr("_foo")},
+                    {"type", Attr("indirect")},
+                },
+            .description = "underscore_prefixed_flake_id",
+            .expectedUrl = "flake:_foo",
+        },
+        InputFromURLTestCase{
             .url = "flake:nixpkgs/branch",
             .attrs =
                 {
@@ -281,6 +292,18 @@ TEST(to_string, doesntReencodeUrl)
     auto expected = "http://localhost:8181/test/%2B3d.tar.gz";
 
     ASSERT_EQ(unparsed, expected);
+}
+
+TEST(parseInputAttrPath, underscorePrefixed)
+{
+    auto path = flake::parseInputAttrPath("_foo");
+    ASSERT_EQ(path.size(), 1);
+    ASSERT_EQ(path[0], "_foo");
+
+    auto path2 = flake::parseInputAttrPath("_foo/nested");
+    ASSERT_EQ(path2.size(), 2);
+    ASSERT_EQ(path2[0], "_foo");
+    ASSERT_EQ(path2[1], "nested");
 }
 
 } // namespace nix
