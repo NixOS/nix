@@ -115,7 +115,11 @@ rec {
 
   # Binary package for various platforms.
   build = forAllPackages (
-    pkgName: forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.${pkgName})
+    pkgName:
+    lib.filterAttrs (
+      system: _do_not_touch:
+      pkgName == "nix-nswrapper" -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux
+    ) (forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.${pkgName}))
   );
 
   shellInputs = removeAttrs (forAllSystems (
@@ -135,6 +139,10 @@ rec {
     (
       if pkgName == "nix-functional-tests" then
         lib.flip builtins.removeAttrs [ "x86_64-w64-mingw32" ]
+      else if pkgName == "nix-nswrapper" then
+        lib.filterAttrs (
+          crossSystem: _do_not_touch: nixpkgsFor.x86_64-linux.cross.${crossSystem}.stdenv.hostPlatform.isLinux
+        )
       else
         lib.id
     )
@@ -171,7 +179,13 @@ rec {
         )
       );
     in
-    forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
+    forAllPackages (
+      pkgName:
+      lib.filterAttrs (
+        system: _do_not_touch:
+        pkgName == "nix-nswrapper" -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux
+      ) (forAllSystems (system: components.${system}.${pkgName}))
+    );
 
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
@@ -191,7 +205,13 @@ rec {
         )
       );
     in
-    forAllPackages (pkgName: forAllSystems (system: components.${system}.${pkgName}));
+    forAllPackages (
+      pkgName:
+      lib.filterAttrs (
+        system: _do_not_touch:
+        pkgName == "nix-nswrapper" -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux
+      ) (forAllSystems (system: components.${system}.${pkgName}))
+    );
 
   # Perl bindings for various platforms.
   perlBindings = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-perl-bindings);
