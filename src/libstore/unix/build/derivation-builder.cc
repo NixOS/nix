@@ -136,7 +136,7 @@ public:
     /**
      * Cleanup code to run when destroying any DerivationBuilderImpl implementation.
      */
-    void cleanupOnDestruction() noexcept
+    void cleanupOnDestruction() noexcept override
     {
         /* Careful: we should never ever throw an exception from a
            noexcept function. */
@@ -2042,10 +2042,9 @@ void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept
     if (!builder) /* Idempotent and handles nullptr as any deleter must. */
         return;
 
-    if (auto builderImpl = dynamic_cast<DerivationBuilderImpl *>(builder))
-        /* Note that this might call into virtual functions, which we can't do in a destructor of
-           the DerivationBuilderImpl itself. */
-        builderImpl->cleanupOnDestruction();
+    /* Note that this might call into virtual functions, which we can't do in a destructor of
+       the DerivationBuilderImpl itself. */
+    builder->cleanupOnDestruction();
 
     delete builder;
 }
