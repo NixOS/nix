@@ -885,7 +885,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
     mkPath(&*path.accessor, StringData::make(mem, path.path.abs()));
 }
 
-inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
+[[gnu::always_inline]] inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 {
     for (auto l = var.level; l; --l, env = env->up)
         ;
@@ -903,11 +903,11 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
     while (1) {
         forceAttrs(*env->values[0], fromWith->pos, "while evaluating the first subexpression of a with expression");
         if (auto j = env->values[0]->attrs()->get(var.name)) {
-            if (countCalls)
+            if (countCalls) [[unlikely]]
                 attrSelects[j->pos]++;
             return j->value;
         }
-        if (!fromWith->parentWith)
+        if (!fromWith->parentWith) [[unlikely]]
             error<UndefinedVarError>("undefined variable '%1%'", symbols[var.name])
                 .atPos(var.pos)
                 .withFrame(*env, var)
