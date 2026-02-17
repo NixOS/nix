@@ -52,8 +52,8 @@ sockets:
 
 ```
 [Socket]
-ListenStream=/nix/var/nix/unix/daemon-socket/socket
-ListenStream=/nix/var/nix/unix/daemon-socket/socket-2
+ListenStream=/nix/var/nix/daemon-socket/socket
+ListenStream=/nix/var/nix/daemon-socket/socket-2
 ```
 
 )""

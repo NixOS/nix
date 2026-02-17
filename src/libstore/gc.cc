@@ -3,6 +3,7 @@
 #include "nix/store/local-gc.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/path.hh"
+#include "nix/util/configuration.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/signals.hh"
@@ -306,9 +307,33 @@ Roots LocalStore::findRoots(bool censor)
     return roots;
 }
 
+static Roots requestRuntimeRoots(const LocalStoreConfig & config, const std::filesystem::path & socketPath)
+{
+    Roots roots;
+
+    auto socket = connect(socketPath);
+    auto socketSource = FdSource(socket.get());
+
+    while (1) {
+        auto line = socketSource.readLine(true, '\0');
+        if (line == "")
+            break;
+        roots[config.parseStorePath(line)].insert(censored);
+    };
+
+    return roots;
+}
+
 void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
 {
-    auto unchecked = findRuntimeRootsUnchecked(*config);
+    Roots unchecked;
+
+    if (config->useRootsDaemon) {
+        experimentalFeatureSettings.require(Xp::LocalOverlayStore);
+        unchecked = requestRuntimeRoots(*config, config->getRootsSocketPath());
+    } else {
+        unchecked = findRuntimeRootsUnchecked(*config);
+    }
 
     for (auto & [path, links] : unchecked) {
         if (!isValidPath(path))

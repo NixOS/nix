@@ -133,6 +133,27 @@ public:
         Xp::LocalOverlayStore,
     };
 
+    Setting<bool> useRootsDaemon{
+        this,
+        false,
+        "use-roots-daemon",
+        R"(
+          Whether to request garbage collector roots from an external daemon.
+
+          When enabled, the garbage collector connects to a Unix domain socket
+          at [`<state-dir>`](@docroot@/store/types/local-store.md#store-option-state)`/gc-roots-socket/socket` to discover additional roots
+          that should not be collected. This is useful when the Nix daemon runs
+          without root privileges and cannot scan `/proc` for runtime roots.
+
+          The daemon can be started with [`nix store roots-daemon`](@docroot@/command-ref/new-cli/nix3-store-roots-daemon.md).
+        )",
+        {},
+        true,
+        Xp::LocalOverlayStore,
+    };
+
+    std::filesystem::path getRootsSocketPath() const;
+
     static const std::string name()
     {
         return "Local Store";
