@@ -59,4 +59,44 @@ SingleDrvOutputs registerOutputs(
     const std::filesystem::path & tmpDir,
     std::function<std::filesystem::path(const std::string &)> realPathInHost);
 
+/**
+ * Change ownership of a path to the build user. No-op if no build user.
+ */
+void chownToBuilder(UserLock * buildUser, const std::filesystem::path & path);
+
+/**
+ * Change ownership of an open file descriptor to the build user. No-op
+ * if no build user.
+ */
+void chownToBuilder(UserLock * buildUser, int fd, const std::filesystem::path & path);
+
+/**
+ * Write a file into the builder's temporary directory and chown it.
+ */
+void writeBuilderFile(
+    UserLock * buildUser,
+    const std::filesystem::path & tmpDir,
+    int tmpDirFd,
+    const std::string & name,
+    std::string_view contents);
+
+/**
+ * Set up the build environment variables.
+ *
+ * @param tmpDirInSandbox The path to the build temporary directory as
+ *   seen from inside the sandbox.
+ */
+void initEnv(
+    StringMap & env,
+    const std::filesystem::path & homeDir,
+    const std::string & storeDir,
+    const DerivationBuilderParams & params,
+    const StringMap & inputRewrites,
+    const DerivationType & derivationType,
+    const LocalSettings & localSettings,
+    const std::filesystem::path & tmpDirInSandbox,
+    UserLock * buildUser,
+    const std::filesystem::path & tmpDir,
+    int tmpDirFd);
+
 } // namespace nix

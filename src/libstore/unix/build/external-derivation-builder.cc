@@ -410,48 +410,10 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void initEnv()
     {
-        env.clear();
-
-        env["PATH"] = "/path-not-set";
-        env["HOME"] = homeDir;
-        env["NIX_STORE"] = store.storeDir;
-        env["NIX_BUILD_CORES"] = fmt(
-            "%d",
-            settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores
-                                                    : settings.getDefaultCores());
-
-        for (const auto & [name, info] : desugaredEnv.variables) {
-            env[name] = info.prependBuildDirectory ? (tmpDirInSandbox() / info.value).string() : info.value;
-        }
-
-        for (const auto & [fileName, value] : desugaredEnv.extraFiles) {
-            writeBuilderFile(fileName, rewriteStrings(value, inputRewrites));
-        }
-
-        env["NIX_BUILD_TOP"] = tmpDirInSandbox();
-        env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox();
-        env["PWD"] = tmpDirInSandbox();
-
-        if (derivationType.isFixed())
-            env["NIX_OUTPUT_CHECKED"] = "1";
-
-        if (!derivationType.isSandboxed()) {
-            auto & impureEnv = localSettings.impureEnv.get();
-            if (!impureEnv.empty())
-                experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
-
-            for (auto & i : drvOptions.impureEnvVars) {
-                auto envVar = impureEnv.find(i);
-                if (envVar != impureEnv.end()) {
-                    env[i] = envVar->second;
-                } else {
-                    env[i] = getEnv(i).value_or("");
-                }
-            }
-        }
-
-        env["NIX_LOG_FD"] = "2";
-        env["TERM"] = "xterm-256color";
+        nix::initEnv(
+            env, homeDir, store.storeDir, *this, inputRewrites,
+            derivationType, localSettings, tmpDirInSandbox(),
+            buildUser.get(), tmpDir, tmpDirFd.get());
     }
 
     void processSandboxSetupMessages()
@@ -579,32 +541,17 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void chownToBuilder(const std::filesystem::path & path)
     {
-        if (!buildUser)
-            return;
-        if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of %1%", PathFmt(path));
+        nix::chownToBuilder(buildUser.get(), path);
     }
 
     void chownToBuilder(int fd, const std::filesystem::path & path)
     {
-        if (!buildUser)
-            return;
-        if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of file %1%", PathFmt(path));
+        nix::chownToBuilder(buildUser.get(), fd, path);
     }
 
     void writeBuilderFile(const std::string & name, std::string_view contents)
     {
-        auto path = std::filesystem::path(tmpDir) / name;
-        AutoCloseFD fd{openat(
-            tmpDirFd.get(),
-            name.c_str(),
-            O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW,
-            0666)};
-        if (!fd)
-            throw SysError("creating file %s", PathFmt(path));
-        writeFile(fd, path, contents);
-        chownToBuilder(fd.get(), path);
+        nix::writeBuilderFile(buildUser.get(), tmpDir, tmpDirFd.get(), name, contents);
     }
 
     void setUser()

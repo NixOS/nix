@@ -15,7 +15,11 @@
 #include "build/derivation-check.hh"
 #include "store-config-private.hh"
 
+#include "nix/util/strings.hh"
+#include "nix/util/environment-variables.hh"
+
 #include <unistd.h>
+#include <fcntl.h>
 
 namespace nix {
 
@@ -605,6 +609,94 @@ SingleDrvOutputs registerOutputs(
     }
 
     return builtOutputs;
+}
+
+void chownToBuilder(UserLock * buildUser, const std::filesystem::path & path)
+{
+    if (!buildUser)
+        return;
+    if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of %1%", PathFmt(path));
+}
+
+void chownToBuilder(UserLock * buildUser, int fd, const std::filesystem::path & path)
+{
+    if (!buildUser)
+        return;
+    if (fchown(fd, buildUser->getUID(), buildUser->getGID()) == -1)
+        throw SysError("cannot change ownership of file %1%", PathFmt(path));
+}
+
+void writeBuilderFile(
+    UserLock * buildUser,
+    const std::filesystem::path & tmpDir,
+    int tmpDirFd,
+    const std::string & name,
+    std::string_view contents)
+{
+    auto path = std::filesystem::path(tmpDir) / name;
+    AutoCloseFD fd{
+        openat(tmpDirFd, name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+    if (!fd)
+        throw SysError("creating file %s", PathFmt(path));
+    writeFile(fd, path, contents);
+    chownToBuilder(buildUser, fd.get(), path);
+}
+
+void initEnv(
+    StringMap & env,
+    const std::filesystem::path & homeDir,
+    const std::string & storeDir,
+    const DerivationBuilderParams & params,
+    const StringMap & inputRewrites,
+    const DerivationType & derivationType,
+    const LocalSettings & localSettings,
+    const std::filesystem::path & tmpDirInSandbox,
+    UserLock * buildUser,
+    const std::filesystem::path & tmpDir,
+    int tmpDirFd)
+{
+    env.clear();
+
+    env["PATH"] = "/path-not-set";
+    env["HOME"] = homeDir;
+    env["NIX_STORE"] = storeDir;
+    env["NIX_BUILD_CORES"] = fmt(
+        "%d",
+        settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores : settings.getDefaultCores());
+
+    for (const auto & [name, info] : params.desugaredEnv.variables) {
+        env[name] = info.prependBuildDirectory ? (tmpDirInSandbox / info.value).string() : info.value;
+    }
+
+    for (const auto & [fileName, value] : params.desugaredEnv.extraFiles) {
+        writeBuilderFile(buildUser, tmpDir, tmpDirFd, fileName, rewriteStrings(value, inputRewrites));
+    }
+
+    env["NIX_BUILD_TOP"] = tmpDirInSandbox;
+    env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDirInSandbox;
+    env["PWD"] = tmpDirInSandbox;
+
+    if (derivationType.isFixed())
+        env["NIX_OUTPUT_CHECKED"] = "1";
+
+    if (!derivationType.isSandboxed()) {
+        auto & impureEnv = localSettings.impureEnv.get();
+        if (!impureEnv.empty())
+            experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
+
+        for (auto & i : params.drvOptions.impureEnvVars) {
+            auto envVar = impureEnv.find(i);
+            if (envVar != impureEnv.end()) {
+                env[i] = envVar->second;
+            } else {
+                env[i] = getEnv(i).value_or("");
+            }
+        }
+    }
+
+    env["NIX_LOG_FD"] = "2";
+    env["TERM"] = "xterm-256color";
 }
 
 } // namespace nix
