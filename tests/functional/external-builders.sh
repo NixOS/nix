@@ -23,7 +23,7 @@ external_builder="$TEST_ROOT/external-builder.sh"
 cat > "$external_builder" <<EOF
 #! $SHELL -e
 
-PATH=$PATH
+PATH=${PATH@Q}
 
 [[ "\$1" = bla ]]
 
