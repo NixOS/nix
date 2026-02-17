@@ -58,6 +58,7 @@ enum InternalType {
     tListN = tFirstSingleUntaggable,
     tString,
     tPath,
+    tNumberOfInternalTypes, // Must be last
 };
 
 /**
@@ -677,7 +678,7 @@ protected:
         case pdPairOfPointers:
             return static_cast<InternalType>(tFirstPairOfPointers + (payload[1] & discriminatorMask));
         [[unlikely]] default:
-            unreachable();
+            nixUnreachableWhenHardened();
         }
     }
 
@@ -1030,7 +1031,7 @@ private:
     T getStorage() const noexcept
     {
         if (getInternalType() != detail::payloadTypeToInternalType<T>) [[unlikely]]
-            unreachable();
+            nixUnreachableWhenHardened();
         T out;
         ValueStorage::getStorage(out);
         return out;
@@ -1082,45 +1083,44 @@ public:
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
      *
-     * @param invalidIsThunk Instead of aborting an an invalid (probably
+     * @param invalidIsThunk Instead of UB an an invalid (probably
      * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type(bool invalidIsThunk = false) const
+    template<bool invalidIsThunk = false>
+    inline ValueType type() const
     {
-        switch (getInternalType()) {
-        case tUninitialized:
-            break;
-        case tInt:
-            return nInt;
-        case tBool:
-            return nBool;
-        case tString:
-            return nString;
-        case tPath:
-            return nPath;
-        case tNull:
-            return nNull;
-        case tAttrs:
-            return nAttrs;
-        case tListSmall:
-        case tListN:
-            return nList;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            return nFunction;
-        case tExternal:
-            return nExternal;
-        case tFloat:
-            return nFloat;
-        case tThunk:
-        case tApp:
-            return nThunk;
+        /* Explicit lookup table. switch() might compile down (and it does at least with GCC 14)
+           to a jump table. Let's help the compiler a bit here. */
+        static constexpr auto table = [] {
+            std::array<ValueType, tNumberOfInternalTypes> t{};
+            t[tUninitialized] = nThunk;
+            t[tInt] = nInt;
+            t[tBool] = nBool;
+            t[tNull] = nNull;
+            t[tFloat] = nFloat;
+            t[tExternal] = nExternal;
+            t[tAttrs] = nAttrs;
+            t[tPrimOp] = nFunction;
+            t[tLambda] = nFunction;
+            t[tPrimOpApp] = nFunction;
+            t[tApp] = nThunk;
+            t[tThunk] = nThunk;
+            t[tListSmall] = nList;
+            t[tListN] = nList;
+            t[tString] = nString;
+            t[tPath] = nPath;
+            return t;
+        }();
+
+        auto it = getInternalType();
+        if (it == tUninitialized || it >= tNumberOfInternalTypes) [[unlikely]] {
+            if constexpr (invalidIsThunk)
+                return nThunk;
+            else
+                nixUnreachableWhenHardened();
         }
-        if (invalidIsThunk)
-            return nThunk;
-        else
-            unreachable();
+
+        return table[it];
     }
 
     /**

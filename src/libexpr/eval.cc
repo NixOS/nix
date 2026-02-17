@@ -466,7 +466,7 @@ void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 
            We might know the type of a thunk in advance, so be allowed
            to just write it down in that case. */
-        if (auto gotType = v->type(true); gotType != nThunk)
+        if (auto gotType = v->type</*invalidIsThunk=*/true>(); gotType != nThunk)
             assert(info.type == gotType);
 
         /* Install value the base environment. */
