@@ -1,4 +1,4 @@
-#include "external-derivation-builder.hh"
+#include "linux-chroot-derivation-builder.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
@@ -20,8 +20,11 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/personality.hh"
+#include "nix/util/linux-namespaces.hh"
 #include "build/derivation-check.hh"
 #include "store-config-private.hh"
+#include "chroot.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -30,9 +33,19 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
-#ifdef __linux__
-#  include <sys/prctl.h>
+#include <sys/prctl.h>
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet/ip.h>
+#include <sched.h>
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <sys/syscall.h>
+
+#if HAVE_SECCOMP
+#  include <seccomp.h>
 #endif
+#include "linux/fchmodat2-compat.hh"
 
 #if HAVE_STATVFS
 #  include <sys/statvfs.h>
@@ -43,6 +56,7 @@
 
 #include "nix/util/strings.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/cgroup.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -50,14 +64,266 @@
 #  include "nix/util/url.hh"
 #endif
 
-#include <nlohmann/json.hpp>
+#define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
 
 namespace nix {
 
-struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
-{
-    ExternalBuilder externalBuilder;
+using namespace nix::linux;
 
+struct NotDeterministicLinuxChroot : BuildError
+{
+    NotDeterministicLinuxChroot(auto &&... args)
+        : BuildError(BuildResult::Failure::NotDeterministic, args...)
+    {
+        isNonDeterministic = true;
+    }
+};
+
+static void handleDiffHookLinuxChroot(
+    const Path & diffHook,
+    uid_t uid,
+    uid_t gid,
+    const std::filesystem::path & tryA,
+    const std::filesystem::path & tryB,
+    const std::filesystem::path & drvPath,
+    const std::filesystem::path & tmpDir)
+{
+    try {
+        auto diffRes = runProgram(
+            RunOptions{
+                .program = diffHook,
+                .lookupPath = true,
+                .args = {tryA, tryB, drvPath, tmpDir},
+                .uid = uid,
+                .gid = gid,
+                .chdir = "/"});
+        if (!statusOk(diffRes.first))
+            throw ExecError(
+                diffRes.first, "diff-hook program %s %2%", PathFmt(diffHook), statusToString(diffRes.first));
+
+        if (diffRes.second != "")
+            printError(chomp(diffRes.second));
+    } catch (Error & error) {
+        ErrorInfo ei = error.info();
+        ei.msg = HintFmt("diff hook execution failed: %s", ei.msg.str());
+        logError(ei);
+    }
+}
+
+static void rethrowExceptionAsErrorLinuxChroot()
+{
+    try {
+        throw;
+    } catch (Error &) {
+        throw;
+    } catch (std::exception & e) {
+        throw Error(e.what());
+    } catch (...) {
+        throw Error("unknown exception");
+    }
+}
+
+static void handleChildExceptionLinuxChroot(bool sendException)
+{
+    try {
+        rethrowExceptionAsErrorLinuxChroot();
+    } catch (Error & e) {
+        if (sendException) {
+            writeFull(STDERR_FILENO, "\1\n");
+            FdSink sink(STDERR_FILENO);
+            sink << e;
+            sink.flush();
+        } else
+            std::cerr << e.msg();
+    }
+}
+
+static void checkNotWorldWritableLinuxChroot(std::filesystem::path path)
+{
+    while (true) {
+        auto st = lstat(path);
+        if (st.st_mode & S_IWOTH)
+            throw Error("Path %s is world-writable or a symlink. That's not allowed for security.", PathFmt(path));
+        if (path == path.parent_path())
+            break;
+        path = path.parent_path();
+    }
+    return;
+}
+
+static void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    auto st = lstat(src);
+
+    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+
+    if (changePerm)
+        chmod(src, st.st_mode | S_IWUSR);
+
+    std::filesystem::rename(src, dst);
+
+    if (changePerm)
+        chmod(dst, st.st_mode);
+}
+
+static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
+{
+    std::filesystem::path oldPath;
+
+    if (pathExists(storePath)) {
+        do {
+            oldPath = makeTempPath(storePath, ".old");
+        } while (pathExists(oldPath));
+        movePath(storePath, oldPath);
+    }
+    try {
+        movePath(tmpPath, storePath);
+    } catch (...) {
+        try {
+            if (!oldPath.empty())
+                movePath(oldPath, storePath);
+        } catch (...) {
+            ignoreExceptionExceptInterrupt();
+        }
+        throw;
+    }
+    if (!oldPath.empty())
+        deletePath(oldPath);
+}
+
+static void setupSeccomp(const LocalSettings & localSettings)
+{
+    if (!localSettings.filterSyscalls)
+        return;
+
+#if HAVE_SECCOMP
+    scmp_filter_ctx ctx;
+
+    if (!(ctx = seccomp_init(SCMP_ACT_ALLOW)))
+        throw SysError("unable to initialize seccomp mode 2");
+
+    Finally cleanup([&]() { seccomp_release(ctx); });
+
+    constexpr std::string_view nativeSystem = NIX_LOCAL_SYSTEM;
+
+    if (nativeSystem == "x86_64-linux" && seccomp_arch_add(ctx, SCMP_ARCH_X86) != 0)
+        throw SysError("unable to add 32-bit seccomp architecture");
+
+    if (nativeSystem == "x86_64-linux" && seccomp_arch_add(ctx, SCMP_ARCH_X32) != 0)
+        throw SysError("unable to add X32 seccomp architecture");
+
+    if (nativeSystem == "aarch64-linux" && seccomp_arch_add(ctx, SCMP_ARCH_ARM) != 0)
+        printError(
+            "unable to add ARM seccomp architecture; this may result in spurious build failures if running 32-bit ARM processes");
+
+    if (nativeSystem == "mips64-linux" && seccomp_arch_add(ctx, SCMP_ARCH_MIPS) != 0)
+        printError("unable to add mips seccomp architecture");
+
+    if (nativeSystem == "mips64-linux" && seccomp_arch_add(ctx, SCMP_ARCH_MIPS64N32) != 0)
+        printError("unable to add mips64-*abin32 seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" && seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL) != 0)
+        printError("unable to add mipsel seccomp architecture");
+
+    if (nativeSystem == "mips64el-linux" && seccomp_arch_add(ctx, SCMP_ARCH_MIPSEL64N32) != 0)
+        printError("unable to add mips64el-*abin32 seccomp architecture");
+
+    /* Prevent builders from creating setuid/setgid binaries. */
+    for (int perm : {S_ISUID, S_ISGID}) {
+        if (seccomp_rule_add(
+                ctx,
+                SCMP_ACT_ERRNO(EPERM),
+                SCMP_SYS(chmod),
+                1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm))
+            != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(
+                ctx,
+                SCMP_ACT_ERRNO(EPERM),
+                SCMP_SYS(fchmod),
+                1,
+                SCMP_A1(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm))
+            != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(
+                ctx,
+                SCMP_ACT_ERRNO(EPERM),
+                SCMP_SYS(fchmodat),
+                1,
+                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm))
+            != 0)
+            throw SysError("unable to add seccomp rule");
+
+        if (seccomp_rule_add(
+                ctx,
+                SCMP_ACT_ERRNO(EPERM),
+                NIX_SYSCALL_FCHMODAT2,
+                1,
+                SCMP_A2(SCMP_CMP_MASKED_EQ, (scmp_datum_t) perm, (scmp_datum_t) perm))
+            != 0)
+            throw SysError("unable to add seccomp rule");
+    }
+
+    /* Prevent builders from using EAs or ACLs. */
+    if (seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(getxattr), 0) != 0
+        || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lgetxattr), 0) != 0
+        || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fgetxattr), 0) != 0
+        || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(setxattr), 0) != 0
+        || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(lsetxattr), 0) != 0
+        || seccomp_rule_add(ctx, SCMP_ACT_ERRNO(ENOTSUP), SCMP_SYS(fsetxattr), 0) != 0)
+        throw SysError("unable to add seccomp rule");
+
+    if (seccomp_attr_set(ctx, SCMP_FLTATR_CTL_NNP, localSettings.allowNewPrivileges ? 0 : 1) != 0)
+        throw SysError("unable to set 'no new privileges' seccomp attribute");
+
+    if (seccomp_load(ctx) != 0)
+        throw SysError("unable to load seccomp BPF program");
+#else
+    throw Error(
+        "seccomp is not supported on this platform; "
+        "you can bypass this error by setting the option 'filter-syscalls' to false, but note that untrusted builds can then create setuid binaries!");
+#endif
+}
+
+static void doBind(const std::filesystem::path & source, const std::filesystem::path & target, bool optional = false)
+{
+    debug("bind mounting %1% to %2%", PathFmt(source), PathFmt(target));
+
+    auto bindMount = [&]() {
+        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError("bind mount from %1% to %2% failed", PathFmt(source), PathFmt(target));
+    };
+
+    auto maybeSt = maybeLstat(source);
+    if (!maybeSt) {
+        if (optional)
+            return;
+        else
+            throw SysError("getting attributes of path %1%", PathFmt(source));
+    }
+    auto st = *maybeSt;
+
+    if (S_ISDIR(st.st_mode)) {
+        createDirs(target);
+        bindMount();
+    } else if (S_ISLNK(st.st_mode)) {
+        // Symlinks can (apparently) not be bind-mounted, so just copy it
+        createDirs(target.parent_path());
+        copyFile(source, target, false);
+    } else {
+        createDirs(target.parent_path());
+        writeFile(target, "");
+        bindMount();
+    }
+}
+
+static const std::filesystem::path procPath = "/proc";
+
+struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+{
     /**
      * The process ID of the builder.
      */
@@ -85,11 +351,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     std::filesystem::path topTmpDir;
 
     /**
-     * The file descriptor of the temporary directory.
-     */
-    AutoCloseFD tmpDirFd;
-
-    /**
      * The sort of derivation we are building.
      */
     const DerivationType derivationType;
@@ -97,10 +358,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     typedef StringMap Environment;
     Environment env;
 
-    /**
-     * Hash rewriting.
-     */
-    StringMap inputRewrites, outputRewrites;
     typedef std::map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
@@ -126,18 +383,47 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
      */
     std::vector<std::thread> daemonWorkerThreads;
 
-    ExternalDerivationBuilder(
-        LocalStore & store,
-        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-        DerivationBuilderParams params,
-        ExternalBuilder externalBuilder)
+    /**
+     * The chroot root directory.
+     */
+    std::filesystem::path chrootRootDir;
+
+    /**
+     * RAII cleanup for the chroot directory.
+     */
+    std::optional<AutoDelete> autoDelChroot;
+
+    PathsInChroot pathsInChroot;
+
+    /**
+     * Pipe for synchronising updates to the builder namespaces.
+     */
+    Pipe userNamespaceSync;
+
+    /**
+     * The mount namespace and user namespace of the builder, used to add additional
+     * paths to the sandbox as a result of recursive Nix calls.
+     */
+    AutoCloseFD sandboxMountNamespace;
+    AutoCloseFD sandboxUserNamespace;
+
+    /**
+     * On Linux, whether we're doing the build in its own user namespace.
+     */
+    bool usingUserNamespace = true;
+
+    /**
+     * The cgroup of the builder, if any.
+     */
+    std::optional<std::filesystem::path> cgroup;
+
+    LinuxChrootDerivationBuilder(
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , externalBuilder{std::move(externalBuilder)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
-        experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
     void cleanupOnDestruction() noexcept override
@@ -178,22 +464,35 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     bool needsHashRewrite()
     {
-        return true;
+        return false;
     }
 
     std::unique_ptr<UserLock> getBuildUser()
     {
-        return acquireUserLock(settings.nixStateDir, localSettings, 1, false);
+        return acquireUserLock(
+            settings.nixStateDir,
+            store.config->getLocalSettings(),
+            drvOptions.useUidRange(drv) ? 65536 : 1,
+            true);
+    }
+    uid_t sandboxUid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
+    }
+
+    gid_t sandboxGid()
+    {
+        return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 100 : 0) : buildUser->getGID();
     }
 
     PathsInChroot getPathsInSandbox()
     {
-        PathsInChroot pathsInChroot = defaultPathsInChroot;
+        PathsInChroot pathsInChrootLocal = defaultPathsInChroot;
 
         if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
             throw Error("`sandbox-build-dir` must not contain the storeDir");
         }
-        pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
+        pathsInChrootLocal[tmpDirInSandbox()] = {.source = tmpDir};
 
         PathSet allowedPaths = localSettings.allowedImpureHostPrefixes;
 
@@ -215,7 +514,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     store.printStorePath(drvPath),
                     i);
 
-            pathsInChroot[i] = {i, true};
+            pathsInChrootLocal[i] = {i, true};
         }
 
         if (localSettings.preBuildHook != "") {
@@ -242,15 +541,15 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     } else {
                         auto p = line.find('=');
                         if (p == std::string::npos)
-                            pathsInChroot[line] = {.source = line};
+                            pathsInChrootLocal[line] = {.source = line};
                         else
-                            pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
+                            pathsInChrootLocal[line.substr(0, p)] = {.source = line.substr(p + 1)};
                     }
                 }
             }
         }
 
-        return pathsInChroot;
+        return pathsInChrootLocal;
     }
 
     void setBuildTmpDir()
@@ -261,28 +560,113 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     std::filesystem::path tmpDirInSandbox()
     {
-        return "/build";
+        return store.config->getLocalSettings().sandboxBuildDir.get();
     }
 
     void prepareUser()
     {
+        if ((buildUser && buildUser->getUIDCount() != 1) || store.config->getLocalSettings().useCgroups) {
+            experimentalFeatureSettings.require(Xp::Cgroups);
+
+            /* If we're running from the daemon, then this will return the
+               root cgroup of the service. Otherwise, it will return the
+               current cgroup. */
+            auto cgroupFS = getCgroupFS();
+            if (!cgroupFS)
+                throw Error("cannot determine the cgroups file system");
+            auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
+            if (!pathExists(rootCgroupPath))
+                throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
+
+            static std::atomic<unsigned int> counter{0};
+
+            cgroup = rootCgroupPath
+                     / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
+                                  : fmt("nix-build-pid-%d-%d", getpid(), counter++));
+
+            debug("using cgroup %s", PathFmt(*cgroup));
+
+            /* When using a build user, record the cgroup we used for that
+               user so that if we got interrupted previously, we can kill
+               any left-over cgroup first. */
+            if (buildUser) {
+                auto cgroupsDir = std::filesystem::path{settings.nixStateDir} / "cgroups";
+                createDirs(cgroupsDir);
+
+                auto cgroupFile = cgroupsDir / std::to_string(buildUser->getUID());
+
+                if (pathExists(cgroupFile)) {
+                    auto prevCgroup = readFile(cgroupFile);
+                    destroyCgroup(prevCgroup);
+                }
+
+                writeFile(cgroupFile, cgroup->native());
+            }
+        }
+
         killSandbox(false);
     }
 
     void prepareSandbox()
     {
-        if (drvOptions.useUidRange(drv))
-            throw Error("feature 'uid-range' is not supported on this platform");
+        // Start with the default sandbox paths
+        pathsInChroot = getPathsInSandbox();
+
+        for (auto & i : inputPaths) {
+            auto p = store.printStorePath(i);
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
+        }
+
+        /* If we're repairing, checking or rebuilding part of a
+           multiple-outputs derivation, it's possible that we're
+           rebuilding a path that is in settings.sandbox-paths
+           (typically the dependencies of /bin/sh).  Throw them
+           out. */
+        for (auto & i : drv.outputsAndOptPaths(store)) {
+            /* If the name isn't known a priori (i.e. floating
+               content-addressing derivation), the temporary location we use
+               should be fresh.  Freshness means it is impossible that the path
+               is already in the sandbox, so we don't need to worry about
+               removing it.  */
+            if (i.second.second)
+                pathsInChroot.erase(store.printStorePath(*i.second.second));
+        }
+
+        // Set up chroot parameters
+        BuildChrootParams params{
+            .chrootParentDir = store.toRealPath(drvPath) + ".chroot",
+            .useUidRange = drvOptions.useUidRange(drv),
+            .isSandboxed = derivationType.isSandboxed(),
+            .buildUser = buildUser.get(),
+            .storeDir = store.storeDir,
+            .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
+            .getSandboxGid = [this]() { return this->sandboxGid(); },
+        };
+
+        // Create the chroot
+        auto [rootDir, cleanup] = setupBuildChroot(params);
+        chrootRootDir = std::move(rootDir);
+        autoDelChroot.emplace(std::move(cleanup));
+
+        if (cgroup) {
+            if (mkdir(cgroup->c_str(), 0755) != 0)
+                throw SysError("creating cgroup %s", PathFmt(*cgroup));
+            chownToBuilder(*cgroup);
+            chownToBuilder(*cgroup / "cgroup.procs");
+            chownToBuilder(*cgroup / "cgroup.threads");
+            // chownToBuilder(*cgroup / "cgroup.subtree_control");
+        }
     }
 
     Strings getPreBuildHookArgs()
     {
-        return Strings({store.printStorePath(drvPath)});
+        assert(!chrootRootDir.empty());
+        return Strings({store.printStorePath(drvPath), chrootRootDir.native()});
     }
 
     std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
-        return store.toRealPath(p.native());
+        return chrootRootDir / p.relative_path();
     }
 
     void openSlave()
@@ -305,6 +689,228 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         if (dup2(builderOut.get(), STDERR_FILENO) == -1)
             throw SysError("cannot pipe standard error into log file");
     }
+
+    void enterChroot()
+    {
+        userNamespaceSync.writeSide = -1;
+
+        if (readLine(userNamespaceSync.readSide.get()) != "1")
+            throw Error("user namespace initialisation failed");
+
+        userNamespaceSync.readSide = -1;
+
+        if (derivationType.isSandboxed()) {
+
+            /* Initialise the loopback interface. */
+            AutoCloseFD fd(socket(PF_INET, SOCK_DGRAM, IPPROTO_IP));
+            if (!fd)
+                throw SysError("cannot open IP socket");
+
+            struct ifreq ifr;
+            strcpy(ifr.ifr_name, "lo");
+            ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
+            if (ioctl(fd.get(), SIOCSIFFLAGS, &ifr) == -1)
+                throw SysError("cannot set loopback interface flags");
+        }
+
+        /* Set the hostname etc. to fixed values. */
+        char hostname[] = "localhost";
+        if (sethostname(hostname, sizeof(hostname)) == -1)
+            throw SysError("cannot set host name");
+        char domainname[] = "(none)"; // kernel default
+        if (setdomainname(domainname, sizeof(domainname)) == -1)
+            throw SysError("cannot set domain name");
+
+        /* Make all filesystems private. */
+        if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
+            throw SysError("unable to make '/' private");
+
+        /* Bind-mount chroot directory to itself. */
+        if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
+            throw SysError("unable to bind mount %1%", PathFmt(chrootRootDir));
+
+        /* Bind-mount the sandbox's Nix store onto itself so that
+           we can mark it as a "shared" subtree. */
+        std::filesystem::path chrootStoreDir =
+            chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
+
+        if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
+            throw SysError("unable to bind mount the Nix store at %1%", PathFmt(chrootStoreDir));
+
+        if (mount(0, chrootStoreDir.c_str(), 0, MS_SHARED, 0) == -1)
+            throw SysError("unable to make %s shared", PathFmt(chrootStoreDir));
+
+        /* Set up a nearly empty /dev, unless the user asked to
+           bind-mount the host /dev. */
+        Strings ss;
+        if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
+            createDirs(chrootRootDir / "dev" / "shm");
+            createDirs(chrootRootDir / "dev" / "pts");
+            ss.push_back("/dev/full");
+            if (systemFeatures.count("kvm")) {
+                if (pathExists("/dev/kvm")) {
+                    ss.push_back("/dev/kvm");
+                } else {
+                    warn(
+                        "KVM is enabled in system-features but /dev/kvm is not available. "
+                        "QEMU builds may fall back to slow emulation. "
+                        "Consider removing 'kvm' from system-features in nix.conf if KVM is not supported on this system.");
+                }
+            }
+            ss.push_back("/dev/null");
+            ss.push_back("/dev/random");
+            ss.push_back("/dev/tty");
+            ss.push_back("/dev/urandom");
+            ss.push_back("/dev/zero");
+            createSymlink("/proc/self/fd", chrootRootDir / "dev" / "fd");
+            createSymlink("/proc/self/fd/0", chrootRootDir / "dev" / "stdin");
+            createSymlink("/proc/self/fd/1", chrootRootDir / "dev" / "stdout");
+            createSymlink("/proc/self/fd/2", chrootRootDir / "dev" / "stderr");
+        }
+
+        /* Fixed-output derivations typically need to access the network. */
+        if (!derivationType.isSandboxed()) {
+            writeFile(
+                chrootRootDir / "etc" / "nsswitch.conf", "hosts: files dns\nservices: files\n");
+
+            for (auto & path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"})
+                if (pathExists(path))
+                    ss.push_back(path);
+
+            if (auto & caFile = fileTransferSettings.caFile.get()) {
+                if (pathExists(*caFile))
+                    pathsInChroot.try_emplace(
+                        "/etc/ssl/certs/ca-certificates.crt", canonPath(caFile->native(), true), true);
+            }
+        }
+
+        for (auto & i : ss) {
+            auto canonicalPath = canonPath(i, true);
+            pathsInChroot.emplace(i, canonicalPath);
+        }
+
+        /* Bind-mount all the directories from the "host" filesystem. */
+        for (auto & i : pathsInChroot) {
+            if (i.second.source == "/proc")
+                continue; // backwards compatibility
+
+#if HAVE_EMBEDDED_SANDBOX_SHELL
+            if (i.second.source == "__embedded_sandbox_shell__") {
+                static unsigned char sh[] = {
+#  include "embedded-sandbox-shell.gen.hh"
+                };
+                auto dst = chrootRootDir / i.first.relative_path();
+                createDirs(dst.parent_path());
+                writeFile(dst, std::string_view((const char *) sh, sizeof(sh)));
+                chmod(dst, 0555);
+            } else
+#endif
+            {
+                doBind(i.second.source, chrootRootDir / i.first.relative_path(), i.second.optional);
+            }
+        }
+
+        /* Bind a new instance of procfs on /proc. */
+        createDirs(chrootRootDir / "proc");
+        if (mount("none", (chrootRootDir / "proc").c_str(), "proc", 0, 0) == -1)
+            throw SysError("mounting /proc");
+
+        /* Mount sysfs on /sys. */
+        if (buildUser && buildUser->getUIDCount() != 1) {
+            createDirs(chrootRootDir / "sys");
+            if (mount("none", (chrootRootDir / "sys").c_str(), "sysfs", 0, 0) == -1)
+                throw SysError("mounting /sys");
+        }
+
+        /* Mount a new tmpfs on /dev/shm. */
+        if (pathExists("/dev/shm")
+            && mount(
+                   "none",
+                   (chrootRootDir / "dev" / "shm").c_str(),
+                   "tmpfs",
+                   0,
+                   fmt("size=%s", store.config->getLocalSettings().sandboxShmSize).c_str())
+                   == -1)
+            throw SysError("mounting /dev/shm");
+
+        /* Mount a new devpts on /dev/pts. */
+        if (pathExists("/dev/pts/ptmx") && !pathExists(chrootRootDir / "dev" / "ptmx")
+            && !pathsInChroot.count("/dev/pts")) {
+            if (mount("none", (chrootRootDir / "dev" / "pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0) {
+                createSymlink("/dev/pts/ptmx", chrootRootDir / "dev" / "ptmx");
+                chmod(chrootRootDir / "dev" / "pts" / "ptmx", 0666);
+            } else {
+                if (errno != EINVAL)
+                    throw SysError("mounting /dev/pts");
+                doBind("/dev/pts", chrootRootDir / "dev" / "pts");
+                doBind("/dev/ptmx", chrootRootDir / "dev" / "ptmx");
+            }
+        }
+
+        /* Make /etc unwritable. */
+        if (!drvOptions.useUidRange(drv))
+            chmod(chrootRootDir / "etc", 0555);
+
+        /* Unshare this mount namespace. */
+        if (unshare(CLONE_NEWNS) == -1)
+            throw SysError("unsharing mount namespace");
+
+        /* Unshare the cgroup namespace. */
+        if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
+            throw SysError("unsharing cgroup namespace");
+
+        /* Do the chroot(). */
+        if (chdir(chrootRootDir.c_str()) == -1)
+            throw SysError("cannot change directory to %1%", PathFmt(chrootRootDir));
+
+        if (mkdir("real-root", 0500) == -1)
+            throw SysError("cannot create real-root directory");
+
+        if (pivot_root(".", "real-root") == -1)
+            throw SysError("cannot pivot old root directory onto %1%", PathFmt(chrootRootDir / "real-root"));
+
+        if (chroot(".") == -1)
+            throw SysError("cannot change root directory to %1%", PathFmt(chrootRootDir));
+
+        if (umount2("real-root", MNT_DETACH) == -1)
+            throw SysError("cannot unmount real root filesystem");
+
+        if (rmdir("real-root") == -1)
+            throw SysError("cannot remove real-root directory");
+
+        /* Apply seccomp and personality. */
+        setupSeccomp(localSettings);
+        linux::setPersonality({
+            .system = drv.platform,
+            .impersonateLinux26 = localSettings.impersonateLinux26,
+        });
+    }
+
+    void setUser()
+    {
+        preserveDeathSignal([this]() {
+            /* Switch to the sandbox uid/gid in the user namespace. */
+            if (setgid(sandboxGid()) == -1)
+                throw SysError("setgid failed");
+            if (setuid(sandboxUid()) == -1)
+                throw SysError("setuid failed");
+        });
+    }
+
+    void execBuilder(const Strings & args, const Strings & envStrs)
+    {
+        execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+
+    /**
+     * Arguments passed to runChild().
+     */
+    struct RunChildArgs
+    {
+#if NIX_WITH_AWS_AUTH
+        std::optional<AwsCredentials> awsCredentials;
+#endif
+    };
 
 #if NIX_WITH_AWS_AUTH
     std::optional<AwsCredentials> preResolveAwsCredentials()
@@ -330,81 +936,218 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 #endif
 
-    void startChild()
+    void runChild(RunChildArgs args)
     {
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            throw Error("'recursive-nix' is not supported yet by external derivation builders");
+        bool sendException = true;
 
-        auto json = nlohmann::json::object();
+        try {
+            commonChildInit();
 
-        json.emplace("version", 1);
-        json.emplace("builder", drv.builder);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : drv.args)
-                l.push_back(rewriteStrings(i, inputRewrites));
-            json.emplace("args", std::move(l));
-        }
-        {
-            auto j = nlohmann::json::object();
-            for (auto & [name, value] : env)
-                j.emplace(name, rewriteStrings(value, inputRewrites));
-            json.emplace("env", std::move(j));
-        }
-        json.emplace("topTmpDir", topTmpDir.native());
-        json.emplace("tmpDir", tmpDir.native());
-        json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-        json.emplace("storeDir", store.storeDir);
-        json.emplace("realStoreDir", store.config->realStoreDir.get());
-        json.emplace("system", drv.platform);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : inputPaths)
-                l.push_back(store.printStorePath(i));
-            json.emplace("inputPaths", std::move(l));
-        }
-        {
-            auto l = nlohmann::json::object();
-            for (auto & i : scratchOutputs)
-                l.emplace(i.first, store.printStorePath(i.second));
-            json.emplace("outputs", std::move(l));
-        }
+            BuiltinBuilderContext ctx{
+                .drv = drv,
+                .hashedMirrors = settings.getLocalSettings().hashedMirrors,
+                .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_AWS_AUTH
+                .awsCredentials = args.awsCredentials,
+#endif
+            };
 
-        // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
-        // that, see this comment by Eelco about how to make it not suck:
-        // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
-        auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
-        writeFile(jsonFile, json.dump());
-
-        pid = startProcess([&]() {
-            openSlave();
-            try {
-                commonChildInit();
-
-                Strings args = {externalBuilder.program};
-
-                if (!externalBuilder.args.empty()) {
-                    args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
+            if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+                try {
+                    ctx.netrcData = readFile(fileTransferSettings.netrcFile);
+                } catch (SystemError &) {
                 }
 
-                args.insert(args.end(), jsonFile);
+                if (auto & caFile = fileTransferSettings.caFile.get())
+                    try {
+                        ctx.caFileData = readFile(*caFile);
+                    } catch (SystemError &) {
+                    }
+            }
 
-                if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into %1%", PathFmt(tmpDir));
+            enterChroot();
 
-                chownToBuilder(topTmpDir);
+            if (chdir(tmpDirInSandbox().c_str()) == -1)
+                throw SysError("changing into %1%", PathFmt(tmpDir));
 
-                setUser();
+            unix::closeExtraFDs();
 
-                debug("executing external builder: %s", concatStringsSep(" ", args));
-                execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
+            struct rlimit limit = {0, RLIM_INFINITY};
+            setrlimit(RLIMIT_CORE, &limit);
 
-                throw SysError("executing %s", PathFmt(externalBuilder.program));
+            setUser();
+
+            writeFull(STDERR_FILENO, std::string("\2\n"));
+
+            sendException = false;
+
+            if (drv.isBuiltin()) {
+                try {
+                    logger = makeJSONLogger(getStandardError());
+
+                    for (auto & e : drv.outputs)
+                        ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));
+
+                    std::string builtinName = drv.builder.substr(8);
+                    assert(RegisterBuiltinBuilder::builtinBuilders);
+                    if (auto builtin = get(RegisterBuiltinBuilder::builtinBuilders(), builtinName))
+                        (*builtin)(ctx);
+                    else
+                        throw Error("unsupported builtin builder '%1%'", builtinName);
+                    _exit(0);
+                } catch (std::exception & e) {
+                    writeFull(STDERR_FILENO, e.what() + std::string("\n"));
+                    _exit(1);
+                }
+            }
+
+            Strings buildArgs;
+            buildArgs.push_back(std::string(baseNameOf(drv.builder)));
+
+            for (auto & i : drv.args)
+                buildArgs.push_back(rewriteStrings(i, inputRewrites));
+
+            Strings envStrs;
+            for (auto & i : env)
+                envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
+
+            execBuilder(buildArgs, envStrs);
+
+            throw SysError("executing '%1%'", drv.builder);
+
+        } catch (...) {
+            handleChildExceptionLinuxChroot(sendException);
+            _exit(1);
+        }
+    }
+
+    void startChild()
+    {
+        RunChildArgs args{
+#if NIX_WITH_AWS_AUTH
+            .awsCredentials = preResolveAwsCredentials(),
+#endif
+        };
+
+        userNamespaceSync.create();
+
+        usingUserNamespace = userNamespacesSupported();
+
+        Pipe sendPid;
+        sendPid.create();
+
+        Pid helper = startProcess([&]() {
+            sendPid.readSide.close();
+
+            /* We need to open the slave early, before
+               CLONE_NEWUSER. Otherwise we get EPERM when running as
+               root. */
+            openSlave();
+
+            try {
+                /* Drop additional groups here because we can't do it
+                   after we've created the new user namespace. */
+                if (setgroups(0, 0) == -1) {
+                    if (errno != EPERM)
+                        throw SysError("setgroups failed");
+                    if (store.config->getLocalSettings().requireDropSupplementaryGroups)
+                        throw Error(
+                            "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
+                }
+
+                ProcessOptions options;
+                options.cloneFlags =
+                    CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
+                if (derivationType.isSandboxed())
+                    options.cloneFlags |= CLONE_NEWNET;
+                if (usingUserNamespace)
+                    options.cloneFlags |= CLONE_NEWUSER;
+
+                pid_t child = startProcess([this, args = std::move(args)]() { runChild(std::move(args)); }, options);
+
+                writeFull(sendPid.writeSide.get(), fmt("%d\n", child));
+                _exit(0);
             } catch (...) {
-                handleChildExceptionExternal(true);
+                handleChildExceptionLinuxChroot(true);
                 _exit(1);
             }
         });
+
+        sendPid.writeSide.close();
+
+        if (helper.wait() != 0) {
+            processSandboxSetupMessages();
+            // Only reached if the child process didn't send an exception.
+            throw Error("unable to start build process");
+        }
+
+        userNamespaceSync.readSide = -1;
+
+        /* Make sure that we write *something* to the child in case of
+           an exception. */
+        bool userNamespaceSyncDone = false;
+        Finally cleanup([&]() {
+            try {
+                if (!userNamespaceSyncDone)
+                    writeFull(userNamespaceSync.writeSide.get(), "0\n");
+            } catch (...) {
+            }
+            userNamespaceSync.writeSide = -1;
+        });
+
+        FdSource sendPidSource(sendPid.readSide.get());
+        auto ss = tokenizeString<std::vector<std::string>>(sendPidSource.readLine());
+        assert(ss.size() == 1);
+        pid = string2Int<pid_t>(ss[0]).value();
+        auto thisProcPath = procPath / std::to_string(static_cast<pid_t>(pid));
+
+        if (usingUserNamespace) {
+            uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
+            uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
+            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
+
+            writeFile(thisProcPath / "uid_map", fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
+
+            if (!buildUser || buildUser->getUIDCount() == 1)
+                writeFile(thisProcPath / "setgroups", "deny");
+
+            writeFile(thisProcPath / "gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+        } else {
+            debug("note: not using a user namespace");
+            if (!buildUser)
+                throw Error(
+                    "cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
+        }
+
+        /* Now that we know the sandbox uid, we can write /etc/passwd. */
+        writeFile(
+            chrootRootDir / "etc" / "passwd",
+            fmt("root:x:0:0:Nix build user:%3%:/noshell\n"
+                "nixbld:x:%1%:%2%:Nix build user:%3%:/noshell\n"
+                "nobody:x:65534:65534:Nobody:/:/noshell\n",
+                sandboxUid(),
+                sandboxGid(),
+                store.config->getLocalSettings().sandboxBuildDir));
+
+        /* Save the mount- and user namespace of the child. */
+        auto sandboxPath = thisProcPath / "ns";
+        sandboxMountNamespace = open((sandboxPath / "mnt").c_str(), O_RDONLY);
+        if (sandboxMountNamespace.get() == -1)
+            throw SysError("getting sandbox mount namespace");
+
+        if (usingUserNamespace) {
+            sandboxUserNamespace = open((sandboxPath / "user").c_str(), O_RDONLY);
+            if (sandboxUserNamespace.get() == -1)
+                throw SysError("getting sandbox user namespace");
+        }
+
+        /* Move the child into its own cgroup. */
+        if (cgroup)
+            writeFile(*cgroup / "cgroup.procs", fmt("%d", (pid_t) pid));
+
+        /* Signal the builder that we've updated its user namespace. */
+        writeFull(userNamespaceSync.writeSide.get(), "1\n");
+        userNamespaceSyncDone = true;
     }
 
     void initEnv()
@@ -452,7 +1195,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         env["NIX_LOG_FD"] = "2";
         env["TERM"] = "xterm-256color";
     }
-
     void processSandboxSetupMessages()
     {
         std::vector<std::string> msgs;
@@ -574,6 +1316,38 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     void addDependencyImpl(const StorePath & path) override
     {
         addedPaths.insert(path);
+
+        debug("materialising '%s' in the sandbox", store.printStorePath(path));
+
+        std::filesystem::path source = store.toRealPath(path);
+        std::filesystem::path target =
+            chrootRootDir / std::filesystem::path(store.printStorePath(path)).relative_path();
+
+        if (pathExists(target)) {
+            // There is a similar debug message in doBind, so only run it in this block to not have double messages.
+            debug("bind-mounting %s -> %s", PathFmt(target), PathFmt(source));
+            throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
+        }
+
+        /* Bind-mount the path into the sandbox. This requires
+           entering its mount namespace, which is not possible
+           in multithreaded programs. So we do this in a
+           child process.*/
+        Pid child(startProcess([&]() {
+            if (usingUserNamespace && (setns(sandboxUserNamespace.get(), CLONE_NEWUSER) == -1))
+                throw SysError("entering sandbox user namespace");
+
+            if (setns(sandboxMountNamespace.get(), CLONE_NEWNS) == -1)
+                throw SysError("entering sandbox mount namespace");
+
+            doBind(source, target);
+
+            _exit(0);
+        }));
+
+        int status = child.wait();
+        if (status != 0)
+            throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
     }
 
     void chownToBuilder(const std::filesystem::path & path)
@@ -605,28 +1379,17 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         writeFile(fd, path, contents);
         chownToBuilder(fd.get(), path);
     }
-
-    void setUser()
-    {
-        if (buildUser) {
-            preserveDeathSignal([this]() {
-                auto gids = buildUser->getSupplementaryGIDs();
-                if (setgroups(gids.size(), gids.data()) == -1)
-                    throw SysError("cannot set supplementary groups of build user");
-
-                if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
-                    || getegid() != buildUser->getGID())
-                    throw SysError("setgid failed");
-
-                if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
-                    || geteuid() != buildUser->getUID())
-                    throw SysError("setuid failed");
-            });
-        }
-    }
-
     void killSandbox(bool getStats)
     {
+        if (cgroup) {
+            auto stats = destroyCgroup(*cgroup);
+            if (getStats) {
+                buildResult.cpuUser = stats.cpuUser;
+                buildResult.cpuSystem = stats.cpuSystem;
+            }
+            return;
+        }
+
         if (buildUser) {
             auto uid = buildUser->getUID();
             assert(uid != 0);
@@ -675,7 +1438,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
         return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), path.name());
     }
-
     void cleanupBuild(bool force)
     {
         if (force) {
@@ -694,6 +1456,24 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 deletePath(topTmpDir);
             topTmpDir = "";
             tmpDir = "";
+        }
+
+        if (autoDelChroot) {
+            /* Move paths out of the chroot for easier debugging of
+               build failures. */
+            if (!force && buildMode == bmNormal)
+                for (auto & [_, status] : initialOutputs) {
+                    if (!status.known)
+                        continue;
+                    if (buildMode != bmCheck && status.known->isValid())
+                        continue;
+                    std::filesystem::path p = store.toRealPath(status.known->path);
+                    std::filesystem::path chrootPath = chrootRootDir / p.relative_path();
+                    if (pathExists(chrootPath))
+                        std::filesystem::rename(chrootPath, p);
+                }
+
+            autoDelChroot.reset();
         }
     }
 
@@ -720,12 +1500,13 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         setBuildTmpDir();
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         chownToBuilder(tmpDirFd.get(), tmpDir);
 
+        StringMap inputRewrites;
         for (auto & [outputName, status] : initialOutputs) {
             auto scratchPath = !status.known ? makeFallbackPath(outputName)
                                : !needsHashRewrite()
@@ -788,12 +1569,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             if (chown(slaveName.c_str(), buildUser->getUID(), 0))
                 throw SysError("changing owner of pseudoterminal slave");
         }
-#ifdef __APPLE__
-        else {
-            if (grantpt(builderOut.get()))
-                throw SysError("granting access to pseudoterminal slave");
-        }
-#endif
 
         if (unlockpt(builderOut.get()))
             throw SysError("unlocking pseudoterminal");
@@ -833,9 +1608,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         struct PerhapsNeedToRegister
         {
             StorePathSet refs;
-            /**
-             * References to other outputs. Built by looking up in `scratchOutputsInverse`.
-             */
             StringSet otherOutputs;
         };
 
@@ -1201,7 +1973,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                             movePath(actualPath, dst);
 
                             if (diffHook) {
-                                handleDiffHookExternal(
+                                handleDiffHookLinuxChroot(
                                     *diffHook,
                                     buildUser ? buildUser->getUID() : getuid(),
                                     buildUser ? buildUser->getGID() : getgid(),
@@ -1211,13 +1983,13 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                                     tmpDir);
                             }
 
-                            throw NotDeterministicExternal(
+                            throw NotDeterministicLinuxChroot(
                                 "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
                                 store.printStorePath(drvPath),
                                 store.toRealPath(finalDestPath),
                                 dst);
                         } else
-                            throw NotDeterministicExternal(
+                            throw NotDeterministicLinuxChroot(
                                 "derivation '%s' may not be deterministic: output '%s' differs",
                                 store.printStorePath(drvPath),
                                 store.toRealPath(finalDestPath));
@@ -1287,9 +2059,11 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         return builtOutputs;
     }
-
     SingleDrvOutputs unprepareBuild() override
     {
+        sandboxMountNamespace = -1;
+        sandboxUserNamespace = -1;
+
         int status = pid.kill();
 
         debug("builder process for '%s' finished", store.printStorePath(drvPath));
@@ -1337,16 +2111,12 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 };
 
-const std::filesystem::path ExternalDerivationBuilder::homeDir = "/homeless-shelter";
+const std::filesystem::path LinuxChrootDerivationBuilder::homeDir = "/homeless-shelter";
 
-DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params,
-    const ExternalBuilder & handler)
+DerivationBuilderUnique makeLinuxChrootDerivationBuilder(
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
-    return DerivationBuilderUnique(
-        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
+    return DerivationBuilderUnique(new LinuxChrootDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 }
 
 } // namespace nix
