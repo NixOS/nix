@@ -7,6 +7,7 @@
 #include "nix/store/realisation.hh"
 
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/store/tests/test-main.hh"
 
 namespace nix {
 
@@ -31,8 +32,10 @@ TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);
 
-    auto store = [] {
-        auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
+    auto settings = getTestSettings();
+
+    auto store = [&] {
+        auto cfg = make_ref<DummyStoreConfig>(settings, StoreReference::Params{});
         cfg->readOnly = false;
         return cfg->openDummyStore();
     }();
@@ -73,9 +76,10 @@ TEST_P(DummyStoreJsonTest, from_json)
     using namespace nlohmann;
     /* Cannot use `readJsonTest` because need to dereference the stores
        for equality. */
+    auto settings = getTestSettings();
     readTest(Path{name} + ".json", [&](const auto & encodedRaw) {
         auto encoded = json::parse(encodedRaw);
-        ref<DummyStore> decoded = adl_serializer<ref<DummyStore>>::from_json(encoded);
+        ref<DummyStore> decoded = adl_serializer<ref<DummyStore>>::from_json(settings, encoded);
         ASSERT_EQ(*decoded, *expected);
     });
 }
@@ -88,12 +92,13 @@ TEST_P(DummyStoreJsonTest, to_json)
 
 INSTANTIATE_TEST_SUITE_P(DummyStoreJSON, DummyStoreJsonTest, [] {
     initLibStore(false);
-    auto writeCfg = make_ref<DummyStore::Config>(DummyStore::Config::Params{});
+    auto settings = getTestSettings();
+    auto writeCfg = make_ref<DummyStore::Config>(settings, DummyStore::Config::Params{});
     writeCfg->readOnly = false;
     return ::testing::Values(
         std::pair{
             "empty",
-            make_ref<DummyStore::Config>(DummyStore::Config::Params{})->openDummyStore(),
+            make_ref<DummyStore::Config>(settings, DummyStore::Config::Params{})->openDummyStore(),
         },
         std::pair{
             "one-flat-file",

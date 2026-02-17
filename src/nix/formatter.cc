@@ -6,6 +6,7 @@
 #include "nix/cmd/installable-derived-path.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/store/globals.hh"
+#include "nix/main/shared.hh"
 
 #include "run.hh"
 

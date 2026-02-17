@@ -6,6 +6,7 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
+#include "nix/main/shared.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;

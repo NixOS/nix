@@ -40,8 +40,10 @@ struct CmdAddToStore : MixDryRun, StoreCommand
 
         auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(path));
 
-        auto storePath = dryRun ? store->computeStorePath(*namePart, sourcePath, caMethod, hashAlgo, {}).first
-                                : store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
+        auto storePath =
+            dryRun
+                ? store->computeStorePath(store->config.settings, *namePart, sourcePath, caMethod, hashAlgo, {}).first
+                : store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
 
         logger->cout("%s", store->printStorePath(storePath));
     }

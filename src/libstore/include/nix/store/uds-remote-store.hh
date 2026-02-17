@@ -19,9 +19,10 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
     /**
      * @param authority is the socket path.
      */
-    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+    UDSRemoteStoreConfig(
+        nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params);
 
-    UDSRemoteStoreConfig(const Params & params);
+    UDSRemoteStoreConfig(nix::Settings & settings, const Params & params);
 
     static const std::string name()
     {

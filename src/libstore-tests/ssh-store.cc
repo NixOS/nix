@@ -1,14 +1,16 @@
 #include <gtest/gtest.h>
 
+#include "nix/store/globals.hh"
 #include "nix/store/ssh-store.hh"
-#include "nix/util/config-impl.hh"
-#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/store/tests/test-main.hh"
 
 namespace nix {
 
 TEST(SSHStore, constructConfig)
 {
+    auto settings = getTestSettings();
     SSHStoreConfig config{
+        settings,
         "ssh-ng",
         "me@localhost:2222",
         StoreConfig::Params{
@@ -34,7 +36,9 @@ TEST(SSHStore, constructConfig)
 
 TEST(MountedSSHStore, constructConfig)
 {
+    auto settings = getTestSettings();
     MountedSSHStoreConfig config{
+        settings,
         "mounted-ssh",
         "localhost",
         StoreConfig::Params{

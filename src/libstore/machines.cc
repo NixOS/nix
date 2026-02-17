@@ -91,9 +91,9 @@ StoreReference Machine::completeStoreReference() const
     return storeUri;
 }
 
-ref<Store> Machine::openStore() const
+ref<Store> Machine::openStore(Settings & settings) const
 {
-    return nix::openStore(completeStoreReference());
+    return nix::openStore(settings, completeStoreReference());
 }
 
 static std::vector<std::string> expandBuilderLines(const std::string & builders)

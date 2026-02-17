@@ -30,7 +30,7 @@ public:
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
+    LocalFSStoreConfig(nix::Settings & settings, PathView path, const Params & params);
 
     OptionalPathSetting rootDir = makeRootDirSetting(*this, std::nullopt);
 
@@ -40,25 +40,25 @@ private:
      * An indirection so that we don't need to refer to global settings
      * in headers.
      */
-    static Path getDefaultStateDir();
+    static Path getDefaultStateDir(const nix::Settings & settings);
 
     /**
      * An indirection so that we don't need to refer to global settings
      * in headers.
      */
-    static Path getDefaultLogDir();
+    static Path getDefaultLogDir(const nix::Settings & settings);
 
 public:
 
     PathSetting stateDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
+        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(settings),
         "state",
         "Directory where Nix stores state."};
 
     PathSetting logDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
+        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(settings),
         "log",
         "directory where Nix stores log files."};
 

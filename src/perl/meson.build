@@ -77,6 +77,10 @@ libsodium_dep = dependency('libsodium')
 
 nix_store_dep = dependency('nix-store')
 
+# TEMP hack to get global settings, until we extend Perl API with
+# explicit settings loading or similar.
+nix_main_dep = dependency('nix-main')
+
 
 # Finding Perl Headers is a pain. as they do not have
 # pkgconfig available, are not in a standard location,
@@ -170,6 +174,7 @@ nix_perl_store_dep_list = [
   curl_dep,
   libsodium_dep,
   nix_store_dep,
+  nix_main_dep,
 ]
 
 # # build

@@ -11,6 +11,7 @@
 
 namespace nix {
 
+class Settings;
 struct SourcePath;
 
 MakeError(BadStorePath, Error);
@@ -89,6 +90,7 @@ struct StoreDirConfig
      * path for the given file system object.
      */
     std::pair<StorePath, Hash> computeStorePath(
+        const Settings & settings,
         std::string_view name,
         const SourcePath & path,
         ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive,

@@ -12,7 +12,8 @@ struct LocalBinaryCacheStoreConfig : std::enable_shared_from_this<LocalBinaryCac
      * @param binaryCacheDir `file://` is a short-hand for `file:///`
      * for now.
      */
-    LocalBinaryCacheStoreConfig(std::string_view scheme, PathView binaryCacheDir, const Params & params);
+    LocalBinaryCacheStoreConfig(
+        nix::Settings & settings, std::string_view scheme, PathView binaryCacheDir, const Params & params);
 
     Path binaryCacheDir;
 

@@ -1,4 +1,5 @@
 #include "nix/cmd/command.hh"
+#include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/make-content-addressed.hh"
 #include "nix/main/common-args.hh"
@@ -30,7 +31,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
 
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
-        auto dstStore = !dstUri ? openStore() : openStore(StoreReference{*dstUri});
+        auto dstStore = !dstUri ? openStore(settings) : openStore(settings, StoreReference{*dstUri});
 
         auto remappings =
             makeContentAddressed(*srcStore, *dstStore, StorePathSet(storePaths.begin(), storePaths.end()));

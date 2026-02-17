@@ -13,7 +13,6 @@
 #include "nix/main/shared.hh"
 #include "nix/main/plugin.hh"
 #include "nix/store/pathlocks.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/serialise.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/store-open.hh"
@@ -81,7 +80,7 @@ static int main_build_remote(int argc, char ** argv)
 
         initPlugins();
 
-        auto store = openStore();
+        auto store = openStore(settings);
 
         /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
            that gets cleared on reboot, but it wouldn't work on macOS. */
@@ -234,7 +233,7 @@ static int main_build_remote(int argc, char ** argv)
 
                     Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", storeUri));
 
-                    sshStore = bestMachine->openStore();
+                    sshStore = bestMachine->openStore(settings);
                     sshStore->connect();
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, {.block = false}));

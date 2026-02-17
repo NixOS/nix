@@ -327,8 +327,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         }
 
         bool canBuildLocally = [&] {
-            if (drv->platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv->platform)
-                && !drv->isBuiltin())
+            if (drv->platform != worker.store.config.settings.thisSystem.get()
+                && !worker.store.config.settings.extraPlatforms.get().count(drv->platform) && !drv->isBuiltin())
                 return false;
 
             if (worker.settings.maxBuildJobs.get() == 0 && !drv->isBuiltin())
@@ -377,7 +377,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                    use that. If there is not, then check if we can do a "true" local
                    build. */
 
-                externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
+                externalBuilder = worker.store.config.settings.findExternalDerivationBuilderIfSupported(*drv);
 
                 if (!externalBuilder && !canBuildLocally) {
                     auto msg =
@@ -389,12 +389,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                             Magenta(worker.store.printStorePath(drvPath)),
                             Magenta(drv->platform),
                             concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(*drv)),
-                            Magenta(settings.thisSystem),
+                            Magenta(worker.store.config.settings.thisSystem),
                             concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
 
                     // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
                     // we should tell them to run the command to install Darwin 2
-                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
+                    if (drv->platform == "x86_64-darwin" && worker.store.config.settings.thisSystem == "aarch64-darwin")
                         msg += fmt(
                             "\nNote: run `%s` to run programs for x86_64-darwin",
                             Magenta(
@@ -479,7 +479,8 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
-    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+    std::unique_ptr<LogFile> logFile =
+        std::make_unique<LogFile>(worker.store, drvPath, worker.store.config.settings.getLogFileSettings());
 
     std::set<MuxablePipePollState::CommChannel> fds;
     fds.insert(hook->fromHook.readSide.get());
@@ -655,7 +656,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     std::unique_ptr<LogFile> logFile;
 
     auto openLogFile = [&]() {
-        logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+        logFile = std::make_unique<LogFile>(worker.store, drvPath, worker.store.config.settings.getLogFileSettings());
     };
 
     auto closeLogFile = [&]() { logFile.reset(); };
@@ -756,6 +757,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             }
 
             DerivationBuilderParams params{
+                .settings = worker.store.config.settings,
                 .drvPath = drvPath,
                 .buildResult = buildResult,
                 .drv = *drv,

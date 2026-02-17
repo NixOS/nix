@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
+#include "nix/store/globals.hh"
 #include "nix/store/legacy-ssh-store.hh"
+#include "nix/store/tests/test-main.hh"
 
 namespace nix {
 
 TEST(LegacySSHStore, constructConfig)
 {
+    auto settings = getTestSettings();
     LegacySSHStoreConfig config(
+        settings,
         "ssh",
         "me@localhost:2222",
         StoreConfig::Params{

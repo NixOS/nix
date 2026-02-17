@@ -1,7 +1,9 @@
+#include "nix/store/globals.hh"
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/s3-url.hh"
+#include "nix/store/tests/test-main.hh"
 
 #include <gtest/gtest.h>
 
@@ -9,7 +11,8 @@ namespace nix {
 
 TEST(S3BinaryCacheStore, constructConfig)
 {
-    S3BinaryCacheStoreConfig config{"s3", "foobar", {}};
+    auto settings = getTestSettings();
+    S3BinaryCacheStoreConfig config{settings, "s3", "foobar", {}};
 
     // The bucket name is stored as the host part of the authority in cacheUri
     EXPECT_EQ(
@@ -22,8 +25,9 @@ TEST(S3BinaryCacheStore, constructConfig)
 
 TEST(S3BinaryCacheStore, constructConfigWithRegion)
 {
+    auto settings = getTestSettings();
     Store::Config::Params params{{"region", "eu-west-1"}};
-    S3BinaryCacheStoreConfig config{"s3", "my-bucket", params};
+    S3BinaryCacheStoreConfig config{settings, "s3", "my-bucket", params};
 
     EXPECT_EQ(
         config.cacheUri,
@@ -37,7 +41,8 @@ TEST(S3BinaryCacheStore, constructConfigWithRegion)
 
 TEST(S3BinaryCacheStore, defaultSettings)
 {
-    S3BinaryCacheStoreConfig config{"s3", "test-bucket", {}};
+    auto settings = getTestSettings();
+    S3BinaryCacheStoreConfig config{settings, "s3", "test-bucket", {}};
 
     EXPECT_EQ(
         config.cacheUri,
@@ -58,11 +63,13 @@ TEST(S3BinaryCacheStore, defaultSettings)
  */
 TEST(S3BinaryCacheStore, s3StoreConfigPreservesParameters)
 {
+    auto settings = getTestSettings();
+
     StringMap params;
     params["region"] = "eu-west-1";
     params["endpoint"] = "custom.s3.com";
 
-    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
+    S3BinaryCacheStoreConfig config(settings, "s3", "test-bucket", params);
 
     // The config should preserve S3-specific parameters
     EXPECT_EQ(
@@ -93,13 +100,15 @@ TEST(S3BinaryCacheStore, s3SchemeRegistration)
  */
 TEST(S3BinaryCacheStore, parameterFiltering)
 {
+    auto settings = getTestSettings();
+
     StringMap params;
     params["region"] = "eu-west-1";
     params["endpoint"] = "minio.local";
     params["want-mass-query"] = "true"; // Non-S3 store parameter
     params["priority"] = "10";          // Non-S3 store parameter
 
-    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
+    S3BinaryCacheStoreConfig config(settings, "s3", "test-bucket", params);
 
     // Only S3-specific params should be in cacheUri.query
     EXPECT_EQ(
@@ -127,16 +136,19 @@ TEST(S3BinaryCacheStore, parameterFiltering)
  */
 TEST(S3BinaryCacheStore, storageClassDefault)
 {
-    S3BinaryCacheStoreConfig config{"s3", "test-bucket", {}};
+    auto settings = getTestSettings();
+    S3BinaryCacheStoreConfig config{settings, "s3", "test-bucket", {}};
     EXPECT_EQ(config.storageClass.get(), std::nullopt);
 }
 
 TEST(S3BinaryCacheStore, storageClassConfiguration)
 {
+    auto settings = getTestSettings();
+
     StringMap params;
     params["storage-class"] = "GLACIER";
 
-    S3BinaryCacheStoreConfig config("s3", "test-bucket", params);
+    S3BinaryCacheStoreConfig config(settings, "s3", "test-bucket", params);
     EXPECT_EQ(config.storageClass.get(), std::optional<std::string>("GLACIER"));
 }
 

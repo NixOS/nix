@@ -82,7 +82,8 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
 {
     using LocalFSStoreConfig::LocalFSStoreConfig;
 
-    LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+    LocalStoreConfig(
+        nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params);
 
 private:
 

@@ -4,9 +4,9 @@
 
 namespace nix {
 
-std::string fetchBuildLog(ref<Store> store, const StorePath & path, std::string_view what)
+std::string fetchBuildLog(Settings & settings, ref<Store> store, const StorePath & path, std::string_view what)
 {
-    auto subs = getDefaultSubstituters();
+    auto subs = getDefaultSubstituters(settings);
 
     subs.push_front(store);
 

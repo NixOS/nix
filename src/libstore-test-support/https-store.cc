@@ -1,4 +1,5 @@
 #include "nix/store/tests/https-store.hh"
+#include "nix/store/tests/test-main.hh"
 
 #include <thread>
 
@@ -36,9 +37,9 @@ void HttpsBinaryCacheStoreTest::SetUp()
     cacheDir = tmpDir / "cache";
     delTmpDir = std::make_unique<AutoDelete>(tmpDir);
 
-    localCacheStore =
-        make_ref<LocalBinaryCacheStoreConfig>("file", cacheDir.string(), LocalBinaryCacheStoreConfig::Params{})
-            ->openStore();
+    localCacheStore = make_ref<LocalBinaryCacheStoreConfig>(
+                          settings, "file", cacheDir.string(), LocalBinaryCacheStoreConfig::Params{})
+                          ->openStore();
 
     caCert = tmpDir / "ca.crt";
     caKey = tmpDir / "ca.key";
@@ -123,6 +124,7 @@ std::vector<std::string> HttpsBinaryCacheStoreMtlsTest::serverArgs()
 ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
 {
     auto res = make_ref<TestHttpBinaryCacheStoreConfig>(
+        settings,
         ParsedURL{
             .scheme = "https",
             .authority =

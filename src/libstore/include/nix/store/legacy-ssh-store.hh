@@ -14,7 +14,8 @@ struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>
 {
     using CommonSSHStoreConfig::CommonSSHStoreConfig;
 
-    LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+    LegacySSHStoreConfig(
+        nix::Settings & settings, std::string_view scheme, std::string_view authority, const Params & params);
 
 #ifndef _WIN32
     // Hack for getting remote build log output.

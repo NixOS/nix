@@ -41,7 +41,7 @@ struct CmdLog : InstallableCommand
         auto path = resolveDerivedPath(*store, *oneUp);
 
         RunPager pager;
-        auto log = fetchBuildLog(store, path, installable->what());
+        auto log = fetchBuildLog(settings, store, path, installable->what());
         logger->stop();
         writeFull(getStandardOutput(), log);
     }

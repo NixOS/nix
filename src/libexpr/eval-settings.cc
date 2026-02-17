@@ -48,8 +48,8 @@ Strings EvalSettings::parseNixPath(const std::string & s)
     return res;
 }
 
-EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
-    : readOnlyMode{readOnlyMode}
+EvalSettings::EvalSettings(nix::Settings & storeSettings, EvalSettings::LookupPathHooks lookupPathHooks)
+    : storeSettings{storeSettings}
     , lookupPathHooks{lookupPathHooks}
 {
     auto var = getEnv("NIX_ABORT_ON_WARN");
@@ -57,7 +57,7 @@ EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lo
         builtinsAbortOnWarn = true;
 }
 
-Strings EvalSettings::getDefaultNixPath()
+Strings EvalSettings::getDefaultNixPath(nix::Settings & settings)
 {
     Strings res;
     auto add = [&](const std::filesystem::path & p, const std::string & s = std::string()) {
@@ -70,7 +70,7 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(std::filesystem::path{getNixDefExpr()} / "channels");
+    add(std::filesystem::path{getNixDefExpr(settings)} / "channels");
     auto profilesDirOpts = settings.getProfileDirsOptions();
     add(rootChannelsDir(profilesDirOpts) / "nixpkgs", "nixpkgs");
     add(rootChannelsDir(profilesDirOpts));
@@ -101,10 +101,10 @@ std::string EvalSettings::resolvePseudoUrl(std::string_view url)
 const std::string & EvalSettings::getCurrentSystem() const
 {
     const auto & evalSystem = currentSystem.get();
-    return evalSystem != "" ? evalSystem : settings.thisSystem.get();
+    return evalSystem != "" ? evalSystem : storeSettings.thisSystem.get();
 }
 
-std::filesystem::path getNixDefExpr()
+std::filesystem::path getNixDefExpr(const Settings & settings)
 {
     return settings.useXDGBaseDirectories ? getStateDir() / "defexpr" : getHome() / ".nix-defexpr";
 }
