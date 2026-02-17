@@ -35,7 +35,7 @@ class BindingsBuilder;
  * about how this is mapped into the alignment bits to save significant memory.
  * This also restricts the number of internal types represented with distinct memory layouts.
  */
-typedef enum {
+enum InternalType {
     tUninitialized = 0,
     /* layout: Single/zero field payload */
     tInt = 1,
@@ -46,16 +46,19 @@ typedef enum {
     tPrimOp,
     tAttrs,
     /* layout: Pair of pointers payload */
-    tListSmall,
+    tFirstPairOfPointers,
+    tListSmall = tFirstPairOfPointers,
     tPrimOpApp,
     tApp,
     tThunk,
     tLambda,
+    tLastPairOfPointers = tLambda,
     /* layout: Single untaggable field */
-    tListN,
+    tFirstSingleUntaggable,
+    tListN = tFirstSingleUntaggable,
     tString,
     tPath,
-} InternalType;
+};
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -633,7 +636,7 @@ class alignas(16)
     template<InternalType type, typename T, typename U>
     void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
     {
-        static_assert(type >= tListSmall && type <= tLambda);
+        static_assert(type >= tFirstPairOfPointers && type <= tLastPairOfPointers);
         {
             auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
             assertAligned(firstFieldPayload);
@@ -642,7 +645,7 @@ class alignas(16)
         {
             auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
             assertAligned(secondFieldPayload);
-            payload[1] = (type - tListSmall) | secondFieldPayload;
+            payload[1] = (type - tFirstPairOfPointers) | secondFieldPayload;
         }
     }
 
@@ -670,9 +673,9 @@ protected:
         case pdListN:
         case pdString:
         case pdPath:
-            return static_cast<InternalType>(tListN + (pd - pdListN));
+            return static_cast<InternalType>(tFirstSingleUntaggable + (pd - pdListN));
         case pdPairOfPointers:
-            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
+            return static_cast<InternalType>(tFirstPairOfPointers + (payload[1] & discriminatorMask));
         [[unlikely]] default:
             unreachable();
         }
