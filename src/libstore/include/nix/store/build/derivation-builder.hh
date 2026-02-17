@@ -184,6 +184,13 @@ struct DerivationBuilder : RestrictionContext
      * killed.
      */
     virtual bool killChild() = 0;
+
+    /**
+     * Called by `DerivationBuilderDeleter` before deletion. Runs
+     * cleanup logic that needs to call virtual methods (which
+     * cannot safely be called from a destructor).
+     */
+    virtual void cleanupOnDestruction() noexcept {}
 };
 
 /**
