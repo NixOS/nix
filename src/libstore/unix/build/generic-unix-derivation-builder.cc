@@ -1,4 +1,4 @@
-#include "external-derivation-builder.hh"
+#include "generic-unix-derivation-builder.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
@@ -20,6 +20,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+
 #include "build/derivation-check.hh"
 #include "store-config-private.hh"
 
@@ -30,9 +31,6 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
-#ifdef __linux__
-#  include <sys/prctl.h>
-#endif
 
 #if HAVE_STATVFS
 #  include <sys/statvfs.h>
@@ -50,14 +48,10 @@
 #  include "nix/util/url.hh"
 #endif
 
-#include <nlohmann/json.hpp>
-
 namespace nix {
 
-struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 {
-    ExternalBuilder externalBuilder;
-
     /**
      * The process ID of the builder.
      */
@@ -85,11 +79,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     std::filesystem::path topTmpDir;
 
     /**
-     * The file descriptor of the temporary directory.
-     */
-    AutoCloseFD tmpDirFd;
-
-    /**
      * The sort of derivation we are building.
      */
     const DerivationType derivationType;
@@ -97,10 +86,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     typedef StringMap Environment;
     Environment env;
 
-    /**
-     * Hash rewriting.
-     */
-    StringMap inputRewrites, outputRewrites;
     typedef std::map<StorePath, StorePath> RedirectedOutputs;
     RedirectedOutputs redirectedOutputs;
 
@@ -126,18 +111,13 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
      */
     std::vector<std::thread> daemonWorkerThreads;
 
-    ExternalDerivationBuilder(
-        LocalStore & store,
-        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-        DerivationBuilderParams params,
-        ExternalBuilder externalBuilder)
+    GenericUnixDerivationBuilder(
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , externalBuilder{std::move(externalBuilder)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
     {
-        experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
     void cleanupOnDestruction() noexcept override
@@ -226,8 +206,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             auto state = stBegin;
             auto lines = runProgram(localSettings.preBuildHook, false, getPreBuildHookArgs());
             auto lastPos = std::string::size_type{0};
-            for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
-                 nlPos = lines.find('\n', lastPos)) {
+            for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
                 auto line = lines.substr(lastPos, nlPos - lastPos);
                 lastPos = nlPos + 1;
                 if (state == stBegin) {
@@ -255,8 +234,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void setBuildTmpDir()
     {
-        tmpDir = topTmpDir / "build";
-        createDir(tmpDir, 0700);
+        tmpDir = topTmpDir;
     }
 
     std::filesystem::path tmpDirInSandbox()
@@ -307,6 +285,42 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             throw SysError("cannot pipe standard error into log file");
     }
 
+    void enterChroot() {}
+
+    void setUser()
+    {
+        if (buildUser) {
+            preserveDeathSignal([this]() {
+                auto gids = buildUser->getSupplementaryGIDs();
+                if (setgroups(gids.size(), gids.data()) == -1)
+                    throw SysError("cannot set supplementary groups of build user");
+
+                if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
+                    || getegid() != buildUser->getGID())
+                    throw SysError("setgid failed");
+
+                if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
+                    || geteuid() != buildUser->getUID())
+                    throw SysError("setuid failed");
+            });
+        }
+    }
+
+    void execBuilder(const Strings & args, const Strings & envStrs)
+    {
+        execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    }
+
+    /**
+     * Arguments passed to runChild().
+     */
+    struct RunChildArgs
+    {
+#if NIX_WITH_AWS_AUTH
+        std::optional<AwsCredentials> awsCredentials;
+#endif
+    };
+
 #if NIX_WITH_AWS_AUTH
     std::optional<AwsCredentials> preResolveAwsCredentials()
     {
@@ -331,80 +345,102 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 #endif
 
-    void startChild()
+    void runChild(RunChildArgs args)
     {
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            throw Error("'recursive-nix' is not supported yet by external derivation builders");
+        bool sendException = true;
 
-        auto json = nlohmann::json::object();
+        try {
+            commonChildInit();
 
-        json.emplace("version", 1);
-        json.emplace("builder", drv.builder);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : drv.args)
-                l.push_back(rewriteStrings(i, inputRewrites));
-            json.emplace("args", std::move(l));
-        }
-        {
-            auto j = nlohmann::json::object();
-            for (auto & [name, value] : env)
-                j.emplace(name, rewriteStrings(value, inputRewrites));
-            json.emplace("env", std::move(j));
-        }
-        json.emplace("topTmpDir", topTmpDir.native());
-        json.emplace("tmpDir", tmpDir.native());
-        json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-        json.emplace("storeDir", store.storeDir);
-        json.emplace("realStoreDir", store.config->realStoreDir.get());
-        json.emplace("system", drv.platform);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : inputPaths)
-                l.push_back(store.printStorePath(i));
-            json.emplace("inputPaths", std::move(l));
-        }
-        {
-            auto l = nlohmann::json::object();
-            for (auto & i : scratchOutputs)
-                l.emplace(i.first, store.printStorePath(i.second));
-            json.emplace("outputs", std::move(l));
-        }
+            BuiltinBuilderContext ctx{
+                .drv = drv,
+                .hashedMirrors = settings.getLocalSettings().hashedMirrors,
+                .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_AWS_AUTH
+                .awsCredentials = args.awsCredentials,
+#endif
+            };
 
-        // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
-        // that, see this comment by Eelco about how to make it not suck:
-        // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
-        auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
-        writeFile(jsonFile, json.dump());
-
-        pid = startProcess([&]() {
-            openSlave();
-            try {
-                commonChildInit();
-
-                Strings args = {externalBuilder.program};
-
-                if (!externalBuilder.args.empty()) {
-                    args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
+            if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+                try {
+                    ctx.netrcData = readFile(fileTransferSettings.netrcFile);
+                } catch (SystemError &) {
                 }
 
-                args.insert(args.end(), jsonFile);
-
-                if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into %1%", PathFmt(tmpDir));
-
-                chownToBuilder(topTmpDir);
-
-                setUser();
-
-                debug("executing external builder: %s", concatStringsSep(" ", args));
-                execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
-
-                throw SysError("executing %s", PathFmt(externalBuilder.program));
-            } catch (...) {
-                handleChildExceptionExternal(true);
-                _exit(1);
+                if (auto & caFile = fileTransferSettings.caFile.get())
+                    try {
+                        ctx.caFileData = readFile(*caFile);
+                    } catch (SystemError &) {
+                    }
             }
+
+            enterChroot();
+
+            if (chdir(tmpDirInSandbox().c_str()) == -1)
+                throw SysError("changing into %1%", PathFmt(tmpDir));
+
+            unix::closeExtraFDs();
+
+            struct rlimit limit = {0, RLIM_INFINITY};
+            setrlimit(RLIMIT_CORE, &limit);
+
+            setUser();
+
+            writeFull(STDERR_FILENO, std::string("\2\n"));
+
+            sendException = false;
+
+            if (drv.isBuiltin()) {
+                try {
+                    logger = makeJSONLogger(getStandardError());
+
+                    for (auto & e : drv.outputs)
+                        ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));
+
+                    std::string builtinName = drv.builder.substr(8);
+                    assert(RegisterBuiltinBuilder::builtinBuilders);
+                    if (auto builtin = get(RegisterBuiltinBuilder::builtinBuilders(), builtinName))
+                        (*builtin)(ctx);
+                    else
+                        throw Error("unsupported builtin builder '%1%'", builtinName);
+                    _exit(0);
+                } catch (std::exception & e) {
+                    writeFull(STDERR_FILENO, e.what() + std::string("\n"));
+                    _exit(1);
+                }
+            }
+
+            Strings buildArgs;
+            buildArgs.push_back(std::string(baseNameOf(drv.builder)));
+
+            for (auto & i : drv.args)
+                buildArgs.push_back(rewriteStrings(i, inputRewrites));
+
+            Strings envStrs;
+            for (auto & i : env)
+                envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
+
+            execBuilder(buildArgs, envStrs);
+
+            throw SysError("executing '%1%'", drv.builder);
+
+        } catch (...) {
+            handleChildException(sendException);
+            _exit(1);
+        }
+    }
+
+    void startChild()
+    {
+        RunChildArgs args{
+#if NIX_WITH_AWS_AUTH
+            .awsCredentials = preResolveAwsCredentials(),
+#endif
+        };
+
+        pid = startProcess([this, args = std::move(args)]() {
+            openSlave();
+            runChild(std::move(args));
         });
     }
 
@@ -415,10 +451,10 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         env["PATH"] = "/path-not-set";
         env["HOME"] = homeDir;
         env["NIX_STORE"] = store.storeDir;
-        env["NIX_BUILD_CORES"] = fmt(
-            "%d",
-            settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores
-                                                    : settings.getDefaultCores());
+        env["NIX_BUILD_CORES"] =
+            fmt("%d",
+                settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores
+                                                       : settings.getDefaultCores());
 
         for (const auto & [name, info] : desugaredEnv.variables) {
             env[name] = info.prependBuildDirectory ? (tmpDirInSandbox() / info.value).string() : info.value;
@@ -515,8 +551,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 struct sockaddr_un remoteAddr;
                 socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-                AutoCloseFD remote =
-                    accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
                 if (!remote) {
                     if (errno == EINTR || errno == EAGAIN)
                         continue;
@@ -532,11 +567,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 auto workerThread = std::thread([store, remote{std::move(remote)}]() {
                     try {
                         daemon::processConnection(
-                            store,
-                            FdSource(remote.get()),
-                            FdSink(remote.get()),
-                            NotTrusted,
-                            daemon::Recursive);
+                            store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
                         debug("terminated daemon connection");
                     } catch (const Interrupted &) {
                         debug("interrupted daemon connection");
@@ -596,34 +627,12 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     void writeBuilderFile(const std::string & name, std::string_view contents)
     {
         auto path = std::filesystem::path(tmpDir) / name;
-        AutoCloseFD fd{openat(
-            tmpDirFd.get(),
-            name.c_str(),
-            O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW,
-            0666)};
+        AutoCloseFD fd{
+            openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
         if (!fd)
             throw SysError("creating file %s", PathFmt(path));
         writeFile(fd, path, contents);
         chownToBuilder(fd.get(), path);
-    }
-
-    void setUser()
-    {
-        if (buildUser) {
-            preserveDeathSignal([this]() {
-                auto gids = buildUser->getSupplementaryGIDs();
-                if (setgroups(gids.size(), gids.data()) == -1)
-                    throw SysError("cannot set supplementary groups of build user");
-
-                if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
-                    || getegid() != buildUser->getGID())
-                    throw SysError("setgid failed");
-
-                if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
-                    || geteuid() != buildUser->getUID())
-                    throw SysError("setuid failed");
-            });
-        }
     }
 
     void killSandbox(bool getStats)
@@ -672,8 +681,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     StorePath makeFallbackPath(const StorePath & path)
     {
-        auto pathType =
-            "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
+        auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
         return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), path.name());
     }
 
@@ -721,21 +729,20 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         setBuildTmpDir();
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         chownToBuilder(tmpDirFd.get(), tmpDir);
 
+        StringMap inputRewrites;
         for (auto & [outputName, status] : initialOutputs) {
-            auto scratchPath = !status.known ? makeFallbackPath(outputName)
-                               : !needsHashRewrite()
+            auto scratchPath = !status.known                ? makeFallbackPath(outputName)
+                               : !needsHashRewrite()        ? status.known->path
+                               : !status.known->isPresent() ? status.known->path
+                               : buildMode != bmRepair && !status.known->isValid()
                                    ? status.known->path
-                                   : !status.known->isPresent()
-                                         ? status.known->path
-                                         : buildMode != bmRepair && !status.known->isValid()
-                                               ? status.known->path
-                                               : makeFallbackPath(status.known->path);
+                                   : makeFallbackPath(status.known->path);
             scratchOutputs.insert_or_assign(outputName, scratchPath);
 
             inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
@@ -789,12 +796,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             if (chown(slaveName.c_str(), buildUser->getUID(), 0))
                 throw SysError("changing owner of pseudoterminal slave");
         }
-#ifdef __APPLE__
-        else {
-            if (grantpt(builderOut.get()))
-                throw SysError("granting access to pseudoterminal slave");
-        }
-#endif
 
         if (unlockpt(builderOut.get()))
             throw SysError("unlocking pseudoterminal");
@@ -834,9 +835,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         struct PerhapsNeedToRegister
         {
             StorePathSet refs;
-            /**
-             * References to other outputs. Built by looking up in `scratchOutputsInverse`.
-             */
             StringSet otherOutputs;
         };
 
@@ -844,8 +842,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         for (auto & [outputName, path] : scratchOutputs)
             scratchOutputsInverse.insert_or_assign(path, outputName);
 
-        std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>>
-            outputReferencesIfUnregistered;
+        std::map<std::string, std::variant<AlreadyRegistered, PerhapsNeedToRegister>> outputReferencesIfUnregistered;
         std::map<std::string, PosixStat> outputStats;
         for (auto & [outputName, _] : drv.outputs) {
             auto scratchOutput = get(scratchOutputs, outputName);
@@ -903,10 +900,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             if (discardReferences)
                 debug("discarding references of output '%s'", outputName);
             else {
-                debug(
-                    "scanning for references for output '%s' in temp location %s",
-                    outputName,
-                    PathFmt(actualPath));
+                debug("scanning for references for output '%s' in temp location %s", outputName, PathFmt(actualPath));
 
                 NullSink blank;
                 references = scanForReferences(blank, actualPath, referenceablePaths);
@@ -928,24 +922,21 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         StringSet emptySet;
 
-        auto topoSortResult =
-            topoSort(outputsToSort, [&](const std::string & name) -> const StringSet & {
-                auto * orifu = get(outputReferencesIfUnregistered, name);
-                if (!orifu)
-                    throw BuildError(
-                        BuildResult::Failure::OutputRejected,
-                        "no output reference for '%s' in build of '%s'",
-                        name,
-                        store.printStorePath(drvPath));
-                return std::visit(
-                    overloaded{
-                        [&](const AlreadyRegistered &) -> const StringSet & { return emptySet; },
-                        [&](const PerhapsNeedToRegister & refs) -> const StringSet & {
-                            return refs.otherOutputs;
-                        },
-                    },
-                    *orifu);
-            });
+        auto topoSortResult = topoSort(outputsToSort, [&](const std::string & name) -> const StringSet & {
+            auto * orifu = get(outputReferencesIfUnregistered, name);
+            if (!orifu)
+                throw BuildError(
+                    BuildResult::Failure::OutputRejected,
+                    "no output reference for '%s' in build of '%s'",
+                    name,
+                    store.printStorePath(drvPath));
+            return std::visit(
+                overloaded{
+                    [&](const AlreadyRegistered &) -> const StringSet & { return emptySet; },
+                    [&](const PerhapsNeedToRegister & refs) -> const StringSet & { return refs.otherOutputs; },
+                },
+                *orifu);
+        });
 
         auto sortedOutputNames = std::visit(
             overloaded{
@@ -973,8 +964,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             auto finish = [&](StorePath finalStorePath) {
                 finalOutputs.insert_or_assign(outputName, finalStorePath);
                 if (*scratchPath != finalStorePath)
-                    outputRewrites[std::string{scratchPath->hashPart()}] =
-                        std::string{finalStorePath.hashPart()};
+                    outputRewrites[std::string{scratchPath->hashPart()}] = std::string{finalStorePath.hashPart()};
             };
 
             auto orifu = get(outputReferencesIfUnregistered, outputName);
@@ -986,9 +976,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                         finish(skippedFinalPath.path);
                         return std::nullopt;
                     },
-                    [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> {
-                        return r.refs;
-                    },
+                    [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> { return r.refs; },
                 },
                 *orifu);
 
@@ -1074,8 +1062,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     }
                     case FileIngestionMethod::Git: {
                         return git::dumpHash(
-                                   outputHash.hashAlgo,
-                                   {getFSSourceAccessor(), CanonPath(actualPath.native())})
+                                   outputHash.hashAlgo, {getFSSourceAccessor(), CanonPath(actualPath.native())})
                             .hash;
                     }
                     }
@@ -1085,8 +1072,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 auto newInfo0 = ValidPathInfo::makeFromCA(
                     store,
                     outputPathName(drv.name, outputName),
-                    ContentAddressWithReferences::fromParts(
-                        outputHash.method, std::move(got), rewriteRefs()),
+                    ContentAddressWithReferences::fromParts(outputHash.method, std::move(got), rewriteRefs()),
                     Hash::dummy);
                 if (*scratchPath != newInfo0.path) {
                     rewriteOutput(StringMap{{oldHashPart, std::string(newInfo0.path.hashPart())}});
@@ -1112,8 +1098,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                         auto requiredFinalPath = output.path;
                         if (*scratchPath != requiredFinalPath)
                             outputRewrites.insert_or_assign(
-                                std::string{scratchPath->hashPart()},
-                                std::string{requiredFinalPath.hashPart()});
+                                std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                         rewriteOutput(outputRewrites);
                         HashResult narHashAndSize = hashPath(
                             {getFSSourceAccessor(), CanonPath(actualPath.native())},
@@ -1202,7 +1187,7 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                             movePath(actualPath, dst);
 
                             if (diffHook) {
-                                handleDiffHookExternal(
+                                handleDiffHook(
                                     *diffHook,
                                     buildUser ? buildUser->getUID() : getuid(),
                                     buildUser ? buildUser->getGID() : getgid(),
@@ -1212,13 +1197,13 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                                     tmpDir);
                             }
 
-                            throw NotDeterministicExternal(
+                            throw NotDeterministic(
                                 "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
                                 store.printStorePath(drvPath),
                                 store.toRealPath(finalDestPath),
                                 dst);
                         } else
-                            throw NotDeterministicExternal(
+                            throw NotDeterministic(
                                 "derivation '%s' may not be deterministic: output '%s' differs",
                                 store.printStorePath(drvPath),
                                 store.toRealPath(finalDestPath));
@@ -1338,16 +1323,12 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 };
 
-const std::filesystem::path ExternalDerivationBuilder::homeDir = "/homeless-shelter";
+const std::filesystem::path GenericUnixDerivationBuilder::homeDir = "/homeless-shelter";
 
-DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params,
-    const ExternalBuilder & handler)
+DerivationBuilderUnique makeGenericUnixDerivationBuilder(
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
-    return DerivationBuilderUnique(
-        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
+    return DerivationBuilderUnique(new GenericUnixDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 }
 
 } // namespace nix
