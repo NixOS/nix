@@ -185,7 +185,9 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
             return EvalState{
                 .fetchSettings = std::move(builder->fetchSettings),
                 .settings = std::move(builder->settings),
-                .state = nix::EvalState(builder->lookupPath, builder->store, self->fetchSettings, self->settings),
+                .statePtr = std::make_shared<nix::EvalState>(
+                    builder->lookupPath, builder->store, self->fetchSettings, self->settings),
+                .state = *self->statePtr,
             };
         });
     }

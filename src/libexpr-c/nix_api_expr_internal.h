@@ -24,7 +24,8 @@ struct EvalState
 {
     nix::fetchers::Settings fetchSettings;
     nix::EvalSettings settings;
-    nix::EvalState state;
+    std::shared_ptr<nix::EvalState> statePtr;
+    nix::EvalState & state;
 };
 
 struct BindingsBuilder

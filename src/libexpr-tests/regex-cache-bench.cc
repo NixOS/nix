@@ -27,7 +27,8 @@ static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
         EvalSettings evalSettings{readOnlyMode};
         evalSettings.nixPath = {};
 
-        EvalState st({}, store, fetchSettings, evalSettings, nullptr);
+        auto stPtr = std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr);
+        auto & st = *stPtr;
         Expr * expr = st.parseExprFromString(std::string(exprStr), st.rootPath(CanonPath::root));
 
         Value v;
