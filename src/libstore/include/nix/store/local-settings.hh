@@ -707,6 +707,12 @@ public:
         //        Current system: 'aarch64-darwin' with features {apple-virt, benchmark, big-parallel, nixos-test}
         // Xp::ExternalBuilders
     };
+
+    /**
+     * Finds the first external derivation builder that supports this
+     * derivation, or else returns a null pointer.
+     */
+    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 };
 
 } // namespace nix

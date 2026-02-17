@@ -282,3 +282,14 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
     # Error messages should not be empty (end with just "failed:")
     <<<"$out" grepQuietInverse -E "^error:.*failed: *$"
 fi
+
+# https://github.com/NixOS/nix/issues/14883
+# When max-jobs=0 and no remote builders, the error should say
+# "local builds are disabled" instead of the misleading
+# "required system or feature not available".
+if isDaemonNewer "2.34pre"; then
+    expectStderr 1 nix build --impure --max-jobs 0 --expr \
+      'derivation { name = "test-maxjobs"; builder = "/bin/sh"; args = ["-c" "exit 0"]; system = builtins.currentSystem; }' \
+      --no-link \
+      | grepQuiet "local builds are disabled"
+fi
