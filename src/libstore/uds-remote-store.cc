@@ -19,16 +19,12 @@
 
 namespace nix {
 
-UDSRemoteStoreConfig::UDSRemoteStoreConfig(
-    std::string_view scheme, std::string_view authority, const StoreReference::Params & params)
+UDSRemoteStoreConfig::UDSRemoteStoreConfig(const std::filesystem::path & path, const StoreReference::Params & params)
     : Store::Config{params}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params}
-    , path{authority.empty() ? settings.nixDaemonSocketFile : std::filesystem::path{authority}}
+    , path{path.empty() ? settings.nixDaemonSocketFile : path}
 {
-    if (uriSchemes().count(scheme) == 0) {
-        throw UsageError("Scheme must be 'unix'");
-    }
 }
 
 std::string UDSRemoteStoreConfig::doc()
@@ -43,7 +39,7 @@ std::string UDSRemoteStoreConfig::doc()
 // don't we just wire it all through? I believe there are cases where it
 // will live reload so we want to continue to account for that.
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
-    : UDSRemoteStoreConfig(*uriSchemes().begin(), "", params)
+    : UDSRemoteStoreConfig("", params)
 {
 }
 
@@ -69,7 +65,7 @@ StoreReference UDSRemoteStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
-                .authority = path.string(),
+                .authority = encodeUrlPath(pathToUrlPath(path)),
             },
         .params = getQueryParams(),
     };

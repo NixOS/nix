@@ -280,7 +280,7 @@ std::string encodeQuery(const StringMap & query);
 /**
  * Parse a URL into a ParsedURL.
  *
- * @parm lenient Also allow some long-supported Nix URIs that are not quite compliant with RFC3986.
+ * @param lenient Also allow some long-supported Nix URIs that are not quite compliant with RFC3986.
  * Here are the deviations:
  * - Fragments can contain unescaped (not URL encoded) '^', '"' or space literals.
  * - Queries may contain unescaped '"' or spaces.

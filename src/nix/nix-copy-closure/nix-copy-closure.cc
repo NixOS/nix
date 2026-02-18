@@ -49,7 +49,11 @@ static int main_nix_copy_closure(int argc, char ** argv)
         if (sshHost.empty())
             throw UsageError("no host name specified");
 
-        auto remoteConfig = make_ref<LegacySSHStoreConfig>("ssh", sshHost, LegacySSHStoreConfig::Params{});
+        auto remoteConfig =
+            /* FIXME: This doesn't go through the back-compat machinery for IPv6 unbracketed URLs that
+               is in StoreReference::parse. TODO: Maybe add a authority parsing function specifically
+               for SSH reference parsing? */
+            make_ref<LegacySSHStoreConfig>(ParsedURL::Authority::parse(sshHost), LegacySSHStoreConfig::Params{});
         remoteConfig->compress |= gzip;
         auto to = toMode ? remoteConfig->openStore() : openStore();
         auto from = toMode ? openStore() : remoteConfig->openStore();

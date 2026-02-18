@@ -18,7 +18,7 @@ std::filesystem::path LocalFSStoreConfig::getDefaultLogDir()
     return settings.getLogFileSettings().nixLogDir;
 }
 
-LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
+LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, const Params & params)
     : StoreConfig(params)
     /* Default `?root` from `rootDir` if non set
      * NOTE: We would like to just do rootDir.set(...), which would take care of

@@ -42,6 +42,24 @@ PATH2=$(nix path-info --store "$TEST_ROOT/x" "$CORRECT_PATH")
 PATH3=$(nix path-info --store "local?root=$TEST_ROOT/x" "$CORRECT_PATH")
 [ "$CORRECT_PATH" == "$PATH3" ]
 
+# Test chroot store path with + symbols in it to exercise pct-encoding issues.
+cp -r "$TEST_ROOT/x" "$TEST_ROOT/x+chroot"
+
+PATH4=$(nix path-info --store "local://$TEST_ROOT/x+chroot" "$CORRECT_PATH")
+[ "$CORRECT_PATH" == "$PATH4" ]
+
+PATH5=$(nix path-info --store "$TEST_ROOT/x+chroot" "$CORRECT_PATH")
+[ "$CORRECT_PATH" == "$PATH5" ]
+
+# Params are pct-encoded.
+PATH6=$(nix path-info --store "local?root=$TEST_ROOT/x%2Bchroot" "$CORRECT_PATH")
+[ "$CORRECT_PATH" == "$PATH6" ]
+
+PATH7=$(nix path-info --store "local://$TEST_ROOT/x%2Bchroot" "$CORRECT_PATH")
+[ "$CORRECT_PATH" == "$PATH7" ]
+# Path gets decoded.
+[[ ! -d "$TEST_ROOT/x%2Bchroot" ]]
+
 # Ensure store info trusted works with local store
 nix --store "$TEST_ROOT/x" store info --json | jq -e '.trusted'
 

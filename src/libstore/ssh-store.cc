@@ -11,10 +11,10 @@
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+SSHStoreConfig::SSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
     : Store::Config{params}
     , RemoteStore::Config{params}
-    , CommonSSHStoreConfig{scheme, authority, params}
+    , CommonSSHStoreConfig{authority, params}
 {
 }
 
@@ -97,11 +97,11 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
 {
 }
 
-MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
+MountedSSHStoreConfig::MountedSSHStoreConfig(const ParsedURL::Authority & authority, StringMap params)
     : StoreConfig(params)
     , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(scheme, host, params)
+    , CommonSSHStoreConfig(authority, params)
+    , SSHStoreConfig(authority, params)
     , LocalFSStoreConfig(params)
 {
 }

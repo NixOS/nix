@@ -11,15 +11,10 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
                               virtual LocalFSStoreConfig,
                               virtual RemoteStoreConfig
 {
-    // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
-    // outlined in https://github.com/NixOS/nix/issues/10766
     using LocalFSStoreConfig::LocalFSStoreConfig;
     using RemoteStoreConfig::RemoteStoreConfig;
 
-    /**
-     * @param authority is the socket path.
-     */
-    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+    UDSRemoteStoreConfig(const std::filesystem::path & path, const Params & params);
 
     UDSRemoteStoreConfig(const Params & params);
 

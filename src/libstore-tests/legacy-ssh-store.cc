@@ -7,8 +7,7 @@ namespace nix {
 TEST(LegacySSHStore, constructConfig)
 {
     LegacySSHStoreConfig config(
-        "ssh",
-        "me@localhost:2222",
+        ParsedURL::Authority::parse("me@localhost:2222"),
         StoreConfig::Params{
             {
                 "remote-program",

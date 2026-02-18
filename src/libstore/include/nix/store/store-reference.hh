@@ -56,6 +56,7 @@ struct StoreReference
 
     /**
      * General case, a regular `scheme://authority` URL.
+     * @todo Consider making this pluggable instead of passing through the encoded authority + path.
      */
     struct Specified
     {

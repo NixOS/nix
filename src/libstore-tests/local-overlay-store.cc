@@ -7,7 +7,6 @@ namespace nix {
 TEST(LocalOverlayStore, constructConfig_rootQueryParam)
 {
     LocalOverlayStoreConfig config{
-        "local-overlay",
         "",
         {
             {
@@ -22,7 +21,7 @@ TEST(LocalOverlayStore, constructConfig_rootQueryParam)
 
 TEST(LocalOverlayStore, constructConfig_rootPath)
 {
-    LocalOverlayStoreConfig config{"local-overlay", "/foo/bar", {}};
+    LocalOverlayStoreConfig config{"/foo/bar", {}};
 
     EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
 }
