@@ -294,7 +294,14 @@ TEST(makeParentCanonical, noParent)
 
 TEST(makeParentCanonical, root)
 {
-    ASSERT_EQ(makeParentCanonical("/"), "/");
+    auto rootPath =
+#ifndef _WIN32
+        "/"
+#else
+        "C:\\"
+#endif
+        ;
+    ASSERT_EQ(makeParentCanonical(rootPath), rootPath);
 }
 
 /* ----------------------------------------------------------------------------

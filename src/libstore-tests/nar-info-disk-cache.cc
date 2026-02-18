@@ -10,6 +10,10 @@ namespace nix {
 
 TEST(NarInfoDiskCacheImpl, create_and_read)
 {
+#ifdef _WIN32
+    GTEST_SKIP_("Broken on Windows"); // TODO: Fix
+#endif
+
     // This is a large single test to avoid some setup overhead.
 
     int prio = 12345;

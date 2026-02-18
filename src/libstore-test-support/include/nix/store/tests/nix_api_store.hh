@@ -44,7 +44,7 @@ protected:
         auto tmpl = nix::defaultTempDir() / "tests_nix-store.";
         for (size_t i = 0; true; ++i) {
             nixDir = tmpl.string() + std::to_string(i);
-            if (std::filesystem::create_directory(nixDir))
+            if (std::filesystem::create_directories(nixDir))
                 break;
         }
 #else
