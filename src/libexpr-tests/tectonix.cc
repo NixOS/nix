@@ -361,56 +361,16 @@ TEST_F(TectonixTest, zoneSrc_non_zone_path_throws)
 }
 
 // ============================================================================
-// Phase 4: Builtin Tests - __unsafeTectonixInternalZone
+// Phase 4: Builtin Tests - __unsafeTectonixInternalZoneRoot
 // ============================================================================
 
-// Disabled: requires real store (dummy:// doesn't support addToStoreFromDump)
-TEST_F(TectonixTest, DISABLED_zone_returns_attrset_with_expected_attrs)
+TEST_F(TectonixTest, zoneRoot_returns_path)
 {
-    auto ctx = createTectonixContext();
-    auto v = ctx->eval(R"(builtins.unsafeTectonixInternalZone "//areas/tools/dev")");
+    auto ctx = createTectonixContext(false); // no checkout path
+    auto v = ctx->eval(R"(builtins.unsafeTectonixInternalZoneRoot "//areas/tools/dev")");
 
-    ASSERT_THAT(v, IsAttrsOfSize(5));
-
-    // Check outPath exists and is a string
-    auto outPath = v.attrs()->get(ctx->state->symbols.create("outPath"));
-    ASSERT_NE(outPath, nullptr);
-    ctx->state->forceValue(*outPath->value, noPos);
-    ASSERT_THAT(*outPath->value, IsString());
-
-    // Check root exists
-    auto root = v.attrs()->get(ctx->state->symbols.create("root"));
-    ASSERT_NE(root, nullptr);
-
-    // Check treeSha exists and is a string
-    auto treeSha = v.attrs()->get(ctx->state->symbols.create("treeSha"));
-    ASSERT_NE(treeSha, nullptr);
-    ctx->state->forceValue(*treeSha->value, noPos);
-    ASSERT_THAT(*treeSha->value, IsString());
-    ASSERT_EQ(treeSha->value->string_view().size(), 40u);
-
-    // Check zonePath matches input
-    auto zonePath = v.attrs()->get(ctx->state->symbols.create("zonePath"));
-    ASSERT_NE(zonePath, nullptr);
-    ctx->state->forceValue(*zonePath->value, noPos);
-    ASSERT_THAT(*zonePath->value, IsStringEq("//areas/tools/dev"));
-
-    // Check dirty is false (clean repo)
-    auto dirty = v.attrs()->get(ctx->state->symbols.create("dirty"));
-    ASSERT_NE(dirty, nullptr);
-    ctx->state->forceValue(*dirty->value, noPos);
-    ASSERT_THAT(*dirty->value, IsFalse());
-}
-
-// Disabled: requires real store (dummy:// doesn't support addToStoreFromDump)
-TEST_F(TectonixTest, DISABLED_zone_outPath_is_store_path)
-{
-    auto ctx = createTectonixContext();
-    auto v = ctx->eval(R"((builtins.unsafeTectonixInternalZone "//areas/tools/dev").outPath)");
-
-    ASSERT_THAT(v, IsString());
-    auto pathStr = v.string_view();
-    ASSERT_TRUE(pathStr.find("/nix/store/") == 0 || pathStr.find(settings.nixStore) == 0);
+    // Check root is null
+    ASSERT_THAT(v, IsNull());
 }
 
 TEST_F(TectonixTest, zone_invalid_path_throws)
@@ -418,8 +378,21 @@ TEST_F(TectonixTest, zone_invalid_path_throws)
     auto ctx = createTectonixContext();
 
     ASSERT_THROW(
-        ctx->eval(R"(builtins.unsafeTectonixInternalZone "//not/a/zone")"),
+        ctx->eval(R"(builtins.unsafeTectonixInternalZoneRoot "//not/a/zone")"),
         EvalError);
+}
+
+// ============================================================================
+// Phase 4: Builtin Tests - __unsafeTectonixInternalZoneIsDirty
+// ============================================================================
+
+TEST_F(TectonixTest, zoneIsDirty_returns_false)
+{
+    auto ctx = createTectonixContext();
+    auto v = ctx->eval(R"(builtins.unsafeTectonixInternalZoneIsDirty "//areas/tools/dev")");
+
+    // Check dirty is false (clean repo)
+    ASSERT_THAT(v, IsFalse());
 }
 
 // ============================================================================
