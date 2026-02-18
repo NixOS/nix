@@ -86,6 +86,17 @@ struct NarInfoDiskCacheSettings : public virtual Config
           would prevent trying to pull the path again and failing with a hash
           mismatch if the build isn't reproducible.
         )"};
+
+    Setting<unsigned int> ttlMeta{
+        this,
+        7 * 24 * 3600,
+        "narinfo-cache-meta-ttl",
+        R"(
+          The TTL in seconds for caching binary cache metadata (i.e.
+          `/nix-cache-info`). This determines how long information about a
+          binary cache (such as its store directory, priority, and whether it
+          wants mass queries) is considered valid before being refreshed.
+        )"};
 };
 
 class Settings : public virtual Config,

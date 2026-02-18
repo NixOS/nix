@@ -566,12 +566,16 @@ void mainWrapped(int argc, char ** argv)
             fileTransferSettings.tries = 0;
         if (!fileTransferSettings.connectTimeout.overridden)
             fileTransferSettings.connectTimeout = 1;
+        auto & ttlMeta = settings.getNarInfoDiskCacheSettings().ttlMeta;
+        if (!ttlMeta.overridden)
+            ttlMeta = std::numeric_limits<unsigned int>::max();
     }
 
     if (args.refresh) {
         fetchSettings.tarballTtl = 0;
         settings.getNarInfoDiskCacheSettings().ttlNegative = 0;
         settings.getNarInfoDiskCacheSettings().ttlPositive = 0;
+        settings.getNarInfoDiskCacheSettings().ttlMeta = 0;
     }
 
     if (args.command->second->forceImpureByDefault() && !evalSettings.pureEval.overridden) {
