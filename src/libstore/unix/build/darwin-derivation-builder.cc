@@ -15,50 +15,22 @@
 #  include "nix/store/local-store.hh"
 #  include "nix/util/processes.hh"
 #  include "nix/store/builtins.hh"
-#  include "nix/store/path-references.hh"
-#  include "nix/util/util.hh"
-#  include "nix/util/archive.hh"
-#  include "nix/util/git.hh"
-#  include "nix/store/daemon.hh"
-#  include "nix/util/topo-sort.hh"
 #  include "nix/store/build/child.hh"
-#  include "nix/util/unix-domain-socket.hh"
-#  include "nix/store/posix-fs-canonicalise.hh"
-#  include "nix/util/posix-source-accessor.hh"
 #  include "nix/store/restricted-store.hh"
 #  include "nix/store/user-lock.hh"
 #  include "nix/store/globals.hh"
-#  include "nix/store/build/derivation-env-desugar.hh"
-#  include "nix/util/terminal.hh"
-#  include "nix/store/filetransfer.hh"
-#  include "build/derivation-check.hh"
 #  include "store-config-private.hh"
 
-#  include <sys/un.h>
 #  include <fcntl.h>
-#  include <termios.h>
 #  include <unistd.h>
-#  include <sys/mman.h>
 #  include <sys/resource.h>
-#  include <sys/socket.h>
-
-#  if HAVE_STATVFS
-#    include <sys/statvfs.h>
-#  endif
-
-#  include <pwd.h>
-#  include <grp.h>
 
 #  include "nix/util/strings.hh"
 #  include "nix/util/signals.hh"
 
 #  if NIX_WITH_AWS_AUTH
 #    include "nix/store/aws-creds.hh"
-#    include "nix/store/s3-url.hh"
-#    include "nix/util/url.hh"
 #  endif
-
-#  include <nlohmann/json.hpp>
 
 /* This definition is undocumented but depended upon by all major browsers. */
 extern "C" int
@@ -88,15 +60,8 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 {
     PathsInChroot pathsInChroot;
 
-    /**
-     * Whether full sandboxing is enabled. Note that macOS builds
-     * always have *some* sandboxing (see sandbox-minimal.sb).
-     */
     bool useSandbox;
 
-    /**
-     * The process ID of the builder.
-     */
     Pid pid;
 
     LocalStore & store;
@@ -105,63 +70,29 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
-    /**
-     * User selected for running the builder.
-     */
     std::unique_ptr<UserLock> buildUser;
 
-    /**
-     * The temporary directory used for the build.
-     */
     std::filesystem::path tmpDir;
 
-    /**
-     * The top-level temporary directory.
-     */
     std::filesystem::path topTmpDir;
 
-    /**
-     * The sort of derivation we are building.
-     */
     const DerivationType derivationType;
 
-    typedef StringMap Environment;
-    Environment env;
+    StringMap env;
 
-    typedef std::map<StorePath, StorePath> RedirectedOutputs;
-    RedirectedOutputs redirectedOutputs;
+    std::map<StorePath, StorePath> redirectedOutputs;
 
-    /**
-     * The output paths used during the build.
-     */
     OutputPathMap scratchOutputs;
+
+    AutoCloseFD tmpDirFd;
+
+    StringMap inputRewrites, outputRewrites;
 
     static const std::filesystem::path homeDir;
 
-    /**
-     * The recursive Nix daemon socket.
-     */
     AutoCloseFD daemonSocket;
-
-    /**
-     * The daemon main thread.
-     */
     std::thread daemonThread;
-
-    /**
-     * The daemon worker threads.
-     */
     std::vector<std::thread> daemonWorkerThreads;
-
-    /**
-     * Arguments passed to runChild().
-     */
-    struct RunChildArgs
-    {
-#  if NIX_WITH_AWS_AUTH
-        std::optional<AwsCredentials> awsCredentials;
-#  endif
-    };
 
     DarwinDerivationBuilder(
         LocalStore & store,
@@ -184,7 +115,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             ignoreExceptionInDestructor();
         }
         try {
-            stopDaemon();
+            nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -217,32 +148,9 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return true;
     }
 
-
     std::filesystem::path tmpDirInSandbox()
     {
         return "/build";
-    }
-
-
-
-    void stopDaemon()
-    {
-        if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
-            if (errno == ENOTCONN) {
-                daemonSocket.close();
-            } else {
-                throw SysError("shutting down daemon socket");
-            }
-        }
-
-        if (daemonThread.joinable())
-            daemonThread.join();
-
-        for (auto & thread : daemonWorkerThreads)
-            thread.join();
-        daemonWorkerThreads.clear();
-
-        daemonSocket.close();
     }
 
     void addDependencyImpl(const StorePath & path) override
@@ -257,11 +165,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             assert(uid != 0);
             killUser(uid);
 
-            /* Clean up System V IPC objects owned by this user.
-             * On Darwin, IPC objects (shared memory segments, message queues, and semaphores)
-             * can persist after the build user's processes are killed, since there are no IPC namespaces
-             * like on Linux. This can exhaust kernel IPC limits over time.
-             */
+            /* Clean up System V IPC objects owned by this user. */
             struct IpcsCommand ic;
             size_t ic_size = sizeof(ic);
             std::vector<int> shm_ids, msg_ids, sem_ids;
@@ -367,26 +271,9 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return ret;
     }
 
-
     void cleanupBuild(bool force)
     {
-        if (force) {
-            for (auto & i : redirectedOutputs)
-                deletePath(store.toRealPath(i.second));
-        }
-
-        if (topTmpDir != "") {
-            chmod(topTmpDir, 0000);
-
-            if (settings.keepFailed && !force && !drv.isBuiltin()) {
-                printError("note: keeping build directory %s", PathFmt(tmpDir));
-                chmod(topTmpDir, 0755);
-                chmod(tmpDir, 0755);
-            } else
-                deletePath(topTmpDir);
-            topTmpDir = "";
-            tmpDir = "";
-        }
+        nix::cleanupBuildCore(force, store, redirectedOutputs, drv, topTmpDir, tmpDir);
     }
 
     std::optional<Descriptor> startBuild() override
@@ -413,47 +300,14 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         createDir(tmpDir, 0700);
         assert(!tmpDir.empty());
 
-        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        StringMap inputRewrites;
-        for (auto & [outputName, status] : initialOutputs) {
-            auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
-                return store.makeStorePath(
-                    "rewrite:" + std::string(drvPath.to_string()) + ":" + suffix, Hash(HashAlgorithm::SHA256), name);
-            };
-            auto scratchPath =
-                !status.known
-                    ? makeFallbackPath("name:" + std::string(outputName), outputPathName(drv.name, outputName))
-                : !needsHashRewrite()        ? status.known->path
-                : !status.known->isPresent() ? status.known->path
-                : buildMode != bmRepair && !status.known->isValid()
-                    ? status.known->path
-                    : makeFallbackPath(std::string(status.known->path.to_string()), status.known->path.name());
-            scratchOutputs.insert_or_assign(outputName, scratchPath);
-
-            inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
-
-            if (!status.known)
-                continue;
-            auto fixedFinalPath = status.known->path;
-
-            if (fixedFinalPath == scratchPath)
-                continue;
-
-            deletePath(store.printStorePath(scratchPath));
-
-            {
-                std::string h1{fixedFinalPath.hashPart()};
-                std::string h2{scratchPath.hashPart()};
-                inputRewrites[h1] = h2;
-            }
-
-            redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
-        }
+        inputRewrites.clear();
+        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
 
         nix::initEnv(
             env,
@@ -477,58 +331,13 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             }
             pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
-            PathSet allowedPaths = localSettings.allowedImpureHostPrefixes;
-
-            auto impurePaths = drvOptions.impureHostDeps;
-
-            for (auto & i : impurePaths) {
-                bool found = false;
-                std::filesystem::path canonI = canonPath(i);
-                for (auto & a : allowedPaths) {
-                    std::filesystem::path canonA = canonPath(a);
-                    if (isDirOrInDir(canonI, canonA)) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    throw Error(
-                        "derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
-                        store.printStorePath(drvPath),
-                        i);
-
-                pathsInChroot[i] = {i, true};
-            }
+            nix::checkAndAddImpurePaths(
+                pathsInChroot, drvOptions, store, drvPath, localSettings.allowedImpureHostPrefixes);
 
             if (localSettings.preBuildHook != "") {
                 printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
-
-                enum BuildHookState { stBegin, stExtraChrootDirs };
-
-                auto state = stBegin;
                 auto lines = runProgram(localSettings.preBuildHook, false, Strings({store.printStorePath(drvPath)}));
-                auto lastPos = std::string::size_type{0};
-                for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
-                    auto line = lines.substr(lastPos, nlPos - lastPos);
-                    lastPos = nlPos + 1;
-                    if (state == stBegin) {
-                        if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
-                            state = stExtraChrootDirs;
-                        } else {
-                            throw Error("unknown pre-build hook command '%1%'", line);
-                        }
-                    } else if (state == stExtraChrootDirs) {
-                        if (line == "") {
-                            state = stBegin;
-                        } else {
-                            auto p = line.find('=');
-                            if (p == std::string::npos)
-                                pathsInChroot[line] = {.source = line};
-                            else
-                                pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
-                        }
-                    }
-                }
+                nix::parsePreBuildHook(pathsInChroot, lines);
             }
         }
 
@@ -537,147 +346,32 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix")) {
-            experimentalFeatureSettings.require(Xp::RecursiveNix);
+        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+            nix::setupRecursiveNixDaemon(
+                store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(),
+                daemonSocket, daemonThread, daemonWorkerThreads, buildUser.get());
 
-            auto daemonStore = makeRestrictedStore(
-                [&] {
-                    auto config = make_ref<LocalStore::Config>(*this->store.config);
-                    config->pathInfoCacheSize = 0;
-                    config->stateDir = "/no-such-path";
-                    config->logDir = "/no-such-path";
-                    return config;
-                }(),
-                ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-                *this);
-
-            addedPaths.clear();
-
-            auto socketName = ".nix-socket";
-            std::filesystem::path socketPath = tmpDir / socketName;
-            env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
-
-            daemonSocket = createUnixDomainSocket(socketPath, 0600);
-
-            nix::chownToBuilder(buildUser.get(), socketPath);
-
-            daemonThread = std::thread([this, daemonStore]() {
-                while (true) {
-                    struct sockaddr_un remoteAddr;
-                    socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-                    AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-                    if (!remote) {
-                        if (errno == EINTR || errno == EAGAIN)
-                            continue;
-                        if (errno == EINVAL || errno == ECONNABORTED)
-                            break;
-                        throw SysError("accepting connection");
-                    }
-
-                    unix::closeOnExec(remote.get());
-
-                    debug("received daemon connection");
-
-                    auto workerThread = std::thread([daemonStore, remote{std::move(remote)}]() {
-                        try {
-                            daemon::processConnection(
-                                daemonStore,
-                                FdSource(remote.get()),
-                                FdSink(remote.get()),
-                                NotTrusted,
-                                daemon::Recursive);
-                            debug("terminated daemon connection");
-                        } catch (const Interrupted &) {
-                            debug("interrupted daemon connection");
-                        } catch (SystemError &) {
-                            ignoreExceptionExceptInterrupt();
-                        }
-                    });
-
-                    daemonWorkerThreads.push_back(std::move(workerThread));
-                }
-
-                debug("daemon shutting down");
-            });
-        }
-
-        printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
-        printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
-        for (auto & i : drv.env)
-            printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        nix::logBuilderInfo(drv);
 
         miscMethods->openLogFile();
 
-        builderOut = posix_openpt(O_RDWR | O_NOCTTY);
-        if (!builderOut)
-            throw SysError("opening pseudoterminal master");
-
-        std::string slaveName = getPtsName(builderOut.get());
-
-        if (buildUser) {
-            chmod(slaveName, 0600);
-
-            if (chown(slaveName.c_str(), buildUser->getUID(), 0))
-                throw SysError("changing owner of pseudoterminal slave");
-        } else {
-            if (grantpt(builderOut.get()))
-                throw SysError("granting access to pseudoterminal slave");
-        }
-
-        if (unlockpt(builderOut.get()))
-            throw SysError("unlocking pseudoterminal");
+        nix::setupPTYMaster(builderOut, buildUser.get(), true);
 
         buildResult.startTime = time(0);
 
         /* Start the child process */
         {
-            RunChildArgs args{
 #  if NIX_WITH_AWS_AUTH
-                .awsCredentials = [this]() -> std::optional<AwsCredentials> {
-                    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-                        auto url = drv.env.find("url");
-                        if (url != drv.env.end()) {
-                            try {
-                                auto parsedUrl = parseURL(url->second);
-                                if (parsedUrl.scheme == "s3") {
-                                    debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
-                                    auto s3Url = ParsedS3URL::parse(parsedUrl);
-                                    auto credentials = getAwsCredentialsProvider()->getCredentials(s3Url);
-                                    debug("Successfully pre-resolved AWS credentials in parent process");
-                                    return credentials;
-                                }
-                            } catch (const std::exception & e) {
-                                debug("Error pre-resolving S3 credentials: %s", e.what());
-                            }
-                        }
-                    }
-                    return std::nullopt;
-                }(),
+            auto awsCredentials = nix::preResolveAwsCredentials(drv);
 #  endif
-            };
 
-            pid = startProcess([this, &inputRewrites, args = std::move(args)]() {
-                /* Open and configure the pseudoterminal slave */
-                {
-                    std::string slaveName = getPtsName(builderOut.get());
-
-                    AutoCloseFD slaveOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-                    if (!slaveOut)
-                        throw SysError("opening pseudoterminal slave");
-
-                    struct termios term;
-                    if (tcgetattr(slaveOut.get(), &term))
-                        throw SysError("getting pseudoterminal attributes");
-
-                    cfmakeraw(&term);
-
-                    if (tcsetattr(slaveOut.get(), TCSANOW, &term))
-                        throw SysError("putting pseudoterminal into raw mode");
-
-                    if (dup2(slaveOut.get(), STDERR_FILENO) == -1)
-                        throw SysError("cannot pipe standard error into log file");
-                }
+            pid = startProcess([this
+#  if NIX_WITH_AWS_AUTH
+                                ,
+                                awsCredentials
+#  endif
+            ]() {
+                nix::setupPTYSlave(builderOut.get());
 
                 /* Warning: in the child we should absolutely not make any SQLite calls! */
 
@@ -687,30 +381,16 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
                     commonChildInit();
 
-                    /* Make the contents of netrc and the CA certificate bundle
-                       available to builtin:fetchurl (which may run under a
-                       different uid and/or in a sandbox). */
                     BuiltinBuilderContext ctx{
                         .drv = drv,
                         .hashedMirrors = settings.getLocalSettings().hashedMirrors,
                         .tmpDirInSandbox = tmpDirInSandbox(),
 #  if NIX_WITH_AWS_AUTH
-                        .awsCredentials = args.awsCredentials,
+                        .awsCredentials = awsCredentials,
 #  endif
                     };
 
-                    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-                        try {
-                            ctx.netrcData = readFile(fileTransferSettings.netrcFile);
-                        } catch (SystemError &) {
-                        }
-
-                        if (auto & caFile = fileTransferSettings.caFile.get())
-                            try {
-                                ctx.caFileData = readFile(*caFile);
-                            } catch (SystemError &) {
-                            }
-                    }
+                    nix::setupBuiltinFetchurlContext(ctx, drv);
 
                     /* enterChroot() is a no-op on Darwin */
 
@@ -728,21 +408,8 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
                     /* Drop privileges to the build user and apply Darwin sandbox profile */
                     {
-                        if (buildUser) {
-                            preserveDeathSignal([this]() {
-                                auto gids = buildUser->getSupplementaryGIDs();
-                                if (setgroups(gids.size(), gids.data()) == -1)
-                                    throw SysError("cannot set supplementary groups of build user");
-
-                                if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
-                                    || getegid() != buildUser->getGID())
-                                    throw SysError("setgid failed");
-
-                                if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
-                                    || geteuid() != buildUser->getUID())
-                                    throw SysError("setuid failed");
-                            });
-                        }
+                        if (buildUser)
+                            nix::dropPrivileges(*buildUser);
 
                         /* This has to appear before import statements. */
                         std::string sandboxProfile = "(version 1)\n";
@@ -896,26 +563,8 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
                     sendException = false;
 
-                    /* If this is a builtin builder, call it now. This should not return. */
-                    if (drv.isBuiltin()) {
-                        try {
-                            logger = makeJSONLogger(getStandardError());
-
-                            for (auto & e : drv.outputs)
-                                ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));
-
-                            std::string builtinName = drv.builder.substr(8);
-                            assert(RegisterBuiltinBuilder::builtinBuilders);
-                            if (auto builtin = get(RegisterBuiltinBuilder::builtinBuilders(), builtinName))
-                                (*builtin)(ctx);
-                            else
-                                throw Error("unsupported builtin builder '%1%'", builtinName);
-                            _exit(0);
-                        } catch (std::exception & e) {
-                            writeFull(STDERR_FILENO, e.what() + std::string("\n"));
-                            _exit(1);
-                        }
-                    }
+                    if (drv.isBuiltin())
+                        nix::runBuiltinBuilder(ctx, drv, scratchOutputs, store);
 
                     /* It's not a builtin builder, so execute the program. */
 
@@ -971,36 +620,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         pid.setSeparatePG(true);
 
-        /* Wait for the child to finish setting up the sandbox */
-        {
-            std::vector<std::string> msgs;
-            while (true) {
-                std::string msg = [&]() {
-                    try {
-                        return readLine(builderOut.get());
-                    } catch (Error & e) {
-                        auto status = pid.wait();
-                        e.addTrace(
-                            {},
-                            "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
-                            store.printStorePath(drvPath),
-                            statusToString(status),
-                            concatStringsSep("|", msgs));
-                        throw;
-                    }
-                }();
-                if (msg.substr(0, 1) == "\2")
-                    break;
-                if (msg.substr(0, 1) == "\1") {
-                    FdSource source(builderOut.get());
-                    auto ex = readError(source);
-                    ex.addTrace({}, "while setting up the build environment");
-                    throw ex;
-                }
-                debug("sandbox setup: " + msg);
-                msgs.push_back(std::move(msg));
-            }
-        }
+        nix::processSandboxSetupMessages(builderOut, pid, store, drvPath);
 
         return builderOut.get();
     }
@@ -1008,45 +628,16 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     SingleDrvOutputs unprepareBuild() override
     {
-        int status = pid.kill();
-
-        debug("builder process for '%s' finished", store.printStorePath(drvPath));
-
-        buildResult.timesBuilt++;
-        buildResult.stopTime = time(0);
-
-        miscMethods->childTerminated();
-
-        builderOut.close();
-
-        miscMethods->closeLogFile();
+        int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
 
         killSandbox(true);
 
-        stopDaemon();
+        nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
 
-        if (buildResult.cpuUser && buildResult.cpuSystem) {
-            debug(
-                "builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-                store.printStorePath(drvPath),
-                status,
-                ((double) buildResult.cpuUser->count()) / 1000000,
-                ((double) buildResult.cpuSystem->count()) / 1000000);
-        }
+        nix::logCpuUsage(store, drvPath, buildResult, status);
 
         if (!statusOk(status)) {
-            bool diskFull = false;
-#  if HAVE_STATVFS
-            {
-                uint64_t required = 8ULL * 1024 * 1024;
-                struct statvfs st;
-                if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-                    && (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-                if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-            }
-#  endif
+            bool diskFull = nix::isDiskFull(store, tmpDir);
 
             cleanupBuild(false);
 
@@ -1058,7 +649,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        StringMap outputRewrites;
+        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
             store, localSettings, *this, addedPaths, scratchOutputs,
             outputRewrites, buildUser.get(), tmpDir,

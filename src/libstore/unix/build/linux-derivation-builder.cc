@@ -6,50 +6,23 @@
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
-#include "nix/store/path-references.hh"
-#include "nix/util/util.hh"
-#include "nix/util/archive.hh"
-#include "nix/util/git.hh"
-#include "nix/store/daemon.hh"
-#include "nix/util/topo-sort.hh"
 #include "nix/store/build/child.hh"
-#include "nix/util/unix-domain-socket.hh"
-#include "nix/store/posix-fs-canonicalise.hh"
-#include "nix/util/posix-source-accessor.hh"
-#include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/build/derivation-env-desugar.hh"
-#include "nix/util/terminal.hh"
-#include "nix/store/filetransfer.hh"
+#include "nix/store/restricted-store.hh"
 #include "nix/store/personality.hh"
 #include "nix/util/linux-namespaces.hh"
-#include "build/derivation-check.hh"
 #include "store-config-private.hh"
 
-#include <sys/un.h>
 #include <fcntl.h>
-#include <termios.h>
 #include <unistd.h>
-#include <sys/mman.h>
 #include <sys/resource.h>
-#include <sys/socket.h>
-#include <sys/prctl.h>
-
-#if HAVE_STATVFS
-#  include <sys/statvfs.h>
-#endif
-
-#include <pwd.h>
-#include <grp.h>
 
 #include "nix/util/strings.hh"
 #include "nix/util/signals.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
-#  include "nix/store/s3-url.hh"
-#  include "nix/util/url.hh"
 #endif
 
 namespace nix {
@@ -58,9 +31,6 @@ using namespace nix::linux;
 
 struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 {
-    /**
-     * The process ID of the builder.
-     */
     Pid pid;
 
     LocalStore & store;
@@ -69,52 +39,28 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
-    /**
-     * User selected for running the builder.
-     */
     std::unique_ptr<UserLock> buildUser;
 
-    /**
-     * The temporary directory used for the build.
-     */
     std::filesystem::path tmpDir;
 
-    /**
-     * The top-level temporary directory.
-     */
     std::filesystem::path topTmpDir;
 
-    /**
-     * The sort of derivation we are building.
-     */
     const DerivationType derivationType;
 
-    typedef StringMap Environment;
-    Environment env;
+    StringMap env;
 
-    typedef std::map<StorePath, StorePath> RedirectedOutputs;
-    RedirectedOutputs redirectedOutputs;
+    std::map<StorePath, StorePath> redirectedOutputs;
 
-    /**
-     * The output paths used during the build.
-     */
     OutputPathMap scratchOutputs;
+
+    AutoCloseFD tmpDirFd;
+
+    StringMap inputRewrites, outputRewrites;
 
     static const std::filesystem::path homeDir;
 
-    /**
-     * The recursive Nix daemon socket.
-     */
     AutoCloseFD daemonSocket;
-
-    /**
-     * The daemon main thread.
-     */
     std::thread daemonThread;
-
-    /**
-     * The daemon worker threads.
-     */
     std::vector<std::thread> daemonWorkerThreads;
 
     LinuxDerivationBuilder(
@@ -134,7 +80,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             ignoreExceptionInDestructor();
         }
         try {
-            stopDaemon();
+            nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -173,26 +119,6 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return topTmpDir;
     }
 
-    void stopDaemon()
-    {
-        if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
-            if (errno == ENOTCONN) {
-                daemonSocket.close();
-            } else {
-                throw SysError("shutting down daemon socket");
-            }
-        }
-
-        if (daemonThread.joinable())
-            daemonThread.join();
-
-        for (auto & thread : daemonWorkerThreads)
-            thread.join();
-        daemonWorkerThreads.clear();
-
-        daemonSocket.close();
-    }
-
     void addDependencyImpl(const StorePath & path) override
     {
         addedPaths.insert(path);
@@ -221,23 +147,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void cleanupBuild(bool force)
     {
-        if (force) {
-            for (auto & i : redirectedOutputs)
-                deletePath(store.toRealPath(i.second));
-        }
-
-        if (topTmpDir != "") {
-            chmod(topTmpDir, 0000);
-
-            if (settings.keepFailed && !force && !drv.isBuiltin()) {
-                printError("note: keeping build directory %s", PathFmt(tmpDir));
-                chmod(topTmpDir, 0755);
-                chmod(tmpDir, 0755);
-            } else
-                deletePath(topTmpDir);
-            topTmpDir = "";
-            tmpDir = "";
-        }
+        nix::cleanupBuildCore(force, store, redirectedOutputs, drv, topTmpDir, tmpDir);
     }
 
     std::optional<Descriptor> startBuild() override
@@ -263,47 +173,14 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         tmpDir = topTmpDir;
         assert(!tmpDir.empty());
 
-        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        StringMap inputRewrites;
-        for (auto & [outputName, status] : initialOutputs) {
-            auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
-                return store.makeStorePath(
-                    "rewrite:" + std::string(drvPath.to_string()) + ":" + suffix, Hash(HashAlgorithm::SHA256), name);
-            };
-            auto scratchPath =
-                !status.known
-                    ? makeFallbackPath("name:" + std::string(outputName), outputPathName(drv.name, outputName))
-                : !needsHashRewrite()        ? status.known->path
-                : !status.known->isPresent() ? status.known->path
-                : buildMode != bmRepair && !status.known->isValid()
-                    ? status.known->path
-                    : makeFallbackPath(std::string(status.known->path.to_string()), status.known->path.name());
-            scratchOutputs.insert_or_assign(outputName, scratchPath);
-
-            inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
-
-            if (!status.known)
-                continue;
-            auto fixedFinalPath = status.known->path;
-
-            if (fixedFinalPath == scratchPath)
-                continue;
-
-            deletePath(store.printStorePath(scratchPath));
-
-            {
-                std::string h1{fixedFinalPath.hashPart()};
-                std::string h2{scratchPath.hashPart()};
-                inputRewrites[h1] = h2;
-            }
-
-            redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
-        }
+        inputRewrites.clear();
+        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
 
         nix::initEnv(
             env,
@@ -326,145 +203,32 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix")) {
-            experimentalFeatureSettings.require(Xp::RecursiveNix);
+        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+            nix::setupRecursiveNixDaemon(
+                store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(),
+                daemonSocket, daemonThread, daemonWorkerThreads, buildUser.get());
 
-            auto restrictedStore = makeRestrictedStore(
-                [&] {
-                    auto config = make_ref<LocalStore::Config>(*this->store.config);
-                    config->pathInfoCacheSize = 0;
-                    config->stateDir = "/no-such-path";
-                    config->logDir = "/no-such-path";
-                    return config;
-                }(),
-                ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-                *this);
-
-            addedPaths.clear();
-
-            auto socketName = ".nix-socket";
-            std::filesystem::path socketPath = tmpDir / socketName;
-            env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
-
-            daemonSocket = createUnixDomainSocket(socketPath, 0600);
-
-            nix::chownToBuilder(buildUser.get(), socketPath);
-
-            daemonThread = std::thread([this, restrictedStore]() {
-                while (true) {
-                    struct sockaddr_un remoteAddr;
-                    socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-                    AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-                    if (!remote) {
-                        if (errno == EINTR || errno == EAGAIN)
-                            continue;
-                        if (errno == EINVAL || errno == ECONNABORTED)
-                            break;
-                        throw SysError("accepting connection");
-                    }
-
-                    unix::closeOnExec(remote.get());
-
-                    debug("received daemon connection");
-
-                    auto workerThread = std::thread([restrictedStore, remote{std::move(remote)}]() {
-                        try {
-                            daemon::processConnection(
-                                restrictedStore,
-                                FdSource(remote.get()),
-                                FdSink(remote.get()),
-                                NotTrusted,
-                                daemon::Recursive);
-                            debug("terminated daemon connection");
-                        } catch (const Interrupted &) {
-                            debug("interrupted daemon connection");
-                        } catch (SystemError &) {
-                            ignoreExceptionExceptInterrupt();
-                        }
-                    });
-
-                    daemonWorkerThreads.push_back(std::move(workerThread));
-                }
-
-                debug("daemon shutting down");
-            });
-        }
-
-        printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
-        printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
-        for (auto & i : drv.env)
-            printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        nix::logBuilderInfo(drv);
 
         miscMethods->openLogFile();
 
-        builderOut = posix_openpt(O_RDWR | O_NOCTTY);
-        if (!builderOut)
-            throw SysError("opening pseudoterminal master");
-
-        std::string slaveName = getPtsName(builderOut.get());
-
-        if (buildUser) {
-            chmod(slaveName, 0600);
-
-            if (chown(slaveName.c_str(), buildUser->getUID(), 0))
-                throw SysError("changing owner of pseudoterminal slave");
-        }
-
-        if (unlockpt(builderOut.get()))
-            throw SysError("unlocking pseudoterminal");
+        nix::setupPTYMaster(builderOut, buildUser.get());
 
         buildResult.startTime = time(0);
 
         /* Start child */
         {
 #if NIX_WITH_AWS_AUTH
-            std::optional<AwsCredentials> awsCredentials;
-            if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-                auto url = drv.env.find("url");
-                if (url != drv.env.end()) {
-                    try {
-                        auto parsedUrl = parseURL(url->second);
-                        if (parsedUrl.scheme == "s3") {
-                            debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
-                            auto s3Url = ParsedS3URL::parse(parsedUrl);
-                            awsCredentials = getAwsCredentialsProvider()->getCredentials(s3Url);
-                            debug("Successfully pre-resolved AWS credentials in parent process");
-                        }
-                    } catch (const std::exception & e) {
-                        debug("Error pre-resolving S3 credentials: %s", e.what());
-                    }
-                }
-            }
+            auto awsCredentials = nix::preResolveAwsCredentials(drv);
 #endif
 
-            pid = startProcess([this,
-                                &inputRewrites
+            pid = startProcess([this
 #if NIX_WITH_AWS_AUTH
                                 ,
                                 awsCredentials
 #endif
             ]() {
-                /* Open pseudoterminal slave */
-                {
-                    std::string slaveName = getPtsName(builderOut.get());
-
-                    AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-                    if (!builderOut)
-                        throw SysError("opening pseudoterminal slave");
-
-                    struct termios term;
-                    if (tcgetattr(builderOut.get(), &term))
-                        throw SysError("getting pseudoterminal attributes");
-
-                    cfmakeraw(&term);
-
-                    if (tcsetattr(builderOut.get(), TCSANOW, &term))
-                        throw SysError("putting pseudoterminal into raw mode");
-
-                    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
-                        throw SysError("cannot pipe standard error into log file");
-                }
+                nix::setupPTYSlave(builderOut.get());
 
                 bool sendException = true;
 
@@ -480,18 +244,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 #endif
                     };
 
-                    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-                        try {
-                            ctx.netrcData = readFile(fileTransferSettings.netrcFile);
-                        } catch (SystemError &) {
-                        }
-
-                        if (auto & caFile = fileTransferSettings.caFile.get())
-                            try {
-                                ctx.caFileData = readFile(*caFile);
-                            } catch (SystemError &) {
-                            }
-                    }
+                    nix::setupBuiltinFetchurlContext(ctx, drv);
 
                     setupSeccomp(localSettings);
 
@@ -508,59 +261,17 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     struct rlimit limit = {0, RLIM_INFINITY};
                     setrlimit(RLIMIT_CORE, &limit);
 
-                    if (buildUser) {
-                        preserveDeathSignal([this]() {
-                            auto gids = buildUser->getSupplementaryGIDs();
-                            if (setgroups(gids.size(), gids.data()) == -1)
-                                throw SysError("cannot set supplementary groups of build user");
-
-                            if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
-                                || getegid() != buildUser->getGID())
-                                throw SysError("setgid failed");
-
-                            if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
-                                || geteuid() != buildUser->getUID())
-                                throw SysError("setuid failed");
-                        });
-                    }
+                    if (buildUser)
+                        nix::dropPrivileges(*buildUser);
 
                     writeFull(STDERR_FILENO, std::string("\2\n"));
 
                     sendException = false;
 
-                    if (drv.isBuiltin()) {
-                        try {
-                            logger = makeJSONLogger(getStandardError());
+                    if (drv.isBuiltin())
+                        nix::runBuiltinBuilder(ctx, drv, scratchOutputs, store);
 
-                            for (auto & e : drv.outputs)
-                                ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));
-
-                            std::string builtinName = drv.builder.substr(8);
-                            assert(RegisterBuiltinBuilder::builtinBuilders);
-                            if (auto builtin = get(RegisterBuiltinBuilder::builtinBuilders(), builtinName))
-                                (*builtin)(ctx);
-                            else
-                                throw Error("unsupported builtin builder '%1%'", builtinName);
-                            _exit(0);
-                        } catch (std::exception & e) {
-                            writeFull(STDERR_FILENO, e.what() + std::string("\n"));
-                            _exit(1);
-                        }
-                    }
-
-                    Strings buildArgs;
-                    buildArgs.push_back(std::string(baseNameOf(drv.builder)));
-
-                    for (auto & i : drv.args)
-                        buildArgs.push_back(rewriteStrings(i, inputRewrites));
-
-                    Strings envStrs;
-                    for (auto & i : env)
-                        envStrs.push_back(rewriteStrings(i.first + "=" + i.second, inputRewrites));
-
-                    execve(drv.builder.c_str(), stringsToCharPtrs(buildArgs).data(), stringsToCharPtrs(envStrs).data());
-
-                    throw SysError("executing '%1%'", drv.builder);
+                    nix::execBuilder(drv, inputRewrites, env);
 
                 } catch (...) {
                     handleChildException(sendException);
@@ -571,81 +282,23 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         pid.setSeparatePG(true);
 
-        /* Process sandbox setup messages */
-        {
-            std::vector<std::string> msgs;
-            while (true) {
-                std::string msg = [&]() {
-                    try {
-                        return readLine(builderOut.get());
-                    } catch (Error & e) {
-                        auto status = pid.wait();
-                        e.addTrace(
-                            {},
-                            "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
-                            store.printStorePath(drvPath),
-                            statusToString(status),
-                            concatStringsSep("|", msgs));
-                        throw;
-                    }
-                }();
-                if (msg.substr(0, 1) == "\2")
-                    break;
-                if (msg.substr(0, 1) == "\1") {
-                    FdSource source(builderOut.get());
-                    auto ex = readError(source);
-                    ex.addTrace({}, "while setting up the build environment");
-                    throw ex;
-                }
-                debug("sandbox setup: " + msg);
-                msgs.push_back(std::move(msg));
-            }
-        }
+        nix::processSandboxSetupMessages(builderOut, pid, store, drvPath);
 
         return builderOut.get();
     }
 
     SingleDrvOutputs unprepareBuild() override
     {
-        int status = pid.kill();
-
-        debug("builder process for '%s' finished", store.printStorePath(drvPath));
-
-        buildResult.timesBuilt++;
-        buildResult.stopTime = time(0);
-
-        miscMethods->childTerminated();
-
-        builderOut.close();
-
-        miscMethods->closeLogFile();
+        int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
 
         killSandbox(true);
 
-        stopDaemon();
+        nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
 
-        if (buildResult.cpuUser && buildResult.cpuSystem) {
-            debug(
-                "builder for '%s' terminated with status %d, user CPU %.3fs, system CPU %.3fs",
-                store.printStorePath(drvPath),
-                status,
-                ((double) buildResult.cpuUser->count()) / 1000000,
-                ((double) buildResult.cpuSystem->count()) / 1000000);
-        }
+        nix::logCpuUsage(store, drvPath, buildResult, status);
 
         if (!statusOk(status)) {
-            bool diskFull = false;
-#if HAVE_STATVFS
-            {
-                uint64_t required = 8ULL * 1024 * 1024;
-                struct statvfs st;
-                if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-                    && (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-                if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
-                    diskFull = true;
-            }
-#endif
+            bool diskFull = nix::isDiskFull(store, tmpDir);
 
             cleanupBuild(false);
 
@@ -657,7 +310,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        StringMap outputRewrites;
+        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
             store,
             localSettings,

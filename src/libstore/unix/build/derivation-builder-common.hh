@@ -6,11 +6,14 @@
 
 #include <filesystem>
 #include <functional>
+#include <thread>
+#include <vector>
 
 namespace nix {
 
 class LocalStore;
 struct UserLock;
+struct Pid;
 
 struct NotDeterministic : BuildError
 {
@@ -98,5 +101,170 @@ void initEnv(
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
     int tmpDirFd);
+
+/**
+ * Compute scratch output paths and set up hash rewrites for each output.
+ * Populates `scratchOutputs`, `redirectedOutputs`, and `inputRewrites`.
+ */
+void computeScratchOutputs(
+    LocalStore & store,
+    const DerivationBuilderParams & params,
+    OutputPathMap & scratchOutputs,
+    std::map<StorePath, StorePath> & redirectedOutputs,
+    StringMap & inputRewrites,
+    bool needsHashRewrite);
+
+/**
+ * Shut down the recursive Nix daemon socket, thread, and worker threads.
+ */
+void stopDaemon(
+    AutoCloseFD & daemonSocket,
+    std::thread & daemonThread,
+    std::vector<std::thread> & daemonWorkerThreads);
+
+/**
+ * Read and process sandbox setup messages from the builder child process.
+ * Waits for the "\2" ready signal, handles "\1" error reports.
+ */
+void processSandboxSetupMessages(
+    AutoCloseFD & builderOut,
+    Pid & pid,
+    const Store & store,
+    const StorePath & drvPath);
+
+/**
+ * Set up the recursive Nix daemon for the builder, including socket,
+ * chown, accept loop, and environment variable.
+ */
+void setupRecursiveNixDaemon(
+    LocalStore & store,
+    DerivationBuilder & builder,
+    const DerivationBuilderParams & params,
+    StorePathSet & addedPaths,
+    StringMap & env,
+    const std::filesystem::path & tmpDir,
+    const std::filesystem::path & tmpDirInSandbox,
+    AutoCloseFD & daemonSocket,
+    std::thread & daemonThread,
+    std::vector<std::thread> & daemonWorkerThreads,
+    UserLock * buildUser);
+
+/**
+ * Log chatty builder info (builder path, args, env vars).
+ */
+void logBuilderInfo(const BasicDerivation & drv);
+
+/**
+ * Set up the PTY master. On platforms where grantpt is needed when there
+ * is no build user (macOS), pass `grantOnNoBuildUser = true`.
+ */
+void setupPTYMaster(
+    AutoCloseFD & builderOut,
+    UserLock * buildUser,
+    bool grantOnNoBuildUser = false);
+
+/**
+ * Set up the PTY slave in the child process: open, configure raw mode,
+ * dup2 to stderr.
+ */
+void setupPTYSlave(int masterFd);
+
+/**
+ * Pre-resolve AWS credentials for S3 URLs in `builtin:fetchurl`.
+ * Returns nullopt if not applicable or on error.
+ */
+#if NIX_WITH_AWS_AUTH
+struct AwsCredentials;
+std::optional<AwsCredentials> preResolveAwsCredentials(const BasicDerivation & drv);
+#endif
+
+/**
+ * Set up the `BuiltinBuilderContext` with fetchurl-specific data (netrc, caFile).
+ */
+struct BuiltinBuilderContext;
+void setupBuiltinFetchurlContext(
+    BuiltinBuilderContext & ctx,
+    const BasicDerivation & drv);
+
+/**
+ * Run a builtin builder. Does not return on success (calls `_exit(0)`).
+ * On failure, writes error to stderr and calls `_exit(1)`.
+ */
+[[noreturn]] void runBuiltinBuilder(
+    BuiltinBuilderContext & ctx,
+    const BasicDerivation & drv,
+    const OutputPathMap & scratchOutputs,
+    Store & store);
+
+/**
+ * Drop privileges to the build user (setgroups, setgid, setuid).
+ * Preserves the death signal across the uid change.
+ */
+void dropPrivileges(UserLock & buildUser);
+
+/**
+ * Build the execve argument and environment arrays, then exec the builder.
+ * Does not return.
+ */
+[[noreturn]] void execBuilder(
+    const BasicDerivation & drv,
+    const StringMap & inputRewrites,
+    const StringMap & env);
+
+/**
+ * Check whether the store or tmpdir is low on disk space.
+ */
+bool isDiskFull(LocalStore & store, const std::filesystem::path & tmpDir);
+
+/**
+ * Common first part of `unprepareBuild()`: kill the child, log,
+ * update build result, close log file. Returns the exit status.
+ */
+int commonUnprepare(
+    Pid & pid,
+    const Store & store,
+    const StorePath & drvPath,
+    BuildResult & buildResult,
+    DerivationBuilderCallbacks & miscMethods,
+    AutoCloseFD & builderOut);
+
+/**
+ * Log CPU usage stats if available.
+ */
+void logCpuUsage(
+    const Store & store,
+    const StorePath & drvPath,
+    const BuildResult & buildResult,
+    int status);
+
+/**
+ * Common core of `cleanupBuild()`: delete redirected outputs if forced,
+ * handle keepFailed, clean up tmpDir.
+ */
+void cleanupBuildCore(
+    bool force,
+    LocalStore & store,
+    const std::map<StorePath, StorePath> & redirectedOutputs,
+    const BasicDerivation & drv,
+    std::filesystem::path & topTmpDir,
+    std::filesystem::path & tmpDir);
+
+/**
+ * Validate impure host dependencies against allowed prefixes and add
+ * them to `pathsInChroot`.
+ */
+void checkAndAddImpurePaths(
+    PathsInChroot & pathsInChroot,
+    const DerivationOptions<StorePath> & drvOptions,
+    const Store & store,
+    const StorePath & drvPath,
+    const PathSet & allowedPrefixes);
+
+/**
+ * Parse pre-build hook output and add extra sandbox paths.
+ */
+void parsePreBuildHook(
+    PathsInChroot & pathsInChroot,
+    const std::string & hookOutput);
 
 } // namespace nix
