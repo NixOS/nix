@@ -16,7 +16,8 @@ struct GetDerivationsEnv
     fetchers::Settings fetchSettings{};
     bool readOnlyMode = true;
     EvalSettings evalSettings{readOnlyMode};
-    EvalState state;
+    std::shared_ptr<EvalState> statePtr;
+    EvalState & state;
 
     Bindings * autoArgs = nullptr;
     Value attrsValue;
@@ -27,7 +28,8 @@ struct GetDerivationsEnv
             settings.nixPath = {};
             return settings;
         }())
-        , state({}, store, fetchSettings, evalSettings, nullptr)
+        , statePtr(std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr))
+        , state(*statePtr)
     {
         autoArgs = state.buildBindings(0).finish();
 

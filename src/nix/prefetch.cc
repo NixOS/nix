@@ -203,7 +203,7 @@ static int main_nix_prefetch_url(int argc, char ** argv)
         setLogFormat("bar");
 
         auto store = openStore();
-        auto state = std::make_unique<EvalState>(myArgs.lookupPath, store, fetchSettings, evalSettings);
+        auto state = std::make_shared<EvalState>(myArgs.lookupPath, store, fetchSettings, evalSettings);
 
         Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 

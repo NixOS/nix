@@ -247,11 +247,12 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     evalSettings.restrictEval = true;
     evalSettings.pureEval = true;
-    EvalState state(
-        {},
+    auto statePtr = std::make_shared<EvalState>(
+        LookupPath{},
         openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
         fetchSettings,
         evalSettings);
+    auto & state = *statePtr;
 
     auto vGenerateManpage = state.allocValue();
     state.eval(
@@ -454,11 +455,12 @@ void mainWrapped(int argc, char ** argv)
             Xp::FetchTree,
         };
         evalSettings.pureEval = false;
-        EvalState state(
-            {},
+        auto statePtr = std::make_shared<EvalState>(
+            LookupPath{},
             openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
             fetchSettings,
             evalSettings);
+        auto & state = *statePtr;
         auto builtinsJson = nlohmann::json::object();
         for (auto & builtinPtr : state.getBuiltins().attrs()->lexicographicOrder(state.symbols)) {
             auto & builtin = *builtinPtr;
