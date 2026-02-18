@@ -20,14 +20,14 @@ namespace nix {
  * Denotes a build failure that stemmed from the builder exiting with a
  * failing exist status.
  */
-struct BuilderFailureError : BuildError
+struct BuilderFailureError final : CloneableError<BuilderFailureError, BuildError>
 {
     int builderStatus;
 
     std::string extraMsgAfter;
 
     BuilderFailureError(BuildResult::Failure::Status status, int builderStatus, std::string extraMsgAfter)
-        : BuildError{
+        : CloneableError{
             status,
               /* No message for now, because the caller will make for
                  us, with extra context */

@@ -166,7 +166,7 @@ struct SQLiteTxn
     ~SQLiteTxn();
 };
 
-struct SQLiteError : Error
+struct SQLiteError : CloneableError<SQLiteError, Error>
 {
     std::string path;
     std::string errMsg;

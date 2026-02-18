@@ -17,7 +17,7 @@ namespace nix {
 
 SQLiteError::SQLiteError(
     const char * path, const char * errMsg, int errNo, int extendedErrNo, int offset, HintFmt && hf)
-    : Error("")
+    : CloneableError("")
     , path(path)
     , errMsg(errMsg)
     , errNo(errNo)

@@ -133,14 +133,14 @@ std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
 
-class ExecError : public Error
+class ExecError final : public CloneableError<ExecError, Error>
 {
 public:
     int status;
 
     template<typename... Args>
     ExecError(int status, const Args &... args)
-        : Error(args...)
+        : CloneableError(args...)
         , status(status)
     {
     }

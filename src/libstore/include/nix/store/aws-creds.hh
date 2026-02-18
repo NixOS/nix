@@ -34,12 +34,13 @@ struct AwsCredentials
     }
 };
 
-class AwsAuthError : public Error
+class AwsAuthError final : public CloneableError<AwsAuthError, Error>
 {
     std::optional<int> errorCode;
 
 public:
-    using Error::Error;
+    using CloneableError::CloneableError;
+
     AwsAuthError(int errorCode);
 
     std::optional<int> getErrorCode() const

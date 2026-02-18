@@ -60,12 +60,12 @@ namespace {
 using curlSList = std::unique_ptr<::curl_slist, decltype([](::curl_slist * list) { ::curl_slist_free_all(list); })>;
 using curlMulti = std::unique_ptr<::CURLM, decltype([](::CURLM * multi) { ::curl_multi_cleanup(multi); })>;
 
-struct curlMultiError : Error
+struct curlMultiError final : CloneableError<curlMultiError, Error>
 {
     ::CURLMcode code;
 
     curlMultiError(::CURLMcode code)
-        : Error{"unexpected curl multi error: %s", ::curl_multi_strerror(code)}
+        : CloneableError{"unexpected curl multi error: %s", ::curl_multi_strerror(code)}
     {
         assert(code != CURLM_OK);
     }
@@ -1212,7 +1212,7 @@ void FileTransfer::download(
 template<typename... Args>
 FileTransferError::FileTransferError(
     FileTransfer::Error error, std::optional<std::string> response, const Args &... args)
-    : Error(args...)
+    : CloneableError(args...)
     , error(error)
     , response(response)
 {

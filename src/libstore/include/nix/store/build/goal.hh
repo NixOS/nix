@@ -10,7 +10,7 @@
 
 namespace nix {
 
-struct TimedOut : BuildError
+struct TimedOut final : CloneableError<TimedOut, BuildError>
 {
     time_t maxDuration;
 

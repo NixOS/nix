@@ -28,7 +28,7 @@
 namespace nix {
 
 AwsAuthError::AwsAuthError(int errorCode)
-    : Error("AWS authentication error: '%s' (%d)", aws_error_str(errorCode), errorCode)
+    : CloneableError("AWS authentication error: '%s' (%d)", aws_error_str(errorCode), errorCode)
     , errorCode(errorCode)
 {
 }

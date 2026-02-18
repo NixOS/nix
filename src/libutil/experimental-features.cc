@@ -378,7 +378,7 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature, std::string reason)
-    : Error(
+    : CloneableError(
           "experimental Nix feature '%1%' is disabled%2%; add '--extra-experimental-features %1%' to enable it",
           showExperimentalFeature(feature),
           Uncolored(optionalBracket(" (", reason, ")")))

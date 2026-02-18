@@ -226,13 +226,31 @@ public:
     {
         return err;
     };
+
+    [[noreturn]] virtual void throwClone() const = 0;
 };
 
-#define MakeError(newClass, superClass) \
-    class newClass : public superClass  \
-    {                                   \
-    public:                             \
-        using superClass::superClass;   \
+template<typename Derived, typename Base>
+class CloneableError : public Base
+{
+public:
+    using Base::Base;
+
+    /**
+     * Rethrow a copy of this exception. Useful when the exception can get
+     * modified when appending traces.
+     */
+    [[noreturn]] void throwClone() const override
+    {
+        throw Derived(static_cast<const Derived &>(*this));
+    }
+};
+
+#define MakeError(newClass, superClass)                             \
+    class newClass : public CloneableError<newClass, superClass>    \
+    {                                                               \
+    public:                                                         \
+        using CloneableError<newClass, superClass>::CloneableError; \
     }
 
 MakeError(Error, BaseError);
@@ -244,21 +262,21 @@ MakeError(UnimplementedError, Error);
  * std::error_code. Use when you want to catch and check an error condition like
  * no_such_file_or_directory (ENOENT) without ifdefs.
  */
-class SystemError : public Error
+class SystemError : public CloneableError<SystemError, Error>
 {
     std::error_code errorCode;
 
 public:
     template<typename... Args>
     SystemError(std::errc posixErrNo, Args &&... args)
-        : Error(std::forward<Args>(args)...)
+        : CloneableError(std::forward<Args>(args)...)
         , errorCode(std::make_error_code(posixErrNo))
     {
     }
 
     template<typename... Args>
     SystemError(std::error_code errorCode, Args &&... args)
-        : Error(std::forward<Args>(args)...)
+        : CloneableError(std::forward<Args>(args)...)
         , errorCode(errorCode)
     {
     }
@@ -290,7 +308,7 @@ public:
  * support is too WIP to justify the code churn, but if it is finished
  * then a better identifier becomes moe worth it.
  */
-class SysError : public SystemError
+class SysError final : public CloneableError<SysError, SystemError>
 {
 public:
     int errNo;
@@ -301,7 +319,7 @@ public:
      */
     template<typename... Args>
     SysError(int errNo, const Args &... args)
-        : SystemError(static_cast<std::errc>(errNo), "")
+        : CloneableError(static_cast<std::errc>(errNo), "")
         , errNo(errNo)
     {
         auto hf = HintFmt(args...);
@@ -369,7 +387,7 @@ namespace windows {
  * Unless you need to catch a specific error number, don't catch this in
  * portable code. Catch `SystemError` instead.
  */
-class WinError : public SystemError
+class WinError : public CloneableError<WinError, SystemError>
 {
 public:
     DWORD lastError;
@@ -381,7 +399,7 @@ public:
      */
     template<typename... Args>
     WinError(DWORD lastError, const Args &... args)
-        : SystemError(std::error_code(lastError, std::system_category()), "")
+        : CloneableError(std::error_code(lastError, std::system_category()), "")
         , lastError(lastError)
     {
         auto hf = HintFmt(args...);

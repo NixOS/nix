@@ -14,7 +14,7 @@ namespace nix::eval_cache {
 struct AttrDb;
 class AttrCursor;
 
-struct CachedEvalError : EvalError
+struct CachedEvalError : CloneableError<CachedEvalError, EvalError>
 {
     const ref<AttrCursor> cursor;
     const Symbol attr;

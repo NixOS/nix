@@ -74,11 +74,11 @@ namespace nix {
 
 struct GitSourceAccessor;
 
-struct GitError : public Error
+struct GitError final : public CloneableError<GitError, Error>
 {
     template<typename... Ts>
     GitError(const git_error & error, Ts &&... args)
-        : Error("")
+        : CloneableError("")
     {
         auto hf = HintFmt(std::forward<Ts>(args)...);
         err.msg = HintFmt("%1%: %2% (libgit2 error code = %3%)", Uncolored(hf.str()), error.message, error.klass);

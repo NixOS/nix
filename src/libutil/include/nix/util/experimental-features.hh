@@ -80,7 +80,7 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet &);
  * An experimental feature was required for some (experimental)
  * operation, but was not enabled.
  */
-class MissingExperimentalFeature : public Error
+class MissingExperimentalFeature final : public CloneableError<MissingExperimentalFeature, Error>
 {
 public:
     /**
