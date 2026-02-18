@@ -427,7 +427,9 @@ void mainWrapped(int argc, char ** argv)
 
     evalSettings.pureEval = true;
 
+#ifndef _WIN32
     setLogFormat("bar");
+#endif
     settings.verboseBuild = false;
 
     // If on a terminal, progress will be displayed via progress bars etc. (thus verbosity=notice)
