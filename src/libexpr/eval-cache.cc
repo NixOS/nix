@@ -407,9 +407,13 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.string_view(), v.context()), string_t{v.string_view(), {}}};
-        else if (v.type() == nPath) {
+        if (v.type() == nString) {
+            NixStringContext context;
+            copyContext(v, context);
+            cachedValue = {
+                root->db->setString(getKey(), v.string_view(), v.context()),
+                string_t{v.string_view(), std::move(context)}};
+        } else if (v.type() == nPath) {
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         } else if (v.type() == nBool)
