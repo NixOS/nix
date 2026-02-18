@@ -45,9 +45,9 @@ void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
             checkInterrupt();
         DWORD res;
         if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
-            // Do this because `handleToPath` will overwrite the last error.
+            // Do this because `descriptorToPath` will overwrite the last error.
             auto lastError = GetLastError();
-            auto path = handleToPath(handle);
+            auto path = descriptorToPath(handle);
             throw WinError(lastError, "writing to file %d:%s", handle, PathFmt(path));
         }
         if (res > 0)

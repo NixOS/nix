@@ -272,7 +272,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
             || e.code() == std::errc::not_a_directory)
             printInfo("cannot read potential root '%1%'", path);
         else
-            throw;
+            throw SystemError(e.code(), "finding GC roots in '%1%'", path);
     }
 
     catch (SystemError & e) {

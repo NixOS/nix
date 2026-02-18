@@ -202,14 +202,13 @@ void LocalStore::optimisePath_(
                    full.  When that happens, it's fine to ignore it: we
                    just effectively disable deduplication of this
                    file.
-                   TODO: Get rid of errno, use error code.
                    */
-                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), path, strerror(errno));
+                printInfo("cannot link %s to '%s': %s", PathFmt(linkPath), path, e.code().message());
                 return;
             }
 
             else
-                throw;
+                throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), path);
         }
     }
 
@@ -250,7 +249,7 @@ void LocalStore::optimisePath_(
                 printInfo("%1% has maximum number of links", PathFmt(linkPath));
             return;
         }
-        throw;
+        throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(tempLink));
     }
 
     /* Atomically replace the old file with the new hard link. */
@@ -271,7 +270,7 @@ void LocalStore::optimisePath_(
             debug("%s has reached maximum number of links", PathFmt(linkPath));
             return;
         }
-        throw;
+        throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tempLink), path);
     }
 
     stats.filesLinked++;

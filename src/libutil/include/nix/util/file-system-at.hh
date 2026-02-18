@@ -75,7 +75,7 @@ namespace linux {
  *
  * @see https://man7.org/linux/man-pages/man2/openat2.2.html
  * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
-v*
+ *
  * @param flags O_* flags
  * @param mode Mode for O_{CREAT,TMPFILE}
  * @param resolve RESOLVE_* flags

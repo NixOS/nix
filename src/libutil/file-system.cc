@@ -40,9 +40,9 @@ DirectoryIterator::DirectoryIterator(const std::filesystem::path & p)
         // **Attempt to create the underlying directory_iterator**
         it_ = std::filesystem::directory_iterator(p);
     } catch (const std::filesystem::filesystem_error & e) {
-        // **Catch filesystem_error and throw SysError**
-        // Adapt the error message as needed for SysError
-        throw SysError("cannot read directory %s", PathFmt(p));
+        // **Catch filesystem_error and throw SystemError**
+        // Adapt the error message as needed for SystemError
+        throw SystemError(e.code(), "cannot read directory %s", PathFmt(p));
     }
 }
 
@@ -280,7 +280,11 @@ bool pathAccessible(const std::filesystem::path & path)
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
-    return std::filesystem::read_symlink(path);
+    try {
+        return std::filesystem::read_symlink(path);
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SystemError(e.code(), "reading symbolic link '%s'", PathFmt(path));
+    }
 }
 
 Path readLink(const Path & path)
@@ -463,7 +467,7 @@ void createDirs(const std::filesystem::path & path)
     try {
         std::filesystem::create_directories(path);
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("creating directory '%1%'", path.string());
+        throw SystemError(e.code(), "creating directory '%1%'", path.string());
     }
 }
 
@@ -664,7 +668,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists)
                 continue;
-            throw SysError("creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
+            throw SystemError(e.code(), "creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
         }
 
         try {
@@ -672,7 +676,7 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists)
                 continue;
-            throw SysError("renaming %1% to %2%", PathFmt(tmp), PathFmt(link));
+            throw SystemError(e.code(), "renaming %1% to %2%", PathFmt(tmp), PathFmt(link));
         }
 
         break;
@@ -773,7 +777,7 @@ std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
         }
         return std::filesystem::canonical(parent) / path.filename();
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("canonicalising parent path of %1%", PathFmt(path));
+        throw SystemError(e.code(), "canonicalising parent path of %1%", PathFmt(path));
     }
 }
 

@@ -247,7 +247,8 @@ static void initRepoAtomically(std::filesystem::path & path, GitRepo::Options op
             || e.code() == std::errc::directory_not_empty) {
             return;
         } else
-            throw SysError("moving temporary git repository from %s to %s", PathFmt(tmpDir), PathFmt(path));
+            throw SystemError(
+                e.code(), "moving temporary git repository from %s to %s", PathFmt(tmpDir), PathFmt(path));
     }
     // we successfully moved the repository, so the temporary directory no longer exists.
     delTmpDir.cancel();

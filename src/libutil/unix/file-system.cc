@@ -46,6 +46,31 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
     return open(path.c_str(), flags, mode);
 }
 
+std::filesystem::path descriptorToPath(Descriptor fd)
+{
+    if (fd == STDIN_FILENO)
+        return "<stdin>";
+    if (fd == STDOUT_FILENO)
+        return "<stdout>";
+    if (fd == STDERR_FILENO)
+        return "<stderr>";
+
+#if defined(__linux__)
+    try {
+        return readLink("/proc/self/fd/" + std::to_string(fd));
+    } catch (SystemError &) {
+    }
+#elif HAVE_F_GETPATH
+    /* F_GETPATH requires PATH_MAX buffer per POSIX */
+    char buf[PATH_MAX];
+    if (fcntl(fd, F_GETPATH, buf) != -1)
+        return buf;
+#endif
+
+    /* Fallback for unknown fd or unsupported platform */
+    return "<fd " + std::to_string(fd) + ">";
+}
+
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");

@@ -83,7 +83,7 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
     deletePath(path);
 }
 
-std::filesystem::path windows::handleToPath(HANDLE handle)
+std::filesystem::path descriptorToPath(Descriptor handle)
 {
     std::vector<wchar_t> buf(0x100);
     DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);

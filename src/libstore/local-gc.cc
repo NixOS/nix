@@ -35,7 +35,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
         if (e.code() == std::errc::no_such_file_or_directory || e.code() == std::errc::permission_denied
             || e.code() == std::errc::no_such_process)
             return;
-        throw;
+        throw SystemError(e.code(), "reading symlink '%s'", PathFmt(file));
     }
     if (buf.is_absolute())
         roots[buf.string()].emplace(file.string());
