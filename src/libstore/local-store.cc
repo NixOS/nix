@@ -144,10 +144,7 @@ LocalStore::LocalStore(ref<const Config> config)
     Path gcRootsDir = config->stateDir + "/gcroots";
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
-    if (!pathExists(gcRootsDir)) {
-        createDirs(gcRootsDir);
-        replaceSymlink(profilesDir, gcRootsDir + "/profiles");
-    }
+    createDirs(gcRootsDir);
 
     for (auto & perUserDir : {profilesDir + "/per-user", gcRootsDir + "/per-user"}) {
         createDirs(perUserDir);
