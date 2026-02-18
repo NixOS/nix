@@ -6,9 +6,9 @@
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
 
-namespace nix::windows {
+namespace nix {
 
-std::string WinError::renderError(DWORD lastError)
+std::string SystemError::renderWindowsError(DWORD lastError)
 {
     LPSTR errorText = NULL;
 
@@ -32,5 +32,5 @@ std::string WinError::renderError(DWORD lastError)
     return fmt("CODE=%d", lastError);
 }
 
-} // namespace nix::windows
+} // namespace nix
 #endif

@@ -56,26 +56,24 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
     switch (lockType) {
     case ltNone: {
         OVERLAPPED ov = {0};
-        if (!UnlockFileEx(desc, 0, 2, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            throw winError;
-        }
+        if (!UnlockFileEx(desc, 0, 2, 0, &ov))
+            throw WinError("Failed to unlock file desc %s", desc);
         return true;
     }
     case ltRead: {
         OVERLAPPED ov = {0};
         if (!LockFileEx(desc, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
-            WinError winError("Failed to lock file desc %s", desc);
-            if (winError.lastError == ERROR_LOCK_VIOLATION)
+            auto lastError = GetLastError();
+            if (lastError == ERROR_LOCK_VIOLATION)
                 return false;
-            throw winError;
+            throw WinError(lastError, "Failed to lock file desc %s", desc);
         }
 
         ov.Offset = 1;
         if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            if (winError.lastError != ERROR_NOT_LOCKED)
-                throw winError;
+            auto lastError = GetLastError();
+            if (lastError != ERROR_NOT_LOCKED)
+                throw WinError(lastError, "Failed to unlock file desc %s", desc);
         }
         return true;
     }
@@ -83,17 +81,17 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
         OVERLAPPED ov = {0};
         ov.Offset = 1;
         if (!LockFileEx(desc, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
-            WinError winError("Failed to lock file desc %s", desc);
-            if (winError.lastError == ERROR_LOCK_VIOLATION)
+            auto lastError = GetLastError();
+            if (lastError == ERROR_LOCK_VIOLATION)
                 return false;
-            throw winError;
+            throw WinError(lastError, "Failed to lock file desc %s", desc);
         }
 
         ov.Offset = 0;
         if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            if (winError.lastError != ERROR_NOT_LOCKED)
-                throw winError;
+            auto lastError = GetLastError();
+            if (lastError != ERROR_NOT_LOCKED)
+                throw WinError(lastError, "Failed to unlock file desc %s", desc);
         }
         return true;
     }

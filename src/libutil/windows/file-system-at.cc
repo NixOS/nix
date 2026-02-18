@@ -13,8 +13,6 @@
 
 namespace nix {
 
-using namespace nix::windows;
-
 namespace windows {
 
 namespace {
@@ -210,6 +208,8 @@ bool isReparsePoint(HANDLE handle)
 
 } // namespace windows
 
+using namespace nix::windows;
+
 Descriptor openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
 {
@@ -259,9 +259,10 @@ Descriptor openFileEnsureBeneathNoSymlinks(
                 FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
                 FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
             );
-        } catch (WinError & e) {
+        } catch (SystemError & e) {
             /* Check if this is because it's a symlink */
-            if (e.lastError == ERROR_CANT_ACCESS_FILE || e.lastError == ERROR_ACCESS_DENIED) {
+            auto err = e.ec().value();
+            if (err == ERROR_CANT_ACCESS_FILE || err == ERROR_ACCESS_DENIED) {
                 throwIfSymlink(wcomponent, pathUpTo(std::next(it)));
             }
             throw;
@@ -286,9 +287,9 @@ Descriptor openFileEnsureBeneathNoSymlinks(
             desiredAccess,
             createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
             createDisposition);
-    } catch (WinError & e) {
+    } catch (SystemError & e) {
         /* Check if final component is a symlink when we requested to not follow it */
-        if (e.lastError == ERROR_CANT_ACCESS_FILE) {
+        if (e.ec().value() == ERROR_CANT_ACCESS_FILE) {
             throwIfSymlink(finalComponent, path);
         }
         throw;

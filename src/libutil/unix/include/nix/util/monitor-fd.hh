@@ -60,7 +60,7 @@ inline void MonitorFdHup::runThread(int watchFd, int notifyFd)
 {
     int kqResult = kqueue();
     if (kqResult < 0) {
-        throw SysError("MonitorFdHup kqueue");
+        throw SystemError::fromPosix("MonitorFdHup kqueue");
     }
     AutoCloseFD kq{kqResult};
 
@@ -78,14 +78,14 @@ inline void MonitorFdHup::runThread(int watchFd, int notifyFd)
 
     int result = kevent(kq.get(), kevs.data(), kevs.size(), nullptr, 0, nullptr);
     if (result < 0) {
-        throw SysError("MonitorFdHup kevent add");
+        throw SystemError::fromPosix("MonitorFdHup kevent add");
     }
 
     while (true) {
         struct kevent event;
         int numEvents = kevent(kq.get(), nullptr, 0, &event, 1, nullptr);
         if (numEvents < 0) {
-            throw SysError("MonitorFdHup kevent watch");
+            throw SystemError::fromPosix("MonitorFdHup kevent watch");
         }
 
         if (numEvents > 0 && (event.flags & EV_EOF)) {
@@ -112,7 +112,7 @@ inline void MonitorFdHup::runThread(int watchFd, int notifyFd)
             if (errno == EINTR || errno == EAGAIN) {
                 continue;
             } else {
-                throw SysError("in MonitorFdHup poll()");
+                throw SystemError::fromPosix("in MonitorFdHup poll()");
             }
         }
 

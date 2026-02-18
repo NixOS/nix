@@ -47,16 +47,16 @@ TEST(fchmodatTryNoFollow, works)
     /* Check that symlinks are not followed and targets are not changed. */
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("filelink"), 0777); } catch (SysError & e) {
-            if (e.errNo != EOPNOTSUPP)
+        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("filelink"), 0777); } catch (SystemError & e) {
+            if (!e.is(std::errc::operation_not_supported))
                 throw;
         });
     ASSERT_EQ(stat((tmpDir / "file").c_str(), &st), 0);
     EXPECT_EQ(st.st_mode & 0777, 0644);
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("dirlink"), 0777); } catch (SysError & e) {
-            if (e.errNo != EOPNOTSUPP)
+        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("dirlink"), 0777); } catch (SystemError & e) {
+            if (!e.is(std::errc::operation_not_supported))
                 throw;
         });
     ASSERT_EQ(stat((tmpDir / "dir").c_str(), &st), 0);
@@ -110,14 +110,14 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
 
             try {
                 fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600);
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 _exit(1);
             }
 
             try {
                 fchmodatTryNoFollow(dirFd.get(), CanonPath("link"), 0777);
-            } catch (SysError & e) {
-                if (e.errNo == EOPNOTSUPP)
+            } catch (SystemError & e) {
+                if (e.is(std::errc::operation_not_supported))
                     _exit(0); /* Success. */
             }
 

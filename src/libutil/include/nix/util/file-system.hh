@@ -199,7 +199,7 @@ std::filesystem::path readLink(const std::filesystem::path & path);
  *
  * @note this function will clobber `errno` (Unix) / "last error"
  * (Windows), so care must be used to get those error codes, then call
- * this, then build a `SysError` / `WinError` with the saved error code.
+ * this, then build a `SystemError` with the saved error code.
  */
 std::filesystem::path descriptorToPath(Descriptor fd);
 

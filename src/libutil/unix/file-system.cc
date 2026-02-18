@@ -186,9 +186,9 @@ static void _deletePath(
         if ((st.st_mode & PERM_MASK) != PERM_MASK)
             try {
                 unix::fchmodatTryNoFollow(parentfd, CanonPath(name), st.st_mode | PERM_MASK);
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
-                if (e.errNo == EOPNOTSUPP)
+                if (e.is(std::errc::operation_not_supported))
                     e.addTrace({}, "%1% is now a symlink, expected directory", PathFmt(path));
                 throw;
             }

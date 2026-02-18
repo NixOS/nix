@@ -40,7 +40,7 @@ bool userNamespacesSupported()
 
             auto r = pid.wait();
             assert(!r);
-        } catch (SysError & e) {
+        } catch (SystemError & e) {
             debug("user namespaces do not work on this system: %s", e.msg());
             return false;
         }
@@ -77,7 +77,7 @@ bool mountAndPidNamespacesSupported()
                 return false;
             }
 
-        } catch (SysError & e) {
+        } catch (SystemError & e) {
             debug("mount namespaces do not work on this system: %s", e.msg());
             return false;
         }

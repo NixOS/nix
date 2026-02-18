@@ -250,18 +250,15 @@ class SystemError : public Error
     std::error_code errorCode;
     std::string errorDetails;
 
-protected:
-
     /**
-     * Just here to allow derived classes to use the right constructor
-     * (the protected one).
+     * Just here to allow the static methods to use the right constructor
+     * (the private one).
      */
     struct Disambig
     {};
 
     /**
-     * Protected constructor for subclasses that provide their own error message.
-     * The error message is appended to the formatted hint.
+     * Private constructor with explicit error message string.
      */
     template<typename... Args>
     SystemError(Disambig, std::error_code errorCode, std::string_view errorDetails, Args &&... args)
@@ -284,6 +281,79 @@ public:
     {
     }
 
+    /**
+     * Construct a POSIX error using the explicitly-provided error number.
+     * `strerror` will be used to try to add additional information to the message.
+     */
+    template<typename... Args>
+    static SystemError fromPosixExplicit(int errNo, Args &&... args)
+    {
+        return SystemError(
+            Disambig{},
+            std::make_error_code(static_cast<std::errc>(errNo)),
+            strerror(errNo),
+            std::forward<Args>(args)...);
+    }
+
+    /**
+     * Construct a POSIX error using the ambient `errno`.
+     *
+     * Be sure to not perform another `errno`-modifying operation before
+     * calling this!
+     */
+    template<typename... Args>
+    static SystemError fromPosix(Args &&... args)
+    {
+        return fromPosixExplicit(errno, std::forward<Args>(args)...);
+    }
+
+#ifdef _WIN32
+    /**
+     * Construct a Windows error using the explicitly-provided error number.
+     * `FormatMessageA` will be used to try to add additional information
+     * to the message.
+     */
+    template<typename... Args>
+    static SystemError fromWindowsExplicit(DWORD lastError, Args &&... args)
+    {
+        return SystemError(
+            Disambig{},
+            std::error_code(lastError, std::system_category()),
+            renderWindowsError(lastError),
+            std::forward<Args>(args)...);
+    }
+
+    /**
+     * Construct a Windows error using `GetLastError()`.
+     *
+     * Be sure to not perform another last-error-modifying operation
+     * before calling this!
+     */
+    template<typename... Args>
+    static SystemError fromWindows(Args &&... args)
+    {
+        return fromWindowsExplicit(GetLastError(), std::forward<Args>(args)...);
+    }
+
+private:
+    static std::string renderWindowsError(DWORD lastError);
+
+public:
+#endif
+
+    /**
+     * Construct using the native error (errno on POSIX, GetLastError() on Windows).
+     */
+    template<typename... Args>
+    static SystemError fromNative(Args &&... args)
+    {
+#ifdef _WIN32
+        return fromWindows(std::forward<Args>(args)...);
+#else
+        return fromPosix(std::forward<Args>(args)...);
+#endif
+    }
+
     const std::error_code ec() const &
     {
         return errorCode;
@@ -296,53 +366,58 @@ public:
 };
 
 /**
- * POSIX system error, created using `errno`, `strerror` friends.
- *
- * Throw this, but prefer not to catch this, and catch `SystemError`
- * instead. This allows implementations to freely switch between this
- * and `windows::WinError` without breaking catch blocks.
- *
- * However, it is permissible to catch this and rethrow so long as
- * certain conditions are not met (e.g. to catch only if `errNo =
- * EFooBar`). In that case, try to also catch the equivalent `windows::WinError`
- * code.
- *
- * @todo Rename this to `PosixError` or similar. At this point Windows
- * support is too WIP to justify the code churn, but if it is finished
- * then a better identifier becomes moe worth it.
+ * Wrapper to avoid churn
  */
-class SysError : public SystemError
+template<typename... Args>
+SystemError SysError(int errNo, Args &&... args)
 {
-public:
-    int errNo;
+    return SystemError::fromPosixExplicit(errNo, std::forward<Args>(args)...);
+}
 
-    /**
-     * Construct using the explicitly-provided error number. `strerror`
-     * will be used to try to add additional information to the message.
-     */
-    template<typename... Args>
-    SysError(int errNo, Args &&... args)
-        : SystemError(
-              Disambig{},
-              std::make_error_code(static_cast<std::errc>(errNo)),
-              strerror(errNo),
-              std::forward<Args>(args)...)
-        , errNo(errNo)
-    {
-    }
+/**
+ * Wrapper to avoid churn
+ */
+template<typename... Args>
+SystemError SysError(Args &&... args)
+{
+    return SystemError::fromPosix(std::forward<Args>(args)...);
+}
 
-    /**
-     * Construct using the ambient `errno`.
-     *
-     * Be sure to not perform another `errno`-modifying operation before
-     * calling this constructor!
-     */
-    template<typename... Args>
-    SysError(Args &&... args)
-        : SysError(errno, std::forward<Args>(args)...)
-    {
-    }
-};
+#ifdef _WIN32
+
+namespace windows {
+
+/**
+ * Wrapper to avoid churn
+ */
+template<typename... Args>
+SystemError WinError(DWORD lastError, Args &&... args)
+{
+    return SystemError::fromWindowsExplicit(lastError, std::forward<Args>(args)...);
+}
+
+/**
+ * Wrapper to avoid churn
+ */
+template<typename... Args>
+SystemError WinError(Args &&... args)
+{
+    return SystemError::fromWindows(std::forward<Args>(args)...);
+}
+
+} // namespace windows
+
+#endif
+
+/**
+ * Convenience wrapper for when we use `errno`-based error handling
+ * on Unix, and `GetLastError()`-based error handling on Windows.
+ */
+template<typename... Args>
+SystemError NativeSysError(Args &&... args)
+{
+    return SystemError::fromNative(std::forward<Args>(args)...);
+}
 
 /**
  * Throw an exception for the purpose of checking that exception
@@ -381,70 +456,5 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
 #else
 #  define nixUnreachableWhenHardened std::unreachable
 #endif
-
-#ifdef _WIN32
-
-namespace windows {
-
-/**
- * Windows Error type.
- *
- * Unless you need to catch a specific error number, don't catch this in
- * portable code. Catch `SystemError` instead.
- */
-class WinError : public SystemError
-{
-public:
-    DWORD lastError;
-
-    /**
-     * Construct using the explicitly-provided error number.
-     * `FormatMessageA` will be used to try to add additional
-     * information to the message.
-     */
-    template<typename... Args>
-    WinError(DWORD lastError, Args &&... args)
-        : SystemError(
-              Disambig{},
-              std::error_code(lastError, std::system_category()),
-              renderError(lastError),
-              std::forward<Args>(args)...)
-        , lastError(lastError)
-    {
-    }
-
-    /**
-     * Construct using `GetLastError()` and the ambient "last error".
-     *
-     * Be sure to not perform another last-error-modifying operation
-     * before calling this constructor!
-     */
-    template<typename... Args>
-    WinError(Args &&... args)
-        : WinError(GetLastError(), std::forward<Args>(args)...)
-    {
-    }
-
-private:
-
-    static std::string renderError(DWORD lastError);
-};
-
-} // namespace windows
-
-#endif
-
-/**
- * Convenience alias for when we use a `errno`-based error handling
- * function on Unix, and `GetLastError()`-based error handling on on
- * Windows.
- */
-using NativeSysError =
-#ifdef _WIN32
-    windows::WinError
-#else
-    SysError
-#endif
-    ;
 
 } // namespace nix
