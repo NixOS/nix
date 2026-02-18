@@ -11,13 +11,12 @@ HEAD_SHA=$(get_head_sha "$TEST_WORLD")
 echo "Testing dirty zone detection..."
 
 # First, verify zone is clean
-zone_info=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    --option tectonix-checkout-path "$TEST_WORLD" \
-    'builtins.unsafeTectonixInternalZone "//areas/tools/dev"')
-echo "Clean zone info: $zone_info"
+dirty_status=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").dirty' \
+    --option tectonix-checkout-path "$TEST_WORLD")
+echo "Clean zone dirty status: $dirty_status"
 
-# Extract dirty status (should be false)
-if echo "$zone_info" | grepQuiet '"dirty":true'; then
+if [[ "$dirty_status" == "true" ]]; then
     fail "Zone should be clean before modification"
 fi
 
@@ -25,20 +24,19 @@ fi
 echo "Modified content" >> "$TEST_WORLD/areas/tools/dev/zone.nix"
 
 # Now check dirty status
-zone_info_dirty=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    --option tectonix-checkout-path "$TEST_WORLD" \
-    'builtins.unsafeTectonixInternalZone "//areas/tools/dev"')
-echo "Dirty zone info: $zone_info_dirty"
+dirty_status_after=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").dirty' \
+    --option tectonix-checkout-path "$TEST_WORLD")
+echo "Dirty zone dirty status: $dirty_status_after"
 
-# dirty should now be true
-if ! echo "$zone_info_dirty" | grepQuiet '"dirty":true'; then
+if [[ "$dirty_status_after" != "true" ]]; then
     fail "Zone should be dirty after modification"
 fi
 
 # Check dirtyZones builtin
 dirty_zones=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    --option tectonix-checkout-path "$TEST_WORLD" \
-    'builtins.unsafeTectonixInternalDirtyZones')
+    'builtins.unsafeTectonixInternalDirtyZones' \
+    --option tectonix-checkout-path "$TEST_WORLD")
 echo "Dirty zones: $dirty_zones"
 
 # Verify the modified zone appears as dirty
@@ -47,12 +45,12 @@ if ! echo "$dirty_zones" | grepQuiet "//areas/tools/dev"; then
 fi
 
 # Verify an unmodified zone is not dirty
-zone_info_clean=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    --option tectonix-checkout-path "$TEST_WORLD" \
-    'builtins.unsafeTectonixInternalZone "//areas/tools/tec"')
-echo "Unmodified zone info: $zone_info_clean"
+clean_dirty_status=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/tec").dirty' \
+    --option tectonix-checkout-path "$TEST_WORLD")
+echo "Unmodified zone dirty status: $clean_dirty_status"
 
-if echo "$zone_info_clean" | grepQuiet '"dirty":true'; then
+if [[ "$clean_dirty_status" == "true" ]]; then
     fail "Unmodified zone should not be dirty"
 fi
 

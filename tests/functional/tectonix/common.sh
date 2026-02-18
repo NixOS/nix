@@ -47,6 +47,14 @@ MANIFEST_EOF
     git config user.email "test@example.com"
     git config user.name "Test User"
 
+    # Create sparse-checkout-roots so dirty zone detection works
+    mkdir -p .git/info
+    cat > .git/info/sparse-checkout-roots << 'SPARSE_EOF'
+W-000001
+W-000002
+W-000003
+SPARSE_EOF
+
     # Commit everything
     git add -A
     git commit -m "Initial commit"

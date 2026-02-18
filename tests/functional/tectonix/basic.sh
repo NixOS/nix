@@ -43,24 +43,32 @@ zone_src=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
 echo "Zone source path: $zone_src"
 
 # Verify it's a store path
-if [[ ! "$zone_src" =~ ^/nix/store/ ]]; then
+if [[ ! "$zone_src" =~ ^${NIX_STORE_DIR:-/nix/store}/ ]]; then
     fail "Zone source should be a store path, got: $zone_src"
 fi
 
-# Test: Zone attribute set
-zone_info=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    'builtins.unsafeTectonixInternalZone "//areas/tools/dev"')
-echo "Zone info: $zone_info"
+# Test: Zone attribute set - verify individual attributes
+zone_outpath=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").outPath')
+echo "Zone outPath: $zone_outpath"
+[[ -n "$zone_outpath" ]] || fail "Zone should have outPath"
 
-# Verify expected attributes
-echo "$zone_info" | grepQuiet "outPath"
-echo "$zone_info" | grepQuiet "treeSha"
-echo "$zone_info" | grepQuiet "zonePath"
-echo "$zone_info" | grepQuiet "dirty"
+zone_treeSha=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").treeSha')
+echo "Zone treeSha: $zone_treeSha"
+[[ -n "$zone_treeSha" ]] || fail "Zone should have treeSha"
+
+zone_zonePath=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").zonePath')
+echo "Zone zonePath: $zone_zonePath"
+[[ "$zone_zonePath" == "//areas/tools/dev" ]] || fail "Zone zonePath should be //areas/tools/dev, got: $zone_zonePath"
+
+zone_dirty=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    '(builtins.unsafeTectonixInternalZone "//areas/tools/dev").dirty')
+echo "Zone dirty: $zone_dirty"
 
 # Verify dirty is false (clean repo)
-dirty=$(echo "$zone_info" | nix eval --json --expr "(builtins.fromJSON \"$(echo "$zone_info" | sed 's/"/\\"/g')\").dirty" 2>/dev/null || echo "$zone_info" | grep -o '"dirty":[^,}]*' | cut -d: -f2)
-if [[ "$dirty" == "true" ]]; then
+if [[ "$zone_dirty" == "true" ]]; then
     fail "Zone should not be dirty in clean repo"
 fi
 
