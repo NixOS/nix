@@ -407,9 +407,11 @@ struct EvalSettings : Config
         R"(
           Path to the git directory for tectonix builtins (default: `~/world/git`).
 
-          This enables the tectonix builtins (`builtins.unsafeTectonixInternalTreeSha`, `builtins.unsafeTectonixInternalTree`,
-          `builtins.unsafeTectonixInternalZoneSrc`, `builtins.unsafeTectonixInternalZone`, `builtins.unsafeTectonixInternalManifest`)
-          which provide native access to files from a git repository during Nix evaluation.
+          This enables the tectonix builtins (`builtins.unsafeTectonixInternalTreeSha`,
+          `builtins.unsafeTectonixInternalTree`, `builtins.unsafeTectonixInternalZoneSrc`,
+          `builtins.unsafeTectonixInternalZoneRoot`, `builtins.unsafeTectonixInternalZoneIsDirty`,
+          `builtins.unsafeTectonixInternalManifest`) which provide native access to files from a
+          git repository during Nix evaluation.
         )"};
 
     Setting<std::string> tectonixGitSha{

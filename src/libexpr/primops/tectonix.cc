@@ -275,20 +275,16 @@ static RegisterPrimOp primop_unsafeTectonixInternalDirtyZones({
 });
 
 // ============================================================================
-// builtins.__unsafeTectonixInternalZone zonePath
-// Returns an attrset with zone info (flake-like interface)
+// builtins.__unsafeTectonixInternalZoneIsDirty zonePath
+// Returns whether a given zone is dirty in the checkout
 // ============================================================================
-static void prim_unsafeTectonixInternalZone(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_unsafeTectonixInternalZoneIsDirty(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     auto zonePath = state.forceStringNoCtx(*args[0], pos,
-        "while evaluating the 'zonePath' argument to builtins.__unsafeTectonixInternalZone");
+        "while evaluating the 'zonePath' argument to builtins.__unsafeTectonixInternalZoneIsDirty");
 
     validateZonePath(state, pos, zonePath);
 
-    // Get tree SHA before we potentially fetch
-    auto treeSha = state.getWorldTreeSha(zonePath);
-
-    // Check dirty status
     bool isDirty = false;
     if (state.isTectonixSourceAvailable()) {
         auto & dirtyZones = state.getTectonixDirtyZones();
@@ -296,55 +292,65 @@ static void prim_unsafeTectonixInternalZone(EvalState & state, const PosIdx pos,
         isDirty = it != dirtyZones.end() && it->second;
     }
 
-    auto storePath = state.getZoneStorePath(zonePath);
-    auto storePathStr = state.store->printStorePath(storePath);
-
-    // Build result attrset (like fetchTree)
-    auto attrs = state.buildBindings(5);
-
-    // outPath: string with context (for use as derivation src)
-    attrs.alloc("outPath").mkString(storePathStr, {
-        NixStringContextElem::Opaque{storePath}
-    }, state.mem);
-
-    // root: path value (for reading files without devirtualization)
-    attrs.alloc("root").mkPath(
-        state.rootPath(CanonPath(storePathStr)), state.mem);
-
-    attrs.alloc("treeSha").mkString(treeSha.gitRev(), state.mem);
-    attrs.alloc("zonePath").mkString(zonePath, state.mem);
-    attrs.alloc("dirty").mkBool(isDirty);
-
-    v.mkAttrs(attrs);
+    v.mkBool(isDirty);
 }
 
-static RegisterPrimOp primop_unsafeTectonixInternalZone({
-    .name = "__unsafeTectonixInternalZone",
+static RegisterPrimOp primop_unsafeTectonixInternalZoneIsDirty({
+    .name = "__unsafeTectonixInternalZoneIsDirty",
     .args = {"zonePath"},
     .doc = R"(
-      Get a zone from the world repository.
+      Get whether a zone is in the sparse checkout and whether it is dirty.
 
-      Returns an attrset with:
-      - outPath: Store path string with context (for use as derivation src)
-      - root: Path value for reading files (no devirtualization)
-      - treeSha: Git tree SHA for this zone
-      - zonePath: The zone path argument
-      - dirty: Whether the zone has uncommitted changes
+      Example: `builtins.unsafeTectonixInternalZoneIsDirty "//areas/tools/tec"`
 
-      With `lazy-trees = true`, the zone is mounted lazily. Use `root` to
-      read files without triggering a copy to the store:
-
-          let zone = builtins.__unsafeTectonixInternalZone "//areas/tools/tec";
-          in import (zone.root + "/zone.nix")
-
-      Use `outPath` as derivation src (triggers copy at build time):
-
-          mkDerivation { src = zone.outPath; }
-
-      Uses `--tectonix-git-dir` (defaults to `~/world/git`) and requires
-      `--tectonix-git-sha` to be set.
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`).
     )",
-    .fun = prim_unsafeTectonixInternalZone,
+    .fun = prim_unsafeTectonixInternalZoneIsDirty,
+});
+
+// ============================================================================
+// builtins.__unsafeTectonixInternalZoneRoot zonePath
+// Returns an zone root path in sparse checkout
+// ============================================================================
+static void prim_unsafeTectonixInternalZoneRoot(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    auto zonePath = state.forceStringNoCtx(*args[0], pos,
+        "while evaluating the 'zonePath' argument to builtins.__unsafeTectonixInternalZoneRoot");
+
+    validateZonePath(state, pos, zonePath);
+
+    std::string zone(zonePath);
+    if (hasPrefix(zone, "//"))
+        zone = zone.substr(2);
+
+    auto checkoutPath = state.settings.tectonixCheckoutPath.get();
+    auto fullPath = std::filesystem::path(checkoutPath) / zone;
+
+    if (std::filesystem::exists(fullPath) && !state.settings.pureEval) {
+        v.mkString(fullPath.string(), state.mem);
+    } else {
+        // Zone not accessible in checkout
+        v.mkNull();
+    }
+}
+
+static RegisterPrimOp primop_unsafeTectonixInternalZoneRoot({
+    .name = "__unsafeTectonixInternalZoneRoot",
+    .args = {"zonePath"},
+    .doc = R"(
+      Get the root of a zone in sparse checkout, if available.
+
+      With `lazy-trees = true`, returns a virtual store path that is only
+      materialized when used as a derivation input (devirtualized).
+
+      In source-available mode with uncommitted changes, uses checkout content
+      (always eager for dirty zones).
+
+      Example: `builtins.unsafeTectonixInternalZoneRoot "//areas/tools/tec"`
+
+      Uses `--tectonix-git-dir` (defaults to `~/world/git`).
+    )",
+    .fun = prim_unsafeTectonixInternalZoneRoot,
 });
 
 } // namespace nix
