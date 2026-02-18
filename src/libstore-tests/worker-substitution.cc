@@ -198,12 +198,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     // Snapshot the destination store before
     checkpointJson("ca-drv/store-before", dummyStore);
 
-    // Compute the hash modulo of the derivation
-    // For CA floating derivations, the kind is Deferred since outputs aren't known until build
-    auto hashModulo = hashDerivationModulo(*dummyStore, drv, true);
-    ASSERT_EQ(hashModulo.kind, DrvHash::Kind::Deferred);
-    auto drvHash = hashModulo.hashes.at("out");
-
     // Create the output store object
     auto outputPath = substituter->addToStore(
         "test-ca-drv-out",
@@ -222,7 +216,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Add the realisation (build trace) to the substituter
     substituter->buildTrace.insert_or_assign(
-        drvHash,
+        drvPath,
         std::map<std::string, UnkeyedRealisation>{
             {
                 "out",
@@ -236,7 +230,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     checkpointJson("ca-drv/substituter", substituter);
 
     // The realisation should not exist in the destination store yet
-    DrvOutput drvOutput{drvHash, "out"};
+    DrvOutput drvOutput{drvPath, "out"};
     ASSERT_FALSE(dummyStore->queryRealisation(drvOutput));
 
     // Create a worker with our custom substituter
@@ -299,11 +293,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     // Write the dependency derivation to the destination store
     auto depDrvPath = dummyStore->writeDerivation(depDrv);
 
-    // Compute the hash modulo for the dependency derivation
-    auto depHashModulo = hashDerivationModulo(*dummyStore, depDrv, true);
-    ASSERT_EQ(depHashModulo.kind, DrvHash::Kind::Deferred);
-    auto depDrvHash = depHashModulo.hashes.at("out");
-
     // Create the output store object for the dependency in the substituter
     auto depOutputPath = substituter->addToStore(
         "dep-drv-out",
@@ -322,7 +311,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Add the realisation for the dependency to the substituter
     substituter->buildTrace.insert_or_assign(
-        depDrvHash,
+        depDrvPath,
         std::map<std::string, UnkeyedRealisation>{
             {
                 "out",
@@ -353,11 +342,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);
 
-    // Compute the hash modulo for the root derivation
-    auto rootHashModulo = hashDerivationModulo(*dummyStore, rootDrv, true);
-    ASSERT_EQ(rootHashModulo.kind, DrvHash::Kind::Deferred);
-    auto rootDrvHash = rootHashModulo.hashes.at("out");
-
     // Create the output store object for the root derivation
     // Note: it does NOT reference the dependency's output
     auto rootOutputPath = substituter->addToStore(
@@ -378,12 +362,12 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
         HashAlgorithm::SHA256);
 
     // The DrvOutputs for both derivations
-    DrvOutput depDrvOutput{depDrvHash, "out"};
-    DrvOutput rootDrvOutput{rootDrvHash, "out"};
+    DrvOutput depDrvOutput{depDrvPath, "out"};
+    DrvOutput rootDrvOutput{rootDrvPath, "out"};
 
     // Add the realisation for the root derivation to the substituter
     substituter->buildTrace.insert_or_assign(
-        rootDrvHash,
+        rootDrvPath,
         std::map<std::string, UnkeyedRealisation>{
             {
                 "out",

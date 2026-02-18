@@ -861,13 +861,14 @@ DrvHashes drvHashes;
 /* Look up the derivation by value and memoize the
    `hashDerivationModulo` call.
  */
-static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPath)
+static DrvHashModulo pathDerivationModulo(Store & store, const StorePath & drvPath)
 {
-    std::optional<DrvHash> hash;
+    std::optional<DrvHashModulo> hash;
     if (drvHashes.cvisit(drvPath, [&hash](const auto & kv) { hash.emplace(kv.second); })) {
         return *hash;
     }
     auto h = hashDerivationModulo(store, store.readInvalidDerivation(drvPath), false);
+
     // Cache it
     drvHashes.insert_or_assign(drvPath, h);
     return h;
@@ -890,12 +891,10 @@ static const DrvHash pathDerivationModulo(Store & store, const StorePath & drvPa
    don't leak the provenance of fixed outputs, reducing pointless cache
    misses as the build itself won't know this.
  */
-DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
-    auto type = drv.type();
-
     /* Return a fixed hash for fixed-output derivations. */
-    if (type.isFixed()) {
+    if (drv.type().isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
@@ -905,54 +904,66 @@ DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOut
                     + store.printStorePath(dof.path(store, drv.name, i.first)));
             outputHashes.insert_or_assign(i.first, std::move(hash));
         }
-        return DrvHash{
-            .hashes = outputHashes,
-            .kind = DrvHash::Kind::Regular,
-        };
+        return outputHashes;
     }
 
-    auto kind = std::visit(
-        overloaded{
-            [](const DerivationType::InputAddressed & ia) {
-                /* This might be a "pesimistically" deferred output, so we don't
-                   "taint" the kind yet. */
-                return DrvHash::Kind::Regular;
-            },
-            [](const DerivationType::ContentAddressed & ca) {
-                return ca.fixed ? DrvHash::Kind::Regular : DrvHash::Kind::Deferred;
-            },
-            [](const DerivationType::Impure &) -> DrvHash::Kind { return DrvHash::Kind::Deferred; }},
-        drv.type().raw);
+    if (std::visit(
+            overloaded{
+                [](const DerivationType::InputAddressed & ia) {
+                    /* This might be a "pesimistically" deferred output, so we don't
+                       "taint" the kind yet. */
+                    return false;
+                },
+                [](const DerivationType::ContentAddressed & ca) {
+                    // Already covered
+                    assert(!ca.fixed);
+                    return true;
+                },
+                [](const DerivationType::Impure &) { return true; }},
+            drv.type().raw)) {
+        return DrvHashModulo::DeferredDrv{};
+    }
 
+    /* For other derivations, replace the inputs paths with recursive
+       calls to this function. */
     DerivedPathMap<StringSet>::ChildNode::Map inputs2;
     for (auto & [drvPath, node] : drv.inputDrvs.map) {
+        /* Need to build and resolve dynamic derivations first */
+        if (!node.childMap.empty()) {
+            return DrvHashModulo::DeferredDrv{};
+        }
+
         const auto & res = pathDerivationModulo(store, drvPath);
-        if (res.kind == DrvHash::Kind::Deferred)
-            kind = DrvHash::Kind::Deferred;
-        for (auto & outputName : node.value) {
-            const auto h = get(res.hashes, outputName);
-            if (!h)
-                throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
-            inputs2[h->to_string(HashFormat::Base16, false)].value.insert(outputName);
+        if (std::visit(
+                overloaded{
+                    [&](const DrvHashModulo::DeferredDrv &) { return true; },
+                    // Regular non-CA derivation, replace derivation
+                    [&](const DrvHashModulo::DrvHash & drvHash) {
+                        inputs2.insert_or_assign(drvHash.to_string(HashFormat::Base16, false), node);
+                        return false;
+                    },
+                    // CA derivation's output hashes
+                    [&](const DrvHashModulo::CaOutputHashes & outputHashes) {
+                        for (auto & outputName : node.value) {
+                            /* Put each one in with a single "out" output.. */
+                            const auto h = get(outputHashes, outputName);
+                            if (!h)
+                                throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
+                            inputs2.insert_or_assign(
+                                h->to_string(HashFormat::Base16, false),
+                                DerivedPathMap<StringSet>::ChildNode{
+                                    .value = {"out"},
+                                });
+                        }
+                        return false;
+                    },
+                },
+                res.raw)) {
+            return DrvHashModulo::DeferredDrv{};
         }
     }
 
-    auto hash = hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
-
-    std::map<std::string, Hash> outputHashes;
-    for (const auto & [outputName, _] : drv.outputs) {
-        outputHashes.insert_or_assign(outputName, hash);
-    }
-
-    return DrvHash{
-        .hashes = outputHashes,
-        .kind = kind,
-    };
-}
-
-std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv)
-{
-    return hashDerivationModulo(store, drv, true).hashes;
+    return hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
 }
 
 static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig & store)
@@ -1102,26 +1113,6 @@ void BasicDerivation::applyRewrites(const StringMap & rewrites)
     }
 }
 
-static void rewriteDerivation(Store & store, BasicDerivation & drv, const StringMap & rewrites)
-{
-    drv.applyRewrites(rewrites);
-
-    auto hashModulo = hashDerivationModulo(store, Derivation(drv), true);
-    for (auto & [outputName, output] : drv.outputs) {
-        if (std::holds_alternative<DerivationOutput::Deferred>(output.raw)) {
-            auto h = get(hashModulo.hashes, outputName);
-            if (!h)
-                throw Error(
-                    "derivation '%s' output '%s' has no hash (derivations.cc/rewriteDerivation)", drv.name, outputName);
-            auto outPath = store.makeOutputPath(outputName, *h, drv.name);
-            drv.env[outputName] = store.printStorePath(outPath);
-            output = DerivationOutput::InputAddressed{
-                .path = std::move(outPath),
-            };
-        }
-    }
-}
-
 bool Derivation::shouldResolve() const
 {
     /* No input drvs means nothing to resolve. */
@@ -1233,9 +1224,13 @@ std::optional<BasicDerivation> Derivation::tryResolve(
                 queryResolutionChain))
             return std::nullopt;
 
-    rewriteDerivation(store, resolved, inputRewrites);
+    resolved.applyRewrites(inputRewrites);
 
-    return resolved;
+    Derivation resolved2{std::move(resolved)};
+
+    resolved2.fillInOutputPaths(store);
+
+    return resolved2;
 }
 
 /**
@@ -1262,7 +1257,15 @@ std::optional<BasicDerivation> Derivation::tryResolve(
 template<bool fillIn>
 static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
 {
-    std::optional<DrvHash> hashesModulo;
+    std::optional<DrvHashModulo> hashModulo_;
+
+    auto hashModulo = [&]() -> const auto & {
+        if (!hashModulo_) {
+            // somewhat expensive so we do lazily
+            hashModulo_ = hashDerivationModulo(store, drv, true);
+        }
+        return *hashModulo_;
+    };
 
     for (auto & [outputName, output] : drv.outputs) {
         auto envHasRightPath = [&](const StorePath & actual, bool isDeferred = false) {
@@ -1299,65 +1302,64 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             }
         };
         auto hash = [&]<typename Output>(const Output & outputVariant) {
-            if (!hashesModulo) {
-                // somewhat expensive so we do lazily
-                hashesModulo = hashDerivationModulo(store, drv, true);
-            }
-            switch (hashesModulo->kind) {
-            case DrvHash::Kind::Regular: {
-                auto h = get(hashesModulo->hashes, outputName);
-                if (!h)
-                    throw Error("derivation produced no hash for output '%s'", outputName);
-                auto outPath = store.makeOutputPath(outputName, *h, drvName);
+            std::visit(
+                overloaded{
+                    [&](const DrvHashModulo::DrvHash & drvHash) {
+                        auto outPath = store.makeOutputPath(outputName, drvHash, drvName);
 
-                if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
-                    if (outputVariant.path == outPath) {
-                        return; // Correct case
-                    }
-                    /* Error case, an explicitly wrong path is
-                       always an error. */
-                    throw Error(
-                        "derivation has incorrect output '%s', should be '%s'",
-                        store.printStorePath(outputVariant.path),
-                        store.printStorePath(outPath));
-                } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
-                    if constexpr (fillIn)
-                        /* Fill in output path for Deferred
-                           outputs */
-                        output = DerivationOutput::InputAddressed{
-                            .path = outPath,
-                        };
-                    else
-                        /* Validation mode: deferred outputs
-                           should have been filled in */
-                        warn(
-                            "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
-                            store.printStorePath(outPath));
-                } else {
-                    /* Will never happen, based on where
-                       `hash` is called. */
-                    static_assert(false);
-                }
-                envHasRightPath(outPath);
-                break;
-            }
-            case DrvHash::Kind::Deferred:
-                if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
-                    /* Error case, an explicitly wrong path is
-                       always an error. */
-                    throw Error(
-                        "derivation has incorrect output '%s', should be deferred",
-                        store.printStorePath(outputVariant.path));
-                } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
-                    /* Correct: Deferred output with Deferred
-                       hash kind. */
-                } else {
-                    /* Will never happen, based on where
-                       `hash` is called. */
-                    static_assert(false);
-                }
-                break;
-            }
+                        if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
+                            if (outputVariant.path == outPath) {
+                                envHasRightPath(outPath);
+                                return; // Correct case
+                            }
+                            /* Error case, an explicitly wrong path is
+                               always an error. */
+                            throw Error(
+                                "derivation has incorrect output '%s', should be '%s'",
+                                store.printStorePath(outputVariant.path),
+                                store.printStorePath(outPath));
+                        } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
+                            if constexpr (fillIn) {
+                                /* Fill in output path for Deferred outputs */
+                                output = DerivationOutput::InputAddressed{
+                                    .path = outPath,
+                                };
+                                envHasRightPath(outPath);
+                            } else {
+                                /* Validation mode: deferred outputs
+                                   should have been filled in */
+                                warn(
+                                    "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
+                                    store.printStorePath(outPath));
+                            }
+                        } else {
+                            /* Will never happen, based on where
+                               `hash` is called. */
+                            static_assert(false);
+                        }
+                    },
+                    [&](const DrvHashModulo::CaOutputHashes &) {
+                        /* Shouldn't happen as the original output is
+                           input-addressed (or deferred waiting to be). */
+                        assert(false);
+                    },
+                    [&](const DrvHashModulo::DeferredDrv &) {
+                        if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
+                            /* Error case, an explicitly wrong path is
+                               always an error. */
+                            throw Error(
+                                "derivation has incorrect output '%s', should be deferred",
+                                store.printStorePath(outputVariant.path));
+                        } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
+                            /* Correct: Deferred output with Deferred hash kind. */
+                        } else {
+                            /* Will never happen, based on where
+                               `hash` is called. */
+                            static_assert(false);
+                        }
+                    },
+                },
+                hashModulo().raw);
         };
         std::visit(
             overloaded{

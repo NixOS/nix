@@ -380,9 +380,8 @@ Store::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore
         return outputs;
 
     auto drv = evalStore.readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
+    for (auto & [outputName, _] : drv.outputs) {
+        auto realisation = queryRealisation(DrvOutput{path, outputName});
         if (realisation) {
             outputs.insert_or_assign(outputName, realisation->outPath);
         } else {
@@ -402,7 +401,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * ev
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw MissingRealisation(printStorePath(path), outName);
+            throw MissingRealisation(*this, path, outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
