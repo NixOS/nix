@@ -53,6 +53,10 @@ deps_other += boost
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
+# eval-cache uses `INSERT ... RETURNING` which requires >= 3.35
+sqlite = dependency('sqlite3', 'sqlite', version : '>= 3.35')
+deps_private += sqlite
+
 bdw_gc_required = get_option('gc').disable_if(
   'address' in get_option('b_sanitize'),
   error_message : 'Building with Boehm GC and ASAN is not supported',
