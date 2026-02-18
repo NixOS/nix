@@ -31,6 +31,16 @@ class NarInfoTestV2 : public CharacterizationTest, public LibStoreTest
     }
 };
 
+class NarInfoTestV3 : public CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "nar-info" / "json-3";
+
+    std::filesystem::path goldenMaster(PathView testStem) const override
+    {
+        return unitTestData / (testStem + ".json");
+    }
+};
+
 static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
 {
     auto info = NarInfo::makeFromCA(
@@ -122,6 +132,31 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
     JSON_READ_TEST_V2(STEM, PURE) \
     JSON_WRITE_TEST_V2(STEM, PURE)
 
+#define JSON_READ_TEST_V3(STEM, PURE)                              \
+    TEST_F(NarInfoTestV3, NarInfo_##STEM##_from_json)              \
+    {                                                              \
+        readTest(#STEM, [&](const auto & encoded_) {               \
+            auto encoded = json::parse(encoded_);                  \
+            auto expected = makeNarInfo(*store, PURE);             \
+            auto got = UnkeyedNarInfo::fromJSON(nullptr, encoded); \
+            ASSERT_EQ(got, expected);                              \
+        });                                                        \
+    }
+
+#define JSON_WRITE_TEST_V3(STEM, PURE)                                                                         \
+    TEST_F(NarInfoTestV3, NarInfo_##STEM##_to_json)                                                            \
+    {                                                                                                          \
+        writeTest(                                                                                             \
+            #STEM,                                                                                             \
+            [&]() -> json { return makeNarInfo(*store, PURE).toJSON(nullptr, PURE, PathInfoJsonFormat::V3); }, \
+            [](const auto & file) { return json::parse(readFile(file)); },                                     \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });          \
+    }
+
+#define JSON_TEST_V3(STEM, PURE)  \
+    JSON_READ_TEST_V3(STEM, PURE) \
+    JSON_WRITE_TEST_V3(STEM, PURE)
+
 JSON_TEST_V1(pure, false)
 JSON_TEST_V1(impure, true)
 
@@ -130,5 +165,8 @@ JSON_READ_TEST_V1(pure_noversion, false)
 
 JSON_TEST_V2(pure, false)
 JSON_TEST_V2(impure, true)
+
+JSON_TEST_V3(pure, false)
+JSON_TEST_V3(impure, true)
 
 } // namespace nix

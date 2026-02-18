@@ -1,6 +1,6 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-object-info-v2.json"
-title: Store Object Info v2
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/store-object-info-v3.json"
+title: Store Object Info v3
 description: |
   Information about a [store object](@docroot@/store/store-object.md).
 
@@ -50,10 +50,10 @@ $defs:
     properties:
       version:
         type: integer
-        const: 2
-        title: Format version (must be 2)
+        const: 3
+        title: Format version (must be 3)
         description: |
-          Must be `2`.
+          Must be `3`.
           This is a guard that allows us to continue evolving this format.
           Here is the rough version history:
 
@@ -62,6 +62,8 @@ $defs:
           - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from `.narinfo` format.
 
           - Version 2: Use structured JSON type for `ca`
+
+          - Version 3: Use structured JSON type for `signatures`
 
       path:
         "$ref": "./store-path-v1.yaml"
@@ -174,7 +176,7 @@ $defs:
 
           > This is an "impure" field that may not be included in certain contexts.
         items:
-          type: string
+          "$ref": "./signature-v2.yaml"
 
       # Computed closure fields
       closureSize:

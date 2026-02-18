@@ -178,12 +178,21 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
 namespace nlohmann {
 void adl_serializer<Signature>::to_json(json & j, const Signature & s)
 {
-    j = s.to_string();
+    j = {
+        {"keyName", s.keyName},
+        {"sig", base64::encode(std::as_bytes(std::span<const char>{s.sig}))},
+    };
 }
 
 Signature adl_serializer<Signature>::from_json(const json & j)
 {
-    return Signature::parse(getString(j));
+    if (j.is_string())
+        return Signature::parse(getString(j));
+    auto obj = getObject(j);
+    return Signature{
+        .keyName = getString(valueAt(obj, "keyName")),
+        .sig = base64::decode(getString(valueAt(obj, "sig"))),
+    };
 }
 
 } // namespace nlohmann
