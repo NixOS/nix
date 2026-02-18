@@ -58,6 +58,9 @@ struct AttrDb
         SQLiteStmt insertAttributeWithContext;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
+        SQLiteStmt upsertAttribute;
+        SQLiteStmt insertAttributeIfNotExists;
+        SQLiteStmt deleteMissingChildren;
         std::unique_ptr<SQLiteTxn> txn;
     };
 
@@ -91,6 +94,17 @@ struct AttrDb
             state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
         state->queryAttributes.create(state->db, "select name from Attributes where parent = ?");
+
+        state->upsertAttribute.create(
+            state->db,
+            "insert into Attributes(parent, name, type, value) values (?, ?, ?, ?) "
+            "on conflict(parent, name) do update set type = excluded.type, value = excluded.value "
+            "returning rowid");
+
+        state->insertAttributeIfNotExists.create(
+            state->db, "insert or ignore into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
+
+        state->deleteMissingChildren.create(state->db, "delete from Attributes where parent = ? and type = 3");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -126,18 +140,20 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
-                .apply(AttrType::FullAttrs)
-                .apply(0, false)
-                .exec();
-
-            AttrId rowId = state->db.getLastInsertedRowId();
+            // Seal the attribute names: we now know the complete set.
+            auto upsertAttribute(state->upsertAttribute.use()
+                                     .apply(key.first)
+                                     .apply(symbols[key.second])
+                                     .apply(AttrType::FullAttrs)
+                                     .apply(0, false));
+            upsertAttribute.next();
+            auto rowId = (AttrId) upsertAttribute.getInt(0);
             assert(rowId);
+            state->deleteMissingChildren.use().apply(rowId).exec();
 
+            // Insert children as placeholders, but don't replace existing entries
             for (auto & attr : attrs)
-                state->insertAttribute.use()
+                state->insertAttributeIfNotExists.use()
                     .apply(rowId)
                     .apply(symbols[attr])
                     .apply(AttrType::Placeholder)
