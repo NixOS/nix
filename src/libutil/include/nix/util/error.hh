@@ -17,6 +17,7 @@
 
 #include "nix/util/suggestions.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/config.hh"
 
 #include <cstring>
 #include <list>
@@ -350,7 +351,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
  */
 [[gnu::noinline, gnu::cold, noreturn]] void unreachable(std::source_location loc = std::source_location::current());
 
-#if NIX_UBSAN_ENABLED == 1
+#if NIX_UBSAN_ENABLED
 /* When building with sanitizers, also enable expensive unreachable checks. In
    optimised builds this explicitly invokes UB with std::unreachable for better
    optimisations. */

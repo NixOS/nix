@@ -9,9 +9,3 @@ endif
 if 'address' in get_option('b_sanitize')
   deps_other += declare_dependency(sources : 'asan-options.cc')
 endif
-
-if 'undefined' in get_option('b_sanitize')
-  add_project_arguments('-DNIX_UBSAN_ENABLED=1', language : 'cpp')
-else
-  add_project_arguments('-DNIX_UBSAN_ENABLED=0', language : 'cpp')
-endif
