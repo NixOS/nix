@@ -193,16 +193,6 @@ struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         addedPaths.insert(path);
     }
 
-    void chownToBuilder(const std::filesystem::path & path)
-    {
-        nix::chownToBuilder(buildUser.get(), path);
-    }
-
-    void chownToBuilder(int fd, const std::filesystem::path & path)
-    {
-        nix::chownToBuilder(buildUser.get(), fd, path);
-    }
-
     void killSandbox(bool getStats)
     {
         if (buildUser) {
@@ -222,19 +212,6 @@ struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             miscMethods->childTerminated();
         }
         return ret;
-    }
-
-    StorePath makeFallbackPath(OutputNameView outputName)
-    {
-        auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), outputPathName(drv.name, outputName));
-    }
-
-    StorePath makeFallbackPath(const StorePath & path)
-    {
-        auto pathType =
-            "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), path.name());
     }
 
     void cleanupBuild(bool force)
@@ -285,18 +262,22 @@ struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
-        chownToBuilder(tmpDirFd.get(), tmpDir);
+        nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
         StringMap inputRewrites;
         for (auto & [outputName, status] : initialOutputs) {
-            auto scratchPath = !status.known ? makeFallbackPath(outputName)
-                               : !needsHashRewrite()
-                                   ? status.known->path
-                                   : !status.known->isPresent()
-                                         ? status.known->path
-                                         : buildMode != bmRepair && !status.known->isValid()
-                                               ? status.known->path
-                                               : makeFallbackPath(status.known->path);
+            auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
+                return store.makeStorePath(
+                    "rewrite:" + std::string(drvPath.to_string()) + ":" + suffix, Hash(HashAlgorithm::SHA256), name);
+            };
+            auto scratchPath =
+                !status.known
+                    ? makeFallbackPath("name:" + std::string(outputName), outputPathName(drv.name, outputName))
+                : !needsHashRewrite()        ? status.known->path
+                : !status.known->isPresent() ? status.known->path
+                : buildMode != bmRepair && !status.known->isValid()
+                    ? status.known->path
+                    : makeFallbackPath(std::string(status.known->path.to_string()), status.known->path.name());
             scratchOutputs.insert_or_assign(outputName, scratchPath);
 
             inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
@@ -362,7 +343,7 @@ struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
             daemonSocket = createUnixDomainSocket(socketPath, 0600);
 
-            chownToBuilder(socketPath);
+            nix::chownToBuilder(buildUser.get(), socketPath);
 
             daemonThread = std::thread([this, restrictedStore]() {
                 while (true) {

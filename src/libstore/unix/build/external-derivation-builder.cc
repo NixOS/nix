@@ -187,30 +187,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return "/build";
     }
 
-#if NIX_WITH_AWS_AUTH
-    std::optional<AwsCredentials> preResolveAwsCredentials()
-    {
-        if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-            auto url = drv.env.find("url");
-            if (url != drv.env.end()) {
-                try {
-                    auto parsedUrl = parseURL(url->second);
-                    if (parsedUrl.scheme == "s3") {
-                        debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
-                        auto s3Url = ParsedS3URL::parse(parsedUrl);
-                        auto credentials = getAwsCredentialsProvider()->getCredentials(s3Url);
-                        debug("Successfully pre-resolved AWS credentials in parent process");
-                        return credentials;
-                    }
-                } catch (const std::exception & e) {
-                    debug("Error pre-resolving S3 credentials: %s", e.what());
-                }
-            }
-        }
-        return std::nullopt;
-    }
-#endif
-
     void stopDaemon()
     {
         if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
@@ -260,19 +236,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             miscMethods->childTerminated();
         }
         return ret;
-    }
-
-    StorePath makeFallbackPath(OutputNameView outputName)
-    {
-        auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), outputPathName(drv.name, outputName));
-    }
-
-    StorePath makeFallbackPath(const StorePath & path)
-    {
-        auto pathType =
-            "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), path.name());
     }
 
     void cleanupBuild(bool force)
@@ -327,14 +290,18 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
         for (auto & [outputName, status] : initialOutputs) {
-            auto scratchPath = !status.known ? makeFallbackPath(outputName)
-                               : !needsHashRewrite()
-                                   ? status.known->path
-                                   : !status.known->isPresent()
-                                         ? status.known->path
-                                         : buildMode != bmRepair && !status.known->isValid()
-                                               ? status.known->path
-                                               : makeFallbackPath(status.known->path);
+            auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
+                return store.makeStorePath(
+                    "rewrite:" + std::string(drvPath.to_string()) + ":" + suffix, Hash(HashAlgorithm::SHA256), name);
+            };
+            auto scratchPath =
+                !status.known
+                    ? makeFallbackPath("name:" + std::string(outputName), outputPathName(drv.name, outputName))
+                : !needsHashRewrite()        ? status.known->path
+                : !status.known->isPresent() ? status.known->path
+                : buildMode != bmRepair && !status.known->isValid()
+                    ? status.known->path
+                    : makeFallbackPath(std::string(status.known->path.to_string()), status.known->path.name());
             scratchOutputs.insert_or_assign(outputName, scratchPath);
 
             inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);

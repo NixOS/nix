@@ -224,6 +224,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
 
+
     void stopDaemon()
     {
         if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
@@ -367,19 +368,6 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
 
-    StorePath makeFallbackPath(OutputNameView outputName)
-    {
-        auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), outputPathName(drv.name, outputName));
-    }
-
-    StorePath makeFallbackPath(const StorePath & path)
-    {
-        auto pathType =
-            "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
-        return store.makeStorePath(pathType, Hash(HashAlgorithm::SHA256), path.name());
-    }
-
     void cleanupBuild(bool force)
     {
         if (force) {
@@ -433,14 +421,18 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         StringMap inputRewrites;
         for (auto & [outputName, status] : initialOutputs) {
-            auto scratchPath = !status.known ? makeFallbackPath(outputName)
-                               : !needsHashRewrite()
-                                   ? status.known->path
-                                   : !status.known->isPresent()
-                                         ? status.known->path
-                                         : buildMode != bmRepair && !status.known->isValid()
-                                               ? status.known->path
-                                               : makeFallbackPath(status.known->path);
+            auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
+                return store.makeStorePath(
+                    "rewrite:" + std::string(drvPath.to_string()) + ":" + suffix, Hash(HashAlgorithm::SHA256), name);
+            };
+            auto scratchPath =
+                !status.known
+                    ? makeFallbackPath("name:" + std::string(outputName), outputPathName(drv.name, outputName))
+                : !needsHashRewrite()        ? status.known->path
+                : !status.known->isPresent() ? status.known->path
+                : buildMode != bmRepair && !status.known->isValid()
+                    ? status.known->path
+                    : makeFallbackPath(std::string(status.known->path.to_string()), status.known->path.name());
             scratchOutputs.insert_or_assign(outputName, scratchPath);
 
             inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
