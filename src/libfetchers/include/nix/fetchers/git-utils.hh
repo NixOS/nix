@@ -28,6 +28,8 @@ struct GitAccessorOptions
     bool smudgeLfs = false;
     bool submodules = false; // Currently implemented in GitInputScheme rather than GitAccessor
 
+    std::optional<std::string> subtree; // Optional subtree path to access when using workdir accessor
+
     std::string makeFingerprint(const Hash & rev) const;
 };
 
@@ -40,11 +42,6 @@ struct GitRepo
         bool create = false;
         bool bare = false;
         bool packfilesOnly = false;
-        /**
-         * Open only the object database, bypassing full repository validation.
-         * Useful for repos with unsupported extensions (e.g., reftables).
-         */
-        bool odbOnly = false;
     };
 
     static ref<GitRepo> openRepo(const std::filesystem::path & path, Options options);

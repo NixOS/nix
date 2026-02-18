@@ -272,29 +272,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     {
         initLibGit2();
 
-        if (options.odbOnly) {
-            /* Open only the object database, bypassing full repository validation.
-               This is useful for repositories with unsupported extensions like reftables.
-               We create a fake repository wrapping the ODB for API compatibility. */
-
-            git_odb * rawOdb = nullptr;
-            if (git_odb_open(&rawOdb, (path / "objects").string().c_str()))
-                throw Error("opening Git object database %s: %s", path / "objects", git_error_last()->message);
-
-            // Use RAII to ensure cleanup on any exception path
-            ObjectDb odb(rawOdb);
-
-            if (git_repository_wrap_odb(Setter(repo), odb.get()))
-                throw Error("wrapping Git object database: %s", git_error_last()->message);
-
-            // wrap_odb took ownership on success, release from unique_ptr to prevent double-free
-            odb.release();
-
-            // odbOnly mode is strictly read-only: no mempack backend, no write support.
-            // Attempting to write objects in this mode will fail.
-            return;
-        }
-
         initRepoAtomically(path, options);
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw Error("opening Git repository %s: %s", path, git_error_last()->message);
@@ -1115,8 +1092,9 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
 {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
+    std::optional<std::string> subtree;
 
-    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
+    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev, std::optional<std::string> subtree)
         : CachingFilteringSourceAccessor(
               next,
               [&](const CanonPath & path) {
@@ -1125,6 +1103,7 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
               })
         , repo(repo)
         , rev(rev)
+        , subtree(subtree)
     {
     }
 
@@ -1148,6 +1127,9 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
     bool isExportIgnored(const CanonPath & path)
     {
         const char * exportIgnoreEntry = nullptr;
+        auto repoPath = path;
+        if (subtree)
+            repoPath = CanonPath(*subtree + "/" + repoPath.rel());
 
         // GIT_ATTR_CHECK_INDEX_ONLY:
         // > It will use index only for creating archives or for a bare repo
@@ -1481,7 +1463,7 @@ GitRepoImpl::getAccessor(const Hash & rev, const GitAccessorOptions & options, s
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, options);
     rawGitAccessor->setPathDisplay(std::move(displayPrefix));
     if (options.exportIgnore)
-        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev, std::nullopt);
     else
         return rawGitAccessor;
 }
@@ -1490,15 +1472,27 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
+    std::filesystem::path accessorPath;
+    std::set<CanonPath> allowedPrefixes;
+    if (options.subtree) {
+        accessorPath = std::filesystem::path(path.string() + *options.subtree);
+        for (CanonPath prefix : wd.files) {
+            if (prefix.abs().starts_with(*options.subtree + "/"))
+                allowedPrefixes.emplace(prefix.abs().substr(options.subtree->size()));
+        }
+    } else {
+        accessorPath = path;
+        allowedPrefixes = wd.files;
+    }
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
-                                           makeFSSourceAccessor(path),
-                                           std::set<CanonPath>{wd.files},
+                                           makeFSSourceAccessor(accessorPath),
+                                           std::set<CanonPath>{allowedPrefixes},
                                            // Always allow access to the root, but not its children.
                                            boost::unordered_flat_set<CanonPath>{CanonPath::root},
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
-        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
+        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt, options.subtree);
     return fileAccessor;
 }
 
