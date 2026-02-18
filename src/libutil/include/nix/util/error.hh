@@ -127,20 +127,20 @@ public:
     BaseError & operator=(BaseError &&) = default;
 
     template<typename... Args>
-    BaseError(unsigned int status, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .status = status}
+    BaseError(unsigned int status, Args &&... args)
+        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .status = status}
     {
     }
 
     template<typename... Args>
-    explicit BaseError(const std::string & fs, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, args...), .pos = {}}
+    explicit BaseError(const std::string & fs, Args &&... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, std::forward<Args>(args)...), .pos = {}}
     {
     }
 
     template<typename... Args>
-    BaseError(const Suggestions & sug, const Args &... args)
-        : err{.level = lvlError, .msg = HintFmt(args...), .pos = {}, .suggestions = sug}
+    BaseError(const Suggestions & sug, Args &&... args)
+        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .suggestions = sug}
     {
     }
 
@@ -204,9 +204,9 @@ public:
      * @param args... Format string arguments.
      */
     template<typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, const Args &... args)
+    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, Args &&... args)
     {
-        addTrace(std::move(pos), HintFmt(std::string(fs), args...));
+        addTrace(std::move(pos), HintFmt(std::string(fs), std::forward<Args>(args)...));
     }
 
     /**
@@ -248,19 +248,39 @@ MakeError(UnimplementedError, Error);
 class SystemError : public Error
 {
     std::error_code errorCode;
+    std::string errorDetails;
 
-public:
+protected:
+
+    /**
+     * Just here to allow derived classes to use the right constructor
+     * (the protected one).
+     */
+    struct Disambig
+    {};
+
+    /**
+     * Protected constructor for subclasses that provide their own error message.
+     * The error message is appended to the formatted hint.
+     */
     template<typename... Args>
-    SystemError(std::errc posixErrNo, Args &&... args)
-        : Error(std::forward<Args>(args)...)
-        , errorCode(std::make_error_code(posixErrNo))
+    SystemError(Disambig, std::error_code errorCode, std::string_view errorDetails, Args &&... args)
+        : Error("")
+        , errorCode(errorCode)
+        , errorDetails(errorDetails)
     {
+        auto hf = HintFmt(std::forward<Args>(args)...);
+        err.msg = HintFmt("%s: %s", Uncolored(hf.str()), errorDetails);
     }
 
+public:
+    /**
+     * Construct with an error code. The error code's message is automatically
+     * appended to the error message.
+     */
     template<typename... Args>
     SystemError(std::error_code errorCode, Args &&... args)
-        : Error(std::forward<Args>(args)...)
-        , errorCode(errorCode)
+        : SystemError(Disambig{}, errorCode, errorCode.message(), std::forward<Args>(args)...)
     {
     }
 
@@ -301,12 +321,14 @@ public:
      * will be used to try to add additional information to the message.
      */
     template<typename... Args>
-    SysError(int errNo, const Args &... args)
-        : SystemError(static_cast<std::errc>(errNo), "")
+    SysError(int errNo, Args &&... args)
+        : SystemError(
+              Disambig{},
+              std::make_error_code(static_cast<std::errc>(errNo)),
+              strerror(errNo),
+              std::forward<Args>(args)...)
         , errNo(errNo)
     {
-        auto hf = HintFmt(args...);
-        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), strerror(errNo));
     }
 
     /**
@@ -316,8 +338,8 @@ public:
      * calling this constructor!
      */
     template<typename... Args>
-    SysError(const Args &... args)
-        : SysError(errno, args...)
+    SysError(Args &&... args)
+        : SysError(errno, std::forward<Args>(args)...)
     {
     }
 };
@@ -381,12 +403,14 @@ public:
      * information to the message.
      */
     template<typename... Args>
-    WinError(DWORD lastError, const Args &... args)
-        : SystemError(std::error_code(lastError, std::system_category()), "")
+    WinError(DWORD lastError, Args &&... args)
+        : SystemError(
+              Disambig{},
+              std::error_code(lastError, std::system_category()),
+              renderError(lastError),
+              std::forward<Args>(args)...)
         , lastError(lastError)
     {
-        auto hf = HintFmt(args...);
-        err.msg = HintFmt("%1%: %2%", Uncolored(hf.str()), renderError(lastError));
     }
 
     /**
@@ -396,14 +420,14 @@ public:
      * before calling this constructor!
      */
     template<typename... Args>
-    WinError(const Args &... args)
-        : WinError(GetLastError(), args...)
+    WinError(Args &&... args)
+        : WinError(GetLastError(), std::forward<Args>(args)...)
     {
     }
 
 private:
 
-    std::string renderError(DWORD lastError);
+    static std::string renderError(DWORD lastError);
 };
 
 } // namespace windows

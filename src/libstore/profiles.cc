@@ -103,7 +103,7 @@ static void removeFile(const std::filesystem::path & path)
     try {
         std::filesystem::remove(path);
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("removing file %1%", PathFmt(path));
+        throw SystemError(e.code(), "removing file %1%", PathFmt(path));
     }
 }
 
@@ -323,8 +323,6 @@ std::filesystem::path getDefaultProfile(ProfileDirsOptions settings)
         auto linkDir = profileLink.parent_path();
         return absPath(readLink(profileLink), &linkDir);
     } catch (Error &) {
-        return profileLink;
-    } catch (std::filesystem::filesystem_error &) {
         return profileLink;
     }
 }

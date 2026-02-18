@@ -111,8 +111,8 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
                 std::string text;
                 try {
                     text = readFile(path);
-                } catch (const SysError & e) {
-                    if (e.errNo != ENOENT)
+                } catch (const SystemError & e) {
+                    if (!e.is(std::errc::no_such_file_or_directory))
                         throw;
                     debug("cannot find machines file '%s'", path);
                     continue;

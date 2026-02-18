@@ -43,8 +43,8 @@ void removeOldGenerations(std::filesystem::path dir)
             std::string link;
             try {
                 link = readLink(path);
-            } catch (std::filesystem::filesystem_error & e) {
-                if (e.code() == std::errc::no_such_file_or_directory)
+            } catch (SystemError & e) {
+                if (e.is(std::errc::no_such_file_or_directory))
                     continue;
                 throw;
             }

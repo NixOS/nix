@@ -710,7 +710,7 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
     try {
         cwd = std::filesystem::current_path();
     } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("cannot determine current working directory");
+        throw SystemError(e.code(), "cannot determine current working directory");
     }
 
     auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);

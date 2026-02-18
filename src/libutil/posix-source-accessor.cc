@@ -170,7 +170,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
                 if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
                     return std::nullopt;
                 else
-                    throw;
+                    throw SystemError(e.code(), "getting status of '%s'", PathFmt(entry.path()));
             }
         }();
         res.emplace(entry.path().filename().string(), type);

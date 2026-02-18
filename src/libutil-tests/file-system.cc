@@ -319,7 +319,7 @@ TEST(chmodIfNeeded, works)
 
 TEST(chmodIfNeeded, nonexistent)
 {
-    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SysError);
+    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SystemError);
 }
 
 /* ----------------------------------------------------------------------------
@@ -340,7 +340,7 @@ TEST(DirectoryIterator, works)
 
 TEST(DirectoryIterator, nonexistent)
 {
-    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
+    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
 }
 
 /* ----------------------------------------------------------------------------

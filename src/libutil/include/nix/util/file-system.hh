@@ -189,21 +189,19 @@ Path readLink(const Path & path);
  */
 std::filesystem::path readLink(const std::filesystem::path & path);
 
-#ifdef _WIN32
-namespace windows {
-
 /**
- * Get the path associated with a file handle.
+ * Get the path associated with a file descriptor.
  *
  * @note One MUST only use this for error handling, because it creates
  * TOCTOU issues. We don't mind if error messages point to out of date
  * paths (that is a rather trivial TOCTOU --- the error message is best
  * effort) but for anything else we do.
+ *
+ * @note this function will clobber `errno` (Unix) / "last error"
+ * (Windows), so care must be used to get those error codes, then call
+ * this, then build a `SysError` / `WinError` with the saved error code.
  */
-std::filesystem::path handleToPath(Descriptor handle);
-
-} // namespace windows
-#endif
+std::filesystem::path descriptorToPath(Descriptor fd);
 
 /**
  * Open a `Descriptor` with read-only access to the given directory.

@@ -1419,7 +1419,6 @@ static int main_nix_env(int argc, char ** argv)
                 replaceSymlink(defaultChannelsDir(profilesDirOpts), nixExprPath / "channels");
                 if (!isRootUser())
                     replaceSymlink(rootChannelsDir(profilesDirOpts), nixExprPath / "channels_root");
-            } catch (std::filesystem::filesystem_error &) {
             } catch (Error &) {
             }
         }

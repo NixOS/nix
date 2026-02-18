@@ -156,13 +156,13 @@ OsString readSymlinkTarget(HANDLE linkHandle)
     size_t path_buf_offset = offsetof(ReparseDataBuffer, SymbolicLinkReparseBuffer.PathBuffer[0]);
 
     if (out < path_buf_offset) {
-        auto fullPath = handleToPath(linkHandle);
+        auto fullPath = descriptorToPath(linkHandle);
         throw WinError(
             DWORD{ERROR_REPARSE_TAG_INVALID}, "invalid reparse data for %d:%s", linkHandle, PathFmt(fullPath));
     }
 
     if (reparse->ReparseTag != IO_REPARSE_TAG_SYMLINK) {
-        auto fullPath = handleToPath(linkHandle);
+        auto fullPath = descriptorToPath(linkHandle);
         throw WinError(DWORD{ERROR_REPARSE_TAG_INVALID}, "not a symlink: %d:%s", linkHandle, PathFmt(fullPath));
     }
 
@@ -179,7 +179,7 @@ OsString readSymlinkTarget(HANDLE linkHandle)
     }
 
     if (path_buf_offset + name_offset + name_length > out) {
-        auto fullPath = handleToPath(linkHandle);
+        auto fullPath = descriptorToPath(linkHandle);
         throw WinError(
             DWORD{ERROR_REPARSE_TAG_INVALID}, "invalid symlink data for %d:%s", linkHandle, PathFmt(fullPath));
     }
