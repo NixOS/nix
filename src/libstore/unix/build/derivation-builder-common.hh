@@ -2,18 +2,18 @@
 
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-settings.hh"
-#include "nix/util/error.hh"
 
 #include <filesystem>
 #include <functional>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace nix {
 
 class LocalStore;
+class Pid;
 struct UserLock;
-struct Pid;
 
 struct NotDeterministic : BuildError
 {
@@ -57,7 +57,6 @@ SingleDrvOutputs registerOutputs(
     const DerivationBuilderParams & params,
     const StorePathSet & addedPaths,
     const std::map<std::string, StorePath> & scratchOutputs,
-    StringMap & outputRewrites,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
     std::function<std::filesystem::path(const std::string &)> realPathInHost);
@@ -89,9 +88,7 @@ void writeBuilderFile(
  * @param tmpDirInSandbox The path to the build temporary directory as
  *   seen from inside the sandbox.
  */
-void initEnv(
-    StringMap & env,
-    const std::filesystem::path & homeDir,
+StringMap initEnv(
     const std::string & storeDir,
     const DerivationBuilderParams & params,
     const StringMap & inputRewrites,
@@ -104,14 +101,11 @@ void initEnv(
 
 /**
  * Compute scratch output paths and set up hash rewrites for each output.
- * Populates `scratchOutputs`, `redirectedOutputs`, and `inputRewrites`.
+ * Returns {scratchOutputs, inputRewrites, redirectedOutputs}.
  */
-void computeScratchOutputs(
+std::tuple<OutputPathMap, StringMap, std::map<StorePath, StorePath>> computeScratchOutputs(
     LocalStore & store,
     const DerivationBuilderParams & params,
-    OutputPathMap & scratchOutputs,
-    std::map<StorePath, StorePath> & redirectedOutputs,
-    StringMap & inputRewrites,
     bool needsHashRewrite);
 
 /**
@@ -266,5 +260,10 @@ void checkAndAddImpurePaths(
 void parsePreBuildHook(
     PathsInChroot & pathsInChroot,
     const std::string & hookOutput);
+
+/**
+ * Home directory path used by non-sandboxed and Darwin builders.
+ */
+extern const std::filesystem::path homeDir;
 
 } // namespace nix

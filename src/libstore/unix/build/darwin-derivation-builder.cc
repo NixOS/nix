@@ -58,8 +58,6 @@ namespace nix {
 
 struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 {
-    PathsInChroot pathsInChroot;
-
     bool useSandbox;
 
     Pid pid;
@@ -78,17 +76,9 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     const DerivationType derivationType;
 
-    StringMap env;
-
     std::map<StorePath, StorePath> redirectedOutputs;
 
     OutputPathMap scratchOutputs;
-
-    AutoCloseFD tmpDirFd;
-
-    StringMap inputRewrites, outputRewrites;
-
-    static const std::filesystem::path homeDir;
 
     AutoCloseFD daemonSocket;
     std::thread daemonThread;
@@ -100,10 +90,10 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         DerivationBuilderParams params,
         bool useSandbox)
         : DerivationBuilderParams{std::move(params)}
+        , useSandbox{useSandbox}
         , store{store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
-        , useSandbox{useSandbox}
     {
     }
 
@@ -142,11 +132,6 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
     friend struct RestrictedStore;
-
-    bool needsHashRewrite()
-    {
-        return true;
-    }
 
     std::filesystem::path tmpDirInSandbox()
     {
@@ -300,18 +285,17 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         createDir(tmpDir, 0700);
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        inputRewrites.clear();
-        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
+        StringMap inputRewrites;
+        std::tie(scratchOutputs, inputRewrites, redirectedOutputs) =
+            nix::computeScratchOutputs(store, *this, /* needsHashRewrite= */ true);
 
-        nix::initEnv(
-            env,
-            homeDir,
+        auto env = nix::initEnv(
             store.storeDir,
             *this,
             inputRewrites,
@@ -323,6 +307,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             tmpDirFd.get());
 
         /* Compute paths to expose in the sandbox */
+        PathsInChroot pathsInChroot;
         {
             pathsInChroot = defaultPathsInChroot;
 
@@ -341,15 +326,24 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             }
         }
 
-        if (needsHashRewrite() && pathExists(homeDir))
+        if (pathExists(homeDir))
             throw Error(
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
             nix::setupRecursiveNixDaemon(
-                store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(),
-                daemonSocket, daemonThread, daemonWorkerThreads, buildUser.get());
+                store,
+                *this,
+                *this,
+                addedPaths,
+                env,
+                tmpDir,
+                tmpDirInSandbox(),
+                daemonSocket,
+                daemonThread,
+                daemonWorkerThreads,
+                buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -365,7 +359,10 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             auto awsCredentials = nix::preResolveAwsCredentials(drv);
 #  endif
 
-            pid = startProcess([this
+            pid = startProcess([this,
+                                &env,
+                                &inputRewrites,
+                                &pathsInChroot
 #  if NIX_WITH_AWS_AUTH
                                 ,
                                 awsCredentials
@@ -625,7 +622,6 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return builderOut.get();
     }
 
-
     SingleDrvOutputs unprepareBuild() override
     {
         int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
@@ -649,10 +645,14 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
-            store, localSettings, *this, addedPaths, scratchOutputs,
-            outputRewrites, buildUser.get(), tmpDir,
+            store,
+            localSettings,
+            *this,
+            addedPaths,
+            scratchOutputs,
+            buildUser.get(),
+            tmpDir,
             [this](const std::string & p) -> std::filesystem::path { return store.toRealPath(p); });
 
         cleanupBuild(true);
@@ -660,8 +660,6 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return builtOutputs;
     }
 };
-
-const std::filesystem::path DarwinDerivationBuilder::homeDir = "/homeless-shelter";
 
 DerivationBuilderUnique makeDarwinDerivationBuilder(
     LocalStore & store,

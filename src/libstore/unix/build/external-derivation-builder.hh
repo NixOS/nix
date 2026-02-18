@@ -5,7 +5,7 @@
 
 namespace nix {
 
-struct LocalStore;
+class LocalStore;
 
 DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,

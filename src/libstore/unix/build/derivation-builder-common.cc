@@ -45,6 +45,8 @@
 
 namespace nix {
 
+const std::filesystem::path homeDir = "/homeless-shelter";
+
 void handleDiffHook(
     const Path & diffHook,
     uid_t uid,
@@ -163,11 +165,11 @@ SingleDrvOutputs registerOutputs(
     const DerivationBuilderParams & params,
     const StorePathSet & addedPaths,
     const std::map<std::string, StorePath> & scratchOutputs,
-    StringMap & outputRewrites,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
     std::function<std::filesystem::path(const std::string &)> realPathInHost)
 {
+    StringMap outputRewrites;
     auto & drv = params.drv;
     auto & drvPath = params.drvPath;
     auto & drvOptions = params.drvOptions;
@@ -665,9 +667,7 @@ void writeBuilderFile(
     chownToBuilder(buildUser, fd.get(), path);
 }
 
-void initEnv(
-    StringMap & env,
-    const std::filesystem::path & homeDir,
+StringMap initEnv(
     const std::string & storeDir,
     const DerivationBuilderParams & params,
     const StringMap & inputRewrites,
@@ -678,7 +678,7 @@ void initEnv(
     const std::filesystem::path & tmpDir,
     int tmpDirFd)
 {
-    env.clear();
+    StringMap env;
 
     env["PATH"] = "/path-not-set";
     env["HOME"] = homeDir;
@@ -719,16 +719,18 @@ void initEnv(
 
     env["NIX_LOG_FD"] = "2";
     env["TERM"] = "xterm-256color";
+
+    return env;
 }
 
-void computeScratchOutputs(
+std::tuple<OutputPathMap, StringMap, std::map<StorePath, StorePath>> computeScratchOutputs(
     LocalStore & store,
     const DerivationBuilderParams & params,
-    OutputPathMap & scratchOutputs,
-    std::map<StorePath, StorePath> & redirectedOutputs,
-    StringMap & inputRewrites,
     bool needsHashRewrite)
 {
+    OutputPathMap scratchOutputs;
+    StringMap inputRewrites;
+    std::map<StorePath, StorePath> redirectedOutputs;
     for (auto & [outputName, status] : params.initialOutputs) {
         auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
             return store.makeStorePath(
@@ -765,6 +767,8 @@ void computeScratchOutputs(
 
         redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
     }
+
+    return {std::move(scratchOutputs), std::move(inputRewrites), std::move(redirectedOutputs)};
 }
 
 void stopDaemon(

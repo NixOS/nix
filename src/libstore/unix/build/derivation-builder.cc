@@ -1,24 +1,9 @@
 #include "nix/store/build/derivation-builder.hh"
-#include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
-#include "nix/util/processes.hh"
-#include "nix/store/builtins.hh"
-#include "nix/store/path-references.hh"
-#include "nix/util/util.hh"
-#include "nix/util/archive.hh"
-#include "nix/util/git.hh"
-#include "nix/store/daemon.hh"
-#include "nix/util/topo-sort.hh"
-#include "nix/store/build/child.hh"
-#include "nix/util/unix-domain-socket.hh"
-#include "nix/store/posix-fs-canonicalise.hh"
-#include "nix/util/posix-source-accessor.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
-#include "nix/util/terminal.hh"
-#include "nix/store/filetransfer.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -40,13 +25,6 @@
 
 #include <pwd.h>
 #include <grp.h>
-#include <iostream>
-
-#include "nix/util/strings.hh"
-#include "nix/util/signals.hh"
-
-#include "store-config-private.hh"
-#include "build/derivation-check.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"

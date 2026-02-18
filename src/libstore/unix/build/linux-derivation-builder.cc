@@ -11,15 +11,10 @@
 #include "nix/store/globals.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/personality.hh"
-#include "nix/util/linux-namespaces.hh"
-#include "store-config-private.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/resource.h>
-
-#include "nix/util/strings.hh"
-#include "nix/util/signals.hh"
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -47,17 +42,9 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     const DerivationType derivationType;
 
-    StringMap env;
-
     std::map<StorePath, StorePath> redirectedOutputs;
 
     OutputPathMap scratchOutputs;
-
-    AutoCloseFD tmpDirFd;
-
-    StringMap inputRewrites, outputRewrites;
-
-    static const std::filesystem::path homeDir;
 
     AutoCloseFD daemonSocket;
     std::thread daemonThread;
@@ -107,11 +94,6 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
     friend struct RestrictedStore;
-
-    bool needsHashRewrite()
-    {
-        return true;
-    }
 
     std::filesystem::path tmpDirInSandbox()
     {
@@ -173,18 +155,17 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         tmpDir = topTmpDir;
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        inputRewrites.clear();
-        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
+        StringMap inputRewrites;
+        std::tie(scratchOutputs, inputRewrites, redirectedOutputs) =
+            nix::computeScratchOutputs(store, *this, /* needsHashRewrite= */ true);
 
-        nix::initEnv(
-            env,
-            homeDir,
+        auto env = nix::initEnv(
             store.storeDir,
             *this,
             inputRewrites,
@@ -198,15 +179,24 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         if (drvOptions.useUidRange(drv))
             throw Error("feature 'uid-range' is not supported on this platform");
 
-        if (needsHashRewrite() && pathExists(homeDir))
+        if (pathExists(homeDir))
             throw Error(
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
             nix::setupRecursiveNixDaemon(
-                store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(),
-                daemonSocket, daemonThread, daemonWorkerThreads, buildUser.get());
+                store,
+                *this,
+                *this,
+                addedPaths,
+                env,
+                tmpDir,
+                tmpDirInSandbox(),
+                daemonSocket,
+                daemonThread,
+                daemonWorkerThreads,
+                buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -222,7 +212,9 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             auto awsCredentials = nix::preResolveAwsCredentials(drv);
 #endif
 
-            pid = startProcess([this
+            pid = startProcess([this,
+                                &env,
+                                &inputRewrites
 #if NIX_WITH_AWS_AUTH
                                 ,
                                 awsCredentials
@@ -310,14 +302,12 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
             store,
             localSettings,
             *this,
             addedPaths,
             scratchOutputs,
-            outputRewrites,
             buildUser.get(),
             tmpDir,
             [this](const std::string & p) { return store.toRealPath(p); });
@@ -327,8 +317,6 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return builtOutputs;
     }
 };
-
-const std::filesystem::path LinuxDerivationBuilder::homeDir = "/homeless-shelter";
 
 DerivationBuilderUnique makeLinuxDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)

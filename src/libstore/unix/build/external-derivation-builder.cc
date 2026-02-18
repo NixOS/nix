@@ -4,19 +4,16 @@
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
-#include "nix/store/builtins.hh"
 #include "nix/store/build/child.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
-#include "store-config-private.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/resource.h>
 
 #include "nix/util/strings.hh"
-#include "nix/util/signals.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -40,18 +37,11 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     std::filesystem::path topTmpDir;
 
-    AutoCloseFD tmpDirFd;
-
     const DerivationType derivationType;
 
-    StringMap env;
-
-    StringMap inputRewrites, outputRewrites;
     std::map<StorePath, StorePath> redirectedOutputs;
 
     OutputPathMap scratchOutputs;
-
-    static const std::filesystem::path homeDir;
 
     AutoCloseFD daemonSocket;
     std::thread daemonThread;
@@ -106,11 +96,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
     friend struct RestrictedStore;
-
-    bool needsHashRewrite()
-    {
-        return true;
-    }
 
     std::filesystem::path tmpDirInSandbox()
     {
@@ -172,18 +157,17 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         createDir(tmpDir, 0700);
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        inputRewrites.clear();
-        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
+        StringMap inputRewrites;
+        std::tie(scratchOutputs, inputRewrites, redirectedOutputs) =
+            nix::computeScratchOutputs(store, *this, /* needsHashRewrite= */ true);
 
-        nix::initEnv(
-            env,
-            homeDir,
+        auto env = nix::initEnv(
             store.storeDir,
             *this,
             inputRewrites,
@@ -197,21 +181,32 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         if (drvOptions.useUidRange(drv))
             throw Error("feature 'uid-range' is not supported on this platform");
 
-        if (needsHashRewrite() && pathExists(homeDir))
+        if (pathExists(homeDir))
             throw Error(
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
             nix::setupRecursiveNixDaemon(
-                store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(),
-                daemonSocket, daemonThread, daemonWorkerThreads, buildUser.get());
+                store,
+                *this,
+                *this,
+                addedPaths,
+                env,
+                tmpDir,
+                tmpDirInSandbox(),
+                daemonSocket,
+                daemonThread,
+                daemonWorkerThreads,
+                buildUser.get());
 
         nix::logBuilderInfo(drv);
 
         miscMethods->openLogFile();
 
-        nix::setupPTYMaster(builderOut, buildUser.get(),
+        nix::setupPTYMaster(
+            builderOut,
+            buildUser.get(),
 #ifdef __APPLE__
             true
 #else
@@ -330,10 +325,14 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
-            store, localSettings, *this, addedPaths, scratchOutputs,
-            outputRewrites, buildUser.get(), tmpDir,
+            store,
+            localSettings,
+            *this,
+            addedPaths,
+            scratchOutputs,
+            buildUser.get(),
+            tmpDir,
             [this](const std::string & p) { return store.toRealPath(p); });
 
         cleanupBuild(true);
@@ -341,8 +340,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return builtOutputs;
     }
 };
-
-const std::filesystem::path ExternalDerivationBuilder::homeDir = "/homeless-shelter";
 
 DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
