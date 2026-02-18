@@ -437,7 +437,7 @@ ref<GitRepo> EvalState::getWorldRepo() const
         if (hasPrefix(gitDir, "~/"))
             gitDir = getHome() + gitDir.substr(1);
 
-        worldRepo = GitRepo::openRepo(std::filesystem::path(gitDir), {.bare = true, .odbOnly = true});
+        worldRepo = GitRepo::openRepo(std::filesystem::path(gitDir), {.bare = true});
         debug("opened world repo at %s", gitDir);
     });
     return *worldRepo;
@@ -486,8 +486,27 @@ std::optional<ref<SourceAccessor>> EvalState::getWorldCheckoutAccessor() const
         return std::nullopt;
 
     std::call_once(worldCheckoutAccessorFlag, [this]() {
-        // Use the global filesystem accessor with the checkout path as root
-        worldCheckoutAccessor = getFSSourceAccessor();
+        auto checkoutPath = std::filesystem::path(settings.tectonixCheckoutPath.get());
+        auto repo = GitRepo::openRepo(checkoutPath, {});
+        auto workdirInfo = repo->getWorkdirInfo();
+
+        auto makeNotAllowedError = [checkoutPath](const CanonPath & path) -> RestrictedPathError {
+            if (pathExists(checkoutPath / path.rel()))
+                return RestrictedPathError(
+                    "Path '%1%' in the repository %2% is not tracked by Git.\n"
+                    "\n"
+                    "To make it visible to Nix, run:\n"
+                    "\n"
+                    "git -C %2% add \"%1%\"",
+                    path.rel(),
+                    checkoutPath);
+            else
+                return RestrictedPathError("Path '%s' does not exist in Git repository %s.", path.rel(), checkoutPath);
+        };
+
+        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+        worldCheckoutAccessor = repo->getAccessor(workdirInfo, opts, makeNotAllowedError);
+        debug("created world checkout accessor for working tree at %s", checkoutPath.string());
     });
     return *worldCheckoutAccessor;
 }
@@ -759,11 +778,9 @@ const std::string & EvalState::getManifestContent() const
         if (isTectonixSourceAvailable()) {
             auto checkoutAccessor = getWorldCheckoutAccessor();
             if (checkoutAccessor) {
-                auto checkoutPath = settings.tectonixCheckoutPath.get();
-                auto checkoutFullPath = CanonPath(checkoutPath + fullPath.abs());
-                if ((*checkoutAccessor)->pathExists(checkoutFullPath)) {
-                    tectonixManifestContent = (*checkoutAccessor)->readFile(checkoutFullPath);
-                    debug("loaded manifest from checkout: %s", checkoutFullPath);
+                if ((*checkoutAccessor)->pathExists(fullPath)) {
+                    tectonixManifestContent = (*checkoutAccessor)->readFile(fullPath);
+                    debug("loaded manifest from checkout: %s", fullPath);
                     return;
                 }
             }
@@ -905,7 +922,7 @@ StorePath EvalState::getZoneFromCheckout(std::string_view zonePath)
 
         auto storePath = fetchToStore(
             fetchSettings, *store,
-            SourcePath(*checkoutAccessor, CanonPath(checkoutPath + "/" + zone)),
+            SourcePath(*checkoutAccessor, CanonPath("/" + zone)),
             FetchMode::Copy, name);
 
         allowPath(storePath);
@@ -940,7 +957,26 @@ StorePath EvalState::getZoneFromCheckout(std::string_view zonePath)
     // undefined. This is analogous to normal file reads and acceptable for local
     // development workflows where dirty zones are being actively worked on.
     debug("mounting live checkout for dirty zone %s - modifications during evaluation may cause undefined behavior", zonePath);
-    auto accessor = makeFSSourceAccessor(fullPath);
+    auto repo = GitRepo::openRepo(checkoutPath, {});
+    auto workdirInfo = repo->getWorkdirInfo();
+
+    auto makeNotAllowedError = [checkoutPath, zone](const CanonPath & path) -> RestrictedPathError {
+        if (pathExists(checkoutPath + "/" + zone + "/" + path.rel()))
+            return RestrictedPathError(
+                "Path '%1%' in the repository %2% is not tracked by Git.\n"
+                "\n"
+                "To make it visible to Nix, run:\n"
+                "\n"
+                "git -C %2% add \"%1%\"",
+                zone + "/" + path.rel(),
+                checkoutPath);
+        else
+            return RestrictedPathError("Path '%s' does not exist in Git repository %s.", zone + "/" + path.rel(), checkoutPath);
+    };
+
+    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false, .subtree = "/" + zone};
+    auto accessor = repo->getAccessor(workdirInfo, opts, makeNotAllowedError);
+    debug("created world checkout accessor for zone at %s", fullPath.string());
 
     // Create virtual store path
     auto storePath = StorePath::random(name);
