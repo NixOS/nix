@@ -1987,11 +1987,15 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
     UpdateQueue q;
     evalForUpdate(state, env, q);
 
-    v.mkAttrs(&Bindings::emptyBindings);
+    Value vTmp;
+    vTmp.mkAttrs(&Bindings::emptyBindings);
+
     for (auto & rhs : std::views::reverse(q)) {
         /* Remember that queue is sorted rightmost attrset first. */
-        eval(state, /*v=*/v, /*v1=*/v, /*v2=*/rhs);
+        eval(state, /*v=*/vTmp, /*v1=*/vTmp, /*v2=*/rhs);
     }
+
+    v = vTmp;
 }
 
 void Expr::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
