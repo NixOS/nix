@@ -182,129 +182,9 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return true;
     }
 
-    std::unique_ptr<UserLock> getBuildUser()
-    {
-        return acquireUserLock(settings.nixStateDir, localSettings, 1, false);
-    }
-
-    PathsInChroot getPathsInSandbox()
-    {
-        PathsInChroot pathsInChroot = defaultPathsInChroot;
-
-        if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
-            throw Error("`sandbox-build-dir` must not contain the storeDir");
-        }
-        pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
-
-        PathSet allowedPaths = localSettings.allowedImpureHostPrefixes;
-
-        auto impurePaths = drvOptions.impureHostDeps;
-
-        for (auto & i : impurePaths) {
-            bool found = false;
-            std::filesystem::path canonI = canonPath(i);
-            for (auto & a : allowedPaths) {
-                std::filesystem::path canonA = canonPath(a);
-                if (isDirOrInDir(canonI, canonA)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found)
-                throw Error(
-                    "derivation '%s' requested impure path '%s', but it was not in allowed-impure-host-deps",
-                    store.printStorePath(drvPath),
-                    i);
-
-            pathsInChroot[i] = {i, true};
-        }
-
-        if (localSettings.preBuildHook != "") {
-            printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
-
-            enum BuildHookState { stBegin, stExtraChrootDirs };
-
-            auto state = stBegin;
-            auto lines = runProgram(localSettings.preBuildHook, false, getPreBuildHookArgs());
-            auto lastPos = std::string::size_type{0};
-            for (auto nlPos = lines.find('\n'); nlPos != std::string::npos;
-                 nlPos = lines.find('\n', lastPos)) {
-                auto line = lines.substr(lastPos, nlPos - lastPos);
-                lastPos = nlPos + 1;
-                if (state == stBegin) {
-                    if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
-                        state = stExtraChrootDirs;
-                    } else {
-                        throw Error("unknown pre-build hook command '%1%'", line);
-                    }
-                } else if (state == stExtraChrootDirs) {
-                    if (line == "") {
-                        state = stBegin;
-                    } else {
-                        auto p = line.find('=');
-                        if (p == std::string::npos)
-                            pathsInChroot[line] = {.source = line};
-                        else
-                            pathsInChroot[line.substr(0, p)] = {.source = line.substr(p + 1)};
-                    }
-                }
-            }
-        }
-
-        return pathsInChroot;
-    }
-
-    void setBuildTmpDir()
-    {
-        tmpDir = topTmpDir / "build";
-        createDir(tmpDir, 0700);
-    }
-
     std::filesystem::path tmpDirInSandbox()
     {
         return "/build";
-    }
-
-    void prepareUser()
-    {
-        killSandbox(false);
-    }
-
-    void prepareSandbox()
-    {
-        if (drvOptions.useUidRange(drv))
-            throw Error("feature 'uid-range' is not supported on this platform");
-    }
-
-    Strings getPreBuildHookArgs()
-    {
-        return Strings({store.printStorePath(drvPath)});
-    }
-
-    std::filesystem::path realPathInHost(const std::filesystem::path & p)
-    {
-        return store.toRealPath(p.native());
-    }
-
-    void openSlave()
-    {
-        std::string slaveName = getPtsName(builderOut.get());
-
-        AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
-        if (!builderOut)
-            throw SysError("opening pseudoterminal slave");
-
-        struct termios term;
-        if (tcgetattr(builderOut.get(), &term))
-            throw SysError("getting pseudoterminal attributes");
-
-        cfmakeraw(&term);
-
-        if (tcsetattr(builderOut.get(), TCSANOW, &term))
-            throw SysError("putting pseudoterminal into raw mode");
-
-        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
-            throw SysError("cannot pipe standard error into log file");
     }
 
 #if NIX_WITH_AWS_AUTH
@@ -330,189 +210,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return std::nullopt;
     }
 #endif
-
-    void startChild()
-    {
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            throw Error("'recursive-nix' is not supported yet by external derivation builders");
-
-        auto json = nlohmann::json::object();
-
-        json.emplace("version", 1);
-        json.emplace("builder", drv.builder);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : drv.args)
-                l.push_back(rewriteStrings(i, inputRewrites));
-            json.emplace("args", std::move(l));
-        }
-        {
-            auto j = nlohmann::json::object();
-            for (auto & [name, value] : env)
-                j.emplace(name, rewriteStrings(value, inputRewrites));
-            json.emplace("env", std::move(j));
-        }
-        json.emplace("topTmpDir", topTmpDir.native());
-        json.emplace("tmpDir", tmpDir.native());
-        json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-        json.emplace("storeDir", store.storeDir);
-        json.emplace("realStoreDir", store.config->realStoreDir.get());
-        json.emplace("system", drv.platform);
-        {
-            auto l = nlohmann::json::array();
-            for (auto & i : inputPaths)
-                l.push_back(store.printStorePath(i));
-            json.emplace("inputPaths", std::move(l));
-        }
-        {
-            auto l = nlohmann::json::object();
-            for (auto & i : scratchOutputs)
-                l.emplace(i.first, store.printStorePath(i.second));
-            json.emplace("outputs", std::move(l));
-        }
-
-        // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
-        // that, see this comment by Eelco about how to make it not suck:
-        // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
-        auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
-        writeFile(jsonFile, json.dump());
-
-        pid = startProcess([&]() {
-            openSlave();
-            try {
-                commonChildInit();
-
-                Strings args = {externalBuilder.program};
-
-                if (!externalBuilder.args.empty()) {
-                    args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
-                }
-
-                args.insert(args.end(), jsonFile);
-
-                if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into %1%", PathFmt(tmpDir));
-
-                chownToBuilder(topTmpDir);
-
-                setUser();
-
-                debug("executing external builder: %s", concatStringsSep(" ", args));
-                execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
-
-                throw SysError("executing %s", PathFmt(externalBuilder.program));
-            } catch (...) {
-                handleChildExceptionExternal(true);
-                _exit(1);
-            }
-        });
-    }
-
-    void initEnv()
-    {
-        nix::initEnv(
-            env, homeDir, store.storeDir, *this, inputRewrites,
-            derivationType, localSettings, tmpDirInSandbox(),
-            buildUser.get(), tmpDir, tmpDirFd.get());
-    }
-
-    void processSandboxSetupMessages()
-    {
-        std::vector<std::string> msgs;
-        while (true) {
-            std::string msg = [&]() {
-                try {
-                    return readLine(builderOut.get());
-                } catch (Error & e) {
-                    auto status = pid.wait();
-                    e.addTrace(
-                        {},
-                        "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
-                        store.printStorePath(drvPath),
-                        statusToString(status),
-                        concatStringsSep("|", msgs));
-                    throw;
-                }
-            }();
-            if (msg.substr(0, 1) == "\2")
-                break;
-            if (msg.substr(0, 1) == "\1") {
-                FdSource source(builderOut.get());
-                auto ex = readError(source);
-                ex.addTrace({}, "while setting up the build environment");
-                throw ex;
-            }
-            debug("sandbox setup: " + msg);
-            msgs.push_back(std::move(msg));
-        }
-    }
-
-    void startDaemon()
-    {
-        experimentalFeatureSettings.require(Xp::RecursiveNix);
-
-        auto store = makeRestrictedStore(
-            [&] {
-                auto config = make_ref<LocalStore::Config>(*this->store.config);
-                config->pathInfoCacheSize = 0;
-                config->stateDir = "/no-such-path";
-                config->logDir = "/no-such-path";
-                return config;
-            }(),
-            ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-            *this);
-
-        addedPaths.clear();
-
-        auto socketName = ".nix-socket";
-        std::filesystem::path socketPath = tmpDir / socketName;
-        env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
-
-        daemonSocket = createUnixDomainSocket(socketPath, 0600);
-
-        chownToBuilder(socketPath);
-
-        daemonThread = std::thread([this, store]() {
-            while (true) {
-                struct sockaddr_un remoteAddr;
-                socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-                AutoCloseFD remote =
-                    accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-                if (!remote) {
-                    if (errno == EINTR || errno == EAGAIN)
-                        continue;
-                    if (errno == EINVAL || errno == ECONNABORTED)
-                        break;
-                    throw SysError("accepting connection");
-                }
-
-                unix::closeOnExec(remote.get());
-
-                debug("received daemon connection");
-
-                auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                    try {
-                        daemon::processConnection(
-                            store,
-                            FdSource(remote.get()),
-                            FdSink(remote.get()),
-                            NotTrusted,
-                            daemon::Recursive);
-                        debug("terminated daemon connection");
-                    } catch (const Interrupted &) {
-                        debug("interrupted daemon connection");
-                    } catch (SystemError &) {
-                        ignoreExceptionExceptInterrupt();
-                    }
-                });
-
-                daemonWorkerThreads.push_back(std::move(workerThread));
-            }
-
-            debug("daemon shutting down");
-        });
-    }
 
     void stopDaemon()
     {
@@ -544,35 +241,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         nix::chownToBuilder(buildUser.get(), path);
     }
 
-    void chownToBuilder(int fd, const std::filesystem::path & path)
-    {
-        nix::chownToBuilder(buildUser.get(), fd, path);
-    }
-
-    void writeBuilderFile(const std::string & name, std::string_view contents)
-    {
-        nix::writeBuilderFile(buildUser.get(), tmpDir, tmpDirFd.get(), name, contents);
-    }
-
-    void setUser()
-    {
-        if (buildUser) {
-            preserveDeathSignal([this]() {
-                auto gids = buildUser->getSupplementaryGIDs();
-                if (setgroups(gids.size(), gids.data()) == -1)
-                    throw SysError("cannot set supplementary groups of build user");
-
-                if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
-                    || getegid() != buildUser->getGID())
-                    throw SysError("setgid failed");
-
-                if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
-                    || geteuid() != buildUser->getUID())
-                    throw SysError("setuid failed");
-            });
-        }
-    }
-
     void killSandbox(bool getStats)
     {
         if (buildUser) {
@@ -592,23 +260,6 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             miscMethods->childTerminated();
         }
         return ret;
-    }
-
-    bool decideWhetherDiskFull()
-    {
-        bool diskFull = false;
-#if HAVE_STATVFS
-        {
-            uint64_t required = 8ULL * 1024 * 1024;
-            struct statvfs st;
-            if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-                && (uint64_t) st.f_bavail * st.f_bsize < required)
-                diskFull = true;
-            if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
-                diskFull = true;
-        }
-#endif
-        return diskFull;
     }
 
     StorePath makeFallbackPath(OutputNameView outputName)
@@ -649,13 +300,13 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     {
         if (useBuildUsers(localSettings)) {
             if (!buildUser)
-                buildUser = getBuildUser();
+                buildUser = acquireUserLock(settings.nixStateDir, localSettings, 1, false);
 
             if (!buildUser)
                 return std::nullopt;
         }
 
-        prepareUser();
+        killSandbox(false);
 
         auto buildDir = store.config->getBuildDir();
 
@@ -665,14 +316,15 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             checkNotWorldWritable(buildDir);
 
         topTmpDir = createTempDir(buildDir, "nix", 0700);
-        setBuildTmpDir();
+        tmpDir = topTmpDir / "build";
+        createDir(tmpDir, 0700);
         assert(!tmpDir.empty());
 
         tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
-        chownToBuilder(tmpDirFd.get(), tmpDir);
+        nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
         for (auto & [outputName, status] : initialOutputs) {
             auto scratchPath = !status.known ? makeFallbackPath(outputName)
@@ -705,17 +357,91 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
         }
 
-        initEnv();
+        nix::initEnv(
+            env,
+            homeDir,
+            store.storeDir,
+            *this,
+            inputRewrites,
+            derivationType,
+            localSettings,
+            tmpDirInSandbox(),
+            buildUser.get(),
+            tmpDir,
+            tmpDirFd.get());
 
-        prepareSandbox();
+        if (drvOptions.useUidRange(drv))
+            throw Error("feature 'uid-range' is not supported on this platform");
 
         if (needsHashRewrite() && pathExists(homeDir))
             throw Error(
                 "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
                 PathFmt(homeDir));
 
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            startDaemon();
+        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix")) {
+            experimentalFeatureSettings.require(Xp::RecursiveNix);
+
+            auto restrictedStore = makeRestrictedStore(
+                [&] {
+                    auto config = make_ref<LocalStore::Config>(*this->store.config);
+                    config->pathInfoCacheSize = 0;
+                    config->stateDir = "/no-such-path";
+                    config->logDir = "/no-such-path";
+                    return config;
+                }(),
+                ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
+                *this);
+
+            addedPaths.clear();
+
+            auto socketName = ".nix-socket";
+            std::filesystem::path socketPath = tmpDir / socketName;
+            env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
+
+            daemonSocket = createUnixDomainSocket(socketPath, 0600);
+
+            chownToBuilder(socketPath);
+
+            daemonThread = std::thread([this, restrictedStore]() {
+                while (true) {
+                    struct sockaddr_un remoteAddr;
+                    socklen_t remoteAddrLen = sizeof(remoteAddr);
+
+                    AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                    if (!remote) {
+                        if (errno == EINTR || errno == EAGAIN)
+                            continue;
+                        if (errno == EINVAL || errno == ECONNABORTED)
+                            break;
+                        throw SysError("accepting connection");
+                    }
+
+                    unix::closeOnExec(remote.get());
+
+                    debug("received daemon connection");
+
+                    auto workerThread = std::thread([restrictedStore, remote{std::move(remote)}]() {
+                        try {
+                            daemon::processConnection(
+                                restrictedStore,
+                                FdSource(remote.get()),
+                                FdSink(remote.get()),
+                                NotTrusted,
+                                daemon::Recursive);
+                            debug("terminated daemon connection");
+                        } catch (const Interrupted &) {
+                            debug("interrupted daemon connection");
+                        } catch (SystemError &) {
+                            ignoreExceptionExceptInterrupt();
+                        }
+                    });
+
+                    daemonWorkerThreads.push_back(std::move(workerThread));
+                }
+
+                debug("daemon shutting down");
+            });
+        }
 
         printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
         printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
@@ -748,21 +474,150 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         buildResult.startTime = time(0);
 
-        startChild();
+        /* Start child */
+        {
+            if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+                throw Error("'recursive-nix' is not supported yet by external derivation builders");
+
+            auto json = nlohmann::json::object();
+
+            json.emplace("version", 1);
+            json.emplace("builder", drv.builder);
+            {
+                auto l = nlohmann::json::array();
+                for (auto & i : drv.args)
+                    l.push_back(rewriteStrings(i, inputRewrites));
+                json.emplace("args", std::move(l));
+            }
+            {
+                auto j = nlohmann::json::object();
+                for (auto & [name, value] : env)
+                    j.emplace(name, rewriteStrings(value, inputRewrites));
+                json.emplace("env", std::move(j));
+            }
+            json.emplace("topTmpDir", topTmpDir.native());
+            json.emplace("tmpDir", tmpDir.native());
+            json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
+            json.emplace("storeDir", store.storeDir);
+            json.emplace("realStoreDir", store.config->realStoreDir.get());
+            json.emplace("system", drv.platform);
+            {
+                auto l = nlohmann::json::array();
+                for (auto & i : inputPaths)
+                    l.push_back(store.printStorePath(i));
+                json.emplace("inputPaths", std::move(l));
+            }
+            {
+                auto l = nlohmann::json::object();
+                for (auto & i : scratchOutputs)
+                    l.emplace(i.first, store.printStorePath(i.second));
+                json.emplace("outputs", std::move(l));
+            }
+
+            // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
+            // that, see this comment by Eelco about how to make it not suck:
+            // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
+            auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
+            writeFile(jsonFile, json.dump());
+
+            pid = startProcess([&]() {
+                /* Open pseudoterminal slave */
+                {
+                    std::string slaveName = getPtsName(builderOut.get());
+
+                    AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+                    if (!builderOut)
+                        throw SysError("opening pseudoterminal slave");
+
+                    struct termios term;
+                    if (tcgetattr(builderOut.get(), &term))
+                        throw SysError("getting pseudoterminal attributes");
+
+                    cfmakeraw(&term);
+
+                    if (tcsetattr(builderOut.get(), TCSANOW, &term))
+                        throw SysError("putting pseudoterminal into raw mode");
+
+                    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+                        throw SysError("cannot pipe standard error into log file");
+                }
+                try {
+                    commonChildInit();
+
+                    Strings args = {externalBuilder.program};
+
+                    if (!externalBuilder.args.empty()) {
+                        args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
+                    }
+
+                    args.insert(args.end(), jsonFile);
+
+                    if (chdir(tmpDir.c_str()) == -1)
+                        throw SysError("changing into %1%", PathFmt(tmpDir));
+
+                    chownToBuilder(topTmpDir);
+
+                    if (buildUser) {
+                        preserveDeathSignal([this]() {
+                            auto gids = buildUser->getSupplementaryGIDs();
+                            if (setgroups(gids.size(), gids.data()) == -1)
+                                throw SysError("cannot set supplementary groups of build user");
+
+                            if (setgid(buildUser->getGID()) == -1 || getgid() != buildUser->getGID()
+                                || getegid() != buildUser->getGID())
+                                throw SysError("setgid failed");
+
+                            if (setuid(buildUser->getUID()) == -1 || getuid() != buildUser->getUID()
+                                || geteuid() != buildUser->getUID())
+                                throw SysError("setuid failed");
+                        });
+                    }
+
+                    debug("executing external builder: %s", concatStringsSep(" ", args));
+                    execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
+
+                    throw SysError("executing %s", PathFmt(externalBuilder.program));
+                } catch (...) {
+                    handleChildException(true);
+                    _exit(1);
+                }
+            });
+        }
 
         pid.setSeparatePG(true);
 
-        processSandboxSetupMessages();
+        /* Process sandbox setup messages */
+        {
+            std::vector<std::string> msgs;
+            while (true) {
+                std::string msg = [&]() {
+                    try {
+                        return readLine(builderOut.get());
+                    } catch (Error & e) {
+                        auto status = pid.wait();
+                        e.addTrace(
+                            {},
+                            "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
+                            store.printStorePath(drvPath),
+                            statusToString(status),
+                            concatStringsSep("|", msgs));
+                        throw;
+                    }
+                }();
+                if (msg.substr(0, 1) == "\2")
+                    break;
+                if (msg.substr(0, 1) == "\1") {
+                    FdSource source(builderOut.get());
+                    auto ex = readError(source);
+                    ex.addTrace({}, "while setting up the build environment");
+                    throw ex;
+                }
+                debug("sandbox setup: " + msg);
+                msgs.push_back(std::move(msg));
+            }
+        }
 
         return builderOut.get();
-    }
-
-    SingleDrvOutputs registerOutputs()
-    {
-        return nix::registerOutputs(
-            store, localSettings, *this, addedPaths, scratchOutputs,
-            outputRewrites, buildUser.get(), tmpDir,
-            [this](const std::string & p) { return realPathInHost(p); });
     }
 
     SingleDrvOutputs unprepareBuild() override
@@ -794,7 +649,18 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }
 
         if (!statusOk(status)) {
-            bool diskFull = decideWhetherDiskFull();
+            bool diskFull = false;
+#if HAVE_STATVFS
+            {
+                uint64_t required = 8ULL * 1024 * 1024;
+                struct statvfs st;
+                if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
+                    && (uint64_t) st.f_bavail * st.f_bsize < required)
+                    diskFull = true;
+                if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
+                    diskFull = true;
+            }
+#endif
 
             cleanupBuild(false);
 
@@ -806,7 +672,16 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        auto builtOutputs = registerOutputs();
+        auto builtOutputs = nix::registerOutputs(
+            store,
+            localSettings,
+            *this,
+            addedPaths,
+            scratchOutputs,
+            outputRewrites,
+            buildUser.get(),
+            tmpDir,
+            [this](const std::string & p) { return store.toRealPath(p); });
 
         cleanupBuild(true);
 
