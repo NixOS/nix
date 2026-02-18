@@ -1066,6 +1066,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
+        StringMap outputRewrites;
         auto builtOutputs = nix::registerOutputs(
             store, localSettings, *this, addedPaths, scratchOutputs,
             outputRewrites, buildUser.get(), tmpDir,
