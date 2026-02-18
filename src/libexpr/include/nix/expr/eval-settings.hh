@@ -364,7 +364,7 @@ struct EvalSettings : Config
 
     Setting<bool> lazyTrees{
         this,
-        false,
+        true,
         "lazy-trees",
         R"(
           If set to true, flakes and trees fetched by [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) are only copied to the Nix store when they're used as a dependency of a derivation. This avoids copying (potentially large) source trees unnecessarily.
