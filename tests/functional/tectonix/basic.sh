@@ -43,25 +43,19 @@ zone_src=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
 echo "Zone source path: $zone_src"
 
 # Verify it's a store path
-if [[ ! "$zone_src" =~ ^/nix/store/ ]]; then
+if [[ ! "$zone_src" =~ ^"$NIX_STORE_DIR" ]]; then
     fail "Zone source should be a store path, got: $zone_src"
 fi
 
 # Test: Zone attribute set
-zone_info=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    'builtins.unsafeTectonixInternalZone "//areas/tools/dev"')
-echo "Zone info: $zone_info"
+zone_root=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    'builtins.unsafeTectonixInternalZoneRoot "//areas/tools/dev"')
+echo "Zone root: $zone_root"
 
-# Verify expected attributes
-echo "$zone_info" | grepQuiet "outPath"
-echo "$zone_info" | grepQuiet "treeSha"
-echo "$zone_info" | grepQuiet "zonePath"
-echo "$zone_info" | grepQuiet "dirty"
-
-# Verify dirty is false (clean repo)
-dirty=$(echo "$zone_info" | nix eval --json --expr "(builtins.fromJSON \"$(echo "$zone_info" | sed 's/"/\\"/g')\").dirty" 2>/dev/null || echo "$zone_info" | grep -o '"dirty":[^,}]*' | cut -d: -f2)
-if [[ "$dirty" == "true" ]]; then
-    fail "Zone should not be dirty in clean repo"
+# Verify it exists in world tree
+echo "$zone_root" | grepQuiet "$TEST_WORLD"
+if [[ ! "$zone_root" =~ ^"$TEST_WORLD" ]]; then
+    fail "Zone root should be in world tree"
 fi
 
 echo "Basic tests passed!"
