@@ -11,19 +11,7 @@ namespace nix {
 
 using namespace nix::windows;
 
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
-{
-    // FIXME use `std::filesystem::last_write_time`.
-    //
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-    warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
-}
-
-Descriptor openDirectory(const std::filesystem::path & path)
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink)
 {
     return CreateFileW(
         path.c_str(),
@@ -31,7 +19,7 @@ Descriptor openDirectory(const std::filesystem::path & path)
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_BACKUP_SEMANTICS | (followFinalSymlink ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr);
 }
 
@@ -83,7 +71,7 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
     deletePath(path);
 }
 
-std::filesystem::path windows::handleToPath(HANDLE handle)
+std::filesystem::path descriptorToPath(Descriptor handle)
 {
     std::vector<wchar_t> buf(0x100);
     DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
@@ -103,6 +91,79 @@ std::filesystem::path windows::handleToPath(HANDLE handle)
         dw -= 1;
     }
     return std::filesystem::path{std::wstring{buf.data(), dw}};
+}
+
+time_t windows::fileTimeToUnixTime(const FILETIME & ft)
+{
+    /* FILETIME is 100-nanosecond intervals since January 1, 1601 UTC.
+       Unix time is seconds since January 1, 1970 UTC.
+       Difference is 11644473600 seconds. */
+    ULARGE_INTEGER ull;
+    ull.LowPart = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+    return static_cast<time_t>(ull.QuadPart / 10000000ULL - 11644473600ULL);
+}
+
+void windows::statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks)
+{
+    memset(&st, 0, sizeof(st));
+
+    /* Determine file type */
+    if (dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        st.st_mode = S_IFLNK | 0777;
+    } else if (dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        st.st_mode = S_IFDIR | 0755;
+    } else {
+        st.st_mode = S_IFREG | 0644;
+    }
+
+    /* File size (only meaningful for regular files) */
+    st.st_size = (static_cast<int64_t>(nFileSizeHigh) << 32) | nFileSizeLow;
+
+    /* Timestamps */
+    st.st_atime = fileTimeToUnixTime(ftLastAccessTime);
+    st.st_mtime = fileTimeToUnixTime(ftLastWriteTime);
+    st.st_ctime = fileTimeToUnixTime(ftCreationTime);
+
+    st.st_nlink = nNumberOfLinks;
+    st.st_uid = 0;
+    st.st_gid = 0;
+}
+
+/**
+ * Fill a PosixStat structure from WIN32_FIND_DATAW.
+ */
+static void statFromFindData(const WIN32_FIND_DATAW & fd, PosixStat & st)
+{
+    windows::statFromFileInfo(
+        st,
+        fd.dwFileAttributes,
+        fd.ftCreationTime,
+        fd.ftLastAccessTime,
+        fd.ftLastWriteTime,
+        fd.nFileSizeHigh,
+        fd.nFileSizeLow);
+}
+
+PosixStat lstat(const std::filesystem::path & path)
+{
+    WIN32_FIND_DATAW fd;
+    HANDLE h = FindFirstFileW(path.c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        throw WinError("getting status of %s", PathFmt(path));
+    FindClose(h);
+
+    PosixStat st;
+    statFromFindData(fd, st);
+    return st;
 }
 
 } // namespace nix

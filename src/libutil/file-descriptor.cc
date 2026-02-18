@@ -184,22 +184,19 @@ void AutoCloseFD::close()
     }
 }
 
-void AutoCloseFD::fsync() const
+void fsync(Descriptor fd)
 {
-    if (fd != INVALID_DESCRIPTOR) {
-        int result;
-        result =
+    int result =
 #ifdef _WIN32
-            ::FlushFileBuffers(fd)
+        ::FlushFileBuffers(fd)
 #elif defined(__APPLE__)
-            ::fcntl(fd, F_FULLFSYNC)
+        ::fcntl(fd, F_FULLFSYNC)
 #else
-            ::fsync(fd)
+        ::fsync(fd)
 #endif
-            ;
-        if (result == -1)
-            throw NativeSysError("fsync file descriptor %1%", fd);
-    }
+        ;
+    if (result == -1)
+        throw NativeSysError("fsync file descriptor %1%", fd);
 }
 
 void AutoCloseFD::startFsync() const

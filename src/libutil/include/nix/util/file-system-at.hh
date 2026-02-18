@@ -15,6 +15,7 @@
  */
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 
 #include <optional>
 
@@ -32,6 +33,60 @@ namespace nix {
  * @throws Interrupted if interrupted.
  */
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Create a symlink relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new symlink
+ * @param target The symlink target (what it points to)
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createSymlinkAt(Descriptor dirFd, const CanonPath & path, const OsString & target);
+
+/**
+ * Create a directory relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path for the new directory
+ *
+ * @throws SystemError on any I/O errors.
+ */
+void createDirectoryAt(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of an open file/directory handle.
+ *
+ * @param fd File descriptor/handle
+ * @throws SystemError on I/O errors.
+ */
+PosixStat fstat(Descriptor fd);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @return nullopt if the path does not exist.
+ * @throws SystemError on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const CanonPath & path);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @throws SystemError if the path does not exist or on other I/O errors.
+ *
+ * @pre path.isRoot() is false
+ */
+PosixStat fstatat(Descriptor dirFd, const CanonPath & path);
 
 /**
  * Safe(r) function to open a file relative to dirFd, while
@@ -67,6 +122,14 @@ Descriptor openFileEnsureBeneathNoSymlinks(
 #endif
 );
 
+/**
+ * Set the access and modification time of a file relative to a directory file descriptor.
+ *
+ * @pre path.isRoot() is false
+ * @throws SysError if any operation fails
+ */
+void setWriteTime(Descriptor dirFd, const CanonPath & path, time_t accessedTime, time_t modificationTime);
+
 #ifdef __linux__
 namespace linux {
 
@@ -75,7 +138,7 @@ namespace linux {
  *
  * @see https://man7.org/linux/man-pages/man2/openat2.2.html
  * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
-v*
+ *
  * @param flags O_* flags
  * @param mode Mode for O_{CREAT,TMPFILE}
  * @param resolve RESOLVE_* flags

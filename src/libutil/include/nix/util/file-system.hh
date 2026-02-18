@@ -28,11 +28,20 @@
  * Polyfill for MinGW
  *
  * Windows does in fact support symlinks, but the C runtime interfaces predate this.
- *
- * @todo get rid of this, and stop using `stat` when we want `lstat` too.
+ * We define S_IFLNK and S_ISLNK so that our lstat implementation can properly
+ * indicate symlinks by setting these mode bits when it detects a reparse point.
  */
+#ifndef S_IFLNK
+#  ifndef _WIN32
+#    error "S_IFLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_IFLNK 0120000
+#endif
 #ifndef S_ISLNK
-#  define S_ISLNK(m) false
+#  ifndef _WIN32
+#    error "S_ISLNK should be defined on non-Windows platforms"
+#  endif
+#  define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
 
 namespace nix {
@@ -125,6 +134,38 @@ using PosixStat =
 #endif
     ;
 
+#ifdef _WIN32
+namespace windows {
+
+/**
+ * Convert Windows FILETIME to Unix time_t.
+ */
+time_t fileTimeToUnixTime(const FILETIME & ft);
+
+/**
+ * Fill a PosixStat structure from file attributes and timestamps.
+ *
+ * @param dwFileAttributes File attributes (FILE_ATTRIBUTE_*)
+ * @param ftCreationTime Creation time
+ * @param ftLastAccessTime Last access time
+ * @param ftLastWriteTime Last write time
+ * @param nFileSizeHigh High 32 bits of file size
+ * @param nFileSizeLow Low 32 bits of file size
+ * @param nNumberOfLinks Number of hard links (default 1)
+ */
+void statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks = 1);
+
+} // namespace windows
+#endif
+
 /**
  * Get status of `path`.
  */
@@ -133,10 +174,6 @@ PosixStat lstat(const std::filesystem::path & path);
  * Get status of `path` following symlinks.
  */
 PosixStat stat(const std::filesystem::path & path);
-/**
- * Get status of an open file descriptor.
- */
-PosixStat fstat(int fd);
 /**
  * `lstat` the given path if it exists.
  * @return std::nullopt if the path doesn't exist, or an optional containing the result of `lstat` otherwise
@@ -189,26 +226,26 @@ Path readLink(const Path & path);
  */
 std::filesystem::path readLink(const std::filesystem::path & path);
 
-#ifdef _WIN32
-namespace windows {
-
 /**
- * Get the path associated with a file handle.
+ * Get the path associated with a file descriptor.
  *
  * @note One MUST only use this for error handling, because it creates
  * TOCTOU issues. We don't mind if error messages point to out of date
  * paths (that is a rather trivial TOCTOU --- the error message is best
  * effort) but for anything else we do.
+ *
+ * @note this function will clobber `errno` (Unix) / "last error"
+ * (Windows), so care must be used to get those error codes, then call
+ * this, then build a `SysError` / `WinError` with the saved error code.
  */
-std::filesystem::path handleToPath(Descriptor handle);
-
-} // namespace windows
-#endif
+std::filesystem::path descriptorToPath(Descriptor fd);
 
 /**
  * Open a `Descriptor` with read-only access to the given directory.
+ *
+ * @param followSymlinks If false, fail if the path is a symlink.
  */
-Descriptor openDirectory(const std::filesystem::path & path);
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink = true);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.
@@ -268,8 +305,7 @@ writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 066
     return writeFile(path.string(), source, mode, sync);
 }
 
-void writeFile(
-    AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const Path * origPath = nullptr);
 
 /**
  * Flush a path's parent directory to disk.
@@ -301,30 +337,6 @@ void createDirs(const std::filesystem::path & path);
  * Create a single directory.
  */
 void createDir(const Path & path, mode_t mode = 0755);
-
-/**
- * Set the access and modification times of the given path, not
- * following symlinks.
- *
- * @param accessedTime Specified in seconds.
- *
- * @param modificationTime Specified in seconds.
- *
- * @param isSymlink Whether the file in question is a symlink. Used for
- * fallback code where we don't have `lutimes` or similar. if
- * `std::optional` is passed, the information will be recomputed if it
- * is needed. Race conditions are possible so be careful!
- */
-void setWriteTime(
-    const std::filesystem::path & path,
-    time_t accessedTime,
-    time_t modificationTime,
-    std::optional<bool> isSymlink = std::nullopt);
-
-/**
- * Convenience wrapper that takes all arguments from the `PosixStat`.
- */
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
 
 /**
  * Create a symlink.

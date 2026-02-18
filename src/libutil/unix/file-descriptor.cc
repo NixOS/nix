@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
@@ -49,7 +50,8 @@ void readFull(int fd, char * buf, size_t count)
                 pollFD(fd, POLLIN);
                 continue;
             }
-            throw SysError("reading from file");
+            auto savedErrno = errno;
+            throw SysError(savedErrno, "reading from file %s", PathFmt(descriptorToPath(fd)));
         }
         if (res == 0)
             throw EndOfFile("unexpected end-of-file");
@@ -72,7 +74,8 @@ void writeFull(int fd, std::string_view s, bool allowInterrupts)
                 pollFD(fd, POLLOUT);
                 continue;
             }
-            throw SysError("writing to file");
+            auto savedErrno = errno;
+            throw SysError(savedErrno, "writing to file %s", PathFmt(descriptorToPath(fd)));
         }
         if (res > 0)
             s.remove_prefix(res);
@@ -95,8 +98,10 @@ std::string readLine(int fd, bool eofOk, char terminator)
                 pollFD(fd, POLLIN);
                 continue;
             }
-            default:
-                throw SysError("reading a line");
+            default: {
+                auto savedErrno = errno;
+                throw SysError(savedErrno, "reading a line from %s", PathFmt(descriptorToPath(fd)));
+            }
             }
         } else if (rd == 0) {
             if (eofOk)

@@ -195,70 +195,41 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
     return path == dir || isInDir(path, dir);
 }
 
-#ifdef _WIN32
-#  define STAT _wstat64
-#  define LSTAT _wstat64
-#else
-#  define STAT stat
-#  define LSTAT lstat
-#endif
-
 PosixStat stat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (STAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-PosixStat lstat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (LSTAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-PosixStat fstat(int fd)
 {
     PosixStat st;
     if (
 #ifdef _WIN32
-        _fstat64
+        _wstat64
 #else
-        ::fstat
+        ::stat
 #endif
-        (fd, &st))
-        throw SysError("getting status of fd %d", fd);
+        (path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
     return st;
 }
 
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (STAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+    try {
+        return stat(path);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory))
+            return std::nullopt;
+        throw;
     }
-    return st;
 }
 
 std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (LSTAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+    try {
+        return lstat(path);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::no_such_file_or_directory) || e.is(std::errc::not_a_directory))
+            return std::nullopt;
+        throw;
     }
-    return st;
 }
-
-#undef STAT
-#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -336,23 +307,23 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    writeFile(fd, path, s, mode, sync);
+    writeFile(fd.get(), s, sync, &path);
 
     /* Close explicitly to propagate the exceptions. */
     fd.close();
 }
 
-void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode, FsSync sync)
+void writeFile(Descriptor fd, std::string_view s, FsSync sync, const Path * origPath)
 {
-    assert(fd);
+    assert(fd != INVALID_DESCRIPTOR);
     try {
-        writeFull(fd.get(), s);
+        writeFull(fd, s);
 
         if (sync == FsSync::Yes)
-            fd.fsync();
+            fsync(fd);
 
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", origPath);
+        e.addTrace({}, "writing file '%1%'", origPath ? *origPath : descriptorToPath(fd).string());
         throw;
     }
 }
@@ -679,11 +650,6 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
     }
 }
 
-void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
-{
-    setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
-}
-
 void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete)
 {
     auto fromStatus = std::filesystem::symlink_status(from);
@@ -708,7 +674,7 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
         throw Error("file %s has an unsupported type", PathFmt(from));
     }
 
-    setWriteTime(to, lstat(from.string().c_str()));
+    // Note: we don't preserve timestamps anymore
     if (andDelete) {
         if (!std::filesystem::is_symlink(fromStatus))
             std::filesystem::permissions(

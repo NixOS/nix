@@ -23,9 +23,9 @@
 
 namespace nix {
 
-Descriptor openDirectory(const std::filesystem::path & path)
+Descriptor openDirectory(const std::filesystem::path & path, bool followFinalSymlink)
 {
-    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (followFinalSymlink ? 0 : O_NOFOLLOW));
 }
 
 Descriptor openFileReadonly(const std::filesystem::path & path)
@@ -46,56 +46,42 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
     return open(path.c_str(), flags, mode);
 }
 
+std::filesystem::path descriptorToPath(Descriptor fd)
+{
+    if (fd == STDIN_FILENO)
+        return "<stdin>";
+    if (fd == STDOUT_FILENO)
+        return "<stdout>";
+    if (fd == STDERR_FILENO)
+        return "<stderr>";
+
+#if defined(__linux__)
+    try {
+        return readLink("/proc/self/fd/" + std::to_string(fd));
+    } catch (...) {
+    }
+#elif HAVE_F_GETPATH
+    /* F_GETPATH requires PATH_MAX buffer per POSIX */
+    char buf[PATH_MAX];
+    if (fcntl(fd, F_GETPATH, buf) != -1)
+        return buf;
+#endif
+
+    /* Fallback for unknown fd or unsupported platform */
+    return "<fd " + std::to_string(fd) + ">";
+}
+
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
+PosixStat lstat(const std::filesystem::path & path)
 {
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
-    struct timespec times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_nsec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_nsec = 0,
-        },
-    };
-    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path));
-#else
-    struct timeval times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_usec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_usec = 0,
-        },
-    };
-#  if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", PathFmt{path});
-#  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
-
-    if (!isSymlink) {
-        if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
-    } else {
-        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
-    }
-#  endif
-#endif
+    PosixStat st;
+    if (::lstat(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
 }
 
 #ifdef __FreeBSD__

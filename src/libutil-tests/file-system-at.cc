@@ -1,9 +1,10 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fs-sink.hh"
+
+#include <cstring>
 
 namespace nix {
 
