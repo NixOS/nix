@@ -1268,7 +1268,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     };
 
     for (auto & [outputName, output] : drv.outputs) {
-        auto envHasRightPath = [&](const StorePath & actual, bool isDeferred = false) {
+        auto envHasRightPath = [&](const StorePath & actual, bool isDeferred) {
             if constexpr (fillIn) {
                 auto j = drv.env.find(outputName);
                 /* Fill in mode: fill in missing or empty environment
@@ -1306,10 +1306,10 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                 overloaded{
                     [&](const DrvHashModulo::DrvHash & drvHash) {
                         auto outPath = store.makeOutputPath(outputName, drvHash, drvName);
-
+                        constexpr static bool deferred = std::is_same_v<Output, DerivationOutput::Deferred>;
+                        envHasRightPath(outPath, deferred);
                         if constexpr (std::is_same_v<Output, DerivationOutput::InputAddressed>) {
                             if (outputVariant.path == outPath) {
-                                envHasRightPath(outPath);
                                 return; // Correct case
                             }
                             /* Error case, an explicitly wrong path is
@@ -1318,13 +1318,12 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                                 "derivation has incorrect output '%s', should be '%s'",
                                 store.printStorePath(outputVariant.path),
                                 store.printStorePath(outPath));
-                        } else if constexpr (std::is_same_v<Output, DerivationOutput::Deferred>) {
+                        } else if constexpr (deferred) {
                             if constexpr (fillIn) {
                                 /* Fill in output path for Deferred outputs */
                                 output = DerivationOutput::InputAddressed{
                                     .path = outPath,
                                 };
-                                envHasRightPath(outPath);
                             } else {
                                 /* Validation mode: deferred outputs
                                    should have been filled in */
@@ -1365,7 +1364,9 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             overloaded{
                 [&](const DerivationOutput::InputAddressed & o) { hash(o); },
                 [&](const DerivationOutput::Deferred & o) { hash(o); },
-                [&](const DerivationOutput::CAFixed & dof) { envHasRightPath(dof.path(store, drvName, outputName)); },
+                [&](const DerivationOutput::CAFixed & dof) {
+                    envHasRightPath(dof.path(store, drvName, outputName), false);
+                },
                 [&](const auto &) {
                     // Nothing to do for other output types
                 },
