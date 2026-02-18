@@ -31,6 +31,8 @@ TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);
 
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
         cfg->readOnly = false;
@@ -53,6 +55,8 @@ TEST(DummyStore, realisation_read)
 
     ASSERT_TRUE(value2);
     EXPECT_EQ(*value2, value);
+
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "");
 }
 
 /* ----------------------------------------------------------------------------
