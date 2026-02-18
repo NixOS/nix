@@ -781,6 +781,12 @@ RawInstallablesCommand::RawInstallablesCommand()
         .handler = {&readFromStdIn, true},
     });
 
+    addFlag({
+        .longName = "all",
+        .description = "Apply to all packages",
+        .handler = {&all, true},
+    });
+
     expectArgs({
         .label = "installables",
         .handler = {&rawInstallables},
@@ -817,6 +823,26 @@ void RawInstallablesCommand::run(ref<Store> store)
         }
     } else {
         applyDefaultInstallables(rawInstallables);
+    }
+    if (all) {
+        Completions completions;
+        for (auto & raw : rawInstallables) {
+            completeFlakeRefWithFragment(
+                completions,
+                getEvalState(),
+                lockFlags,
+                getDefaultFlakeAttrPathPrefixes(),
+                getDefaultFlakeAttrPaths(),
+                raw + "#");
+        }
+        rawInstallables.clear();
+        for (auto & c : completions.completions) {
+            if (c.completion.find("#") + 1 == c.completion.size() || c.completion.find("#checks") != std::string::npos
+                || c.completion.find("#packages") != std::string::npos
+                || c.completion.find("#default") != std::string::npos)
+                continue;
+            rawInstallables.push_back(c.completion);
+        }
     }
     run(store, std::move(rawInstallables));
 }
