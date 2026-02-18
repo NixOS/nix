@@ -408,6 +408,29 @@ public:
      */
     std::shared_ptr<const UnkeyedRealisation> queryRealisation(const DrvOutput &);
 
+    struct DeepDerivationOutputResult
+    {
+        /**
+         * The output path, if known.
+         */
+        std::optional<StorePath> outPath;
+
+        /**
+         * The resolved derivation path. For non-CA derivations or
+         * derivations that don't need resolution, this equals the
+         * original drvPath.
+         */
+        StorePath resolvedDrvPath;
+    };
+
+    /**
+     * Like queryStaticPartialDerivationOutput, but resolves the
+     * derivation first if needed. Returns both the output path and
+     * the resolved derivation path.
+     */
+    DeepDerivationOutputResult deepQueryPartialDerivationOutput(
+        const StorePath & drvPath, const std::string & outputName, Store * evalStore = nullptr);
+
     /**
      * Asynchronous version of queryRealisation().
      */
@@ -479,6 +502,22 @@ public:
     queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
+     * Like the above, but takes the derivation directly.
+     *
+     * @note For CA derivations, the derivation should already be
+     * resolved, or output path lookup will not work.
+     */
+    std::map<std::string, std::optional<StorePath>>
+    queryPartialDerivationOutputMap(const Derivation & drv, Store * evalStore = nullptr);
+
+    /**
+     * Like the above, but resolves the derivation first if needed
+     * for CA derivation output lookup.
+     */
+    std::map<std::string, std::optional<StorePath>>
+    deepQueryPartialDerivationOutputMap(const StorePath & drvPath, Store * evalStore = nullptr);
+
+    /**
      * Like `queryPartialDerivationOutputMap` but only considers
      * statically known output paths (i.e. those that can be gotten from
      * the derivation itself.
@@ -490,10 +529,22 @@ public:
     queryStaticPartialDerivationOutputMap(const StorePath & path);
 
     /**
+     * Like the above, but for a single output.
+     */
+    virtual std::optional<StorePath>
+    queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName);
+
+    /**
      * Query the mapping outputName=>outputPath for the given derivation.
      * Assume every output has a mapping and throw an exception otherwise.
      */
     OutputPathMap queryDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
+
+    /**
+     * Like queryDerivationOutputMap, but resolves the derivation first
+     * for CA derivations.
+     */
+    OutputPathMap deepQueryDerivationOutputMap(const StorePath & path, Store * evalStore = nullptr);
 
     /**
      * Query the full store path given the hash part of a valid store

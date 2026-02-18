@@ -11,13 +11,12 @@
 -- of having many abandoned tables lying around. Closer to the end of
 -- the experiment, we'll provide guidance on how to clean this up.
 
-create table if not exists BuildTraceV2 (
+create table if not exists BuildTraceV3 (
     id integer primary key autoincrement not null,
     drvPath text not null,
     outputName text not null, -- symbolic output id, usually "out"
-    outputPath integer not null,
-    signatures text, -- space-separated list
-    foreign key (outputPath) references ValidPaths(id) on delete cascade
+    outputPath text not null,
+    signatures text -- space-separated list
 );
 
-create index if not exists IndexBuildTraceV2 on BuildTraceV2(drvPath, outputName);
+create index if not exists IndexBuildTraceV3 on BuildTraceV3(drvPath, outputName);

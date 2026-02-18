@@ -106,6 +106,7 @@ struct LocalStore::State::Stmts
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt UpdateRealisedOutput;
+    SQLiteStmt DeleteRealisedOutput;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
@@ -360,15 +361,24 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->RegisterRealisedOutput.create(
             state->db,
             R"(
-                insert into BuildTraceV2 (drvPath, outputName, outputPath, signatures)
-                values (?, ?, (select id from ValidPaths where path = ?), ?)
+                insert into BuildTraceV3 (drvPath, outputName, outputPath, signatures)
+                values (?, ?, ?, ?)
                 ;
             )");
         state->stmts->UpdateRealisedOutput.create(
             state->db,
             R"(
-                update BuildTraceV2
+                update BuildTraceV3
                     set signatures = ?
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
+        state->stmts->DeleteRealisedOutput.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
                 where
                     drvPath = ? and
                     outputName = ?
@@ -377,16 +387,14 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
-                select BuildTraceV2.id, Output.path, BuildTraceV2.signatures from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
+                select id, outputPath, signatures from BuildTraceV3
                     where drvPath = ? and outputName = ?
                     ;
             )");
         state->stmts->QueryAllRealisedOutputs.create(
             state->db,
             R"(
-                select outputName, Output.path from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
+                select outputName, outputPath from BuildTraceV3
                     where drvPath = ?
                     ;
             )");
@@ -604,7 +612,7 @@ void LocalStore::upgradeDBSchema(State & state)
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         doUpgrade(
-            "20251016-ca-derivations",
+            "20251017-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
 }
@@ -667,6 +675,15 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                     concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
+    });
+}
+
+void LocalStore::deleteBuildTrace(const DrvOutput & id)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
+    retrySQLite<void>([&]() {
+        auto state(_state->lock());
+        state->stmts->DeleteRealisedOutput.use()(id.drvPath.to_string())(id.outputName).exec();
     });
 }
 
@@ -875,6 +892,27 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
 
         return outputs;
     });
+}
+
+std::optional<StorePath>
+LocalStore::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
+{
+    auto outputs = queryStaticPartialDerivationOutputMap(path);
+    auto it = outputs.find(outputName);
+    if (it == outputs.end()) {
+        /* Only throw if CA derivations is disabled, because then the
+           SQL table is complete.
+
+           With CA derivations enabled, derivations without static
+           outputs exist, this absence of a row in this table does not
+           mean the derivation doesn't have an output necessarily, just
+           that that it doesn't have an output with a known output path.
+          */
+        if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+            throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
+        return std::nullopt;
+    }
+    return it->second;
 }
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)
@@ -1568,10 +1606,6 @@ void LocalStore::queryRealisationUncached(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
     try {
-        if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-            callback(nullptr);
-            return;
-        }
         auto maybeRealisation = retrySQLite<std::optional<const UnkeyedRealisation>>(
             [&]() { return queryRealisation_(*_state->lock(), id); });
         if (maybeRealisation)

@@ -274,6 +274,9 @@ public:
     std::map<std::string, std::optional<StorePath>>
     queryStaticPartialDerivationOutputMap(const StorePath & path) override;
 
+    std::optional<StorePath>
+    queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName) override;
+
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override;
 
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
@@ -332,6 +335,8 @@ public:
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
+
+    void deleteBuildTrace(const DrvOutput & id) override;
 
     /**
      * Called by `collectGarbage` to trace in reverse.

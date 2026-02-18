@@ -2,6 +2,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/comparator.hh"
+#include "nix/util/callback.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -101,26 +102,134 @@ nlohmann::json BuiltPath::toJSON(const StoreDirConfig & store) const
         raw());
 }
 
+/**
+ * A wrapper store that collects all queried realisations into a set.
+ * Used by toRealisedPaths to gather realisations for copying.
+ */
+struct RealisationCollectingStore : Store
+{
+    Store & wrapped;
+    RealisedPath::Set & collected;
+
+    RealisationCollectingStore(Store & wrapped, RealisedPath::Set & collected)
+        : Store(wrapped.config)
+        , wrapped(wrapped)
+        , collected(collected)
+    {
+    }
+
+    void queryPathInfoUncached(
+        const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
+    {
+        try {
+            callback(wrapped.queryPathInfo(path));
+        } catch (...) {
+            callback.rethrow();
+        }
+    }
+
+    void queryRealisationUncached(
+        const DrvOutput & drvOutput, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
+    {
+        auto realisation = wrapped.queryRealisation(drvOutput);
+        if (realisation) {
+            collected.insert(Realisation{*realisation, drvOutput});
+        }
+        callback(std::move(realisation));
+    }
+
+    bool isValidPathUncached(const StorePath & path) override
+    {
+        return wrapped.isValidPath(path);
+    }
+
+    StorePathSet queryAllValidPaths() override
+    {
+        return wrapped.queryAllValidPaths();
+    }
+
+    void queryReferrers(const StorePath & path, StorePathSet & referrers) override
+    {
+        wrapped.queryReferrers(path, referrers);
+    }
+
+    StorePathSet queryValidDerivers(const StorePath & path) override
+    {
+        return wrapped.queryValidDerivers(path);
+    }
+
+    std::map<std::string, std::optional<StorePath>>
+    queryStaticPartialDerivationOutputMap(const StorePath & path) override
+    {
+        return wrapped.queryStaticPartialDerivationOutputMap(path);
+    }
+
+    std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
+    {
+        return wrapped.queryPathFromHashPart(hashPart);
+    }
+
+    void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override
+    {
+        wrapped.addToStore(info, source, repair, checkSigs);
+    }
+
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair) override
+    {
+        return wrapped.addToStoreFromDump(dump, name, dumpMethod, hashMethod, hashAlgo, references, repair);
+    }
+
+    void registerDrvOutput(const Realisation & info) override
+    {
+        wrapped.registerDrvOutput(info);
+    }
+
+    void registerDrvOutput(const Realisation & info, CheckSigsFlag checkSigs) override
+    {
+        wrapped.registerDrvOutput(info, checkSigs);
+    }
+
+    void narFromPath(const StorePath & path, Sink & sink) override
+    {
+        wrapped.narFromPath(path, sink);
+    }
+
+    ref<SourceAccessor> getFSAccessor(bool requireValidPath) override
+    {
+        return wrapped.getFSAccessor(requireValidPath);
+    }
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath) override
+    {
+        return wrapped.getFSAccessor(path, requireValidPath);
+    }
+
+    std::optional<TrustedFlag> isTrustedClient() override
+    {
+        return wrapped.isTrustedClient();
+    }
+};
+
 RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
 {
     RealisedPath::Set res;
+    RealisationCollectingStore collectingStore(store, res);
     std::visit(
         overloaded{
             [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
             [&](const BuiltPath::Built & p) {
                 for (auto & [outputName, outputPath] : p.outputs) {
-                    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-                        DrvOutput key{
-                            .drvPath = p.drvPath->outPath(),
-                            .outputName = outputName,
-                        };
-                        auto thisRealisation = store.queryRealisation(key);
-                        // We’ve built it, so we must have the realisation.
-                        assert(thisRealisation);
-                        res.insert(Realisation{*thisRealisation, key});
-                    } else {
-                        res.insert(outputPath);
-                    }
+                    /* Call deepQueryPartialDerivationOutput to trigger
+                       realisation collection via the wrapper store. */
+                    collectingStore.deepQueryPartialDerivationOutput(p.drvPath->outPath(), outputName);
+                    res.insert(outputPath);
                 }
             },
         },

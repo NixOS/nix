@@ -1,8 +1,14 @@
 {
   "buildTrace": {
-    "11yvkl84ashq63ilwc2mi4va41z2disw-root-drv.drv": {
+    "am42vl3rp8w29f5hyp9ljckxll50icpl-root-drv.drv": {
       "out": {
         "outPath": "px7apdw6ydm9ynjy5g0bpdcylw3xz2kj-root-drv-out",
+        "signatures": []
+      }
+    },
+    "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
+      "out": {
+        "outPath": "w0yjpwh59kpbyc7hz9jgmi44r9br908i-dep-drv-out",
         "signatures": []
       }
     }

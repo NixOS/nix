@@ -90,6 +90,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
         copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
+    StorePathSet inputs = drv->inputSrcs;
+
+    /* Substitute any input sources that aren't valid. */
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i))
             continue;
@@ -99,6 +102,41 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
                 worker.store.printStorePath(i),
                 worker.store.printStorePath(drvPath));
         waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
+    }
+
+    /* If we get this far, we know no dynamic drvs inputs */
+
+    /* Build any input derivation outputs that aren't valid. */
+    for (auto & [depDrvPath, depNode] : drv->inputDrvs.map) {
+        for (auto & outputName : depNode.value) {
+            auto outMap = [&] {
+                for (auto * drvStore : {&worker.evalStore, &worker.store})
+                    if (drvStore->isValidPath(depDrvPath))
+                        return worker.store.deepQueryDerivationOutputMap(depDrvPath, drvStore);
+                assert(false);
+            }();
+
+            auto outMapPath = outMap.find(outputName);
+            if (outMapPath == outMap.end()) {
+                throw Error(
+                    "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
+                    worker.store.printStorePath(drvPath),
+                    outputName,
+                    worker.store.printStorePath(depDrvPath));
+            }
+
+            auto outputPath = outMapPath->second;
+            inputs.insert(outputPath);
+
+            if (!worker.store.isValidPath(outputPath)) {
+                waitees.insert(worker.makeGoal(
+                    DerivedPath::Built{
+                        .drvPath = makeConstantStorePathRef(depDrvPath),
+                        .outputs = OutputsSpec::Names{outputName},
+                    },
+                    buildMode));
+            }
+        }
     }
 
     co_await await(std::move(waitees));
@@ -119,8 +157,6 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     /* Gather information necessary for computing the closure and/or
        running the build hook. */
 
-    /* Determine the full set of input paths. */
-
     if (storeDerivation) {
         assert(drv->inputDrvs.map.empty());
         /* Store the resolved derivation, as part of the record of
@@ -128,40 +164,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
         worker.store.writeDerivation(*drv);
     }
 
+    /* Determine the full set of input paths. */
     StorePathSet inputPaths;
-
-    {
-        /* If we get this far, we know no dynamic drvs inputs */
-
-        for (auto & [depDrvPath, depNode] : drv->inputDrvs.map) {
-            for (auto & outputName : depNode.value) {
-                /* Don't need to worry about `inputGoals`, because
-                   impure derivations are always resolved above. Can
-                   just use DB. This case only happens in the (older)
-                   input addressed and fixed output derivation cases. */
-                auto outMap = [&] {
-                    for (auto * drvStore : {&worker.evalStore, &worker.store})
-                        if (drvStore->isValidPath(depDrvPath))
-                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
-                    assert(false);
-                }();
-
-                auto outMapPath = outMap.find(outputName);
-                if (outMapPath == outMap.end()) {
-                    throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath),
-                        outputName,
-                        worker.store.printStorePath(depDrvPath));
-                }
-
-                worker.store.computeFSClosure(outMapPath->second, inputPaths);
-            }
-        }
-    }
-
-    /* Second, the input sources. */
-    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
+    worker.store.computeFSClosure(inputs, inputPaths);
 
     debug("added input paths %s", worker.store.showPaths(inputPaths));
 
@@ -1272,7 +1277,7 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,
-                    .status = PathStatus::Valid,
+                    .status = worker.store.isValidPath(real->outPath) ? PathStatus::Valid : PathStatus::Absent,
                 };
             } else if (info.known && info.known->isValid()) {
                 // We know the output because it's a static output of the
