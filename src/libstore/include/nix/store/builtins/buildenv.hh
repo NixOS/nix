@@ -22,7 +22,7 @@ struct Package
     }
 };
 
-class BuildEnvFileConflictError : public Error
+class BuildEnvFileConflictError final : public CloneableError<BuildEnvFileConflictError, Error>
 {
 public:
     const Path fileA;
@@ -30,7 +30,7 @@ public:
     int priority;
 
     BuildEnvFileConflictError(const Path fileA, const Path fileB, int priority)
-        : Error(
+        : CloneableError(
               "Unable to build profile. There is a conflict for the following files:\n"
               "\n"
               "  %1%\n"

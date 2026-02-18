@@ -1,11 +1,11 @@
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/worker.hh"
-#include "nix/store/globals.hh"
+#include "nix/store/worker-settings.hh"
 
 namespace nix {
 
 TimedOut::TimedOut(time_t maxDuration)
-    : BuildError(BuildResult::Failure::TimedOut, "timed out after %1% seconds", maxDuration)
+    : CloneableError(BuildResult::Failure::TimedOut, "timed out after %1% seconds", maxDuration)
     , maxDuration(maxDuration)
 {
 }

@@ -55,10 +55,10 @@
 
 namespace nix {
 
-struct NotDeterministic : BuildError
+struct NotDeterministic final : CloneableError<NotDeterministic, BuildError>
 {
     NotDeterministic(auto &&... args)
-        : BuildError(BuildResult::Failure::NotDeterministic, args...)
+        : CloneableError(BuildResult::Failure::NotDeterministic, args...)
     {
         isNonDeterministic = true;
     }

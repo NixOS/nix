@@ -18,11 +18,11 @@ static std::string parsePublicHostKey(std::string_view host, std::string_view ss
     }
 }
 
-class InvalidSSHAuthority : public Error
+class InvalidSSHAuthority final : public CloneableError<InvalidSSHAuthority, Error>
 {
 public:
     InvalidSSHAuthority(const ParsedURL::Authority & authority, std::string_view reason)
-        : Error("invalid SSH authority: '%s': %s", authority.to_string(), reason)
+        : CloneableError("invalid SSH authority: '%s': %s", authority.to_string(), reason)
     {
     }
 };

@@ -1312,11 +1312,12 @@ static void prim_warn(EvalState & state, const PosIdx pos, Value ** args, Value 
         state.forceString(*args[0], pos, "while evaluating the first argument; the message passed to builtins.warn");
 
     {
-        BaseError msg(std::string{msgStr});
-        msg.atPos(state.positions[pos]);
-        auto info = msg.info();
-        info.level = lvlWarn;
-        info.isFromExpr = true;
+        ErrorInfo info{
+            .level = lvlWarn,
+            .msg = HintFmt(std::string(msgStr)),
+            .pos = state.positions[pos],
+            .isFromExpr = true,
+        };
         logWarning(info);
     }
 

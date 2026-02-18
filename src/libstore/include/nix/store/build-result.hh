@@ -58,7 +58,7 @@ enum struct BuildResultFailureStatus : uint8_t {
  * This is both an exception type (inherits from Error) and serves as
  * the failure variant in BuildResult::inner.
  */
-struct BuildError : public Error
+struct BuildError : public CloneableError<BuildError, Error>
 {
     using Status = BuildResultFailureStatus;
     using enum Status;
@@ -80,7 +80,7 @@ public:
      */
     template<typename... Args>
     BuildError(Status status, const Args &... args)
-        : Error(args...)
+        : CloneableError(args...)
         , status{status}
     {
     }
@@ -97,7 +97,7 @@ public:
      * Also used for deserialization.
      */
     BuildError(Args args)
-        : Error(std::move(args.msg))
+        : CloneableError(std::move(args.msg))
         , status{args.status}
         , isNonDeterministic{args.isNonDeterministic}
 
@@ -108,7 +108,7 @@ public:
      * Default constructor for deserialization.
      */
     BuildError()
-        : Error("")
+        : CloneableError("")
     {
     }
 
