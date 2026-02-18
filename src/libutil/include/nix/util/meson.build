@@ -2,7 +2,12 @@
 
 include_dirs = [ include_directories('../..') ]
 
-headers = files(
+config_pub_h = configure_file(
+  configuration : configdata_pub,
+  output : 'config.hh',
+)
+
+headers = [ config_pub_h ] + files(
   'abstract-setting-to-json.hh',
   'alignment.hh',
   'ansicolor.hh',

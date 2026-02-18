@@ -16,7 +16,8 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configdata_pub = configuration_data()
+configdata_priv = configuration_data()
 
 deps_private_maybe_subproject = []
 deps_public_maybe_subproject = []
@@ -34,8 +35,14 @@ check_funcs = [
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
   define_value = cxx.has_function(funcspec[0]).to_int()
-  configdata.set(define_name, define_value, description : funcspec[1])
+  configdata_priv.set(define_name, define_value, description : funcspec[1])
 endforeach
+
+configdata_pub.set(
+  'NIX_UBSAN_ENABLED',
+  ('undefined' in get_option('b_sanitize')).to_int(),
+  description : 'Whether nix has been built with UBSan enabled',
+)
 
 subdir('nix-meson-build-support/libatomic')
 
@@ -104,7 +111,7 @@ cpuid = dependency(
   version : '>= 0.7.0',
   required : cpuid_required,
 )
-configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
+configdata_priv.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
@@ -113,7 +120,7 @@ deps_public += nlohmann_json
 cxx = meson.get_compiler('cpp')
 
 config_priv_h = configure_file(
-  configuration : configdata,
+  configuration : configdata_priv,
   output : 'util-config-private.hh',
 )
 
