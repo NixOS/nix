@@ -8,14 +8,9 @@ set --global --export __ETC_PROFILE_NIX_SOURCED 1
 # Local helpers
 
 function add_path --argument-names new_path
-    if type -q fish_add_path
-        # fish 3.2.0 or newer
-        fish_add_path --prepend --global $new_path
-    else
-        # older versions of fish
-        if not contains $new_path $fish_user_paths
-            set --global fish_user_paths $new_path $fish_user_paths
-        end
+    # Directly manipulate PATH to avoid conflicts with user's fish_user_paths
+    if not contains $new_path $PATH
+        set --global --export --prepend PATH $new_path
     end
 end
 
