@@ -561,6 +561,14 @@ static void printUnquotedString(std::string & res, std::string_view s)
     res += '"';
 }
 
+static void printUnquotedStorePath(std::string & res, const StoreDirConfig & store, const StorePath & path)
+{
+    res += '"';
+    // Specialized and inlined StoreDirConfig::printStorePath
+    concatStringsTo(res, store.storeDir, "/", path.to_string());
+    res += '"';
+}
+
 template<class ForwardIterator>
 static void printStrings(std::string & res, ForwardIterator i, ForwardIterator j)
 {
@@ -728,15 +736,23 @@ std::string Derivation::unparse(
             else
                 s += ',';
             s += '(';
-            printUnquotedString(s, store.printStorePath(drvPath));
+            printUnquotedStorePath(s, store, drvPath);
             unparseDerivedPathMapNode(store, s, childMap);
             s += ')';
         }
     }
 
     s += "],"sv;
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
-    printUnquotedStrings(s, paths.begin(), paths.end());
+    s += '[';
+    first = true;
+    for (auto & i : inputSrcs) {
+        if (first)
+            first = false;
+        else
+            s += ',';
+        printUnquotedStorePath(s, store, i);
+    }
+    s += ']';
 
     s += ',';
     printUnquotedString(s, platform);
