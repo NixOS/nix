@@ -18,7 +18,13 @@ const WorkerProto::Version WorkerProto::latest = {
     .number =
         {
             .major = 1,
-            .minor = 38,
+            .minor = 39,
+        },
+    .features =
+        {
+            std::string{
+                WorkerProto::featureCancelledAndHashMismatchStatus,
+            },
         },
 };
 
@@ -46,6 +52,75 @@ std::partial_ordering WorkerProto::Version::operator<=>(const WorkerProto::Versi
 }
 
 /* protocol-specific definitions */
+
+/**
+ * Mapping from protocol wire values to BuildResultStatus.
+ *
+ * The array index is the wire value. Indices 15 and 16 require the
+ * `cancelled-and-hash-mismatch-status` feature.
+ */
+constexpr static BuildResultStatus buildResultStatusTable[] = {
+    BuildResultSuccessStatus::Built,                  // 0
+    BuildResultSuccessStatus::Substituted,            // 1
+    BuildResultSuccessStatus::AlreadyValid,           // 2
+    BuildResultFailureStatus::PermanentFailure,       // 3
+    BuildResultFailureStatus::InputRejected,          // 4
+    BuildResultFailureStatus::OutputRejected,         // 5
+    BuildResultFailureStatus::TransientFailure,       // 6
+    BuildResultFailureStatus::CachedFailure,          // 7
+    BuildResultFailureStatus::TimedOut,               // 8
+    BuildResultFailureStatus::MiscFailure,            // 9
+    BuildResultFailureStatus::DependencyFailed,       // 10
+    BuildResultFailureStatus::LogLimitExceeded,       // 11
+    BuildResultFailureStatus::NotDeterministic,       // 12
+    BuildResultSuccessStatus::ResolvesToAlreadyValid, // 13
+    BuildResultFailureStatus::NoSubstituters,         // 14
+    BuildResultFailureStatus::HashMismatch,           // 15
+    BuildResultFailureStatus::Cancelled,              // 16
+};
+
+BuildResultStatus
+WorkerProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    auto rawStatus = readNum<uint64_t>(conn.from);
+
+    if (rawStatus >= std::size(buildResultStatusTable))
+        throw Error("Invalid BuildResult status %d from remote", rawStatus);
+
+    return buildResultStatusTable[rawStatus];
+}
+
+void WorkerProto::Serialise<BuildResultStatus>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const BuildResultStatus & status)
+{
+    auto effective = status;
+
+    /* If the remote doesn't support the cancelled-and-hash-mismatch-status
+       feature, convert new statuses for backwards compatibility. */
+    if (auto * f = std::get_if<BuildResultFailureStatus>(&effective);
+        f && !conn.version.features.contains(WorkerProto::featureCancelledAndHashMismatchStatus)) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (*f) {
+        case BuildResultFailureStatus::HashMismatch:
+            effective = BuildResultFailureStatus::OutputRejected;
+            break;
+        case BuildResultFailureStatus::Cancelled:
+            effective = BuildResultFailureStatus::MiscFailure;
+            break;
+        default:
+            break;
+        }
+#pragma GCC diagnostic pop
+    }
+
+    for (auto && [wire, val] : enumerate(buildResultStatusTable))
+        if (val == effective) {
+            conn.to << uint64_t(wire);
+            return;
+        }
+    unreachable();
+}
 
 BuildMode WorkerProto::Serialise<BuildMode>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {

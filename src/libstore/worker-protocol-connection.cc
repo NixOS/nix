@@ -63,7 +63,12 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
 
         else if (msg == STDERR_ERROR) {
             if (protoVersion >= WorkerProto::Version{.number = {1, 26}}) {
-                ex = std::make_exception_ptr(readError(from));
+                unsigned int exitStatus = 1;
+                if (protoVersion.features.contains(WorkerProto::featureCancelledAndHashMismatchStatus))
+                    exitStatus = readInt(from);
+                auto e = readError(from);
+                e.withExitStatus(exitStatus);
+                ex = std::make_exception_ptr(std::move(e));
             } else {
                 auto error = readString(from);
                 unsigned int status = readInt(from);

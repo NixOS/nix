@@ -115,9 +115,6 @@ DECLARE_COMMON_SERIALISER(std::optional<ContentAddress>);
  */
 using BuildResultStatus = std::variant<BuildResultSuccessStatus, BuildResultFailureStatus>;
 
-template<>
-DECLARE_COMMON_SERIALISER(BuildResultStatus);
-
 #undef COMMA_
 
 } // namespace nix

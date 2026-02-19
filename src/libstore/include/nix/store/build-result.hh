@@ -46,10 +46,15 @@ enum struct BuildResultFailureStatus : uint8_t {
     LogLimitExceeded,
     NotDeterministic,
     NoSubstituters,
-    /// A certain type of `OutputRejected`. The protocols do not yet
-    /// know about this one, so change it back to `OutputRejected`
-    /// before serialization.
+    /// A certain type of `OutputRejected`. Requires the
+    /// `cancelled-and-hash-mismatch-status` feature; falls back to
+    /// `OutputRejected` when communicating with older remotes.
     HashMismatch,
+    /// Goal was never attempted because another goal failed (and
+    /// `--keep-going` wasn't used). Requires the
+    /// `cancelled-and-hash-mismatch-status` feature; falls back to
+    /// `MiscFailure` when communicating with older remotes.
+    Cancelled,
 };
 
 /**
@@ -73,14 +78,22 @@ struct BuildError : public Error
      */
     bool isNonDeterministic = false;
 
+private:
+
+    /**
+     * Used in the constructors
+     */
+    static unsigned int exitCodeFromStatus(Status status);
+
 public:
+
     /**
      * Variadic constructor for throwing with format strings.
      * Delegates to the string constructor after formatting.
      */
     template<typename... Args>
     BuildError(Status status, const Args &... args)
-        : Error(args...)
+        : Error(exitCodeFromStatus(status), args...)
         , status{status}
     {
     }
@@ -97,10 +110,9 @@ public:
      * Also used for deserialization.
      */
     BuildError(Args args)
-        : Error(std::move(args.msg))
+        : Error(exitCodeFromStatus(args.status), std::move(args.msg))
         , status{args.status}
         , isNonDeterministic{args.isNonDeterministic}
-
     {
     }
 

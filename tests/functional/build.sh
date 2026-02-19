@@ -162,14 +162,15 @@ if isDaemonNewer "2.34pre"; then
     # With the fix, cancelled goals are not reported as failures.
     # Use -j1 so only x1 starts and fails; x2, x3, x4 are cancelled.
     out="$(nix build -f fod-failing.nix -j1 -L 2>&1)" && status=0 || status=$?
-    test "$status" = 1
+    test "$status" = 102 # hash mismatch
     # Only the hash mismatch error for x1. Cancelled goals not reported.
     test "$(<<<"$out" grep -cE '^error:')" = 1
     # Regression test: error messages should not be empty (end with just "failed:")
     <<<"$out" grepQuietInverse -E "^error:.*failed: *$"
 else
     out="$(nix build -f fod-failing.nix -L 2>&1)" && status=0 || status=$?
-    test "$status" = 1
+    # Old daemons don't send HashMismatch status, so we get generic build failure (100)
+    test "$status" = 100
     # At minimum, check that x1 is reported as failing
     <<<"$out" grepQuiet -E "error:.*-x1"
 fi
@@ -178,7 +179,12 @@ fi
 <<<"$out" grepQuiet -vE "hash mismatch in fixed-output derivation '.*-x2\\.drv'"
 
 out="$(nix build -f fod-failing.nix -L x1 x2 x3 --keep-going 2>&1)" && status=0 || status=$?
-test "$status" = 1
+# All three FODs fail with hash mismatch; aggregate exit status reflects this
+if isDaemonNewer "2.34pre"; then
+    test "$status" = 102 # hash mismatch
+else
+    test "$status" = 100 # build failure (old daemon uses OutputRejected)
+fi
 # three "hash mismatch" errors - for each failing fod, one "build of ... failed"
 test "$(<<<"$out" grep -cE '^error:')" = 4
 <<<"$out" grepQuiet -E "hash mismatch in fixed-output derivation '.*-x1\\.drv'"
@@ -242,7 +248,7 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
         --option extra-sandbox-paths "/cancelled-builds-fifo=$fifoDir" \
         2>&1)" && status=0 || status=$?
     rm -rf "$fifoDir"
-    test "$status" = 1
+    test "$status" = 100 # build failure
     # The error should be for fast-fail, not for cancelled goals
     <<<"$out" grepQuiet -E "Cannot build.*fast-fail"
     # Cancelled goals should NOT appear in error messages (but may appear in "will be built" list)
@@ -272,7 +278,7 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
         "./cancelled-builds#checks.$system.depends-on-fail" \
         2>&1)" && status=0 || status=$?
     rm -rf "$fifoDir"
-    test "$status" = 1
+    test "$status" = 100 # build failure
     # The error should be for fast-fail, not for cancelled goals
     <<<"$out" grepQuiet -E "Cannot build.*fast-fail"
     # Cancelled goals should NOT appear in error messages

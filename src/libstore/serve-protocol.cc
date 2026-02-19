@@ -14,6 +14,72 @@ namespace nix {
 
 /* protocol-specific definitions */
 
+/**
+ * Mapping from protocol wire values to BuildResultStatus.
+ *
+ * The array index is the wire value. ServeProto does not support
+ * HashMismatch or Cancelled; those are converted before writing.
+ */
+constexpr static BuildResultStatus buildResultStatusTable[] = {
+    BuildResultSuccessStatus::Built,                  // 0
+    BuildResultSuccessStatus::Substituted,            // 1
+    BuildResultSuccessStatus::AlreadyValid,           // 2
+    BuildResultFailureStatus::PermanentFailure,       // 3
+    BuildResultFailureStatus::InputRejected,          // 4
+    BuildResultFailureStatus::OutputRejected,         // 5
+    BuildResultFailureStatus::TransientFailure,       // 6
+    BuildResultFailureStatus::CachedFailure,          // 7
+    BuildResultFailureStatus::TimedOut,               // 8
+    BuildResultFailureStatus::MiscFailure,            // 9
+    BuildResultFailureStatus::DependencyFailed,       // 10
+    BuildResultFailureStatus::LogLimitExceeded,       // 11
+    BuildResultFailureStatus::NotDeterministic,       // 12
+    BuildResultSuccessStatus::ResolvesToAlreadyValid, // 13
+    BuildResultFailureStatus::NoSubstituters,         // 14
+};
+
+BuildResultStatus
+ServeProto::Serialise<BuildResultStatus>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
+{
+    auto rawStatus = readNum<uint64_t>(conn.from);
+
+    if (rawStatus >= std::size(buildResultStatusTable))
+        throw Error("Invalid BuildResult status %d from remote", rawStatus);
+
+    return buildResultStatusTable[rawStatus];
+}
+
+void ServeProto::Serialise<BuildResultStatus>::write(
+    const StoreDirConfig & store, ServeProto::WriteConn conn, const BuildResultStatus & status)
+{
+    auto effective = status;
+
+    /* ServeProto doesn't have feature negotiation, so convert new
+       statuses that old remotes don't understand. */
+    if (auto * f = std::get_if<BuildResultFailureStatus>(&effective)) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+        switch (*f) {
+        case BuildResultFailureStatus::HashMismatch:
+            effective = BuildResultFailureStatus::OutputRejected;
+            break;
+        case BuildResultFailureStatus::Cancelled:
+            effective = BuildResultFailureStatus::MiscFailure;
+            break;
+        default:
+            break;
+        }
+#pragma GCC diagnostic pop
+    }
+
+    for (auto && [wire, val] : enumerate(buildResultStatusTable))
+        if (val == effective) {
+            conn.to << uint64_t(wire);
+            return;
+        }
+    unreachable();
+}
+
 BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & store, ServeProto::ReadConn conn)
 {
     BuildResult res;
@@ -23,7 +89,7 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
     std::string errorMsg;
     bool isNonDeterministic = false;
 
-    auto status = ServeProto::Serialise<BuildResultStatus>::read(store, {conn.from});
+    auto status = ServeProto::Serialise<BuildResultStatus>::read(store, conn);
     conn.from >> errorMsg;
 
     if (conn.version >= ServeProto::Version{2, 3})
@@ -75,11 +141,11 @@ void ServeProto::Serialise<BuildResult>::write(
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                ServeProto::write(store, {conn.to}, BuildResultStatus{failure.status});
+                ServeProto::write(store, conn, BuildResultStatus{failure.status});
                 common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                ServeProto::write(store, {conn.to}, BuildResultStatus{success.status});
+                ServeProto::write(store, conn, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },
