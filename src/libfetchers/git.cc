@@ -44,8 +44,9 @@ static bool isCacheFileWithinTtl(const Settings & settings, time_t now, const Po
 
 std::filesystem::path getCachePath(std::string_view key, bool shallow)
 {
-    return getCacheDir() / "gitv3"
-           / (hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : ""));
+    auto name =
+        hashString(HashAlgorithm::SHA256, key).to_string(HashFormat::Nix32, false) + (shallow ? "-shallow" : "");
+    return getCacheDir() / "gitv3" / std::move(name);
 }
 
 // Returns the name of the HEAD branch.
@@ -629,7 +630,7 @@ struct GitInputScheme : InputScheme
         if (url.scheme == "file" && !forceHttp && !isBareRepository(renderUrlPathEnsureLegal(url.path))) {
             auto path = renderUrlPathEnsureLegal(url.path);
 
-            if (!isAbsolute(path)) {
+            if (!std::filesystem::path(path).is_absolute()) {
                 warn(
                     "Fetching Git repository '%s', which uses a path relative to the current directory. "
                     "This is not supported and will stop working in a future release. "

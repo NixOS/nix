@@ -475,7 +475,7 @@ private:
 };
 
 static void handleDiffHook(
-    const Path & diffHook,
+    const std::filesystem::path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,

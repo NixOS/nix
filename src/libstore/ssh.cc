@@ -98,7 +98,7 @@ void SSHMaster::addCommonSSHOpts(Strings & args)
         args.insert(args.end(), {"-i", keyFile});
     if (!sshPublicHostKey.empty()) {
         std::filesystem::path fileName = tmpDir->path() / "host-key";
-        writeFile(fileName.string(), authority.host + " " + sshPublicHostKey + "\n");
+        writeFile(fileName, authority.host + " " + sshPublicHostKey + "\n");
         args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
     }
     if (compress)
@@ -150,7 +150,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 #ifdef _WIN32 // TODO re-enable on Windows, once we can start processes.
     throw UnimplementedError("cannot yet SSH on windows because spawning processes is not yet implemented");
 #else
-    Path socketPath = startMaster();
+    std::filesystem::path socketPath = startMaster();
 
     Pipe in, out;
     in.create();
@@ -228,7 +228,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
 
-Path SSHMaster::startMaster()
+std::filesystem::path SSHMaster::startMaster()
 {
     if (!useMaster)
         return "";
@@ -238,7 +238,7 @@ Path SSHMaster::startMaster()
     if (state->sshMaster != INVALID_DESCRIPTOR)
         return state->socketPath;
 
-    state->socketPath = (Path) *tmpDir + "/ssh.sock";
+    state->socketPath = tmpDir->path() / "ssh.sock";
 
     Pipe out;
     out.create();

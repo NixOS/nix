@@ -12,6 +12,7 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
 
+#include <filesystem>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -41,24 +42,12 @@ struct Sink;
 struct Source;
 
 /**
- * Return whether the path denotes an absolute path.
- */
-bool isAbsolute(PathView path);
-
-/**
  * @return An absolutized path, resolving paths relative to the
  * specified directory, or the current directory otherwise.  The path
  * is also canonicalised.
  *
  * In the process of being deprecated for `std::filesystem::absolute`.
  */
-Path absPath(PathView path, std::optional<PathView> dir = {}, bool resolveSymlinks = false);
-
-inline Path absPath(const Path & path, std::optional<PathView> dir = {}, bool resolveSymlinks = false)
-{
-    return absPath(PathView{path}, dir, resolveSymlinks);
-}
-
 std::filesystem::path
 absPath(const std::filesystem::path & path, const std::filesystem::path * dir = nullptr, bool resolveSymlinks = false);
 
@@ -73,25 +62,7 @@ absPath(const std::filesystem::path & path, const std::filesystem::path * dir = 
  * false` case), and `std::filesystem::weakly_canonical` (for the
  * `resolveSymlinks = true` case).
  */
-Path canonPath(PathView path, bool resolveSymlinks = false);
-
-static inline Path canonPath(const Path & path, bool resolveSymlinks = false)
-{
-    return canonPath(PathView{path}, resolveSymlinks);
-}
-
 std::filesystem::path canonPath(const std::filesystem::path & path, bool resolveSymlinks = false);
-
-/**
- * @return The directory part of the given canonical path, i.e.,
- * everything before the final `/`.  If the path is the root or an
- * immediate child thereof (e.g., `/foo`), this means `/`
- * is returned.
- *
- * In the process of being deprecated for
- * `std::filesystem::path::parent_path`.
- */
-Path dirOf(const PathView path);
 
 /**
  * @return the base name of the given canonical path, i.e., everything
@@ -177,15 +148,6 @@ bool pathAccessible(const std::filesystem::path & path);
 /**
  * Read the contents (target) of a symbolic link.  The result is not
  * in any way canonicalised.
- *
- * In the process of being deprecated for
- * `std::filesystem::read_symlink`.
- */
-Path readLink(const Path & path);
-
-/**
- * Read the contents (target) of a symbolic link.  The result is not
- * in any way canonicalised.
  */
 std::filesystem::path readLink(const std::filesystem::path & path);
 
@@ -241,43 +203,34 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
 /**
  * Read the contents of a file into a string.
  */
-std::string readFile(const Path & path);
 std::string readFile(const std::filesystem::path & path);
-void readFile(const Path & path, Sink & sink, bool memory_map = true);
+void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map = true);
 
 enum struct FsSync { Yes, No };
 
 /**
  * Write a string to a file.
  */
-void writeFile(const Path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
 
-static inline void
-writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No)
-{
-    return writeFile(path.string(), s, mode, sync);
-}
-
-void writeFile(const Path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
-
-static inline void
-writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No)
-{
-    return writeFile(path.string(), source, mode, sync);
-}
+void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
 
 void writeFile(
-    AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+    AutoCloseFD & fd,
+    const std::filesystem::path & origPath,
+    std::string_view s,
+    mode_t mode = 0666,
+    FsSync sync = FsSync::No);
 
 /**
  * Flush a path's parent directory to disk.
  */
-void syncParent(const Path & path);
+void syncParent(const std::filesystem::path & path);
 
 /**
  * Flush a file or entire directory tree to disk.
  */
-void recursiveSync(const Path & path);
+void recursiveSync(const std::filesystem::path & path);
 
 /**
  * Delete a path; i.e., in the case of a directory, it is deleted
@@ -298,7 +251,7 @@ void createDirs(const std::filesystem::path & path);
 /**
  * Create a single directory.
  */
-void createDir(const Path & path, mode_t mode = 0755);
+void createDir(const std::filesystem::path & path, mode_t mode = 0755);
 
 /**
  * Set the access and modification times of the given path, not
@@ -328,17 +281,12 @@ void setWriteTime(const std::filesystem::path & path, const PosixStat & st);
  * Create a symlink.
  *
  */
-void createSymlink(const Path & target, const Path & link);
+void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link);
 
 /**
  * Atomically create or replace a symlink.
  */
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link);
-
-inline void replaceSymlink(const Path & target, const Path & link)
-{
-    return replaceSymlink(std::filesystem::path{target}, std::filesystem::path{link});
-}
 
 /**
  * Similar to 'renameFile', but fallback to a copy+remove if `src` and `dst`
@@ -347,7 +295,7 @@ inline void replaceSymlink(const Path & target, const Path & link)
  * Beware that this might not be atomic because of the copy that happens behind
  * the scenes
  */
-void moveFile(const Path & src, const Path & dst);
+void moveFile(const std::filesystem::path & src, const std::filesystem::path & dst);
 
 /**
  * Recursively copy the content of `oldPath` to `newPath`. If `andDelete` is
@@ -454,7 +402,7 @@ AutoCloseFD createAnonymousTempFile();
 /**
  * Create a temporary file, returning a file handle and its path.
  */
-std::pair<AutoCloseFD, Path> createTempFile(const Path & prefix = "nix");
+std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesystem::path & prefix = "nix");
 
 /**
  * Return `TMPDIR`, or the default temporary directory if unset or empty.
@@ -479,8 +427,10 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 
 /**
  * Used in various places.
+ *
+ * @todo type
  */
-typedef std::function<bool(const Path & path)> PathFilter;
+typedef std::function<bool(const std::string & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 

@@ -31,7 +31,7 @@ namespace nix::flake {
 // setting name -> setting value -> allow or ignore.
 typedef std::map<std::string, std::map<std::string, bool>> TrustedList;
 
-std::filesystem::path trustedListPath()
+static std::filesystem::path trustedListPath()
 {
     return getDataDir() / "trusted-settings.json";
 }

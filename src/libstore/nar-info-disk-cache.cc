@@ -89,7 +89,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     {
         auto state(_state.lock());
 
-        createDirs(dirOf(dbPath));
+        createDirs(std::filesystem::path(dbPath).parent_path());
 
         state->db = SQLite(dbPath, SQLite::Settings{sqliteSettings});
 

@@ -52,7 +52,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
 
     AutoCloseDir dir(opendir(linksDir.c_str()));
     if (!dir)
-        throw SysError("opening directory '%1%'", linksDir);
+        throw SysError("opening directory %1%", PathFmt(linksDir));
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -61,7 +61,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
         inodeHash.insert(dirent->d_ino);
     }
     if (errno)
-        throw SysError("reading directory '%1%'", linksDir);
+        throw SysError("reading directory %1%", PathFmt(linksDir));
 
     printMsg(lvlTalkative, "loaded %1% hash inodes", inodeHash.size());
 
@@ -226,7 +226,7 @@ void LocalStore::optimisePath_(
     /* Make the containing directory writable, but only if it's not
        the store itself (we don't want or need to mess with its
        permissions). */
-    const Path dirOfPath(dirOf(path));
+    const Path dirOfPath(std::filesystem::path(path).parent_path());
     bool mustToggle = dirOfPath != config->realStoreDir.get();
     if (mustToggle)
         makeWritable(dirOfPath);
@@ -304,7 +304,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
             continue; /* path was GC'ed, probably */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir + "/" + std::string(i.to_string()), inodeHash, NoRepair);
+            optimisePath_(&act, stats, (config->realStoreDir.get() / i.to_string()).string(), inodeHash, NoRepair);
         }
         done++;
         act.progress(done, paths.size());

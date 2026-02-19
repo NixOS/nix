@@ -74,9 +74,9 @@ static Cache cache;
 
 std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    // Note: we convert std::filesystem::path to Path because the
+    // Note: we convert std::filesystem::path to std::string because the
     // former is not hashable on libc++.
-    Path absPath = makeAbsPath(path).string();
+    std::string absPath = makeAbsPath(path).string();
 
     if (auto res = getConcurrent(cache, absPath))
         return *res;

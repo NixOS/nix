@@ -104,7 +104,7 @@ std::string runProgram(
     return res.second;
 }
 
-std::optional<Path> getProgramInterpreter(const Path & program)
+std::optional<std::filesystem::path> getProgramInterpreter(const std::filesystem::path & program)
 {
     // These extensions are automatically handled by Windows and don't require an interpreter.
     static constexpr const char * exts[] = {".exe", ".cmd", ".bat"};

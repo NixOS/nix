@@ -267,7 +267,11 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
 }
 
 std::string runProgram(
-    Path program, bool lookupPath, const Strings & args, const std::optional<std::string> & input, bool isInteractive)
+    std::filesystem::path program,
+    bool lookupPath,
+    const Strings & args,
+    const std::optional<std::string> & input,
+    bool isInteractive)
 {
     auto res = runProgram(
         RunOptions{
@@ -278,7 +282,7 @@ std::string runProgram(
             .isInteractive = isInteractive});
 
     if (!statusOk(res.first))
-        throw ExecError(res.first, "program '%1%' %2%", program, statusToString(res.first));
+        throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
 
     return res.second;
 }
@@ -364,7 +368,7 @@ void runProgram2(const RunOptions & options)
             else
                 execv(options.program.c_str(), stringsToCharPtrs(args_).data());
 
-            throw SysError("executing '%1%'", options.program);
+            throw SysError("executing %s", PathFmt(options.program));
         },
         processOptions);
 
@@ -412,7 +416,7 @@ void runProgram2(const RunOptions & options)
         promise.get_future().get();
 
     if (status)
-        throw ExecError(status, "program '%1%' %2%", options.program, statusToString(status));
+        throw ExecError(status, "program %s %s", PathFmt(options.program), statusToString(status));
 }
 
 //////////////////////////////////////////////////////////////////////

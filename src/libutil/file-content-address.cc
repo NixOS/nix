@@ -75,7 +75,7 @@ void dumpPath(const SourcePath & path, Sink & sink, FileSerialisationMethod meth
     }
 }
 
-void restorePath(const Path & path, Source & source, FileSerialisationMethod method, bool startFsync)
+void restorePath(const std::filesystem::path & path, Source & source, FileSerialisationMethod method, bool startFsync)
 {
     switch (method) {
     case FileSerialisationMethod::Flat:

@@ -432,7 +432,7 @@ void EvalState::checkURI(const std::string & uri)
 
     /* If the URI is a path, then check it against allowedPaths as
        well. */
-    if (isAbsolute(uri)) {
+    if (std::filesystem::path(uri).is_absolute()) {
         if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
             rootFS2->checkAccess(CanonPath(uri));
         return;

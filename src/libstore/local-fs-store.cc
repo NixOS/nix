@@ -112,7 +112,7 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
     return std::make_shared<PosixSourceAccessor>(std::move(absPath));
 }
 
-const std::string LocalFSStore::drvsLogDir = "drvs";
+const std::filesystem::path LocalFSStore::drvsLogDir = "drvs";
 
 std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)
 {
@@ -120,10 +120,10 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        Path logPath =
-            j == 0 ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-                   : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
-        Path logBz2Path = logPath + ".bz2";
+        auto logPath = config.logDir.get()
+                       / (j == 0 ? drvsLogDir / baseName.substr(0, 2) / baseName.substr(2) : drvsLogDir / baseName);
+        auto logBz2Path = logPath;
+        logBz2Path += ".bz2";
 
         if (pathExists(logPath))
             return readFile(logPath);

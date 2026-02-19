@@ -52,12 +52,12 @@ struct CmdCopySigs : StorePathsCommand
 
         // logger->setExpected(doneLabel, storePaths.size());
 
-        auto doPath = [&](const Path & storePathS) {
+        auto doPath = [&](const std::filesystem::path & storePathS) {
             // Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
 
-            auto storePath = store->parseStorePath(storePathS);
+            auto storePath = store->parseStorePath(storePathS.string());
 
             auto info = store->queryPathInfo(storePath);
 
@@ -101,7 +101,7 @@ static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"})
 
 struct CmdSign : StorePathsCommand
 {
-    Path secretKeyFile;
+    std::filesystem::path secretKeyFile;
 
     CmdSign()
     {

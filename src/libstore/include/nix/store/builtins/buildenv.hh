@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/util/fmt.hh"
 
 namespace nix {
 
@@ -10,11 +11,11 @@ namespace nix {
  */
 struct Package
 {
-    Path path;
+    std::filesystem::path path;
     bool active;
     int priority;
 
-    Package(const Path & path, bool active, int priority)
+    Package(const std::filesystem::path & path, bool active, int priority)
         : path{path}
         , active{active}
         , priority{priority}
@@ -25,18 +26,18 @@ struct Package
 class BuildEnvFileConflictError : public Error
 {
 public:
-    const Path fileA;
-    const Path fileB;
+    const std::filesystem::path fileA;
+    const std::filesystem::path fileB;
     int priority;
 
-    BuildEnvFileConflictError(const Path fileA, const Path fileB, int priority)
+    BuildEnvFileConflictError(const std::filesystem::path fileA, const std::filesystem::path fileB, int priority)
         : Error(
               "Unable to build profile. There is a conflict for the following files:\n"
               "\n"
               "  %1%\n"
               "  %2%",
-              fileA,
-              fileB)
+              PathFmt(fileA),
+              PathFmt(fileB))
         , fileA(fileA)
         , fileB(fileB)
         , priority(priority)
@@ -46,6 +47,6 @@ public:
 
 typedef std::vector<Package> Packages;
 
-void buildProfile(const Path & out, Packages && pkgs);
+void buildProfile(const std::filesystem::path & out, Packages && pkgs);
 
 } // namespace nix

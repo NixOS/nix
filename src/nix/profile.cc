@@ -421,10 +421,10 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
                 for (auto it = begin; it != end; it++) {
                     auto & [name, profileElement] = *it;
                     for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.starts_with(store->printStorePath(storePath))) {
+                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
                             return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
                         }
-                        if (conflictError.fileB.starts_with(store->printStorePath(storePath))) {
+                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
                             return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
                         }
                     }
@@ -462,8 +462,8 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
                 "To prioritise the existing package:\n"
                 "\n"
                 "  nix profile add %4% --priority %7%\n",
-                originalConflictingFilePath,
-                newConflictingFilePath,
+                PathFmt(originalConflictingFilePath),
+                PathFmt(newConflictingFilePath),
                 originalEntryName,
                 concatStringsSep(" ", newConflictingRefs),
                 conflictError.priority,

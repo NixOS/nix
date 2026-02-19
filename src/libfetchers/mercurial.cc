@@ -302,7 +302,7 @@ struct MercurialInputScheme : InputScheme
                     }
                 }
             } else {
-                createDirs(dirOf(cacheDir.string()));
+                createDirs(cacheDir.parent_path());
                 runHg({"clone", "--noupdate", "--", actualUrl, cacheDir.string()});
             }
         }

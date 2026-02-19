@@ -69,7 +69,7 @@ static void addChannel(const std::string & url, const std::string & name)
     writeChannels();
 }
 
-static Path profile;
+static std::filesystem::path profile;
 
 // Remove a channel.
 static void removeChannel(const std::string & name)
@@ -81,7 +81,7 @@ static void removeChannel(const std::string & name)
     runProgram(getNixBin("nix-env").string(), true, {"--profile", profile, "--uninstall", name});
 }
 
-static Path nixDefExpr;
+static std::filesystem::path nixDefExpr;
 
 // Fetch Nix expressions and binary cache URLs from the subscribed channels.
 static void update(const StringSet & channelNames)
@@ -117,12 +117,12 @@ static void update(const StringSet & channelNames)
 
         if (!(channelNames.empty() || channelNames.count(name))) {
             // no need to update this channel, reuse the existing store path
-            Path symlink = profile + "/" + name;
-            Path storepath = dirOf(readLink(symlink));
+            std::filesystem::path symlink = profile / name;
+            std::filesystem::path storepath = std::filesystem::read_symlink(symlink).parent_path();
             exprs.push_back(
                 "f: rec { name = \"" + cname
                 + "\"; type = \"derivation\"; outputs = [\"out\"]; system = \"builtin\"; outPath = builtins.storePath \""
-                + storepath + "\"; out = { inherit outPath; };}");
+                + storepath.string() + "\"; out = { inherit outPath; };}");
         } else {
             // We want to download the url to a file to see if it's a tarball while also checking if we
             // got redirected in the process, so that we can grab the various parts of a nix channel
@@ -137,7 +137,7 @@ static void update(const StringSet & channelNames)
                     false,
                     {"--no-out-link",
                      "--expr",
-                     "import " + unpackChannelPath + "{ name = \"" + cname + "\"; channelName = \"" + name
+                     "import " + unpackChannelPath.string() + "{ name = \"" + cname + "\"; channelName = \"" + name
                          + "\"; src = builtins.storePath \"" + store->printStorePath(result.storePath) + "\"; }"});
                 unpacked = true;
             }
@@ -174,12 +174,12 @@ static void update(const StringSet & channelNames)
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
             if (unlink(nixDefExpr.c_str()) == -1)
-                throw SysError("unlinking %1%", nixDefExpr);
+                throw SysError("unlinking %1%", PathFmt(nixDefExpr));
     } else if (errno != ENOENT) {
-        throw SysError("getting status of %1%", nixDefExpr);
+        throw SysError("getting status of %1%", PathFmt(nixDefExpr));
     }
-    createDirs(nixDefExpr);
-    auto channelLink = nixDefExpr + "/channels";
+    std::filesystem::create_directories(nixDefExpr);
+    auto channelLink = nixDefExpr / "channels";
     replaceSymlink(profile, channelLink);
 }
 
@@ -188,12 +188,13 @@ static int main_nix_channel(int argc, char ** argv)
     {
         // Figure out the name of the `.nix-channels' file to use
         auto home = getHome();
-        channelsList = settings.useXDGBaseDirectories ? createNixStateDir() + "/channels" : home + "/.nix-channels";
+        channelsList =
+            settings.useXDGBaseDirectories ? (createNixStateDir() / "channels").string() : home + "/.nix-channels";
         nixDefExpr = getNixDefExpr();
 
         // Figure out the name of the channels profile.
-        profile = profilesDir(settings.getProfileDirsOptions()) + "/channels";
-        createDirs(dirOf(profile));
+        profile = profilesDir(settings.getProfileDirsOptions()) / "channels";
+        createDirs(profile.parent_path());
 
         enum { cNone, cAdd, cRemove, cList, cUpdate, cListGenerations, cRollback } cmd = cNone;
 

@@ -680,21 +680,21 @@ static void performOp(
                 "you are not privileged to create perm roots\n\n"
                 "hint: you can just do this client-side without special privileges, and probably want to do that instead.");
         auto storePath = WorkerProto::Serialise<StorePath>::read(*store, rconn);
-        Path gcRoot = absPath(readString(conn.from));
+        std::filesystem::path gcRoot = absPath(readString(conn.from));
         logger->startWork();
         auto & localFSStore = require<LocalFSStore>(*store);
-        localFSStore.addPermRoot(storePath, gcRoot);
+        localFSStore.addPermRoot(storePath, gcRoot.string());
         logger->stopWork();
-        conn.to << gcRoot;
+        conn.to << gcRoot.string();
         break;
     }
 
     case WorkerProto::Op::AddIndirectRoot: {
-        Path path = absPath(readString(conn.from));
+        std::filesystem::path path = absPath(readString(conn.from));
 
         logger->startWork();
         auto & indirectRootStore = require<IndirectRootStore>(*store);
-        indirectRootStore.addIndirectRoot(path);
+        indirectRootStore.addIndirectRoot(path.string());
         logger->stopWork();
 
         conn.to << 1;

@@ -46,7 +46,7 @@ using std::cout;
 
 typedef void (*Operation)(Strings opFlags, Strings opArgs);
 
-static Path gcRoot;
+static std::filesystem::path gcRoot;
 static int rootNr = 0;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
@@ -99,12 +99,12 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = gcRoot;
+                    std::filesystem::path rootName = gcRoot;
                     if (rootNr > 1)
                         rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out")
                         rootName += "-" + i->first;
-                    retPath = store2->addPermRoot(outPath, rootName);
+                    retPath = store2->addPermRoot(outPath, rootName.string());
                 }
             }
             outputs.insert(retPath);
@@ -121,11 +121,11 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (gcRoot == "")
                 printGCWarning();
             else {
-                Path rootName = gcRoot;
+                std::filesystem::path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1)
                     rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName)};
+                return {store2->addPermRoot(path.path, rootName.string())};
             }
         }
         return {store->printStorePath(path.path)};
@@ -528,8 +528,8 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1)
         throw UsageError("'--print-env' requires one derivation store path");
 
-    Path drvPath = opArgs.front();
-    Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath));
+    std::filesystem::path drvPath = opArgs.front();
+    Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath.string()));
 
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
@@ -689,7 +689,7 @@ static void opGC(Strings opFlags, Strings opArgs)
 
     if (printRoots) {
         Roots roots = gcStore.findRoots(false);
-        std::set<std::pair<Path, StorePath>> roots2;
+        std::set<std::pair<std::filesystem::path, StorePath>> roots2;
         // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)

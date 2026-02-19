@@ -105,7 +105,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = P
  * shell backtick operator).
  */
 std::string runProgram(
-    Path program,
+    std::filesystem::path program,
     bool lookupPath = false,
     const Strings & args = Strings(),
     const std::optional<std::string> & input = {},
@@ -113,7 +113,7 @@ std::string runProgram(
 
 struct RunOptions
 {
-    Path program;
+    std::filesystem::path program;
     bool lookupPath = true;
     Strings args;
 #ifndef _WIN32
