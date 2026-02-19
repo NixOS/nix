@@ -137,4 +137,34 @@ TEST_F(FSSourceAccessorTest, works)
     }
 }
 
+/* ----------------------------------------------------------------------------
+ * RestoreSink non-directory at root (no dirFd)
+ * --------------------------------------------------------------------------*/
+
+TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
+{
+    auto filePath = tmpDir / "rootfile";
+    {
+        RestoreSink sink(false);
+        sink.dstPath = filePath;
+        // No dirFd set - this tests the !dirFd path
+        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+    }
+
+    EXPECT_THAT(makeFSSourceAccessor(filePath), HasContents(CanonPath::root, "root content"));
+}
+
+TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
+{
+    auto linkPath = tmpDir / "rootlink";
+    {
+        RestoreSink sink(false);
+        sink.dstPath = linkPath;
+        // No dirFd set - this tests the !dirFd path
+        sink.createSymlink(CanonPath::root, "symlink_target");
+    }
+
+    EXPECT_THAT(makeFSSourceAccessor(linkPath), HasSymlink(CanonPath::root, "symlink_target"));
+}
+
 } // namespace nix
