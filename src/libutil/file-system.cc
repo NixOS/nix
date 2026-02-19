@@ -262,13 +262,13 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 
 bool pathExists(const std::filesystem::path & path)
 {
-    return maybeLstat(path.string()).has_value();
+    return maybeLstat(path).has_value();
 }
 
 bool pathAccessible(const std::filesystem::path & path)
 {
     try {
-        return pathExists(path.string());
+        return pathExists(path);
     } catch (SystemError & e) {
         // swallow EPERM
         if (e.is(std::errc::operation_not_permitted))
