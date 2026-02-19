@@ -7,6 +7,7 @@
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
+#include "nix/util/json-utils.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -28,10 +29,19 @@ BuildResult ServeProto::Serialise<BuildResult>::read(const StoreDirConfig & stor
 
     if (conn.version >= ServeProto::Version{2, 3})
         conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
-    if (conn.version >= ServeProto::Version{2, 6}) {
-        auto builtOutputs = ServeProto::Serialise<DrvOutputs>::read(store, conn);
-        for (auto && [output, realisation] : builtOutputs)
-            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+
+    if (conn.version >= ServeProto::Version{2, 8}) {
+        success.builtOutputs = ServeProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
+    } else if (conn.version >= ServeProto::Version{2, 6}) {
+        for (auto & [output, realisation] : ServeProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
+            success.builtOutputs.insert_or_assign(
+                output.substr(n + 1),
+                UnkeyedRealisation{
+                    StorePath{getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))}});
+        }
     }
 
     res.inner = std::visit(
@@ -63,15 +73,30 @@ void ServeProto::Serialise<BuildResult>::write(
        default value for the fields that don't exist in that case. */
     auto common = [&](std::string_view errorMsg, bool isNonDeterministic, const auto & builtOutputs) {
         conn.to << errorMsg;
+
         if (conn.version >= ServeProto::Version{2, 3})
             conn.to << res.timesBuilt << isNonDeterministic << res.startTime << res.stopTime;
-        if (conn.version >= ServeProto::Version{2, 6}) {
-            DrvOutputs builtOutputsFullKey;
-            for (auto & [output, realisation] : builtOutputs)
-                builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
-            ServeProto::write(store, conn, builtOutputsFullKey);
+
+        if (conn.version >= ServeProto::Version{2, 8}) {
+            ServeProto::write(store, conn, builtOutputs);
+        } else if (conn.version >= ServeProto::Version{2, 6}) {
+            // Old clients read `builtOutputs` as a `StringMap` keyed
+            // by `sha256:<hex>!<outputName>` with JSON-encoded
+            // realisations.  The derivation hash no longer exists, but
+            // old clients only extract `outputName` and `outPath`, so
+            // a dummy hash suffices.
+            StringMap sm;
+            for (auto & [outputName, realisation] : builtOutputs) {
+                auto dummyId = Hash::dummy.to_string(HashFormat::Base16, true) + "!" + outputName;
+                nlohmann::json j;
+                j["id"] = dummyId;
+                j["outPath"] = realisation.outPath.to_string();
+                sm[dummyId] = j.dump();
+            }
+            ServeProto::write(store, conn, sm);
         }
     };
+
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
@@ -156,6 +181,84 @@ void ServeProto::Serialise<ServeProto::BuildOptions>::write(
     if (conn.version >= ServeProto::Version{2, 7}) {
         conn.to << ((int) options.keepFailed);
     }
+}
+
+UnkeyedRealisation ServeProto::Serialise<UnkeyedRealisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (conn.version < ServeProto::Version{2, 8}) {
+        throw Error(
+            "serve protocol %d.%d is too old (< 2.8) to support content-addressing derivations",
+            conn.version.major,
+            conn.version.minor);
+    }
+
+    auto outPath = ServeProto::Serialise<StorePath>::read(store, conn);
+    auto signatures = ServeProto::Serialise<std::set<Signature>>::read(store, conn);
+
+    return UnkeyedRealisation{
+        .outPath = std::move(outPath),
+        .signatures = std::move(signatures),
+    };
+}
+
+void ServeProto::Serialise<UnkeyedRealisation>::write(
+    const StoreDirConfig & store, WriteConn conn, const UnkeyedRealisation & info)
+{
+    if (conn.version < ServeProto::Version{2, 8}) {
+        throw Error(
+            "serve protocol %d.%d is too old (< 2.8) to support content-addressing derivations",
+            conn.version.major,
+            conn.version.minor);
+    }
+    ServeProto::write(store, conn, info.outPath);
+    ServeProto::write(store, conn, info.signatures);
+}
+
+DrvOutput ServeProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (conn.version < ServeProto::Version{2, 8}) {
+        throw Error(
+            "serve protocol %d.%d is too old (< 2.8) to support content-addressing derivations",
+            conn.version.major,
+            conn.version.minor);
+    }
+
+    auto drvPath = ServeProto::Serialise<StorePath>::read(store, conn);
+    auto outputName = ServeProto::Serialise<std::string>::read(store, conn);
+
+    return DrvOutput{
+        .drvPath = std::move(drvPath),
+        .outputName = std::move(outputName),
+    };
+}
+
+void ServeProto::Serialise<DrvOutput>::write(const StoreDirConfig & store, WriteConn conn, const DrvOutput & info)
+{
+    if (conn.version < ServeProto::Version{2, 8}) {
+        throw Error(
+            "serve protocol %d.%d is too old (< 2.8) to support content-addressing derivations",
+            conn.version.major,
+            conn.version.minor);
+    }
+    ServeProto::write(store, conn, info.drvPath);
+    ServeProto::write(store, conn, info.outputName);
+}
+
+Realisation ServeProto::Serialise<Realisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    auto id = ServeProto::Serialise<DrvOutput>::read(store, conn);
+    auto unkeyed = ServeProto::Serialise<UnkeyedRealisation>::read(store, conn);
+
+    return Realisation{
+        std::move(unkeyed),
+        std::move(id),
+    };
+}
+
+void ServeProto::Serialise<Realisation>::write(const StoreDirConfig & store, WriteConn conn, const Realisation & info)
+{
+    ServeProto::write(store, conn, info.id);
+    ServeProto::write(store, conn, static_cast<const UnkeyedRealisation &>(info));
 }
 
 } // namespace nix

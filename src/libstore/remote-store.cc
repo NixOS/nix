@@ -503,12 +503,7 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;
-    if (conn->protoVersion.number < WorkerProto::Version::Number{1, 31}) {
-        WorkerProto::write(*this, *conn, info.id);
-        conn->to << std::string(info.outPath.to_string());
-    } else {
-        WorkerProto::write(*this, *conn, info);
-    }
+    WorkerProto::write(*this, *conn, info);
     conn.processStderr();
 }
 
@@ -518,8 +513,10 @@ void RemoteStore::queryRealisationUncached(
     try {
         auto conn(getConnection());
 
-        if (conn->protoVersion.number < WorkerProto::Version::Number{1, 27}) {
-            warn("the daemon is too old to support content-addressing derivations, please upgrade it to 2.4");
+        if (!conn->protoVersion.features.contains(WorkerProto::featureRealisationWithPath)) {
+            warn(
+                "the daemon is missing the '%s' protocol feature, needed to support content-addressing derivations",
+                WorkerProto::featureRealisationWithPath);
             return callback(nullptr);
         }
 
@@ -527,21 +524,12 @@ void RemoteStore::queryRealisationUncached(
         WorkerProto::write(*this, *conn, id);
         conn.processStderr();
 
-        auto real = [&]() -> std::shared_ptr<const UnkeyedRealisation> {
-            if (conn->protoVersion.number < WorkerProto::Version::Number{1, 31}) {
-                auto outPaths = WorkerProto::Serialise<std::set<StorePath>>::read(*this, *conn);
-                if (outPaths.empty())
-                    return nullptr;
-                return std::make_shared<const UnkeyedRealisation>(UnkeyedRealisation{.outPath = *outPaths.begin()});
-            } else {
-                auto realisations = WorkerProto::Serialise<std::set<Realisation>>::read(*this, *conn);
-                if (realisations.empty())
-                    return nullptr;
-                return std::make_shared<const UnkeyedRealisation>(*realisations.begin());
-            }
-        }();
-
-        callback(std::shared_ptr<const UnkeyedRealisation>(real));
+        callback([&]() -> std::shared_ptr<const UnkeyedRealisation> {
+            auto realisation = WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::read(*this, *conn);
+            if (!realisation)
+                return nullptr;
+            return std::make_shared<const UnkeyedRealisation>(*realisation);
+        }());
     } catch (...) {
         return callback.rethrow();
     }
@@ -623,30 +611,19 @@ std::vector<KeyedBuildResult> RemoteStore::buildPathsWithResults(
 
                         OutputPathMap outputs;
                         auto drvPath = resolveDerivedPath(*evalStore, *bfd.drvPath);
-                        auto drv = evalStore->readDerivation(drvPath);
-                        const auto outputHashes = staticOutputHashes(*evalStore, drv); // FIXME: expensive
                         auto built = resolveDerivedPath(*this, bfd, &*evalStore);
                         for (auto & [output, outputPath] : built) {
-                            auto outputHash = get(outputHashes, output);
-                            if (!outputHash)
-                                throw Error(
-                                    "the derivation '%s' doesn't have an output named '%s'",
-                                    printStorePath(drvPath),
-                                    output);
-                            auto outputId = DrvOutput{*outputHash, output};
+                            auto outputId = DrvOutput{drvPath, output};
                             if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
                                 auto realisation = queryRealisation(outputId);
                                 if (!realisation)
-                                    throw MissingRealisation(outputId);
-                                success.builtOutputs.emplace(output, Realisation{*realisation, outputId});
+                                    throw MissingRealisation(*this, outputId);
+                                success.builtOutputs.emplace(output, *realisation);
                             } else {
                                 success.builtOutputs.emplace(
                                     output,
-                                    Realisation{
-                                        UnkeyedRealisation{
-                                            .outPath = outputPath,
-                                        },
-                                        outputId,
+                                    UnkeyedRealisation{
+                                        .outPath = outputPath,
                                     });
                             }
                         }
