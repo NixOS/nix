@@ -56,14 +56,14 @@ LENGTH_PREFIXED_PROTO_HELPER(Inner, std::vector<T>);
 #define COMMA_ ,
 template<class Inner, typename T, typename Compare>
 LENGTH_PREFIXED_PROTO_HELPER(Inner, std::set<T COMMA_ Compare>);
+#undef COMMA_
 
 template<class Inner, typename... Ts>
 LENGTH_PREFIXED_PROTO_HELPER(Inner, std::tuple<Ts...>);
 
-template<class Inner, typename K, typename V, typename Compare>
-#define LENGTH_PREFIXED_PROTO_HELPER_X std::map<K, V, Compare>
+template<class Inner, typename K, typename V>
+#define LENGTH_PREFIXED_PROTO_HELPER_X std::map<K, V>
 LENGTH_PREFIXED_PROTO_HELPER(Inner, LENGTH_PREFIXED_PROTO_HELPER_X);
-#undef COMMA_
 
 template<class Inner, typename T>
 std::vector<T>
@@ -109,11 +109,11 @@ void LengthPrefixedProtoHelper<Inner, std::set<T, Compare>>::write(
     }
 }
 
-template<class Inner, typename K, typename V, typename Compare>
-std::map<K, V, Compare> LengthPrefixedProtoHelper<Inner, std::map<K, V, Compare>>::read(
-    const StoreDirConfig & store, typename Inner::ReadConn conn)
+template<class Inner, typename K, typename V>
+std::map<K, V>
+LengthPrefixedProtoHelper<Inner, std::map<K, V>>::read(const StoreDirConfig & store, typename Inner::ReadConn conn)
 {
-    std::map<K, V, Compare> resMap;
+    std::map<K, V> resMap;
     auto size = readNum<size_t>(conn.from);
     while (size--) {
         auto k = S<K>::read(store, conn);
@@ -123,9 +123,9 @@ std::map<K, V, Compare> LengthPrefixedProtoHelper<Inner, std::map<K, V, Compare>
     return resMap;
 }
 
-template<class Inner, typename K, typename V, typename Compare>
-void LengthPrefixedProtoHelper<Inner, std::map<K, V, Compare>>::write(
-    const StoreDirConfig & store, typename Inner::WriteConn conn, const std::map<K, V, Compare> & resMap)
+template<class Inner, typename K, typename V>
+void LengthPrefixedProtoHelper<Inner, std::map<K, V>>::write(
+    const StoreDirConfig & store, typename Inner::WriteConn conn, const std::map<K, V> & resMap)
 {
     conn.to << resMap.size();
     for (auto & i : resMap) {

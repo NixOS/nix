@@ -26,13 +26,12 @@ namespace nix {
         LengthPrefixedProtoHelper<CommonProto, T>::write(store, conn, t);                                \
     }
 
-COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 #define COMMA_ ,
+COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename T COMMA_ typename Compare>, std::set<T COMMA_ Compare>)
 COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename... Ts>, std::tuple<Ts...>)
 
-COMMON_USE_LENGTH_PREFIX_SERIALISER(
-    template<typename K COMMA_ typename V COMMA_ typename Compare>, std::map<K COMMA_ V COMMA_ Compare>)
+COMMON_USE_LENGTH_PREFIX_SERIALISER(template<typename K COMMA_ typename V>, std::map<K COMMA_ V>)
 #undef COMMA_
 
 /* protocol-specific templates */

@@ -301,8 +301,9 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
        given this information by the downstream goal, that cannot happen
        anymore if the downstream goal only cares about one output, but
        we care about all outputs. */
-    for (auto & [outputName, _] : drv->outputs) {
-        InitialOutput v;
+    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
+    for (auto & [outputName, outputHash] : outputHashes) {
+        InitialOutput v{.outputHash = outputHash};
 
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
@@ -1267,7 +1268,7 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                                                                               : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{drvPath, i.first};
+        auto drvOutput = DrvOutput{info.outputHash, i.first};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {

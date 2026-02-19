@@ -163,13 +163,10 @@ StoreWrapper::queryPathInfo(char * path, int base32)
         }
 
 SV *
-StoreWrapper::queryRawRealisation(char * drvPath, char * outputName)
+StoreWrapper::queryRawRealisation(char * outputId)
     PPCODE:
       try {
-        auto realisation = THIS->store->queryRealisation(DrvOutput{
-            .drvPath = THIS->store->parseStorePath(drvPath),
-            .outputName = outputName,
-        });
+        auto realisation = THIS->store->queryRealisation(DrvOutput::parse(outputId));
         if (realisation)
             XPUSHs(sv_2mortal(newSVpv(static_cast<nlohmann::json>(*realisation).dump().c_str(), 0)));
         else

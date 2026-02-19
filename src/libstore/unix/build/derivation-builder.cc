@@ -1958,10 +1958,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             {
                 .outPath = newInfo.path,
             },
-            DrvOutput{
-                .drvPath = drvPath,
-                .outputName = outputName,
-            },
+            DrvOutput{oldinfo->outputHash, outputName},
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
             store.signRealisation(thisRealisation);

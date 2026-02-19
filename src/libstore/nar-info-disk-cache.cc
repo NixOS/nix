@@ -42,18 +42,12 @@ create table if not exists NARs (
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
-create table if not exists BuildTrace (
+create table if not exists Realisations (
     cache integer not null,
-
-    drvPath text not null,
-    outputName text not null,
-
-    -- The following are null if the realisation is absent
-    outputPath text,
-    sigs text,
-
+    outputId text not null,
+    content blob, -- Json serialisation of the realisation, or null if the realisation is absent
     timestamp        integer not null,
-    primary key (cache, drvPath, outputName),
+    primary key (cache, outputId),
     foreign key (cache) references BinaryCaches(id) on delete cascade
 );
 
@@ -93,7 +87,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     NarInfoDiskCacheImpl(
         const Settings & settings,
         SQLiteSettings sqliteSettings,
-        Path dbPath = (getCacheDir() / "binary-cache-v8.sqlite").string())
+        Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
         : NarInfoDiskCache{settings}
     {
         auto state(_state.lock());
@@ -129,24 +123,24 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
         state->insertRealisation.create(
             state->db,
             R"(
-                insert or replace into BuildTrace(cache, drvPath, outputName, outputPath, sigs, timestamp)
-                    values (?, ?, ?, ?, ?, ?)
+                insert or replace into Realisations(cache, outputId, content, timestamp)
+                    values (?, ?, ?, ?)
             )");
 
         state->insertMissingRealisation.create(
             state->db,
             R"(
-                insert or replace into BuildTrace(cache, drvPath, outputName, timestamp)
-                    values (?, ?, ?, ?)
+                insert or replace into Realisations(cache, outputId, timestamp)
+                    values (?, ?, ?)
             )");
 
         state->queryRealisation.create(
             state->db,
             R"(
-                select outputPath, sigs from BuildTrace
-                    where cache = ? and drvPath = ? and outputName = ? and
-                        ((outputPath is null and timestamp > ?) or
-                         (outputPath is not null and timestamp > ?))
+                select content from Realisations
+                    where cache = ? and outputId = ?  and
+                        ((content is null and timestamp > ?) or
+                         (content is not null and timestamp > ?))
             )");
 
         /* Periodically purge expired entries from the database. */
@@ -303,27 +297,22 @@ public:
 
                 auto now = time(0);
 
-                auto queryRealisation(state->queryRealisation.use()(cache.id)(id.drvPath.to_string())(id.outputName)(
+                auto queryRealisation(state->queryRealisation.use()(cache.id)(id.to_string())(
                     now - settings.ttlNegative)(now - settings.ttlPositive));
 
                 if (!queryRealisation.next())
-                    return {oUnknown, nullptr};
+                    return {oUnknown, 0};
 
                 if (queryRealisation.isNull(0))
-                    return {oInvalid, nullptr};
+                    return {oInvalid, 0};
 
                 try {
                     return {
                         oValid,
-                        std::make_shared<Realisation>(
-                            UnkeyedRealisation{
-                                .outPath = StorePath{queryRealisation.getStr(0)},
-                                .signatures = nlohmann::json::parse(queryRealisation.getStr(1)),
-                            },
-                            id),
+                        std::make_shared<Realisation>(nlohmann::json::parse(queryRealisation.getStr(0))),
                     };
                 } catch (Error & e) {
-                    e.addTrace({}, "reading build trace key-value from the local disk cache");
+                    e.addTrace({}, "while parsing the local disk cache");
                     throw;
                 }
             });
@@ -369,9 +358,7 @@ public:
             auto & cache(getCache(*state, uri));
 
             state->insertRealisation
-                .use()(cache.id)(realisation.id.drvPath.to_string())(realisation.id.outputName)(
-                    realisation.outPath.to_string())(static_cast<nlohmann::json>(realisation.signatures).dump())(
-                    time(0))
+                .use()(cache.id)(realisation.id.to_string())(static_cast<nlohmann::json>(realisation).dump())(time(0))
                 .exec();
         });
     }
@@ -382,7 +369,7 @@ public:
             auto state(_state.lock());
 
             auto & cache(getCache(*state, uri));
-            state->insertMissingRealisation.use()(cache.id)(id.drvPath.to_string())(id.outputName)(time(0)).exec();
+            state->insertMissingRealisation.use()(cache.id)(id.to_string())(time(0)).exec();
         });
     }
 };

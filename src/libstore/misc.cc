@@ -242,15 +242,16 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
                         // If there are unknown output paths, attempt to find if the
                         // paths are known to substituters through a realisation.
+                        auto outputHashes = staticOutputHashes(*this, *drv);
                         knownOutputPaths = true;
 
-                        for (auto & [outputName, _] : drv->outputs) {
+                        for (auto [outputName, hash] : outputHashes) {
                             if (!bfd.outputs.contains(outputName))
                                 continue;
 
                             bool found = false;
                             for (auto & sub : getDefaultSubstituters()) {
-                                auto realisation = sub->queryRealisation({drvPath, outputName});
+                                auto realisation = sub->queryRealisation({hash, outputName});
                                 if (!realisation)
                                     continue;
                                 found = true;
@@ -367,7 +368,7 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd, 
     OutputPathMap outputs;
     for (auto & [outputName, outputPathOpt] : outputsOpt) {
         if (!outputPathOpt)
-            throw MissingRealisation(store, *bfd.drvPath, drvPath, outputName);
+            throw MissingRealisation(bfd.drvPath->to_string(store), outputName);
         auto & outputPath = *outputPathOpt;
         outputs.insert_or_assign(outputName, outputPath);
     }
@@ -391,7 +392,7 @@ StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req, Store
                         bfd.output);
                 auto & optPath = outputPaths.at(bfd.output);
                 if (!optPath)
-                    throw MissingRealisation(store, *bfd.drvPath, drvPath, bfd.output);
+                    throw MissingRealisation(bfd.drvPath->to_string(store), bfd.output);
                 return *optPath;
             },
         },

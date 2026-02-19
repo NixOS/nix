@@ -45,6 +45,7 @@ struct InitialOutputStatus
 
 struct InitialOutput
 {
+    Hash outputHash;
     std::optional<InitialOutputStatus> known;
 };
 
