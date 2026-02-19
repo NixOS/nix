@@ -84,14 +84,18 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             dirSink.createDirectory(CanonPath("d"));
             dirSink.createSymlink(CanonPath("c"), "./d");
         });
+#ifdef _WIN32
+        EXPECT_THROW(sink.createDirectory(CanonPath("a/b/c/e")), SymlinkNotAllowed);
+#else
         // FIXME: This still follows symlinks on Unix (incorrectly succeeds)
         sink.createDirectory(CanonPath("a/b/c/e"));
+#endif
         // Test that symlinks in intermediate path are detected during nested operations
-        ASSERT_THROW(
+        EXPECT_THROW(
             sink.createDirectory(
                 CanonPath("a/b/c/f"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {}),
             SymlinkNotAllowed);
-        ASSERT_THROW(
+        EXPECT_THROW(
             sink.createRegularFile(
                 CanonPath("a/b/c/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); }),
             SymlinkNotAllowed);
