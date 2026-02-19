@@ -39,7 +39,7 @@ std::filesystem::path getHome()
                 auto st = maybeStat(homeDir->c_str());
                 if (st && st->st_uid != geteuid())
                     unownedUserHomeDir.swap(homeDir);
-            } catch (SysError & e) {
+            } catch (SystemError & e) {
                 warn(
                     "couldn't stat $HOME ('%s') for reason other than not existing, falling back to the one defined in the 'passwd' file: %s",
                     *homeDir,

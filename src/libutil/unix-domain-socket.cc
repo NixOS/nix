@@ -78,8 +78,8 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
                 if (operation(fd, psaddr, sizeof(addr)) == -1)
                     throw SysError("cannot %s to socket at '%s'", operationName, path);
                 writeFull(pipe.writeSide.get(), "0\n");
-            } catch (SysError & e) {
-                writeFull(pipe.writeSide.get(), fmt("%d\n", e.errNo));
+            } catch (SystemError & e) {
+                writeFull(pipe.writeSide.get(), fmt("%d\n", e.ec().value()));
             } catch (...) {
                 writeFull(pipe.writeSide.get(), "-1\n");
             }

@@ -188,7 +188,7 @@ void unix::closeExtraFDs()
             }
         }
         return;
-    } catch (SysError &) {
+    } catch (SystemError &) {
     }
 #endif
 

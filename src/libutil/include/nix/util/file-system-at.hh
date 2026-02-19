@@ -97,7 +97,7 @@ namespace unix {
  * AT_SYMLINK_NOFOLLOW, since it's the best we can do without failing.
  *
  * @pre path.isRoot() is false
- * @throws SysError if any operation fails
+ * @throws SystemError if any operation fails
  */
 void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
 

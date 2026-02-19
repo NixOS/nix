@@ -8,6 +8,8 @@
 
 namespace nix {
 
+using namespace nix::windows;
+
 std::chrono::microseconds getCpuUserTime()
 {
     FILETIME creationTime;
@@ -17,7 +19,7 @@ std::chrono::microseconds getCpuUserTime()
 
     if (!GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime)) {
         auto lastError = GetLastError();
-        throw windows::WinError(lastError, "failed to get CPU time");
+        throw WinError(lastError, "failed to get CPU time");
     }
 
     ULARGE_INTEGER uLargeInt;
