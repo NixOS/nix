@@ -181,13 +181,16 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     if (context)
         context->last_err_code = NIX_OK;
     try {
+        auto fetchSettings = std::make_unique<nix::fetchers::Settings>(std::move(builder->fetchSettings));
+        auto settings = std::make_unique<nix::EvalSettings>(std::move(builder->settings));
+        auto statePtr =
+            std::make_shared<nix::EvalState>(builder->lookupPath, builder->store, *fetchSettings, *settings);
         return unsafe_new_with_self<EvalState>([&](auto * self) {
             return EvalState{
-                .fetchSettings = std::move(builder->fetchSettings),
-                .settings = std::move(builder->settings),
-                .statePtr = std::make_shared<nix::EvalState>(
-                    builder->lookupPath, builder->store, self->fetchSettings, self->settings),
-                .state = *self->statePtr,
+                .state = *statePtr,
+                .fetchSettings = std::move(fetchSettings),
+                .settings = std::move(settings),
+                .statePtr = std::move(statePtr),
             };
         });
     }
