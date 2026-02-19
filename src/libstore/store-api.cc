@@ -1189,8 +1189,14 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
     auto accessor = store.requireStoreObjectAccessor(drvPath, requireValidPath);
+    auto contents = accessor->readFile(CanonPath::root);
+
     try {
-        return parseDerivation(store, accessor->readFile(CanonPath::root), Derivation::nameFromPath(drvPath));
+        /* Special case for an empty file to show the user a better message */
+        if (contents.empty())
+            throw FormatError("file is empty (possible filesystem corruption)");
+
+        return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
     }
