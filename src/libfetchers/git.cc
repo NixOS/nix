@@ -796,6 +796,51 @@ struct GitInputScheme : InputScheme
     }
 
     /**
+     * Try to serve a git input from the cache using (rev, url) as the
+     * cache key. Returns nullopt on cache miss.
+     */
+    std::optional<std::pair<ref<SourceAccessor>, Input>>
+    getAccessorFromCache(const Settings & settings, Store & store, const Input & input) const
+    {
+        auto rev = input.getRev();
+        if (!rev) return std::nullopt;
+
+        auto url = getStrAttr(input.attrs, "url");
+
+        Cache::Key cacheKey{"gitRevUrl", {
+            {"rev", rev->gitRev()},
+            {"url", url},
+            {"submodules", getSubmodulesAttr(input) ? "1" : "0"},
+            {"exportIgnore", getExportIgnoreAttr(input) ? "1" : "0"},
+            {"lfs", getLfsAttr(input) ? "1" : "0"},
+        }};
+
+        auto cached = settings.getCache()->lookupStorePath(cacheKey, store);
+        if (!cached)
+            return std::nullopt;
+
+        debug("using cached store path for git input '%s'", input.to_string());
+
+        auto accessor = store.requireStoreObjectAccessor(cached->storePath);
+
+        auto options = getGitAccessorOptions(input);
+        auto fp = options.makeFingerprint(*rev);
+        if (options.submodules)
+            fp += ";s";
+        accessor->fingerprint = fp;
+        accessor->setPathDisplay("«" + input.to_string(true) + "»");
+
+        Input result(input);
+
+        if (auto lm = maybeGetIntAttr(cached->value, "lastModified"))
+            result.attrs.insert_or_assign("lastModified", *lm);
+        if (auto rc = maybeGetIntAttr(cached->value, "revCount"))
+            result.attrs.insert_or_assign("revCount", *rc);
+
+        return std::make_pair(accessor, std::move(result));
+    }
+
+    /**
      * Get a `SourceAccessor` for the given Git revision using Nix < 2.20 semantics, i.e. using `git archive` or `git
      * checkout`.
      */
@@ -997,20 +1042,30 @@ struct GitInputScheme : InputScheme
 
         auto accessor = repo->getAccessor(rev, options, "«" + input.to_string(true) + "»");
 
+        /* Track whether the legacy (git archive) fallback was used. If so,
+           we must not cache the result in gitRevUrl, because the legacy
+           store path has different content (exportIgnore/CRLF/export-subst
+           applied) than what the cache key (exportIgnore=0) implies. Caching
+           it would poison subsequent modern fetches of the same rev. */
+        bool usedLegacyFallback = false;
+
         if (settings.nix219Compat && !options.smudgeLfs && accessor->pathExists(CanonPath(".gitattributes"))) {
             /* Use Nix 2.19 semantics to generate locks, but if a NAR hash is specified, support Nix >= 2.20 semantics
              * as well. */
             warn("Using Nix 2.19 semantics to export Git repository '%s'.", input.to_string());
             auto accessorModern = accessor;
             accessor = getLegacyGitAccessor(store, repoInfo, repoDir, rev, options);
+            usedLegacyFallback = true;
             if (expectedNarHash) {
                 auto narHashLegacy =
                     fetchToStore2(settings, store, {accessor}, FetchMode::DryRun, input.getName()).second;
                 if (expectedNarHash != narHashLegacy) {
                     auto narHashModern =
                         fetchToStore2(settings, store, {accessorModern}, FetchMode::DryRun, input.getName()).second;
-                    if (expectedNarHash == narHashModern)
+                    if (expectedNarHash == narHashModern) {
                         accessor = accessorModern;
+                        usedLegacyFallback = false;
+                    }
                 }
             }
         } else {
@@ -1032,6 +1087,7 @@ struct GitInputScheme : InputScheme
                             expectedNarHash->to_string(HashFormat::SRI, true),
                             narHashNew.to_string(HashFormat::SRI, true));
                         accessor = accessorLegacy;
+                        usedLegacyFallback = true;
                     }
                 }
             }
@@ -1082,6 +1138,32 @@ struct GitInputScheme : InputScheme
                 accessor = makeMountedSourceAccessor(std::move(mounts));
                 accessor->fingerprint = newFingerprint;
             }
+        }
+
+        // Cache for future rev+url lookups.
+        // Skip caching when the legacy fallback was used, because the
+        // legacy store path has exportIgnore/CRLF/export-subst applied
+        // and would not match the cache key (which says exportIgnore=0).
+        if (!usedLegacyFallback) {
+            auto url = getStrAttr(input.attrs, "url");
+            auto [storePath, _narHash] = fetchToStore2(
+                settings, store, {accessor}, FetchMode::DryRun, input.getName());
+
+            Cache::Key cacheKey{"gitRevUrl", {
+                {"rev", rev.gitRev()},
+                {"url", url},
+                {"submodules", getSubmodulesAttr(input) ? "1" : "0"},
+                {"exportIgnore", getExportIgnoreAttr(input) ? "1" : "0"},
+                {"lfs", getLfsAttr(input) ? "1" : "0"},
+            }};
+
+            Attrs cacheValue;
+            if (auto lm = input.getLastModified())
+                cacheValue.insert_or_assign("lastModified", uint64_t(*lm));
+            if (auto rc = input.getRevCount())
+                cacheValue.insert_or_assign("revCount", uint64_t(*rc));
+
+            settings.getCache()->upsert(cacheKey, store, cacheValue, storePath);
         }
 
         assert(!origRev || origRev == rev);
@@ -1189,6 +1271,19 @@ struct GitInputScheme : InputScheme
             throw UnimplementedError("exportIgnore and submodules are not supported together yet");
         }
 
+        // Try to serve from cache (rev + url) before doing any network fetch.
+        // Skip the cache when nix219Compat is enabled, because it changes
+        // which content is returned (legacy git-archive behavior) and the
+        // cache doesn't distinguish between the two modes.
+        if (input.getRev() && !settings.nix219Compat) {
+            try {
+                if (auto cached = getAccessorFromCache(settings, store, input))
+                    return *cached;
+            } catch (Error & e) {
+                debug("cache lookup failed for git input '%s': %s", input.to_string(), e.what());
+            }
+        }
+
         auto [accessor, final] = input.getRef() || input.getRev() || !repoInfo.getPath()
                                      ? getAccessorFromCommit(settings, store, repoInfo, std::move(input))
                                      : getAccessorFromWorkdir(settings, store, repoInfo, std::move(input));
@@ -1203,7 +1298,12 @@ struct GitInputScheme : InputScheme
         if (auto rev = input.getRev())
             // FIXME: this can return a wrong fingerprint for the legacy (`git archive`) case, since we don't know here
             // whether to append the `;legacy` suffix or not.
-            return options.makeFingerprint(*rev);
+        {
+            auto fp = options.makeFingerprint(*rev);
+            if (options.submodules)
+                fp += ";s";
+            return fp;
+        }
         else {
             auto repoInfo = getRepoInfo(input);
             if (auto repoPath = repoInfo.getPath(); repoPath && repoInfo.workdirInfo.submodules.empty()) {
