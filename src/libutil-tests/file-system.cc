@@ -16,10 +16,12 @@ using namespace std::string_view_literals;
 
 #ifdef _WIN32
 #  define FS_SEP L"\\"
-#  define FS_ROOT L"C:" FS_SEP // Need a mounted one, C drive is likely
+#  define FS_ROOT_NO_TRAILING_SLASH L"C:" // Need a mounted one, C drive is likely
+#  define FS_ROOT FS_ROOT_NO_TRAILING_SLASH FS_SEP
 #else
 #  define FS_SEP "/"
-#  define FS_ROOT FS_SEP
+#  define FS_ROOT_NO_TRAILING_SLASH FS_SEP
+#  define FS_ROOT FS_ROOT_NO_TRAILING_SLASH
 #endif
 
 #ifndef PATH_MAX
@@ -44,7 +46,7 @@ TEST(absPath, doesntChangeRoot)
 {
     auto p = absPath(std::filesystem::path{FS_ROOT});
 
-    ASSERT_EQ(p, FS_ROOT);
+    ASSERT_EQ(p, FS_ROOT_NO_TRAILING_SLASH);
 }
 
 TEST(absPath, turnsEmptyPathIntoCWD)
@@ -196,42 +198,42 @@ TEST(baseNameOf, absoluteNothingSlashNothing)
 
 TEST(isInDir, trivialCase)
 {
-    EXPECT_TRUE(isInDir("/foo/bar", "/foo"));
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP "bar", FS_ROOT "foo"));
 }
 
 TEST(isInDir, notInDir)
 {
-    EXPECT_FALSE(isInDir("/zes/foo/bar", "/foo"));
+    EXPECT_FALSE(isInDir(FS_ROOT "zes" FS_SEP "foo" FS_SEP "bar", FS_ROOT "foo"));
 }
 
 TEST(isInDir, emptyDir)
 {
-    EXPECT_FALSE(isInDir("/zes/foo/bar", ""));
+    EXPECT_FALSE(isInDir(FS_ROOT "zes" FS_SEP "foo" FS_SEP "bar", ""));
 }
 
 TEST(isInDir, hiddenSubdirectory)
 {
-    EXPECT_TRUE(isInDir("/foo/.ssh", "/foo"));
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP ".ssh", FS_ROOT "foo"));
 }
 
 TEST(isInDir, ellipsisEntry)
 {
-    EXPECT_TRUE(isInDir("/foo/...", "/foo"));
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP "...", FS_ROOT "foo"));
 }
 
 TEST(isInDir, sameDir)
 {
-    EXPECT_FALSE(isInDir("/foo", "/foo"));
+    EXPECT_FALSE(isInDir(FS_ROOT "foo", FS_ROOT "foo"));
 }
 
 TEST(isInDir, sameDirDot)
 {
-    EXPECT_FALSE(isInDir("/foo/.", "/foo"));
+    EXPECT_FALSE(isInDir(FS_ROOT "foo" FS_SEP ".", FS_ROOT "foo"));
 }
 
 TEST(isInDir, dotDotPrefix)
 {
-    EXPECT_FALSE(isInDir("/foo/../bar", "/foo"));
+    EXPECT_FALSE(isInDir(FS_ROOT "foo" FS_SEP ".." FS_SEP "bar", FS_ROOT "foo"));
 }
 
 /* ----------------------------------------------------------------------------
@@ -240,8 +242,8 @@ TEST(isInDir, dotDotPrefix)
 
 TEST(isDirOrInDir, trueForSameDirectory)
 {
-    ASSERT_EQ(isDirOrInDir("/nix", "/nix"), true);
-    ASSERT_EQ(isDirOrInDir("/", "/"), true);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "nix", FS_ROOT "nix"), true);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT, FS_ROOT), true);
 }
 
 TEST(isDirOrInDir, trueForEmptyPaths)
@@ -251,17 +253,17 @@ TEST(isDirOrInDir, trueForEmptyPaths)
 
 TEST(isDirOrInDir, falseForDisjunctPaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo", "/bar"), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo", FS_ROOT "bar"), false);
 }
 
 TEST(isDirOrInDir, relativePaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo" FS_SEP "..", FS_ROOT "foo"), false);
 }
 
 TEST(isDirOrInDir, relativePathsTwice)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo" FS_SEP "..", FS_ROOT "foo" FS_SEP "."), false);
 }
 
 /* ----------------------------------------------------------------------------
@@ -294,7 +296,7 @@ TEST(makeParentCanonical, noParent)
 
 TEST(makeParentCanonical, root)
 {
-    ASSERT_EQ(makeParentCanonical("/"), "/");
+    ASSERT_EQ(makeParentCanonical(FS_ROOT), FS_ROOT_NO_TRAILING_SLASH);
 }
 
 /* ----------------------------------------------------------------------------
