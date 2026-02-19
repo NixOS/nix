@@ -316,8 +316,20 @@ void WorkerProto::Serialise<BuildResult>::write(
         if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
             WorkerProto::write(store, conn, builtOutputs);
         } else if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
-            // Don't support those types of realisations anymore.
-            WorkerProto::write(store, conn, StringMap{});
+            // Old clients read `builtOutputs` as a `StringMap` keyed
+            // by `sha256:<hex>!<outputName>` with JSON-encoded
+            // realisations. The derivation hash no longer exists, but
+            // old clients only extract `outputName` and `outPath`, so
+            // a dummy hash suffices.
+            StringMap sm;
+            for (auto & [outputName, realisation] : builtOutputs) {
+                auto dummyId = Hash::dummy.to_string(HashFormat::Base16, true) + "!" + outputName;
+                nlohmann::json j;
+                j["id"] = dummyId;
+                j["outPath"] = realisation.outPath.to_string();
+                sm[dummyId] = j.dump();
+            }
+            WorkerProto::write(store, conn, sm);
         }
     };
 

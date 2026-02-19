@@ -1042,4 +1042,65 @@ TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
     });
 }
 
+/**
+ * The old-protocol fallback writes `builtOutputs` as a `StringMap`
+ * with a dummy hash so that old clients can still extract output
+ * paths. This round-trips because the read side only uses the
+ * `outputName` (from the key) and `outPath` (from the JSON value).
+ */
+VERSIONED_CHARACTERIZATION_TEST(
+    WorkerProtoTest,
+    buildResult_1_29_compat,
+    "build-result-1.29-compat",
+    (WorkerProto::Version{
+        .number =
+            {
+                .major = 1,
+                .minor = 29,
+            },
+    }),
+    ({
+        using namespace std::literals::chrono_literals;
+        std::tuple<BuildResult, BuildResult, BuildResult> t{
+            BuildResult{.inner{BuildResult::Failure{{
+                .status = BuildResult::Failure::OutputRejected,
+                .msg = HintFmt("no idea why"),
+            }}}},
+            BuildResult{
+                .inner{BuildResult::Failure{{
+                    .status = BuildResult::Failure::NotDeterministic,
+                    .msg = HintFmt("no idea why"),
+                    .isNonDeterministic = true,
+                }}},
+                .timesBuilt = 3,
+                .startTime = 30,
+                .stopTime = 50,
+            },
+            BuildResult{
+                .inner{BuildResult::Success{
+                    .status = BuildResult::Success::Built,
+                    .builtOutputs =
+                        {
+                            {
+                                "foo",
+                                {
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+                                },
+                            },
+                            {
+                                "bar",
+                                {
+                                    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar"},
+                                },
+                            },
+                        },
+                }},
+                .timesBuilt = 1,
+                .startTime = 30,
+                .stopTime = 50,
+            },
+        };
+        t;
+    }))
+
 } // namespace nix

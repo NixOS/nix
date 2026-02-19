@@ -80,8 +80,20 @@ void ServeProto::Serialise<BuildResult>::write(
         if (conn.version >= ServeProto::Version{2, 8}) {
             ServeProto::write(store, conn, builtOutputs);
         } else if (conn.version >= ServeProto::Version{2, 6}) {
-            // We no longer support these types of realisations
-            ServeProto::write(store, conn, StringMap{});
+            // Old clients read `builtOutputs` as a `StringMap` keyed
+            // by `sha256:<hex>!<outputName>` with JSON-encoded
+            // realisations.  The derivation hash no longer exists, but
+            // old clients only extract `outputName` and `outPath`, so
+            // a dummy hash suffices.
+            StringMap sm;
+            for (auto & [outputName, realisation] : builtOutputs) {
+                auto dummyId = Hash::dummy.to_string(HashFormat::Base16, true) + "!" + outputName;
+                nlohmann::json j;
+                j["id"] = dummyId;
+                j["outPath"] = realisation.outPath.to_string();
+                sm[dummyId] = j.dump();
+            }
+            ServeProto::write(store, conn, sm);
         }
     };
 
