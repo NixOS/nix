@@ -43,19 +43,31 @@ zone_src=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
 echo "Zone source path: $zone_src"
 
 # Verify it's a store path
-if [[ ! "$zone_src" =~ ^"$NIX_STORE_DIR" ]]; then
+if [[ ! "$zone_src" =~ ^${NIX_STORE_DIR:-/nix/store}/ ]]; then
     fail "Zone source should be a store path, got: $zone_src"
 fi
 
-# Test: Zone attribute set
-zone_root=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
-    'builtins.unsafeTectonixInternalZoneRoot "//areas/tools/dev"')
+# Test: Zone root access
+zone_root=$(tectonix_eval "$TEST_WORLD/.git" "$HEAD_SHA" \
+    'builtins.unsafeTectonixInternalZoneRoot "//areas/tools/dev"' \
+    --option tectonix-checkout-path "$TEST_WORLD" \
+    --no-pure-eval)
 echo "Zone root: $zone_root"
+[[ -n "$zone_root" ]] || fail "Zone root should not be empty"
 
-# Verify it exists in world tree
-echo "$zone_root" | grepQuiet "$TEST_WORLD"
-if [[ ! "$zone_root" =~ ^"$TEST_WORLD" ]]; then
-    fail "Zone root should be in world tree"
+# Verify zone root points into the test world
+if [[ ! "$zone_root" =~ "$TEST_WORLD" ]]; then
+    fail "Zone root should reference test world, got: $zone_root"
+fi
+
+# Test: Zone is not dirty in clean repo
+zone_is_dirty=$(tectonix_eval_json "$TEST_WORLD/.git" "$HEAD_SHA" \
+    'builtins.unsafeTectonixInternalZoneIsDirty "//areas/tools/dev"' \
+    --option tectonix-checkout-path "$TEST_WORLD")
+echo "Zone dirty: $zone_is_dirty"
+
+if [[ "$zone_is_dirty" == "true" ]]; then
+    fail "Zone should not be dirty in clean repo"
 fi
 
 echo "Basic tests passed!"

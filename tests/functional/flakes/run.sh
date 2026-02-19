@@ -56,6 +56,10 @@ sort "$TEST_ROOT"/actual-env | uniq > "$TEST_ROOT"/actual-env.sorted
 diff "$TEST_ROOT"/expected-env.sorted "$TEST_ROOT"/actual-env.sorted
 
 # Test for issue #13994: verify behavior of -- separator with installable
+# Skip these tests with lazy-trees as ${self}/file references don't resolve
+# to usable store paths at runtime with lazy tree source accessors.
+if [[ $(nix config show lazy-trees) = false ]]; then
+
 # Create a flake with an app that prints its arguments
 clearStore
 rm -rf "$TEST_HOME"/.cache "$TEST_HOME"/.config "$TEST_HOME"/.local
@@ -90,4 +94,6 @@ nix run --no-write-lock-file -- . myarg1 myarg2 2>&1 | grepQuiet "ARGS: myarg1 m
 
 # And verify that a non-installable first argument causes an error
 expectStderr 1 nix run --no-write-lock-file -- myarg1 myarg2 | grepQuiet "error.*myarg1"
+
+fi # lazy-trees = false
 
