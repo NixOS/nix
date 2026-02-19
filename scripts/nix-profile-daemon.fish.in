@@ -53,7 +53,7 @@ end
 
 # Set up environment.
 # This part should be kept in sync with nixpkgs:nixos/modules/programs/environment.nix
-set --export NIX_PROFILES "@localstatedir@/nix/profiles/default $HOME/.nix-profile"
+set --export NIX_PROFILES "@localstatedir@/nix/profiles/default $NIX_LINK"
 
 # Populate bash completions, .desktop files, etc
 if test -z "$XDG_DATA_DIRS"
