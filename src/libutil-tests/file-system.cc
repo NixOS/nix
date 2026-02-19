@@ -303,6 +303,9 @@ TEST(makeParentCanonical, root)
  * chmodIfNeeded
  * --------------------------------------------------------------------------*/
 
+#ifndef _WIN32
+// Windows doesn't support Unix-style permission bits - lstat always
+// returns the same mode regardless of what chmod sets.
 TEST(chmodIfNeeded, works)
 {
     auto [autoClose_, tmpFile] = nix::createTempFile();
@@ -318,6 +321,7 @@ TEST(chmodIfNeeded, works)
         }
     }
 }
+#endif
 
 TEST(chmodIfNeeded, nonexistent)
 {
