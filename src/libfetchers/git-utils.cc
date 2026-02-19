@@ -22,6 +22,7 @@
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
+#include <git2/index.h>
 #include <git2/indexer.h>
 #include <git2/object.h>
 #include <git2/odb.h>
@@ -90,6 +91,7 @@ typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
 typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> ConfigIterator;
 typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
+typedef std::unique_ptr<git_index, Deleter<git_index_free>> Index;
 typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
 
 static Hash toHash(const git_oid & oid)
@@ -560,6 +562,21 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
+    }
+
+    std::set<CanonPath> getTrackedFilesFromIndex() override
+    {
+        Index index;
+        if (git_repository_index(Setter(index), *this))
+            throw Error("getting git index: %s", git_error_last()->message);
+
+        std::set<CanonPath> files;
+        size_t count = git_index_entrycount(index.get());
+        for (size_t i = 0; i < count; i++) {
+            auto entry = git_index_get_byindex(index.get(), i);
+            files.insert(CanonPath(entry->path));
+        }
+        return files;
     }
 
     std::optional<std::string> getWorkdirRef() override
@@ -1476,9 +1493,14 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     std::set<CanonPath> allowedPrefixes;
     if (options.subtree) {
         accessorPath = std::filesystem::path(path.string() + *options.subtree);
-        for (CanonPath prefix : wd.files) {
-            if (prefix.abs().starts_with(*options.subtree + "/"))
-                allowedPrefixes.emplace(prefix.abs().substr(options.subtree->size()));
+        auto subtreePath = CanonPath(*options.subtree);
+        // Use lower_bound to skip directly to the subtree range.
+        // CanonPath ordering guarantees children follow their parent.
+        for (auto it = wd.files.lower_bound(subtreePath);
+             it != wd.files.end() && it->isWithin(subtreePath);
+             ++it) {
+            if (*it != subtreePath) // skip the directory entry itself
+                allowedPrefixes.emplace(it->abs().substr(options.subtree->size()));
         }
     } else {
         accessorPath = path;
@@ -1486,7 +1508,7 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     }
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
                                            makeFSSourceAccessor(accessorPath),
-                                           std::set<CanonPath>{allowedPrefixes},
+                                           std::move(allowedPrefixes),
                                            // Always allow access to the root, but not its children.
                                            boost::unordered_flat_set<CanonPath>{CanonPath::root},
                                            std::move(makeNotAllowedError))

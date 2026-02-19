@@ -91,6 +91,13 @@ struct GitRepo
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
 
+    /**
+     * Get the set of tracked files by reading the git index directly.
+     * Much faster than getWorkdirInfo() for large repos because it
+     * doesn't require a filesystem walk to compute dirty status.
+     */
+    virtual std::set<CanonPath> getTrackedFilesFromIndex() = 0;
+
     static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
     /* Get the ref that HEAD points to. */
