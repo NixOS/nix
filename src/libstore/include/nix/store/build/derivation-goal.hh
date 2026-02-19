@@ -66,6 +66,8 @@ private:
      */
     std::unique_ptr<Derivation> drv;
 
+    const Hash outputHash;
+
     const BuildMode buildMode;
 
     /**

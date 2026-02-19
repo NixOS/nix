@@ -12,12 +12,6 @@ namespace nix {
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
 
-/* Note: you generally shouldn't change the protocol version. Define a
-   new `WorkerProto::Feature` instead. */
-#define PROTOCOL_VERSION (1 << 8 | 39)
-#define MINIMUM_PROTOCOL_VERSION (1 << 8 | 18)
-#define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
-#define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 #define STDERR_NEXT 0x6f6c6d67
 #define STDERR_READ 0x64617461  // data needed from source
 #define STDERR_WRITE 0x64617416 // data for sink
@@ -36,9 +30,6 @@ struct BuildResult;
 struct KeyedBuildResult;
 struct ValidPathInfo;
 struct UnkeyedValidPathInfo;
-struct DrvOutput;
-struct UnkeyedRealisation;
-struct Realisation;
 enum BuildMode : uint8_t;
 enum TrustedFlag : bool;
 enum class GCAction;
@@ -117,12 +108,6 @@ struct WorkerProto
     static const Version latest;
 
     static const Version minimum;
-
-    /**
-     * Feature for transmitting `UnkeyedRealisation` and `DrvOutput`
-     * using drvPath (store path) instead of the old hash-based JSON format.
-     */
-    static constexpr std::string_view featureRealisationWithPath = "realisation-with-path-not-hash";
 
     /**
      * A unidirectional read connection, to be used by the read half of the
@@ -322,14 +307,6 @@ DECLARE_WORKER_SERIALISER(ValidPathInfo);
 template<>
 DECLARE_WORKER_SERIALISER(UnkeyedValidPathInfo);
 template<>
-DECLARE_WORKER_SERIALISER(DrvOutput);
-template<>
-DECLARE_WORKER_SERIALISER(UnkeyedRealisation);
-template<>
-DECLARE_WORKER_SERIALISER(Realisation);
-template<>
-DECLARE_WORKER_SERIALISER(std::optional<UnkeyedRealisation>);
-template<>
 DECLARE_WORKER_SERIALISER(BuildMode);
 template<>
 DECLARE_WORKER_SERIALISER(GCAction);
@@ -348,8 +325,8 @@ DECLARE_WORKER_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_WORKER_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V, typename Compare>
-DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
+template<typename K, typename V>
+DECLARE_WORKER_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_
 
 } // namespace nix

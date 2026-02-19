@@ -37,19 +37,20 @@ TEST(DummyStore, realisation_read)
         return cfg->openDummyStore();
     }();
 
-    StorePath drvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"};
+    auto drvHash = Hash::parseExplicitFormatUnprefixed(
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", HashAlgorithm::SHA256, HashFormat::Base16);
 
     auto outputName = "foo";
 
-    EXPECT_EQ(store->queryRealisation({drvPath, outputName}), nullptr);
+    EXPECT_EQ(store->queryRealisation({drvHash, outputName}), nullptr);
 
     UnkeyedRealisation value{
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
     };
 
-    store->buildTrace.insert({drvPath, {{outputName, value}}});
+    store->buildTrace.insert({drvHash, {{outputName, value}}});
 
-    auto value2 = store->queryRealisation({drvPath, outputName});
+    auto value2 = store->queryRealisation({drvHash, outputName});
 
     ASSERT_TRUE(value2);
     EXPECT_EQ(*value2, value);
@@ -130,7 +131,10 @@ INSTANTIATE_TEST_SUITE_P(DummyStoreJSON, DummyStoreJsonTest, [] {
             [&] {
                 auto store = writeCfg->openDummyStore();
                 store->buildTrace.insert_or_assign(
-                    StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
+                    Hash::parseExplicitFormatUnprefixed(
+                        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                        HashAlgorithm::SHA256,
+                        HashFormat::Base16),
                     std::map<std::string, UnkeyedRealisation>{
                         {
                             "out",

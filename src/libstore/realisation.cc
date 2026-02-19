@@ -8,34 +8,28 @@ namespace nix {
 
 MakeError(InvalidDerivationOutputId, Error);
 
-DrvOutput DrvOutput::parse(const StoreDirConfig & store, std::string_view s)
+DrvOutput DrvOutput::parse(const std::string & strRep)
 {
-    size_t n = s.rfind('^');
-    if (n == s.npos)
-        throw InvalidDerivationOutputId("Invalid derivation output id '%s': missing '^'", s);
-    return DrvOutput{
-        .drvPath = store.parseStorePath(s.substr(0, n)),
-        .outputName = OutputName{s.substr(n + 1)},
-    };
-}
+    size_t n = strRep.find("!");
+    if (n == strRep.npos)
+        throw InvalidDerivationOutputId("Invalid derivation output id %s", strRep);
 
-std::string DrvOutput::render(const StoreDirConfig & store) const
-{
-    return std::string(store.printStorePath(drvPath)) + "^" + outputName;
+    return DrvOutput{
+        .drvHash = Hash::parseAnyPrefixed(strRep.substr(0, n)),
+        .outputName = strRep.substr(n + 1),
+    };
 }
 
 std::string DrvOutput::to_string() const
 {
-    return std::string(drvPath.to_string()) + "^" + outputName;
+    return strHash() + "!" + outputName;
 }
 
 std::string UnkeyedRealisation::fingerprint(const DrvOutput & key) const
 {
-    auto serialised = static_cast<nlohmann::json>(Realisation{*this, key});
-    auto value = serialised.find("value");
-    assert(value != serialised.end());
-    value->erase("signatures");
-    return serialised.dump();
+    nlohmann::json serialized = Realisation{*this, key};
+    serialized.erase("signatures");
+    return serialized.dump();
 }
 
 void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
@@ -67,20 +61,9 @@ const StorePath & RealisedPath::path() const &
     return std::visit([](auto & arg) -> auto & { return arg.getPath(); }, raw);
 }
 
-MissingRealisation::MissingRealisation(
-    const StoreDirConfig & store, const StorePath & drvPath, const OutputName & outputName)
-    : Error("cannot operate on output '%s' of the unbuilt derivation '%s'", outputName, store.printStorePath(drvPath))
+bool Realisation::isCompatibleWith(const UnkeyedRealisation & other) const
 {
-}
-
-MissingRealisation::MissingRealisation(
-    const StoreDirConfig & store,
-    const SingleDerivedPath & drvPath,
-    const StorePath & drvPathResolved,
-    const OutputName & outputName)
-    : MissingRealisation{store, drvPathResolved, outputName}
-{
-    addTrace({}, "looking up realisation for derivation '%s'", drvPath.to_string(store));
+    return outPath == other.outPath;
 }
 
 } // namespace nix
@@ -91,20 +74,12 @@ using namespace nix;
 
 DrvOutput adl_serializer<DrvOutput>::from_json(const json & json)
 {
-    auto obj = getObject(json);
-
-    return {
-        .drvPath = valueAt(obj, "drvPath"),
-        .outputName = getString(valueAt(obj, "outputName")),
-    };
+    return DrvOutput::parse(getString(json));
 }
 
 void adl_serializer<DrvOutput>::to_json(json & json, const DrvOutput & drvOutput)
 {
-    json = {
-        {"drvPath", drvOutput.drvPath},
-        {"outputName", drvOutput.outputName},
-    };
+    json = drvOutput.to_string();
 }
 
 UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & json0)
@@ -126,25 +101,25 @@ void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedReali
     json = {
         {"outPath", r.outPath},
         {"signatures", r.signatures},
+        // back-compat
+        {"dependentRealisations", json::object()},
     };
 }
 
-Realisation adl_serializer<Realisation>::from_json(const json & json)
+Realisation adl_serializer<Realisation>::from_json(const json & json0)
 {
-    auto obj = getObject(json);
+    auto json = getObject(json0);
 
-    return {
-        static_cast<UnkeyedRealisation>(valueAt(obj, "value")),
-        static_cast<DrvOutput>(valueAt(obj, "key")),
+    return Realisation{
+        static_cast<UnkeyedRealisation>(json0),
+        valueAt(json, "id"),
     };
 }
 
 void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
 {
-    json = {
-        {"key", r.id},
-        {"value", static_cast<const UnkeyedRealisation &>(r)},
-    };
+    json = static_cast<const UnkeyedRealisation &>(r);
+    json["id"] = r.id;
 }
 
 } // namespace nlohmann

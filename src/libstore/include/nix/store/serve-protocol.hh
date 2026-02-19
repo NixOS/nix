@@ -8,18 +8,12 @@ namespace nix {
 #define SERVE_MAGIC_1 0x390c9deb
 #define SERVE_MAGIC_2 0x5452eecb
 
-#define SERVE_PROTOCOL_VERSION (2 << 8 | 8)
-#define GET_PROTOCOL_MAJOR(x) ((x) & 0xff00)
-#define GET_PROTOCOL_MINOR(x) ((x) & 0x00ff)
 struct StoreDirConfig;
 struct Source;
 
 // items being serialised
 struct BuildResult;
 struct UnkeyedValidPathInfo;
-struct DrvOutput;
-struct UnkeyedRealisation;
-struct Realisation;
 
 /**
  * The "serve protocol", used by ssh:// stores.
@@ -69,7 +63,7 @@ struct ServeProto
 
     static constexpr Version latest = {
         .major = 2,
-        .minor = 8,
+        .minor = 7,
     };
 
     /**
@@ -211,12 +205,6 @@ inline std::ostream & operator<<(std::ostream & s, ServeProto::Command op)
 template<>
 DECLARE_SERVE_SERIALISER(BuildResult);
 template<>
-DECLARE_SERVE_SERIALISER(DrvOutput);
-template<>
-DECLARE_SERVE_SERIALISER(UnkeyedRealisation);
-template<>
-DECLARE_SERVE_SERIALISER(Realisation);
-template<>
 DECLARE_SERVE_SERIALISER(UnkeyedValidPathInfo);
 template<>
 DECLARE_SERVE_SERIALISER(ServeProto::BuildOptions);
@@ -229,8 +217,8 @@ DECLARE_SERVE_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_SERVE_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V, typename Compare>
-DECLARE_SERVE_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
+template<typename K, typename V>
+DECLARE_SERVE_SERIALISER(std::map<K COMMA_ V>);
 #undef COMMA_
 
 } // namespace nix

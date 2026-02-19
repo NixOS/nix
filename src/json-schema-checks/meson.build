@@ -65,6 +65,9 @@ schemas = [
     'schema' : schema_dir / 'build-trace-entry-v2.yaml',
     'files' : [
       'simple.json',
+      # The field is no longer supported, but we want to show that we
+      # ignore it during parsing.
+      'with-dependent-realisations.json',
       'with-signature.json',
     ],
   },

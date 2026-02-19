@@ -108,16 +108,20 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
         overloaded{
             [&](const BuiltPath::Opaque & p) { res.insert(p.path); },
             [&](const BuiltPath::Built & p) {
+                auto drvHashes = staticOutputHashes(store, store.readDerivation(p.drvPath->outPath()));
                 for (auto & [outputName, outputPath] : p.outputs) {
                     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
-                        DrvOutput key{
-                            .drvPath = p.drvPath->outPath(),
-                            .outputName = outputName,
-                        };
+                        auto drvOutput = get(drvHashes, outputName);
+                        if (!drvOutput)
+                            throw Error(
+                                "the derivation '%s' has unrealised output '%s' (derived-path.cc/toRealisedPaths)",
+                                store.printStorePath(p.drvPath->outPath()),
+                                outputName);
+                        DrvOutput key{*drvOutput, outputName};
                         auto thisRealisation = store.queryRealisation(key);
-                        // We’ve built it, so we must have the realisation.
-                        assert(thisRealisation);
-                        res.insert(Realisation{*thisRealisation, key});
+                        assert(thisRealisation); // We’ve built it, so we must
+                                                 // have the realisation
+                        res.insert(Realisation{*thisRealisation, std::move(key)});
                     } else {
                         res.insert(outputPath);
                     }

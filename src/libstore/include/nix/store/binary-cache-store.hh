@@ -90,18 +90,8 @@ protected:
 
     /**
      * The prefix under which realisation infos will be stored
-     *
-     * @note The previous (still experimental, though) hash-keyed
-     * realisations were under "realisations". "build trace" is a better
-     * name anyways (issue #11895). This is call "v2" accordingly.
-     *
-     * While we're experimenting, we'll freely increase this version
-     * number. Old build traces will just be "abandoned" at the old URL.
-     * When we are done experimenting, we'll try lean more on versioning
-     * the build trace entries themselves than the entire directory, for
-     * a smoother migration path.
      */
-    constexpr const static std::string realisationsPrefix = "build-trace-v2";
+    constexpr const static std::string realisationsPrefix = "realisations";
 
     constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
@@ -110,7 +100,7 @@ protected:
     /**
      * Compute the path to the given realisation
      *
-     * It's `${realisationsPrefix}/${drvPath}/${outputName}`.
+     * It's `${realisationsPrefix}/${drvOutput}.doi`.
      */
     std::string makeRealisationPath(const DrvOutput & id);
 
