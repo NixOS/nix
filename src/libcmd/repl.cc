@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
+#include <sstream>
 
 #include "nix/util/error.hh"
 #include "nix/cmd/repl-interacter.hh"
@@ -129,6 +131,88 @@ std::string removeWhitespace(std::string s)
     return s;
 }
 
+static bool isVarName(std::string_view s);
+
+static std::string formatAttrForCompletion(std::string_view name, bool forceQuote)
+{
+    if (!forceQuote && isVarName(name))
+        return std::string{name};
+
+    std::ostringstream out;
+    printLiteralString(out, name);
+    return out.str();
+}
+
+struct AttrPrefixInfo
+{
+    bool usesQuotes = false;
+    std::string prefix;
+    bool valid = true;
+};
+
+static AttrPrefixInfo parseAttrPrefix(std::string_view text)
+{
+    if (text.empty() || text[0] != '"') {
+        AttrPrefixInfo info;
+        info.usesQuotes = false;
+        info.prefix = std::string(text);
+        info.valid = true;
+        return info;
+    }
+
+    AttrPrefixInfo info;
+    info.usesQuotes = true;
+
+    bool escaped = false;
+    for (size_t i = 1; i < text.size(); ++i) {
+        char c = text[i];
+        if (escaped) {
+            switch (c) {
+            case 'n':
+                info.prefix.push_back('\n');
+                break;
+            case 'r':
+                info.prefix.push_back('\r');
+                break;
+            case 't':
+                info.prefix.push_back('\t');
+                break;
+            case '"':
+                info.prefix.push_back('"');
+                break;
+            case '\\':
+                info.prefix.push_back('\\');
+                break;
+            default:
+                info.prefix.push_back(c);
+                break;
+            }
+            escaped = false;
+            continue;
+        }
+
+        if (c == '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (c == '"')
+            return info;
+
+        if (c == '$' && i + 1 < text.size() && text[i + 1] == '{') {
+            info.valid = false;
+            return info;
+        }
+
+        info.prefix.push_back(c);
+    }
+
+    if (escaped)
+        info.prefix.push_back('\\');
+
+    return info;
+}
+
 NixRepl::NixRepl(
     const LookupPath & lookupPath,
     ref<EvalState> state,
@@ -242,7 +326,26 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         cur = std::string(prefix, start + 1);
     }
 
-    size_t slash, dot;
+    size_t slash;
+    std::optional<size_t> dotPos;
+    Expr * parsedDotExpr = nullptr;
+    for (size_t searchPos = std::string::npos;;) {
+        size_t candidate = cur.rfind('.', searchPos);
+        if (candidate == std::string::npos)
+            break;
+        try {
+            parsedDotExpr = parseString(std::string(cur.substr(0, candidate)));
+            dotPos = candidate;
+            break;
+        } catch (IncompleteReplExpr &) {
+            // Ignore and continue searching earlier separators.
+        } catch (ParseError &) {
+            // Ignore and continue searching earlier separators.
+        }
+        if (candidate == 0)
+            break;
+        searchPos = candidate - 1;
+    }
 
     if ((slash = cur.rfind('/')) != std::string::npos) {
         try {
@@ -256,7 +359,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             }
         } catch (Error &) {
         }
-    } else if ((dot = cur.rfind('.')) == std::string::npos) {
+    } else if (!dotPos) {
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
@@ -266,6 +369,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             i++;
         }
     } else {
+        auto dot = *dotPos;
         /* Temporarily disable the debugger, to avoid re-entering readline. */
         auto debug_repl = state->debugRepl;
         state->debugRepl = nullptr;
@@ -276,8 +380,11 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                attributes. */
             auto expr = cur.substr(0, dot);
             auto cur2 = cur.substr(dot + 1);
+            auto attrInfo = parseAttrPrefix(cur2);
+            if (!attrInfo.valid)
+                return completions;
 
-            Expr * e = parseString(expr);
+            Expr * e = parsedDotExpr ? parsedDotExpr : parseString(expr);
             Value v;
             e->eval(*state, *env, v);
             state->forceAttrs(
@@ -287,9 +394,10 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 
             for (auto & i : *v.attrs()) {
                 std::string_view name = state->symbols[i.name];
-                if (name.substr(0, cur2.size()) != cur2)
+                if (name.substr(0, attrInfo.prefix.size()) != attrInfo.prefix)
                     continue;
-                completions.insert(concatStrings(prev, expr, ".", name));
+                bool forceQuote = attrInfo.usesQuotes || !isVarName(name);
+                completions.insert(concatStrings(prev, expr, ".", formatAttrForCompletion(name, forceQuote)));
             }
 
         } catch (ParseError & e) {
