@@ -412,7 +412,11 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         oss << "Did you mean " << suggestions.trim() << "?" << std::endl;
     }
 
-    out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
+    if (einfo.noIndent) {
+        out << prefix << chomp(oss.str());
+    } else {
+        out << indent(prefix, std::string(filterANSIEscapes(prefix, true).size(), ' '), chomp(oss.str()));
+    }
 
     return out;
 }
