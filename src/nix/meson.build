@@ -99,6 +99,7 @@ nix_sources = [ config_priv_h ] + files(
   'search.cc',
   'self-exe.cc',
   'sigs.cc',
+  'store-break-lock.cc',
   'store-copy-log.cc',
   'store-delete.cc',
   'store-gc.cc',
