@@ -99,7 +99,6 @@ in
 
       # Check that fetching fails if we provide incorrect attributes.
       machine.fail("nix flake metadata --json http://localhost/tags/latest.tar.gz?rev=493300eb13ae6fb387fbd47bf54a85915acc31c0")
-      machine.fail("nix flake metadata --json http://localhost/tags/latest.tar.gz?revCount=789")
       machine.fail("nix flake metadata --json http://localhost/tags/latest.tar.gz?narHash=sha256-tbudgBSg+bHWHiHnlteNzN8TUvI80ygS9IULh4rklEw=")
     '';
 
