@@ -530,6 +530,10 @@ private:
     mutable std::once_flag worldCheckoutAccessorFlag;
     mutable std::optional<ref<SourceAccessor>> worldCheckoutAccessor;
 
+    /** Cached tracked files from the checkout's git index (thread-safe via once_flag) */
+    mutable std::once_flag worldCheckoutTrackedFilesFlag;
+    mutable std::set<CanonPath> worldCheckoutTrackedFiles;
+
     /** Cache: world path → tree SHA (lazy computed, cached at each path level) */
     const ref<boost::concurrent_flat_map<std::string, Hash>> worldTreeShaCache;
 

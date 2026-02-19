@@ -488,7 +488,13 @@ std::optional<ref<SourceAccessor>> EvalState::getWorldCheckoutAccessor() const
     std::call_once(worldCheckoutAccessorFlag, [this]() {
         auto checkoutPath = std::filesystem::path(settings.tectonixCheckoutPath.get());
         auto repo = GitRepo::openRepo(checkoutPath, {});
-        auto workdirInfo = repo->getWorkdirInfo();
+        // Use the cached git index for tracked files instead of getWorkdirInfo(),
+        // which does a full filesystem walk via libgit2 (no fsmonitor support).
+        GitRepo::WorkdirInfo workdirInfo;
+        std::call_once(worldCheckoutTrackedFilesFlag, [&]() {
+            worldCheckoutTrackedFiles = repo->getTrackedFilesFromIndex();
+        });
+        workdirInfo.files = worldCheckoutTrackedFiles;
 
         auto makeNotAllowedError = [checkoutPath](const CanonPath & path) -> RestrictedPathError {
             if (pathExists(checkoutPath / path.rel()))
@@ -958,7 +964,19 @@ StorePath EvalState::getZoneFromCheckout(std::string_view zonePath)
     // development workflows where dirty zones are being actively worked on.
     debug("mounting live checkout for dirty zone %s - modifications during evaluation may cause undefined behavior", zonePath);
     auto repo = GitRepo::openRepo(checkoutPath, {});
-    auto workdirInfo = repo->getWorkdirInfo();
+    // Ensure the cached tracked files are populated (computed once).
+    std::call_once(worldCheckoutTrackedFilesFlag, [&]() {
+        worldCheckoutTrackedFiles = repo->getTrackedFilesFromIndex();
+    });
+    // Pre-filter to only this zone's files using lower_bound on the sorted
+    // set, avoiding a full copy of all 978K entries on each zone mount.
+    GitRepo::WorkdirInfo workdirInfo;
+    auto subtreePath = CanonPath("/" + zone);
+    for (auto it = worldCheckoutTrackedFiles.lower_bound(subtreePath);
+         it != worldCheckoutTrackedFiles.end() && it->isWithin(subtreePath);
+         ++it) {
+        workdirInfo.files.insert(*it);
+    }
 
     auto makeNotAllowedError = [checkoutPath, zone](const CanonPath & path) -> RestrictedPathError {
         if (pathExists(checkoutPath + "/" + zone + "/" + path.rel()))
