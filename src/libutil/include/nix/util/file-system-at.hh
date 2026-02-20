@@ -54,7 +54,7 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
  * @throws SymlinkNotAllowed if any path components are symlinks
  * @throws SystemError on other errors
  */
-Descriptor openFileEnsureBeneathNoSymlinks(
+AutoCloseFD openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,
     const CanonPath & path,
 #ifdef _WIN32

@@ -340,23 +340,23 @@ void writeFile(const Path & path, std::string_view s, mode_t mode, FsSync sync)
     if (!fd)
         throw SysError("opening file '%1%'", path);
 
-    writeFile(fd, path, s, mode, sync);
+    writeFile(fd.get(), s, sync, &path);
 
     /* Close explicitly to propagate the exceptions. */
     fd.close();
 }
 
-void writeFile(AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode, FsSync sync)
+void writeFile(Descriptor fd, std::string_view s, FsSync sync, const Path * origPath)
 {
-    assert(fd);
+    assert(fd != INVALID_DESCRIPTOR);
     try {
-        writeFull(fd.get(), s);
+        writeFull(fd, s);
 
         if (sync == FsSync::Yes)
-            fd.fsync();
+            syncDescriptor(fd);
 
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", origPath);
+        e.addTrace({}, "writing file '%1%'", origPath ? *origPath : descriptorToPath(fd).string());
         throw;
     }
 }

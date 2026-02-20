@@ -266,8 +266,7 @@ writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 066
     return writeFile(path.string(), source, mode, sync);
 }
 
-void writeFile(
-    AutoCloseFD & fd, const Path & origPath, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const Path * origPath = nullptr);
 
 /**
  * Flush a path's parent directory to disk.

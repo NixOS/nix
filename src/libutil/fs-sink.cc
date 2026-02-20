@@ -181,7 +181,7 @@ void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(C
                component are not followed. */
             constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
             if (!dirFd)
-                return ::open(p.c_str(), flags, 0666);
+                return AutoCloseFD{::open(p.c_str(), flags, 0666)};
             return openFileEnsureBeneathNoSymlinks(dirFd.get(), path, flags, 0666);
         }()
 #endif
