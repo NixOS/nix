@@ -1,0 +1,8 @@
+error:
+       … while calling the 'fromJSON' builtin
+         at /pwd/lang/eval-fail/fromJSON-valueWithNullByte.nix:1:1:
+            1| builtins.fromJSON ''"a\u0000b"''
+             | ^
+            2|
+
+       error: input string 'a␀b' cannot be represented as Nix string because it contains null bytes

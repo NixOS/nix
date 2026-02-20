@@ -1,0 +1,16 @@
+error:
+       … while evaluating the attribute 'absolutePath'
+         at /pwd/lang/eval-fail/readDir-nonexistent-1.nix:2:3:
+            1| {
+            2|   absolutePath = builtins.readDir /this/path/really/should/not/exist;
+             |   ^
+            3| }
+
+       … while calling the 'readDir' builtin
+         at /pwd/lang/eval-fail/readDir-nonexistent-1.nix:2:18:
+            1| {
+            2|   absolutePath = builtins.readDir /this/path/really/should/not/exist;
+             |                  ^
+            3| }
+
+       error: path '/this/path/really/should/not/exist' does not exist

@@ -1,0 +1,1 @@
+{ absolute = /foo; expr = /pwd/lang/eval-okay/foo/bar; home = /fake-home/foo; notfirst = /pwd/lang/eval-okay/bar/foo; simple = /pwd/lang/eval-okay/foo; slashes = /foo/bar; surrounded = /pwd/lang/eval-okay/a-foo-b; }

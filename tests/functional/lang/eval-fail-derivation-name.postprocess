@@ -1,9 +1,0 @@
-# shellcheck shell=bash
-set -euo pipefail
-testcaseBasename=$1
-
-# Line numbers change when derivation.nix docs are updated.
-sed -i "$testcaseBasename.err" \
-  -e 's/[0-9 ][0-9 ][0-9 ][0-9 ][0-9 ][0-9 ][0-9 ][0-9]\([^0-9]\)/<number>\1/g' \
-  -e 's/[0-9][0-9]*/<number>/g' \
-  ;

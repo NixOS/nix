@@ -1,5 +1,0 @@
-warning: relative path literal 'test/subdir' should be prefixed with '.' for clarity: './test/subdir' (lint-short-path-literals)
-         at /pwd/lang/eval-okay-short-path-literal-warn.nix:1:1:
-              1| test/subdir
-               | ^
-              2|

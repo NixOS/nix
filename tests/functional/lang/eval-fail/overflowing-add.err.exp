@@ -1,0 +1,6 @@
+error: integer overflow in adding 9223372036854775807 + 1
+       at /pwd/lang/eval-fail/overflowing-add.nix:5:5:
+            4| in
+            5| a + b
+             |     ^
+            6|

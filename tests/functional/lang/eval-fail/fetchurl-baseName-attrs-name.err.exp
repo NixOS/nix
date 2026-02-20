@@ -1,0 +1,8 @@
+error:
+       … while calling the 'fetchurl' builtin
+         at /pwd/lang/eval-fail/fetchurl-baseName-attrs-name.nix:1:1:
+            1| builtins.fetchurl {
+             | ^
+            2|   url = "https://example.com/foo.tar.gz";
+
+       error: invalid store path name when fetching URL 'https://example.com/foo.tar.gz': name '~wobble~' contains illegal character '~'. Please change the value for the 'name' attribute passed to 'fetchurl', so that it can create a valid store path.

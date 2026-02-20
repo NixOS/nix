@@ -1,5 +1,0 @@
-error: URL literals are disallowed. Consider using a string literal "http://example.com" instead (lint-url-literals)
-       at /pwd/lang/eval-fail-url-literal.nix:1:1:
-            1| http://example.com
-             | ^
-            2|

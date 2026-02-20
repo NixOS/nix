@@ -1,0 +1,9 @@
+error:
+       … while calling the 'sub' builtin
+         at /pwd/lang/eval-fail/overflowing-sub.nix:5:3:
+            4| in
+            5| a - b
+             |   ^
+            6|
+
+       error: integer overflow in subtracting -9223372036854775807 - 2

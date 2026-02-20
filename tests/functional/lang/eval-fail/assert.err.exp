@@ -1,0 +1,30 @@
+error:
+       … while evaluating the attribute 'body'
+         at /pwd/lang/eval-fail/assert.nix:7:3:
+            6|
+            7|   body = x "x";
+             |   ^
+            8| }
+
+       … from call site
+         at /pwd/lang/eval-fail/assert.nix:7:10:
+            6|
+            7|   body = x "x";
+             |          ^
+            8| }
+
+       … while calling 'x'
+         at /pwd/lang/eval-fail/assert.nix:3:5:
+            2|   x =
+            3|     arg:
+             |     ^
+            4|     assert arg == "y";
+
+       … while evaluating the condition of the assertion '(arg == "y")'
+         at /pwd/lang/eval-fail/assert.nix:4:5:
+            3|     arg:
+            4|     assert arg == "y";
+             |     ^
+            5|     123;
+
+       error: string '"x"' is not equal to string '"y"'

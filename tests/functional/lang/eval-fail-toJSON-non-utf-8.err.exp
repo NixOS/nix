@@ -1,8 +1,0 @@
-error:
-       â€¦ while calling the 'toJSON' builtin
-         at /pwd/lang/eval-fail-toJSON-non-utf-8.nix:1:1:
-            1| builtins.toJSON "_invalid UTF-8: ÿ_"
-             | ^
-            2|
-
-       error: JSON serialization error: [json.exception.type_error.316] invalid UTF-8 byte at index 16: 0xFF

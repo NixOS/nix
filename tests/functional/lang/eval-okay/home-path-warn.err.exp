@@ -1,0 +1,5 @@
+warning: home path literals are not portable. Consider replacing path literal '~/foo' by a string, relative path, or parameter (lint-absolute-path-literals)
+         at /pwd/lang/eval-okay/home-path-warn.nix:1:17:
+              1| builtins.isPath ~/foo
+               |                 ^
+              2|

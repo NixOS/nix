@@ -1,0 +1,22 @@
+error:
+       … while evaluating the condition of the assertion '({ ding = false; } == { ding = null; })'
+         at /pwd/lang/eval-fail/assert-equal-type-nested.nix:1:1:
+            1| assert { ding = false; } == { ding = null; };
+             | ^
+            2| abort "unreachable"
+
+       … while comparing attribute 'ding'
+
+       … where left hand side is
+         at /pwd/lang/eval-fail/assert-equal-type-nested.nix:1:10:
+            1| assert { ding = false; } == { ding = null; };
+             |          ^
+            2| abort "unreachable"
+
+       … where right hand side is
+         at /pwd/lang/eval-fail/assert-equal-type-nested.nix:1:31:
+            1| assert { ding = false; } == { ding = null; };
+             |                               ^
+            2| abort "unreachable"
+
+       error: a Boolean of value 'false' is not equal to null of value 'null'

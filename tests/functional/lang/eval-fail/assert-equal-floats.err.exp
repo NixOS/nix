@@ -1,0 +1,22 @@
+error:
+       … while evaluating the condition of the assertion '({ b = 1; } == { b = 1.01; })'
+         at /pwd/lang/eval-fail/assert-equal-floats.nix:1:1:
+            1| assert { b = 1.0; } == { b = 1.01; };
+             | ^
+            2| abort "unreachable"
+
+       … while comparing attribute 'b'
+
+       … where left hand side is
+         at /pwd/lang/eval-fail/assert-equal-floats.nix:1:10:
+            1| assert { b = 1.0; } == { b = 1.01; };
+             |          ^
+            2| abort "unreachable"
+
+       … where right hand side is
+         at /pwd/lang/eval-fail/assert-equal-floats.nix:1:26:
+            1| assert { b = 1.0; } == { b = 1.01; };
+             |                          ^
+            2| abort "unreachable"
+
+       error: a float with value '1' is not equal to a float with value '1.01'

@@ -603,6 +603,8 @@ int main(int argc, char ** argv)
     // libstdc++'s std::regex.
     // This used to be 64 MiB, but macOS as deployed on GitHub Actions has a
     // hard limit slightly under that, so we round it down a bit.
+    // On Windows the stack reserve is set to 60 MiB in the PE header via
+    // the linker flag in meson.build, since setrlimit does not exist there.
     nix::setStackSize(60 * 1024 * 1024);
 #endif
 

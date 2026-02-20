@@ -1,8 +1,0 @@
-error:
-       … while evaluating the condition of the assertion '(/pwd/lang/foo == /pwd/lang/bar)'
-         at /pwd/lang/eval-fail-assert-equal-paths.nix:1:1:
-            1| assert ./foo == ./bar;
-             | ^
-            2| throw "unreachable"
-
-       error: path '/pwd/lang/foo' is not equal to path '/pwd/lang/bar'

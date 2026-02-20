@@ -1,0 +1,9 @@
+error:
+       … while evaluating the condition of the assertion '((x: x) == (x: x))'
+         at /pwd/lang/eval-fail/assert-equal-function-direct.nix:3:1:
+            2| # This only compares a direct comparison and makes no claims about functions in nested structures.
+            3| assert (x: x) == (x: x);
+             | ^
+            4| abort "unreachable"
+
+       error: distinct functions and immediate comparisons of identical functions compare as unequal

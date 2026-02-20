@@ -1,15 +1,11 @@
-# Language tests - discovered via glob
+# Language tests - discovered via Python script (cross-platform)
 
 python = find_program('python3')
 lang_test_runner = files('test.py')
 
-# Meson doesn't have glob, so shell out to find test files
-# Only include formulaic tests (parse-fail-*, parse-okay-*, eval-fail-*, eval-okay-*)
 lang_test_files_result = run_command(
-  'sh',
-  '-c',
-  'cd "$1" && ls -1 parse-fail-*.nix parse-okay-*.nix eval-fail-*.nix eval-okay-*.nix 2>/dev/null | sed "s/\\.nix$//"',
-  '--',
+  python,
+  files('discover_tests.py'),
   meson.current_source_dir(),
   check : true,
 )

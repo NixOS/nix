@@ -1,0 +1,16 @@
+error:
+       … while evaluating the attribute 'relativePath'
+         at /pwd/lang/eval-fail/readDir-nonexistent-2.nix:2:3:
+            1| {
+            2|   relativePath = builtins.readDir ./this/path/really/should/not/exist;
+             |   ^
+            3| }
+
+       … while calling the 'readDir' builtin
+         at /pwd/lang/eval-fail/readDir-nonexistent-2.nix:2:18:
+            1| {
+            2|   relativePath = builtins.readDir ./this/path/really/should/not/exist;
+             |                  ^
+            3| }
+
+       error: path '/pwd/lang/eval-fail/this/path/really/should/not/exist' does not exist

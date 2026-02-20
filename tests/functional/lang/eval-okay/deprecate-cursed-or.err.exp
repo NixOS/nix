@@ -1,0 +1,12 @@
+warning: at /pwd/lang/eval-okay/deprecate-cursed-or.nix:3:47: This expression uses `or` as an identifier in a way that will change in a future Nix release.
+Wrap this entire expression in parentheses to preserve its current meaning:
+    ((x: x) or)
+Give feedback at https://github.com/NixOS/nix/pull/11121
+warning: at /pwd/lang/eval-okay/deprecate-cursed-or.nix:4:39: This expression uses `or` as an identifier in a way that will change in a future Nix release.
+Wrap this entire expression in parentheses to preserve its current meaning:
+    ((x: x + 1) or)
+Give feedback at https://github.com/NixOS/nix/pull/11121
+warning: at /pwd/lang/eval-okay/deprecate-cursed-or.nix:5:44: This expression uses `or` as an identifier in a way that will change in a future Nix release.
+Wrap this entire expression in parentheses to preserve its current meaning:
+    ((x: x) or)
+Give feedback at https://github.com/NixOS/nix/pull/11121

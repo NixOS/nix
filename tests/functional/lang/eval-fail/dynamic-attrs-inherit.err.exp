@@ -1,0 +1,6 @@
+error: dynamic attributes not allowed in inherit
+       at /pwd/lang/eval-fail/dynamic-attrs-inherit.nix:5:11:
+            4| {
+            5|   inherit ${"a" + ""};
+             |           ^
+            6| }

@@ -1,0 +1,28 @@
+error:
+       … while evaluating the attribute 'body'
+         at /pwd/lang/eval-fail/scope-5.nix:13:3:
+           12|
+           13|   body = f { };
+             |   ^
+           14|
+
+       … from call site
+         at /pwd/lang/eval-fail/scope-5.nix:13:10:
+           12|
+           13|   body = f { };
+             |          ^
+           14|
+
+       … while calling 'f'
+         at /pwd/lang/eval-fail/scope-5.nix:7:5:
+            6|   f =
+            7|     {
+             |     ^
+            8|       x ? y,
+
+       error: infinite recursion encountered
+       at /pwd/lang/eval-fail/scope-5.nix:8:11:
+            7|     {
+            8|       x ? y,
+             |           ^
+            9|       y ? x,

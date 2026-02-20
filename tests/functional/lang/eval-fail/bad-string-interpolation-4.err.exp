@@ -1,0 +1,9 @@
+error:
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail/bad-string-interpolation-4.nix:19:3:
+           18| # The error message should not be too long.
+           19| ''${pkgs}''
+             |   ^
+           20|
+
+       error: cannot coerce a set to a string: { a = { a = { a = { a = "ha"; b = "ha"; c = "ha"; d = "ha"; e = "ha"; f = "ha"; g = "ha"; h = "ha"; j = "ha"; }; «8 attributes elided» }; «8 attributes elided» }; «8 attributes elided» }

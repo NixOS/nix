@@ -1,0 +1,10 @@
+error:
+       … while calling the 'fetchTree' builtin
+         at /pwd/lang/eval-fail/fetchTree-relative-path.nix:1:1:
+            1| builtins.fetchTree "file:./relative-path.tar.gz"
+             | ^
+            2|
+
+       … while fetching the input 'file:./relative-path.tar.gz'
+
+       error: tarball 'file:./relative-path.tar.gz' must use an absolute path. The 'file' scheme does not support relative paths.

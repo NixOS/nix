@@ -1,0 +1,14 @@
+error:
+       … while evaluating the attribute 'set'
+         at /pwd/lang/eval-fail/dup-dynamic-attrs.nix:2:3:
+            1| {
+            2|   set = {
+             |   ^
+            3|     "${"" + "b"}" = 1;
+
+       error: dynamic attribute 'b' already defined at /pwd/lang/eval-fail/dup-dynamic-attrs.nix:3:5
+       at /pwd/lang/eval-fail/dup-dynamic-attrs.nix:6:5:
+            5|   set = {
+            6|     "${"b" + ""}" = 2;
+             |     ^
+            7|   };

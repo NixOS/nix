@@ -182,12 +182,20 @@ endif
 
 include_dirs = [ include_directories('.') ]
 
+# On Windows the stack size is fixed in the PE header (no setrlimit). The
+# evaluator and libstdc++ regex need a large stack, matching the 60 MiB
+# setStackSize call in main.cc that is skipped on Windows.
+nix_link_args = linker_export_flags
+if host_machine.system() == 'windows'
+  nix_link_args += [ '-Wl,--stack,62914560' ]
+endif
+
 this_exe = executable(
   meson.project_name(),
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args : linker_export_flags,
+  link_args : nix_link_args,
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )

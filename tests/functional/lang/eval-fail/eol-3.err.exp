@@ -1,0 +1,6 @@
+error: undefined variable 'invalid'
+       at /pwd/lang/eval-fail/eol-3.nix:2:1:
+            1| # foo
+            2| invalid
+             | ^
+            3| # bar

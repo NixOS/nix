@@ -1,0 +1,8 @@
+error:
+       … while evaluating the condition of the assertion '(1 == 1.1)'
+         at /pwd/lang/eval-fail/assert-equal-int-float.nix:1:1:
+            1| assert 1 == 1.1;
+             | ^
+            2| throw "unreachable"
+
+       error: an integer with value '1' is not equal to a float with value '1.1'

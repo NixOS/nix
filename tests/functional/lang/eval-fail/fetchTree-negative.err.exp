@@ -1,0 +1,8 @@
+error:
+       … while calling the 'fetchTree' builtin
+         at /pwd/lang/eval-fail/fetchTree-negative.nix:1:1:
+            1| builtins.fetchTree {
+             | ^
+            2|   type = "file";
+
+       error: negative value given for 'fetchTree' argument 'owner': -1

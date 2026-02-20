@@ -1,0 +1,30 @@
+error:
+       … while calling the 'deepSeq' builtin
+         at /pwd/lang/eval-fail/deepseq-stack-overflow.nix:8:1:
+            7| in
+            8| builtins.deepSeq reverseLinkedList (
+             | ^
+            9|   throw "unexpected success; expected a controlled stack overflow instead"
+
+       … while evaluating the attribute 'tail'
+         at /pwd/lang/eval-fail/deepseq-stack-overflow.nix:6:67:
+            5|   long = builtins.genList (x: x) 100000;
+            6|   reverseLinkedList = builtins.foldl' (tail: head: { inherit head tail; }) null long;
+             |                                                                   ^
+            7| in
+
+       (9997 duplicate frames omitted)
+
+       … while evaluating the attribute 'head'
+         at /pwd/lang/eval-fail/deepseq-stack-overflow.nix:6:62:
+            5|   long = builtins.genList (x: x) 100000;
+            6|   reverseLinkedList = builtins.foldl' (tail: head: { inherit head tail; }) null long;
+             |                                                              ^
+            7| in
+
+       error: stack overflow; max-call-depth exceeded
+       at /pwd/lang/eval-fail/deepseq-stack-overflow.nix:5:28:
+            4| let
+            5|   long = builtins.genList (x: x) 100000;
+             |                            ^
+            6|   reverseLinkedList = builtins.foldl' (tail: head: { inherit head tail; }) null long;

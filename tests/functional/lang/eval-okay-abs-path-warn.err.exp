@@ -1,5 +1,0 @@
-warning: absolute path literals are not portable. Consider replacing path literal '/tmp/foo' by a string, relative path, or parameter (lint-absolute-path-literals)
-         at /pwd/lang/eval-okay-abs-path-warn.nix:1:1:
-              1| /tmp/foo
-               | ^
-              2|

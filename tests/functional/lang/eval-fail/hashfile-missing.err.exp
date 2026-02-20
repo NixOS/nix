@@ -1,0 +1,13 @@
+error:
+       … while calling the 'toString' builtin
+         at /pwd/lang/eval-fail/hashfile-missing.nix:7:1:
+            6| in
+            7| toString (
+             | ^
+            8|   builtins.concatLists (
+
+       … while evaluating the first argument passed to builtins.toString
+
+       … while calling the 'hashFile' builtin
+
+       error: path '/pwd/lang/eval-fail/this-file-is-definitely-not-there-7392097' does not exist

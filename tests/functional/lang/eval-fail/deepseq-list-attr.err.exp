@@ -1,0 +1,25 @@
+error:
+       … while calling the 'deepSeq' builtin
+         at /pwd/lang/eval-fail/deepseq-list-attr.nix:3:1:
+            2|
+            3| builtins.deepSeq [
+             | ^
+            4|   1
+
+       … while evaluating list element at index 1
+
+       … while evaluating the attribute 'b'
+         at /pwd/lang/eval-fail/deepseq-list-attr.nix:7:5:
+            6|     a = 2;
+            7|     b = throw "error in attr in list element";
+             |     ^
+            8|   }
+
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail/deepseq-list-attr.nix:7:9:
+            6|     a = 2;
+            7|     b = throw "error in attr in list element";
+             |         ^
+            8|   }
+
+       error: error in attr in list element

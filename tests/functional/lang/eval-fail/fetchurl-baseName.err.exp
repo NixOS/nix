@@ -1,0 +1,8 @@
+error:
+       … while calling the 'fetchurl' builtin
+         at /pwd/lang/eval-fail/fetchurl-baseName.nix:1:1:
+            1| builtins.fetchurl "https://example.com/~wiggle~"
+             | ^
+            2|
+
+       error: invalid store path name when fetching URL 'https://example.com/~wiggle~': name '~wiggle~' contains illegal character '~'. Please pass an attribute set with 'url' and 'name' attributes to 'fetchurl',  so that it can create a valid store path.

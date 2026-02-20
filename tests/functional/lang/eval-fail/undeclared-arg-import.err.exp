@@ -1,0 +1,13 @@
+error:
+       … from call site
+         at /pwd/lang/eval-fail/undeclared-arg-import.nix:1:1:
+            1| import ../non-eval-trivial-lambda-formals.nix {
+             | ^
+            2|   a = "a";
+
+       error: function 'anonymous lambda' called with unexpected argument 'b'
+       at /pwd/lang/non-eval-trivial-lambda-formals.nix:1:1:
+            1| { a }: a
+             | ^
+            2|
+       Did you mean a?

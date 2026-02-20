@@ -11,10 +11,10 @@ src/.wraplock
 /tests/functional/nix-shell
 
 # /tests/functional/lang/
-/tests/functional/lang/*.out
-/tests/functional/lang/*.out.xml
-/tests/functional/lang/*.err
-/tests/functional/lang/*.ast
+/tests/functional/lang/**/*.out
+/tests/functional/lang/**/*.out.xml
+/tests/functional/lang/**/*.err
+/tests/functional/lang/**/*.ast
 
 /outputs
 

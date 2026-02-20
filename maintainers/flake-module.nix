@@ -67,39 +67,39 @@
               ''^tests/functional/lang/parse-.*\.nix$''
 
               # Formatting-sensitive
-              ''^tests/functional/lang/eval-okay-curpos\.nix$''
+              ''^tests/functional/lang/eval-okay/curpos\.nix$''
               ''^tests/functional/lang/.*comment.*\.nix$''
               ''^tests/functional/lang/.*newline.*\.nix$''
               ''^tests/functional/lang/.*eol.*\.nix$''
 
               # Syntax tests
               ''^tests/functional/shell.shebang\.nix$''
-              ''^tests/functional/lang/eval-okay-ind-string\.nix$''
+              ''^tests/functional/lang/eval-okay/ind-string\.nix$''
 
               # Not supported by nixfmt
-              ''^tests/functional/lang/eval-okay-deprecate-cursed-or\.nix$''
-              ''^tests/functional/lang/eval-okay-attrs5\.nix$''
-              ''^tests/functional/lang/eval-fail-dynamic-attrs-inherit\.nix$''
-              ''^tests/functional/lang/eval-fail-dynamic-attrs-inherit-2\.nix$''
+              ''^tests/functional/lang/eval-okay/deprecate-cursed-or\.nix$''
+              ''^tests/functional/lang/eval-okay/attrs5\.nix$''
+              ''^tests/functional/lang/eval-fail/dynamic-attrs-inherit\.nix$''
+              ''^tests/functional/lang/eval-fail/dynamic-attrs-inherit-2\.nix$''
 
               # More syntax tests
               # These tests, or parts of them, should have been parse-* test cases.
-              ''^tests/functional/lang/eval-fail-eol-2\.nix$''
-              ''^tests/functional/lang/eval-fail-path-slash\.nix$''
-              ''^tests/functional/lang/eval-fail-toJSON-non-utf-8\.nix$''
-              ''^tests/functional/lang/eval-fail-set\.nix$''
+              ''^tests/functional/lang/eval-fail/eol-2\.nix$''
+              ''^tests/functional/lang/eval-fail/path-slash\.nix$''
+              ''^tests/functional/lang/eval-fail/toJSON-non-utf-8\.nix$''
+              ''^tests/functional/lang/eval-fail/set\.nix$''
 
               # Language tests, don't churn the formatting of strings
-              ''^tests/functional/lang/eval-fail-fromTOML-overflow\.nix$''
-              ''^tests/functional/lang/eval-fail-fromTOML-underflow\.nix$''
-              ''^tests/functional/lang/eval-fail-bad-string-interpolation-3\.nix$''
-              ''^tests/functional/lang/eval-fail-bad-string-interpolation-4\.nix$''
-              ''^tests/functional/lang/eval-okay-regex-match2\.nix$''
+              ''^tests/functional/lang/eval-fail/fromTOML-overflow\.nix$''
+              ''^tests/functional/lang/eval-fail/fromTOML-underflow\.nix$''
+              ''^tests/functional/lang/eval-fail/bad-string-interpolation-3\.nix$''
+              ''^tests/functional/lang/eval-fail/bad-string-interpolation-4\.nix$''
+              ''^tests/functional/lang/eval-okay/regex-match2\.nix$''
 
               # URL literal tests - nixfmt converts unquoted URLs to strings
-              ''^tests/functional/lang/eval-fail-url-literal\.nix$''
-              ''^tests/functional/lang/eval-okay-url-literal-warn\.nix$''
-              ''^tests/functional/lang/eval-okay-url-literal-default\.nix$''
+              ''^tests/functional/lang/eval-fail/url-literal\.nix$''
+              ''^tests/functional/lang/eval-okay/url-literal-warn\.nix$''
+              ''^tests/functional/lang/eval-okay/url-literal-default\.nix$''
             ];
           };
           clang-format = {

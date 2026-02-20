@@ -48,7 +48,7 @@ with import ./config.nix;
   };
 
   fetchurl = import <nix/fetchurl.nix> {
-    url = "file://" + toString ./lang/eval-okay-xml.exp.xml;
+    url = "file://" + toString ./lang/eval-okay/xml.exp.xml;
     sha256 = "sha256-behBlX+DQK/Pjvkuc8Tx68Jwi4E5v86wDq+ZLaHyhQE=";
   };
 }
