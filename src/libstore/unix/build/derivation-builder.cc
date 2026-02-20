@@ -1269,7 +1269,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
         openat(tmpDirFd.get(), name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
-    writeFile(fd, path, contents);
+    writeFile(fd.get(), contents);
     chownToBuilder(fd.get(), path);
 }
 
