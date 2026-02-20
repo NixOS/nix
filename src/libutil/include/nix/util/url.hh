@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <ranges>
 #include <span>
 
@@ -265,7 +266,13 @@ std::string percentEncode(std::string_view s, std::string_view keep = "");
  * paths have no escape sequences --- file names cannot contain a
  * `/`.
  */
-Path renderUrlPathEnsureLegal(const std::vector<std::string> & urlPath);
+Path renderUrlPathEnsureLegal(std::span<const std::string> urlPath);
+
+/**
+ * Render URL path segments to a string by joining with `/`.
+ * Does not percent-encode the segments.
+ */
+std::string renderUrlPathNoPctEncoding(std::span<const std::string> urlPath);
 
 /**
  * Percent encode path. `%2F` for "interior slashes" is the most
@@ -346,6 +353,22 @@ ParsedURL fixGitURL(std::string url);
  * Does not check whether the scheme is understood, as that's context-dependent.
  */
 bool isValidSchemeName(std::string_view scheme);
+
+/**
+ * Convert a filesystem path to a URL path vector.
+ *
+ * On Windows, converts backslashes to forward slashes and prepends a `/`
+ * before the drive letter (e.g., `C:\foo\bar` becomes `/C:/foo/bar`).
+ */
+std::vector<std::string> pathToUrlPath(const std::filesystem::path & path);
+
+/**
+ * Convert a URL path vector to a native filesystem path.
+ *
+ * On Windows, strips the leading `/` before the drive letter and converts
+ * to native format (e.g., `/C:/foo/bar` becomes `C:\foo\bar`).
+ */
+std::filesystem::path urlPathToPath(std::span<const std::string> urlPath);
 
 /**
  * Either a ParsedURL or a verbatim string. This is necessary because in certain cases URI must be passed

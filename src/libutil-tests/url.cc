@@ -956,4 +956,108 @@ TEST(nix, isValidSchemeName)
     ASSERT_FALSE(isValidSchemeName("http "));
 }
 
+/* ----------------------------------------------------------------------------
+ * pathToUrlPath / urlPathToPath
+ * --------------------------------------------------------------------------*/
+
+struct UrlPathTestCase
+{
+    std::string_view urlString;
+    ParsedURL urlParsed;
+    std::filesystem::path path;
+    std::string description;
+};
+
+class UrlPathTest : public ::testing::TestWithParam<UrlPathTestCase>
+{};
+
+TEST_P(UrlPathTest, pathToUrlPath)
+{
+    const auto & testCase = GetParam();
+    auto urlPath = pathToUrlPath(testCase.path);
+    EXPECT_EQ(urlPath, testCase.urlParsed.path);
+}
+
+TEST_P(UrlPathTest, urlPathToPath)
+{
+    const auto & testCase = GetParam();
+    auto path = urlPathToPath(testCase.urlParsed.path);
+    EXPECT_EQ(path, testCase.path);
+}
+
+TEST_P(UrlPathTest, urlToString)
+{
+    const auto & testCase = GetParam();
+    EXPECT_EQ(testCase.urlParsed.to_string(), testCase.urlString);
+}
+
+TEST_P(UrlPathTest, stringToUrl)
+{
+    const auto & testCase = GetParam();
+    auto parsed = parseURL(std::string{testCase.urlString});
+    EXPECT_EQ(parsed, testCase.urlParsed);
+}
+
+#ifndef _WIN32
+
+INSTANTIATE_TEST_SUITE_P(
+    Unix,
+    UrlPathTest,
+    ::testing::Values(
+        UrlPathTestCase{
+            .urlString = "file:///foo/bar/baz",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "foo", "bar", "baz"},
+                },
+            .path = "/foo/bar/baz",
+            .description = "absolute_path",
+        },
+        UrlPathTestCase{
+            .urlString = "file:///",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", ""},
+                },
+            .path = "/",
+            .description = "root_path",
+        }),
+    [](const auto & info) { return info.param.description; });
+
+#else // _WIN32
+
+INSTANTIATE_TEST_SUITE_P(
+    Windows,
+    UrlPathTest,
+    ::testing::Values(
+        UrlPathTestCase{
+            .urlString = "file:///C:/foo/bar/baz",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "foo", "bar", "baz"},
+                },
+            .path = L"C:\\foo\\bar\\baz",
+            .description = "absolute_path",
+        },
+        UrlPathTestCase{
+            .urlString = "file:///C:/",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", ""},
+                },
+            .path = L"C:\\",
+            .description = "drive_root",
+        }),
+    [](const auto & info) { return info.param.description; });
+
+#endif // _WIN32
+
 } // namespace nix
