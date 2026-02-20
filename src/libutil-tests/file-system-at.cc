@@ -45,7 +45,7 @@ TEST(readLinkAt, works)
         sink.createDirectory(CanonPath("dir"));
     }
 
-    AutoCloseFD dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir);
 
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
@@ -54,7 +54,7 @@ TEST(readLinkAt, works)
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
-    AutoCloseFD subDirFd = openDirectory(tmpDir / "a");
+    auto subDirFd = openDirectory(tmpDir / "a");
     EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
@@ -107,7 +107,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             SymlinkNotAllowed);
     }
 
-    AutoCloseFD dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir);
 
     // Helper to open files with platform-specific arguments
     auto openRead = [&](std::string_view path) -> AutoCloseFD {

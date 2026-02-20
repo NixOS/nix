@@ -39,7 +39,7 @@ TEST(fchmodatTryNoFollow, works)
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
     ASSERT_NO_THROW(chmod(tmpDir / "dir", 0755));
 
-    AutoCloseFD dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir);
     ASSERT_TRUE(dirFd);
 
     struct ::stat st;
@@ -104,7 +104,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
             if (mount("tmpfs", "/proc", "tmpfs", 0, 0) == -1)
                 _exit(1);
 
-            AutoCloseFD dirFd = openDirectory(tmpDir);
+            auto dirFd = openDirectory(tmpDir);
             if (!dirFd)
                 exit(1);
 

@@ -23,17 +23,17 @@
 
 namespace nix {
 
-Descriptor openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path)
 {
-    return open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    return AutoCloseFD{open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
 }
 
-Descriptor openFileReadonly(const std::filesystem::path & path)
+AutoCloseFD openFileReadonly(const std::filesystem::path & path)
 {
-    return open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    return AutoCloseFD{open(path.c_str(), O_RDONLY | O_CLOEXEC)};
 }
 
-Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
+AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
 {
     auto flags = O_WRONLY | O_CREAT | O_CLOEXEC;
     if (params.truncateExisting) {
@@ -43,7 +43,7 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
     } else {
         flags |= O_EXCL; /* O_CREAT | O_EXCL already ensures that symlinks are not followed. */
     }
-    return open(path.c_str(), flags, mode);
+    return AutoCloseFD{open(path.c_str(), flags, mode)};
 }
 
 std::filesystem::path descriptorToPath(Descriptor fd)

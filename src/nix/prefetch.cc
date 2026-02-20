@@ -112,7 +112,7 @@ std::tuple<StorePath, Hash> prefetchFile(
             if (executable)
                 mode = 0700;
 
-            AutoCloseFD fd = openNewFileForWrite(tmpFile, mode, {.truncateExisting = false});
+            auto fd = openNewFileForWrite(tmpFile, mode, {.truncateExisting = false});
             if (!fd)
                 throw SysError("creating temporary file %s", PathFmt(tmpFile));
 

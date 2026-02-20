@@ -45,7 +45,7 @@ static void readChannels()
 // Writes the list of channels.
 static void writeChannels()
 {
-    AutoCloseFD channelsFD = openNewFileForWrite(
+    auto channelsFD = openNewFileForWrite(
         channelsList,
         0644,
         {

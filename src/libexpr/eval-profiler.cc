@@ -137,7 +137,7 @@ public:
         : state(state)
         , sampleInterval(period)
         , profileFd([&]() {
-            AutoCloseFD fd = openNewFileForWrite(
+            auto fd = openNewFileForWrite(
                 profileFile,
                 0660,
                 {

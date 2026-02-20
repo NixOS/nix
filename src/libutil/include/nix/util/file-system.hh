@@ -168,14 +168,14 @@ std::filesystem::path descriptorToPath(Descriptor fd);
 /**
  * Open a `Descriptor` with read-only access to the given directory.
  */
-Descriptor openDirectory(const std::filesystem::path & path);
+AutoCloseFD openDirectory(const std::filesystem::path & path);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.
  *
  * @note For directories use @ref openDirectory.
  */
-Descriptor openFileReadonly(const std::filesystem::path & path);
+AutoCloseFD openFileReadonly(const std::filesystem::path & path);
 
 struct OpenNewFileForWriteParams
 {
@@ -198,7 +198,7 @@ struct OpenNewFileForWriteParams
  *
  * @todo Reparse points on Windows.
  */
-Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params);
+AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params);
 
 /**
  * Read the contents of a file into a string.

@@ -153,7 +153,7 @@ ref<NarAccessor> makeLazyNarAccessor(NarListing listing, GetNarBytes getNarBytes
 
 GetNarBytes seekableGetNarBytes(const std::filesystem::path & path)
 {
-    AutoCloseFD fd = openFileReadonly(path);
+    auto fd = openFileReadonly(path);
     if (!fd)
         throw NativeSysError("opening NAR cache file %s", PathFmt(path));
 

@@ -23,41 +23,41 @@ void setWriteTime(
     warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
-Descriptor openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path)
 {
-    return CreateFileW(
+    return AutoCloseFD{CreateFileW(
         path.c_str(),
         GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
         FILE_FLAG_BACKUP_SEMANTICS,
-        /*hTemplateFile=*/nullptr);
+        /*hTemplateFile=*/nullptr)};
 }
 
-Descriptor openFileReadonly(const std::filesystem::path & path)
+AutoCloseFD openFileReadonly(const std::filesystem::path & path)
 {
-    return CreateFileW(
+    return AutoCloseFD{CreateFileW(
         path.c_str(),
         GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL,
-        /*hTemplateFile=*/nullptr);
+        /*hTemplateFile=*/nullptr)};
 }
 
-Descriptor
+AutoCloseFD
 openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t mode, OpenNewFileForWriteParams params)
 {
-    return CreateFileW(
+    return AutoCloseFD{CreateFileW(
         path.c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */
         FILE_ATTRIBUTE_NORMAL,
-        /*hTemplateFile=*/nullptr);
+        /*hTemplateFile=*/nullptr)};
 }
 
 std::filesystem::path defaultTempDir()
