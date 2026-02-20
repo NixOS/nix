@@ -20,6 +20,9 @@ Worker::Worker(Store & store, Store & evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
+#ifdef _WIN32
+    , ioport{CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)}
+#endif
     , store(store)
     , evalStore(evalStore)
     , settings(nix::settings.getWorkerSettings())
@@ -27,6 +30,10 @@ Worker::Worker(Store & store, Store & evalStore)
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
 {
+#ifdef _WIN32
+    if (!ioport)
+        throw windows::WinError("CreateIoCompletionPort");
+#endif
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
