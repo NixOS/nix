@@ -148,4 +148,10 @@ off_t lseek(HANDLE h, off_t offset, int whence)
     return newPos.QuadPart;
 }
 
+void syncDescriptor(Descriptor fd)
+{
+    if (!::FlushFileBuffers(fd))
+        throw WinError("FlushFileBuffers file descriptor %1%", fd);
+}
+
 } // namespace nix

@@ -207,4 +207,17 @@ void unix::closeOnExec(int fd)
         throw SysError("setting close-on-exec flag");
 }
 
+void syncDescriptor(Descriptor fd)
+{
+    int result =
+#if defined(__APPLE__)
+        ::fcntl(fd, F_FULLFSYNC)
+#else
+        ::fsync(fd)
+#endif
+        ;
+    if (result == -1)
+        throw NativeSysError("fsync file descriptor %1%", fd);
+}
+
 } // namespace nix
