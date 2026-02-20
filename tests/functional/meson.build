@@ -221,6 +221,7 @@ subdir('dyn-drv')
 subdir('flakes')
 subdir('git')
 subdir('git-hashing')
+subdir('lang')
 subdir('local-overlay-store')
 
 foreach suite : suites
