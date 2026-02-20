@@ -116,7 +116,8 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     LinuxChrootDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderParams{std::move(params)}
+        : DerivationBuilder{params.inputPaths}
+        , DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
@@ -142,23 +143,6 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }
     }
 
-    const StorePathSet & originalPaths() override
-    {
-        return inputPaths;
-    }
-
-    bool isAllowed(const StorePath & path) override
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    bool isAllowed(const DrvOutput & id) override
-    {
-        return addedDrvOutputs.count(id);
-    }
-
-    friend struct RestrictedStore;
-
     uid_t sandboxUid()
     {
         return usingUserNamespace ? (!buildUser || buildUser->getUIDCount() == 1 ? 1000 : 0) : buildUser->getUID();
@@ -176,7 +160,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void addDependencyImpl(const StorePath & path) override
     {
-        addedPaths.insert(path);
+        RestrictionContext::addDependencyImpl(path);
 
         debug("materialising '%s' in the sandbox", store.printStorePath(path));
 
@@ -355,7 +339,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         for (auto & i : inputPaths) {
             auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -388,7 +372,9 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
             assert(!chrootRootDir.empty());
             auto lines = runProgram(
-                localSettings.preBuildHook, false, Strings({store.printStorePath(drvPath), chrootRootDir.native()}));
+                localSettings.preBuildHook.get(),
+                false,
+                Strings({store.printStorePath(drvPath), chrootRootDir.native()}));
             nix::parsePreBuildHook(pathsInChroot, lines);
         }
 
@@ -401,7 +387,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            daemon.start(store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(), buildUser.get());
+            daemon.start(store, *this, env, tmpDir, tmpDirInSandbox(), buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -827,8 +813,8 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             scratchOutputs,
             buildUser.get(),
             tmpDir,
-            [this](const std::string & p) -> std::filesystem::path {
-                return chrootRootDir / std::filesystem::path(p).relative_path();
+            [this](const std::filesystem::path & p) -> std::filesystem::path {
+                return chrootRootDir / p.relative_path();
             });
 
         cleanupBuild(true);

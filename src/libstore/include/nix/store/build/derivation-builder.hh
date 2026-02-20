@@ -137,7 +137,11 @@ struct DerivationBuilderCallbacks
  */
 struct DerivationBuilder : RestrictionContext
 {
-    DerivationBuilder() = default;
+    explicit DerivationBuilder(const StorePathSet & inputPaths)
+        : RestrictionContext(inputPaths)
+    {
+    }
+
     virtual ~DerivationBuilder() = default;
 
     /**

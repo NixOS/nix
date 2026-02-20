@@ -50,7 +50,8 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     LinuxDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderParams{std::move(params)}
+        : DerivationBuilder{params.inputPaths}
+        , DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{drv.type()}
@@ -76,32 +77,10 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }
     }
 
-    const StorePathSet & originalPaths() override
-    {
-        return inputPaths;
-    }
-
-    bool isAllowed(const StorePath & path) override
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    bool isAllowed(const DrvOutput & id) override
-    {
-        return addedDrvOutputs.count(id);
-    }
-
-    friend struct RestrictedStore;
-
     std::filesystem::path tmpDirInSandbox()
     {
         assert(!topTmpDir.empty());
         return topTmpDir;
-    }
-
-    void addDependencyImpl(const StorePath & path) override
-    {
-        addedPaths.insert(path);
     }
 
     void killSandbox(bool getStats)
@@ -183,7 +162,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 PathFmt(homeDir));
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            daemon.start(store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(), buildUser.get());
+            daemon.start(store, *this, env, tmpDir, tmpDirInSandbox(), buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -297,7 +276,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             scratchOutputs,
             buildUser.get(),
             tmpDir,
-            [this](const std::string & p) { return store.toRealPath(p); });
+            [this](const std::filesystem::path & p) { return store.toRealPath(store.parseStorePath(p.native())); });
 
         cleanupBuild(true);
 
