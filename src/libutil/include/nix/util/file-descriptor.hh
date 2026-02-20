@@ -65,7 +65,7 @@ std::string readFile(Descriptor fd);
  * Platform-specific read into a buffer.
  *
  * Thin wrapper around ::read (Unix) or ReadFile (Windows).
- * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ * Handles EINTR on Unix. Treats ERROR_BROKEN_PIPE as EOF on Windows.
  *
  * @param fd The file descriptor to read from
  * @param buffer The buffer to read into
@@ -73,6 +73,19 @@ std::string readFile(Descriptor fd);
  * @throws SystemError on failure
  */
 size_t read(Descriptor fd, std::span<std::byte> buffer);
+
+/**
+ * Platform-specific write from a buffer.
+ *
+ * Thin wrapper around ::write (Unix) or WriteFile (Windows).
+ * Handles EINTR on Unix.
+ *
+ * @param fd The file descriptor to write to
+ * @param buffer The buffer to write from
+ * @return The number of bytes actually written
+ * @throws SystemError on failure
+ */
+size_t write(Descriptor fd, std::span<const std::byte> buffer);
 
 /**
  * Get the size of a file.

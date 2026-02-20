@@ -190,24 +190,7 @@ bool BufferedSource::hasData()
 
 size_t FdSource::readUnbuffered(char * data, size_t len)
 {
-#ifdef _WIN32
-    DWORD n;
-    checkInterrupt();
-    if (!::ReadFile(fd, data, len, &n, NULL)) {
-        _good = false;
-        throw windows::WinError("ReadFile when FdSource::readUnbuffered");
-    }
-#else
-    ssize_t n;
-    do {
-        checkInterrupt();
-        n = ::read(fd, data, len);
-    } while (n == -1 && errno == EINTR);
-    if (n == -1) {
-        _good = false;
-        throw SysError("reading from file");
-    }
-#endif
+    auto n = nix::read(fd, {reinterpret_cast<std::byte *>(data), len});
     if (n == 0) {
         _good = false;
         throw EndOfFile(std::string(*endOfFileError));

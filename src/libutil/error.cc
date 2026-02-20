@@ -422,13 +422,20 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
  */
 static void writeErr(std::string_view buf)
 {
+    Descriptor fd = getStandardError();
     while (!buf.empty()) {
-        auto n = write(STDERR_FILENO, buf.data(), buf.size());
+#ifdef _WIN32
+        DWORD n;
+        if (!WriteFile(fd, buf.data(), buf.size(), &n, NULL))
+            abort();
+#else
+        auto n = ::write(fd, buf.data(), buf.size());
         if (n < 0) {
             if (errno == EINTR)
                 continue;
             abort();
         }
+#endif
         buf = buf.substr(n);
     }
 }

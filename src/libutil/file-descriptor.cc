@@ -8,9 +8,101 @@
 #ifdef _WIN32
 #  include <winnt.h>
 #  include <fileapi.h>
+#else
+#  include <poll.h>
 #endif
 
 namespace nix {
+
+namespace {
+
+enum class PollDirection { In, Out };
+
+/**
+ * Retry an I/O operation if it fails with EAGAIN/EWOULDBLOCK.
+ *
+ * On Unix, polls the fd and retries. On Windows, just calls `f` once.
+ *
+ * This retry logic is needed to handle non-blocking reads/writes. This
+ * is needed in the buildhook, because somehow the json logger file
+ * descriptor ends up being non-blocking and breaks remote-building.
+ *
+ * @todo Get rid of buildhook and remove this logic again
+ * (https://github.com/NixOS/nix/issues/12688)
+ */
+template<typename F>
+auto retryOnBlock([[maybe_unused]] Descriptor fd, [[maybe_unused]] PollDirection dir, F && f) -> decltype(f())
+{
+#ifndef _WIN32
+    while (true) {
+        try {
+            return std::forward<F>(f)();
+        } catch (SystemError & e) {
+            if (e.is(std::errc::resource_unavailable_try_again) || e.is(std::errc::operation_would_block)) {
+                struct pollfd pfd;
+                pfd.fd = fd;
+                pfd.events = dir == PollDirection::In ? POLLIN : POLLOUT;
+                if (poll(&pfd, 1, -1) == -1)
+                    throw SysError("poll on file descriptor failed");
+                continue;
+            }
+            throw;
+        }
+    }
+#else
+    return std::forward<F>(f)();
+#endif
+}
+
+} // namespace
+
+void readFull(Descriptor fd, char * buf, size_t count)
+{
+    while (count) {
+        checkInterrupt();
+        auto res = retryOnBlock(
+            fd, PollDirection::In, [&]() { return read(fd, {reinterpret_cast<std::byte *>(buf), count}); });
+        if (res == 0)
+            throw EndOfFile("unexpected end-of-file");
+        count -= res;
+        buf += res;
+    }
+}
+
+std::string readLine(Descriptor fd, bool eofOk, char terminator)
+{
+    std::string s;
+    while (1) {
+        checkInterrupt();
+        char ch;
+        // FIXME: inefficient
+        auto rd =
+            retryOnBlock(fd, PollDirection::In, [&]() { return read(fd, {reinterpret_cast<std::byte *>(&ch), 1}); });
+        if (rd == 0) {
+            if (eofOk)
+                return s;
+            else
+                throw EndOfFile("unexpected EOF reading a line");
+        } else {
+            if (ch == terminator)
+                return s;
+            s += ch;
+        }
+    }
+}
+
+void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts)
+{
+    while (!s.empty()) {
+        if (allowInterrupts)
+            checkInterrupt();
+        auto res = retryOnBlock(fd, PollDirection::Out, [&]() {
+            return write(fd, {reinterpret_cast<const std::byte *>(s.data()), s.size()});
+        });
+        if (res > 0)
+            s.remove_prefix(res);
+    }
+}
 
 void writeLine(Descriptor fd, std::string s)
 {
@@ -67,8 +159,6 @@ void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts)
                 && (e.is(std::errc::resource_unavailable_try_again) || e.is(std::errc::operation_would_block)))
                 break;
 #endif
-            if (e.is(std::errc::interrupted))
-                continue;
             throw;
         }
 
@@ -105,18 +195,8 @@ void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
     std::array<std::byte, 64 * 1024> buf;
 
     while (left) {
-        checkInterrupt();
         auto limit = std::min<size_t>(left, buf.size());
-        /* Should be initialized before we read, because the `catch`
-           block either throws or continues. */
-        size_t n;
-        try {
-            n = readOffset(fd, offset, std::span(buf.data(), limit));
-        } catch (SystemError & e) {
-            if (e.is(std::errc::interrupted))
-                continue;
-            throw;
-        }
+        auto n = readOffset(fd, offset, std::span(buf.data(), limit));
         if (n == 0)
             throw EndOfFile("unexpected end-of-file");
         assert(n <= left);
