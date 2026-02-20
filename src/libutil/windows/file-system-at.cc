@@ -29,7 +29,7 @@ namespace {
  * @param createDisposition FILE_OPEN, FILE_CREATE, etc.
  * @return Handle to the opened file/directory (caller must close)
  */
-HANDLE ntOpenAt(
+AutoCloseFD ntOpenAt(
     Descriptor dirFd,
     std::wstring_view pathComponent,
     ACCESS_MASK desiredAccess,
@@ -73,7 +73,7 @@ HANDLE ntOpenAt(
         throw WinError(
             RtlNtStatusToDosError(status), "opening %s relative to directory handle", PathFmt(pathComponent));
 
-    return h;
+    return AutoCloseFD{h};
 }
 
 /**
@@ -81,9 +81,9 @@ HANDLE ntOpenAt(
  *
  * @param dirFd Directory handle to open relative to
  * @param path Relative path to the symlink
- * @return Handle to the symlink (caller must close)
+ * @return Handle to the symlink
  */
-HANDLE openSymlinkAt(Descriptor dirFd, const CanonPath & path)
+AutoCloseFD openSymlinkAt(Descriptor dirFd, const CanonPath & path)
 {
     assert(!path.isRoot());
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
@@ -210,7 +210,7 @@ bool isReparsePoint(HANDLE handle)
 
 } // namespace windows
 
-Descriptor openFileEnsureBeneathNoSymlinks(
+AutoCloseFD openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
 {
     assert(!path.isRoot());
@@ -233,9 +233,8 @@ Descriptor openFileEnsureBeneathNoSymlinks(
     /* Helper to check if a component is a symlink and throw SymlinkNotAllowed if so */
     auto throwIfSymlink = [&](std::wstring_view component, const CanonPath & pathForError) {
         try {
-            auto testFd =
+            auto testHandle =
                 ntOpenAt(getParentFd(), component, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
-            AutoCloseFD testHandle(testFd);
             if (isReparsePoint(testHandle.get()))
                 throw SymlinkNotAllowed(pathForError);
         } catch (SymlinkNotAllowed &) {
@@ -278,7 +277,7 @@ Descriptor openFileEnsureBeneathNoSymlinks(
     /* Now open the final component with requested flags */
     std::wstring finalComponent = string_to_os_string(std::string(path.baseName().value()));
 
-    HANDLE finalHandle;
+    AutoCloseFD finalHandle;
     try {
         finalHandle = ntOpenAt(
             getParentFd(),
@@ -295,7 +294,7 @@ Descriptor openFileEnsureBeneathNoSymlinks(
     }
 
     /* Final check: did we accidentally open a symlink? */
-    if (isReparsePoint(finalHandle))
+    if (isReparsePoint(finalHandle.get()))
         throw SymlinkNotAllowed(path);
 
     return finalHandle;

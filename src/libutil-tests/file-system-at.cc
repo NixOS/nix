@@ -104,7 +104,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     AutoCloseFD dirFd = openDirectory(tmpDir);
 
     // Helper to open files with platform-specific arguments
-    auto openRead = [&](std::string_view path) -> Descriptor {
+    auto openRead = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
             CanonPath(path),
@@ -118,7 +118,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         );
     };
 
-    auto openReadDir = [&](std::string_view path) -> Descriptor {
+    auto openReadDir = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
             CanonPath(path),
@@ -132,7 +132,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
         );
     };
 
-    auto openCreateExclusive = [&](std::string_view path) -> Descriptor {
+    auto openCreateExclusive = [&](std::string_view path) -> AutoCloseFD {
         return openFileEnsureBeneathNoSymlinks(
             dirFd.get(),
             CanonPath(path),
@@ -158,19 +158,19 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
 
 #if !defined(_WIN32) && !defined(__CYGWIN__)
     // This returns ELOOP on cygwin when O_NOFOLLOW is used
-    EXPECT_EQ(openCreateExclusive("a/broken_symlink"), INVALID_DESCRIPTOR);
+    EXPECT_FALSE(openCreateExclusive("a/broken_symlink"));
     /* Sanity check, no symlink shenanigans and behaves the same as regular openat with O_EXCL | O_CREAT. */
     EXPECT_EQ(errno, EEXIST);
 #endif
     EXPECT_THROW(openCreateExclusive("a/absolute_symlink/broken_symlink"), SymlinkNotAllowed);
 
     // Test invalid paths
-    EXPECT_EQ(openRead("c/d/regular/a"), INVALID_DESCRIPTOR);
-    EXPECT_EQ(openReadDir("c/d/regular"), INVALID_DESCRIPTOR);
+    EXPECT_FALSE(openRead("c/d/regular/a"));
+    EXPECT_FALSE(openReadDir("c/d/regular"));
 
     // Test valid paths work
-    EXPECT_TRUE(AutoCloseFD{openRead("c/d/regular")});
-    EXPECT_TRUE(AutoCloseFD{openCreateExclusive("a/regular")});
+    EXPECT_TRUE(openRead("c/d/regular"));
+    EXPECT_TRUE(openCreateExclusive("a/regular"));
 }
 
 } // namespace nix

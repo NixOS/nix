@@ -136,7 +136,7 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
     }
 }
 
-static Descriptor
+static AutoCloseFD
 openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
 {
     AutoCloseFD parentFd;
@@ -179,19 +179,19 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
                 throw SymlinkNotAllowed(path2);
             }
 
-            return INVALID_DESCRIPTOR;
+            return AutoCloseFD{};
         }
 
         parentFd = std::move(parentFd2);
     }
 
-    auto res = ::openat(getParentFd(), std::string(path.baseName().value()).c_str(), flags | O_NOFOLLOW, mode);
-    if (res < 0 && errno == ELOOP)
+    AutoCloseFD res = ::openat(getParentFd(), std::string(path.baseName().value()).c_str(), flags | O_NOFOLLOW, mode);
+    if (!res && errno == ELOOP)
         throw SymlinkNotAllowed(path);
     return res;
 }
 
-Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+AutoCloseFD openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
 {
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
     assert(!path.isRoot());
@@ -201,7 +201,7 @@ Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & p
     if (maybeFd) {
         if (*maybeFd < 0 && errno == ELOOP)
             throw SymlinkNotAllowed(path);
-        return *maybeFd;
+        return AutoCloseFD{*maybeFd};
     }
 #endif
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
