@@ -191,6 +191,9 @@ public:
 
 TEST_F(PureEvalTest, pathExists)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Unix paths not valid on Windows";
+#endif
     ASSERT_THAT(eval("builtins.pathExists /."), IsFalse());
     ASSERT_THAT(eval("builtins.pathExists /nix"), IsFalse());
     ASSERT_THAT(eval("builtins.pathExists /nix/store"), IsFalse());

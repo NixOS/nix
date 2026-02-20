@@ -17,6 +17,9 @@ namespace nix {
 
 TEST(parseFlakeRef, path)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Unix absolute paths not valid on Windows";
+#endif
     experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
 
     fetchers::Settings fetchSettings;
