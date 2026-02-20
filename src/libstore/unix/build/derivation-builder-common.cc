@@ -45,6 +45,8 @@
 
 namespace nix {
 
+const std::filesystem::path homeDir = "/homeless-shelter";
+
 void handleDiffHook(
     const Path & diffHook,
     uid_t uid,
@@ -163,11 +165,11 @@ SingleDrvOutputs registerOutputs(
     const DerivationBuilderParams & params,
     const StorePathSet & addedPaths,
     const std::map<std::string, StorePath> & scratchOutputs,
-    StringMap & outputRewrites,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
     std::function<std::filesystem::path(const std::string &)> realPathInHost)
 {
+    StringMap outputRewrites;
     auto & drv = params.drv;
     auto & drvPath = params.drvPath;
     auto & drvOptions = params.drvOptions;
@@ -665,9 +667,7 @@ void writeBuilderFile(
     chownToBuilder(buildUser, fd.get(), path);
 }
 
-void initEnv(
-    StringMap & env,
-    const std::filesystem::path & homeDir,
+StringMap initEnv(
     const std::string & storeDir,
     const DerivationBuilderParams & params,
     const StringMap & inputRewrites,
@@ -678,7 +678,7 @@ void initEnv(
     const std::filesystem::path & tmpDir,
     int tmpDirFd)
 {
-    env.clear();
+    StringMap env;
 
     env["PATH"] = "/path-not-set";
     env["HOME"] = homeDir;
@@ -719,16 +719,16 @@ void initEnv(
 
     env["NIX_LOG_FD"] = "2";
     env["TERM"] = "xterm-256color";
+
+    return env;
 }
 
-void computeScratchOutputs(
-    LocalStore & store,
-    const DerivationBuilderParams & params,
-    OutputPathMap & scratchOutputs,
-    std::map<StorePath, StorePath> & redirectedOutputs,
-    StringMap & inputRewrites,
-    bool needsHashRewrite)
+std::tuple<OutputPathMap, StringMap, std::map<StorePath, StorePath>>
+computeScratchOutputs(LocalStore & store, const DerivationBuilderParams & params, bool needsHashRewrite)
 {
+    OutputPathMap scratchOutputs;
+    StringMap inputRewrites;
+    std::map<StorePath, StorePath> redirectedOutputs;
     for (auto & [outputName, status] : params.initialOutputs) {
         auto makeFallbackPath = [&](const std::string & suffix, std::string_view name) {
             return store.makeStorePath(
@@ -763,26 +763,28 @@ void computeScratchOutputs(
 
         redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
     }
+
+    return {std::move(scratchOutputs), std::move(inputRewrites), std::move(redirectedOutputs)};
 }
 
-void stopDaemon(AutoCloseFD & daemonSocket, std::thread & daemonThread, std::vector<std::thread> & daemonWorkerThreads)
+void RecursiveNixDaemon::stop()
 {
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
+    if (socket && shutdown(socket.get(), SHUT_RDWR) == -1) {
         if (errno == ENOTCONN) {
-            daemonSocket.close();
+            socket.close();
         } else {
             throw SysError("shutting down daemon socket");
         }
     }
 
-    if (daemonThread.joinable())
-        daemonThread.join();
-
-    for (auto & thread : daemonWorkerThreads)
+    if (thread.joinable())
         thread.join();
-    daemonWorkerThreads.clear();
 
-    daemonSocket.close();
+    for (auto & t : workerThreads)
+        t.join();
+    workerThreads.clear();
+
+    socket.close();
 }
 
 void processSandboxSetupMessages(AutoCloseFD & builderOut, Pid & pid, const Store & store, const StorePath & drvPath)
@@ -816,7 +818,7 @@ void processSandboxSetupMessages(AutoCloseFD & builderOut, Pid & pid, const Stor
     }
 }
 
-void setupRecursiveNixDaemon(
+void RecursiveNixDaemon::start(
     LocalStore & store,
     DerivationBuilder & builder,
     const DerivationBuilderParams & params,
@@ -824,9 +826,6 @@ void setupRecursiveNixDaemon(
     StringMap & env,
     const std::filesystem::path & tmpDir,
     const std::filesystem::path & tmpDirInSandbox,
-    AutoCloseFD & daemonSocket,
-    std::thread & daemonThread,
-    std::vector<std::thread> & daemonWorkerThreads,
     UserLock * buildUser)
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
@@ -848,16 +847,16 @@ void setupRecursiveNixDaemon(
     std::filesystem::path socketPath = tmpDir / socketName;
     env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox / socketName).native();
 
-    daemonSocket = createUnixDomainSocket(socketPath, 0600);
+    socket = createUnixDomainSocket(socketPath, 0600);
 
     nix::chownToBuilder(buildUser, socketPath);
 
-    daemonThread = std::thread([&daemonSocket, &daemonWorkerThreads, restrictedStore]() {
+    thread = std::thread([this, restrictedStore]() {
         while (true) {
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            AutoCloseFD remote = accept(socket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN)
                     continue;
@@ -882,7 +881,7 @@ void setupRecursiveNixDaemon(
                 }
             });
 
-            daemonWorkerThreads.push_back(std::move(workerThread));
+            workerThreads.push_back(std::move(workerThread));
         }
 
         debug("daemon shutting down");
