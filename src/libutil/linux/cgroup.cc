@@ -13,7 +13,7 @@
 #include <dirent.h>
 #include <mntent.h>
 
-namespace nix {
+namespace nix::linux {
 
 std::optional<std::filesystem::path> getCgroupFS()
 {
@@ -174,4 +174,4 @@ CanonPath getRootCgroup()
     return rootCgroup;
 }
 
-} // namespace nix
+} // namespace nix::linux
