@@ -5,7 +5,6 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <poll.h>
 #include <span>
 
 #include "util-config-private.hh"
@@ -13,111 +12,19 @@
 
 namespace nix {
 
-namespace {
-
-// This function is needed to handle non-blocking reads/writes. This is needed in the buildhook, because
-// somehow the json logger file descriptor ends up being non-blocking and breaks remote-building.
-// TODO: get rid of buildhook and remove this function again (https://github.com/NixOS/nix/issues/12688)
-void pollFD(int fd, int events)
-{
-    struct pollfd pfd;
-    pfd.fd = fd;
-    pfd.events = events;
-    int ret = poll(&pfd, 1, -1);
-    if (ret == -1) {
-        throw SysError("poll on file descriptor failed");
-    }
-}
-} // namespace
-
 std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     auto st = nix::fstat(fd);
     return st.st_size;
 }
 
-void readFull(int fd, char * buf, size_t count)
-{
-    while (count) {
-        checkInterrupt();
-        ssize_t res = ::read(fd, buf, count);
-        if (res == -1) {
-            switch (errno) {
-            case EINTR:
-                continue;
-            case EAGAIN:
-                pollFD(fd, POLLIN);
-                continue;
-            }
-            auto savedErrno = errno;
-            throw SysError(savedErrno, "reading from file %s", PathFmt(descriptorToPath(fd)));
-        }
-        if (res == 0)
-            throw EndOfFile("unexpected end-of-file");
-        count -= res;
-        buf += res;
-    }
-}
-
-void writeFull(int fd, std::string_view s, bool allowInterrupts)
-{
-    while (!s.empty()) {
-        if (allowInterrupts)
-            checkInterrupt();
-        ssize_t res = write(fd, s.data(), s.size());
-        if (res == -1) {
-            switch (errno) {
-            case EINTR:
-                continue;
-            case EAGAIN:
-                pollFD(fd, POLLOUT);
-                continue;
-            }
-            auto savedErrno = errno;
-            throw SysError(savedErrno, "writing to file %s", PathFmt(descriptorToPath(fd)));
-        }
-        if (res > 0)
-            s.remove_prefix(res);
-    }
-}
-
-std::string readLine(int fd, bool eofOk, char terminator)
-{
-    std::string s;
-    while (1) {
-        checkInterrupt();
-        char ch;
-        // FIXME: inefficient
-        ssize_t rd = ::read(fd, &ch, 1);
-        if (rd == -1) {
-            switch (errno) {
-            case EINTR:
-                continue;
-            case EAGAIN: {
-                pollFD(fd, POLLIN);
-                continue;
-            }
-            default: {
-                auto savedErrno = errno;
-                throw SysError(savedErrno, "reading a line from %s", PathFmt(descriptorToPath(fd)));
-            }
-            }
-        } else if (rd == 0) {
-            if (eofOk)
-                return s;
-            else
-                throw EndOfFile("unexpected EOF reading a line");
-        } else {
-            if (ch == terminator)
-                return s;
-            s += ch;
-        }
-    }
-}
-
 size_t read(Descriptor fd, std::span<std::byte> buffer)
 {
-    ssize_t n = ::read(fd, buffer.data(), buffer.size());
+    ssize_t n;
+    do {
+        checkInterrupt();
+        n = ::read(fd, buffer.data(), buffer.size());
+    } while (n == -1 && errno == EINTR);
     if (n == -1)
         throw SysError("read of %1% bytes", buffer.size());
     return static_cast<size_t>(n);
@@ -125,9 +32,25 @@ size_t read(Descriptor fd, std::span<std::byte> buffer)
 
 size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
 {
-    ssize_t n = pread(fd, buffer.data(), buffer.size(), offset);
+    ssize_t n;
+    do {
+        checkInterrupt();
+        n = pread(fd, buffer.data(), buffer.size(), offset);
+    } while (n == -1 && errno == EINTR);
     if (n == -1)
         throw SysError("pread of %1% bytes at offset %2%", buffer.size(), offset);
+    return static_cast<size_t>(n);
+}
+
+size_t write(Descriptor fd, std::span<const std::byte> buffer)
+{
+    ssize_t n;
+    do {
+        checkInterrupt();
+        n = ::write(fd, buffer.data(), buffer.size());
+    } while (n == -1 && errno == EINTR);
+    if (n == -1)
+        throw SysError("write of %1% bytes", buffer.size());
     return static_cast<size_t>(n);
 }
 
