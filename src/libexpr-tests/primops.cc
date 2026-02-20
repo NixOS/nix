@@ -118,6 +118,9 @@ TEST_F(PrimOpTest, tryEvalSuccess)
 
 TEST_F(PrimOpTest, getEnv)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "No setenv on Windows";
+#endif
     setEnv("_NIX_UNIT_TEST_ENV_VALUE", "test value");
     auto v = eval("builtins.getEnv \"_NIX_UNIT_TEST_ENV_VALUE\"");
     ASSERT_THAT(v, IsStringEq("test value"));
@@ -156,12 +159,18 @@ TEST_F(PrimOpTest, placeholder)
 
 TEST_F(PrimOpTest, baseNameOf)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Unix path handling differs on Windows";
+#endif
     auto v = eval("builtins.baseNameOf /some/path");
     ASSERT_THAT(v, IsStringEq("path"));
 }
 
 TEST_F(PrimOpTest, dirOf)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Unix path handling differs on Windows";
+#endif
     auto v = eval("builtins.dirOf /some/path");
     ASSERT_THAT(v, IsPathEq("/some"));
 }
@@ -664,7 +673,7 @@ INSTANTIATE_TEST_SUITE_P(
         CASE(R"({ outPath = "foo"; })", "foo")
 // this is broken on cygwin because canonPath("//./test", false) returns //./test
 // FIXME: don't use canonPath
-#ifndef __CYGWIN__
+#if !defined(__CYGWIN__) && !defined(_WIN32)
             ,
         CASE(R"(./test)", "/test")
 #endif

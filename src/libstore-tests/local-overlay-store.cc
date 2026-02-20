@@ -6,24 +6,38 @@ namespace nix {
 
 TEST(LocalOverlayStore, constructConfig_rootQueryParam)
 {
+    constexpr std::string_view rootPath =
+#ifdef _WIN32
+        "C:\\foo\\bar"
+#else
+        "/foo/bar"
+#endif
+        ;
     LocalOverlayStoreConfig config{
         "",
         {
             {
                 "root",
-                "/foo/bar",
+                std::string{rootPath},
             },
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{rootPath}});
 }
 
 TEST(LocalOverlayStore, constructConfig_rootPath)
 {
-    LocalOverlayStoreConfig config{"/foo/bar", {}};
+    constexpr std::string_view rootPath =
+#ifdef _WIN32
+        "C:\\foo\\bar"
+#else
+        "/foo/bar"
+#endif
+        ;
+    LocalOverlayStoreConfig config{std::string{rootPath}, {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{rootPath}});
 }
 
 } // namespace nix

@@ -24,7 +24,11 @@ let
 in
 
 {
-  unitTests = {
-    "nix-util-tests" = fixOutput packages."nix-util-tests-x86_64-w64-mingw32".passthru.tests.run;
+  unitTests = builtins.mapAttrs (n: v: fixOutput packages.${v}.passthru.tests.run) {
+    "nix-util-tests" = "nix-util-tests-x86_64-w64-mingw32";
+    "nix-store-tests" = "nix-store-tests-x86_64-w64-mingw32";
+    "nix-fetchers-tests" = "nix-fetchers-tests-x86_64-w64-mingw32";
+    "nix-expr-tests" = "nix-expr-tests-x86_64-w64-mingw32";
+    "nix-flake-tests" = "nix-flake-tests-x86_64-w64-mingw32";
   };
 }

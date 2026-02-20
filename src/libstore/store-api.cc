@@ -78,7 +78,11 @@ std::string StoreDirSetting::parse(const std::string & str) const
 {
     if (str.empty())
         throw UsageError("setting '%s' is a path and paths cannot be empty", name);
-    return CanonPath(str).abs();
+    // Use CanonPath for Unix-style paths, canonPath for native paths
+    if (str.starts_with("/"))
+        return CanonPath(str).abs();
+    else
+        return canonPath(str).string();
 }
 
 StoreConfigBase::StoreConfigBase(const StoreReference::Params & params, FilePathType pathType)
