@@ -31,7 +31,6 @@
 #include <grp.h>
 
 #include "nix/util/strings.hh"
-#include "nix/util/signals.hh"
 #include "nix/util/cgroup.hh"
 
 #if NIX_WITH_AWS_AUTH
@@ -96,34 +95,22 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     const DerivationType derivationType;
 
-    StringMap env;
-
     std::map<StorePath, StorePath> redirectedOutputs;
 
     OutputPathMap scratchOutputs;
 
-    AutoCloseFD tmpDirFd;
-
-    StringMap inputRewrites, outputRewrites;
-
-    static const std::filesystem::path homeDir;
-
-    AutoCloseFD daemonSocket;
-    std::thread daemonThread;
-    std::vector<std::thread> daemonWorkerThreads;
+    RecursiveNixDaemon daemon;
 
     std::filesystem::path chrootRootDir;
 
     std::optional<AutoDelete> autoDelChroot;
 
-    PathsInChroot pathsInChroot;
-
-    Pipe userNamespaceSync;
-
     AutoCloseFD sandboxMountNamespace;
     AutoCloseFD sandboxUserNamespace;
 
     bool usingUserNamespace = true;
+
+    Pipe userNamespaceSync;
 
     std::optional<std::filesystem::path> cgroup;
 
@@ -144,7 +131,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             ignoreExceptionInDestructor();
         }
         try {
-            nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
+            daemon.stop();
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -171,11 +158,6 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 
     friend struct RestrictedStore;
-
-    bool needsHashRewrite()
-    {
-        return false;
-    }
 
     uid_t sandboxUid()
     {
@@ -339,18 +321,17 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         createDir(tmpDir, 0700);
         assert(!tmpDir.empty());
 
-        tmpDirFd = AutoCloseFD{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
+        AutoCloseFD tmpDirFd{open(tmpDir.c_str(), O_RDONLY | O_NOFOLLOW | O_DIRECTORY)};
         if (!tmpDirFd)
             throw SysError("failed to open the build temporary directory descriptor %1%", PathFmt(tmpDir));
 
         nix::chownToBuilder(buildUser.get(), tmpDirFd.get(), tmpDir);
 
-        inputRewrites.clear();
-        nix::computeScratchOutputs(store, *this, scratchOutputs, redirectedOutputs, inputRewrites, needsHashRewrite());
+        StringMap inputRewrites;
+        std::tie(scratchOutputs, inputRewrites, redirectedOutputs) =
+            nix::computeScratchOutputs(store, *this, /* needsHashRewrite= */ false);
 
-        nix::initEnv(
-            env,
-            homeDir,
+        auto env = nix::initEnv(
             store.storeDir,
             *this,
             inputRewrites,
@@ -362,6 +343,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             tmpDirFd.get());
 
         // Start with the default sandbox paths
+        PathsInChroot pathsInChroot;
         pathsInChroot = defaultPathsInChroot;
 
         if (hasPrefix(store.storeDir, tmpDirInSandbox().native())) {
@@ -418,24 +400,8 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             nix::chownToBuilder(buildUser.get(), *cgroup / "cgroup.threads");
         }
 
-        if (needsHashRewrite() && pathExists(homeDir))
-            throw Error(
-                "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
-                PathFmt(homeDir));
-
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            nix::setupRecursiveNixDaemon(
-                store,
-                *this,
-                *this,
-                addedPaths,
-                env,
-                tmpDir,
-                tmpDirInSandbox(),
-                daemonSocket,
-                daemonThread,
-                daemonWorkerThreads,
-                buildUser.get());
+            daemon.start(store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(), buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -485,13 +451,33 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     if (usingUserNamespace)
                         options.cloneFlags |= CLONE_NEWUSER;
 
-                    pid_t child = startProcess(
-                        [this
+                    struct RunChildArgs
+                    {
+                        StringMap env;
+                        StringMap inputRewrites;
+                        PathsInChroot pathsInChroot;
 #if NIX_WITH_AWS_AUTH
-                         ,
-                         awsCredentials
+                        std::optional<AwsCredentials> awsCredentials;
 #endif
-                    ]() mutable {
+                    };
+
+                    RunChildArgs args{
+                        .env = std::move(env),
+                        .inputRewrites = std::move(inputRewrites),
+                        .pathsInChroot = std::move(pathsInChroot),
+#if NIX_WITH_AWS_AUTH
+                        .awsCredentials = std::move(awsCredentials),
+#endif
+                    };
+
+                    pid_t child = startProcess(
+                        [this, args = std::move(args)]() mutable {
+                            auto & env = args.env;
+                            auto & inputRewrites = args.inputRewrites;
+                            auto & pathsInChroot = args.pathsInChroot;
+#if NIX_WITH_AWS_AUTH
+                            auto & awsCredentials = args.awsCredentials;
+#endif
                             // runChild inlined
                             bool sendException = true;
 
@@ -833,7 +819,7 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
         killSandbox(true);
 
-        nix::stopDaemon(daemonSocket, daemonThread, daemonWorkerThreads);
+        daemon.stop();
 
         nix::logCpuUsage(store, drvPath, buildResult, status);
 
@@ -850,14 +836,12 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             };
         }
 
-        outputRewrites.clear();
         auto builtOutputs = nix::registerOutputs(
             store,
             localSettings,
             *this,
             addedPaths,
             scratchOutputs,
-            outputRewrites,
             buildUser.get(),
             tmpDir,
             [this](const std::string & p) -> std::filesystem::path {
@@ -869,8 +853,6 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         return builtOutputs;
     }
 };
-
-const std::filesystem::path LinuxChrootDerivationBuilder::homeDir = "/homeless-shelter";
 
 DerivationBuilderUnique makeLinuxChrootDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)

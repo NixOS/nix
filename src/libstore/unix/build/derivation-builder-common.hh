@@ -2,18 +2,18 @@
 
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-settings.hh"
-#include "nix/util/error.hh"
 
 #include <filesystem>
 #include <functional>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 namespace nix {
 
 class LocalStore;
+class Pid;
 struct UserLock;
-struct Pid;
 
 struct NotDeterministic : BuildError
 {
@@ -57,7 +57,6 @@ SingleDrvOutputs registerOutputs(
     const DerivationBuilderParams & params,
     const StorePathSet & addedPaths,
     const std::map<std::string, StorePath> & scratchOutputs,
-    StringMap & outputRewrites,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
     std::function<std::filesystem::path(const std::string &)> realPathInHost);
@@ -89,9 +88,7 @@ void writeBuilderFile(
  * @param tmpDirInSandbox The path to the build temporary directory as
  *   seen from inside the sandbox.
  */
-void initEnv(
-    StringMap & env,
-    const std::filesystem::path & homeDir,
+StringMap initEnv(
     const std::string & storeDir,
     const DerivationBuilderParams & params,
     const StringMap & inputRewrites,
@@ -104,43 +101,39 @@ void initEnv(
 
 /**
  * Compute scratch output paths and set up hash rewrites for each output.
- * Populates `scratchOutputs`, `redirectedOutputs`, and `inputRewrites`.
+ * Returns {scratchOutputs, inputRewrites, redirectedOutputs}.
  */
-void computeScratchOutputs(
-    LocalStore & store,
-    const DerivationBuilderParams & params,
-    OutputPathMap & scratchOutputs,
-    std::map<StorePath, StorePath> & redirectedOutputs,
-    StringMap & inputRewrites,
-    bool needsHashRewrite);
+std::tuple<OutputPathMap, StringMap, std::map<StorePath, StorePath>>
+computeScratchOutputs(LocalStore & store, const DerivationBuilderParams & params, bool needsHashRewrite);
 
 /**
- * Shut down the recursive Nix daemon socket, thread, and worker threads.
+ * Manages the recursive Nix daemon socket, accept thread, and worker
+ * threads used by all derivation builder implementations.
  */
-void stopDaemon(AutoCloseFD & daemonSocket, std::thread & daemonThread, std::vector<std::thread> & daemonWorkerThreads);
+struct RecursiveNixDaemon
+{
+    AutoCloseFD socket;
+    std::thread thread;
+    std::vector<std::thread> workerThreads;
+
+    void stop();
+
+    void start(
+        LocalStore & store,
+        DerivationBuilder & builder,
+        const DerivationBuilderParams & params,
+        StorePathSet & addedPaths,
+        StringMap & env,
+        const std::filesystem::path & tmpDir,
+        const std::filesystem::path & tmpDirInSandbox,
+        UserLock * buildUser);
+};
 
 /**
  * Read and process sandbox setup messages from the builder child process.
  * Waits for the "\2" ready signal, handles "\1" error reports.
  */
 void processSandboxSetupMessages(AutoCloseFD & builderOut, Pid & pid, const Store & store, const StorePath & drvPath);
-
-/**
- * Set up the recursive Nix daemon for the builder, including socket,
- * chown, accept loop, and environment variable.
- */
-void setupRecursiveNixDaemon(
-    LocalStore & store,
-    DerivationBuilder & builder,
-    const DerivationBuilderParams & params,
-    StorePathSet & addedPaths,
-    StringMap & env,
-    const std::filesystem::path & tmpDir,
-    const std::filesystem::path & tmpDirInSandbox,
-    AutoCloseFD & daemonSocket,
-    std::thread & daemonThread,
-    std::vector<std::thread> & daemonWorkerThreads,
-    UserLock * buildUser);
 
 /**
  * Log chatty builder info (builder path, args, env vars).
@@ -242,5 +235,10 @@ void checkAndAddImpurePaths(
  * Parse pre-build hook output and add extra sandbox paths.
  */
 void parsePreBuildHook(PathsInChroot & pathsInChroot, const std::string & hookOutput);
+
+/**
+ * Home directory path used by non-sandboxed and Darwin builders.
+ */
+extern const std::filesystem::path homeDir;
 
 } // namespace nix

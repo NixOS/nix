@@ -5,7 +5,7 @@
 
 namespace nix {
 
-struct LocalStore;
+class LocalStore;
 
 DerivationBuilderUnique makeGenericUnixDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
