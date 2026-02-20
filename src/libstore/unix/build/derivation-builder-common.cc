@@ -48,7 +48,7 @@ namespace nix {
 const std::filesystem::path homeDir = "/homeless-shelter";
 
 void handleDiffHook(
-    const Path & diffHook,
+    const std::filesystem::path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,
@@ -167,7 +167,7 @@ SingleDrvOutputs registerOutputs(
     const std::map<std::string, StorePath> & scratchOutputs,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
-    std::function<std::filesystem::path(const std::string &)> realPathInHost)
+    std::function<std::filesystem::path(const std::filesystem::path &)> realPathInHost)
 {
     StringMap outputRewrites;
     auto & drv = params.drv;
@@ -519,19 +519,19 @@ SingleDrvOutputs registerOutputs(
         auto optFixedPath = output->path(store, drv.name, outputName);
         if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(finalDestPath)});
+            dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)});
         }
 
-        if (store.toRealPath(finalDestPath) != actualPath) {
+        if (store.toRealPath(newInfo.path) != actualPath) {
             if (buildMode == bmRepair) {
-                replaceValidPath(store.toRealPath(finalDestPath), actualPath);
+                replaceValidPath(store.toRealPath(newInfo.path), actualPath);
             } else if (buildMode == bmCheck) {
                 /* leave new path in place for comparison */
             } else if (store.isValidPath(newInfo.path)) {
                 assert(newInfo.ca);
                 deletePath(actualPath);
             } else {
-                auto destPath = store.toRealPath(finalDestPath);
+                auto destPath = store.toRealPath(newInfo.path);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
             }
@@ -543,7 +543,8 @@ SingleDrvOutputs registerOutputs(
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
                     if (diffHook || settings.keepFailed) {
-                        auto dst = store.toRealPath(finalDestPath + ".check");
+                        auto dst = store.toRealPath(newInfo.path);
+                        dst += ".check";
                         deletePath(dst);
                         movePath(actualPath, dst);
 
@@ -559,15 +560,15 @@ SingleDrvOutputs registerOutputs(
                         }
 
                         throw NotDeterministic(
-                            "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
+                            "derivation '%s' may not be deterministic: output %s differs from %s",
                             store.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath),
-                            dst);
+                            PathFmt(store.toRealPath(newInfo.path)),
+                            PathFmt(dst));
                     } else
                         throw NotDeterministic(
-                            "derivation '%s' may not be deterministic: output '%s' differs",
+                            "derivation '%s' may not be deterministic: output %s differs",
                             store.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath));
+                            PathFmt(store.toRealPath(newInfo.path)));
                 }
 
                 if (!oldInfo.ultimate) {
@@ -585,7 +586,7 @@ SingleDrvOutputs registerOutputs(
             }
 
             if (!store.isValidPath(newInfo.path))
-                store.optimisePath(store.toRealPath(finalDestPath), NoRepair);
+                store.optimisePath(store.toRealPath(newInfo.path), NoRepair);
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
@@ -623,7 +624,10 @@ SingleDrvOutputs registerOutputs(
             {
                 .outPath = newInfo.path,
             },
-            DrvOutput{oldinfo->outputHash, outputName},
+            DrvOutput{
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
             store.signRealisation(thisRealisation);
@@ -662,7 +666,7 @@ void writeBuilderFile(
         openat(tmpDirFd, name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
-    writeFile(fd, path, contents);
+    writeFile(fd.get(), contents);
     chownToBuilder(buildUser, fd.get(), path);
 }
 
@@ -820,8 +824,6 @@ void processSandboxSetupMessages(AutoCloseFD & builderOut, Pid & pid, const Stor
 void RecursiveNixDaemon::start(
     LocalStore & store,
     DerivationBuilder & builder,
-    const DerivationBuilderParams & params,
-    StorePathSet & addedPaths,
     StringMap & env,
     const std::filesystem::path & tmpDir,
     const std::filesystem::path & tmpDirInSandbox,
@@ -840,7 +842,7 @@ void RecursiveNixDaemon::start(
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(store.shared_from_this())),
         builder);
 
-    addedPaths.clear();
+    builder.addedPaths.clear();
 
     auto socketName = ".nix-socket";
     std::filesystem::path socketPath = tmpDir / socketName;

@@ -87,7 +87,8 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)
-        : DerivationBuilderParams{std::move(params)}
+        : DerivationBuilder{params.inputPaths}
+        , DerivationBuilderParams{std::move(params)}
         , useSandbox{useSandbox}
         , store{store}
         , miscMethods{std::move(miscMethods)}
@@ -114,32 +115,10 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }
     }
 
-    const StorePathSet & originalPaths() override
-    {
-        return inputPaths;
-    }
-
-    bool isAllowed(const StorePath & path) override
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    bool isAllowed(const DrvOutput & id) override
-    {
-        return addedDrvOutputs.count(id);
-    }
-
-    friend struct RestrictedStore;
-
     std::filesystem::path tmpDirInSandbox()
     {
         assert(!topTmpDir.empty());
         return topTmpDir;
-    }
-
-    void addDependencyImpl(const StorePath & path) override
-    {
-        addedPaths.insert(path);
     }
 
     void killSandbox(bool getStats)
@@ -331,7 +310,7 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                 PathFmt(homeDir));
 
         if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            daemon.start(store, *this, *this, addedPaths, env, tmpDir, tmpDirInSandbox(), buildUser.get());
+            daemon.start(store, *this, env, tmpDir, tmpDirInSandbox(), buildUser.get());
 
         nix::logBuilderInfo(drv);
 
@@ -658,7 +637,9 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams
             scratchOutputs,
             buildUser.get(),
             tmpDir,
-            [this](const std::string & p) -> std::filesystem::path { return store.toRealPath(p); });
+            [this](const std::filesystem::path & p) -> std::filesystem::path {
+                return store.toRealPath(store.parseStorePath(p.native()));
+            });
 
         cleanupBuild(true);
 

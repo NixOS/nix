@@ -15,17 +15,17 @@ class LocalStore;
 class Pid;
 struct UserLock;
 
-struct NotDeterministic : BuildError
+struct NotDeterministic final : CloneableError<NotDeterministic, BuildError>
 {
     NotDeterministic(auto &&... args)
-        : BuildError(BuildResult::Failure::NotDeterministic, args...)
+        : CloneableError(BuildResult::Failure::NotDeterministic, args...)
     {
         isNonDeterministic = true;
     }
 };
 
 void handleDiffHook(
-    const Path & diffHook,
+    const std::filesystem::path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,
@@ -59,7 +59,7 @@ SingleDrvOutputs registerOutputs(
     const std::map<std::string, StorePath> & scratchOutputs,
     UserLock * buildUser,
     const std::filesystem::path & tmpDir,
-    std::function<std::filesystem::path(const std::string &)> realPathInHost);
+    std::function<std::filesystem::path(const std::filesystem::path &)> realPathInHost);
 
 /**
  * Change ownership of a path to the build user. No-op if no build user.
@@ -121,8 +121,6 @@ struct RecursiveNixDaemon
     void start(
         LocalStore & store,
         DerivationBuilder & builder,
-        const DerivationBuilderParams & params,
-        StorePathSet & addedPaths,
         StringMap & env,
         const std::filesystem::path & tmpDir,
         const std::filesystem::path & tmpDirInSandbox,

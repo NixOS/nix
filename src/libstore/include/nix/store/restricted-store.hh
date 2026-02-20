@@ -24,11 +24,6 @@ struct LocalStoreConfig;
 struct RestrictionContext
 {
     /**
-     * Paths that are already allowed to begin with
-     */
-    virtual const StorePathSet & originalPaths() = 0;
-
-    /**
      * Paths that were added via recursive Nix calls.
      */
     StorePathSet addedPaths;
@@ -38,14 +33,35 @@ struct RestrictionContext
      */
     std::set<DrvOutput> addedDrvOutputs;
 
+    explicit RestrictionContext(const StorePathSet & inputPaths)
+        : inputPaths_(inputPaths)
+    {
+    }
+
+    /**
+     * Paths that are already allowed to begin with.
+     */
+    const StorePathSet & originalPaths()
+    {
+        return inputPaths_;
+    }
+
     /**
      * Recursive Nix calls are only allowed to build or realize paths
      * in the original input closure or added via a recursive Nix call
      * (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
      * /nix/store/<bla> is some arbitrary path in a binary cache).
      */
-    virtual bool isAllowed(const StorePath &) = 0;
-    virtual bool isAllowed(const DrvOutput & id) = 0;
+    bool isAllowed(const StorePath & path)
+    {
+        return inputPaths_.count(path) || addedPaths.count(path);
+    }
+
+    bool isAllowed(const DrvOutput & id)
+    {
+        return addedDrvOutputs.count(id);
+    }
+
     bool isAllowed(const DerivedPath & id);
 
     /**
@@ -62,13 +78,21 @@ struct RestrictionContext
     virtual ~RestrictionContext() = default;
 
 protected:
-
     /**
-     * This is the underlying implementation to be defined. The caller
-     * will ensure that this is only called on newly added dependencies,
-     * and that idempotent calls are a no-op.
+     * Called for each newly added dependency. The default
+     * implementation just records the path. Override to perform
+     * additional work (e.g. bind-mounting into a chroot).
      */
-    virtual void addDependencyImpl(const StorePath & path) = 0;
+    virtual void addDependencyImpl(const StorePath & path)
+    {
+        addedPaths.insert(path);
+    }
+
+private:
+    /**
+     * Reference to the original input paths, owned by the caller.
+     */
+    const StorePathSet & inputPaths_;
 };
 
 /**
