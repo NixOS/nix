@@ -1190,10 +1190,15 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 if ((attrPathS[0] == "apps" || attrPathS[0] == "checks" || attrPathS[0] == "devShells"
                      || attrPathS[0] == "legacyPackages" || attrPathS[0] == "packages")
                     && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
-                    for (const auto & subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
+                    try {
+                        for (const auto & subAttr : visitor2->getAttrs()) {
+                            if (hasContent(*visitor2, attrPath2, subAttr)) {
+                                return true;
+                            }
                         }
+                    } catch (IFDError & e) {
+                        // allow IFD errors here; as we handle them during `visit()`
+                        return true;
                     }
                     return false;
                 }
@@ -1201,10 +1206,14 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 if ((attrPathS.size() == 1)
                     && (attrPathS[0] == "formatter" || attrPathS[0] == "nixosConfigurations"
                         || attrPathS[0] == "nixosModules" || attrPathS[0] == "overlays")) {
-                    for (const auto & subAttr : visitor2->getAttrs()) {
-                        if (hasContent(*visitor2, attrPath2, subAttr)) {
-                            return true;
+                    try {
+                        for (const auto & subAttr : visitor2->getAttrs()) {
+                            if (hasContent(*visitor2, attrPath2, subAttr)) {
+                                return true;
+                            }
                         }
+                    } catch (IFDError & e) {
+                        return true;
                     }
                     return false;
                 }
@@ -1241,9 +1250,22 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                     if (!json)
                         logger->cout("%s", headerPrefix);
                     std::vector<Symbol> attrs;
-                    for (const auto & attr : visitor.getAttrs()) {
-                        if (hasContent(visitor, attrPath, attr))
-                            attrs.push_back(attr);
+                    try {
+                        for (const auto & attr : visitor.getAttrs()) {
+                            if (hasContent(visitor, attrPath, attr))
+                                attrs.push_back(attr);
+                        }
+                        if (!json)
+                            logger->cout("%s", headerPrefix);
+                    } catch (IFDError & e) {
+                        if (!json) {
+                            logger->cout(
+                                fmt("%s " ANSI_WARNING "omitted due to use of import from derivation" ANSI_NORMAL,
+                                    headerPrefix));
+                        } else {
+                            logger->warn(fmt(
+                                "%s omitted due to use of import from derivation", concatStringsSep(".", attrPathS)));
+                        }
                     }
 
                     for (const auto & [i, attr] : enumerate(attrs)) {

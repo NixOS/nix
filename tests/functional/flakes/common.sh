@@ -96,6 +96,8 @@ writeIfdFlake() {
 {
   outputs = { self }: {
     packages.$system.default = import ./ifd.nix;
+    checks.$system = import ./ifd.nix;
+    formatter = import ./ifd.nix;
   };
 }
 EOF
