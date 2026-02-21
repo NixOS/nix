@@ -72,9 +72,6 @@ TEST(readLinkAt, works)
 
 TEST(openFileEnsureBeneathNoSymlinks, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 

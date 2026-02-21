@@ -31,7 +31,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const Setting<AbsolutePath> upperLayer{
+    Setting<AbsolutePath> upperLayer{
         (StoreConfig *) this,
         "",
         "upper-layer",
@@ -53,7 +53,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const Setting<AbsolutePath> remountHook{
+    Setting<AbsolutePath> remountHook{
         (StoreConfig *) this,
         "",
         "remount-hook",

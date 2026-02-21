@@ -31,10 +31,10 @@ public:
         }
     }
 
-    std::string nixDir;
-    std::string nixStoreDir;
-    std::string nixStateDir;
-    std::string nixLogDir;
+    std::filesystem::path nixDir;
+    std::filesystem::path nixStoreDir;
+    std::filesystem::path nixStateDir;
+    std::filesystem::path nixLogDir;
 
 protected:
     Store * open_local_store()
@@ -54,14 +54,17 @@ protected:
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 
-        nixStoreDir = nixDir + "/my_nix_store";
-        nixStateDir = nixDir + "/my_state";
-        nixLogDir = nixDir + "/my_log";
+        nixStoreDir = nixDir / "my_nix_store";
+        nixStateDir = nixDir / "my_state";
+        nixLogDir = nixDir / "my_log";
 
         // Options documented in `nix help-stores`
-        const char * p1[] = {"store", nixStoreDir.c_str()};
-        const char * p2[] = {"state", nixStateDir.c_str()};
-        const char * p3[] = {"log", nixLogDir.c_str()};
+        auto nixStoreDirStr = nixStoreDir.string();
+        auto nixStateDirStr = nixStateDir.string();
+        auto nixLogDirStr = nixLogDir.string();
+        const char * p1[] = {"store", nixStoreDirStr.c_str()};
+        const char * p2[] = {"state", nixStateDirStr.c_str()};
+        const char * p3[] = {"log", nixLogDirStr.c_str()};
 
         const char ** params[] = {p1, p2, p3, nullptr};
 

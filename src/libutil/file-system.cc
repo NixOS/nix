@@ -1,5 +1,6 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-path-impl.hh"
@@ -217,11 +218,19 @@ bool pathAccessible(const std::filesystem::path & path)
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::read_symlink on Windows yet
+    auto parentDir = openDirectory(path.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(path));
+    return readLinkAt(parentDir.get(), CanonPath{path.filename().string()});
+#else
     try {
         return std::filesystem::read_symlink(path);
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
+#endif
 }
 
 std::string readFile(const std::filesystem::path & path)
@@ -583,10 +592,18 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
 {
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::create_symlink on Windows yet
+    auto parentDir = openDirectory(link.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(link));
+    createUnknownSymlinkAt(parentDir.get(), CanonPath{link.filename().string()}, target.native());
+#else
     std::error_code ec;
     std::filesystem::create_symlink(target, link, ec);
     if (ec)
-        throw SysError(ec.value(), "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+        throw SystemError(ec, "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+#endif
 }
 
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
@@ -596,11 +613,11 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         tmp = tmp.lexically_normal();
 
         try {
-            std::filesystem::create_symlink(target, tmp);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::file_exists)
+            createSymlink(target, tmp);
+        } catch (SystemError & e) {
+            if (e.is(std::errc::file_exists))
                 continue;
-            throw SystemError(e.code(), "creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
+            throw;
         }
 
         try {
