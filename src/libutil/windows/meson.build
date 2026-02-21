@@ -11,6 +11,7 @@ sources += files(
   'processes.cc',
   'users.cc',
   'windows-async-pipe.cc',
+  'windows-environment.cc',
   'windows-error.cc',
 )
 
