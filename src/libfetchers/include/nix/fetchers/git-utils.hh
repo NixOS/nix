@@ -28,8 +28,6 @@ struct GitAccessorOptions
     bool smudgeLfs = false;
     bool submodules = false; // Currently implemented in GitInputScheme rather than GitAccessor
 
-    std::optional<std::string> subtree; // Optional subtree path to access when using workdir accessor
-
     std::string makeFingerprint(const Hash & rev) const;
 };
 
@@ -90,13 +88,6 @@ struct GitRepo
     };
 
     virtual WorkdirInfo getWorkdirInfo() = 0;
-
-    /**
-     * Get the set of tracked files by reading the git index directly.
-     * Much faster than getWorkdirInfo() for large repos because it
-     * doesn't require a filesystem walk to compute dirty status.
-     */
-    virtual std::set<CanonPath> getTrackedFilesFromIndex() = 0;
 
     static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
