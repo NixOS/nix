@@ -16,7 +16,10 @@ class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    BinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+    {
+    }
 
     Setting<CompressionAlgo> compression{
         this,

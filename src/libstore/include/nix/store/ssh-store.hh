@@ -12,8 +12,12 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
                         virtual RemoteStoreConfig,
                         virtual CommonSSHStoreConfig
 {
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+    SSHStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , RemoteStoreConfig(params, FilePathType::Unix)
+        , CommonSSHStoreConfig(params)
+    {
+    }
 
     SSHStoreConfig(const ParsedURL::Authority & authority, const Params & params);
 
