@@ -4,6 +4,25 @@
 
 namespace nix {
 
+TEST(UDSRemoteStore, storeDir_absolutePath)
+{
+    std::filesystem::path storeDir =
+#ifdef _WIN32
+        "C:\\";
+#else
+        "/";
+#endif
+    storeDir /= "nix";
+    storeDir /= "store";
+    UDSRemoteStoreConfig config{"", {{"store", storeDir.string()}}};
+    EXPECT_EQ(config.storeDir, storeDir.string());
+}
+
+TEST(UDSRemoteStore, storeDir_relativePath_rejected)
+{
+    EXPECT_THROW(UDSRemoteStoreConfig("", {{"store", (std::filesystem::path{"nix"} / "store").string()}}), UsageError);
+}
+
 TEST(UDSRemoteStore, constructConfig)
 {
     UDSRemoteStoreConfig config{"/tmp/socket", {}};

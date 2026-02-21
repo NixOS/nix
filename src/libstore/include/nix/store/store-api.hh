@@ -73,58 +73,126 @@ struct MissingPaths
 };
 
 /**
- * A setting for the Nix store directory. Automatically canonicalises the
- * path and rejects the empty string. Stored as `std::string` because
- * store directory are valid file paths on *some* OS, but not neccessarily the OS of this build of Nix.
- *
- * (For example, consider `SSHStore` from Linux to Windows, or vice versa, the foreign path will not be a valid
- * `std::filesystem::path`.)
- */
-class StoreDirSetting : public BaseSetting<std::string>
-{
-public:
-    StoreDirSetting(
-        Config * options,
-        const std::string & def,
-        const std::string & name,
-        const std::string & description,
-        const StringSet & aliases = {});
-
-    std::string parse(const std::string & str) const override;
-
-    void operator=(const std::string & v)
-    {
-        this->assign(v);
-    }
-};
-
-/**
  * Need to make this a separate class so I can get the right
  * initialization order in the constructor for `StoreConfig`.
  */
 struct StoreConfigBase : Config
 {
-    using Config::Config;
-
-private:
+protected:
 
     /**
-     * Compute the default Nix store directory from environment variables
-     * (`NIX_STORE_DIR`, `NIX_STORE`) or the compile-time default.
+     * This data type is only used for `StoreConfigBase` constructor's
+     * `pathType` parameter. This documentation will describe what it means in
+     * that one context.
+     *
+     * This enum determines how the default (logical) store path for the store
+     * is chosen, if no explicit setting was given. There are two different ways
+     * to default this setting. `Native` is appropriate for any store which is a
+     * `LocalFSStore`, and `Unix` is appropriate for any store which is *not* a
+     * `LocalFSStore`.
+     *
+     * Because this information is needed when constructing `StoreConfigBase`,
+     * we cannot use a virtual method in a directed class (like `LocalFSStore`)
+     * so instead we add this argument to `StoreConfigBase` in order to make the
+     * choice in a non-vtable/inheritance-based way.
      */
-    static std::string getDefaultNixStoreDir();
+    enum struct FilePathType {
+        /**
+         * Unix-style path (e.g., `/nix/store`)
+         *
+         * Unix paths use forward slashes, and do not have any root "drive" or
+         * other such notion.
+         *
+         * When the store dir is defaulted this way, we do not care what OS we
+         * are on. The default path is canonicalized, removing any `..`
+         * lexically.
+         *
+         * This is used for store implementations that do not use the host file
+         * system, like `DummyStore` which is entirely in-memory and portable,
+         * or remote stores which refer to some *other* computer's file system.
+         *
+         * The default store path used in this case is morally a `CanonPath`.
+         *
+         * The default store path in this case is a hard-coded constant,
+         * `NIX_STORE_DIR`, which is probably `/nix/store`.
+         *
+         * @todo At some point we will have to adjust this further, to support
+         * the case of Unix SSHing to Windows.
+         */
+        Unix,
+
+        /**
+         * Native path for the current platform. On Unix this is a Unix Path,
+         * and on Windows, it is a Windows path.
+         *
+         * This is used for store implementations that do use the local file
+         * system as part of their interface (not just as an implementation
+         * detail). Concretely, that is all stores that inherit from
+         * `LocalFSStore`.
+         *
+         * Those stores advertise that the store objects are on disk, and the
+         * logical store directory path (at least after one enters the
+         * appropriate chroot / other similar mechanism) is the literal
+         * directory those store objects are contained with. As such, the store
+         * directory path must be something that is supported by the OS's native
+         * file system (or inside the chroot / other similar mechanism, if
+         * needed).
+         *
+         * The default store path used in this case is morally a
+         * `std::filesystem::path`.
+         *
+         * The default store path in this case depends on the platform:
+         *
+         * - On Unix, is based on a hard-coded constant, `NIX_STORE_DIR`, which
+         * is probably `/nix/store`.
+         *
+         * - On Windows, it is based on `%PROGRAMDATA%\nix\store`.
+         *
+         * In both cases, the default path is canonicalized, removing any `..`
+         * lexically.
+         */
+        Native,
+    };
 
 public:
 
-    StoreDirSetting storeDir_{
-        this,
-        getDefaultNixStoreDir(),
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
+    /**
+     * A setting for the Nix store directory. Automatically canonicalises the
+     * path and rejects the empty string. Stored as `std::string` because
+     * store directory are valid file paths on *some* OS, but not neccessarily the OS of this build of Nix.
+     *
+     * (For example, consider `SSHStore` from Linux to Windows, or vice versa, the foreign path will not be a valid
+     * `std::filesystem::path`.)
+     */
+    class StoreDirSetting : public BaseSetting<std::string>
+    {
+        friend StoreConfigBase;
+
+        FilePathType pathType;
+
+        /**
+         * Compute the default Nix store directory from environment variables
+         * (`NIX_STORE_DIR`, `NIX_STORE`) or the compile-time default.
+         *
+         * @param pathType Whether to return a Unix-style or native path. Different
+         * stores will use different types for the default store path.
+         */
+        StoreDirSetting(Config * options, FilePathType pathType);
+
+        std::string parse(const std::string & str) const override;
+
+        void operator=(const std::string & v)
+        {
+            this->assign(v);
+        }
+    };
+
+    StoreDirSetting storeDir_;
+
+    /**
+     * @pathType see FilePathType
+     */
+    StoreConfigBase(const StoreReference::Params & params, FilePathType pathType);
 };
 
 /**
@@ -163,7 +231,7 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
     using Params = StoreReference::Params;
 
-    StoreConfig(const Params & params);
+    StoreConfig(const Params & params, FilePathType pathType);
 
     StoreConfig() = delete;
 

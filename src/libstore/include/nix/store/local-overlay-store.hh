@@ -13,7 +13,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
     }
 
     LocalOverlayStoreConfig(const std::filesystem::path & path, const Params & params)
-        : StoreConfig(params)
+        : StoreConfig(params, FilePathType::Native)
         , LocalFSStoreConfig(path, params)
         , LocalStoreConfig(path, params)
     {
