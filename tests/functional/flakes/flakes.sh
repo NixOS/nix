@@ -222,6 +222,12 @@ nix store gc
 nix registry list --flake-registry "file://$registry" --refresh | grepQuiet flake3
 mv "$registry.tmp" "$registry"
 
+# A symlinked registry file should work even when the symlink target is
+# an absolute path. The source accessor needs to be rooted at `/` for this.
+ln -sfn "$registry" "$TEST_ROOT/registry-symlink.json"
+nix registry list --flake-registry "$TEST_ROOT/registry-symlink.json" | grepQuiet flake1
+rm "$TEST_ROOT/registry-symlink.json"
+
 # Ensure that locking ignores the user registry.
 mkdir -p "$TEST_HOME/.config/nix"
 ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
