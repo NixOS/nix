@@ -89,7 +89,7 @@ static int main_build_remote(int argc, char ** argv)
         if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
             currentLoad = localStore->config.stateDir.get() / "current-load";
         else
-            currentLoad = std::filesystem::path{settings.nixStateDir} / "current-load";
+            currentLoad = settings.nixStateDir / "current-load";
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;

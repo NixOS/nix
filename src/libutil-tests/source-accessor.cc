@@ -153,9 +153,6 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 
 TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "symlinks have some problems under Wine";
-#endif
     auto linkPath = tmpDir / "rootlink2";
     {
         RestoreSink sink{DescriptorDestination::open(linkPath, FinalSymlink::Follow), /*startFsync=*/false};

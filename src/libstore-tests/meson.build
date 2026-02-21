@@ -105,14 +105,27 @@ this_exe = executable(
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
+# Environment variables for tests
+test_env = {
+  '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+  'HOME' : meson.current_build_dir() / 'test-home',
+  # Clear NIX_STORE so tests use the default store path for the
+  # platform, and ignores anything to do with whatever dev shell we
+  # might be in
+  'NIX_STORE' : '',
+}
+
+# When cross-compiling, don't set NIX_REMOTE because the build machine's path
+# style doesn't match the host machine's. Tests that need a specific store
+# use their own store fixtures.
+if (build_machine.system() == 'windows') == (host_machine.system() == 'windows')
+  test_env += {'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store'}
+endif
+
 test(
   meson.project_name(),
   this_exe,
-  env : {
-    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-    'HOME' : meson.current_build_dir() / 'test-home',
-    'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store',
-  },
+  env : test_env,
   protocol : 'gtest',
 )
 

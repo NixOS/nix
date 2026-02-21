@@ -260,7 +260,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists((config->realStoreDir.get() / storePath.to_string()).string());
+        return pathExists(config->realStoreDir.get() / storePath.to_string());
     };
 
     bool errors = false;

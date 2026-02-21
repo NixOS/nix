@@ -359,7 +359,37 @@ void createDirectoryAt(Descriptor dirFd, const CanonPath & path)
     auto wpath = std::filesystem::path(path.rel()).make_preferred();
 
     /* Create the directory. The handle is immediately closed. */
-    ntOpenAt(dirFd, wpath.c_str(), FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE, FILE_CREATE);
+    auto result = maybeNtOpenAt(dirFd, wpath.c_str(), FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE, FILE_CREATE);
+    if (result)
+        return; /* Success */
+
+    auto lastError = RtlNtStatusToDosError(result.error());
+
+    /* Check if error is due to symlink in path */
+    if (lastError == ERROR_INVALID_NAME || lastError == ERROR_DIRECTORY) {
+        /* Scan path components to find symlink */
+        AutoCloseFD currentFd;
+        auto getCurrentFd = [&]() { return currentFd ? currentFd.get() : dirFd; };
+        CanonPath currentPath = CanonPath::root;
+        for (auto & component : path) {
+            currentPath.push(component);
+            std::wstring wcomponent = string_to_os_string(std::string(component));
+            auto testResult =
+                maybeNtOpenAt(getCurrentFd(), wcomponent, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+            if (!testResult)
+                break; /* Can't determine, let original error propagate */
+            if (isReparsePoint(testResult.value().get()))
+                throw SymlinkNotAllowed(currentPath);
+            /* Move to this directory for next iteration */
+            auto dirResult = maybeNtOpenAt(
+                getCurrentFd(), wcomponent, FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT);
+            if (!dirResult)
+                break;
+            currentFd = std::move(dirResult.value());
+        }
+    }
+
+    throw WinError(lastError, "creating directory %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
 }
 
 PosixStat fstat(Descriptor fd)
@@ -430,18 +460,11 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
         });
     };
 
-    /* Helper to check if a component is a symlink and throw SymlinkNotAllowed if so */
-    auto throwIfSymlink = [&](std::wstring_view component, const CanonPath & pathForError) {
-        try {
-            auto testHandle =
-                ntOpenAt(getParentFd(), component, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
-            if (isReparsePoint(testHandle.get()))
-                throw SymlinkNotAllowed(pathForError);
-        } catch (SymlinkNotAllowed &) {
-            throw;
-        } catch (...) {
-            /* If we can't determine, ignore and let caller handle original error */
-        }
+    /* Helper to check if a component is a symlink */
+    auto isSymlink = [&](std::wstring_view component) -> bool {
+        auto testResult =
+            maybeNtOpenAt(getParentFd(), component, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+        return testResult && isReparsePoint(testResult.value().get());
     };
 
     /* Iterate through each path component to ensure no symlinks in intermediate directories.
@@ -450,54 +473,60 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
         std::wstring wcomponent = string_to_os_string(std::string(*it));
 
         /* Open directory without following symlinks */
-        AutoCloseFD parentFd2;
-        try {
-            parentFd2 = ntOpenAt(
-                getParentFd(),
-                wcomponent,
-                FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
-                FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
-            );
-        } catch (WinError & e) {
-            /* Check if this is because it's a symlink */
-            if (e.lastError == ERROR_CANT_ACCESS_FILE || e.lastError == ERROR_ACCESS_DENIED) {
-                throwIfSymlink(wcomponent, pathUpTo(std::next(it)));
+        auto parentFd2 = maybeNtOpenAt(
+            getParentFd(),
+            wcomponent,
+            FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
+            FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
+        );
+
+        if (!parentFd2) {
+            auto lastError = RtlNtStatusToDosError(parentFd2.error());
+            /* Check if this is because it's a symlink.
+               Opening a symlink with FILE_DIRECTORY_FILE fails with various errors. */
+            if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_ACCESS_DENIED
+                || lastError == ERROR_DIRECTORY || lastError == ERROR_INVALID_NAME) {
+                if (isSymlink(wcomponent))
+                    throw SymlinkNotAllowed(pathUpTo(std::next(it)));
             }
-            throw;
+            /* Not a symlink, return invalid FD like Unix does */
+            return AutoCloseFD{};
         }
 
         /* Check if what we opened is actually a symlink */
-        if (isReparsePoint(parentFd2.get())) {
+        if (isReparsePoint(parentFd2.value().get())) {
             throw SymlinkNotAllowed(pathUpTo(std::next(it)));
         }
 
-        parentFd = std::move(parentFd2);
+        parentFd = std::move(parentFd2.value());
     }
 
     /* Now open the final component with requested flags */
     std::wstring finalComponent = string_to_os_string(std::string(path.baseName().value()));
 
-    AutoCloseFD finalHandle;
-    try {
-        finalHandle = ntOpenAt(
-            getParentFd(),
-            finalComponent,
-            desiredAccess,
-            createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
-            createDisposition);
-    } catch (WinError & e) {
-        /* Check if final component is a symlink when we requested to not follow it */
-        if (e.lastError == ERROR_CANT_ACCESS_FILE) {
-            throwIfSymlink(finalComponent, path);
+    auto finalResult = maybeNtOpenAt(
+        getParentFd(),
+        finalComponent,
+        desiredAccess,
+        createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
+        createDisposition);
+
+    if (!finalResult) {
+        auto lastError = RtlNtStatusToDosError(finalResult.error());
+        /* Check if final component is a symlink */
+        if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_DIRECTORY || lastError == ERROR_INVALID_NAME) {
+            if (isSymlink(finalComponent))
+                throw SymlinkNotAllowed(path);
         }
-        throw;
+        /* Not a symlink, return invalid FD like Unix does */
+        return AutoCloseFD{};
     }
 
     /* Final check: did we accidentally open a symlink? */
-    if (isReparsePoint(finalHandle.get()))
+    if (isReparsePoint(finalResult.value().get()))
         throw SymlinkNotAllowed(path);
 
-    return finalHandle;
+    return std::move(finalResult.value());
 }
 
 } // namespace nix
