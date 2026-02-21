@@ -1,7 +1,9 @@
+#include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/windows-environment.hh"
 
 #ifdef _WIN32
 #  include <errhandlingapi.h>
@@ -51,31 +53,43 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
     return desc;
 }
 
+/**
+ * Throw a WinError, or if running under Wine, just warn and return true.
+ * Wine has incomplete file locking support, so we degrade gracefully.
+ */
+template<typename... Args>
+static bool warnOrThrowWine(DWORD lastError, const std::string & fs, const Args &... args)
+{
+    if (isWine()) {
+        warn(fs + ": %s (ignored under Wine)", args..., lastError);
+        return true;
+    }
+    throw WinError(lastError, fs, args...);
+}
+
 bool lockFile(Descriptor desc, LockType lockType, bool wait)
 {
     switch (lockType) {
     case ltNone: {
         OVERLAPPED ov = {0};
-        if (!UnlockFileEx(desc, 0, 2, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            throw winError;
-        }
+        if (!UnlockFileEx(desc, 0, 2, 0, &ov))
+            return warnOrThrowWine(GetLastError(), "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
         return true;
     }
     case ltRead: {
         OVERLAPPED ov = {0};
         if (!LockFileEx(desc, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
-            WinError winError("Failed to lock file desc %s", desc);
-            if (winError.lastError == ERROR_LOCK_VIOLATION)
+            auto lastError = GetLastError();
+            if (lastError == ERROR_LOCK_VIOLATION)
                 return false;
-            throw winError;
+            return warnOrThrowWine(lastError, "Failed to lock file %s", PathFmt(descriptorToPath(desc)));
         }
 
         ov.Offset = 1;
         if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            if (winError.lastError != ERROR_NOT_LOCKED)
-                throw winError;
+            auto lastError = GetLastError();
+            if (lastError != ERROR_NOT_LOCKED)
+                return warnOrThrowWine(lastError, "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
         }
         return true;
     }
@@ -83,17 +97,17 @@ bool lockFile(Descriptor desc, LockType lockType, bool wait)
         OVERLAPPED ov = {0};
         ov.Offset = 1;
         if (!LockFileEx(desc, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
-            WinError winError("Failed to lock file desc %s", desc);
-            if (winError.lastError == ERROR_LOCK_VIOLATION)
+            auto lastError = GetLastError();
+            if (lastError == ERROR_LOCK_VIOLATION)
                 return false;
-            throw winError;
+            return warnOrThrowWine(lastError, "Failed to lock file %s", PathFmt(descriptorToPath(desc)));
         }
 
         ov.Offset = 0;
         if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            WinError winError("Failed to unlock file desc %s", desc);
-            if (winError.lastError != ERROR_NOT_LOCKED)
-                throw winError;
+            auto lastError = GetLastError();
+            if (lastError != ERROR_NOT_LOCKED)
+                return warnOrThrowWine(lastError, "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
         }
         return true;
     }
