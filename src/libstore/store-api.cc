@@ -28,21 +28,39 @@
 
 #include "nix/util/strings.hh"
 
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 using json = nlohmann::json;
 
 namespace nix {
 
-std::string StoreConfigBase::getDefaultNixStoreDir()
+std::string StoreConfigBase::getDefaultNixStoreDir(FilePathType pathType)
 {
-    return
-#ifndef _WIN32
-        canonPath
+    auto envOverrides =
+        getEnvOsNonEmpty(OS_STR("NIX_STORE_DIR")).or_else([] { return getEnvOsNonEmpty(OS_STR("NIX_STORE")); });
+
+    switch (pathType) {
+    case FilePathType::Unix:
+        return CanonPath(envOverrides.transform([](auto && s) { return os_string_to_string(std::move(s)); })
+                             .value_or(NIX_STORE_DIR))
+            .abs();
+
+    case FilePathType::Native:
+        return envOverrides.transform([](auto && s) { return std::filesystem::path(std::move(s)); })
+            .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+                return windows::known_folders::getProgramData() / "nix" / "store";
+#else
+                return NIX_STORE_DIR;
 #endif
-        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR)))
-#ifndef _WIN32
-            .string()
-#endif
-            ;
+            })
+            .transform([](auto && s) { return canonPath(s); })
+            .value()
+            .string();
+    }
+    assert(false);
 }
 
 StoreDirSetting::StoreDirSetting(
@@ -60,11 +78,26 @@ std::string StoreDirSetting::parse(const std::string & str) const
 {
     if (str.empty())
         throw UsageError("setting '%s' is a path and paths cannot be empty", name);
-    return canonPath(str).string();
+    return CanonPath(str).abs();
 }
 
-StoreConfig::StoreConfig(const Params & params)
-    : StoreConfigBase(params)
+StoreConfigBase::StoreConfigBase(const StoreReference::Params & params, FilePathType pathType)
+    : Config(params)
+    , storeDir_{
+          this,
+          getDefaultNixStoreDir(pathType),
+          "store",
+          R"(
+            Logical location of the Nix store, usually
+            `/nix/store`. Note that you can only copy store paths
+            between stores if they have the same `store` setting.
+          )",
+      }
+{
+}
+
+StoreConfig::StoreConfig(const Params & params, FilePathType pathType)
+    : StoreConfigBase(params, pathType)
     , StoreDirConfig{storeDir_}
 {
 }

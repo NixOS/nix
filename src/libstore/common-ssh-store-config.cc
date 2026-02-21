@@ -4,7 +4,7 @@
 namespace nix {
 
 CommonSSHStoreConfig::CommonSSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Unix)
     , authority(authority)
 {
 }
