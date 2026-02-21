@@ -146,7 +146,7 @@ struct RealisedPath
     auto operator<=>(const RealisedPath &) const = default;
 };
 
-class MissingRealisation : public Error
+class MissingRealisation final : public CloneableError<MissingRealisation, Error>
 {
 public:
     MissingRealisation(DrvOutput & outputId)
@@ -155,7 +155,7 @@ public:
     }
 
     MissingRealisation(std::string_view drv, OutputName outputName)
-        : Error(
+        : CloneableError(
               "cannot operate on output '%s' of the "
               "unbuilt derivation '%s'",
               outputName,

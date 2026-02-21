@@ -41,6 +41,11 @@ const std::string & BaseError::calcWhat() const
     }
 }
 
+bool BaseError::hasPos() const
+{
+    return err.pos.get() && *err.pos.get();
+}
+
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
 std::ostream & operator<<(std::ostream & os, const HintFmt & hf)

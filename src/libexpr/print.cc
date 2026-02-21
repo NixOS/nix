@@ -509,6 +509,17 @@ private:
         }
     }
 
+    void printFailed()
+    {
+        if (options.ansiColors)
+            output << ANSI_MAGENTA;
+        // Historically, a tried and then ignored value (e.g. through tryEval) was
+        // reverted to the original thunk.
+        output << "«thunk»";
+        if (options.ansiColors)
+            output << ANSI_NORMAL;
+    }
+
     void printExternal(Value & v)
     {
         v.external()->print(output);
@@ -588,6 +599,10 @@ private:
 
             case nFunction:
                 printFunction(v);
+                break;
+
+            case nFailed:
+                printFailed();
                 break;
 
             case nThunk:

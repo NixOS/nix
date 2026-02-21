@@ -403,7 +403,7 @@ ref<FileTransfer> getFileTransfer();
  */
 ref<FileTransfer> makeFileTransfer(const FileTransferSettings & settings = fileTransferSettings);
 
-class FileTransferError : public Error
+class FileTransferError final : public CloneableError<FileTransferError, Error>
 {
 public:
     FileTransfer::Error error;

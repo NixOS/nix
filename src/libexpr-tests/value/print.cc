@@ -188,6 +188,22 @@ TEST_F(ValuePrintingTests, vBlackhole)
     test(vBlackhole, "«potential infinite recursion»");
 }
 
+TEST_F(ValuePrintingTests, vFailed)
+{
+    Value v;
+    try {
+        throw Error("nope");
+    } catch (...) {
+        v.mkFailed(std::current_exception(), nullptr);
+    }
+
+    // Historically, a tried and then ignored value (e.g. through tryEval) was
+    // reverted to the original thunk.
+
+    test(v, "«thunk»");
+    test(v, ANSI_MAGENTA "«thunk»" ANSI_NORMAL, PrintOptions{.ansiColors = true});
+}
+
 TEST_F(ValuePrintingTests, depthAttrs)
 {
     Value vOne;

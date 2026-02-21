@@ -9,14 +9,14 @@
 
 namespace nix {
 
-class BadNixStringContextElem : public Error
+class BadNixStringContextElem final : public CloneableError<BadNixStringContextElem, Error>
 {
 public:
     std::string_view raw;
 
     template<typename... Args>
     BadNixStringContextElem(std::string_view raw_, const Args &... args)
-        : Error("")
+        : CloneableError("")
     {
         raw = raw_;
         auto hf = HintFmt(args...);

@@ -517,4 +517,106 @@ TEST_F(nix_api_expr_test, nix_expr_attrset_update)
     assert_ctx_ok();
 }
 
+// The following is a test case for retryable thunks. This is a requirement
+// for the current way in which NixOps4 evaluates its deployment expressions.
+// An alternative strategy could be implemented, but unwinding the stack may
+// be a more efficient way to deal with many suspensions/resumptions, compared
+// to e.g. using a thread or coroutine stack for each suspended dependency.
+// This test models the essential bits of a deployment tool that uses such
+// a strategy.
+
+// State for the retryable primop - simulates deployment resource availability
+struct DeploymentResourceState
+{
+    bool vm_created = false;
+};
+
+static void primop_load_resource_input(
+    void * user_data, nix_c_context * context, EvalState * state, nix_value ** args, nix_value * ret)
+{
+    assert(context);
+    assert(state);
+    auto * resource_state = static_cast<DeploymentResourceState *>(user_data);
+
+    // Get the resource input name argument
+    std::string input_name;
+    if (nix_get_string(context, args[0], OBSERVE_STRING(input_name)) != NIX_OK)
+        return;
+
+    // Only handle "vm_id" input - throw for anything else
+    if (input_name != "vm_id") {
+        std::string error_msg = "unknown resource input: " + input_name;
+        nix_set_err_msg(context, NIX_ERR_NIX_ERROR, error_msg.c_str());
+        return;
+    }
+
+    if (resource_state->vm_created) {
+        // VM has been created, return the ID
+        nix_init_string(context, ret, "vm-12345");
+    } else {
+        // VM not created yet, fail with dependency error
+        nix_set_err_msg(context, NIX_ERR_RECOVERABLE, "VM not yet created");
+    }
+}
+
+TEST_F(nix_api_expr_test, nix_expr_thunk_re_evaluation_after_deployment)
+{
+    // This test demonstrates NixOps4's requirement: a thunk calling a primop should be
+    // re-evaluable when deployment resources become available that were not available initially.
+
+    DeploymentResourceState resource_state;
+
+    PrimOp * primop = nix_alloc_primop(
+        ctx,
+        primop_load_resource_input,
+        1,
+        "loadResourceInput",
+        nullptr,
+        "load a deployment resource input",
+        &resource_state);
+    assert_ctx_ok();
+
+    nix_value * primopValue = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_primop(ctx, primopValue, primop);
+    assert_ctx_ok();
+
+    nix_value * inputName = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_string(ctx, inputName, "vm_id");
+    assert_ctx_ok();
+
+    // Create a single thunk by using nix_init_apply instead of nix_value_call
+    // This creates a lazy application that can be forced multiple times
+    nix_value * thunk = nix_alloc_value(ctx, state);
+    assert_ctx_ok();
+    nix_init_apply(ctx, thunk, primopValue, inputName);
+    assert_ctx_ok();
+
+    // First force: VM not created yet, should fail
+    nix_value_force(ctx, state, thunk);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), testing::HasSubstr("VM not yet created"));
+
+    // Clear the error context for the next attempt
+    nix_c_context_free(ctx);
+    ctx = nix_c_context_create();
+
+    // Simulate deployment process: VM gets created
+    resource_state.vm_created = true;
+
+    // Second force of the SAME thunk: this is where the "failed" value issue appears
+    // With failed value caching, this should fail because the thunk is marked as permanently failed
+    // Without failed value caching (or with retryable failures), this should succeed
+    nix_value_force(ctx, state, thunk);
+
+    // If we get here without error, the thunk was successfully re-evaluated
+    assert_ctx_ok();
+
+    std::string result;
+    nix_get_string(ctx, thunk, OBSERVE_STRING(result));
+    assert_ctx_ok();
+    ASSERT_STREQ("vm-12345", result.c_str());
+}
+
 } // namespace nixC
