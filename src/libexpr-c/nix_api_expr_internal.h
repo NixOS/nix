@@ -22,10 +22,12 @@ struct nix_eval_state_builder
 
 struct EvalState
 {
-    nix::fetchers::Settings fetchSettings;
-    nix::EvalSettings settings;
-    std::shared_ptr<nix::EvalState> statePtr;
+    // Must be first: `(EvalState *) &state` relies on this.
+    // Do NOT reorder.
     nix::EvalState & state;
+    std::unique_ptr<nix::fetchers::Settings> fetchSettings;
+    std::unique_ptr<nix::EvalSettings> settings;
+    std::shared_ptr<nix::EvalState> statePtr;
 };
 
 struct BindingsBuilder
