@@ -43,7 +43,7 @@ class TestHttpBinaryCacheStoreConfig : public HttpBinaryCacheStoreConfig
 {
 public:
     TestHttpBinaryCacheStoreConfig(ParsedURL url, const Store::Config::Params & params)
-        : StoreConfig(params)
+        : StoreConfig(params, FilePathType::Unix)
         , HttpBinaryCacheStoreConfig(url, params)
     {
     }

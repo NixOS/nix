@@ -12,8 +12,8 @@
 namespace nix {
 
 SSHStoreConfig::SSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
-    : Store::Config{params}
-    , RemoteStore::Config{params}
+    : Store::Config{params, FilePathType::Unix}
+    , RemoteStore::Config{params, FilePathType::Unix}
     , CommonSSHStoreConfig{authority, params}
 {
 }
@@ -89,8 +89,8 @@ protected:
 };
 
 MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
+    : StoreConfig(params, FilePathType::Native)
+    , RemoteStoreConfig(params, FilePathType::Native)
     , CommonSSHStoreConfig(params)
     , SSHStoreConfig(params)
     , LocalFSStoreConfig(params)
@@ -98,8 +98,8 @@ MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
 }
 
 MountedSSHStoreConfig::MountedSSHStoreConfig(const ParsedURL::Authority & authority, StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
+    : StoreConfig(params, FilePathType::Native)
+    , RemoteStoreConfig(params, FilePathType::Native)
     , CommonSSHStoreConfig(authority, params)
     , SSHStoreConfig(authority, params)
     , LocalFSStoreConfig(params)

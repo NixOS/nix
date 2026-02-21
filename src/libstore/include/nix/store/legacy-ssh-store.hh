@@ -12,7 +12,11 @@ namespace nix {
 
 struct LegacySSHStoreConfig : std::enable_shared_from_this<LegacySSHStoreConfig>, virtual CommonSSHStoreConfig
 {
-    using CommonSSHStoreConfig::CommonSSHStoreConfig;
+    LegacySSHStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , CommonSSHStoreConfig(params)
+    {
+    }
 
     LegacySSHStoreConfig(const ParsedURL::Authority & authority, const Params & params);
 
