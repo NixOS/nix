@@ -720,11 +720,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
             auto linksName = baseNameOf(linksDir);
+            auto linksNameB3 = baseNameOf(linksDirB3);
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
                 std::string name = dirent->d_name;
-                if (name == "." || name == ".." || name == linksName)
+                if (name == "." || name == ".." || name == linksName || name == linksNameB3)
                     continue;
 
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
@@ -748,52 +749,67 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         return;
     }
 
-    /* Unlink all files in /nix/store/.links that have a link count of 1,
-       which indicates that there are no other links and so they can be
-       safely deleted.  FIXME: race condition with optimisePath(): we
-       might see a link count of 1 just before optimisePath() increases
-       the link count. */
+    /* Unlink all files in /nix/store/.links (and .links-b3) that have a
+       link count of 1, which indicates that there are no other links
+       and so they can be safely deleted.  FIXME: race condition with
+       optimisePath(): we might see a link count of 1 just before
+       optimisePath() increases the link count. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
         printInfo("deleting unused links...");
 
-        AutoCloseDir dir(opendir(linksDir.c_str()));
-        if (!dir)
-            throw SysError("opening directory '%1%'", linksDir);
-
         int64_t actualSize = 0, unsharedSize = 0;
 
-        struct dirent * dirent;
-        while (errno = 0, dirent = readdir(dir.get())) {
-            checkInterrupt();
-            std::string name = dirent->d_name;
-            if (name == "." || name == "..")
-                continue;
-            Path path = linksDir + "/" + name;
-
-            auto st = lstat(path);
-
-            if (st.st_nlink != 1) {
-                actualSize += st.st_size;
-                unsharedSize += (st.st_nlink - 1) * st.st_size;
-                continue;
+        auto cleanLinks = [&](const Path & dir) {
+            AutoCloseDir d(opendir(dir.c_str()));
+            if (!d) {
+                if (errno == ENOENT)
+                    return;
+                throw SysError("opening directory '%1%'", dir);
             }
 
-            printMsg(lvlTalkative, "deleting unused link '%1%'", path);
+            struct dirent * dirent;
+            while (errno = 0, dirent = readdir(d.get())) {
+                checkInterrupt();
+                std::string name = dirent->d_name;
+                if (name == "." || name == "..")
+                    continue;
+                Path path = dir + "/" + name;
 
-            if (unlink(path.c_str()) == -1)
-                throw SysError("deleting '%1%'", path);
+                auto st = lstat(path);
 
-            /* Do not account for deleted file here. Rely on deletePath()
-               accounting.  */
-        }
+                if (st.st_nlink != 1) {
+                    actualSize += st.st_size;
+                    unsharedSize += (st.st_nlink - 1) * st.st_size;
+                    continue;
+                }
+
+                printMsg(lvlTalkative, "deleting unused link '%1%'", path);
+
+                if (unlink(path.c_str()) == -1)
+                    throw SysError("deleting '%1%'", path);
+
+                /* Do not account for deleted file here. Rely on deletePath()
+                   accounting.  */
+            }
+        };
+
+        cleanLinks(linksDir);
+        cleanLinks(linksDirB3);
 
         int64_t overhead =
 #ifdef _WIN32
             0
 #else
             [&] {
-                auto st = stat(linksDir);
-                return st.st_blocks * 512ULL;
+                int64_t total = 0;
+                auto addOverhead = [&](const Path & dir) {
+                    auto st = maybeStat(dir);
+                    if (st)
+                        total += st->st_blocks * 512ULL;
+                };
+                addOverhead(linksDir);
+                addOverhead(linksDirB3);
+                return total;
             }()
 #endif
             ;

@@ -121,6 +121,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , _state(make_ref<Sync<State>>())
     , dbDir(config->stateDir + "/db")
     , linksDir(config->realStoreDir + "/.links")
+    , linksDirB3(config->realStoreDir + "/.links-b3")
     , reservedPath(dbDir + "/reserved")
     , schemaPath(dbDir + "/schema")
     , tempRootsDir(config->stateDir + "/temproots")
@@ -137,6 +138,8 @@ LocalStore::LocalStore(ref<const Config> config)
         makeStoreWritable();
     }
     createDirs(linksDir);
+    if (experimentalFeatureSettings.isEnabled(Xp::BLAKE3Links))
+        createDirs(linksDirB3);
     Path profilesDir = config->stateDir + "/profiles";
     createDirs(profilesDir);
     createDirs(tempRootsDir);
@@ -1345,6 +1348,59 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 } else {
                     errors = true;
                 }
+            }
+        }
+
+        if (experimentalFeatureSettings.isEnabled(Xp::BLAKE3Links) && pathExists(linksDirB3)) {
+            for (auto & link : DirectoryIterator{linksDirB3}) {
+                checkInterrupt();
+                auto name = link.path().filename().string();
+                printMsg(lvlTalkative, "checking contents of %s", PathFmt(name));
+
+                auto corrupt = [&](const std::string & msg) {
+                    printError(msg);
+                    if (repair) {
+                        std::filesystem::remove(link.path());
+                        printInfo("removed link %s", PathFmt(link.path()));
+                    } else {
+                        errors = true;
+                    }
+                };
+
+                if (name.size() < 2 || name[name.size() - 2] != '-') {
+                    corrupt(fmt("link %s has invalid name (missing type suffix)", PathFmt(link.path())));
+                    continue;
+                }
+
+                char suffix = name.back();
+
+                mode_t expectedMode;
+                try {
+                    expectedMode = linkSuffixMode(suffix);
+                } catch (Error &) {
+                    corrupt(fmt("link %s has invalid type suffix '%c'", PathFmt(link.path()), suffix));
+                    continue;
+                }
+
+                auto st = lstat(link.path());
+                if ((st.st_mode & linkModeMask) != expectedMode) {
+                    corrupt(
+                        fmt("link %s has suffix '%c' but mode 0%o does not match expected 0%o",
+                            PathFmt(link.path()),
+                            suffix,
+                            st.st_mode & linkModeMask,
+                            expectedMode));
+                    continue;
+                }
+
+                auto expectedHash = name.substr(0, name.size() - 2);
+                Hash contentHash = (st.st_mode & S_IFMT) == S_IFLNK
+                                       ? hashString(HashAlgorithm::BLAKE3, readLink(link.path()).string())
+                                       : hashFile(HashAlgorithm::BLAKE3, link.path());
+                std::string hash = contentHash.to_string(HashFormat::Nix32, false);
+                if (hash != expectedHash)
+                    corrupt(fmt(
+                        "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), expectedHash, hash));
             }
         }
 

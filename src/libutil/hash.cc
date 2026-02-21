@@ -30,7 +30,8 @@ const StringSet hashFormats = {"base64", "nix32", "base16", "sri"};
 Hash::Hash(HashAlgorithm algo, const ExperimentalFeatureSettings & xpSettings)
     : algo(algo)
 {
-    if (algo == HashAlgorithm::BLAKE3) {
+    if (algo == HashAlgorithm::BLAKE3 && !xpSettings.isEnabled(Xp::BLAKE3Hashes)
+        && !xpSettings.isEnabled(Xp::BLAKE3Links)) {
         xpSettings.require(Xp::BLAKE3Hashes);
     }
     hashSize = regularHashSize(algo);

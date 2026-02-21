@@ -11,9 +11,49 @@
 #include <chrono>
 #include <future>
 #include <string>
+#include <sys/stat.h>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
+
+/**
+ * Mode bits encoded by .links-b3 link name suffixes.
+ *
+ *   'r' = regular file (not executable)
+ *   'x' = regular file (executable)
+ *   's' = symlink
+ */
+constexpr mode_t linkModeMask = S_IFMT | S_IXUSR;
+
+constexpr mode_t linkModeR = S_IFREG;
+constexpr mode_t linkModeX = S_IFREG | S_IXUSR;
+constexpr mode_t linkModeS = S_IFLNK | S_IXUSR;
+
+inline char linkModeSuffix(mode_t mode)
+{
+    auto m = mode & linkModeMask;
+    if (m == linkModeR)
+        return 'r';
+    if (m == linkModeX)
+        return 'x';
+    if (m == linkModeS)
+        return 's';
+    throw Error("unexpected mode 0%o for .links-b3 entry", mode);
+}
+
+inline mode_t linkSuffixMode(char suffix)
+{
+    switch (suffix) {
+    case 'r':
+        return linkModeR;
+    case 'x':
+        return linkModeX;
+    case 's':
+        return linkModeS;
+    default:
+        throw Error("invalid .links-b3 suffix '%c'", suffix);
+    }
+}
 
 /**
  * Nix store and database schema version.
@@ -230,6 +270,7 @@ public:
 
     const Path dbDir;
     const Path linksDir;
+    const Path linksDirB3;
     const Path reservedPath;
     const Path schemaPath;
     const Path tempRootsDir;
