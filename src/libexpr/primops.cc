@@ -3535,6 +3535,59 @@ static RegisterPrimOp primop_mapAttrs({
     .fun = prim_mapAttrs,
 });
 
+
+static void prim_concatMapAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceAttrs(*args[1], pos,
+        "while evaluating the second argument passed to builtins.concatMapAttrs");
+    auto inAttrs = args[1]->attrs();
+
+    std::map<SymbolIdx, Value*> attrMap;
+
+    for (auto &i : *inAttrs) {
+        Value * vName = Value::toPtr(state.symbols[i.name]);
+        Value * funApp = state.allocValue();
+        funApp->mkApp(args[0], vName);
+        Value * result = state.allocValue();
+        result->mkApp(funApp, i.value);
+        state.forceAttrs(*result, pos,
+            "while evaluating the result of the function passed to builtins.concatMapAttrs");
+
+        // Direct insertion into map - automatically handles deduplication
+        // If duplicate keys exist, this overwrites with the later value (last-write-wins)
+        for (auto &j : *result->attrs()) {
+            attrMap[j.name] = j.value;
+        }
+    }
+
+    auto attrs = state.buildBindings(attrMap.size());
+    for (const auto& [name, value] : attrMap) {
+        attrs.insert(name, value);
+    }
+
+    v.mkAttrs(attrs.alreadySorted());
+}
+
+
+static RegisterPrimOp primop_concatMapAttrs({
+    .name = "__concatMapAttrs",
+    .args = {"f", "attrset"},
+    .doc = R"(
+      Apply function *f* to every element of *attrset*. For example,
+
+      ```nix
+      builtins.concatMapAttrs (name: value: { ${name} = value; "${name}-${value}" = value; } ]) { foo = "fizz"; bar = "buzz"; }
+      ```
+
+      evaluates to `{ foo = "fizz"; foo-fizz = "fizz"; bar = "buzz"; bar-buzz = "buzz"; }`.
+
+      If multiple applications of *f* return attribute sets with the same attribute names,
+      the last write wins. Meaning the value from the attribute set that was processed later will be kept in the final result.
+    )",
+    .fun = prim_concatMapAttrs,
+});
+
+
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     // we will first count how many values are present for each given key.
