@@ -13,10 +13,6 @@ using testing::Eq;
 using testing::Field;
 using testing::SizeIs;
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
 using namespace nix;
 
 TEST(machines, getMachinesWithEmptyBuilders)
