@@ -277,7 +277,7 @@ struct curlFileTransfer : public FileTransfer
                 result.urls.push_back(effectiveUriCStr);
         }
 
-        std::string parseContentEncoding(std::string_view contentEncoding)
+        static std::string parseContentEncoding(std::string_view contentEncoding)
         {
 
             if (contentEncoding.find(",") != std::string::npos) {
