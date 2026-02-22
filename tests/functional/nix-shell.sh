@@ -206,6 +206,36 @@ chmod a+x "$TEST_ROOT"/issue-11892/shebangscript
   | tee /dev/stderr \
   | grepQuiet "ok baz11892"
 
+(
+    # Test the prioritization of build shells
+    export NIX_BUILD_SHELL="$PWD/dummy-build-shells/1-shell"
+    export NIX_PATH="nixpkgs=$PWD/dummy-build-shells/2-nixpkgs.nix"
+
+    # 1. $NIX_BUILD_SHELL
+    # "echo 3" will not run because the bash used is provied by 1-shell
+    output=$(nix-shell --pure "$shellDotNix" -A shellDrv --run "echo 3")
+    [ "$output" = "1" ]
+
+    # 2. (import <nixpkgs> {}).bashInteractive
+    # "echo 3" will not be run because the bash used is provided by 2-nixpkgs
+    unset NIX_BUILD_SHELL
+    output=$(nix-shell --pure "$shellDotNix" -A shellDrv --run "echo 3")
+    [ "$output" = "2" ]
+
+    # 3. bash from $PATH
+    # NOTE: we should really test this by overwriting $PATH and passing --keep
+    # PATH to nix-shell, but the mkDerivation in config.nix will overwrite
+    # whatever PATH we give here so we'll use what's defined in config.nix
+    # (actual bash) as our third example with --run 'echo 3'
+    unset NIX_PATH
+    output=$(nix-shell --pure "$shellDotNix" -A shellDrv --run 'echo 3')
+    [ "$output" = "3" ]
+
+    # 4. once we are in the nix-shell, `bash` should be whatever is provided by
+    # the derivation
+    output=$(nix-shell --pure "$shellDotNix" -A shellDrvFakeBash4 --run 'bash -e "echo 5"')
+    [ "$output" = "4" ]
+)
 
 #####################
 # Flake equivalents #

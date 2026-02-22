@@ -485,8 +485,12 @@ static void main_nix_build(int argc, char ** argv)
                 shellDrv = bashDrv;
 
             } catch (Error & e) {
-                logError(e.info());
-                notice("uses bash from your environment");
+                // in a shebang, it doesn't matter which bash we use since we immediately execute the interpreter
+                if (!inShebang) {
+                    logErrorInfo(lvlInfo, e.info());
+                    printInfo(
+                        "Cannot access '(import <nixpkgs> {}).bashInteractive'; falling back to bash from your environment.");
+                }
                 shell = "bash";
             }
         }
@@ -632,9 +636,8 @@ static void main_nix_build(int argc, char ** argv)
                 + structuredAttrsRC +
                 "\n[ -e $stdenv/setup ] && source $stdenv/setup; "
                 "%3%"
-                "PATH=%4%:\"$PATH\"; "
-                "SHELL=%5%; "
-                "BASH=%5%; "
+                "SHELL=%4%; "
+                "BASH=%4%; "
                 "set +e; "
                 R"s([ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && )s" +
                 (isRootUser()
@@ -643,13 +646,12 @@ static void main_nix_build(int argc, char ** argv)
                 "if [ \"$(type -t runHook)\" = function ]; then runHook shellHook; fi; "
                 "unset NIX_ENFORCE_PURITY; "
                 "shopt -u nullglob; "
-                "unset TZ; %6%"
+                "unset TZ; %5%"
                 "shopt -s execfail;"
-                "%7%",
+                "%6%",
                 escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                escapeShellArgAlways(dirOf(*shell)),
                 escapeShellArgAlways(*shell),
                 tzExport,
                 envCommand);
