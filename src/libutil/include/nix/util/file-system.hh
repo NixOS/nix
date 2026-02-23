@@ -244,7 +244,7 @@ Descriptor openNewFileForWrite(const std::filesystem::path & path, mode_t mode, 
  */
 std::string readFile(const Path & path);
 std::string readFile(const std::filesystem::path & path);
-void readFile(const Path & path, Sink & sink, bool memory_map = true);
+void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map = true);
 
 enum struct FsSync { Yes, No };
 

@@ -21,7 +21,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include <boost/exception/diagnostic_information.hpp>
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <boost/filesystem/path.hpp>
 
 #ifdef __FreeBSD__
 #  include <sys/param.h>
@@ -305,25 +307,27 @@ std::string readFile(const std::filesystem::path & path)
     return readFile(fd.get());
 }
 
-void readFile(const Path & path, Sink & sink, bool memory_map)
+void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
 {
     // Memory-map the file for faster processing where possible.
     if (memory_map) {
         try {
-            boost::iostreams::mapped_file_source mmap(path);
+            // mapped_file_source can't be constructed from std::filesystem::path with wide paths. Go
+            // through boost::filesystem::path.
+            boost::iostreams::mapped_file_source mmap(boost::filesystem::path{path.native()});
             if (mmap.is_open()) {
                 sink({mmap.data(), mmap.size()});
                 return;
             }
         } catch (const boost::exception & e) {
+            debug("memory-mapping failed for path: %s: %s", PathFmt(path), boost::diagnostic_information(e));
         }
-        debug("memory-mapping failed for path: %s", path);
     }
 
     // Stream the file instead if memory-mapping fails or is disabled.
-    AutoCloseFD fd = openFileReadonly(std::filesystem::path(path));
+    AutoCloseFD fd = openFileReadonly(path);
     if (!fd)
-        throw NativeSysError("opening file %s", path);
+        throw NativeSysError("opening file %s", PathFmt(path));
     drainFD(fd.get(), sink);
 }
 
