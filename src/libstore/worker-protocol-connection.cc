@@ -5,6 +5,12 @@
 
 namespace nix {
 
+/**
+ * Bit used to namespace remote activity IDs, preventing collisions
+ * with locally-generated IDs.
+ */
+static constexpr uint64_t remoteActivityIdBit = 1ULL << 63;
+
 WorkerProto::BasicClientConnection::~BasicClientConnection()
 {
     try {
@@ -82,11 +88,23 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto s = readString(from);
             auto fields = readFields(from);
             auto parent = readNum<ActivityId>(from);
+            // Namespace remote activity IDs to prevent collisions with
+            // local IDs by setting the high bit (remoteActivityIdBit).
+            // Local IDs use PID << 32 | counter. On Linux, PIDs are
+            // signed 32-bit values and thus fit in 31 bits, so bit 63
+            // is always clear for local activities.
+            //
+            // Note: this only prevents local-vs-remote collisions;
+            // activities from different remote daemons can still collide.
+            act |= remoteActivityIdBit;
+            if (parent != 0)
+                parent |= remoteActivityIdBit;
             logger->startActivity(act, lvl, type, s, fields, parent, remoteDescription);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {
             auto act = readNum<ActivityId>(from);
+            act |= remoteActivityIdBit;
             logger->stopActivity(act, remoteDescription);
         }
 
@@ -94,6 +112,7 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto act = readNum<ActivityId>(from);
             auto type = (ResultType) readInt(from);
             auto fields = readFields(from);
+            act |= remoteActivityIdBit;
             logger->result(act, type, fields, remoteDescription);
         }
 
