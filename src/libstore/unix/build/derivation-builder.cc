@@ -1821,27 +1821,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             dynamicOutputLock.lockPaths({store.toRealPath(finalDestPath)});
         }
 
-        /* Move files, if needed */
-        if (store.toRealPath(finalDestPath) != actualPath) {
-            if (buildMode == bmRepair) {
-                /* Path already exists, need to replace it */
-                replaceValidPath(store.toRealPath(finalDestPath), actualPath);
-            } else if (buildMode == bmCheck) {
-                /* Path already exists, and we want to compare, so we leave out
-                   new path in place. */
-            } else if (store.isValidPath(newInfo.path)) {
-                /* Path already exists because CA path produced by something
-                   else. No moving needed. */
-                assert(newInfo.ca);
-                /* Can delete our scratch copy now. */
-                deletePath(actualPath);
-            } else {
-                auto destPath = store.toRealPath(finalDestPath);
-                deletePath(destPath);
-                movePath(actualPath, destPath);
-            }
-        }
-
         if (buildMode == bmCheck) {
             /* Check against already registered outputs */
 
@@ -1887,6 +1866,34 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         } else {
             /* do tasks relating to registering these outputs */
 
+            /* Move files, if needed */
+            if (store.toRealPath(finalDestPath) != actualPath) {
+                if (buildMode == bmRepair) {
+                    /* Path already exists, need to replace it */
+                    replaceValidPath(store.toRealPath(finalDestPath), actualPath);
+                    /* Optimize store object we just replaced with new
+                       (not-yet-optimized) data. */
+                    store.optimisePath(
+                        store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
+                } else if (store.isValidPath(newInfo.path)) {
+                    /* Path already exists because CA path produced by something
+                       else. No moving needed. */
+                    assert(newInfo.ca);
+                    /* Can delete our scratch copy now. */
+                    deletePath(actualPath);
+                    /* Presume already-existing store object is already
+                       optimized. */
+                } else {
+                    auto destPath = store.toRealPath(finalDestPath);
+                    deletePath(destPath);
+                    movePath(actualPath, destPath);
+                    /* Optimize store object we just installed from new
+                       (not-yet-optimized) data. */
+                    store.optimisePath(
+                        store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
+                }
+            }
+
             /* For debugging, print out the referenced and unreferenced paths. */
             for (auto & i : inputPaths) {
                 if (references.count(i))
@@ -1894,10 +1901,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 else
                     debug("unreferenced input: '%1%'", store.printStorePath(i));
             }
-
-            if (!store.isValidPath(newInfo.path))
-                store.optimisePath(
-                    store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
