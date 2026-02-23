@@ -88,14 +88,10 @@ struct curlFileTransfer : public FileTransfer
         FileTransferRequest request;
         FileTransferResult result;
         std::unique_ptr<Activity> _act;
-        bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         // buffer to accompany the `req` above
         char errbuf[CURL_ERROR_SIZE];
-        bool active = false;   // whether the handle has been added to the multi object
-        bool paused = false;   // whether the request has been paused previously
-        bool enqueued = false; // whether the request has been added the incoming queue
         std::string statusMsg;
 
         unsigned int attempt = 0;
@@ -108,7 +104,30 @@ struct curlFileTransfer : public FileTransfer
 
         std::string encoding;
 
-        bool acceptRanges = false;
+        /**
+         * Whether either the success or failure function has been called.
+         */
+        bool done:1 = false;
+
+        /**
+         * Whether the handle has been added to the multi object.
+         */
+        bool active:1 = false;
+
+        /**
+         * Whether the request has been paused previously.
+         */
+        bool paused:1 = false;
+
+        /**
+         * Whether the request has been added the incoming queue.
+         */
+        bool enqueued:1 = false;
+
+        /**
+         * Whether we can use range downloads for retries.
+         */
+        bool acceptRanges:1 = false;
 
         curl_off_t writtenToSink = 0;
 
