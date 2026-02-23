@@ -246,51 +246,78 @@ EvalState::EvalState(
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
-    , storeFS(makeMountedSourceAccessor({
-          {CanonPath::root, makeEmptySourceAccessor()},
-          /* In the pure eval case, we can simply require
-             valid paths. However, in the *impure* eval
-             case this gets in the way of the union
-             mechanism, because an invalid access in the
-             upper layer will *not* be caught by the union
-             source accessor, but instead abort the entire
-             lookup.
+    , storeFS([&] {
+        auto accessor = makeMountedSourceAccessor({{CanonPath::root, makeEmptySourceAccessor()}});
 
-             This happens when the store dir in the
-             ambient file system has a path (e.g. because
-             another Nix store there), but the relocated
-             store does not.
+        /* In the pure eval case, we can simply require
+           valid paths. However, in the *impure* eval
+           case this gets in the way of the union
+           mechanism, because an invalid access in the
+           upper layer will *not* be caught by the union
+           source accessor, but instead abort the entire
+           lookup.
 
-             TODO make the various source accessors doing
-             access control all throw the same type of
-             exception, and make union source accessor
-             catch it, so we don't need to do this hack.
-           */
-          {CanonPath(store->storeDir), store->getFSAccessor(settings.pureEval)},
-      }))
-    , rootFS([&] {
-        /* In pure eval mode, we provide a filesystem that only
-           contains the Nix store.
+           This happens when the store dir in the
+           ambient file system has a path (e.g. because
+           another Nix store there), but the relocated
+           store does not.
 
-           Otherwise, use a union accessor to make the augmented store
-           available at its logical location while still having the
-           underlying directory available. This is necessary for
-           instance if we're evaluating a file from the physical
-           /nix/store while using a chroot store, and also for lazy
-           mounted fetchTree. */
-        auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
-
-        /* Apply access control if needed. */
-        if (settings.restrictEval || settings.pureEval)
-            accessor = AllowListSourceAccessor::create(
-                accessor, {}, {}, [&settings](const CanonPath & path) -> RestrictedPathError {
-                    auto modeInformation = settings.pureEval ? "in pure evaluation mode (use '--impure' to override)"
-                                                             : "in restricted mode";
-                    throw RestrictedPathError("access to absolute path '%1%' is forbidden %2%", path, modeInformation);
-                });
+           TODO make the various source accessors doing
+           access control all throw the same type of
+           exception, and make union source accessor
+           catch it, so we don't need to do this hack.
+         */
+        if (settings.pureEval) {
+            /* This is just an overkill way to make sure other store
+               paths get this error, and not the "doesn't exist" error
+               that the mounted source accessor would do on its own. */
+            accessor->mount(
+                CanonPath::root,
+                AllowListSourceAccessor::create(
+                    getFSSourceAccessor(),
+                    {},
+                    {CanonPath::root, CanonPath(store->storeDir)},
+                    [&](const CanonPath & path) -> RestrictedPathError {
+                        throw RestrictedPathError(
+                            "access to absolute path '%1%' is forbidden in pure evaluation mode (use '--impure' to override)",
+                            CanonPath(store->storeDir) / path);
+                    }));
+            /* We don't want to list store paths */
+            accessor->mount(CanonPath(store->storeDir), makeEmptySourceAccessor());
+        } else {
+            accessor->mount(CanonPath(store->storeDir), store->getFSAccessor(false));
+        }
 
         return accessor;
+    }())
+    , rootFS([&] -> decltype(rootFS) {
+        /* In pure eval mode, we provide a filesystem that only
+           contains the Nix store. */
+        if (settings.pureEval)
+            return storeFS;
+
+        auto makeImpureAccessor = [&]() -> decltype(rootFS) {
+            /* If we have a chroot store and pure eval is not enabled,
+               use a union accessor to make the chroot store available
+               at its logical location while still having the underlying
+               directory available. This is necessary for instance if
+               we're evaluating a file from the physical /nix/store
+               while using a chroot store. */
+            auto realStoreDir = dirOf(store->toRealPath(StorePath::dummy));
+            if (store->storeDir != realStoreDir)
+                return makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+
+            return getFSSourceAccessor();
+        }();
+
+        /* Apply access control if needed. */
+        if (settings.restrictEval)
+            return AllowListSourceAccessor::create(
+                makeImpureAccessor(), {}, {}, [](const CanonPath & path) -> RestrictedPathError {
+                    throw RestrictedPathError("access to absolute path '%1%' is forbidden in restricted mode", path);
+                });
+
+        return makeImpureAccessor();
     }())
     , corepkgsFS(make_ref<MemorySourceAccessor>())
     , internalFS(make_ref<MemorySourceAccessor>())
@@ -376,13 +403,19 @@ void EvalState::allowPathLegacy(const Path & path)
 
 void EvalState::allowPath(const StorePath & storePath)
 {
-    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
+    if (settings.pureEval) {
+        storeFS->mount(CanonPath(store->printStorePath(storePath)), ref{store->getFSAccessor(storePath)});
+    }
+    if (settings.restrictEval) {
+        auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>();
+        assert(rootFS2);
         rootFS2->allowPrefix(CanonPath(store->printStorePath(storePath)));
+    }
 }
 
 void EvalState::allowClosure(const StorePath & storePath)
 {
-    if (!rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
+    if (!settings.pureEval && !settings.restrictEval)
         return;
 
     StorePathSet closure;
