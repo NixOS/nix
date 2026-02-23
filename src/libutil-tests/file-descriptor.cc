@@ -3,6 +3,7 @@
 
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/signals.hh"
 
 #include <cstring>
 
@@ -241,6 +242,27 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "abcdefgh");
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "");
+}
+
+TEST(WriteFull, RespectsAllowInterrupts)
+{
+    Pipe pipe;
+    pipe.create();
+
+    setInterrupted(true);
+
+    // Must not throw Interrupted even though the interrupt flag is set.
+    EXPECT_NO_THROW(writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/false));
+
+    // Must throw Interrupted when allowInterrupts is true.
+    EXPECT_THROW(writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/true), Interrupted);
+
+    setInterrupted(false);
+    pipe.writeSide.close();
+
+    // Verify the data from the first write was actually written.
+    FdSource source(pipe.readSide.get());
+    EXPECT_EQ(source.readLine(/*eofOk=*/true), "hello");
 }
 
 } // namespace nix
