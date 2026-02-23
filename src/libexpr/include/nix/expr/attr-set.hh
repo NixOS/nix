@@ -415,6 +415,31 @@ public:
     void sort();
 
     /**
+     * Get the attributes in lexicographically sorted order. Needed for deterministic
+     * iteration order.
+     *
+     * @note Unlike the overload returning a vector of const Attr *, this
+     * copies the attribute values into a @ref out container by value. This is
+     * to reduce the amount of indirection. Note that the resulting Attr
+     * contents are copies and one must not use a pointer to the Attr object for
+     * any purpose other than reading its members.
+     *
+     * (This create a new *pointer reference to* the same Value, in line with call by need.)
+     */
+    template<typename C>
+    void lexicographicOrder(C & out, const SymbolTable & symbols) const
+    {
+        out.reserve(size());
+        for (auto attr : *this)
+            out.push_back(attr);
+        assert(out.size() == size());
+        std::sort(out.begin(), out.end(), [&symbols](const Attr & a, const Attr & b) {
+            std::string_view sa = symbols[a.name], sb = symbols[b.name];
+            return sa < sb;
+        });
+    }
+
+    /**
      * Returns the attributes in lexicographically sorted order.
      */
     std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
