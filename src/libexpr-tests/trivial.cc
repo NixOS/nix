@@ -337,9 +337,16 @@ TEST_F(TrivialExpressionTest, bindOr)
     ASSERT_THAT(*b->value, IsIntEq(1));
 }
 
-TEST_F(TrivialExpressionTest, orCantBeUsed)
+TEST_F(TrivialExpressionTest, orCanBeUsed)
 {
-    ASSERT_THROW(eval("let or = 1; in or"), Error);
+    auto v = eval("let or = 1; in or");
+    ASSERT_THAT(v, IsIntEq(1));
+}
+
+TEST_F(TrivialExpressionTest, orHasCorrectPrecedence)
+{
+    auto v = eval("let inherit (builtins) add; or = 2; in add 1 or");
+    ASSERT_THAT(v, IsIntEq(3));
 }
 
 TEST_F(TrivialExpressionTest, tooManyFormals)
