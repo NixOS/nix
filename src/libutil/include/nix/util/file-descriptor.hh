@@ -85,7 +85,7 @@ size_t read(Descriptor fd, std::span<std::byte> buffer);
  * @return The number of bytes actually written
  * @throws SystemError on failure
  */
-size_t write(Descriptor fd, std::span<const std::byte> buffer);
+size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterrupts);
 
 /**
  * Get the size of a file.

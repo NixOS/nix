@@ -60,9 +60,10 @@ size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
     return static_cast<size_t>(n);
 }
 
-size_t write(Descriptor fd, std::span<const std::byte> buffer)
+size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterrupts)
 {
-    checkInterrupt(); // For consistency with unix
+    if (allowInterrupts)
+        checkInterrupt(); // For consistency with unix
     DWORD n;
     if (!WriteFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL)) {
         auto lastError = GetLastError();
