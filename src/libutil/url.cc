@@ -321,22 +321,6 @@ std::string encodeQuery(const StringMap & ss)
     return res;
 }
 
-Path renderUrlPathEnsureLegal(std::span<const std::string> urlPath)
-{
-    for (const auto & comp : urlPath) {
-        /* This is only really valid for UNIX. Windows has more restrictions. */
-        if (comp.contains('/'))
-            throw BadURL("URL path component '%s' contains '/', which is not allowed in file names", comp);
-        if (comp.contains(char(0))) {
-            using namespace std::string_view_literals;
-            auto str = replaceStrings(comp, "\0"sv, "␀"sv);
-            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", str);
-        }
-    }
-
-    return renderUrlPathNoPctEncoding(urlPath);
-}
-
 std::string renderUrlPathNoPctEncoding(std::span<const std::string> urlPath)
 {
     return concatStringsSep("/", urlPath);
@@ -482,28 +466,41 @@ std::vector<std::string> pathToUrlPath(const std::filesystem::path & path)
 
 std::filesystem::path urlPathToPath(std::span<const std::string> urlPath)
 {
+    for (const auto & comp : urlPath) {
+        /* This is only really valid for UNIX. Windows has more restrictions. */
+        if (comp.contains('/'))
+            throw BadURL("URL path component '%s' contains '/', which is not allowed in file names", comp);
+        if (comp.contains(char(0))) {
+            using namespace std::string_view_literals;
+            auto str = replaceStrings(comp, "\0"sv, "␀"sv);
+            throw BadURL("URL path component '%s' contains NUL byte which is not allowed", str);
+        }
+    }
+
     std::filesystem::path result;
     auto it = urlPath.begin();
 
-    // URL path must start with empty segment (representing absolute path "/")
-    if (it == urlPath.end() || !it->empty())
-        throw Error("only absolute URL paths can be converted to filesystem paths");
+    if (it == urlPath.end())
+        return result;
 
-    ++it;
-    result = "/";
+    // Empty first segment means absolute path (leading "/")
+    if (it->empty()) {
+        ++it;
+        result = "/";
 #ifdef _WIN32
-    // On Windows, check if next segment is a drive letter (e.g., "C:").
-    // If it isn't then this is something like a UNC path rather than a
-    // DOS path.
-    if (it != urlPath.end()) {
-        std::filesystem::path segment{*it};
-        if (segment.has_root_name()) {
-            segment /= "/";
-            result = std::move(segment);
-            ++it;
+        // On Windows, check if next segment is a drive letter (e.g., "C:").
+        // If it isn't then this is something like a UNC path rather than a
+        // DOS path.
+        if (it != urlPath.end()) {
+            std::filesystem::path segment{*it};
+            if (segment.has_root_name()) {
+                segment /= "/";
+                result = std::move(segment);
+                ++it;
+            }
         }
-    }
 #endif
+    }
 
     // Append remaining segments
     for (; it != urlPath.end(); ++it)

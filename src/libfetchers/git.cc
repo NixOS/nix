@@ -627,10 +627,12 @@ struct GitInputScheme : InputScheme
         //
         // See: https://discourse.nixos.org/t/57783 and #9708
         //
-        if (url.scheme == "file" && !forceHttp && !isBareRepository(renderUrlPathEnsureLegal(url.path))) {
-            auto path = renderUrlPathEnsureLegal(url.path);
+        auto maybeUrlFsPathForFileUrl =
+            url.scheme == "file" ? std::make_optional(urlPathToPath(url.path)) : std::nullopt;
+        if (maybeUrlFsPathForFileUrl && !forceHttp && !isBareRepository(maybeUrlFsPathForFileUrl->string())) {
+            auto & path = *maybeUrlFsPathForFileUrl;
 
-            if (!isAbsolute(path)) {
+            if (!path.is_absolute()) {
                 warn(
                     "Fetching Git repository '%s', which uses a path relative to the current directory. "
                     "This is not supported and will stop working in a future release. "
@@ -640,7 +642,7 @@ struct GitInputScheme : InputScheme
 
             repoInfo.location = std::filesystem::absolute(path);
         } else {
-            if (url.scheme == "file")
+            if (maybeUrlFsPathForFileUrl)
                 /* Query parameters are meaningless for file://, but
                    Git interprets them as part of the file name. So get
                    rid of them. */

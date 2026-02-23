@@ -1,5 +1,8 @@
 #include "nix/fetchers/fetchers.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/util.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
@@ -10,6 +13,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 
 #include <sys/time.h>
+#include <variant>
 
 using namespace std::string_literals;
 
@@ -145,7 +149,7 @@ struct MercurialInputScheme : InputScheme
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
         if (url.scheme == "file" && !input.getRef() && !input.getRev())
-            return renderUrlPathEnsureLegal(url.path);
+            return urlPathToPath(url.path);
         return {};
     }
 
@@ -155,29 +159,36 @@ struct MercurialInputScheme : InputScheme
         std::string_view contents,
         std::optional<std::string> commitMsg) const override
     {
-        auto [isLocal, repoPath] = getActualUrl(input);
-        if (!isLocal)
-            throw Error(
-                "cannot commit '%s' to Mercurial repository '%s' because it's not a working tree",
-                path,
-                input.to_string());
+        std::visit(
+            overloaded{
+                [&](const std::filesystem::path & repoPath) {
+                    auto absPath = repoPath / path.rel();
 
-        auto absPath = CanonPath(repoPath) / path;
+                    writeFile(absPath, contents);
 
-        writeFile(absPath.abs(), contents);
+                    // FIXME: shut up if file is already tracked.
+                    runHg({"add", absPath.string()});
 
-        // FIXME: shut up if file is already tracked.
-        runHg({"add", absPath.abs()});
-
-        if (commitMsg)
-            runHg({"commit", absPath.abs(), "-m", *commitMsg});
+                    if (commitMsg)
+                        runHg({"commit", absPath.string(), "-m", *commitMsg});
+                },
+                [&](const std::string &) {
+                    throw Error(
+                        "cannot commit '%s' to Mercurial repository '%s' because it's not a working tree",
+                        path,
+                        input.to_string());
+                },
+            },
+            getActualUrl(input));
     }
 
-    std::pair<bool, std::string> getActualUrl(const Input & input) const
+    std::variant<std::filesystem::path, std::string> getActualUrl(const Input & input) const
     {
         auto url = parseURL(getStrAttr(input.attrs, "url"));
-        bool isLocal = url.scheme == "file";
-        return {isLocal, isLocal ? renderUrlPathEnsureLegal(url.path) : url.to_string()};
+        if (url.scheme == "file")
+            return urlPathToPath(url.path);
+        else
+            return url.to_string();
     }
 
     StorePath fetchToStore(const Settings & settings, Store & store, Input & input) const
@@ -186,35 +197,45 @@ struct MercurialInputScheme : InputScheme
 
         auto name = input.getName();
 
-        auto [isLocal, actualUrl_] = getActualUrl(input);
-        auto actualUrl = actualUrl_; // work around clang bug
+        auto actualUrl_ = getActualUrl(input);
 
         // FIXME: return lastModified.
 
         // FIXME: don't clone local repositories.
 
-        if (!input.getRef() && !input.getRev() && isLocal && pathExists(actualUrl + "/.hg")) {
-
-            bool clean = runHg({"status", "-R", actualUrl, "--modified", "--added", "--removed"}) == "";
-
-            if (!clean) {
-
+        if (auto * localPathP = std::get_if<std::filesystem::path>(&actualUrl_)) {
+            auto & localPath = *localPathP;
+            auto unlocked = !input.getRef() && !input.getRev();
+            auto isValidLocalRepo = pathExists(localPath / ".hg");
+            // short circuting to not bother checking if locked / no repo is important.
+            bool dirty = unlocked && isValidLocalRepo
+                         && runHg({"status", "-R", localPath.string(), "--modified", "--added", "--removed"}) != "";
+            if (dirty) {
                 /* This is an unclean working tree. So copy all tracked
                    files. */
 
                 if (!settings.allowDirty)
-                    throw Error("Mercurial tree '%s' is unclean", actualUrl);
+                    throw Error("Mercurial tree '%s' is unclean", PathFmt{localPath});
 
                 if (settings.warnDirty)
-                    warn("Mercurial tree '%s' is unclean", actualUrl);
+                    warn("Mercurial tree '%s' is unclean", PathFmt{localPath});
 
-                input.attrs.insert_or_assign("ref", chomp(runHg({"branch", "-R", actualUrl})));
+                input.attrs.insert_or_assign("ref", chomp(runHg({"branch", "-R", localPath.string()})));
 
                 auto files = tokenizeString<StringSet>(
-                    runHg({"status", "-R", actualUrl, "--clean", "--modified", "--added", "--no-status", "--print0"}),
+                    runHg({
+                        "status",
+                        "-R",
+                        localPath.string(),
+                        "--clean",
+                        "--modified",
+                        "--added",
+                        "--no-status",
+                        "--print0",
+                    }),
                     "\0"s);
 
-                std::filesystem::path actualPath(absPath(actualUrl));
+                auto actualPath = absPath(localPath);
 
                 PathFilter filter = [&](const Path & p) -> bool {
                     assert(hasPrefix(p, actualPath.string()));
@@ -231,17 +252,22 @@ struct MercurialInputScheme : InputScheme
                     return files.count(file);
                 };
 
-                auto storePath = store.addToStore(
+                return store.addToStore(
                     input.getName(),
                     {getFSSourceAccessor(), CanonPath(actualPath.string())},
                     ContentAddressMethod::Raw::NixArchive,
                     HashAlgorithm::SHA256,
                     {},
                     filter);
-
-                return storePath;
             }
         }
+
+        auto actualUrl = std::visit(
+            overloaded{
+                [&](const std::filesystem::path & p) { return p.string(); },
+                [&](const std::string & s) { return s; },
+            },
+            actualUrl_);
 
         if (!input.getRef())
             input.attrs.insert_or_assign("ref", "default");
@@ -302,7 +328,7 @@ struct MercurialInputScheme : InputScheme
                     }
                 }
             } else {
-                createDirs(dirOf(cacheDir.string()));
+                createDirs(cacheDir.parent_path());
                 runHg({"clone", "--noupdate", "--", actualUrl, cacheDir.string()});
             }
         }

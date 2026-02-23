@@ -19,7 +19,7 @@ struct PathInputScheme : InputScheme
 
         Input input{};
         input.attrs.insert_or_assign("type", "path");
-        input.attrs.insert_or_assign("path", renderUrlPathEnsureLegal(url.path));
+        input.attrs.insert_or_assign("path", urlPathToPath(url.path).string());
 
         for (auto & [name, value] : url.query)
             if (name == "rev" || name == "narHash")
