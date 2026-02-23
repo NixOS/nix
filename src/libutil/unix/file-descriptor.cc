@@ -42,11 +42,12 @@ size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
     return static_cast<size_t>(n);
 }
 
-size_t write(Descriptor fd, std::span<const std::byte> buffer)
+size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterrupts)
 {
     ssize_t n;
     do {
-        checkInterrupt();
+        if (allowInterrupts)
+            checkInterrupt();
         n = ::write(fd, buffer.data(), buffer.size());
     } while (n == -1 && errno == EINTR);
     if (n == -1)

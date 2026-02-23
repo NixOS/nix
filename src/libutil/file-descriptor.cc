@@ -97,7 +97,7 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts)
         if (allowInterrupts)
             checkInterrupt();
         auto res = retryOnBlock(fd, PollDirection::Out, [&]() {
-            return write(fd, {reinterpret_cast<const std::byte *>(s.data()), s.size()});
+            return write(fd, {reinterpret_cast<const std::byte *>(s.data()), s.size()}, allowInterrupts);
         });
         if (res > 0)
             s.remove_prefix(res);
