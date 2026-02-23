@@ -8,6 +8,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
+#include "nix/util/finally.hh"
 #include "nix/util/util.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
@@ -17,6 +18,7 @@
 
 #include <algorithm>
 #include <fstream>
+#include <set>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -636,6 +638,18 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     std::string currentHookLine;
     uint64_t logSize = 0;
 
+    // Track remote sub-build activity IDs for which we incremented
+    // expectedBuilds, so we can decrement when they complete.
+    std::set<ActivityId> remoteSubBuilds;
+
+    // If the hook terminates before sending stop events for all tracked
+    // sub-builds (e.g. timeout, crash), clean up the expectedBuilds count.
+    Finally cleanupSubBuilds([&] {
+        worker.expectedBuilds -= remoteSubBuilds.size();
+        if (!remoteSubBuilds.empty())
+            worker.updateProgress();
+    });
+
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
@@ -660,6 +674,30 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
                                                   : std::optional<std::string_view>{hook->machineName};
                             auto s = handleJSONLogMessage(
                                 *json, worker.act, hook->activities, "the derivation builder", true, machineOpt);
+
+                            // Update the expected build count when the remote daemon
+                            // starts building sub-dependencies we didn't know about.
+                            // Skip the top-level build (already counted by the local
+                            // DerivationGoal's MaintainCount on expectedBuilds).
+                            try {
+                                const auto & action = (*json)["action"];
+                                if (action == "start" && (*json)["type"] == actBuild) {
+                                    const auto & remoteFields = (*json)["fields"];
+                                    auto remoteDrvPath = remoteFields.is_array() && !remoteFields.empty()
+                                                             ? remoteFields[0].get<std::string>()
+                                                             : "";
+                                    if (remoteDrvPath != worker.store.printStorePath(drvPath)) {
+                                        remoteSubBuilds.insert((ActivityId) (*json)["id"]);
+                                        worker.expectedBuilds++;
+                                        worker.updateProgress();
+                                    }
+                                } else if (action == "stop" && remoteSubBuilds.erase((ActivityId) (*json)["id"])) {
+                                    worker.expectedBuilds--;
+                                    worker.updateProgress();
+                                }
+                            } catch (const nlohmann::json::exception & e) {
+                                debug("skipping remote build progress update: %s", e.what());
+                            }
 
                             // ensure that logs from a builder using `ssh-ng://` as protocol
                             // are also available to `nix log`.
