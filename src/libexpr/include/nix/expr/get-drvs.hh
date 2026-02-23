@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/expr/eval.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/store/path.hh"
 
 #include <string>
@@ -20,10 +21,23 @@ public:
 private:
     EvalState * state;
 
+    struct Path {
+        /**
+         * Underlying semantic path, valid in CA and IA cases.
+         */
+        SingleDerivedPath derivedPath;
+
+        /**
+         * If we don't need a placeholder, we'll have a real store path, which we can remember here.
+         * For CA derivations using placeholders, this will be std::nullopt.
+         */
+        std::optional<StorePath> storePath;
+    };
+
     mutable std::string name;
     mutable std::string system;
-    mutable std::optional<std::optional<StorePath>> drvPath;
-    mutable std::optional<StorePath> outPath;
+    mutable std::optional<std::optional<Path>> drvPath;
+    mutable std::optional<Path> outPath;
     mutable std::string outputName;
     Outputs outputs;
 
@@ -52,8 +66,10 @@ public:
     std::string queryName() const;
     std::string querySystem() const;
     std::optional<StorePath> queryDrvPath() const;
+    std::optional<Path> queryDrvPathFlexible() const;
     StorePath requireDrvPath() const;
     StorePath queryOutPath() const;
+    Path queryOutPathFlexible() const;
     std::string queryOutputName() const;
     /**
      * Return the unordered map of output names to (optional) output paths.
@@ -81,12 +97,12 @@ public:
 
     void setDrvPath(StorePath path)
     {
-        drvPath = {{std::move(path)}};
+        drvPath = {{Path{SingleDerivedPath::Opaque{path}, std::move(path)}}};
     }
 
     void setOutPath(StorePath path)
     {
-        outPath = {{std::move(path)}};
+        outPath = Path{SingleDerivedPath::Opaque{path}, std::move(path)};
     }
 
     void setFailed()

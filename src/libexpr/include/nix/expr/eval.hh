@@ -735,6 +735,9 @@ public:
      * string.  If `coerceMore` is set, also converts nulls, integers,
      * booleans and lists to a string.  If `copyToStore` is set,
      * referenced paths are copied to the Nix store as a side effect.
+     * If `strict` is set, ensures that when coercing an attrset with
+     * both `outPath` and `drvPath`, the string context for `outPath`
+     * agrees with the `drvPath` attribute.
      */
     BackedStringView coerceToString(
         const PosIdx pos,
@@ -743,7 +746,8 @@ public:
         std::string_view errorCtx,
         bool coerceMore = false,
         bool copyToStore = true,
-        bool canonicalizePath = true);
+        bool canonicalizePath = true,
+        bool strict = false);
 
     StorePath copyPathToStore(NixStringContext & context, const SourcePath & path);
 
@@ -762,30 +766,33 @@ public:
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
     /**
-     * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
+     * Coerce to `SingleDerivedPath`.
+     *
+     * For strings: must be either a literal store path or a
+     * placeholder (see `DownstreamPlaceholder`). The string context
+     * must be exactly one element, which is either a
+     * `NixStringContextElem::Opaque` or `NixStringContextElem::Built`.
+     * (`NixStringContextElem::DrvDeep` is not permitted). The string
+     * is parsed based on the context --- the context is the source of
+     * truth, and ultimately tells us what we want, and then we ensure
+     * the string corresponds to it.
+     *
+     * For attrsets: must have an `outPath` attribute which is
+     * recursively coerced. If a `drvPath` attribute is present, it is
+     * also coerced and validated to agree with the `outPath` context.
+     *
+     * @param xpSettings Stop-gap to avoid globals during unit tests.
+     *
+     * @param skipStringValidation Skip validating that the string
+     * matches the expected placeholder for the context. This is
+     * exposed for unit testing only to avoid store IO.
      */
-    std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(
+    SingleDerivedPath coerceToSingleDerivedPath(
         const PosIdx pos,
         Value & v,
         std::string_view errorCtx,
-        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-
-    /**
-     * Coerce to `SingleDerivedPath`.
-     *
-     * Must be a string which is either a literal store path or a
-     * "placeholder (see `DownstreamPlaceholder`).
-     *
-     * Even more importantly, the string context must be exactly one
-     * element, which is either a `NixStringContextElem::Opaque` or
-     * `NixStringContextElem::Built`. (`NixStringContextEleme::DrvDeep`
-     * is not permitted).
-     *
-     * The string is parsed based on the context --- the context is the
-     * source of truth, and ultimately tells us what we want, and then
-     * we ensure the string corresponds to it.
-     */
-    SingleDerivedPath coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx);
+        const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings,
+        bool skipStringValidation = false);
 
 #if NIX_USE_BOEHMGC
     /** A GC root for the baseEnv reference. */

@@ -2462,7 +2462,8 @@ BackedStringView EvalState::coerceToString(
     std::string_view errorCtx,
     bool coerceMore,
     bool copyToStore,
-    bool canonicalizePath)
+    bool canonicalizePath,
+    bool strict)
 {
     auto _level = addCallDepth(pos);
 
@@ -2489,14 +2490,28 @@ BackedStringView EvalState::coerceToString(
         auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
         if (maybeString)
             return std::move(*maybeString);
-        auto i = v.attrs()->get(s.outPath);
-        if (!i) {
+        auto outPathAttr = v.attrs()->get(s.outPath);
+        if (!outPathAttr) {
             error<TypeError>(
                 "cannot coerce %1% to a string: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
                 .withTrace(pos, errorCtx)
                 .debugThrow();
         }
-        return coerceToString(pos, *i->value, context, errorCtx, coerceMore, copyToStore, canonicalizePath);
+        try {
+            auto derivedPath = coerceToSingleDerivedPath(pos, v, errorCtx);
+            auto result = mkSingleDerivedPathStringRaw(derivedPath);
+            context.insert(
+                std::visit([](auto && o) -> NixStringContextElem { return std::move(o); }, std::move(derivedPath)));
+            return result;
+        } catch (Error & e) {
+            if (strict)
+                throw;
+            auto info = e.info();
+            info.msg = HintFmt("in a future version of Nix this will be an error: %s", Uncolored(info.msg.str()));
+            logWarning(info);
+            return coerceToString(
+                pos, *outPathAttr->value, context, errorCtx, coerceMore, copyToStore, canonicalizePath, strict);
+        }
     }
 
     if (v.type() == nExternal) {
@@ -2534,7 +2549,8 @@ BackedStringView EvalState::coerceToString(
                         "while evaluating one element of the list",
                         coerceMore,
                         copyToStore,
-                        canonicalizePath);
+                        canonicalizePath,
+                        strict);
                 } catch (Error & e) {
                     e.addTrace(positions[pos], errorCtx);
                     throw;
@@ -2621,63 +2637,131 @@ EvalState::coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & con
     error<EvalError>("path '%1%' is not in the Nix store", path).withTrace(pos, errorCtx).debugThrow();
 }
 
-std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedPathUnchecked(
-    const PosIdx pos, Value & v, std::string_view errorCtx, const ExperimentalFeatureSettings & xpSettings)
+SingleDerivedPath EvalState::coerceToSingleDerivedPath(
+    const PosIdx pos,
+    Value & v,
+    std::string_view errorCtx,
+    const ExperimentalFeatureSettings & xpSettings,
+    bool skipStringValidation)
 {
-    NixStringContext context;
-    auto s = forceString(v, context, pos, errorCtx, xpSettings);
-    auto csize = context.size();
-    if (csize != 1)
-        error<EvalError>("string '%s' has %d entries in its context. It should only have exactly one entry", s, csize)
-            .withTrace(pos, errorCtx)
-            .debugThrow();
-    auto derivedPath = std::visit(
-        overloaded{
-            [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath { return std::move(o); },
-            [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
-                error<EvalError>(
-                    "string '%s' has a context which refers to a complete source and binary closure. This is not supported at this time",
-                    s)
-                    .withTrace(pos, errorCtx)
-                    .debugThrow();
-            },
-            [&](NixStringContextElem::Built && b) -> SingleDerivedPath { return std::move(b); },
-        },
-        ((NixStringContextElem &&) *context.begin()).raw);
-    return {
-        std::move(derivedPath),
-        std::move(s),
-    };
-}
+    forceValue(v, pos);
 
-SingleDerivedPath EvalState::coerceToSingleDerivedPath(const PosIdx pos, Value & v, std::string_view errorCtx)
-{
-    auto [derivedPath, s_] = coerceToSingleDerivedPathUnchecked(pos, v, errorCtx);
-    auto s = s_;
-    auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
-    if (s != sExpected) {
-        /* `std::visit` is used here just to provide a more precise
-           error message. */
-        std::visit(
+    switch (v.type()) {
+    case nAttrs: {
+        if (!isDerivation(v)) {
+            error<TypeError>(
+                "cannot coerce a set that is not a package to a single derived path: %1%",
+                ValuePrinter(*this, v, errorPrintOptions))
+                .withTrace(pos, errorCtx)
+                .debugThrow();
+        }
+
+        auto outPathAttr = v.attrs()->get(s.outPath);
+        if (!outPathAttr) {
+            error<TypeError>(
+                "cannot coerce %1% to a single derived path: no 'outPath' attribute: %2%",
+                showType(v),
+                ValuePrinter(*this, v, errorPrintOptions))
+                .withTrace(pos, errorCtx)
+                .debugThrow();
+        }
+
+        auto outPathDerivedPath =
+            coerceToSingleDerivedPath(pos, *outPathAttr->value, errorCtx, xpSettings, skipStringValidation);
+
+        auto drvPathAttr = v.attrs()->get(s.drvPath);
+        if (drvPathAttr) {
+            auto drvPathDerivedPath =
+                coerceToSingleDerivedPath(pos, *drvPathAttr->value, errorCtx, xpSettings, skipStringValidation);
+
+            std::visit(
+                overloaded{
+                    [&](const SingleDerivedPath::Built & built) {
+                        if (*built.drvPath != drvPathDerivedPath) {
+                            error<EvalError>(
+                                "relative outPath '%s' does not refer to drvPath '%s'",
+                                outPathDerivedPath.to_string(*store),
+                                drvPathDerivedPath.to_string(*store))
+                                .withTrace(pos, errorCtx)
+                                .debugThrow();
+                        }
+                    },
+                    [&](const SingleDerivedPath::Opaque &) {
+                        error<EvalError>(
+                            "relative outPath '%s' does not refer to drvPath '%s'",
+                            outPathDerivedPath.to_string(*store),
+                            drvPathDerivedPath.to_string(*store))
+                            .withTrace(pos, errorCtx)
+                            .debugThrow();
+                    },
+                },
+                outPathDerivedPath.raw());
+        }
+
+        return outPathDerivedPath;
+    }
+
+    case nString: {
+        auto s = v.string_view();
+        NixStringContext context;
+        copyContext(v, context, xpSettings);
+        auto csize = context.size();
+        if (csize != 1)
+            error<EvalError>(
+                "string '%s' has %d entries in its context. It should only have exactly one entry", s, csize)
+                .withTrace(pos, errorCtx)
+                .debugThrow();
+        auto derivedPath = std::visit(
             overloaded{
-                [&](const SingleDerivedPath::Opaque & o) {
-                    error<EvalError>("path string '%s' has context with the different path '%s'", s, sExpected)
+                [&](NixStringContextElem::Opaque && o) -> SingleDerivedPath { return std::move(o); },
+                [&](NixStringContextElem::DrvDeep &&) -> SingleDerivedPath {
+                    error<EvalError>(
+                        "string '%s' has a context which refers to a complete source and binary closure. This is not "
+                        "supported at this time",
+                        s)
                         .withTrace(pos, errorCtx)
                         .debugThrow();
                 },
-                [&](const SingleDerivedPath::Built & b) {
-                    error<EvalError>(
-                        "string '%s' has context with the output '%s' from derivation '%s', but the string is not the right placeholder for this derivation output. It should be '%s'",
-                        s,
-                        b.output,
-                        b.drvPath->to_string(*store),
-                        sExpected)
-                        .withTrace(pos, errorCtx)
-                        .debugThrow();
-                }},
-            derivedPath.raw());
+                [&](NixStringContextElem::Built && b) -> SingleDerivedPath { return std::move(b); },
+            },
+            ((NixStringContextElem &&) *context.begin()).raw);
+
+        if (!skipStringValidation) {
+            auto sExpected = mkSingleDerivedPathStringRaw(derivedPath);
+            if (s != sExpected) {
+                /* `std::visit` is used here just to provide a more precise
+                   error message. */
+                std::visit(
+                    overloaded{
+                        [&](const SingleDerivedPath::Opaque & o) {
+                            error<EvalError>("path string '%s' has context with the different path '%s'", s, sExpected)
+                                .withTrace(pos, errorCtx)
+                                .debugThrow();
+                        },
+                        [&](const SingleDerivedPath::Built & b) {
+                            error<EvalError>(
+                                "string '%s' has context with the output '%s' from derivation '%s', but the string is "
+                                "not the right placeholder for this derivation output. It should be '%s'",
+                                s,
+                                b.output,
+                                b.drvPath->to_string(*store),
+                                sExpected)
+                                .withTrace(pos, errorCtx)
+                                .debugThrow();
+                        }},
+                    derivedPath.raw());
+            }
+        }
+
+        return derivedPath;
     }
-    return derivedPath;
+
+    default:
+        error<TypeError>(
+            "cannot coerce %1% to a single derived path: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
+            .withTrace(pos, errorCtx)
+            .debugThrow();
+    }
 }
 
 // NOTE: This implementation must match eqValues!

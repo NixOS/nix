@@ -1,5 +1,6 @@
 #include "nix/expr/get-drvs.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -21,13 +22,13 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
     , attrs(nullptr)
     , attrPath("")
 {
-    auto [drvPath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
+    auto [drvStorePath, selectedOutputs] = parsePathWithOutputs(*store, drvPathWithOutputs);
 
-    this->drvPath = drvPath;
+    this->drvPath = {{Path{SingleDerivedPath::Opaque{drvStorePath}, drvStorePath}}};
 
-    auto drv = store->derivationFromPath(drvPath);
+    auto drv = store->derivationFromPath(drvStorePath);
 
-    name = drvPath.name();
+    name = drvStorePath.name();
 
     if (selectedOutputs.size() > 1)
         throw Error("building more than one derivation output is not supported, in '%s'", drvPathWithOutputs);
@@ -36,10 +37,18 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
 
     auto i = drv.outputs.find(outputName);
     if (i == drv.outputs.end())
-        throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvPath), outputName);
-    auto & [outputName, output] = *i;
+        throw Error("derivation '%s' does not have output '%s'", store->printStorePath(drvStorePath), outputName);
+    auto & [outputName_, output] = *i;
 
-    outPath = {output.path(*store, drv.name, outputName)};
+    auto outStorePath = output.path(*store, drv.name, outputName_);
+    if (outStorePath) {
+        outPath = Path{SingleDerivedPath::Opaque{*outStorePath}, *outStorePath};
+    } else {
+        // CA derivation with unknown output path
+        outPath = Path{
+            SingleDerivedPath::Built{makeConstantStorePathRef(drvStorePath), outputName_},
+            std::nullopt};
+    }
 }
 
 std::string PackageInfo::queryName() const
@@ -64,24 +73,58 @@ std::string PackageInfo::querySystem() const
     return system;
 }
 
-std::optional<StorePath> PackageInfo::queryDrvPath() const
+std::optional<PackageInfo::Path> PackageInfo::queryDrvPathFlexible() const
 {
     if (!drvPath && attrs) {
-        if (auto i = attrs->get(state->s.drvPath)) {
-            NixStringContext context;
-            auto found = state->coerceToStorePath(
-                i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
+        auto i = attrs->get(state->s.drvPath);
+        if (i) {
+            Value v;
+            v.mkAttrs(const_cast<Bindings *>(attrs));
+            std::optional<SingleDerivedPath> outPathDerivedPath;
             try {
-                found.requireDerivation();
+                // Validate derivation structure
+                outPathDerivedPath = state->coerceToSingleDerivedPath(
+                    noPos, v, "while evaluating the derivation");
             } catch (Error & e) {
-                e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
-                throw;
+                auto info = e.info();
+                info.msg = HintFmt("in a future version of Nix this will be an error: %s", Uncolored(info.msg.str()));
+                logWarning(info);
             }
-            drvPath = {std::move(found)};
+            if (outPathDerivedPath) {
+                // Validation passed. Now get drvPath.
+                auto drvPathDerivedPath = state->coerceToSingleDerivedPath(
+                    i->pos, *i->value, "while evaluating the 'drvPath' attribute of a derivation");
+                if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&drvPathDerivedPath.raw())) {
+                    opaque->path.requireDerivation();
+                    drvPath = {{Path{std::move(drvPathDerivedPath), opaque->path}}};
+                } else {
+                    // Dynamic derivation - drvPath is itself a derivation output
+                    drvPath = {{Path{std::move(drvPathDerivedPath), std::nullopt}}};
+                }
+            } else {
+                // Fall back to old behavior
+                NixStringContext context;
+                auto found = state->coerceToStorePath(
+                    i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
+                try {
+                    found.requireDerivation();
+                } catch (Error & e) {
+                    e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
+                    throw;
+                }
+                drvPath = {{Path{SingleDerivedPath::Opaque{found}, std::move(found)}}};
+            }
         } else
             drvPath = {std::nullopt};
     }
     return drvPath.value_or(std::nullopt);
+}
+
+std::optional<StorePath> PackageInfo::queryDrvPath() const
+{
+    if (auto path = queryDrvPathFlexible())
+        return path->storePath;
+    return std::nullopt;
 }
 
 StorePath PackageInfo::requireDrvPath() const
@@ -91,18 +134,49 @@ StorePath PackageInfo::requireDrvPath() const
     throw Error("derivation does not contain a 'drvPath' attribute");
 }
 
-StorePath PackageInfo::queryOutPath() const
+PackageInfo::Path PackageInfo::queryOutPathFlexible() const
 {
     if (!outPath && attrs) {
-        auto i = attrs->get(state->s.outPath);
-        NixStringContext context;
-        if (i)
-            outPath = state->coerceToStorePath(
-                i->pos, *i->value, context, "while evaluating the output path of a derivation");
+        Value v;
+        v.mkAttrs(const_cast<Bindings *>(attrs));
+        std::optional<SingleDerivedPath> derivedPath;
+        try {
+            derivedPath = state->coerceToSingleDerivedPath(
+                noPos, v, "while evaluating the derivation");
+        } catch (Error & e) {
+            auto info = e.info();
+            info.msg = HintFmt("in a future version of Nix this will be an error: %s", Uncolored(info.msg.str()));
+            logWarning(info);
+        }
+        if (derivedPath) {
+            if (auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&derivedPath->raw())) {
+                outPath = Path{std::move(*derivedPath), opaque->path};
+            } else {
+                // Built path - no concrete output path available (placeholder)
+                outPath = Path{std::move(*derivedPath), std::nullopt};
+            }
+        } else {
+            // Fall back to old behavior
+            auto i = attrs->get(state->s.outPath);
+            NixStringContext context;
+            if (i) {
+                auto path = state->coerceToStorePath(
+                    i->pos, *i->value, context, "while evaluating the output path of a derivation");
+                outPath = Path{SingleDerivedPath::Opaque{path}, std::move(path)};
+            }
+        }
     }
     if (!outPath)
-        throw UnimplementedError("CA derivations are not yet supported");
+        throw Error("derivation does not have an 'outPath' attribute");
     return *outPath;
+}
+
+StorePath PackageInfo::queryOutPath() const
+{
+    auto path = queryOutPathFlexible();
+    if (!path.storePath)
+        throw UnimplementedError("CA derivations are not yet supported");
+    return *path.storePath;
 }
 
 PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsToInstall)
