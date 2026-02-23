@@ -1,4 +1,5 @@
 #include "nix/util/error.hh"
+#include "nix/util/file-path-impl.hh"
 #include "nix/util/split.hh"
 #include "nix/util/url.hh"
 #include "nix/store/store-reference.hh"
@@ -17,7 +18,7 @@ static bool isNonUriPath(const std::string & spec)
         spec.find("://") == std::string::npos
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
-        && spec.find("/") != std::string::npos;
+        && OsPathTrait<char>::findPathSep(spec) != std::string::npos;
 }
 
 std::string StoreReference::render(bool withParams) const
@@ -111,7 +112,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                 .variant =
                     Specified{
                         .scheme = "local",
-                        .authority = absPath(baseURI),
+                        .authority = encodeUrlPath(pathToUrlPath(absPath(std::filesystem::path{baseURI}))),
                     },
                 .params = std::move(params),
             };
