@@ -3,10 +3,31 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/url.hh"
 
 #include <atomic>
 
 namespace nix {
+
+static std::filesystem::path checkBinaryCachePath(const std::filesystem::path & root, std::string_view path)
+{
+    /* Note: these checks aren't complete and don't guard against symlink shenanigans. */
+    auto p = std::filesystem::path(path);
+    if (p.is_absolute())
+        /* Never happens unless the caller is messed up. */
+        throw Error("binary cache path '%s' must be relative", path);
+
+    auto result = (root / p).lexically_normal();
+
+    /* NB: lexically_normal() only does textual normalization and does
+       not resolve symlinks. This is acceptable because store/substituter
+       paths are already trusted, and this check is defense-in-depth
+       against ".." traversal. */
+    if (!isInDir(result, root.lexically_normal()))
+        throw Error("binary cache path '%s' escapes cache directory", path);
+
+    return result;
+}
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     std::string_view scheme, PathView binaryCacheDir, const StoreReference::Params & params)
@@ -29,7 +50,7 @@ StoreReference LocalBinaryCacheStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = "file",
-                .authority = binaryCacheDir,
+                .authority = encodeUrlPath(pathToUrlPath(binaryCacheDir)),
             },
     };
 }
@@ -56,7 +77,9 @@ protected:
     void upsertFile(
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
-        auto path2 = std::filesystem::path{config->binaryCacheDir} / path;
+        /* TODO: Maybe use RestoreSink for writing stuff? It would have to gain the ability to write files
+           atomically (maybe with O_TMPFILE + linkat + AT_EMPTY_PATH when available or fallback to rename). */
+        auto path2 = checkBinaryCachePath(config->binaryCacheDir, path);
         static std::atomic<int> counter{0};
         createDirs(path2.parent_path());
         auto tmp = path2;
@@ -70,7 +93,7 @@ protected:
     void getFile(const std::string & path, Sink & sink) override
     {
         try {
-            readFile(config->binaryCacheDir + "/" + path, sink);
+            readFile(checkBinaryCachePath(config->binaryCacheDir, path), sink);
         } catch (SystemError & e) {
             if (e.is(std::errc::no_such_file_or_directory))
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
@@ -101,17 +124,17 @@ protected:
 
 void LocalBinaryCacheStore::init()
 {
-    createDirs(config->binaryCacheDir + "/nar");
-    createDirs(config->binaryCacheDir + "/" + realisationsPrefix);
+    createDirs(config->binaryCacheDir / "nar");
+    createDirs(config->binaryCacheDir / realisationsPrefix);
     if (config->writeDebugInfo)
-        createDirs(config->binaryCacheDir + "/debuginfo");
-    createDirs(config->binaryCacheDir + "/log");
+        createDirs(config->binaryCacheDir / "debuginfo");
+    createDirs(config->binaryCacheDir / "log");
     BinaryCacheStore::init();
 }
 
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
-    return pathExists(config->binaryCacheDir + "/" + path);
+    return pathExists(checkBinaryCachePath(config->binaryCacheDir, path));
 }
 
 StringSet LocalBinaryCacheStoreConfig::uriSchemes()
