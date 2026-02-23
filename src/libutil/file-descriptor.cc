@@ -76,8 +76,18 @@ std::string readLine(Descriptor fd, bool eofOk, char terminator)
         checkInterrupt();
         char ch;
         // FIXME: inefficient
-        auto rd =
-            retryOnBlock(fd, PollDirection::In, [&]() { return read(fd, {reinterpret_cast<std::byte *>(&ch), 1}); });
+        auto rd = retryOnBlock(fd, PollDirection::In, [&]() -> size_t {
+            try {
+                return read(fd, {reinterpret_cast<std::byte *>(&ch), 1});
+            } catch (SystemError & e) {
+                // On pty masters, EIO signals that the slave side closed,
+                // which is semantically EOF. Map it to a zero-length read
+                // so the existing EOF path handles it.
+                if (e.is(std::errc::io_error))
+                    return 0;
+                throw;
+            }
+        });
         if (rd == 0) {
             if (eofOk)
                 return s;
