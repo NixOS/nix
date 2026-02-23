@@ -655,8 +655,12 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
                     if (c == '\n') {
                         auto json = parseJSONMessage(currentHookLine, "the derivation builder");
                         if (json) {
+                            auto machineOpt = hook->machineName.empty()
+                                                  ? std::optional<std::string_view>{}
+                                                  : std::optional<std::string_view>{hook->machineName};
                             auto s = handleJSONLogMessage(
-                                *json, worker.act, hook->activities, "the derivation builder", true);
+                                *json, worker.act, hook->activities, "the derivation builder", true, machineOpt);
+
                             // ensure that logs from a builder using `ssh-ng://` as protocol
                             // are also available to `nix log`.
                             if (s && logFile->sink) {
@@ -1134,7 +1138,10 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
                     throw;
                 }
             }();
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
+            auto hookMachine = worker.hook->machineName.empty()
+                                   ? std::optional<std::string_view>{}
+                                   : std::optional<std::string_view>{worker.hook->machineName};
+            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true, hookMachine))
                 ;
             else if (s.substr(0, 2) == "# ") {
                 reply = s.substr(2);
