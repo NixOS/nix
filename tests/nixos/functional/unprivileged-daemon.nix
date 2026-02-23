@@ -1,10 +1,5 @@
 { lib, nixComponents, ... }:
 
-let
-  startUid = 65536 * 1024;
-  numExtraUids = 65536 * 1024;
-in
-
 {
   name = "functional-tests-on-nixos_unprivileged-daemon";
 
@@ -17,115 +12,26 @@ in
       users.users.nix-daemon = {
         isSystemUser = true;
         group = "nix-daemon";
-        subUidRanges = [
-          {
-            startUid = startUid;
-            count = numExtraUids;
-          }
-        ];
-        subGidRanges = [
-          {
-            startGid = startUid;
-            count = numExtraUids;
-          }
-        ];
       };
       users.users.alice = {
         isNormalUser = true;
       };
 
-      # nix.enable makes a lot of assumptions that only make sense as root, so set up nix ourselves.
-      # Based on nix-daemon.nix from nixpkgs and other references to `config.nix.enable` in nixpkgs.
-      nix.enable = false;
-
-      # Unprivileged nix daemon cannot remount store read/write, so never make it read-only in the first place.
-      boot.nixStoreMountOpts = lib.mkForce [
-        "nodev"
-        "nosuid"
-        "rw"
-      ];
-
-      environment.systemPackages = [ config.nix.package ];
-      # nix normally defaults to local if running as root, we want root to use the daemon as well.
-      environment.variables.NIX_REMOTE = "daemon";
-
-      systemd.packages = [ config.nix.package ];
-
-      systemd.services.nix-daemon = {
-        path = [
-          config.nix.package
-          config.programs.ssh.package
-          "/run/wrappers"
+      nix = {
+        # We have to use nix-everything for nswrapper, nix-cli doesn't have it.
+        package = lib.mkForce nixComponents.nix-everything;
+        daemonUser = "nix-daemon";
+        daemonGroup = "nix-daemon";
+        settings.experimental-features = [
+          "local-overlay-store"
+          "auto-allocate-uids"
         ];
-        serviceConfig.ExecStart = [
-          ""
-          "${nixComponents.nix-nswrapper}/libexec/nix-nswrapper ${toString startUid} ${toString numExtraUids} ${config.nix.package}/bin/nix-daemon --daemon"
-        ];
-
-        environment = {
-          CURL_CA_BUNDLE = config.security.pki.caBundle;
-          NIX_REMOTE = "local?ignore-gc-delete-failure=true&use-roots-daemon=true";
-          NIX_CONFIG = ''
-            experimental-features = local-overlay-store auto-allocate-uids
-            build-users-group =
-            auto-allocate-uids = true
-            start-id = ${toString startUid}
-            id-count = ${toString numExtraUids}
-            sandbox = true
-            sandbox-fallback = false
-          '';
-        };
-        serviceConfig = {
-          User = "nix-daemon";
-          ExecStartPre = "${pkgs.writeShellScript "nix-load-db" ''
-            if [[ "$(cat /proc/cmdline)" =~ regInfo=([^ ]*) ]]; then
-              ${config.nix.package.out}/bin/nix-store --load-db < ''${BASH_REMATCH[1]}
-            fi
-          ''}";
-        };
       };
 
-      systemd.services.nix-roots-daemon = {
-        environment = {
-          # `use-roots-daemon` is not needed because it is only relevant
-          # for the *client* of this daemon (i.e. the nix daemon opening
-          # the local store in this case). The Nix roots daemon *itself*
-          # doesn't care about this setting --- there's no problem if
-          # someone else opens the local store and directly scans for
-          # roots instead of using this daemon, for example.
-          NIX_REMOTE = "local";
-          NIX_CONFIG = ''
-            extra-experimental-features = local-overlay-store
-          '';
-        };
-        serviceConfig.ExecStart = "${config.nix.package.out}/bin/nix --extra-experimental-features nix-command store roots-daemon";
-      };
-
-      systemd.sockets.nix-roots-daemon = {
-        wantedBy = [
-          "nix-daemon.service"
-        ];
-        listenStreams = [ "/nix/var/nix/gc-roots-socket/socket" ];
-        unitConfig = {
-          ConditionPathIsReadWrite = "/nix/var/nix/gc-roots-socket";
-          RequiresMountsFor = "/nix/store";
-        };
-      };
-      systemd.sockets.nix-daemon.wantedBy = [ "sockets.target" ];
-
-      systemd.tmpfiles.rules = [
-        "d  /nix/.rw-store                     0755 nix-daemon nix-daemon - -"
-        "d  /nix/store                         0755 nix-daemon nix-daemon - -"
-        "d  /nix/store/.links                  0755 nix-daemon nix-daemon - -"
-        "d  /nix/var                           0755 nix-daemon nix-daemon - -"
-        "d  /nix/var/nix                       0755 nix-daemon nix-daemon - -"
-        "d  /nix/var/nix/builds                0755 nix-daemon nix-daemon - -"
-        "d  /nix/var/nix/daemon-socket         0755 nix-daemon nix-daemon - -"
-        "d  /nix/var/nix/gcroots               0755 nix-daemon nix-daemon - -"
-        "L+ /nix/var/nix/gcroots/booted-system 0755 nix-daemon nix-daemon - /run/booted-system"
-        "d  /nix/var/nix/gc-roots-socket       0755 nix-daemon nix-daemon - -"
-        "d  /var/empty/.cache/nix              0755 nix-daemon nix-daemon - -"
-      ];
+      # The store setting `ignore-gc-delete-failure` isn't set by default,
+      # but is needed since the daemon won't own the entire store.
+      systemd.services.nix-daemon.environment.NIX_REMOTE =
+        lib.mkForce "local?ignore-gc-delete-failure=true&use-roots-daemon=true";
     };
 
   testScript = ''
