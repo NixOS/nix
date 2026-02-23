@@ -14,7 +14,7 @@ struct PrimOp;
 /**
  * A deprecated bool setting that migrates to a `Setting<Diagnose>`.
  * When set to true, it emits a deprecation warning and sets the target
- * `Setting<Diagnose>` setting to `warn`.
+ * `Setting<Diagnose>` setting to `Warn`.
  */
 class DeprecatedWarnSetting : public BaseSetting<bool>
 {
@@ -385,6 +385,30 @@ struct EvalSettings : Config
         "warn-short-path-literals",
         R"(
           Deprecated. Use [`lint-short-path-literals`](#conf-lint-short-path-literals)` = warn` instead.
+        )",
+    };
+
+    Setting<Diagnose> lintAbsolutePathLiterals{
+        this,
+        Diagnose::Ignore,
+        "lint-absolute-path-literals",
+        R"(
+          Controls handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
+
+          - `ignore`: Ignore without warning (default)
+          - `warn`: Emit a warning about non-portability
+          - `fatal`: Treat as a parse error
+
+          It is true that some files are more difficult to reference with relative paths,
+          because they would require lots of `../../..` upward traversing to reach them.
+          But firstly, it is probably not a good idea to reference these files ---
+          such paths often make Nix expressions less portable and reproducible,
+          as they depend on the file system layout of the machine evaluating the expression.
+
+          Secondly, with [pure evaluation mode](#conf-pure-eval), most such files are prohibited to access anyway,
+          whether by absolute or relative paths.
+          In that case, enabling this lint in fatal mode is less disruptive,
+          because the paths pure eval allows are usually not the ones that would be ergonomically expressed with absolute paths anyway.
         )",
     };
 

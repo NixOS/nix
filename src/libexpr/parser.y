@@ -415,38 +415,56 @@ path_start
   : PATH {
     std::string_view literal({$1.p, $1.l});
 
-    /* check for short path literals */
-    diagnose(state->settings.lintShortPathLiterals, [&](bool) -> std::optional<ParseError> {
-        if (literal.front() != '/' && literal.front() != '.')
+    if (literal.front() == '/') {
+        diagnose(state->settings.lintAbsolutePathLiterals, [&](bool) -> std::optional<ParseError> {
             return ParseError({
-                .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'", literal, literal),
+                .msg = HintFmt("absolute path literals are not portable. Consider replacing path literal '%s' by a string, relative path, or parameter", literal),
                 .pos = state->positions[CUR_POS]
             });
-        return std::nullopt;
-    });
-
-    auto basePath = std::filesystem::path(state->basePath.path.abs());
-    Path path(absPath(literal, &basePath).string());
-    /* add back in the trailing '/' to the first segment */
-    if (literal.size() > 1 && literal.back() == '/')
-      path += '/';
-    $$ =
+        });
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
-        literal.front() == '/'
-        ? state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path)
-        : state->exprs.add<ExprPath>(state->exprs.alloc, state->basePath.accessor, path);
+        Path path(canonPath(literal));
+        /* add back in the trailing '/' to the first segment */
+        if (literal.size() > 1 && literal.back() == '/')
+          path += '/';
+        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
+    } else {
+        /* check for short path literals */
+        diagnose(state->settings.lintShortPathLiterals, [&](bool) -> std::optional<ParseError> {
+            if (literal.front() != '.')
+                return ParseError({
+                    .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'", literal, literal),
+                    .pos = state->positions[CUR_POS]
+                });
+            return std::nullopt;
+        });
+
+        auto basePath = std::filesystem::path(state->basePath.path.abs());
+        Path path(absPath(literal, &basePath).string());
+        /* add back in the trailing '/' to the first segment */
+        if (literal.size() > 1 && literal.back() == '/')
+          path += '/';
+        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->basePath.accessor, path);
+    }
   }
   | HPATH {
+    std::string_view literal($1.p, $1.l);
     if (state->settings.pureEval) {
         throw Error(
             "the path '%s' can not be resolved in pure mode",
-            std::string_view($1.p, $1.l)
+            literal
         );
     }
+    diagnose(state->settings.lintAbsolutePathLiterals, [&](bool) -> std::optional<ParseError> {
+        return ParseError({
+            .msg = HintFmt("home path literals are not portable. Consider replacing path literal '%s' by a string, relative path, or parameter", literal),
+            .pos = state->positions[CUR_POS]
+        });
+    });
     Path path(getHome().string() + std::string($1.p + 1, $1.l - 1));
-    $$ = state->exprs.add<ExprPath>(state->exprs.alloc, ref<SourceAccessor>(state->rootFS), path);
+    $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
   }
   ;
 
