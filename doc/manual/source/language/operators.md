@@ -188,13 +188,14 @@ All comparison operators are implemented in terms of `<`, and the following equi
 
 ## Equality
 
-- [Attribute sets][attribute set] are compared first by attribute names and then by items until a difference is found.
+- [Attribute sets][attribute set] are compared by size first and then by attribute names and their values until a difference is found.
 - [Lists][list] are compared first by length and then by items until a difference is found.
 - Comparison of distinct [functions][function] returns `false`, but identical functions may be subject to [value identity optimization](#value-identity-optimization).
 - Numbers are type-compatible, see [arithmetic] operators.
 - Floating point numbers only differ up to a limited precision.
 
-The `==` operator is [strict](@docroot@/language/evaluation.md#strictness) in both arguments; when comparing composite types ([attribute sets][attribute set] and [lists][list]), it is partially strict in their contained values: they are evaluated until a difference is found. <!-- this is woefully underspecified, affecting which expressions evaluate correctly; not just "ordering" or error messages. -->
+The `==` operator is [strict](@docroot@/language/evaluation.md#strictness) in both arguments (WHNF); when comparing composite types ([attribute sets][attribute set] and [lists][list]), it is partially strict in their contained values: they are evaluated until a difference is found. On `attrNames` mismatches, no contained values are evaluated. Attribute set comparison `a == b` behaves equivalently to `(builtins.attrNames a) == (builtins.attrNames b) && (builtins.attrValues a == builtins.attrValues b)` if [value identity optimization](#value-identity-optimization) is not taken into account.
+Furthermore, an attribute value (e.g. of `b`) is only evaluated for equality if its sibling attributes of lower lexicographic order (e.g. `a`) are deemed equal.
 
 ### Value identity optimization
 
