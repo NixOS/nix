@@ -41,7 +41,7 @@ struct Registry
 
     void write(const std::filesystem::path & path);
 
-    void add(const Input & from, const Input & to, const Attrs & extraAttrs);
+    void add(const Input & from, const Input & to, const Attrs & extraAttrs, bool exact);
 
     void remove(const Input & input);
 };

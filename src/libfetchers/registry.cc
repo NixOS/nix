@@ -78,9 +78,9 @@ void Registry::write(const std::filesystem::path & path)
     writeFile(path, json.dump(2));
 }
 
-void Registry::add(const Input & from, const Input & to, const Attrs & extraAttrs)
+void Registry::add(const Input & from, const Input & to, const Attrs & extraAttrs, bool exact)
 {
-    entries.emplace_back(Entry{.from = from, .to = to, .extraAttrs = extraAttrs});
+    entries.emplace_back(Entry{.from = from, .to = to, .extraAttrs = extraAttrs, .exact = exact});
 }
 
 void Registry::remove(const Input & input)
@@ -133,7 +133,7 @@ std::shared_ptr<Registry> getFlagRegistry()
 
 void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs)
 {
-    getFlagRegistry()->add(from, to, extraAttrs);
+    getFlagRegistry()->add(from, to, extraAttrs, false);
 }
 
 static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, Store & store)
