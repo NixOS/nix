@@ -915,12 +915,15 @@ configure_shell_profile() {
             _sudo "to back up your current $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX" \
                   cp "$profile_target" "$profile_target$PROFILE_BACKUP_SUFFIX"
         else
-            # try to create the file if its directory exists
+            # try to create the file
+            # If the directory does not exists, create it
             target_dir="$(dirname "$profile_target")"
-            if [ -d "$target_dir" ]; then
-                _sudo "to create a stub $profile_target which will be updated" \
-                    touch "$profile_target"
+            if [ ! -d "$target_dir" ]; then
+                _sudo "to create the $target_dir directory which is missing" \
+                    mkdir -p "$target_dir"
             fi
+            _sudo "to create a stub $profile_target which will be updated" \
+                touch "$profile_target"
         fi
 
         if [ -e "$profile_target" ]; then
