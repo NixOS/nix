@@ -22,6 +22,7 @@
 #include <unistd.h>
 
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <boost/filesystem/path.hpp>
 
 #ifdef __FreeBSD__
 #  include <sys/param.h>
@@ -256,7 +257,7 @@ std::filesystem::path readLink(const std::filesystem::path & path)
     try {
         return std::filesystem::read_symlink(path);
     } catch (std::filesystem::filesystem_error & e) {
-        throw SystemError(e.code(), "reading symbolic link '%s'", PathFmt(path));
+        throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
 }
 
@@ -273,7 +274,8 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
     // Memory-map the file for faster processing where possible.
     if (memory_map) {
         try {
-            boost::iostreams::mapped_file_source mmap(path.string());
+            /* mapped_file_source can't be constructed from a std::filesystem::path. */
+            boost::iostreams::mapped_file_source mmap(boost::filesystem::path(path.native()));
             if (mmap.is_open()) {
                 sink({mmap.data(), mmap.size()});
                 return;
@@ -292,16 +294,15 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
 
 void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync)
 {
-    AutoCloseFD fd = toDescriptor(open(
-        path.string().c_str(),
-        O_WRONLY | O_TRUNC | O_CREAT
-#ifdef O_CLOEXEC
-            | O_CLOEXEC
-#endif
-        ,
-        mode));
+    AutoCloseFD fd = openNewFileForWrite(
+        path,
+        mode,
+        {
+            .truncateExisting = true,
+            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+        });
     if (!fd)
-        throw SysError("opening file '%s'", PathFmt(path));
+        throw NativeSysError("opening file %s", PathFmt(path));
 
     writeFile(fd.get(), s, sync, &path);
 
@@ -319,23 +320,22 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
             syncDescriptor(fd);
 
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%1%'", origPath ? PathFmt(*origPath) : PathFmt(descriptorToPath(fd)));
+        e.addTrace({}, "writing file %1%", origPath ? PathFmt(*origPath) : PathFmt(descriptorToPath(fd)));
         throw;
     }
 }
 
 void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync)
 {
-    AutoCloseFD fd = toDescriptor(open(
-        path.string().c_str(),
-        O_WRONLY | O_TRUNC | O_CREAT
-#ifdef O_CLOEXEC
-            | O_CLOEXEC
-#endif
-        ,
-        mode));
+    AutoCloseFD fd = openNewFileForWrite(
+        path,
+        mode,
+        {
+            .truncateExisting = true,
+            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+        });
     if (!fd)
-        throw SysError("opening file '%s'", PathFmt(path));
+        throw NativeSysError("opening file %s", PathFmt(path));
 
     std::array<char, 64 * 1024> buf;
 
@@ -349,7 +349,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
             }
         }
     } catch (Error & e) {
-        e.addTrace({}, "writing file '%s'", PathFmt(path));
+        e.addTrace({}, "writing file %s", PathFmt(path));
         throw;
     }
     if (sync == FsSync::Yes)
@@ -362,20 +362,23 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
 
 void syncParent(const std::filesystem::path & path)
 {
-    AutoCloseFD fd = toDescriptor(open(path.parent_path().c_str(), O_RDONLY, 0));
+    assert(path.has_parent_path());
+    AutoCloseFD fd = openDirectory(path.parent_path());
     if (!fd)
-        throw SysError("opening file '%s'", PathFmt(path));
+        throw NativeSysError("opening file %s", PathFmt(path));
+    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
     fd.fsync();
 }
 
 void recursiveSync(const std::filesystem::path & path)
 {
+    /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
     /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
-        AutoCloseFD fd = toDescriptor(open(path.string().c_str(), O_RDONLY, 0));
+        AutoCloseFD fd = openFileReadonly(path); /* TODO: O_NOFOLLOW? */
         if (!fd)
-            throw SysError("opening file '%s'", PathFmt(path));
+            throw NativeSysError("opening file %s", PathFmt(path));
         fd.fsync();
         return;
     } else if (S_ISLNK(st.st_mode))
@@ -394,9 +397,9 @@ void recursiveSync(const std::filesystem::path & path)
             if (std::filesystem::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
             } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = toDescriptor(open(entry.path().string().c_str(), O_RDONLY, 0));
+                AutoCloseFD fd = openFileReadonly(entry.path()); /* TODO: O_NOFOLLOW? */
                 if (!fd)
-                    throw SysError("opening file %1%", PathFmt(entry.path()));
+                    throw NativeSysError("opening file %1%", PathFmt(entry.path()));
                 fd.fsync();
             }
         }
@@ -405,9 +408,9 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = toDescriptor(open(dir->string().c_str(), O_RDONLY, 0));
+        AutoCloseFD fd = openDirectory(*dir); /* TODO: O_NOFOLLOW? */
         if (!fd)
-            throw SysError("opening directory %1%", PathFmt(*dir));
+            throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
     }
 }
@@ -422,7 +425,7 @@ void createDir(const std::filesystem::path & path, mode_t mode)
 #endif
             )
         == -1)
-        throw SysError("creating directory '%s'", PathFmt(path));
+        throw SysError("creating directory %s", PathFmt(path));
 }
 
 void createDirs(const std::filesystem::path & path)
@@ -430,7 +433,7 @@ void createDirs(const std::filesystem::path & path)
     try {
         std::filesystem::create_directories(path);
     } catch (std::filesystem::filesystem_error & e) {
-        throw SystemError(e.code(), "creating directory '%1%'", path.string());
+        throw SystemError(e.code(), "creating directory %1%", PathFmt(path));
     }
 }
 
@@ -738,7 +741,6 @@ bool isExecutableFileAmbient(const std::filesystem::path & exe)
 std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
 {
     std::filesystem::path path(absPath(rawPath));
-    ;
     try {
         auto parent = path.parent_path();
         if (parent == path) {
