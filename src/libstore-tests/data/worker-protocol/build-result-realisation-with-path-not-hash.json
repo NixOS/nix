@@ -1,0 +1,39 @@
+[
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": false,
+    "startTime": 0,
+    "status": "OutputRejected",
+    "stopTime": 0,
+    "success": false,
+    "timesBuilt": 0
+  },
+  {
+    "errorMsg": "no idea why",
+    "isNonDeterministic": true,
+    "startTime": 30,
+    "status": "NotDeterministic",
+    "stopTime": 50,
+    "success": false,
+    "timesBuilt": 3
+  },
+  {
+    "builtOutputs": {
+      "bar": {
+        "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
+        "signatures": []
+      },
+      "foo": {
+        "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo",
+        "signatures": []
+      }
+    },
+    "cpuSystem": 604000000,
+    "cpuUser": 500000000,
+    "startTime": 30,
+    "status": "Built",
+    "stopTime": 50,
+    "success": true,
+    "timesBuilt": 1
+  }
+]

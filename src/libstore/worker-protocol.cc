@@ -8,6 +8,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
+#include "nix/util/json-utils.hh"
 
 #include <chrono>
 #include <nlohmann/json.hpp>
@@ -19,6 +20,12 @@ const WorkerProto::Version WorkerProto::latest = {
         {
             .major = 1,
             .minor = 38,
+        },
+    .features =
+        {
+            std::string{
+                WorkerProto::featureRealisationWithPath,
+            },
         },
 };
 
@@ -254,10 +261,19 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
         res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
     }
-    if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
-        for (auto && [output, realisation] : builtOutputs)
-            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+
+    if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        success.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
+    } else if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
+        for (auto && [output, realisation] : WorkerProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
+            success.builtOutputs.insert_or_assign(
+                output.substr(n + 1),
+                UnkeyedRealisation{
+                    StorePath{getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))}});
+        }
     }
 
     res.inner = std::visit(
@@ -296,13 +312,27 @@ void WorkerProto::Serialise<BuildResult>::write(
             WorkerProto::write(store, conn, res.cpuUser);
             WorkerProto::write(store, conn, res.cpuSystem);
         }
-        if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
-            DrvOutputs builtOutputsFullKey;
-            for (auto & [output, realisation] : builtOutputs)
-                builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
-            WorkerProto::write(store, conn, builtOutputsFullKey);
+
+        if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+            WorkerProto::write(store, conn, builtOutputs);
+        } else if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
+            // Old clients read `builtOutputs` as a `StringMap` keyed
+            // by `sha256:<hex>!<outputName>` with JSON-encoded
+            // realisations. The derivation hash no longer exists, but
+            // old clients only extract `outputName` and `outPath`, so
+            // a dummy hash suffices.
+            StringMap sm;
+            for (auto & [outputName, realisation] : builtOutputs) {
+                auto dummyId = Hash::dummy.to_string(HashFormat::Base16, true) + "!" + outputName;
+                nlohmann::json j;
+                j["id"] = dummyId;
+                j["outPath"] = realisation.outPath.to_string();
+                sm[dummyId] = j.dump();
+            }
+            WorkerProto::write(store, conn, sm);
         }
     };
+
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
@@ -393,6 +423,111 @@ void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(
     if (conn.version >= WorkerProto::Version{.number = {1, 35}}) {
         WorkerProto::write(store, conn, info.remoteTrustsUs);
     }
+}
+
+UnkeyedRealisation WorkerProto::Serialise<UnkeyedRealisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to understand build trace",
+            WorkerProto::featureRealisationWithPath);
+    }
+
+    auto outPath = WorkerProto::Serialise<StorePath>::read(store, conn);
+    auto signatures = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
+
+    return UnkeyedRealisation{
+        .outPath = std::move(outPath),
+        .signatures = std::move(signatures),
+    };
+}
+
+void WorkerProto::Serialise<UnkeyedRealisation>::write(
+    const StoreDirConfig & store, WriteConn conn, const UnkeyedRealisation & info)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to understand build trace",
+            WorkerProto::featureRealisationWithPath);
+    }
+    WorkerProto::write(store, conn, info.outPath);
+    WorkerProto::write(store, conn, info.signatures);
+}
+
+std::optional<UnkeyedRealisation>
+WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        // Hack to improve compat
+        (void) WorkerProto::Serialise<std::string>::read(store, conn);
+        return std::nullopt;
+    } else {
+        auto temp = readNum<uint8_t>(conn.from);
+        switch (temp) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto::Serialise<UnkeyedRealisation>::read(store, conn);
+        default:
+            throw Error("Invalid optional build trace from remote");
+        }
+    }
+}
+
+void WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::write(
+    const StoreDirConfig & store, WriteConn conn, const std::optional<UnkeyedRealisation> & info)
+{
+    if (!info) {
+        conn.to << uint8_t{0};
+    } else {
+        conn.to << uint8_t{1};
+        WorkerProto::write(store, conn, *info);
+    }
+}
+
+DrvOutput WorkerProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to support content-addressing derivations",
+            WorkerProto::featureRealisationWithPath);
+    }
+
+    auto drvPath = WorkerProto::Serialise<StorePath>::read(store, conn);
+    auto outputName = WorkerProto::Serialise<std::string>::read(store, conn);
+
+    return DrvOutput{
+        .drvPath = std::move(drvPath),
+        .outputName = std::move(outputName),
+    };
+}
+
+void WorkerProto::Serialise<DrvOutput>::write(const StoreDirConfig & store, WriteConn conn, const DrvOutput & info)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to support content-addressing derivations",
+            WorkerProto::featureRealisationWithPath);
+    }
+    WorkerProto::write(store, conn, info.drvPath);
+    WorkerProto::write(store, conn, info.outputName);
+}
+
+Realisation WorkerProto::Serialise<Realisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    auto id = WorkerProto::Serialise<DrvOutput>::read(store, conn);
+    auto unkeyed = WorkerProto::Serialise<UnkeyedRealisation>::read(store, conn);
+
+    return Realisation{
+        std::move(unkeyed),
+        std::move(id),
+    };
+}
+
+void WorkerProto::Serialise<Realisation>::write(const StoreDirConfig & store, WriteConn conn, const Realisation & info)
+{
+    WorkerProto::write(store, conn, info.id);
+    WorkerProto::write(store, conn, static_cast<const UnkeyedRealisation &>(info));
 }
 
 } // namespace nix
