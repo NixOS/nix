@@ -325,7 +325,7 @@ nix_err nix_store_copy_closure(nix_c_context * context, Store * srcStore, Store 
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix::RealisedPath::Set paths;
+        nix::StorePathSet paths;
         paths.insert(path->path);
         nix::copyClosure(*srcStore->ptr, *dstStore->ptr, paths);
     }

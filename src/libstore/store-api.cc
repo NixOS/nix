@@ -1118,9 +1118,16 @@ void copyClosure(
     if (&srcStore == &dstStore)
         return;
 
-    StorePathSet closure;
-    srcStore.computeFSClosure(storePaths, closure);
-    copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
+    StorePathSet pathsToCopy;
+
+    auto onPathDiscovered = [&](const StorePath & path) -> bool {
+        // Only recurse if the path does not already exist in `dstStore`
+        return repair || !dstStore.isValidPath(path);
+    };
+    srcStore.computeFSClosure(storePaths, pathsToCopy, false, false, false, onPathDiscovered);
+    pathsToCopy.insert(storePaths.begin(), storePaths.end());
+
+    copyPaths(srcStore, dstStore, pathsToCopy, repair, checkSigs, substitute);
 }
 
 std::optional<ValidPathInfo>
