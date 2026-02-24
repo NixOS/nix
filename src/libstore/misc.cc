@@ -23,9 +23,9 @@ void Store::computeFSClosure(
     bool includeOutputs,
     bool includeDerivers)
 {
-    std::function<std::set<StorePath>(const StorePath & path, std::future<ref<const ValidPathInfo>> &)> queryDeps;
+    std::function<asio::awaitable<StorePathSet>(const StorePath & path)> queryDeps;
     if (flipDirection)
-        queryDeps = [&](const StorePath & path, std::future<ref<const ValidPathInfo>> & fut) {
+        queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             StorePathSet referrers;
             queryReferrers(path, referrers);
@@ -41,12 +41,14 @@ void Store::computeFSClosure(
                 for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
                     if (maybeOutPath && isValidPath(*maybeOutPath))
                         res.insert(*maybeOutPath);
-            return res;
+            co_return res;
         };
     else
-        queryDeps = [&](const StorePath & path, std::future<ref<const ValidPathInfo>> & fut) {
+        queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
-            auto info = fut.get();
+            auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+
             for (auto & ref : info->references)
                 if (ref != path)
                     res.insert(ref);
@@ -58,25 +60,9 @@ void Store::computeFSClosure(
 
             if (includeDerivers && info->deriver && isValidPath(*info->deriver))
                 res.insert(*info->deriver);
-            return res;
+            co_return res;
         };
-
-    computeClosure<StorePath>(
-        startPaths,
-        paths_,
-        [&](const StorePath & path, std::function<void(std::promise<std::set<StorePath>> &)> processEdges) {
-            std::promise<std::set<StorePath>> promise;
-            std::function<void(std::future<ref<const ValidPathInfo>>)> getDependencies =
-                [&](std::future<ref<const ValidPathInfo>> fut) {
-                    try {
-                        promise.set_value(queryDeps(path, fut));
-                    } catch (...) {
-                        promise.set_exception(std::current_exception());
-                    }
-                };
-            queryPathInfo(path, getDependencies);
-            processEdges(promise);
-        });
+    computeClosure<StorePath>(startPaths, paths_, queryDeps);
 }
 
 void Store::computeFSClosure(
