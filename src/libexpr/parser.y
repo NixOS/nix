@@ -30,6 +30,7 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/diagnose.hh"
 #include "nix/expr/parser-state.hh"
 
 #define YY_DECL                                    \
@@ -337,12 +338,14 @@ expr_simple
            state->exprs.add<ExprString>(state->exprs.alloc, path)});
   }
   | URI {
-      static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
-      if (noURLLiterals)
-          throw ParseError({
-              .msg = HintFmt("URL literals are disabled"),
+      diagnose(state->settings.lintUrlLiterals, [&](bool fatal) -> std::optional<ParseError> {
+          return ParseError({
+              .msg = HintFmt("URL literals are %s. Consider using a string literal \"%s\" instead",
+                  fatal ? "disallowed" : "discouraged",
+                  std::string_view($1.p, $1.l)),
               .pos = state->positions[CUR_POS]
           });
+      });
       $$ = state->exprs.add<ExprString>(state->exprs.alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
@@ -381,12 +384,14 @@ path_start
     std::string_view literal({$1.p, $1.l});
 
     /* check for short path literals */
-    if (state->settings.warnShortPathLiterals && literal.front() != '/' && literal.front() != '.') {
-        logWarning({
-            .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'. (" ANSI_BOLD "warn-short-path-literals" ANSI_NORMAL " = true)", literal, literal),
-            .pos = state->positions[CUR_POS]
-        });
-    }
+    diagnose(state->settings.lintShortPathLiterals, [&](bool) -> std::optional<ParseError> {
+        if (literal.front() != '/' && literal.front() != '.')
+            return ParseError({
+                .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'", literal, literal),
+                .pos = state->positions[CUR_POS]
+            });
+        return std::nullopt;
+    });
 
     auto basePath = std::filesystem::path(state->basePath.path.abs());
     Path path(absPath(literal, &basePath).string());
