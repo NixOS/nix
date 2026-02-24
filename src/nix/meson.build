@@ -7,7 +7,6 @@ project(
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
-    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.4',
   license : 'LGPL-2.1-or-later',
@@ -257,11 +256,7 @@ custom_target(
 # TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 
-localstatedir = nix_store.get_variable(
-  'localstatedir',
-  default_value : get_option('localstatedir'),
-)
-assert(localstatedir == get_option('localstatedir'))
+localstatedir = nix_store.get_variable('localstatedir')
 store_dir = nix_store.get_variable('storedir')
 subdir('scripts')
 subdir('misc')
