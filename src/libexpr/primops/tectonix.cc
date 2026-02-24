@@ -353,4 +353,29 @@ static RegisterPrimOp primop_unsafeTectonixInternalZoneRoot({
     .fun = prim_unsafeTectonixInternalZoneRoot,
 });
 
+// ============================================================================
+// builtins.unsafeTectonixInternalGitSha
+// Returns the git commit SHA that tectonix is evaluating against
+// ============================================================================
+static void prim_unsafeTectonixInternalGitSha(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    auto & sha = state.requireTectonixGitSha();
+    v.mkString(sha, state.mem);
+}
+
+static RegisterPrimOp primop_unsafeTectonixInternalGitSha({
+    .name = "__unsafeTectonixInternalGitSha",
+    .args = {},
+    .doc = R"(
+      Get the git commit SHA that tectonix is evaluating against.
+
+      Returns the value of `--tectonix-git-sha` as a string.
+
+      Example: `builtins.unsafeTectonixInternalGitSha` returns `"abc123def456..."`.
+
+      Requires `--tectonix-git-sha` to be set.
+    )",
+    .fun = prim_unsafeTectonixInternalGitSha,
+});
+
 } // namespace nix

@@ -577,12 +577,12 @@ private:
      */
     StorePath getZoneFromCheckout(std::string_view zonePath, const boost::unordered_flat_set<std::string> * dirtyFiles = nullptr);
 
+public:
+
     /**
      * Return the configured tectonix git SHA, or throw if unset.
      */
     const std::string & requireTectonixGitSha() const;
-
-public:
 
     /**
      * @param lookupPath     Only used during construction.
