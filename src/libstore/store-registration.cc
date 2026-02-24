@@ -3,6 +3,9 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/environment-variables.hh"
+
+#include <filesystem>
 
 namespace nix {
 
@@ -33,7 +36,9 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                 auto stateDir = getOr(params, "state", settings.nixStateDir.string());
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
-                else if (pathExists(settings.nixDaemonSocketFile))
+                else if (pathExists(
+                             getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH")
+                                 .value_or((std::filesystem::path{stateDir} / "daemon-socket" / "socket").string())))
                     return make_ref<UDSRemoteStore::Config>(params);
 #ifdef __linux__
                 else if (

@@ -48,13 +48,6 @@
 
 namespace nix {
 
-/* The default location of the daemon socket, relative to nixStateDir.
-   The socket is in a directory to allow you to control access to the
-   Nix daemon by setting the mode/ownership of the directory
-   appropriately.  (This wouldn't work on the socket itself since it
-   must be deleted and recreated on startup.) */
-#define DEFAULT_SOCKET_PATH "daemon-socket/socket"
-
 /**
  * Helper to resolve the NIX_CONF_DIR at runtime on Windows.
  * On Windows, NIX_CONF_DIR is not defined at compile time, so we determine
@@ -85,9 +78,6 @@ static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
     : nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixDaemonSocketFile(canonPath(getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))
-                                        .transform([](auto && s) { return std::filesystem::path(s); })
-                                        .value_or(nixStateDir / DEFAULT_SOCKET_PATH)))
 {
 #ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";

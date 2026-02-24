@@ -64,6 +64,14 @@ public:
 
     PathSetting realStoreDir{
         this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
+
+    /**
+     * The default daemon socket path for this store.
+     *
+     * Returns `NIX_DAEMON_SOCKET_PATH` if set, otherwise
+     * `stateDir / "daemon-socket" / "socket"`.
+     */
+    std::filesystem::path getDefaultDaemonSocketPath() const;
 };
 
 struct alignas(8) /* Work around ASAN failures on i686-linux. */

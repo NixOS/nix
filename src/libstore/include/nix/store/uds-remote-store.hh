@@ -33,8 +33,8 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
     /**
      * The path to the unix domain socket.
      *
-     * The default is `settings.nixDaemonSocketFile`, but we don't write
-     * that below, instead putting in the constructor.
+     * The default is `stateDir / "daemon-socket/socket"`, overridden by
+     * `NIX_DAEMON_SOCKET_PATH` if set.
      */
     Path path;
 
