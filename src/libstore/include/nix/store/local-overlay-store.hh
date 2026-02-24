@@ -53,7 +53,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    PathSetting remountHook{
+    Setting<std::filesystem::path> remountHook{
         (StoreConfig *) this,
         "",
         "remount-hook",

@@ -259,16 +259,6 @@ std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep = "");
 
 /**
- * Get the path part of the URL as an absolute or relative Path.
- *
- * @throws if any path component contains an slash (which would have
- * been escaped `%2F` in the rendered URL). This is because OS file
- * paths have no escape sequences --- file names cannot contain a
- * `/`.
- */
-Path renderUrlPathEnsureLegal(std::span<const std::string> urlPath);
-
-/**
  * Render URL path segments to a string by joining with `/`.
  * Does not percent-encode the segments.
  */

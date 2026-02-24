@@ -5,6 +5,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/get-drvs.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/derivations.hh"
@@ -853,7 +854,7 @@ static Strings defaultTemplateAttrPaths = {"templates.default", "defaultTemplate
 struct CmdFlakeInitCommon : virtual Args, EvalCommand
 {
     std::string templateUrl = "templates";
-    Path destDir;
+    std::filesystem::path destDir;
 
     const LockFlags lockFlags{.writeLockFile = false};
 
@@ -958,9 +959,16 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         }(templateDir, flakeDir);
 
         if (!changedFiles.empty() && std::filesystem::exists(std::filesystem::path{flakeDir} / ".git")) {
-            Strings args = {"-C", flakeDir, "add", "--intent-to-add", "--force", "--"};
+            OsStrings args = {
+                OS_STR("-C"),
+                flakeDir.native(),
+                OS_STR("add"),
+                OS_STR("--intent-to-add"),
+                OS_STR("--force"),
+                OS_STR("--"),
+            };
             for (auto & s : changedFiles)
-                args.emplace_back(s.string());
+                args.emplace_back(s.native());
             runProgram("git", true, args);
         }
 

@@ -62,7 +62,6 @@ sources += files(
   'file-system-at.cc',
   'file-system.cc',
   'muxable-pipe.cc',
-  'os-string.cc',
   'processes.cc',
   'signals.cc',
   'users.cc',

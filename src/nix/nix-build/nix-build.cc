@@ -140,7 +140,7 @@ static void main_nix_build(int argc, char ** argv)
     auto myName = isNixShell ? "nix-shell" : "nix-build";
 
     auto inShebang = false;
-    std::string script;
+    std::filesystem::path script;
     std::vector<std::string> savedArgs;
 
     AutoDelete tmpDir(createTempDir("", myName));
@@ -200,9 +200,9 @@ static void main_nix_build(int argc, char ** argv)
     {
         using LegacyArgs::LegacyArgs;
 
-        void setBaseDir(Path baseDir)
+        void setBaseDir(std::filesystem::path baseDir)
         {
-            commandBaseDir = baseDir;
+            commandBaseDir = baseDir.string();
         }
     };
 
@@ -284,11 +284,15 @@ static void main_nix_build(int argc, char ** argv)
                     fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%",
                         execArgs,
                         interpreter,
-                        escapeShellArgAlways(script),
+                        escapeShellArgAlways(script.string()),
                         joined.view());
             } else {
                 envCommand =
-                    fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), joined.view());
+                    fmt("exec %1% %2% %3% %4%",
+                        execArgs,
+                        interpreter,
+                        escapeShellArgAlways(script.string()),
+                        joined.view());
             }
         }
 
@@ -321,7 +325,7 @@ static void main_nix_build(int argc, char ** argv)
         buildMode = bmRepair;
 
     if (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) {
-        myArgs.setBaseDir(absPath(dirOf(script)));
+        myArgs.setBaseDir(absPath(script.parent_path()));
     }
     auto autoArgs = myArgs.getAutoArgs(*state);
 
@@ -373,17 +377,17 @@ static void main_nix_build(int argc, char ** argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : remainingArgs) {
+            auto shebangBaseDir = absPath(script.parent_path());
             if (fromArgs) {
-                auto shebangBaseDir = absPath(dirOf(script));
                 exprs.push_back(state->parseExprFromString(
                     std::move(i),
                     (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript)
-                        ? lookupFileArg(*state, shebangBaseDir)
+                        ? lookupFileArg(*state, shebangBaseDir.string())
                         : state->rootPath(".")));
             } else {
                 auto absolute = i;
                 try {
-                    absolute = canonPath(absPath(i), true);
+                    absolute = canonPath(absPath(std::filesystem::path{i}), true).string();
                 } catch (Error & e) {
                 };
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
@@ -392,9 +396,10 @@ static void main_nix_build(int argc, char ** argv)
                 else {
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
-                    auto baseDir = inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i;
+                    std::filesystem::path iPath{i};
+                    auto baseDir = inShebang && !packages ? absPath(iPath, &shebangBaseDir) : iPath;
 
-                    auto sourcePath = lookupFileArg(*state, baseDir);
+                    auto sourcePath = lookupFileArg(*state, baseDir.string());
                     auto resolvedPath = isNixShell ? resolveShellExprPath(sourcePath) : resolveExprPath(sourcePath);
 
                     exprs.push_back(state->parseExprFromFile(resolvedPath));
@@ -570,7 +575,7 @@ static void main_nix_build(int argc, char ** argv)
         for (auto & var : drv.env)
             if (drvOptions.passAsFile.count(var.first)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
-                Path p = (tmpDir.path() / fn).string();
+                auto p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
             } else

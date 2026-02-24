@@ -52,12 +52,10 @@ struct CmdCopySigs : StorePathsCommand
 
         // logger->setExpected(doneLabel, storePaths.size());
 
-        auto doPath = [&](const Path & storePathS) {
+        auto doPath = [&](const StorePath & storePath) {
             // Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
-
-            auto storePath = store->parseStorePath(storePathS);
 
             auto info = store->queryPathInfo(storePath);
 
@@ -89,7 +87,7 @@ struct CmdCopySigs : StorePathsCommand
         };
 
         for (auto & storePath : storePaths)
-            pool.enqueue(std::bind(doPath, store->printStorePath(storePath)));
+            pool.enqueue(std::bind(doPath, storePath));
 
         pool.process();
 
@@ -101,7 +99,7 @@ static auto rCmdCopySigs = registerCommand2<CmdCopySigs>({"store", "copy-sigs"})
 
 struct CmdSign : StorePathsCommand
 {
-    Path secretKeyFile;
+    std::filesystem::path secretKeyFile;
 
     CmdSign()
     {

@@ -250,9 +250,9 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
         auto parsed = parseURL(url, /*lenient=*/true);
         if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
             /* Here we know that the path must not contain encoded '/' or NUL bytes. */
-            auto path = renderUrlPathEnsureLegal(parsed.path);
-            if (!isAbsolute(path))
-                parsed.path = splitString<std::vector<std::string>>(absPath(path, baseDir->string()), "/");
+            auto path = urlPathToPath(parsed.path);
+            if (!path.is_absolute())
+                parsed.path = pathToUrlPath(absPath(path, get(baseDir)));
         }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {

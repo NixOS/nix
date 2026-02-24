@@ -113,7 +113,7 @@ static DownloadTarballResult downloadTarball_(
     // Namely lets catch when the url is a local file path, but
     // it is not in fact a tarball.
     if (url.scheme == "file") {
-        std::filesystem::path localPath = renderUrlPathEnsureLegal(url.path);
+        std::filesystem::path localPath = urlPathToPath(url.path);
         if (!localPath.is_absolute()) {
             throw Error(
                 "tarball '%s' must use an absolute path. "

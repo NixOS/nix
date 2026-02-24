@@ -3,24 +3,32 @@
 #include <iostream>
 #include <locale>
 
-#include "nix/util/file-path.hh"
-#include "nix/util/file-path-impl.hh"
-#include "nix/util/util.hh"
+#include "nix/util/os-string.hh"
 
 #ifdef _WIN32
 
 namespace nix {
 
-std::string os_string_to_string(PathViewNG::string_view path)
+std::string os_string_to_string(OsStringView s)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    return converter.to_bytes(std::filesystem::path::string_type{path});
+    return converter.to_bytes(s.data(), s.data() + s.size());
 }
 
-std::filesystem::path::string_type string_to_os_string(std::string_view s)
+std::string os_string_to_string(OsString s)
+{
+    return os_string_to_string(OsStringView{s});
+}
+
+OsString string_to_os_string(std::string_view s)
 {
     std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    return converter.from_bytes(std::string{s});
+    return converter.from_bytes(s.data(), s.data() + s.size());
+}
+
+OsString string_to_os_string(std::string s)
+{
+    return string_to_os_string(std::string_view{s});
 }
 
 } // namespace nix

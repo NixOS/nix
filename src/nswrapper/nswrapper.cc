@@ -1,4 +1,5 @@
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/util.hh"
 #include <grp.h>
@@ -61,7 +62,7 @@ void mainWrapped(int argc, char ** argv)
         runProgram(
             "newuidmap",
             true,
-            {
+            toOsStrings({
                 std::to_string(parentPid),
                 // UID 0 in namespace is euid of parent
                 "0",
@@ -71,12 +72,12 @@ void mainWrapped(int argc, char ** argv)
                 std::to_string(baseExtra),
                 std::to_string(baseExtra),
                 std::to_string(numExtra),
-            });
+            }));
 
         runProgram(
             "newgidmap",
             true,
-            {
+            toOsStrings({
                 std::to_string(parentPid),
                 // GID 0 in namespace is egid of parent
                 "0",
@@ -86,7 +87,7 @@ void mainWrapped(int argc, char ** argv)
                 std::to_string(baseExtra),
                 std::to_string(baseExtra),
                 std::to_string(numExtra),
-            });
+            }));
 
         exit(0);
     });
