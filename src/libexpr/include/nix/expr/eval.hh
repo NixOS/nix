@@ -22,6 +22,7 @@
 #include "nix/expr/config.hh"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
 #include <nlohmann/json_fwd.hpp>
@@ -526,14 +527,6 @@ private:
     mutable std::once_flag worldGitAccessorFlag;
     mutable std::optional<ref<SourceAccessor>> worldGitAccessor;
 
-    /** Lazy-initialized source accessor for world checkout (thread-safe via once_flag) */
-    mutable std::once_flag worldCheckoutAccessorFlag;
-    mutable std::optional<ref<SourceAccessor>> worldCheckoutAccessor;
-
-    /** Cached tracked files from the checkout's git index (thread-safe via once_flag) */
-    mutable std::once_flag worldCheckoutTrackedFilesFlag;
-    mutable std::set<CanonPath> worldCheckoutTrackedFiles;
-
     /** Cache: world path → tree SHA (lazy computed, cached at each path level) */
     const ref<boost::concurrent_flat_map<std::string, Hash>> worldTreeShaCache;
 
@@ -541,9 +534,16 @@ private:
     mutable std::once_flag tectonixSparseCheckoutRootsFlag;
     mutable std::set<std::string> tectonixSparseCheckoutRoots;
 
-    /** Lazy-initialized map of zone path → dirty status (thread-safe via once_flag) */
+    /** Per-zone dirty status: whether the zone is dirty, and if so, which
+     *  repo-relative file paths are dirty (from git status). */
+    struct ZoneDirtyInfo {
+        bool dirty = false;
+        boost::unordered_flat_set<std::string> dirtyFiles; // repo-relative paths
+    };
+
+    /** Lazy-initialized map of zone path → dirty info (thread-safe via once_flag) */
     mutable std::once_flag tectonixDirtyZonesFlag;
-    mutable std::map<std::string, bool> tectonixDirtyZones;
+    mutable std::map<std::string, ZoneDirtyInfo> tectonixDirtyZones;
 
     /** Cached manifest content (thread-safe via once_flag) */
     mutable std::once_flag tectonixManifestFlag;
@@ -575,7 +575,7 @@ private:
      * Get zone store path from checkout (for dirty zones).
      * With lazy-trees enabled, mounts lazily and caches by zone path.
      */
-    StorePath getZoneFromCheckout(std::string_view zonePath);
+    StorePath getZoneFromCheckout(std::string_view zonePath, const boost::unordered_flat_set<std::string> * dirtyFiles = nullptr);
 
     /**
      * Return the configured tectonix git SHA, or throw if unset.
@@ -629,9 +629,6 @@ public:
      */
     ref<SourceAccessor> getWorldGitAccessor() const;
 
-    /** Get accessor for world checkout (only in source-available mode) */
-    std::optional<ref<SourceAccessor>> getWorldCheckoutAccessor() const;
-
     /** Get tree SHA for a world path, with lazy caching */
     Hash getWorldTreeSha(std::string_view worldPath) const;
 
@@ -642,7 +639,7 @@ public:
     const std::set<std::string> & getTectonixSparseCheckoutRoots() const;
 
     /** Get map of zone path → dirty status (only for sparse-checked-out zones) */
-    const std::map<std::string, bool> & getTectonixDirtyZones() const;
+    const std::map<std::string, ZoneDirtyInfo> & getTectonixDirtyZones() const;
 
     /** Get cached manifest content (thread-safe, lazy-loaded) */
     const std::string & getManifestContent() const;

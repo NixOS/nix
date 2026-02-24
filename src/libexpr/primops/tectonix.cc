@@ -250,8 +250,8 @@ static void prim_unsafeTectonixInternalDirtyZones(EvalState & state, const PosId
     auto & dirtyZones = state.getTectonixDirtyZones();
 
     auto attrs = state.buildBindings(dirtyZones.size());
-    for (const auto & [zonePath, dirty] : dirtyZones) {
-        attrs.alloc(state.symbols.create(zonePath)).mkBool(dirty);
+    for (const auto & [zonePath, info] : dirtyZones) {
+        attrs.alloc(state.symbols.create(zonePath)).mkBool(info.dirty);
     }
     v.mkAttrs(attrs);
 }
@@ -289,7 +289,7 @@ static void prim_unsafeTectonixInternalZoneIsDirty(EvalState & state, const PosI
     if (state.isTectonixSourceAvailable()) {
         auto & dirtyZones = state.getTectonixDirtyZones();
         auto it = dirtyZones.find(std::string(zonePath));
-        isDirty = it != dirtyZones.end() && it->second;
+        isDirty = it != dirtyZones.end() && it->second.dirty;
     }
 
     v.mkBool(isDirty);

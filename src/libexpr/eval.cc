@@ -480,43 +480,6 @@ ref<SourceAccessor> EvalState::getWorldGitAccessor() const
     return *worldGitAccessor;
 }
 
-std::optional<ref<SourceAccessor>> EvalState::getWorldCheckoutAccessor() const
-{
-    if (!isTectonixSourceAvailable())
-        return std::nullopt;
-
-    std::call_once(worldCheckoutAccessorFlag, [this]() {
-        auto checkoutPath = std::filesystem::path(settings.tectonixCheckoutPath.get());
-        auto repo = GitRepo::openRepo(checkoutPath, {});
-        // Use the cached git index for tracked files instead of getWorkdirInfo(),
-        // which does a full filesystem walk via libgit2 (no fsmonitor support).
-        GitRepo::WorkdirInfo workdirInfo;
-        std::call_once(worldCheckoutTrackedFilesFlag, [&]() {
-            worldCheckoutTrackedFiles = repo->getTrackedFilesFromIndex();
-        });
-        workdirInfo.files = worldCheckoutTrackedFiles;
-
-        auto makeNotAllowedError = [checkoutPath](const CanonPath & path) -> RestrictedPathError {
-            if (pathExists(checkoutPath / path.rel()))
-                return RestrictedPathError(
-                    "Path '%1%' in the repository %2% is not tracked by Git.\n"
-                    "\n"
-                    "To make it visible to Nix, run:\n"
-                    "\n"
-                    "git -C %2% add \"%1%\"",
-                    path.rel(),
-                    checkoutPath);
-            else
-                return RestrictedPathError("Path '%s' does not exist in Git repository %s.", path.rel(), checkoutPath);
-        };
-
-        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
-        worldCheckoutAccessor = repo->getAccessor(workdirInfo, opts, makeNotAllowedError);
-        debug("created world checkout accessor for working tree at %s", checkoutPath.string());
-    });
-    return *worldCheckoutAccessor;
-}
-
 bool EvalState::isTectonixSourceAvailable() const
 {
     return !settings.tectonixCheckoutPath.get().empty();
@@ -658,7 +621,7 @@ const std::set<std::string> & EvalState::getTectonixSparseCheckoutRoots() const
     return tectonixSparseCheckoutRoots;
 }
 
-const std::map<std::string, bool> & EvalState::getTectonixDirtyZones() const
+const std::map<std::string, EvalState::ZoneDirtyInfo> & EvalState::getTectonixDirtyZones() const
 {
     std::call_once(tectonixDirtyZonesFlag, [this]() {
         if (!isTectonixSourceAvailable())
@@ -695,7 +658,7 @@ const std::map<std::string, bool> & EvalState::getTectonixDirtyZones() const
 
         // Initialize all sparse-checked-out zones as not dirty
         for (auto & [zoneId, zonePath] : zoneIdToPath) {
-            tectonixDirtyZones[zonePath] = false;
+            tectonixDirtyZones[zonePath] = {};
         }
 
         // Get dirty files via git status with -z for NUL-separated output
@@ -746,15 +709,12 @@ const std::map<std::string, bool> & EvalState::getTectonixDirtyZones() const
                 }
             }
 
-            // Find which zone(s) these files belong to
             for (const auto & filePath : pathsToCheck) {
-                for (auto & [zonePath, dirty] : tectonixDirtyZones) {
-                    // Normalize zone path for comparison with git status output
-                    // filePath is "/areas/..." and zonePath is "//areas/..."
+                for (auto & [zonePath, info] : tectonixDirtyZones) {
                     auto normalized = "/" + normalizeZonePath(zonePath);
-
                     if (hasPrefix(filePath, normalized + "/") || filePath == normalized) {
-                        tectonixDirtyZones[zonePath] = true;
+                        info.dirty = true;
+                        info.dirtyFiles.insert(filePath.substr(1));
                         break;
                     }
                 }
@@ -762,8 +722,8 @@ const std::map<std::string, bool> & EvalState::getTectonixDirtyZones() const
         }
 
         size_t dirtyCount = 0;
-        for (const auto & [_, dirty] : tectonixDirtyZones)
-            if (dirty) dirtyCount++;
+        for (const auto & [_, info] : tectonixDirtyZones)
+            if (info.dirty) dirtyCount++;
         debug("computed dirty zones: %d of %d zones are dirty", dirtyCount, tectonixDirtyZones.size());
     });
     return tectonixDirtyZones;
@@ -782,13 +742,11 @@ const std::string & EvalState::getManifestContent() const
 
         // In source-available mode, check checkout first
         if (isTectonixSourceAvailable()) {
-            auto checkoutAccessor = getWorldCheckoutAccessor();
-            if (checkoutAccessor) {
-                if ((*checkoutAccessor)->pathExists(fullPath)) {
-                    tectonixManifestContent = (*checkoutAccessor)->readFile(fullPath);
-                    debug("loaded manifest from checkout: %s", fullPath);
-                    return;
-                }
+            auto manifestPath = std::filesystem::path(settings.tectonixCheckoutPath.get()) / ".meta" / "manifest.json";
+            if (std::filesystem::exists(manifestPath)) {
+                tectonixManifestContent = readFile(manifestPath);
+                debug("loaded manifest from checkout: %s", manifestPath.string());
+                return;
             }
         }
 
@@ -816,16 +774,17 @@ StorePath EvalState::getZoneStorePath(std::string_view zonePath)
 {
     // Check dirty status using original zonePath (with // prefix) since
     // tectonixDirtyZones keys come directly from manifest with // prefix
-    bool isDirty = false;
+    const ZoneDirtyInfo * dirtyInfo = nullptr;
     if (isTectonixSourceAvailable()) {
         auto & dirtyZones = getTectonixDirtyZones();
         auto it = dirtyZones.find(std::string(zonePath));
-        isDirty = it != dirtyZones.end() && it->second;
+        if (it != dirtyZones.end() && it->second.dirty)
+            dirtyInfo = &it->second;
     }
 
-    if (isDirty) {
+    if (dirtyInfo) {
         debug("getZoneStorePath: %s is dirty, using checkout", zonePath);
-        return getZoneFromCheckout(zonePath);
+        return getZoneFromCheckout(zonePath, &dirtyInfo->dirtyFiles);
     }
 
     // Clean zone: get tree SHA
@@ -913,101 +872,121 @@ StorePath EvalState::mountZoneByTreeSha(const Hash & treeSha, std::string_view z
     return storePath;
 }
 
-StorePath EvalState::getZoneFromCheckout(std::string_view zonePath)
+/**
+ * Overlays dirty files from disk on top of a clean git tree accessor.
+ */
+struct DirtyOverlaySourceAccessor : SourceAccessor
+{
+    ref<SourceAccessor> base, disk;
+    boost::unordered_flat_set<std::string> dirtyFiles, dirtyDirs;
+
+    DirtyOverlaySourceAccessor(
+        ref<SourceAccessor> base, ref<SourceAccessor> disk,
+        boost::unordered_flat_set<std::string> && dirtyFiles)
+        : base(base), disk(disk), dirtyFiles(std::move(dirtyFiles))
+    {
+        for (auto & f : this->dirtyFiles) {
+            for (auto p = CanonPath(f); !p.isRoot();) {
+                p.pop();
+                if (!dirtyDirs.insert(p.rel().empty() ? "" : std::string(p.rel())).second)
+                    break;
+            }
+        }
+    }
+
+    bool isDirty(const CanonPath & path) { return dirtyFiles.contains(std::string(path.rel())); }
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override
+    {
+        if (path.isRoot()) return base->maybeLstat(path);
+        if (isDirty(path)) return disk->maybeLstat(path);
+        auto s = base->maybeLstat(path);
+        if (s || !dirtyDirs.contains(std::string(path.rel()))) return s;
+        return disk->maybeLstat(path);
+    }
+
+    std::string readFile(const CanonPath & path) override { return (isDirty(path) ? disk : base)->readFile(path); }
+    std::string readLink(const CanonPath & path) override { return (isDirty(path) ? disk : base)->readLink(path); }
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override { return (isDirty(path) ? disk : base)->getPhysicalPath(path); }
+
+    DirEntries readDirectory(const CanonPath & path) override
+    {
+        auto rel = path.isRoot() ? "" : std::string(path.rel());
+        if (!path.isRoot() && !dirtyDirs.contains(rel))
+            return base->readDirectory(path);
+
+        DirEntries entries;
+        try { entries = base->readDirectory(path); } catch (...) {}
+
+        auto prefix = rel.empty() ? "" : rel + "/";
+        for (auto & f : dirtyFiles) {
+            if (!f.starts_with(prefix)) continue;
+            auto rest = std::string_view(f).substr(prefix.size());
+            if (rest.find('/') != std::string_view::npos) continue;
+            auto stat = disk->maybeLstat(path / rest);
+            if (stat) entries[std::string(rest)] = stat->type;
+            else entries.erase(std::string(rest));
+        }
+        for (auto & d : dirtyDirs) {
+            if (!d.starts_with(prefix)) continue;
+            auto rest = std::string_view(d).substr(prefix.size());
+            if (rest.find('/') != std::string_view::npos || rest.empty()) continue;
+            if (!entries.count(std::string(rest)))
+                entries[std::string(rest)] = Type::tDirectory;
+        }
+        return entries;
+    }
+};
+
+StorePath EvalState::getZoneFromCheckout(std::string_view zonePath, const boost::unordered_flat_set<std::string> * dirtyFiles)
 {
     auto zone = normalizeZonePath(zonePath);
     std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
     auto checkoutPath = settings.tectonixCheckoutPath.get();
     auto fullPath = std::filesystem::path(checkoutPath) / zone;
 
-    if (!settings.lazyTrees) {
-        // Eager mode: immediate copy from checkout
-        auto checkoutAccessor = getWorldCheckoutAccessor();
-        if (!checkoutAccessor)
-            throw Error("checkout accessor not available for dirty zone '%s'", zonePath);
+    auto makeDirtyAccessor = [&]() -> ref<SourceAccessor> {
+        auto repo = getWorldRepo();
+        auto baseAccessor = repo->getAccessor(
+            getWorldTreeSha(zone), {.exportIgnore = true, .smudgeLfs = false}, "zone");
+        boost::unordered_flat_set<std::string> zoneDirtyFiles;
+        if (dirtyFiles) {
+            auto zonePrefix = zone + "/";
+            for (auto & f : *dirtyFiles)
+                if (f.starts_with(zonePrefix))
+                    zoneDirtyFiles.insert(f.substr(zonePrefix.size()));
+        }
+        return make_ref<DirtyOverlaySourceAccessor>(
+            baseAccessor, makeFSSourceAccessor(fullPath), std::move(zoneDirtyFiles));
+    };
 
+    if (!settings.lazyTrees) {
+        auto accessor = makeDirtyAccessor();
         auto storePath = fetchToStore(
             fetchSettings, *store,
-            SourcePath(*checkoutAccessor, CanonPath("/" + zone)),
+            SourcePath(accessor, CanonPath::root),
             FetchMode::Copy, name);
-
         allowPath(storePath);
         return storePath;
     }
 
-    // Lazy mode: check cache first with read lock (fast path)
     {
         auto cache = tectonixCheckoutZoneCache_.readLock();
         auto it = cache->find(std::string(zonePath));
-        if (it != cache->end()) {
-            debug("checkout zone cache hit for %s", zonePath);
-            return it->second;
-        }
+        if (it != cache->end()) return it->second;
     }
 
-    // Not in cache - acquire write lock and check again (double-checked locking)
-    // This prevents duplicate mounts when multiple threads race
     auto cache = tectonixCheckoutZoneCache_.lock();
     auto it = cache->find(std::string(zonePath));
-    if (it != cache->end()) {
-        debug("checkout zone cache hit for %s (after lock)", zonePath);
-        return it->second;
-    }
+    if (it != cache->end()) return it->second;
 
-    // Still not cached: create accessor and mount while holding the lock
     if (!std::filesystem::exists(fullPath))
         throw Error("zone '%s' not found in checkout at '%s'", zonePath, fullPath.string());
 
-    // Note: This mounts the live checkout directory, meaning files are read on-demand
-    // during evaluation. If the checkout is modified mid-evaluation, behavior is
-    // undefined. This is analogous to normal file reads and acceptable for local
-    // development workflows where dirty zones are being actively worked on.
-    debug("mounting live checkout for dirty zone %s - modifications during evaluation may cause undefined behavior", zonePath);
-    auto repo = GitRepo::openRepo(checkoutPath, {});
-    // Ensure the cached tracked files are populated (computed once).
-    std::call_once(worldCheckoutTrackedFilesFlag, [&]() {
-        worldCheckoutTrackedFiles = repo->getTrackedFilesFromIndex();
-    });
-    // Pre-filter to only this zone's files using lower_bound on the sorted
-    // set, avoiding a full copy of all 978K entries on each zone mount.
-    GitRepo::WorkdirInfo workdirInfo;
-    auto subtreePath = CanonPath("/" + zone);
-    for (auto it = worldCheckoutTrackedFiles.lower_bound(subtreePath);
-         it != worldCheckoutTrackedFiles.end() && it->isWithin(subtreePath);
-         ++it) {
-        workdirInfo.files.insert(*it);
-    }
-
-    auto makeNotAllowedError = [checkoutPath, zone](const CanonPath & path) -> RestrictedPathError {
-        if (pathExists(checkoutPath + "/" + zone + "/" + path.rel()))
-            return RestrictedPathError(
-                "Path '%1%' in the repository %2% is not tracked by Git.\n"
-                "\n"
-                "To make it visible to Nix, run:\n"
-                "\n"
-                "git -C %2% add \"%1%\"",
-                zone + "/" + path.rel(),
-                checkoutPath);
-        else
-            return RestrictedPathError("Path '%s' does not exist in Git repository %s.", zone + "/" + path.rel(), checkoutPath);
-    };
-
-    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false, .subtree = "/" + zone};
-    auto accessor = repo->getAccessor(workdirInfo, opts, makeNotAllowedError);
-    debug("created world checkout accessor for zone at %s", fullPath.string());
-
-    // Create virtual store path
     auto storePath = StorePath::random(name);
-
-    // Mount accessor at this path first, then allow the path.
-    // This order ensures we don't leave allowed paths without mounts on exception.
-    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+    storeFS->mount(CanonPath(store->printStorePath(storePath)), makeDirtyAccessor());
     allowPath(storePath);
-
-    // Insert into cache (we hold the lock, so this will succeed)
     cache->emplace(std::string(zonePath), storePath);
-
-    debug("mounted checkout zone %s at %s", zonePath, store->printStorePath(storePath));
     return storePath;
 }
 

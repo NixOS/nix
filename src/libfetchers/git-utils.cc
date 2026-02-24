@@ -22,7 +22,6 @@
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
-#include <git2/index.h>
 #include <git2/indexer.h>
 #include <git2/object.h>
 #include <git2/odb.h>
@@ -91,7 +90,6 @@ typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
 typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> ConfigIterator;
 typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
-typedef std::unique_ptr<git_index, Deleter<git_index_free>> Index;
 typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
 
 static Hash toHash(const git_oid & oid)
@@ -562,21 +560,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             info.submodules = parseSubmodules(modulesFile);
 
         return info;
-    }
-
-    std::set<CanonPath> getTrackedFilesFromIndex() override
-    {
-        Index index;
-        if (git_repository_index(Setter(index), *this))
-            throw Error("getting git index: %s", git_error_last()->message);
-
-        std::set<CanonPath> files;
-        size_t count = git_index_entrycount(index.get());
-        for (size_t i = 0; i < count; i++) {
-            auto entry = git_index_get_byindex(index.get(), i);
-            files.insert(CanonPath(entry->path));
-        }
-        return files;
     }
 
     std::optional<std::string> getWorkdirRef() override
@@ -1109,9 +1092,8 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
 {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
-    std::optional<std::string> subtree;
 
-    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev, std::optional<std::string> subtree)
+    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
         : CachingFilteringSourceAccessor(
               next,
               [&](const CanonPath & path) {
@@ -1120,7 +1102,6 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
               })
         , repo(repo)
         , rev(rev)
-        , subtree(subtree)
     {
     }
 
@@ -1144,9 +1125,6 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
     bool isExportIgnored(const CanonPath & path)
     {
         const char * exportIgnoreEntry = nullptr;
-        auto repoPath = path;
-        if (subtree)
-            repoPath = CanonPath(*subtree + "/" + repoPath.rel());
 
         // GIT_ATTR_CHECK_INDEX_ONLY:
         // > It will use index only for creating archives or for a bare repo
@@ -1480,7 +1458,7 @@ GitRepoImpl::getAccessor(const Hash & rev, const GitAccessorOptions & options, s
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, options);
     rawGitAccessor->setPathDisplay(std::move(displayPrefix));
     if (options.exportIgnore)
-        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev, std::nullopt);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
     else
         return rawGitAccessor;
 }
@@ -1489,32 +1467,15 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    std::filesystem::path accessorPath;
-    std::set<CanonPath> allowedPrefixes;
-    if (options.subtree) {
-        accessorPath = std::filesystem::path(path.string() + *options.subtree);
-        auto subtreePath = CanonPath(*options.subtree);
-        // Use lower_bound to skip directly to the subtree range.
-        // CanonPath ordering guarantees children follow their parent.
-        for (auto it = wd.files.lower_bound(subtreePath);
-             it != wd.files.end() && it->isWithin(subtreePath);
-             ++it) {
-            if (*it != subtreePath) // skip the directory entry itself
-                allowedPrefixes.emplace(it->abs().substr(options.subtree->size()));
-        }
-    } else {
-        accessorPath = path;
-        allowedPrefixes = wd.files;
-    }
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
-                                           makeFSSourceAccessor(accessorPath),
-                                           std::move(allowedPrefixes),
+                                           makeFSSourceAccessor(path),
+                                           std::set<CanonPath>(wd.files),
                                            // Always allow access to the root, but not its children.
                                            boost::unordered_flat_set<CanonPath>{CanonPath::root},
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
-        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt, options.subtree);
+        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
     return fileAccessor;
 }
 
