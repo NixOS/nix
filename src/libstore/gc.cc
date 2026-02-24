@@ -35,13 +35,13 @@
 
 namespace nix {
 
-static std::string gcSocketPath = "/gc-socket/socket";
+static std::string gcSocketPath = "gc-socket/socket";
 static std::string gcRootsDir = "gcroots";
 
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
-    Path realRoot = canonPath(fmt("%1%/%2%/auto/%3%", config->stateDir, gcRootsDir, hash));
+    Path realRoot = canonPath((config->stateDir.get() / gcRootsDir / "auto" / hash).string());
     makeSymlink(realRoot, path);
 }
 
@@ -61,7 +61,7 @@ void LocalStore::createTempRootsFile()
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
 
-        debug("acquiring write lock on '%s'", fnTempRoots);
+        debug("acquiring write lock on %s", PathFmt(fnTempRoots));
         lockFile(fdTempRoots->get(), ltWrite, true);
 
         /* Check whether the garbage collector didn't get in our
@@ -105,8 +105,8 @@ restart:
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
-            auto socketPath = config->stateDir.get() + gcSocketPath;
-            debug("connecting to '%s'", socketPath);
+            auto socketPath = config->stateDir.get() / gcSocketPath;
+            debug("connecting to '%s'", PathFmt(socketPath));
             *fdRootsSocket = createUnixDomainSocket();
             try {
                 nix::connect(toSocket(fdRootsSocket->get()), socketPath);
@@ -242,7 +242,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 
             /* Handle indirect roots. */
             else {
-                target = absPath(target, dirOf(path));
+                auto parentPath = std::filesystem::path(path).parent_path();
+                target = absPath(target, &parentPath);
                 if (!pathExists(target)) {
                     if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
@@ -288,8 +289,8 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
 void LocalStore::findRootsNoTemp(Roots & roots, bool censor)
 {
     /* Process direct roots in {gcroots,profiles}. */
-    findRoots(config->stateDir + "/" + gcRootsDir, std::filesystem::file_type::unknown, roots);
-    findRoots(config->stateDir + "/profiles", std::filesystem::file_type::unknown, roots);
+    findRoots((config->stateDir.get() / gcRootsDir).string(), std::filesystem::file_type::unknown, roots);
+    findRoots((config->stateDir.get() / "profiles").string(), std::filesystem::file_type::unknown, roots);
 
     /* Add additional roots returned by different platforms-specific
        heuristics.  This is typically used to add running programs to
@@ -398,8 +399,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Start the server for receiving new roots. */
-    auto socketPath = config->stateDir.get() + gcSocketPath;
-    createDirs(dirOf(socketPath));
+    auto socketPath = config->stateDir.get() / gcSocketPath;
+    createDirs(socketPath.parent_path());
     auto fdServer = createUnixDomainSocket(socketPath, 0666);
 
     // TODO nonblocking socket on windows?
@@ -407,7 +408,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     throw UnimplementedError("External GC client not implemented yet");
 #else
     if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) | O_NONBLOCK) == -1)
-        throw SysError("making socket '%1%' non-blocking", socketPath);
+        throw SysError("making socket '%s' non-blocking", PathFmt(socketPath));
 
     Pipe shutdownPipe;
     shutdownPipe.create();
@@ -539,7 +540,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
         Path path = storeDir + "/" + std::string(baseName);
-        Path realPath = config->realStoreDir + "/" + std::string(baseName);
+        auto realPath = config->realStoreDir.get() / std::string(baseName);
 
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
@@ -547,7 +548,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         if (baseName.find("tmp-", 0) == 0) {
             AutoCloseFD tmpDirFd = openDirectory(realPath);
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
-                debug("skipping locked tempdir '%s'", realPath);
+                debug("skipping locked tempdir '%s'", PathFmt(realPath));
                 return;
             }
         }
@@ -557,7 +558,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         results.paths.insert(path);
 
         uint64_t bytesFreed;
-        deleteStorePath(realPath, bytesFreed, isKnownPath);
+        deleteStorePath(realPath.string(), bytesFreed, isKnownPath);
 
         results.bytesFreed += bytesFreed;
 
@@ -714,12 +715,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         try {
             AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
             if (!dir)
-                throw SysError("opening directory '%1%'", config->realStoreDir);
+                throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
 
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
-            auto linksName = baseNameOf(linksDir);
+            auto linksName = linksDir.filename();
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
@@ -758,7 +759,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         AutoCloseDir dir(opendir(linksDir.c_str()));
         if (!dir)
-            throw SysError("opening directory '%1%'", linksDir);
+            throw SysError("opening directory %1%", PathFmt(linksDir));
 
         int64_t actualSize = 0, unsharedSize = 0;
 
@@ -818,7 +819,7 @@ void LocalStore::autoGC(bool sync)
 
         struct statvfs st;
         if (statvfs(config->realStoreDir.get().c_str(), &st))
-            throw SysError("getting filesystem info about '%s'", config->realStoreDir);
+            throw SysError("getting filesystem info about '%s'", PathFmt(config->realStoreDir.get()));
 
         return (uint64_t) st.f_bavail * st.f_frsize;
     };

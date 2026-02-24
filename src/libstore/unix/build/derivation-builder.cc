@@ -1298,7 +1298,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
             try {
-                ctx.netrcData = readFile(fileTransferSettings.netrcFile);
+                ctx.netrcData = readFile(fileTransferSettings.netrcFile.get());
             } catch (SystemError &) {
             }
 

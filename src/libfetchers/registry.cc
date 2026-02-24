@@ -147,13 +147,14 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
         return Registry::read(
             settings,
             [&] -> SourcePath {
-                if (!isAbsolute(path)) {
+                std::filesystem::path fsPath{path};
+                if (!fsPath.is_absolute()) {
                     auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
                     if (auto store2 = dynamic_cast<LocalFSStore *>(&store))
                         store2->addPermRoot(storePath, (getCacheDir() / "flake-registry.json").string());
                     return {store.requireStoreObjectAccessor(storePath)};
                 } else {
-                    return SourcePath{getFSSourceAccessor(), CanonPath{path}}.resolveSymlinks();
+                    return SourcePath{getFSSourceAccessor(), CanonPath{fsPath.string()}}.resolveSymlinks();
                 }
             }(),
             Registry::Global);

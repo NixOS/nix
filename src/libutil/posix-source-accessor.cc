@@ -69,14 +69,14 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
     return nix::pathExists(makeAbsPath(path).string());
 }
 
-using Cache = boost::concurrent_flat_map<Path, std::optional<PosixStat>>;
+using Cache = boost::concurrent_flat_map<std::string, std::optional<PosixStat>>;
 static Cache cache;
 
 std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
 {
-    // Note: we convert std::filesystem::path to Path because the
+    // Note: we convert std::filesystem::path to std::string because the
     // former is not hashable on libc++.
-    Path absPath = makeAbsPath(path).string();
+    std::string absPath = makeAbsPath(path).string();
 
     if (auto res = getConcurrent(cache, absPath))
         return *res;

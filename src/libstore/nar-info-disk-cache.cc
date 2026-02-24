@@ -84,12 +84,12 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     NarInfoDiskCacheImpl(
         const Settings & settings,
         SQLiteSettings sqliteSettings,
-        Path dbPath = (getCacheDir() / "binary-cache-v7.sqlite").string())
+        std::filesystem::path dbPath = getCacheDir() / "binary-cache-v7.sqlite")
         : NarInfoDiskCache{settings}
     {
         auto state(_state.lock());
 
-        createDirs(dirOf(dbPath));
+        createDirs(dbPath.parent_path());
 
         state->db = SQLite(dbPath, SQLite::Settings{sqliteSettings});
 

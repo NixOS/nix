@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <optional>
 #include <chrono>
 
@@ -42,6 +43,6 @@ void restoreProcessContext(bool restoreMounts = true);
 /**
  * @return the path of the current executable.
  */
-std::optional<Path> getSelfExe();
+std::optional<std::filesystem::path> getSelfExe();
 
 } // namespace nix

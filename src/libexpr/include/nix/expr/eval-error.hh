@@ -2,6 +2,7 @@
 
 #include "nix/util/error.hh"
 #include "nix/util/pos-idx.hh"
+#include "nix/store/path.hh"
 
 namespace nix {
 
@@ -81,12 +82,9 @@ MakeError(RecoverableEvalError, EvalBaseError);
 struct InvalidPathError : public CloneableError<InvalidPathError, EvalError>
 {
 public:
-    Path path;
+    StorePath path;
 
-    InvalidPathError(EvalState & state, const Path & path)
-        : CloneableError(state, "path '%s' is not valid", path)
-    {
-    }
+    InvalidPathError(EvalState & state, const StorePath & path);
 };
 
 /**

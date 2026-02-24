@@ -1178,15 +1178,15 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
 
     auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
 
-    Path logDir;
+    std::filesystem::path logDir;
     if (auto localStore = dynamic_cast<LocalStore *>(&store))
-        logDir = localStore->config->logDir;
+        logDir = localStore->config->logDir.get();
     else
-        logDir = logSettings.nixLogDir.string();
-    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
+        logDir = logSettings.nixLogDir;
+    auto dir = logDir / LocalFSStore::drvsLogDir / baseName.substr(0, 2);
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), logSettings.compressLog ? ".bz2" : "");
+    auto logFileName = dir / (baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
 
     fd = openNewFileForWrite(
         logFileName,
@@ -1196,7 +1196,7 @@ LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings
             .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
         });
     if (!fd)
-        throw SysError("creating log file '%1%'", logFileName);
+        throw SysError("creating log file %1%", PathFmt(logFileName));
 
     fileSink = std::make_shared<FdSink>(fd.get());
 

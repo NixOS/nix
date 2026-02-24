@@ -103,7 +103,7 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
  */
 static void parseConfigFiles(
     const std::string & contents,
-    const std::string & path,
+    const std::filesystem::path & path,
     std::vector<std::pair<std::string, std::string>> & parsedContents)
 {
     unsigned int pos = 0;
@@ -122,7 +122,7 @@ static void parseConfigFiles(
             continue;
 
         if (tokens.size() < 2)
-            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%s' in %s", line, PathFmt(path));
 
         auto include = false;
         auto ignoreMissing = false;
@@ -135,8 +135,9 @@ static void parseConfigFiles(
 
         if (include) {
             if (tokens.size() != 2)
-                throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
-            auto p = absPath(tokens[1], dirOf(path));
+                throw UsageError("syntax error in configuration line '%1%' in %s", line, PathFmt(path));
+            auto parent = path.parent_path();
+            auto p = absPath(std::filesystem::path{tokens[1]}, &parent);
             if (pathExists(p)) {
                 try {
                     std::string includedContents = readFile(p);
@@ -145,13 +146,13 @@ static void parseConfigFiles(
                     // TODO: Do we actually want to ignore this? Or is it better to fail?
                 }
             } else if (!ignoreMissing) {
-                throw Error("file '%1%' included from '%2%' not found", p, path);
+                throw Error("file %s included from %s not found", PathFmt(p), PathFmt(path));
             }
             continue;
         }
 
         if (tokens[1] != "=")
-            throw UsageError("syntax error in configuration line '%1%' in '%2%'", line, path);
+            throw UsageError("syntax error in configuration line '%s' in %s", line, PathFmt(path));
 
         std::string name = std::move(tokens[0]);
 
@@ -456,7 +457,7 @@ std::string BaseSetting<StringMap>::to_string() const
         [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
-static Path parsePath(const AbstractSetting & s, const std::string & str)
+static std::filesystem::path parsePath(const AbstractSetting & s, const std::string & str)
 {
     if (str == "")
         throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
@@ -522,7 +523,7 @@ PathSetting::PathSetting(
 
 Path PathSetting::parse(const std::string & str) const
 {
-    return parsePath(*this, str);
+    return parsePath(*this, str).string();
 }
 
 OptionalPathSetting::OptionalPathSetting(
@@ -541,7 +542,7 @@ std::optional<Path> OptionalPathSetting::parse(const std::string & str) const
     if (str == "")
         return std::nullopt;
     else
-        return parsePath(*this, str);
+        return parsePath(*this, str).string();
 }
 
 void OptionalPathSetting::operator=(const std::optional<Path> & v)

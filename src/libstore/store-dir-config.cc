@@ -20,9 +20,9 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
         canonPath(std::string(path))
 #endif
         ;
-    if (dirOf(p) != storeDir)
-        throw BadStorePath("path '%s' is not in the Nix store", p);
-    return StorePath(baseNameOf(p));
+    if (p.parent_path() != storeDir)
+        throw BadStorePath("path %s is not in the Nix store", PathFmt(p));
+    return StorePath(p.filename().string());
 }
 
 std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const

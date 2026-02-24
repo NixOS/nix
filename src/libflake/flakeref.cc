@@ -112,7 +112,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     auto succeeds = std::regex_match(url, match, pathFlakeRegex);
     if (!succeeds)
         throw Error("invalid flakeref '%s'", url);
-    auto path = match[1].str();
+    std::filesystem::path path = match[1].str();
     auto query = decodeQuery(match[3].str(), /*lenient=*/true);
     auto fragment = percentDecode(match[5].str());
 
@@ -121,60 +121,62 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
            to 'baseDir'). If so, search upward to the root of the
            repo (i.e. the directory containing .git). */
 
-        path = absPath(path, baseDir->string(), true);
+        path = absPath(path, get(baseDir), true);
 
         if (isFlake) {
 
             if (!S_ISDIR(lstat(path).st_mode)) {
-                if (baseNameOf(path) == "flake.nix") {
+                if (path.filename() == "flake.nix") {
                     // Be gentle with people who accidentally write `/foo/bar/flake.nix` instead of `/foo/bar`
+                    auto parentPath = path.parent_path();
                     warn(
-                        "Path '%s' should point at the directory containing the 'flake.nix' file, not the file itself. "
-                        "Pretending that you meant '%s'",
-                        path,
-                        dirOf(path));
-                    path = dirOf(path);
+                        "Path %s should point at the directory containing the 'flake.nix' file, not the file itself. "
+                        "Pretending that you meant %s",
+                        PathFmt(path),
+                        PathFmt(parentPath));
+                    path = parentPath;
                 } else {
-                    throw BadURL("path '%s' is not a flake (because it's not a directory)", path);
+                    throw BadURL("path %s is not a flake (because it's not a directory)", PathFmt(path));
                 }
             }
 
-            if (!allowMissing && !pathExists(path + "/flake.nix")) {
-                notice("path '%s' does not contain a 'flake.nix', searching up", path);
+            if (!allowMissing && !pathExists(path / "flake.nix")) {
+                notice("path %s does not contain a 'flake.nix', searching up", PathFmt(path));
 
                 // Save device to detect filesystem boundary
                 dev_t device = lstat(path).st_dev;
                 bool found = false;
                 while (path != "/") {
-                    if (pathExists(path + "/flake.nix")) {
+                    if (pathExists(path / "flake.nix")) {
                         found = true;
                         break;
-                    } else if (pathExists(path + "/.git"))
+                    } else if (pathExists(path / ".git"))
                         throw Error(
-                            "path '%s' is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
-                            path);
+                            "path %s is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
+                            PathFmt(path));
                     else {
                         if (lstat(path).st_dev != device)
-                            throw Error("unable to find a flake before encountering filesystem boundary at '%s'", path);
+                            throw Error(
+                                "unable to find a flake before encountering filesystem boundary at %s", PathFmt(path));
                     }
-                    path = dirOf(path);
+                    path = path.parent_path();
                 }
                 if (!found)
                     throw BadURL("could not find a flake.nix file");
             }
 
-            if (!allowMissing && !pathExists(path + "/flake.nix"))
-                throw BadURL("path '%s' is not a flake (because it doesn't contain a 'flake.nix' file)", path);
+            if (!allowMissing && !pathExists(path / "flake.nix"))
+                throw BadURL("path %s is not a flake (because it doesn't contain a 'flake.nix' file)", PathFmt(path));
 
             auto flakeRoot = path;
             std::string subdir;
 
             while (flakeRoot != "/") {
-                if (pathExists(flakeRoot + "/.git")) {
+                if (pathExists(flakeRoot / ".git")) {
                     auto parsedURL = ParsedURL{
                         .scheme = "git+file",
                         .authority = ParsedURL::Authority{},
-                        .path = splitString<std::vector<std::string>>(flakeRoot, "/"),
+                        .path = pathToUrlPath(flakeRoot),
                         .query = query,
                         .fragment = fragment,
                     };
@@ -185,19 +187,19 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
-                    if (pathExists(flakeRoot + "/.git/shallow"))
+                    if (pathExists(flakeRoot / ".git" / "shallow"))
                         parsedURL.query.insert_or_assign("shallow", "1");
 
                     return fromParsedURL(fetchSettings, std::move(parsedURL), isFlake);
                 }
 
-                subdir = std::string(baseNameOf(flakeRoot)) + (subdir.empty() ? "" : "/" + subdir);
-                flakeRoot = dirOf(flakeRoot);
+                subdir = flakeRoot.filename().string() + (subdir.empty() ? "" : "/" + subdir);
+                flakeRoot = flakeRoot.parent_path();
             }
         }
 
     } else {
-        if (!preserveRelativePaths && !isAbsolute(path))
+        if (!preserveRelativePaths && !path.is_absolute())
             throw BadURL("flake reference '%s' is not an absolute path", url);
     }
 
@@ -205,8 +207,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
         fetchSettings,
         {
             .scheme = "path",
-            .authority = isAbsolute(path) ? std::optional{ParsedURL::Authority{}} : std::nullopt,
-            .path = splitString<std::vector<std::string>>(path, "/"),
+            .authority = path.is_absolute() ? std::optional{ParsedURL::Authority{}} : std::nullopt,
+            .path = pathToUrlPath(path),
             .query = query,
             .fragment = fragment,
         },

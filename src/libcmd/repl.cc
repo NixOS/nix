@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
 
 #include "nix/util/error.hh"
 #include "nix/cmd/repl-interacter.hh"
@@ -141,7 +142,7 @@ NixRepl::NixRepl(
     , getValues(getValues)
     , staticEnv(new StaticEnv(nullptr, state->staticBaseEnv))
     , runNixPtr{runNix}
-    , interacter(make_unique<ReadlineLikeInteracter>((getDataDir() / "repl-history").string()))
+    , interacter(std::make_unique<ReadlineLikeInteracter>(getDataDir() / "repl-history"))
 {
 }
 

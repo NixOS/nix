@@ -161,7 +161,7 @@ bool Input::isFinal() const
     return maybeGetBoolAttr(attrs, "__final").value_or(false);
 }
 
-std::optional<std::string> Input::isRelative() const
+std::optional<std::filesystem::path> Input::isRelative() const
 {
     assert(scheme);
     return scheme->isRelative(*this);

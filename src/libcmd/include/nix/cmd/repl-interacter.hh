@@ -3,6 +3,7 @@
 
 #include "nix/util/finally.hh"
 #include "nix/util/types.hh"
+#include <filesystem>
 #include <functional>
 #include <string>
 
@@ -36,10 +37,10 @@ public:
 
 class ReadlineLikeInteracter : public virtual ReplInteracter
 {
-    std::string historyFile;
+    std::filesystem::path historyFile;
 public:
-    ReadlineLikeInteracter(std::string historyFile)
-        : historyFile(historyFile)
+    ReadlineLikeInteracter(std::filesystem::path historyFile)
+        : historyFile(std::move(historyFile))
     {
     }
 

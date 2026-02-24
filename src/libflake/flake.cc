@@ -596,7 +596,7 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                         if (auto relativePath = input.ref->input.isRelative()) {
                             return SourcePath{
                                 overriddenSourcePath.accessor,
-                                CanonPath(*relativePath, overriddenSourcePath.path.parent().value())};
+                                CanonPath(relativePath->string(), overriddenSourcePath.path.parent().value())};
                         } else
                             return std::nullopt;
                     };

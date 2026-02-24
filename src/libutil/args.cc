@@ -284,7 +284,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
     // executable file, and it starts with "#!".
     Strings savedArgs;
     if (allowShebang) {
-        auto script = *cmdline.begin();
+        std::filesystem::path script = *cmdline.begin();
         try {
             std::ifstream stream(script);
             char shebang[3] = {0, 0, 0};
@@ -310,8 +310,8 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 for (const auto & word : parseShebangContent(shebangContent)) {
                     cmdline.push_back(word);
                 }
-                cmdline.push_back(script);
-                commandBaseDir = dirOf(script);
+                cmdline.push_back(script.string());
+                commandBaseDir = script.parent_path();
                 for (auto pos = savedArgs.begin(); pos != savedArgs.end(); pos++)
                     cmdline.push_back(*pos);
             }

@@ -15,7 +15,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        pass a pointer to the data. */
     if (ctx.netrcData != "") {
         fileTransferSettings.netrcFile = "netrc";
-        writeFile(fileTransferSettings.netrcFile, ctx.netrcData, 0600);
+        writeFile(fileTransferSettings.netrcFile.get(), ctx.netrcData, 0600);
     }
 
     fileTransferSettings.caFile = "ca-certificates.crt";
