@@ -125,7 +125,7 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
 #if !USE_READLINE
     el_hist_size = 1000;
 #endif
-    read_history(historyFile.c_str());
+    read_history(historyFile.string().c_str());
     auto oldRepl = curRepl;
     curRepl = repl;
     Guard restoreRepl([oldRepl] { curRepl = oldRepl; });
@@ -208,7 +208,7 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
 
 ReadlineLikeInteracter::~ReadlineLikeInteracter()
 {
-    write_history(historyFile.c_str());
+    write_history(historyFile.string().c_str());
 }
 
 }; // namespace nix

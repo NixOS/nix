@@ -175,7 +175,7 @@ LocalStore::LocalStore(ref<const Config> config)
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
                 if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError("changing ownership of path '%s'", PathFmt(config->realStoreDir.get()));
+                    throw SysError("changing ownership of path %s", PathFmt(config->realStoreDir.get()));
                 chmod(config->realStoreDir.get(), perm);
             }
         }
@@ -204,7 +204,7 @@ LocalStore::LocalStore(ref<const Config> config)
         auto st = maybeStat(reservedPath);
         if (!st || st->st_size != gcSettings.reservedSize) {
             AutoCloseFD fd = toDescriptor(open(
-                reservedPath.c_str(),
+                reservedPath.string().c_str(),
                 O_WRONLY | O_CREAT
 #ifndef _WIN32
                     | O_CLOEXEC
@@ -397,7 +397,7 @@ AutoCloseFD LocalStore::openGCLock()
 {
     auto fnGCLock = config->stateDir.get() / "gc.lock";
     auto fdGCLock = open(
-        fnGCLock.c_str(),
+        fnGCLock.string().c_str(),
         O_RDWR | O_CREAT
 #ifndef _WIN32
             | O_CLOEXEC
@@ -405,7 +405,7 @@ AutoCloseFD LocalStore::openGCLock()
         ,
         0600);
     if (!fdGCLock)
-        throw SysError("opening global GC lock '%1%'", PathFmt(fnGCLock));
+        throw SysError("opening global GC lock %1%", PathFmt(fnGCLock));
     return toDescriptor(fdGCLock);
 }
 
@@ -450,7 +450,7 @@ LocalStore::~LocalStore()
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
             fdTempRoots->close();
-            unlink(fnTempRoots.c_str());
+            unlink(fnTempRoots.string().c_str());
         }
     } catch (...) {
         ignoreExceptionInDestructor();
@@ -502,7 +502,7 @@ void LocalStore::openDB(State & state, bool create)
         throw Error("cannot create database while in read-only mode");
     }
 
-    if (access(dbDir.c_str(), R_OK | (config->readOnly ? 0 : W_OK)))
+    if (access(dbDir.string().c_str(), R_OK | (config->readOnly ? 0 : W_OK)))
         throw SysError("Nix database directory %1% is not writable", PathFmt(dbDir));
 
     /* Open the Nix database. */

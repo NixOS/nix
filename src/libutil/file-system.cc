@@ -595,29 +595,25 @@ AutoCloseFD createAnonymousTempFile()
 
 std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesystem::path & prefix)
 {
-    std::filesystem::path tmpl(defaultTempDir() / (prefix.string() + ".XXXXXX"));
-    // Strictly speaking, this is UB, but who cares...
+    assert(!prefix.is_absolute());
+    auto tmpl = (defaultTempDir() / (prefix.string() + ".XXXXXX")).string();
     // FIXME: use O_TMPFILE.
-    AutoCloseFD fd = toDescriptor(
-#ifdef _WIN32
-        _wmkstemp(tmpl.c_str())
-#else
-        mkstemp(const_cast<char *>(tmpl.c_str()))
-#endif
-    );
+    // `mkstemp` modifies the string to contain the actual filename.
+    AutoCloseFD fd = toDescriptor(mkstemp(tmpl.data()));
 
     if (!fd)
-        throw SysError("creating temporary file %s", PathFmt(tmpl));
+        throw SysError("creating temporary file '%s'", tmpl);
 #ifndef _WIN32
     unix::closeOnExec(fd.get());
 #endif
-    return {std::move(fd), tmpl};
+    return {std::move(fd), std::filesystem::path(std::move(tmpl))};
 }
 
 std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)
 {
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
+    assert(!std::filesystem::path(suffix).is_absolute());
     auto tmpRoot = canonPath(root.empty() ? defaultTempDir().string() : root.string(), true);
     return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }

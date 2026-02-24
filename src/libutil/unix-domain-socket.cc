@@ -36,7 +36,7 @@ AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mo
 {
     auto fdSocket = nix::createUnixDomainSocket();
 
-    bind(fdSocket.get(), path);
+    bind(toSocket(fdSocket.get()), path);
 
     chmod(path, mode);
 
@@ -72,7 +72,7 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
             try {
                 pipe.readSide.close();
                 auto dir = std::filesystem::path(path).parent_path();
-                if (chdir(dir.c_str()) == -1)
+                if (chdir(dir.string().c_str()) == -1)
                     throw SysError("chdir to %s failed", PathFmt(dir));
                 std::string base(baseNameOf(path));
                 if (base.size() + 1 >= sizeof(addr.sun_path))
@@ -105,7 +105,7 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
 
 void bind(Socket fd, const std::filesystem::path & path)
 {
-    unlink(path.c_str());
+    unlink(path.string().c_str());
 
     bindConnectProcHelper("bind", ::bind, fd, path.string());
 }

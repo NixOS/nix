@@ -207,7 +207,7 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
 
 void LocalOverlayStore::deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
-    auto mergedDir = config->realStoreDir.get() + "/";
+    auto mergedDir = config->realStoreDir.get().string() + "/";
     if (path.substr(0, mergedDir.length()) != mergedDir) {
         warn("local-overlay: unexpected gc path '%s' ", path);
         return;
@@ -261,7 +261,7 @@ LocalStore::VerificationResult LocalOverlayStore::verifyAllValidPaths(RepairFlag
     StorePathSet done;
 
     auto existsInStoreDir = [&](const StorePath & storePath) {
-        return pathExists(config->realStoreDir.get() + "/" + storePath.to_string());
+        return pathExists((config->realStoreDir.get() / storePath.to_string()).string());
     };
 
     bool errors = false;

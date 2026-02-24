@@ -81,11 +81,15 @@ void execProgramInStore(
 
     if (store->storeDir != store2->getRealStoreDir()) {
         Strings helperArgs = {
-            chrootHelperName, store->storeDir, store2->getRealStoreDir(), std::string(system.value_or("")), program};
+            chrootHelperName,
+            store->storeDir,
+            store2->getRealStoreDir().string(),
+            std::string(system.value_or("")),
+            program};
         for (auto & arg : args)
             helperArgs.push_back(arg);
 
-        execve(getSelfExe().value_or("nix").c_str(), stringsToCharPtrs(helperArgs).data(), envp);
+        execve(getSelfExe().value_or("nix").string().c_str(), stringsToCharPtrs(helperArgs).data(), envp);
 
         throw SysError("could not execute chroot helper");
     }

@@ -76,7 +76,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = canonPath(dstFile, true);
+                    auto target = canonPath(dstFile, true).string();
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
                     if (unlink(dstFile.c_str()) == -1)
@@ -104,7 +104,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
+                        throw BuildEnvFileConflictError(readLink(dstFile).string(), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
                     if (unlink(dstFile.c_str()) == -1)
