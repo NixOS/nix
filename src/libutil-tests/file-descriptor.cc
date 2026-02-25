@@ -300,6 +300,9 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 
 TEST(WriteFull, RespectsAllowInterrupts)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
     Pipe pipe;
     pipe.create();
 

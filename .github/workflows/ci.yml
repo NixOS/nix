@@ -137,6 +137,24 @@ jobs:
         path: out/*
       if: ${{ matrix.primary }}
 
+  windows_tests:
+    needs: basic-checks
+    name: windows unit tests
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+    - name: Run Windows unit tests
+      run: |
+        nix build --file ci/gha/tests/windows.nix unitTests.nix-util-tests -L
+
   installer_test:
     needs: [tests]
     strategy:

@@ -182,7 +182,7 @@ std::string PosixSourceAccessor::readLink(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
-    return nix::readLink(makeAbsPath(path).string()).string();
+    return nix::readLink(makeAbsPath(path)).string();
 }
 
 std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
