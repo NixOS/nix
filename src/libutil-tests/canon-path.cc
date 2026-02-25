@@ -51,6 +51,19 @@ TEST(CanonPath, nullBytes)
     ASSERT_THROW(CanonPath(s, CanonPath::root), BadCanonPath);
 }
 
+TEST(CanonPath, fromFilename)
+{
+    ASSERT_THROW(CanonPath::fromFilename("."), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename(".."), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename(""), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("/.."), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("/."), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("/abc"), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("abc/d"), BadCanonPath);
+    ASSERT_THROW(CanonPath::fromFilename("/abc/d"), BadCanonPath);
+    ASSERT_EQ(CanonPath::fromFilename("abc").rel(), "abc");
+}
+
 TEST(CanonPath, from_existing)
 {
     CanonPath p0("foo//bar/");
