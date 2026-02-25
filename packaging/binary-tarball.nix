@@ -1,6 +1,6 @@
 {
   runCommand,
-  system,
+  stdenv,
   buildPackages,
   cacert,
   nix,
@@ -8,6 +8,8 @@
 }:
 
 let
+
+  inherit (stdenv.hostPlatform) system;
 
   installerClosureInfo = buildPackages.closureInfo {
     rootPaths = [
