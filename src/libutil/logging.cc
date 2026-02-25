@@ -250,15 +250,15 @@ struct JSONLogger : Logger
 
     void write(const nlohmann::json & json)
     {
-        auto line =
-            (includeNixPrefix ? "@nix " : "") + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        auto line = (includeNixPrefix ? "@nix " : "")
+                    + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
 
         /* Acquire a lock to prevent log messages from clobbering each
            other. */
         try {
             auto state(_state.lock());
             if (state->enabled)
-                writeLine(fd, line);
+                writeFullLogging(fd, line);
         } catch (...) {
             bool enabled = false;
             std::swap(_state.lock()->enabled, enabled);
