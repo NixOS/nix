@@ -54,13 +54,10 @@ void LocalStore::createTempRootsFile()
         return;
 
     while (1) {
-        if (pathExists(fnTempRoots)) {
+        if (pathExists(fnTempRoots))
             /* It *must* be stale, since there can be no two
                processes with the same pid. */
-            /* The error code of std::filesystem::remove() is intentionally ignored. */
-            std::error_code ec;
-            std::filesystem::remove(fnTempRoots, ec);
-        }
+            unlink(fnTempRoots.string().c_str());
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
 
@@ -193,9 +190,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
            we don't care about its temporary roots. */
         if (lockFile(fd.get(), ltWrite, false)) {
             printInfo("removing stale temporary roots file %1%", PathFmt(path));
-            /* The error code of std::filesystem::remove() is intentionally ignored. */
-            std::error_code ec;
-            std::filesystem::remove(path, ec);
+            unlink(path.string().c_str());
             writeFull(fd.get(), "d");
             continue;
         }
@@ -252,9 +247,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                 if (!pathExists(target)) {
                     if (isInDir(path, config->stateDir.get() / gcRootsDir / "auto")) {
                         printInfo("removing stale link from %1% to %2%", PathFmt(path), PathFmt(target));
-                        /* The error code of std::filesystem::remove() is intentionally ignored. */
-                        std::error_code ec;
-                        std::filesystem::remove(path, ec);
+                        unlink(path.string().c_str());
                     }
                 } else {
                     if (!std::filesystem::is_symlink(target))
@@ -789,11 +782,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             printMsg(lvlTalkative, "deleting unused link %1%", PathFmt(path));
 
-            try {
-                std::filesystem::remove(path);
-            } catch (std::filesystem::filesystem_error & e) {
-                throw SystemError(e.code(), "deleting %s", PathFmt(path));
-            }
+            if (unlink(path.string().c_str()) == -1)
+                throw SysError("deleting %1%", PathFmt(path));
 
             /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */

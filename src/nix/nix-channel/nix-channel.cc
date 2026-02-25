@@ -192,11 +192,8 @@ static void update(const StringSet & channelNames)
     if (lstat(nixDefExpr.c_str(), &st) == 0) {
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
-            try {
-                std::filesystem::remove(nixDefExpr);
-            } catch (std::filesystem::filesystem_error & e) {
-                throw SystemError(e.code(), "unlinking %s", PathFmt(nixDefExpr));
-            }
+            if (unlink(nixDefExpr.c_str()) == -1)
+                throw SysError("unlinking %1%", PathFmt(nixDefExpr));
     } else if (errno != ENOENT) {
         throw SysError("getting status of %1%", PathFmt(nixDefExpr));
     }

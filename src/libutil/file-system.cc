@@ -587,8 +587,7 @@ AutoCloseFD createAnonymousTempFile()
     if (!fd2)
         throw SysError("creating temporary file %s", PathFmt(path));
     fd = std::move(fd2);
-    std::error_code ec;
-    std::filesystem::remove(path, ec); /* We only care about the file descriptor. */
+    unlink(requireCString(path)); /* We only care about the file descriptor. */
 #endif
 
     return fd;
