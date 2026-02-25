@@ -3312,6 +3312,7 @@ ExprAttrs * EvalState::parseReplBindings(
 
     auto bindings = parseReplBindingsFromBuf(
         text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
+    assert(bindings);
 
     bindings->bindVars(*this, staticEnv);
 

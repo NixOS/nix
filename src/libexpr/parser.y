@@ -646,7 +646,12 @@ ExprAttrs * parseReplBindingsFromBuf(
     Parser parser(scanner, &state);
     parser.parse();
 
-    return dynamic_cast<ExprAttrs *>(state.result);
+    assert(state.result);
+    // state.result is Expr *, but the REPL_BINDINGS grammar rule
+    // always produces an ExprAttrs via the binds1 production.
+    auto bindings = dynamic_cast<ExprAttrs *>(state.result);
+    assert(bindings);
+    return bindings;
 }
 
 
