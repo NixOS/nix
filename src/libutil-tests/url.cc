@@ -893,7 +893,7 @@ TEST_P(ParseURLRelativeTestSuite, relativeRoundTrips)
 {
     auto & p = GetParam();
     auto parsed = parsePossiblyRelativeURL(p.relative);
-    auto str = std::visit([](auto & url) { return url.to_string(); }, parsed);
+    auto str = renderURL(parsed);
     EXPECT_EQ(str, p.relative);
 }
 
@@ -1540,5 +1540,104 @@ INSTANTIATE_TEST_SUITE_P(
     [](const auto & info) { return info.param.description; });
 
 #endif // _WIN32
+
+/* ----------------------------------------------------------------------------
+ * pathToUrlPath / urlPathToPath for relative URLs
+ * --------------------------------------------------------------------------*/
+
+struct RelativeUrlPathTestCase
+{
+    std::string_view urlString;
+    ParsedRelativeUrl urlParsed;
+    std::filesystem::path path;
+    std::string description;
+};
+
+class RelativeUrlPathTest : public ::testing::TestWithParam<RelativeUrlPathTestCase>
+{};
+
+TEST_P(RelativeUrlPathTest, pathToUrlPath)
+{
+    const auto & testCase = GetParam();
+    auto urlPath = pathToUrlPath(testCase.path);
+    EXPECT_EQ(urlPath, testCase.urlParsed.path);
+}
+
+TEST_P(RelativeUrlPathTest, urlPathToPath)
+{
+    const auto & testCase = GetParam();
+    auto path = urlPathToPath(testCase.urlParsed.path);
+    EXPECT_EQ(path, testCase.path);
+}
+
+TEST_P(RelativeUrlPathTest, urlToString)
+{
+    const auto & testCase = GetParam();
+    EXPECT_EQ(testCase.urlParsed.to_string(), testCase.urlString);
+}
+
+TEST_P(RelativeUrlPathTest, stringToUrl)
+{
+    const auto & testCase = GetParam();
+    auto parsed = ParsedRelativeUrl::parse(testCase.urlString);
+    EXPECT_EQ(parsed, testCase.urlParsed);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    RelativeUrlPathTestSuite,
+    RelativeUrlPathTest,
+    ::testing::Values(
+        RelativeUrlPathTestCase{
+            .urlString = "nar/abc123.nar.xz",
+            .urlParsed =
+                ParsedRelativeUrl{
+                    .path = {"nar", "abc123.nar.xz"},
+                },
+#ifdef _WIN32
+            .path = L"nar\\abc123.nar.xz",
+#else
+            .path = "nar/abc123.nar.xz",
+#endif
+            .description = "simple_relative",
+        },
+        RelativeUrlPathTestCase{
+            .urlString = "foo",
+            .urlParsed =
+                ParsedRelativeUrl{
+                    .path = {"foo"},
+                },
+            .path = "foo",
+            .description = "single_segment",
+        },
+        RelativeUrlPathTestCase{
+            .urlString = "a/b/c",
+            .urlParsed =
+                ParsedRelativeUrl{
+                    .path = {"a", "b", "c"},
+                },
+#ifdef _WIN32
+            .path = L"a\\b\\c",
+#else
+            .path = "a/b/c",
+#endif
+            .description = "multiple_segments",
+        },
+        RelativeUrlPathTestCase{
+            .urlString = "/foo/bar",
+            .urlParsed =
+                ParsedRelativeUrl{
+                    .path = {"", "foo", "bar"},
+                },
+#ifdef _WIN32
+            /* Note this is not an absolute path on Windows, but the
+               leading slash still matters (current drive vs current
+               directory). */
+            .path = L"\\foo\\bar",
+#else
+            .path = "/foo/bar",
+#endif
+            .description = "absolute_path_relative_url",
+        }),
+    [](const auto & info) { return info.param.description; });
 
 } // namespace nix

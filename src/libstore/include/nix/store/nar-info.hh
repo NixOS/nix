@@ -4,7 +4,11 @@
 #include "nix/util/compression-algo.hh"
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/url.hh"
+#include "nix/util/canon-path.hh"
 #include "nix/store/path-info.hh"
+
+#include <variant>
 
 namespace nix {
 
@@ -12,13 +16,14 @@ struct StoreDirConfig;
 
 struct UnkeyedNarInfo : virtual UnkeyedValidPathInfo
 {
-    std::string url;
+    ParsedMaybeRelativeURL url;
     std::string compression; // FIXME: Use CompressionAlgo
     std::optional<Hash> fileHash;
     uint64_t fileSize = 0;
 
     UnkeyedNarInfo(UnkeyedValidPathInfo info)
         : UnkeyedValidPathInfo(std::move(info))
+        , url{ParsedRelativeUrl{}}
     {
     }
 

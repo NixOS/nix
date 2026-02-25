@@ -2,27 +2,11 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/url.hh"
 
 #include <atomic>
 
 namespace nix {
-
-static std::filesystem::path checkBinaryCachePath(const std::filesystem::path & root, const std::string & path)
-{
-    auto p = std::filesystem::path(requireCString(path));
-    if (p.empty())
-        throw Error("local binary cache path must not be empty");
-
-    if (p.is_absolute())
-        throw Error("local binary cache path '%s' must not be absolute", path);
-
-    for (const auto & segment : p) {
-        if (segment.native() == OS_STR("..") || segment.native() == OS_STR("."))
-            throw Error("local binary cache path '%s' must not contain '..' or '.' segments", path);
-    }
-
-    return root / p.relative_path();
-}
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     const std::filesystem::path & binaryCacheDir, const StoreReference::Params & params)
@@ -71,12 +55,12 @@ public:
 
 protected:
 
-    bool fileExists(const std::string & path) override;
+    bool fileExists(const CanonPath & path) override;
 
     void upsertFile(
-        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
+        const CanonPath & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
-        auto path2 = checkBinaryCachePath(config->binaryCacheDir, path);
+        auto path2 = config->binaryCacheDir / path.rel();
         static std::atomic<int> counter{0};
         createDirs(path2.parent_path());
         auto tmp = path2;
@@ -87,16 +71,32 @@ protected:
         del.cancel();
     }
 
-    void getFile(const std::string & path, Sink & sink) override
+    void getFile(const ParsedMaybeRelativeURL & url, Sink & sink) override
     {
-        try {
-            /* TODO: Don't follow symlinks? */
-            readFile(checkBinaryCachePath(config->binaryCacheDir, path), sink);
-        } catch (SystemError & e) {
-            if (e.is(std::errc::no_such_file_or_directory))
-                throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
-            throw;
-        }
+        std::visit(
+            overloaded{
+                [&](const ParsedRelativeUrl & url) {
+                    if (url.query)
+                        throw Error(
+                            "local binary cache does not support query parameters in URL '%s', not even empty params map trailing ?",
+                            url.to_string());
+                    if (!url.fragment.empty())
+                        throw Error("local binary cache does not support fragment in URL '%s'", url.to_string());
+                    auto path = urlPathToPath(url.path);
+                    if (path.is_absolute())
+                        throw Error("local binary cache does not support absolute path in URL '%s'", url.to_string());
+                    try {
+                        /* TODO: Don't follow symlinks? */
+                        readFile(config->binaryCacheDir / path, sink);
+                    } catch (SystemError & e) {
+                        if (e.is(std::errc::no_such_file_or_directory))
+                            throw NoSuchBinaryCacheFile("file %s does not exist in binary cache", PathFmt(path));
+                        throw;
+                    }
+                },
+                [&](const ParsedURL &) { unsupported("getFile from absolute URL"); },
+            },
+            url);
     }
 
     StorePathSet queryAllValidPaths() override
@@ -123,16 +123,16 @@ protected:
 void LocalBinaryCacheStore::init()
 {
     createDirs(config->binaryCacheDir / "nar");
-    createDirs(config->binaryCacheDir / realisationsPrefix);
+    createDirs(config->binaryCacheDir / realisationsPrefix.rel());
     if (config->writeDebugInfo)
         createDirs(config->binaryCacheDir / "debuginfo");
     createDirs(config->binaryCacheDir / "log");
     BinaryCacheStore::init();
 }
 
-bool LocalBinaryCacheStore::fileExists(const std::string & path)
+bool LocalBinaryCacheStore::fileExists(const CanonPath & path)
 {
-    return pathExists(checkBinaryCachePath(config->binaryCacheDir, path));
+    return pathExists(config->binaryCacheDir / path.rel());
 }
 
 StringSet LocalBinaryCacheStoreConfig::uriSchemes()

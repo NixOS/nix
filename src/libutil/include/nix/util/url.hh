@@ -357,6 +357,11 @@ ParsedURL parseURL(std::string_view url, bool lenient = false);
  */
 using ParsedMaybeRelativeURL = std::variant<ParsedRelativeUrl, ParsedURL>;
 
+inline std::string renderURL(const ParsedMaybeRelativeURL & url)
+{
+    return std::visit([](const auto & u) { return u.to_string(); }, url);
+}
+
 /**
  * Parse a URL that may be either absolute or relative.
  *

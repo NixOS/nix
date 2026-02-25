@@ -66,6 +66,7 @@ suites = [
       'user-envs-migration.sh',
       'cli-characterisation.sh',
       'binary-cache.sh',
+      'binary-cache-peculiar-url.sh',
       'multiple-outputs.sh',
       'nix-build.sh',
       'gc-concurrent.sh',

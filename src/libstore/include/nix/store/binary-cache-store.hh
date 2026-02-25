@@ -1,9 +1,12 @@
 #pragma once
 ///@file
 
+#include "nix/util/canon-path.hh"
 #include "nix/util/compression-settings.hh"
+#include "nix/util/url.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/nar-info.hh"
 
 #include "nix/util/pool.hh"
 
@@ -11,7 +14,6 @@
 
 namespace nix {
 
-struct NarInfo;
 class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
@@ -115,9 +117,9 @@ protected:
      * the build trace entries themselves than the entire directory, for
      * a smoother migration path.
      */
-    constexpr const static std::string realisationsPrefix = "build-trace-v2";
+    inline static const CanonPath realisationsPrefix = CanonPath::fromFilename("build-trace-v2");
 
-    constexpr const static std::string cacheInfoFile = "nix-cache-info";
+    inline static const CanonPath cacheInfoFile = CanonPath::fromFilename("nix-cache-info");
 
     BinaryCacheStore(Config &);
 
@@ -126,24 +128,24 @@ protected:
      *
      * It's `${realisationsPrefix}/${drvPath}/${outputName}`.
      */
-    std::string makeRealisationPath(const DrvOutput & id);
+    CanonPath makeRealisationPath(const DrvOutput & id);
 
 public:
 
-    virtual bool fileExists(const std::string & path) = 0;
+    virtual bool fileExists(const CanonPath & path) = 0;
 
-    virtual void upsertFile(
-        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
+    virtual void
+    upsertFile(const CanonPath & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) = 0;
 
     void upsertFile(
-        const std::string & path,
+        const CanonPath & path,
         // FIXME: use std::string_view
         std::string && data,
         const std::string & mimeType,
         uint64_t sizeHint);
 
     void upsertFile(
-        const std::string & path,
+        const CanonPath & path,
         // FIXME: use std::string_view
         std::string && data,
         const std::string & mimeType)
@@ -153,9 +155,13 @@ public:
     }
 
     /**
-     * Dump the contents of the specified file to a sink.
+     * Fetch the contents of a URL to a sink.
+     *
+     * For relative URLs, fetches from the binary cache.
+     * For absolute URLs, default implementation throws; subclasses with
+     * network support (like HTTP) may override to support absolute URLs.
      */
-    virtual void getFile(const std::string & path, Sink & sink);
+    virtual void getFile(const ParsedMaybeRelativeURL & url, Sink & sink) = 0;
 
     /**
      * Get the contents of /nix-cache-info. Return std::nullopt if it
@@ -167,9 +173,9 @@ public:
      * Fetch the specified file and call the specified callback with
      * the result. A subclass may implement this asynchronously.
      */
-    virtual void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept;
+    virtual void getFile(const ParsedRelativeUrl & url, Callback<std::optional<std::string>> callback) noexcept;
 
-    std::optional<std::string> getFile(const std::string & path);
+    std::optional<std::string> getFile(const ParsedRelativeUrl & url);
 
 public:
 
@@ -179,7 +185,7 @@ private:
 
     std::string narMagic;
 
-    std::string narInfoFileFor(const StorePath & storePath);
+    CanonPath narInfoFileFor(const StorePath & storePath);
 
     void writeNarInfo(ref<NarInfo> narInfo);
 

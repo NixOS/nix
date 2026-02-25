@@ -79,52 +79,39 @@ void BinaryCacheStore::init()
 
 std::optional<std::string> BinaryCacheStore::getNixCacheInfo()
 {
-    return getFile(cacheInfoFile);
+    return getFile(ParsedRelativeUrl::parse(cacheInfoFile.rel()));
 }
 
 void BinaryCacheStore::upsertFile(
-    const std::string & path, std::string && data, const std::string & mimeType, uint64_t sizeHint)
+    const CanonPath & path, std::string && data, const std::string & mimeType, uint64_t sizeHint)
 {
     StringSource source{data};
     upsertFile(path, source, mimeType, sizeHint);
 }
 
-void BinaryCacheStore::getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept
+void BinaryCacheStore::getFile(const ParsedRelativeUrl & url, Callback<std::optional<std::string>> callback) noexcept
 {
     try {
-        callback(getFile(path));
+        callback(getFile(url));
     } catch (...) {
         callback.rethrow();
     }
 }
 
-void BinaryCacheStore::getFile(const std::string & path, Sink & sink)
-{
-    std::promise<std::optional<std::string>> promise;
-    getFile(path, {[&](std::future<std::optional<std::string>> result) {
-                try {
-                    promise.set_value(result.get());
-                } catch (...) {
-                    promise.set_exception(std::current_exception());
-                }
-            }});
-    sink(*promise.get_future().get());
-}
-
-std::optional<std::string> BinaryCacheStore::getFile(const std::string & path)
+std::optional<std::string> BinaryCacheStore::getFile(const ParsedRelativeUrl & url)
 {
     StringSink sink;
     try {
-        getFile(path, sink);
+        getFile(ParsedMaybeRelativeURL{url}, sink);
     } catch (NoSuchBinaryCacheFile &) {
         return std::nullopt;
     }
     return std::move(sink.s);
 }
 
-std::string BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
+CanonPath BinaryCacheStore::narInfoFileFor(const StorePath & storePath)
 {
-    return std::string(storePath.hashPart()) + ".narinfo";
+    return CanonPath::fromFilename(std::string{storePath.hashPart()} + ".narinfo");
 }
 
 void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
@@ -176,14 +163,16 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
-    narInfo->url = "nar/" + narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
-                   + (config.compression == CompressionAlgo::xz       ? ".xz"
-                      : config.compression == CompressionAlgo::bzip2  ? ".bz2"
-                      : config.compression == CompressionAlgo::zstd   ? ".zst"
-                      : config.compression == CompressionAlgo::lzip   ? ".lzip"
-                      : config.compression == CompressionAlgo::lz4    ? ".lz4"
-                      : config.compression == CompressionAlgo::brotli ? ".br"
-                                                                      : "");
+    auto narUrl = CanonPath::fromFilename("nar")
+                  / (narInfo->fileHash->to_string(HashFormat::Nix32, false) + ".nar"
+                     + (config.compression == CompressionAlgo::xz       ? ".xz"
+                        : config.compression == CompressionAlgo::bzip2  ? ".bz2"
+                        : config.compression == CompressionAlgo::zstd   ? ".zst"
+                        : config.compression == CompressionAlgo::lzip   ? ".lzip"
+                        : config.compression == CompressionAlgo::lz4    ? ".lz4"
+                        : config.compression == CompressionAlgo::brotli ? ".br"
+                                                                        : ""));
+    narInfo->url = ParsedRelativeUrl::parse(narUrl.rel());
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(now2 - now1).count();
     printMsg(
@@ -202,7 +191,7 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
             {"root", narAccessor->getListing()},
         };
 
-        upsertFile(std::string(info.path.hashPart()) + ".ls", j.dump(), "application/json");
+        upsertFile(CanonPath::fromFilename(std::string{info.path.hashPart()} + ".ls"), j.dump(), "application/json");
     }
 
     /* Optionally maintain an index of DWARF debug info files
@@ -216,7 +205,7 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
 
             ThreadPool threadPool(25);
 
-            auto doFile = [&](std::string member, std::string key, std::string target) {
+            auto doFile = [&](std::string member, CanonPath key, std::string target) {
                 checkInterrupt();
 
                 nlohmann::json json;
@@ -250,8 +239,8 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
 
                     auto buildId = s1 + s2;
 
-                    std::string key = "debuginfo/" + buildId;
-                    std::string target = "../" + narInfo->url;
+                    auto key = CanonPath::fromFilename("debuginfo") / buildId;
+                    std::string target = "../" + std::string{narUrl.rel()};
 
                     threadPool.enqueue(std::bind(doFile, std::string(debugPath.rel()), key, target));
                 }
@@ -262,11 +251,11 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
     }
 
     /* Atomically write the NAR file. */
-    if (repair || !fileExists(narInfo->url)) {
+    if (repair || !fileExists(narUrl)) {
         FdSource source{fdTemp.get()};
         source.restart(); /* Seek back to the start of the file. */
         stats.narWrite++;
-        upsertFile(narInfo->url, source, "application/x-nix-nar", narInfo->fileSize);
+        upsertFile(narUrl, source, "application/x-nix-nar", narInfo->fileSize);
     } else
         stats.narWriteAverted++;
 
@@ -596,7 +585,7 @@ void BinaryCacheStore::queryPathInfoUncached(
 
         auto narInfoFile = narInfoFileFor(storePath);
 
-        getFile(narInfoFile, {[=, this](std::future<std::optional<std::string>> fut) {
+        getFile(ParsedRelativeUrl::parse(narInfoFile.rel()), {[=, this](std::future<std::optional<std::string>> fut) {
                     try {
                         auto data = fut.get();
 
@@ -605,8 +594,8 @@ void BinaryCacheStore::queryPathInfoUncached(
 
                         stats.narInfoRead++;
 
-                        (*callbackPtr)(
-                            (std::shared_ptr<ValidPathInfo>) std::make_shared<NarInfo>(*this, *data, narInfoFile));
+                        (*callbackPtr)((std::shared_ptr<ValidPathInfo>) std::make_shared<NarInfo>(
+                            *this, *data, std::string{narInfoFile.rel()}));
 
                         (void) act; // force Activity into this lambda to ensure it stays alive
                     } catch (...) {
@@ -658,9 +647,9 @@ StorePath BinaryCacheStore::addToStore(
         ->path;
 }
 
-std::string BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
+CanonPath BinaryCacheStore::makeRealisationPath(const DrvOutput & id)
 {
-    return realisationsPrefix + "/" + id.drvPath.to_string() + "/" + id.outputName + ".doi";
+    return realisationsPrefix / id.drvPath.to_string() / (id.outputName + ".doi");
 }
 
 void BinaryCacheStore::queryRealisationUncached(
@@ -693,7 +682,7 @@ void BinaryCacheStore::queryRealisationUncached(
         }
     }};
 
-    getFile(outputInfoFilePath, std::move(newCallback));
+    getFile(ParsedRelativeUrl::parse(outputInfoFilePath.rel()), std::move(newCallback));
 }
 
 void BinaryCacheStore::registerDrvOutput(const Realisation & info)
@@ -737,11 +726,11 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set
 
 std::optional<std::string> BinaryCacheStore::getBuildLogExact(const StorePath & path)
 {
-    auto logPath = "log/" + std::string(baseNameOf(printStorePath(path)));
+    auto logPath = CanonPath::fromFilename("log") / path.to_string();
 
     debug("fetching build log from binary cache '%s/%s'", config.getHumanReadableURI(), logPath);
 
-    return getFile(logPath);
+    return getFile(ParsedRelativeUrl::parse(logPath.rel()));
 }
 
 void BinaryCacheStore::addBuildLog(const StorePath & drvPath, std::string_view log)
@@ -749,7 +738,7 @@ void BinaryCacheStore::addBuildLog(const StorePath & drvPath, std::string_view l
     assert(drvPath.isDerivation());
 
     upsertFile(
-        "log/" + std::string(drvPath.to_string()),
+        CanonPath::fromFilename("log") / drvPath.to_string(),
         (std::string) log, // FIXME: don't copy
         "text/plain; charset=utf-8");
 }
