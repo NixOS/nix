@@ -62,7 +62,7 @@ ref<LegacySSHStore::Connection> LegacySSHStore::openConnection()
         command.push_back("--store");
         command.push_back(config->remoteStore.get());
     }
-    conn->sshConn = master.startCommand(std::move(command), std::list{config->extraSshArgs});
+    conn->sshConn = master.startCommand(toOsStrings(std::move(command)), toOsStrings(std::list{config->extraSshArgs}));
     if (config->connPipeSize) {
         conn->sshConn->trySetBufferSize(*config->connPipeSize);
     }

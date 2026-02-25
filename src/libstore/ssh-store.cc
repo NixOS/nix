@@ -208,7 +208,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         command.push_back(config->remoteStore.get());
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
-    conn->sshConn = master.startCommand(std::move(command));
+    conn->sshConn = master.startCommand(toOsStrings(std::move(command)));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

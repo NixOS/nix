@@ -9,7 +9,7 @@
 
 namespace nix {
 
-Strings getNixSshOpts();
+OsStrings getNixSshOpts();
 
 class SSHMaster
 {
@@ -39,7 +39,7 @@ private:
 
     Sync<State> state_;
 
-    void addCommonSSHOpts(Strings & args);
+    void addCommonSSHOpts(OsStrings & args);
     bool isMasterRunning();
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
@@ -83,7 +83,7 @@ public:
      * execute). Will not be used when "fake SSHing" to the local
      * machine.
      */
-    std::unique_ptr<Connection> startCommand(Strings && command, Strings && extraSshArgs = {});
+    std::unique_ptr<Connection> startCommand(OsStrings && command, OsStrings && extraSshArgs = {});
 };
 
 } // namespace nix
