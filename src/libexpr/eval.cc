@@ -3208,6 +3208,21 @@ Expr * EvalState::parseExprFromString(std::string s, const SourcePath & basePath
     return parseExprFromString(std::move(s), basePath, staticBaseEnv);
 }
 
+ExprAttrs *
+EvalState::parseReplBindings(std::string s_, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv)
+{
+    return parseReplBindings(s_, s_, basePath, staticEnv);
+}
+
+ExprAttrs * EvalState::parseReplBindings(
+    std::string s_, std::string errorSource, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv)
+{
+    auto s = make_ref<std::string>(std::move(errorSource));
+    // flex requires two NUL terminators for yy_scan_buffer
+    s_.append("\0\0", 2);
+    return parseReplBindings(s_.data(), s_.size(), Pos::String{.source = s}, basePath, staticEnv);
+}
+
 Expr * EvalState::parseStdin()
 {
     // NOTE this method (and parseExprFromString) must take care to *fully copy* their
@@ -3347,6 +3362,30 @@ Expr * EvalState::parse(
     result->bindVars(*this, staticEnv);
 
     return result;
+}
+
+ExprAttrs * EvalState::parseReplBindings(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    const std::shared_ptr<StaticEnv> & staticEnv)
+{
+    DocCommentMap tmpDocComments;
+    DocCommentMap * docComments = &tmpDocComments;
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
+        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
+        docComments = &it->second;
+    }
+
+    auto bindings = parseReplBindingsFromBuf(
+        text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
+    assert(bindings);
+
+    bindings->bindVars(*this, staticEnv);
+
+    return bindings;
 }
 
 DocComment EvalState::getDocCommentForPos(PosIdx pos)

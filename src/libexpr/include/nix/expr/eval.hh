@@ -603,6 +603,18 @@ public:
     parseExprFromString(std::string s, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const SourcePath & basePath);
 
+    /**
+     * Parse REPL bindings from the specified string.
+     * Returns ExprAttrs with bindings to add to scope.
+     */
+    ExprAttrs *
+    parseReplBindings(std::string s, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv);
+    ExprAttrs * parseReplBindings(
+        std::string s,
+        std::string errorSource,
+        const SourcePath & basePath,
+        const std::shared_ptr<StaticEnv> & staticEnv);
+
     Expr * parseStdin();
 
     /**
@@ -881,6 +893,13 @@ private:
     friend struct ExprLet;
 
     Expr * parse(
+        char * text,
+        size_t length,
+        Pos::Origin origin,
+        const SourcePath & basePath,
+        const std::shared_ptr<StaticEnv> & staticEnv);
+
+    ExprAttrs * parseReplBindings(
         char * text,
         size_t length,
         Pos::Origin origin,

@@ -101,6 +101,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     void addAttrsToScope(Value & attrs);
     void addVarToScope(const Symbol name, Value & v);
     Expr * parseString(std::string s);
+    ExprAttrs * parseReplBindings(std::string s);
     void evalString(std::string s, Value & v);
     void loadDebugTraceEnv(DebugTrace & dt);
 
@@ -307,21 +308,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
     }
 
     return completions;
-}
-
-// FIXME: DRY and match or use the parser
-static bool isVarName(std::string_view s)
-{
-    if (s.size() == 0)
-        return false;
-    char c = s[0];
-    if ((c >= '0' && c <= '9') || c == '-' || c == '\'')
-        return false;
-    for (auto & i : s)
-        if (!((i >= 'a' && i <= 'z') || (i >= 'A' && i <= 'Z') || (i >= '0' && i <= '9') || i == '_' || i == '-'
-              || i == '\''))
-            return false;
-    return true;
 }
 
 StorePath NixRepl::getDerivationPath(Value & v)
@@ -676,15 +662,22 @@ ProcessLineResult NixRepl::processLine(std::string line)
         throw Error("unknown command '%1%'", command);
 
     else {
-        size_t p = line.find('=');
-        std::string name;
-        if (p != std::string::npos && p < line.size() && line[p + 1] != '='
-            && isVarName(name = removeWhitespace(line.substr(0, p)))) {
-            Expr * e = parseString(line.substr(p + 1));
-            Value & v(*state->allocValue());
-            v.mkThunk(env, e);
-            addVarToScope(state->symbols.create(name), v);
+        // Try parsing as bindings first (handles `x = 1`, `inherit ...`, etc.)
+        ExprAttrs * bindings = nullptr;
+        try {
+            bindings = parseReplBindings(line);
+        } catch (ParseError &) {
+        }
+
+        if (bindings) {
+            Env * inheritEnv = bindings->inheritFromExprs ? bindings->buildInheritFromEnv(*state, *env) : nullptr;
+            for (auto & [symbol, def] : *bindings->attrs) {
+                Value & v(*state->allocValue());
+                v.mkThunk(def.chooseByKind(env, env, inheritEnv), def.e);
+                addVarToScope(symbol, v);
+            }
         } else {
+            // Otherwise evaluate as expression
             Value v;
             evalString(line, v);
             auto suspension = logger->suspend();
@@ -870,6 +863,28 @@ Expr * NixRepl::parseString(std::string s)
             throw IncompleteReplExpr(e.msg());
         else
             throw;
+    }
+}
+
+ExprAttrs * NixRepl::parseReplBindings(std::string s)
+{
+    auto basePath = state->rootPath(".");
+
+    // Try parsing as bindings
+    std::exception_ptr bindingsError;
+    try {
+        return state->parseReplBindings(s, basePath, staticEnv);
+    } catch (ParseError &) {
+        bindingsError = std::current_exception();
+    }
+
+    // Try with semicolon appended (for `inherit foo` shorthand)
+    // Use original source (s) for error messages, not s + ";"
+    try {
+        return state->parseReplBindings(s + ";", s, basePath, staticEnv);
+    } catch (ParseError &) {
+        // Semicolon retry failed; rethrow the original bindings error
+        std::rethrow_exception(bindingsError);
     }
 }
 

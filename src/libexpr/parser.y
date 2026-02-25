@@ -54,11 +54,38 @@
         }                                                               \
     while (0)
 
+// Forward declaration for flex scanner type.
+// lexer-tab.hh is large; avoid including it just for this type.
+// Asserted with static_assert in lexer.l.
+typedef void * yyscan_t;
+
 namespace nix {
 
 typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 Expr * parseExprFromBuf(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    Exprs & exprs,
+    SymbolTable & symbols,
+    const EvalSettings & settings,
+    PosTable & positions,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS);
+
+/**
+ * Puts the lexer in REPL bindings mode before the first token. This causes
+ * the parser to accept REPL bindings (attribute definitions).
+ */
+void setReplBindingsMode(yyscan_t scanner);
+
+/**
+ * Parse REPL bindings from a buffer.
+ * Returns ExprAttrs with bindings to add to scope.
+ */
+ExprAttrs * parseReplBindingsFromBuf(
     char * text,
     size_t length,
     Pos::Origin origin,
@@ -175,6 +202,7 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %token IND_STRING_OPEN "start of an indented string"
 %token IND_STRING_CLOSE "end of an indented string"
 %token ELLIPSIS "'...'"
+%token REPL_BINDINGS "start of REPL bindings"
 
 %right IMPL
 %left OR
@@ -195,6 +223,10 @@ start: expr {
   state->result = $1;
 
   // This parser does not use yynerrs; suppress the warning.
+  (void) yynerrs_;
+}
+| REPL_BINDINGS binds1 {
+  state->result = $2;
   (void) yynerrs_;
 };
 
@@ -576,6 +608,51 @@ Expr * parseExprFromBuf(
     parser.parse();
 
     return state.result;
+}
+
+ExprAttrs * parseReplBindingsFromBuf(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    Exprs & exprs,
+    SymbolTable & symbols,
+    const EvalSettings & settings,
+    PosTable & positions,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS)
+{
+    yyscan_t scanner;
+    LexerState lexerState {
+        .positionToDocComment = docComments,
+        .positions = positions,
+        .origin = positions.addOrigin(origin, length),
+    };
+    ParserState state {
+        .lexerState = lexerState,
+        .exprs = exprs,
+        .symbols = symbols,
+        .positions = positions,
+        .basePath = basePath,
+        .origin = lexerState.origin,
+        .rootFS = rootFS,
+        .settings = settings,
+    };
+
+    yylex_init_extra(&lexerState, &scanner);
+    Finally _destroy([&] { yylex_destroy(scanner); });
+
+    yy_scan_buffer(text, length, scanner);
+    setReplBindingsMode(scanner);
+    Parser parser(scanner, &state);
+    parser.parse();
+
+    assert(state.result);
+    // state.result is Expr *, but the REPL_BINDINGS grammar rule
+    // always produces an ExprAttrs via the binds1 production.
+    auto bindings = dynamic_cast<ExprAttrs *>(state.result);
+    assert(bindings);
+    return bindings;
 }
 
 
