@@ -82,7 +82,7 @@ in
 
               # Serve .narinfo files with gzip encoding
               location ~ \.narinfo$ {
-                add_header Content-Encoding gzip;
+                add_header Content-Encoding x-gzip;
                 default_type "text/x-nix-narinfo";
               }
 
@@ -172,7 +172,7 @@ in
 
     # Check Content-Encoding headers on the download endpoint
     narinfo_headers = machine.succeed(f"curl -I http://localhost/cache/{narinfoHash}.narinfo 2>&1")
-    assert "content-encoding: gzip" in narinfo_headers.lower(), f"Expected 'content-encoding: gzip' for .narinfo file, but headers were: {narinfo_headers}"
+    assert "content-encoding: x-gzip" in narinfo_headers.lower(), f"Expected 'content-encoding: x-gzip' for .narinfo file, but headers were: {narinfo_headers}"
 
     ls_headers = machine.succeed(f"curl -I http://localhost/cache/{narinfoHash}.ls 2>&1")
     assert "content-encoding: gzip" in ls_headers.lower(), f"Expected 'content-encoding: gzip' for .ls file, but headers were: {ls_headers}"

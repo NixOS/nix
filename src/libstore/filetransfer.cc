@@ -2,7 +2,6 @@
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/compression.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
@@ -88,14 +87,10 @@ struct curlFileTransfer : public FileTransfer
         FileTransferRequest request;
         FileTransferResult result;
         std::unique_ptr<Activity> _act;
-        bool done = false; // whether either the success or failure function has been called
         Callback<FileTransferResult> callback;
         CURL * req = 0;
         // buffer to accompany the `req` above
         char errbuf[CURL_ERROR_SIZE];
-        bool active = false;   // whether the handle has been added to the multi object
-        bool paused = false;   // whether the request has been paused previously
-        bool enqueued = false; // whether the request has been added the incoming queue
         std::string statusMsg;
 
         unsigned int attempt = 0;
@@ -106,9 +101,35 @@ struct curlFileTransfer : public FileTransfer
 
         curlSList requestHeaders;
 
-        std::string encoding;
+        /**
+         * Whether either the success or failure function has been called.
+         */
+        bool done:1 = false;
 
-        bool acceptRanges = false;
+        /**
+         * Whether the handle has been added to the multi object.
+         */
+        bool active:1 = false;
+
+        /**
+         * Whether the request has been paused previously.
+         */
+        bool paused:1 = false;
+
+        /**
+         * Whether the request has been added the incoming queue.
+         */
+        bool enqueued:1 = false;
+
+        /**
+         * Whether we can use range downloads for retries.
+         */
+        bool acceptRanges:1 = false;
+
+        /**
+         * Whether the response has a non-trivial (not "identity") Content-Encoding.
+         */
+        bool hasContentEncoding:1 = false;
 
         curl_off_t writtenToSink = 0;
 
@@ -169,15 +190,6 @@ struct curlFileTransfer : public FileTransfer
         {
             result.urls.push_back(request.uri.to_string());
 
-            /* Don't set Accept-Encoding for S3 requests that use AWS SigV4 signing.
-               curl's SigV4 implementation signs all headers including Accept-Encoding,
-               but some S3-compatible services (like GCS) modify this header in transit,
-               causing signature verification to fail.
-               See https://github.com/NixOS/nix/issues/15019 */
-#if NIX_WITH_AWS_AUTH
-            if (!request.awsSigV4Provider)
-#endif
-                appendHeaders("Accept-Encoding: zstd, br, gzip, deflate, bzip2, xz");
             if (!request.expectedETag.empty())
                 appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
@@ -225,7 +237,6 @@ struct curlFileTransfer : public FileTransfer
         }
 
         LambdaSink finalSink;
-        std::shared_ptr<FinishSink> decompressionSink;
         std::optional<StringSink> errorSink;
 
         std::exception_ptr callbackException;
@@ -235,18 +246,15 @@ struct curlFileTransfer : public FileTransfer
             size_t realSize = size * nmemb;
             result.bodySize += realSize;
 
-            if (!decompressionSink) {
-                decompressionSink = makeDecompressionSink(encoding, finalSink);
-                if (!successfulStatuses.count(getHTTPStatus())) {
-                    // In this case we want to construct a TeeSink, to keep
-                    // the response around (which we figure won't be big
-                    // like an actual download should be) to improve error
-                    // messages.
-                    errorSink = StringSink{};
-                }
+            if (!errorSink && !successfulStatuses.count(getHTTPStatus())) {
+                // In this case we want to construct a TeeSink, to keep
+                // the response around (which we figure won't be big
+                // like an actual download should be) to improve error
+                // messages.
+                errorSink = StringSink{};
             }
 
-            (*decompressionSink)({(char *) contents, realSize});
+            finalSink({static_cast<const char *>(contents), realSize});
             if (paused) {
                 /* The callback has signaled that the transfer needs to be
                    paused. Already consumed data won't be returned twice unlike
@@ -288,7 +296,7 @@ struct curlFileTransfer : public FileTransfer
                 result.bodySize = 0;
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
-                encoding = "";
+                hasContentEncoding = false;
                 appendCurrentUrl();
             } else {
 
@@ -311,8 +319,10 @@ struct curlFileTransfer : public FileTransfer
                         }
                     }
 
-                    else if (name == "content-encoding")
-                        encoding = trim(line.substr(i + 1));
+                    else if (name == "content-encoding") {
+                        auto value = toLower(trim(line.substr(i + 1)));
+                        hasContentEncoding = !value.empty() && value != "identity";
+                    }
 
                     else if (name == "accept-ranges" && toLower(trim(line.substr(i + 1))) == "bytes")
                         acceptRanges = true;
@@ -330,14 +340,10 @@ struct curlFileTransfer : public FileTransfer
             }
             return realSize;
         } catch (...) {
-#if LIBCURL_VERSION_NUM >= 0x075700
             /* https://curl.se/libcurl/c/CURLOPT_HEADERFUNCTION.html:
                You can also abort the transfer by returning CURL_WRITEFUNC_ERROR. */
             callbackException = std::current_exception();
             return CURL_WRITEFUNC_ERROR;
-#else
-            return realSize;
-#endif
         }
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
@@ -475,6 +481,16 @@ struct curlFileTransfer : public FileTransfer
             }
 
             curl_easy_setopt(req, CURLOPT_URL, request.uri.to_string().c_str());
+
+            /* Enable transparent decompression for downloads.
+               Skip for uploads (Accept-Encoding is meaningless when sending data)
+               and when resuming from an offset (byte ranges don't work with
+               compressed content). */
+            if (writtenToSink == 0 && !request.data)
+                /* Empty string means to enable all supported (that libcurl has
+                   been linked to support) encodings. */
+                curl_easy_setopt(req, CURLOPT_ACCEPT_ENCODING, "");
+
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
@@ -621,14 +637,6 @@ struct curlFileTransfer : public FileTransfer
 
             appendCurrentUrl();
 
-            if (decompressionSink) {
-                try {
-                    decompressionSink->finish();
-                } catch (...) {
-                    callbackException = std::current_exception();
-                }
-            }
-
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
                 httpStatus = 304;
@@ -646,7 +654,9 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 304 && result.etag == "")
                     result.etag = request.expectedETag;
 
-                act().progress(result.bodySize, result.bodySize);
+                curl_off_t dlSize = 0;
+                curl_easy_getinfo(req, CURLINFO_SIZE_DOWNLOAD_T, &dlSize);
+                act().progress(dlSize, dlSize);
                 done = true;
                 callback(std::move(result));
             }
@@ -695,6 +705,7 @@ struct curlFileTransfer : public FileTransfer
                     case CURLE_TOO_MANY_REDIRECTS:
                     case CURLE_WRITE_ERROR:
                     case CURLE_UNSUPPORTED_PROTOCOL:
+                    case CURLE_BAD_CONTENT_ENCODING:
                         err = Misc;
                         break;
                     default: // Shut up warnings
@@ -738,7 +749,7 @@ struct curlFileTransfer : public FileTransfer
                    sink, we can only retry if the server supports
                    ranged requests. */
                 if (err == Transient && attempt < fileTransfer.settings.tries
-                    && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && encoding.empty()))) {
+                    && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && !hasContentEncoding))) {
                     int ms = retryTimeMs
                              * std::pow(
                                  2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
@@ -746,7 +757,6 @@ struct curlFileTransfer : public FileTransfer
                         warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
                     else
                         warn("%s; retrying in %d ms", exc.what(), ms);
-                    decompressionSink.reset();
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     try {

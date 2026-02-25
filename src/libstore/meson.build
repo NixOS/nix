@@ -115,17 +115,10 @@ boost = dependency(
 # put in `deps_other`.
 deps_other += boost
 
-curl = dependency('libcurl', 'curl', version : '>= 7.75.0')
-if curl.version().version_compare('>=8.16.0') and curl.version().version_compare(
-  '<8.17.0',
-)
-  # Out of precaution, avoid building with libcurl version that suffer from https://github.com/curl/curl/issues/19334.
-  error(
-    'curl @0@ has issues with write pausing, please use libcurl < 8.16 or >= 8.17, see https://github.com/curl/curl/issues/19334'.format(
-      curl.version(),
-    ),
-  )
-endif
+# This is quite new, but curl has a bunch of known issues with write pausing and decompression.
+# Please use libcurl >= 8.17. See https://github.com/curl/curl/issues/19334, https://github.com/curl/curl/issues/16280, https://github.com/curl/curl/issues/16955 if in doubt.
+# Patch out this check at your own risk.
+curl = dependency('libcurl', 'curl', version : '>= 8.17.0')
 
 deps_private += curl
 
