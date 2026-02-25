@@ -146,11 +146,10 @@ static void _deletePath(
     }
 #endif
 
-    std::string name(path.filename());
-    assert(name != "." && name != ".." && !name.empty());
+    auto name = CanonPath::fromFilename(path.filename().native());
 
     PosixStat st;
-    if (fstatat(parentfd, name.c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
+    if (fstatat(parentfd, name.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
         if (errno == ENOENT)
             return;
         throw SysError("getting status of %1%", PathFmt(path));
@@ -185,7 +184,7 @@ static void _deletePath(
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK)
             try {
-                unix::fchmodatTryNoFollow(parentfd, CanonPath(name), st.st_mode | PERM_MASK);
+                unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
@@ -193,7 +192,7 @@ static void _deletePath(
                 throw;
             }
 
-        int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        int fd = openat(parentfd, name.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
             throw SysError("opening directory %1%", PathFmt(path));
         AutoCloseDir dir(fdopendir(fd));
@@ -213,7 +212,7 @@ static void _deletePath(
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
-    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
+    if (unlinkat(parentfd, name.rel_c_str(), flags) == -1) {
         if (errno == ENOENT)
             return;
         try {
@@ -230,13 +229,14 @@ static void _deletePath(
 static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFreed MOUNTEDPATHS_PARAM)
 {
     assert(path.is_absolute());
-    assert(path.parent_path() != path);
+    auto parentDirPath = path.parent_path();
+    assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = toDescriptor(open(path.parent_path().string().c_str(), O_RDONLY));
+    AutoCloseFD dirfd = openDirectory(parentDirPath);
     if (!dirfd) {
         if (errno == ENOENT)
             return;
-        throw SysError("opening directory %s", PathFmt(path.parent_path()));
+        throw SysError("opening directory %s", PathFmt(parentDirPath));
     }
 
     std::exception_ptr ex;

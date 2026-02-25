@@ -1270,13 +1270,10 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path &
 
 void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::string_view contents)
 {
-    auto relPath = CanonPath(name);
     /* Path must be the same after normalisation. This is an additional sanity check in addition to
        existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
        a single path component without any `..`, `.` components. */
-    if (relPath.rel() != name || std::ranges::distance(relPath) != 1)
-        throw Error("invalid file name for a builder file: '%s'", name);
-
+    auto relPath = CanonPath::fromFilename(name);
     AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
         tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666);
     auto path = tmpDir / relPath.rel(); /* This is used only for error messages. */
