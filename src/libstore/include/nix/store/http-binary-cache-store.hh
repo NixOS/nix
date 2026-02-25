@@ -8,6 +8,7 @@
 
 #include <chrono>
 #include <exception>
+#include <functional>
 
 namespace nix {
 
@@ -133,7 +134,7 @@ public:
 
 protected:
 
-    std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
+    std::optional<CompressionAlgo> getCompressionMethod(const CanonPath & path);
 
     /**
      * Stop talking to this cache for a while, because a request to it
@@ -143,10 +144,10 @@ protected:
 
     void checkEnabled();
 
-    bool fileExists(const std::string & path) override;
+    bool fileExists(const CanonPath & path) override;
 
     void upsertFile(
-        const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
+        const CanonPath & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
     FileTransferRequest makeRequest(std::string_view path);
 
@@ -170,9 +171,11 @@ protected:
         std::string_view mimeType,
         std::optional<Headers> headers);
 
-    void getFile(const std::string & path, Sink & sink) override;
+    void getFile(const ParsedMaybeRelativeURL & url, Sink & sink) override;
 
-    void getFile(const std::string & path, Callback<std::optional<std::string>> callback) noexcept override;
+    void getFileImpl(FileTransferRequest && request, Sink & sink, std::function<NoSuchBinaryCacheFile()> makeError);
+
+    void getFile(const ParsedRelativeUrl & url, Callback<std::optional<std::string>> callback) noexcept override;
 
     std::optional<std::string> getNixCacheInfo() override;
 

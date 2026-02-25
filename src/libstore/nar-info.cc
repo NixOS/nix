@@ -30,6 +30,7 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
     };
 
     bool havePath = false;
+    bool haveUrl = false;
     bool haveNarHash = false;
 
     size_t pos = 0;
@@ -50,9 +51,10 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
         if (name == "StorePath") {
             path = store.parseStorePath(value);
             havePath = true;
-        } else if (name == "URL")
-            url = value;
-        else if (name == "Compression")
+        } else if (name == "URL") {
+            url = parsePossiblyRelativeURL(value);
+            haveUrl = true;
+        } else if (name == "Compression")
             try {
                 /* XXX: Empty strings used to fall back to the bzip2 normalisation below. Is this intentional? */
                 compression = value.empty() ? CompressionAlgo::bzip2 : parseCompressionAlgo(value);
@@ -99,12 +101,12 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
     if (!compression)
         compression = CompressionAlgo::bzip2;
 
-    if (!havePath || !haveNarHash || url.empty() || narSize == 0) {
+    if (!havePath || !haveUrl || !haveNarHash || narSize == 0) {
         line = 0; // don't include line information in the error
         throw corrupt(
             !havePath      ? "StorePath missing"
+            : !haveUrl     ? "URL missing"
             : !haveNarHash ? "NarHash missing"
-            : url.empty()  ? "URL missing"
             : narSize == 0 ? "NarSize missing or zero"
                            : "?");
     }
@@ -114,7 +116,7 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
 {
     std::string res;
     res += "StorePath: " + store.printStorePath(path) + "\n";
-    res += "URL: " + url + "\n";
+    res += "URL: " + renderURL(url) + "\n";
     assert(compression);
     res += "Compression: " + showCompressionAlgo(*compression) + "\n";
     if (fileHash) {
@@ -149,8 +151,8 @@ UnkeyedNarInfo::toJSON(const StoreDirConfig * store, bool includeImpureInfo, Pat
     auto jsonObject = UnkeyedValidPathInfo::toJSON(store, includeImpureInfo, format);
 
     if (includeImpureInfo) {
-        if (!url.empty())
-            jsonObject["url"] = url;
+        if (!std::holds_alternative<ParsedRelativeUrl>(url) || !std::get<ParsedRelativeUrl>(url).path.empty())
+            jsonObject["url"] = renderURL(url);
         /* XXX: Why is this conditional??? Empty `Compression: ' fields in .narinfo have always
            been treated as bzip2. */
         if (compression)
@@ -179,7 +181,7 @@ UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nloh
         format = *version;
 
     if (auto * url = get(obj, "url"))
-        res.url = getString(*url);
+        res.url = parsePossiblyRelativeURL(getString(*url));
 
     /* XXX: Why is this conditional??? */
     if (auto * compression = get(obj, "compression"))
