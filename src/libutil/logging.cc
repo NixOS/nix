@@ -150,16 +150,21 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
-void writeToStderr(std::string_view s)
+static void writeFullLogging(Descriptor fd, std::string_view s)
 {
     try {
-        writeFull(getStandardError(), s, false);
+        writeFull(fd, s, false);
     } catch (SystemError & e) {
-        /* Ignore failing writes to stderr.  We need to ignore write
-           errors to ensure that cleanup code that logs to stderr runs
-           to completion if the other side of stderr has been closed
-           unexpectedly. */
+        /* Ignore failing logging writes.  We need to ignore write
+           errors to ensure that cleanup code that writes logs runs
+           to completion if the other side of the logging fd has
+           been closed unexpectedly. */
     }
+}
+
+void writeToStderr(std::string_view s)
+{
+    writeFullLogging(getStandardError(), s);
 }
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
