@@ -38,7 +38,7 @@ void removeOldGenerations(std::filesystem::path dir)
         if (type == std::filesystem::file_type::symlink && canWrite) {
             std::string link;
             try {
-                link = readLink(path);
+                link = readLink(path).string();
             } catch (SystemError & e) {
                 if (e.is(std::errc::no_such_file_or_directory))
                     continue;

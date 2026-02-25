@@ -50,7 +50,7 @@ LocalStore::InodeHash LocalStore::loadInodeHash()
     debug("loading hash inodes in memory");
     InodeHash inodeHash;
 
-    AutoCloseDir dir(opendir(linksDir.c_str()));
+    AutoCloseDir dir(opendir(linksDir.string().c_str()));
     if (!dir)
         throw SysError("opening directory %1%", PathFmt(linksDir));
 
@@ -72,9 +72,9 @@ Strings LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & pa
 {
     Strings names;
 
-    AutoCloseDir dir(opendir(path.c_str()));
+    AutoCloseDir dir(opendir(path.string().c_str()));
     if (!dir)
-        throw SysError("opening directory '%s'", PathFmt(path));
+        throw SysError("opening directory %s", PathFmt(path));
 
     struct dirent * dirent;
     while (errno = 0, dirent = readdir(dir.get())) { /* sic */
@@ -91,7 +91,7 @@ Strings LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & pa
         names.push_back(name);
     }
     if (errno)
-        throw SysError("reading directory '%s'", PathFmt(path));
+        throw SysError("reading directory %s", PathFmt(path));
 
     return names;
 }
@@ -111,7 +111,7 @@ void LocalStore::optimisePath_(
        https://github.com/NixOS/nix/pull/2230 for more discussion. */
 
     if (std::regex_search(path.string(), std::regex("\\.app/Contents/.+$"))) {
-        debug("'%s' is not allowed to be linked in macOS", PathFmt(path));
+        debug("%s is not allowed to be linked in macOS", PathFmt(path));
         return;
     }
 #endif
@@ -142,7 +142,7 @@ void LocalStore::optimisePath_(
 
     /* This can still happen on top-level files. */
     if (st.st_nlink > 1 && inodeHash.count(st.st_ino)) {
-        debug("'%s' is already linked, with %d other file(s)", PathFmt(path), st.st_nlink - 2);
+        debug("%s is already linked, with %d other file(s)", PathFmt(path), st.st_nlink - 2);
         return;
     }
 
@@ -162,7 +162,7 @@ void LocalStore::optimisePath_(
             HashAlgorithm::SHA256)
             .hash;
     });
-    debug("'%s' has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
+    debug("%s has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);

@@ -84,7 +84,7 @@ std::filesystem::path Store::followLinksToStore(std::string_view _path) const
     }
 
     if (!isInStore(path.string()))
-        throw BadStorePath("path '%1%' is not in the Nix store", PathFmt(path));
+        throw BadStorePath("path %1% is not in the Nix store", PathFmt(path));
     return path;
 }
 

@@ -15,7 +15,7 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     // Windows <-> Unix ssh-ing).
     auto p =
 #ifdef _WIN32
-        path
+        std::filesystem::path(path)
 #else
         canonPath(std::string(path))
 #endif

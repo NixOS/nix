@@ -560,7 +560,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
                 auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
                 if (localStore && command == ":bl") {
                     std::string symlink = "repl-result-" + outputName;
-                    localStore->addPermRoot(outputPath, absPath(symlink));
+                    localStore->addPermRoot(outputPath, absPath(symlink).string());
                     logger->cout("  ./%s -> %s", symlink, state->store->printStorePath(outputPath));
                 } else {
                     logger->cout("  %s -> %s", outputName, state->store->printStorePath(outputPath));

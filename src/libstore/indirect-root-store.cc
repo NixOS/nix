@@ -17,7 +17,7 @@ void IndirectRootStore::makeSymlink(const Path & link, const Path & target)
 
 Path IndirectRootStore::addPermRoot(const StorePath & storePath, const Path & _gcRoot)
 {
-    Path gcRoot(canonPath(_gcRoot));
+    Path gcRoot(canonPath(_gcRoot).string());
 
     if (isInStore(gcRoot))
         throw Error(

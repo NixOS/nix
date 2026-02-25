@@ -130,7 +130,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         for (auto & i : inputPaths) {
             auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(p)});
+            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
         }
 
         /* If we're repairing, checking or rebuilding part of a
@@ -159,7 +159,7 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
     {
         // FIXME: why the needsHashRewrite() conditional?
         return !needsHashRewrite() ? chrootRootDir / p.relative_path()
-                                   : std::filesystem::path(store.toRealPath(p.native()));
+                                   : std::filesystem::path(store.toRealPath(store.parseStorePath(p.native())));
     }
 
     void cleanupBuild(bool force) override

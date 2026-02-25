@@ -41,7 +41,7 @@ static std::string gcRootsDir = "gcroots";
 void LocalStore::addIndirectRoot(const Path & path)
 {
     std::string hash = hashString(HashAlgorithm::SHA1, path).to_string(HashFormat::Nix32, false);
-    Path realRoot = canonPath((config->stateDir.get() / gcRootsDir / "auto" / hash).string());
+    Path realRoot = canonPath((config->stateDir.get() / gcRootsDir / "auto" / hash).string()).string();
     makeSymlink(realRoot, path);
 }
 
@@ -57,7 +57,7 @@ void LocalStore::createTempRootsFile()
         if (pathExists(fnTempRoots))
             /* It *must* be stale, since there can be no two
                processes with the same pid. */
-            unlink(fnTempRoots.c_str());
+            unlink(fnTempRoots.string().c_str());
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
 
@@ -236,14 +236,14 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
         }
 
         else if (type == std::filesystem::file_type::symlink) {
-            Path target = readLink(path);
+            Path target = readLink(path).string();
             if (isInStore(target))
                 foundRoot(path, target);
 
             /* Handle indirect roots. */
             else {
                 auto parentPath = std::filesystem::path(path).parent_path();
-                target = absPath(target, &parentPath);
+                target = absPath(target, &parentPath).string();
                 if (!pathExists(target)) {
                     if (isInDir(path, std::filesystem::path{config->stateDir.get()} / gcRootsDir / "auto")) {
                         printInfo("removing stale link from '%1%' to '%2%'", path, target);
@@ -252,7 +252,7 @@ void LocalStore::findRoots(const Path & path, std::filesystem::file_type type, R
                 } else {
                     if (!std::filesystem::is_symlink(target))
                         return;
-                    Path target2 = readLink(target);
+                    Path target2 = readLink(target).string();
                     if (isInStore(target2))
                         foundRoot(target, target2);
                 }
@@ -408,7 +408,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     throw UnimplementedError("External GC client not implemented yet");
 #else
     if (fcntl(fdServer.get(), F_SETFL, fcntl(fdServer.get(), F_GETFL) | O_NONBLOCK) == -1)
-        throw SysError("making socket '%s' non-blocking", PathFmt(socketPath));
+        throw SysError("making socket %s non-blocking", PathFmt(socketPath));
 
     Pipe shutdownPipe;
     shutdownPipe.create();
@@ -539,6 +539,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {
+        assert(!std::filesystem::path(baseName).is_absolute());
         Path path = storeDir + "/" + std::string(baseName);
         auto realPath = config->realStoreDir.get() / std::string(baseName);
 
@@ -548,7 +549,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         if (baseName.find("tmp-", 0) == 0) {
             AutoCloseFD tmpDirFd = openDirectory(realPath);
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
-                debug("skipping locked tempdir '%s'", PathFmt(realPath));
+                debug("skipping locked tempdir %s", PathFmt(realPath));
                 return;
             }
         }
@@ -713,7 +714,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             printInfo("determining live/dead paths...");
 
         try {
-            AutoCloseDir dir(opendir(config->realStoreDir.get().c_str()));
+            AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
             if (!dir)
                 throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
 
@@ -757,7 +758,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
         printInfo("deleting unused links...");
 
-        AutoCloseDir dir(opendir(linksDir.c_str()));
+        AutoCloseDir dir(opendir(linksDir.string().c_str()));
         if (!dir)
             throw SysError("opening directory %1%", PathFmt(linksDir));
 
@@ -769,7 +770,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             std::string name = dirent->d_name;
             if (name == "." || name == "..")
                 continue;
-            Path path = linksDir + "/" + name;
+            Path path = (linksDir / name).string();
 
             auto st = lstat(path);
 

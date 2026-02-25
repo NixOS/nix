@@ -30,7 +30,8 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
      */
     , rootDir{makeRootDirSetting(
           *this,
-          !rootDir.empty() && params.count("root") == 0 ? std::optional<Path>{canonPath(rootDir)} : std::nullopt)}
+          !rootDir.empty() && params.count("root") == 0 ? std::optional<Path>{canonPath(rootDir).string()}
+                                                        : std::nullopt)}
 {
 }
 
