@@ -321,7 +321,7 @@ protected:
 
     virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
-        return store.toRealPath(p.native());
+        return store.toRealPath(store.parseStorePath(p.native()));
     }
 
     /**
@@ -1831,14 +1831,14 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optFixedPath = output->path(store, drv.name, outputName);
         if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(finalDestPath)});
+            dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)});
         }
 
         /* Move files, if needed */
-        if (store.toRealPath(finalDestPath) != actualPath) {
+        if (store.toRealPath(newInfo.path) != actualPath) {
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
-                replaceValidPath(store.toRealPath(finalDestPath), actualPath);
+                replaceValidPath(store.toRealPath(newInfo.path), actualPath);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
@@ -1849,7 +1849,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* Can delete our scratch copy now. */
                 deletePath(actualPath);
             } else {
-                auto destPath = store.toRealPath(finalDestPath);
+                auto destPath = store.toRealPath(newInfo.path);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
             }
@@ -1863,7 +1863,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
                     if (diffHook || settings.keepFailed) {
-                        auto dst = store.toRealPath(finalDestPath + ".check");
+                        auto dst = store.toRealPath(newInfo.path) + ".check";
                         deletePath(dst);
                         movePath(actualPath, dst);
 
@@ -1881,13 +1881,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
                             store.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath),
+                            store.toRealPath(newInfo.path),
                             dst);
                     } else
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output '%s' differs",
                             store.printStorePath(drvPath),
-                            store.toRealPath(finalDestPath));
+                            store.toRealPath(newInfo.path));
                 }
 
                 /* Since we verified the build, it's now ultimately trusted. */
@@ -1909,8 +1909,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
 
             if (!store.isValidPath(newInfo.path))
-                store.optimisePath(
-                    store.toRealPath(finalDestPath), NoRepair); // FIXME: combine with scanForReferences()
+                store.optimisePath(store.toRealPath(newInfo.path), NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;

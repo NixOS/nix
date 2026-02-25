@@ -100,7 +100,7 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
      * @param gcRoot The location of the symlink.
      *
      * @param storePath The store object being rooted. The symlink will
-     * point to `toRealPath(store.printStorePath(storePath))`.
+     * point to `toRealPath(storePath)`.
      *
      * How the permanent GC root corresponding to this symlink is
      * managed is implementation-specific.
@@ -114,13 +114,7 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
 
     Path toRealPath(const StorePath & storePath)
     {
-        return toRealPath(printStorePath(storePath));
-    }
-
-    Path toRealPath(const Path & storePath)
-    {
-        assert(isInStore(storePath));
-        return (getRealStoreDir() / std::string(storePath, storeDir.size() + 1)).string();
+        return (getRealStoreDir() / storePath.to_string()).string();
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
