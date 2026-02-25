@@ -281,11 +281,13 @@ TEST(makeParentCanonical, root)
  * chmodIfNeeded
  * --------------------------------------------------------------------------*/
 
-#ifndef _WIN32
-// Windows doesn't support Unix-style permission bits - lstat always
-// returns the same mode regardless of what chmod sets.
 TEST(chmodIfNeeded, works)
 {
+#ifdef _WIN32
+    // Windows doesn't support Unix-style permission bits - lstat always
+    // returns the same mode regardless of what chmod sets.
+    GTEST_SKIP() << "Broken on Windows";
+#endif
     auto [autoClose_, tmpFile] = nix::createTempFile();
     auto deleteTmpFile = AutoDelete(tmpFile);
 
@@ -299,7 +301,6 @@ TEST(chmodIfNeeded, works)
         }
     }
 }
-#endif
 
 TEST(chmodIfNeeded, nonexistent)
 {

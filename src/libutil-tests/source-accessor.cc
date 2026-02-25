@@ -88,6 +88,9 @@ protected:
 
 TEST_F(FSSourceAccessorTest, works)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
     {
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
@@ -156,6 +159,9 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 
 TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "symlinks have some problems under Wine";
+#endif
     auto linkPath = tmpDir / "rootlink";
     {
         RestoreSink sink(false);
