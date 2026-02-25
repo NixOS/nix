@@ -128,7 +128,7 @@ in
       def verify_no_compression(machine, bucket, object_path):
           """Verify S3 object has no compression headers"""
           stat = machine.succeed(f"mc stat minio/{bucket}/{object_path}")
-          if "Content-Encoding" in stat and ("gzip" in stat or "xz" in stat):
+          if "Content-Encoding" in stat and ("gzip" in stat or "br" in stat):
               print(f"mc stat output for {object_path}:")
               print(stat)
               raise Exception(f"Object {object_path} should not have compression Content-Encoding")
@@ -537,20 +537,20 @@ in
 
       @setup_s3()
       def test_compression_mixed(bucket):
-          """Test mixed compression (narinfo=xz, ls=gzip)"""
-          print("\n=== Testing Compression: mixed (narinfo=xz, ls=gzip) ===")
+          """Test mixed compression (narinfo=br, ls=gzip)"""
+          print("\n=== Testing Compression: mixed (narinfo=br, ls=gzip) ===")
 
           store_url = make_s3_url(
               bucket,
-              **{'narinfo-compression': 'xz', 'write-nar-listing': 'true', 'ls-compression': 'gzip'}
+              **{'narinfo-compression': 'br', 'write-nar-listing': 'true', 'ls-compression': 'gzip'}
           )
 
           server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {PKGS['C']}")
 
           pkg_hash = get_package_hash(PKGS['C'])
 
-          # Verify .narinfo has xz compression
-          verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "xz")
+          # Verify .narinfo has br compression
+          verify_content_encoding(server, bucket, f"{pkg_hash}.narinfo", "br")
 
           # Verify .ls has gzip compression
           verify_content_encoding(server, bucket, f"{pkg_hash}.ls", "gzip")
@@ -673,7 +673,7 @@ in
           ).strip()
 
           chunk_size = 5 * 1024 * 1024
-          expected_parts = 3  # 10 MB raw becomes ~10.5 MB compressed (NAR + xz overhead)
+          expected_parts = 3  # 10 MB raw becomes ~10.5 MB compressed (NAR + br overhead)
 
           store_url = make_s3_url(
               bucket,
@@ -755,7 +755,7 @@ in
                   "multipart-upload": "true",
                   "multipart-threshold": str(5 * 1024 * 1024),
                   "multipart-chunk-size": str(5 * 1024 * 1024),
-                  "log-compression": "xz",
+                  "log-compression": "br",
               }
           )
 
