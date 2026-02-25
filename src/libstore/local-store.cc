@@ -450,7 +450,9 @@ LocalStore::~LocalStore()
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
             fdTempRoots->close();
-            unlink(fnTempRoots.string().c_str());
+            /* The error code of std::filesystem::remove() is intentionally ignored. */
+            std::error_code ec;
+            std::filesystem::remove(fnTempRoots, ec);
         }
     } catch (...) {
         ignoreExceptionInDestructor();

@@ -79,8 +79,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     auto target = canonPath(dstFile, true).string();
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking %1%", PathFmt(dstFile));
+                    try {
+                        std::filesystem::remove(dstFile);
+                    } catch (std::filesystem::filesystem_error & e) {
+                        throw SystemError(e.code(), "unlinking %s", PathFmt(dstFile));
+                    }
                     if (mkdir(
                             dstFile.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -107,8 +110,11 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw BuildEnvFileConflictError(readLink(dstFile).string(), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking %1%", PathFmt(dstFile));
+                    try {
+                        std::filesystem::remove(dstFile);
+                    } catch (std::filesystem::filesystem_error & e) {
+                        throw SystemError(e.code(), "unlinking %s", PathFmt(dstFile));
+                    }
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }

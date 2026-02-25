@@ -31,10 +31,12 @@ void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
        races.  Write a (meaningless) token to the file to indicate to
        other processes waiting on this lock that the lock is stale
        (deleted). */
-    unlink(path.c_str());
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
     writeFull(desc, "d");
-    /* Note that the result of unlink() is ignored; removing the lock
-       file is an optimisation, not a necessity. */
+    /* Note that the error code of std::filesystem::remove() is
+       intentionally ignored; removing the lock file is an optimisation,
+       not a necessity. */
 }
 
 bool lockFile(Descriptor desc, LockType lockType, bool wait)
