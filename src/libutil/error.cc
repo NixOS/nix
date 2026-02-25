@@ -27,18 +27,20 @@ void throwExceptionSelfCheck()
         "C++ exception handling is broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.");
 }
 
+void BaseError::recalcWhat() const
+{
+    std::ostringstream oss;
+    showErrorInfo(oss, err, loggerSettings.showTrace);
+    what_ = oss.str();
+}
+
 // c++ std::exception descendants must have a 'const char* what()' function.
 // This stringifies the error and caches it for use by what(), or similarly by msg().
 const std::string & BaseError::calcWhat() const
 {
-    if (what_.has_value())
-        return *what_;
-    else {
-        std::ostringstream oss;
-        showErrorInfo(oss, err, loggerSettings.showTrace);
-        what_ = oss.str();
-        return *what_;
-    }
+    if (!what_.has_value())
+        recalcWhat();
+    return *what_;
 }
 
 bool BaseError::hasPos() const

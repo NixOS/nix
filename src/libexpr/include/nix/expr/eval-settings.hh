@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/expr/diagnose.hh"
 #include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
@@ -9,6 +10,36 @@ namespace nix {
 
 class EvalState;
 struct PrimOp;
+
+/**
+ * A deprecated bool setting that migrates to a `Setting<Diagnose>`.
+ * When set to true, it emits a deprecation warning and sets the target
+ * `Setting<Diagnose>` setting to `warn`.
+ */
+class DeprecatedWarnSetting : public BaseSetting<bool>
+{
+    Setting<Diagnose> & target;
+    const char * targetName;
+
+public:
+    DeprecatedWarnSetting(
+        Config * options,
+        Setting<Diagnose> & target,
+        const char * targetName,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {})
+        : BaseSetting<bool>(false, true, name, description, aliases, std::nullopt)
+        , target(target)
+        , targetName(targetName)
+    {
+        options->addSetting(this);
+    }
+
+    void assign(const bool & v) override;
+    void appendOrSet(bool newValue, bool append) override;
+    void override(const bool & v) override;
+};
 
 struct EvalSettings : Config
 {
@@ -328,20 +359,70 @@ struct EvalSettings : Config
           This option can be enabled by setting `NIX_ABORT_ON_WARN=1` in the environment.
         )"};
 
-    Setting<bool> warnShortPathLiterals{
+    Setting<Diagnose> lintShortPathLiterals{
         this,
-        false,
-        "warn-short-path-literals",
+        Diagnose::Ignore,
+        "lint-short-path-literals",
         R"(
-          If set to true, the Nix evaluator will warn when encountering relative path literals
-          that don't start with `./` or `../`.
+          Controls handling of relative path literals that don't start with `./` or `../`.
 
-          For example, with this setting enabled, `foo/bar` would emit a warning
-          suggesting to use `./foo/bar` instead.
+          - `ignore`: Ignore without warning (default)
+          - `warn`: Emit a warning suggesting to use `./` prefix
+          - `fatal`: Treat as a parse error
+
+          For example, with this setting set to `warn` or `fatal`, `foo/bar` would
+          suggest using `./foo/bar` instead.
 
           This is useful for improving code readability and making path literals
           more explicit.
-    )"};
+        )",
+    };
+
+    DeprecatedWarnSetting warnShortPathLiterals{
+        this,
+        lintShortPathLiterals,
+        "lint-short-path-literals",
+        "warn-short-path-literals",
+        R"(
+          Deprecated. Use [`lint-short-path-literals`](#conf-lint-short-path-literals)` = warn` instead.
+        )",
+    };
+
+    Setting<Diagnose> lintUrlLiterals{
+        this,
+        Diagnose::Ignore,
+        "lint-url-literals",
+        R"(
+          Controls handling of unquoted URLs as part of the Nix language syntax.
+          The Nix language allows for URL literals, like so:
+
+          ```
+          $ nix repl
+          nix-repl> http://foo
+          "http://foo"
+          ```
+
+          Setting this to `warn` or `fatal` will cause the Nix parser to
+          warn or throw an error when encountering a URL literal:
+
+          ```
+          $ nix repl --lint-url-literals fatal
+          nix-repl> http://foo
+          error: URL literal 'http://foo' is deprecated
+                 at «string»:1:1:
+
+                      1| http://foo
+                       | ^
+          ```
+
+          Unquoted URLs are being deprecated and their usage is discouraged.
+
+          The reason is that, as opposed to path literals, URLs have no
+          special properties that distinguish them from regular strings, URLs
+          containing query parameters have to be quoted anyway, and unquoted URLs
+          may confuse external tooling.
+        )",
+    };
 
     Setting<unsigned> bindingsUpdateLayerRhsSizeThreshold{
         this,

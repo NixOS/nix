@@ -225,10 +225,22 @@ public:
         return !err.traces.empty();
     }
 
-    const ErrorInfo & info()
+    /**
+     * Returns a mutable reference to the error info.
+     *
+     * @warning After modifying the returned ErrorInfo, you must call
+     * recalcWhat() to update the cached formatted message.
+     */
+    ErrorInfo & unsafeInfo()
     {
         return err;
-    };
+    }
+
+    /**
+     * Recalculate the cached formatted error message.
+     * Must be called after modifying the error info via unsafeInfo().
+     */
+    void recalcWhat() const;
 
     [[noreturn]] virtual void throwClone() const = 0;
 };

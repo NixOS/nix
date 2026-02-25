@@ -153,6 +153,7 @@ endforeach
 sources = files(
   'attr-path.cc',
   'attr-set.cc',
+  'diagnose.cc',
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',

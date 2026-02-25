@@ -95,6 +95,11 @@
               ''^tests/functional/lang/eval-fail-bad-string-interpolation-3\.nix$''
               ''^tests/functional/lang/eval-fail-bad-string-interpolation-4\.nix$''
               ''^tests/functional/lang/eval-okay-regex-match2\.nix$''
+
+              # URL literal tests - nixfmt converts unquoted URLs to strings
+              ''^tests/functional/lang/eval-fail-url-literal\.nix$''
+              ''^tests/functional/lang/eval-okay-url-literal-warn\.nix$''
+              ''^tests/functional/lang/eval-okay-url-literal-default\.nix$''
             ];
           };
           clang-format = {

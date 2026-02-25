@@ -403,7 +403,11 @@ std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(
             res.insert(thisXpFeature.value());
             if (thisXpFeature.value() == Xp::Flakes)
                 res.insert(Xp::FetchTree);
-        } else
+        } else if (s == "no-url-literals")
+            warn(
+                "experimental feature '%s' has been stabilized and renamed; use 'lint-url-literals = fatal' setting instead",
+                s);
+        else
             warn("unknown experimental feature '%s'", s);
     }
     return res;
