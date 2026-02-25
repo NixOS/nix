@@ -177,12 +177,12 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
      * privilege escalation / symlinks in directories owned by the
      * originating requester that they cannot delete.
      */
-    Path addPermRoot(const StorePath & path, const Path & gcRoot) override
+    std::filesystem::path addPermRoot(const StorePath & path, const std::filesystem::path & gcRoot) override
     {
         auto conn(getConnection());
         conn->to << WorkerProto::Op::AddPermRoot;
         WorkerProto::write(*this, *conn, path);
-        WorkerProto::write(*this, *conn, gcRoot);
+        WorkerProto::write(*this, *conn, gcRoot.string());
         conn.processStderr();
         return readString(conn->from);
     }
@@ -208,7 +208,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         command.push_back(config->remoteStore.get());
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
-    conn->sshConn = master.startCommand(std::move(command));
+    conn->sshConn = master.startCommand(toOsStrings(std::move(command)));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

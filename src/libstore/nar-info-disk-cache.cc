@@ -377,7 +377,8 @@ ref<NarInfoDiskCache> NarInfoDiskCache::get(const Settings & settings, SQLiteSet
     return cache;
 }
 
-ref<NarInfoDiskCache> NarInfoDiskCache::getTest(const Settings & settings, SQLiteSettings sqliteSettings, Path dbPath)
+ref<NarInfoDiskCache>
+NarInfoDiskCache::getTest(const Settings & settings, SQLiteSettings sqliteSettings, std::filesystem::path dbPath)
 {
     return make_ref<NarInfoDiskCacheImpl>(settings, sqliteSettings, dbPath);
 }

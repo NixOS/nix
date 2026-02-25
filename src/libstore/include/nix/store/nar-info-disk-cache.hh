@@ -59,7 +59,7 @@ struct NarInfoDiskCache
      */
     static ref<NarInfoDiskCache> get(const Settings & settings, SQLiteSettings);
 
-    static ref<NarInfoDiskCache> getTest(const Settings & settings, SQLiteSettings, Path dbPath);
+    static ref<NarInfoDiskCache> getTest(const Settings & settings, SQLiteSettings, std::filesystem::path dbPath);
 };
 
 } // namespace nix

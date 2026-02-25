@@ -58,7 +58,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
            environment using bind-mounts.  We put it in the Nix store
            so that the build outputs can be moved efficiently from the
            chroot to their final location. */
-        std::filesystem::path chrootParentDir = store.toRealPath(drvPath) + ".chroot";
+        auto chrootParentDir = store.toRealPath(drvPath);
+        chrootParentDir += ".chroot";
         deletePath(chrootParentDir);
 
         /* Clean up the chroot directory automatically. */

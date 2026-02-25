@@ -29,7 +29,7 @@ StoreReference LocalBinaryCacheStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = "file",
-                .authority = binaryCacheDir,
+                .authority = binaryCacheDir.string(),
             },
     };
 }
@@ -56,7 +56,8 @@ protected:
     void upsertFile(
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
-        auto path2 = std::filesystem::path{config->binaryCacheDir} / path;
+        assert(!std::filesystem::path(path).is_absolute());
+        auto path2 = config->binaryCacheDir / path;
         static std::atomic<int> counter{0};
         createDirs(path2.parent_path());
         auto tmp = path2;
@@ -69,8 +70,9 @@ protected:
 
     void getFile(const std::string & path, Sink & sink) override
     {
+        assert(!std::filesystem::path(path).is_absolute());
         try {
-            readFile(config->binaryCacheDir + "/" + path, sink);
+            readFile(config->binaryCacheDir / path, sink);
         } catch (SystemError & e) {
             if (e.is(std::errc::no_such_file_or_directory))
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
@@ -101,17 +103,18 @@ protected:
 
 void LocalBinaryCacheStore::init()
 {
-    createDirs(config->binaryCacheDir + "/nar");
-    createDirs(config->binaryCacheDir + "/" + realisationsPrefix);
+    createDirs(config->binaryCacheDir / "nar");
+    createDirs(config->binaryCacheDir / realisationsPrefix);
     if (config->writeDebugInfo)
-        createDirs(config->binaryCacheDir + "/debuginfo");
-    createDirs(config->binaryCacheDir + "/log");
+        createDirs(config->binaryCacheDir / "debuginfo");
+    createDirs(config->binaryCacheDir / "log");
     BinaryCacheStore::init();
 }
 
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
-    return pathExists(config->binaryCacheDir + "/" + path);
+    assert(!std::filesystem::path(path).is_absolute());
+    return pathExists(config->binaryCacheDir / path);
 }
 
 StringSet LocalBinaryCacheStoreConfig::uriSchemes()

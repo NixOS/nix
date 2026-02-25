@@ -27,7 +27,7 @@ TEST(machines, getMachinesUriOnly)
     ASSERT_THAT(actual, SizeIs(1));
     EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
-    EXPECT_THAT(actual[0], Field(&Machine::sshKey, SizeIs(0)));
+    EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq(std::filesystem::path{})));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
     EXPECT_THAT(actual[0], Field(&Machine::speedFactor, Eq(1)));
     EXPECT_THAT(actual[0], Field(&Machine::supportedFeatures, SizeIs(0)));
@@ -49,7 +49,7 @@ TEST(machines, getMachinesDefaults)
     ASSERT_THAT(actual, SizeIs(1));
     EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
-    EXPECT_THAT(actual[0], Field(&Machine::sshKey, SizeIs(0)));
+    EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq(std::filesystem::path{})));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
     EXPECT_THAT(actual[0], Field(&Machine::speedFactor, Eq(1)));
     EXPECT_THAT(actual[0], Field(&Machine::supportedFeatures, SizeIs(0)));

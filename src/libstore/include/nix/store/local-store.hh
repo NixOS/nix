@@ -244,7 +244,7 @@ public:
     /**
      * Hack for build-remote.cc.
      */
-    PathSet locksHeld;
+    PathSetNG locksHeld;
 
     /**
      * Initialise the local store, upgrading the schema if
@@ -319,7 +319,7 @@ public:
      * The weak reference merely is a symlink to `path' from
      * /nix/var/nix/gcroots/auto/<hash of `path'>.
      */
-    void addIndirectRoot(const Path & path) override;
+    void addIndirectRoot(const std::filesystem::path & path) override;
 
 private:
 
@@ -353,7 +353,7 @@ public:
      * @param isKnownPath true if this is a known store path, false if it's
      *        garbage/unknown content found in the store directory
      */
-    virtual void deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath);
+    virtual void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath);
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking
@@ -367,7 +367,7 @@ public:
      * Optimise a single store path. Optionally, test the encountered
      * symlinks for corruption.
      */
-    void optimisePath(const Path & path, RepairFlag repair);
+    void optimisePath(const std::filesystem::path & path, RepairFlag repair);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -481,7 +481,7 @@ private:
     PathSet queryValidPathsOld();
     ValidPathInfo queryPathInfoOld(const Path & path);
 
-    void findRoots(const Path & path, std::filesystem::file_type type, Roots & roots);
+    void findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots);
 
     void findRootsNoTemp(Roots & roots, bool censor);
 

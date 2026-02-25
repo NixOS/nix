@@ -104,7 +104,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                         rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out")
                         rootName += "-" + i->first;
-                    retPath = store2->addPermRoot(outPath, rootName.string());
+                    retPath = store2->addPermRoot(outPath, rootName).string();
                 }
             }
             outputs.insert(retPath);
@@ -125,7 +125,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 rootNr++;
                 if (rootNr > 1)
                     rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName.string())};
+                return {store2->addPermRoot(path.path, rootName).string()};
             }
         }
         return {store->printStorePath(path.path)};

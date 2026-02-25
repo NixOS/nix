@@ -481,7 +481,7 @@ private:
 };
 
 static void handleDiffHook(
-    const Path & diffHook,
+    const std::filesystem::path & diffHook,
     uid_t uid,
     uid_t gid,
     const std::filesystem::path & tryA,
@@ -1484,7 +1484,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             continue;
         }
 
-        auto optSt = maybeLstat(actualPath.c_str());
+        auto optSt = maybeLstat(actualPath);
         if (!optSt)
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
@@ -1860,7 +1860,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
                     if (diffHook || settings.keepFailed) {
-                        auto dst = store.toRealPath(newInfo.path) + ".check";
+                        auto dst = store.toRealPath(newInfo.path);
+                        dst += ".check";
                         deletePath(dst);
                         movePath(actualPath, dst);
 
@@ -1876,15 +1877,15 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         }
 
                         throw NotDeterministic(
-                            "derivation '%s' may not be deterministic: output '%s' differs from '%s'",
+                            "derivation '%s' may not be deterministic: output %s differs from %s",
                             store.printStorePath(drvPath),
-                            store.toRealPath(newInfo.path),
-                            dst);
+                            PathFmt(store.toRealPath(newInfo.path)),
+                            PathFmt(dst));
                     } else
                         throw NotDeterministic(
-                            "derivation '%s' may not be deterministic: output '%s' differs",
+                            "derivation '%s' may not be deterministic: output %s differs",
                             store.printStorePath(drvPath),
-                            store.toRealPath(newInfo.path));
+                            PathFmt(store.toRealPath(newInfo.path)));
                 }
 
                 /* Since we verified the build, it's now ultimately trusted. */

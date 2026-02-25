@@ -735,7 +735,7 @@ static void main_nix_build(int argc, char ** argv)
                 std::string symlink = drvPrefix;
                 if (outputName != "out")
                     symlink += "-" + outputName;
-                store2->addPermRoot(outputPath, absPath(symlink).string());
+                store2->addPermRoot(outputPath, absPath(symlink));
             }
 
             outPaths.push_back(outputPath);

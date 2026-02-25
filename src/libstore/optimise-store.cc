@@ -320,7 +320,7 @@ void LocalStore::optimiseStore()
     printInfo("%s freed by hard-linking %d files", renderSize(stats.bytesFreed), stats.filesLinked);
 }
 
-void LocalStore::optimisePath(const Path & path, RepairFlag repair)
+void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag repair)
 {
     OptimiseStats stats;
     InodeHash inodeHash;

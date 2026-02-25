@@ -52,12 +52,12 @@ static void checkValidAuthority(const ParsedURL::Authority & authority)
     }
 }
 
-Strings getNixSshOpts()
+OsStrings getNixSshOpts()
 {
     std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
 
     try {
-        return shellSplitString(sshOpts);
+        return toOsStrings(shellSplitString(sshOpts));
     } catch (Error & e) {
         e.addTrace({}, "while splitting NIX_SSHOPTS '%s'", sshOpts);
         throw;
@@ -66,7 +66,7 @@ Strings getNixSshOpts()
 
 SSHMaster::SSHMaster(
     const ParsedURL::Authority & authority,
-    std::string_view keyFile,
+    std::filesystem::path keyFile,
     std::string_view sshPublicHostKey,
     bool useMaster,
     bool compress,
@@ -80,7 +80,7 @@ SSHMaster::SSHMaster(
         return std::move(oss).str();
     }())
     , fakeSSH(authority.to_string() == "localhost")
-    , keyFile(keyFile)
+    , keyFile(std::move(keyFile))
     , sshPublicHostKey(parsePublicHostKey(authority.host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
@@ -90,39 +90,38 @@ SSHMaster::SSHMaster(
     checkValidAuthority(authority);
 }
 
-void SSHMaster::addCommonSSHOpts(Strings & args)
+void SSHMaster::addCommonSSHOpts(OsStrings & args)
 {
     auto sshArgs = getNixSshOpts();
     args.insert(args.end(), sshArgs.begin(), sshArgs.end());
 
     if (!keyFile.empty())
-        args.insert(args.end(), {"-i", keyFile});
+        args.insert(args.end(), {OS_STR("-i"), keyFile.native()});
     if (!sshPublicHostKey.empty()) {
         std::filesystem::path fileName = tmpDir->path() / "host-key";
         writeFile(fileName, authority.host + " " + sshPublicHostKey + "\n");
-        args.insert(args.end(), {"-oUserKnownHostsFile=" + fileName.string()});
+        args.insert(args.end(), {OS_STR("-oUserKnownHostsFile=") + fileName.native()});
     }
     if (compress)
-        args.push_back("-C");
+        args.push_back(OS_STR("-C"));
 
     if (authority.port)
-        args.push_back(fmt("-p%d", *authority.port));
+        args.push_back(string_to_os_string(fmt("-p%d", *authority.port)));
 
     // We use this to make ssh signal back to us that the connection is established.
     // It really does run locally; see createSSHEnv which sets up SHELL to make
     // it launch more reliably. The local command runs synchronously, so presumably
     // the remote session won't be garbled if the local command is slow.
-    args.push_back("-oPermitLocalCommand=yes");
-    args.push_back("-oLocalCommand=echo started");
+    args.push_back(OS_STR("-oPermitLocalCommand=yes"));
+    args.push_back(OS_STR("-oLocalCommand=echo started"));
 }
 
 bool SSHMaster::isMasterRunning()
 {
-    Strings args = {"-O", "check", hostnameAndUser};
+    OsStrings args = {OS_STR("-O"), OS_STR("check"), string_to_os_string(hostnameAndUser)};
     addCommonSSHOpts(args);
 
-    auto res =
-        runProgram(RunOptions{.program = "ssh", .args = toOsStrings(std::move(args)), .mergeStderrToStdout = true});
+    auto res = runProgram(RunOptions{.program = "ssh", .args = std::move(args), .mergeStderrToStdout = true});
     return res.first == 0;
 }
 
@@ -147,12 +146,12 @@ Strings createSSHEnv()
     return r;
 }
 
-std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && command, Strings && extraSshArgs)
+std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && command, OsStrings && extraSshArgs)
 {
 #ifdef _WIN32 // TODO re-enable on Windows, once we can start processes.
     throw UnimplementedError("cannot yet SSH on windows because spawning processes is not yet implemented");
 #else
-    Path socketPath = startMaster();
+    std::filesystem::path socketPath = startMaster();
 
     Pipe in, out;
     in.create();
@@ -181,13 +180,13 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
             if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
                 throw SysError("duping over stderr");
 
-            Strings args;
+            OsStrings args;
 
             if (!fakeSSH) {
                 args = {"ssh", hostnameAndUser.c_str(), "-x"};
                 addCommonSSHOpts(args);
-                if (socketPath != "")
-                    args.insert(args.end(), {"-S", socketPath});
+                if (!socketPath.empty())
+                    args.insert(args.end(), {"-S", socketPath.string()});
                 if (verbosity >= lvlChatty)
                     args.push_back("-v");
                 args.splice(args.end(), std::move(extraSshArgs));
@@ -230,17 +229,17 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(Strings && comman
 
 #ifndef _WIN32 // TODO re-enable on Windows, once we can start processes.
 
-Path SSHMaster::startMaster()
+std::filesystem::path SSHMaster::startMaster()
 {
     if (!useMaster)
-        return "";
+        return {};
 
     auto state(state_.lock());
 
     if (state->sshMaster != INVALID_DESCRIPTOR)
         return state->socketPath;
 
-    state->socketPath = (Path) *tmpDir + "/ssh.sock";
+    state->socketPath = tmpDir->path() / "ssh.sock";
 
     Pipe out;
     out.create();
@@ -262,7 +261,7 @@ Path SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            Strings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath};
+            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
             addCommonSSHOpts(args);

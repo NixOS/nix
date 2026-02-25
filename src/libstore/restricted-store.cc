@@ -125,7 +125,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
 
     void addTempRoot(const StorePath & path) override {}
 
-    void addIndirectRoot(const Path & path) override {}
+    void addIndirectRoot(const std::filesystem::path & path) override {}
 
     Roots findRoots(bool censor) override
     {

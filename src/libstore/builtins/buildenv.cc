@@ -20,14 +20,15 @@ namespace {
 
 struct State
 {
-    std::map<Path, int> priorities;
+    std::map<std::filesystem::path, int> priorities;
     unsigned long symlinks = 0;
 };
 
 } // namespace
 
 /* For each activated package, create symlinks */
-static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
+static void
+createLinks(State & state, const std::filesystem::path & srcDir, const std::filesystem::path & dstDir, int priority)
 {
     DirectoryIterator srcFiles;
 
@@ -35,7 +36,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         srcFiles = DirectoryIterator{srcDir};
     } catch (SystemError & e) {
         if (e.is(std::errc::not_a_directory)) {
-            warn("not including '%s' in the user environment because it's not a directory", srcDir);
+            warn("not including %s in the user environment because it's not a directory", PathFmt(srcDir));
             return;
         }
         throw;
@@ -76,11 +77,14 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                     createLinks(state, srcFile, dstFile, priority);
                     continue;
                 } else if (S_ISLNK(dstSt.st_mode)) {
-                    auto target = canonPath(dstFile, true).string();
+                    auto target = canonPath(dstFile, true);
                     if (!S_ISDIR(lstat(target).st_mode))
                         throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking %1%", PathFmt(dstFile));
+                    try {
+                        std::filesystem::remove(dstFile);
+                    } catch (std::filesystem::filesystem_error & e) {
+                        throw SystemError(e.code(), "unlinking %s", PathFmt(dstFile));
+                    }
                     if (mkdir(
                             dstFile.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -104,11 +108,14 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 if (S_ISLNK(dstSt.st_mode)) {
                     auto prevPriority = state.priorities[dstFile];
                     if (prevPriority == priority)
-                        throw BuildEnvFileConflictError(readLink(dstFile).string(), srcFile, priority);
+                        throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking %1%", PathFmt(dstFile));
+                    try {
+                        std::filesystem::remove(dstFile);
+                    } catch (std::filesystem::filesystem_error & e) {
+                        throw SystemError(e.code(), "unlinking %s", PathFmt(dstFile));
+                    }
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }
@@ -120,20 +127,20 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 }
 
-void buildProfile(const Path & out, Packages && pkgs)
+void buildProfile(const std::filesystem::path & out, Packages && pkgs)
 {
     State state;
 
     PathSet done, postponed;
 
-    auto addPkg = [&](const Path & pkgDir, int priority) {
-        if (!done.insert(pkgDir).second)
+    auto addPkg = [&](const std::filesystem::path & pkgDir, int priority) {
+        if (!done.insert(pkgDir.string()).second)
             return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
-                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                     readFile(pkgDir / "nix-support" / "propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
         } catch (SystemError & e) {

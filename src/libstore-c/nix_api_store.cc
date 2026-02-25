@@ -116,7 +116,7 @@ nix_err nix_store_real_path(
         context->last_err_code = NIX_OK;
     try {
         auto store2 = store->ptr.dynamic_pointer_cast<nix::LocalFSStore>();
-        auto res = store2 ? store2->toRealPath(path->path) : store->ptr->printStorePath(path->path);
+        auto res = store2 ? store2->toRealPath(path->path).string() : store->ptr->printStorePath(path->path);
         return call_nix_get_string_callback(res, callback, user_data);
     }
     NIXC_CATCH_ERRS

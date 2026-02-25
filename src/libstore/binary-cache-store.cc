@@ -27,12 +27,12 @@ namespace nix {
 BinaryCacheStore::BinaryCacheStore(Config & config)
     : config{config}
 {
-    if (config.secretKeyFile != "")
+    if (!config.secretKeyFile.get().empty())
         signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(config.secretKeyFile.get())}));
 
     if (config.secretKeyFiles != "") {
         std::stringstream ss(config.secretKeyFiles);
-        Path keyPath;
+        std::string keyPath;
         while (std::getline(ss, keyPath, ',')) {
             signers.push_back(std::make_unique<LocalSigner>(SecretKey{readFile(keyPath)}));
         }

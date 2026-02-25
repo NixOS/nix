@@ -587,7 +587,8 @@ AutoCloseFD createAnonymousTempFile()
     if (!fd2)
         throw SysError("creating temporary file %s", PathFmt(path));
     fd = std::move(fd2);
-    unlink(requireCString(path)); /* We only care about the file descriptor. */
+    std::error_code ec;
+    std::filesystem::remove(path, ec); /* We only care about the file descriptor. */
 #endif
 
     return fd;
@@ -614,7 +615,7 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
     // start the counter at a random value to minimize issues with preexisting temp paths
     static std::atomic<uint32_t> counter(std::random_device{}());
     assert(!std::filesystem::path(suffix).is_absolute());
-    auto tmpRoot = canonPath(root.empty() ? defaultTempDir().string() : root.string(), true);
+    auto tmpRoot = canonPath(root.empty() ? defaultTempDir() : root, true);
     return tmpRoot / fmt("%s-%s-%s", suffix, getpid(), counter.fetch_add(1, std::memory_order_relaxed));
 }
 

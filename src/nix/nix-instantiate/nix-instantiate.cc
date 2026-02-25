@@ -91,7 +91,7 @@ void processExpr(
                         rootName += "-" + std::to_string(rootNr);
                     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();
                     if (store2)
-                        drvPathS = store2->addPermRoot(drvPath, rootName.string());
+                        drvPathS = store2->addPermRoot(drvPath, rootName).string();
                 }
                 std::cout << fmt("%s%s\n", drvPathS, (outputName != "out" ? "!" + outputName : ""));
             }

@@ -61,26 +61,27 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         auto args = getNixSshOpts();
 
         if (url.authority->port)
-            args.push_back(fmt("-p%d", *url.authority->port));
+            args.push_back(string_to_os_string(fmt("-p%d", *url.authority->port)));
 
         std::ostringstream hostnameAndUser;
         if (url.authority->user)
             hostnameAndUser << *url.authority->user << "@";
         hostnameAndUser << url.authority->host;
-        args.push_back(std::move(hostnameAndUser).str());
+        args.push_back(string_to_os_string(std::move(hostnameAndUser).str()));
 
-        args.push_back("--");
-        args.push_back("git-lfs-authenticate");
+        args.push_back(OS_STR("--"));
+        args.push_back(OS_STR("git-lfs-authenticate"));
         // FIXME %2F encode slashes? Does this command take/accept percent encoding?
-        args.push_back(url.renderPath(/*encode=*/false));
-        args.push_back("download");
+        args.push_back(string_to_os_string(url.renderPath(/*encode=*/false)));
+        args.push_back(OS_STR("download"));
 
-        auto [status, output] = runProgram({.program = "ssh", .args = toOsStrings(args)});
+        auto [status, output] = runProgram({.program = "ssh", .args = args});
 
         if (output.empty())
             throw Error(
                 "git-lfs-authenticate: no output (cmd: 'ssh %s')",
-                concatMapStringsSep(" ", args, escapeShellArgAlways));
+                concatMapStringsSep(
+                    " ", args, [](const OsString & s) { return escapeShellArgAlways(os_string_to_string(s)); }));
 
         auto queryResp = nlohmann::json::parse(output);
         auto headerIt = queryResp.find("header");

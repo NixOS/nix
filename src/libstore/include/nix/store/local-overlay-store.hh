@@ -99,7 +99,7 @@ protected:
      * at that file path. It might be stored in the lower layer instead,
      * or it might not be part of this store at all.
      */
-    Path toUpperPath(const StorePath & path) const;
+    std::filesystem::path toUpperPath(const StorePath & path) const;
 
     friend struct LocalOverlayStore;
 };
@@ -184,7 +184,7 @@ private:
      * Check which layers the store object exists in to try to avoid
      * needing to remount.
      */
-    void deleteStorePath(const Path & path, uint64_t & bytesFreed, bool isKnownPath) override;
+    void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath) override;
 
     /**
      * Deduplicate by removing store objects from the upper layer that

@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
+#include <filesystem>
+
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
 #include "nix/store/config.hh"
@@ -60,11 +62,12 @@ struct CanonicalizePathMetadataOptions
  * - the owner and group are set to the Nix user and group, if we're
  *   running as root. (Unix only.)
  */
-void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
+void canonicalisePathMetaData(
+    const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
 
-void canonicalisePathMetaData(const Path & path, CanonicalizePathMetadataOptions options);
+void canonicalisePathMetaData(const std::filesystem::path & path, CanonicalizePathMetadataOptions options);
 
-void canonicaliseTimestampAndPermissions(const Path & path);
+void canonicaliseTimestampAndPermissions(const std::filesystem::path & path);
 
 MakeError(PathInUse, Error);
 
