@@ -531,8 +531,8 @@ T readStrings(Source & source)
     return ss;
 }
 
-template Paths readStrings(Source & source);
-template PathSet readStrings(Source & source);
+template Strings readStrings(Source & source);
+template StringSet readStrings(Source & source);
 
 Error readError(Source & source)
 {

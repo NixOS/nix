@@ -422,6 +422,7 @@ path_start
                 .pos = state->positions[CUR_POS]
             });
         });
+
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
@@ -463,7 +464,7 @@ path_start
             .pos = state->positions[CUR_POS]
         });
     });
-    Path path(getHome().string() + std::string($1.p + 1, $1.l - 1));
+    auto path(getHome().string() + std::string($1.p + 1, $1.l - 1));
     $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
   }
   ;

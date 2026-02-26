@@ -395,6 +395,28 @@ std::string BaseSetting<StringSet>::to_string() const
 }
 
 template<>
+std::set<std::filesystem::path> BaseSetting<std::set<std::filesystem::path>>::parse(const std::string & str) const
+{
+    auto tokens = tokenizeString<StringSet>(str);
+    return {tokens.begin(), tokens.end()};
+}
+
+template<>
+void BaseSetting<std::set<std::filesystem::path>>::appendOrSet(std::set<std::filesystem::path> newValue, bool append)
+{
+    if (!append)
+        value.clear();
+    value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+}
+
+template<>
+std::string BaseSetting<std::set<std::filesystem::path>>::to_string() const
+{
+    return concatStringsSep(
+        " ", value | std::views::transform([](const auto & p) { return p.string(); }) | std::ranges::to<Strings>());
+}
+
+template<>
 std::set<ExperimentalFeature> BaseSetting<std::set<ExperimentalFeature>>::parse(const std::string & str) const
 {
     std::set<ExperimentalFeature> res;
@@ -461,7 +483,7 @@ std::string BaseSetting<StringMap>::to_string() const
         [](const auto & kvpair) { return kvpair.first + "=" + kvpair.second; });
 }
 
-static std::filesystem::path parsePath(const AbstractSetting & s, const std::string & str)
+static AbsolutePath parseAbsolutePath(const AbstractSetting & s, const std::string & str)
 {
     if (str == "")
         throw UsageError("setting '%s' is a path and paths cannot be empty", s.name);
@@ -472,7 +494,9 @@ static std::filesystem::path parsePath(const AbstractSetting & s, const std::str
 template<>
 std::filesystem::path BaseSetting<std::filesystem::path>::parse(const std::string & str) const
 {
-    return parsePath(*this, str);
+    if (str == "")
+        throw UsageError("setting '%s' is a path and paths cannot be empty", name);
+    return str;
 }
 
 template<>
@@ -482,17 +506,28 @@ std::string BaseSetting<std::filesystem::path>::to_string() const
 }
 
 template<>
-std::optional<std::filesystem::path>
-BaseSetting<std::optional<std::filesystem::path>>::parse(const std::string & str) const
+AbsolutePath BaseSetting<AbsolutePath>::parse(const std::string & str) const
+{
+    return parseAbsolutePath(*this, str);
+}
+
+template<>
+std::string BaseSetting<AbsolutePath>::to_string() const
+{
+    return value.string();
+}
+
+template<>
+std::optional<AbsolutePath> BaseSetting<std::optional<AbsolutePath>>::parse(const std::string & str) const
 {
     if (str == "")
         return std::nullopt;
     else
-        return parsePath(*this, str);
+        return parseAbsolutePath(*this, str);
 }
 
 template<>
-std::string BaseSetting<std::optional<std::filesystem::path>>::to_string() const
+std::string BaseSetting<std::optional<AbsolutePath>>::to_string() const
 {
     return value ? value->string() : "";
 }
@@ -511,7 +546,8 @@ template class BaseSetting<StringSet>;
 template class BaseSetting<StringMap>;
 template class BaseSetting<std::set<ExperimentalFeature>>;
 template class BaseSetting<std::filesystem::path>;
-template class BaseSetting<std::optional<std::filesystem::path>>;
+template class BaseSetting<AbsolutePath>;
+template class BaseSetting<std::optional<AbsolutePath>>;
 template class BaseSetting<std::optional<std::string>>;
 
 bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const

@@ -153,7 +153,7 @@ public:
         bool location,
         nix::XMLWriter & doc,
         nix::NixStringContext & context,
-        nix::PathSet & drvsSeen,
+        nix::StringSet & drvsSeen,
         const nix::PosIdx pos) const override
     {
         if (!desc.printValueAsXML) {

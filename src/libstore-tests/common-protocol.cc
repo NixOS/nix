@@ -21,7 +21,7 @@ public:
      * Golden test for `T` reading
      */
     template<typename T>
-    void readProtoTest(PathView testStem, const T & expected)
+    void readProtoTest(std::string_view testStem, const T & expected)
     {
         CharacterizationTest::readTest(std::string{testStem + ".bin"}, [&](const auto & encoded) {
             T got = ({
@@ -37,7 +37,7 @@ public:
      * Golden test for `T` write
      */
     template<typename T>
-    void writeProtoTest(PathView testStem, const T & decoded)
+    void writeProtoTest(std::string_view testStem, const T & decoded)
     {
         CharacterizationTest::writeTest(std::string{testStem + ".bin"}, [&]() -> std::string {
             StringSink to;

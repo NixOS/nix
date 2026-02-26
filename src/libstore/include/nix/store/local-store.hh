@@ -40,7 +40,7 @@ private:
     /**
       Input for computing the build directory. See `getBuildDir()`.
      */
-    Setting<std::optional<std::filesystem::path>> buildDir{
+    Setting<std::optional<AbsolutePath>> buildDir{
         this,
         std::nullopt,
         "build-dir",
@@ -244,7 +244,7 @@ public:
     /**
      * Hack for build-remote.cc.
      */
-    PathSetNG locksHeld;
+    PathSet locksHeld;
 
     /**
      * Initialise the local store, upgrading the schema if
@@ -477,9 +477,6 @@ private:
     std::shared_ptr<const ValidPathInfo> queryPathInfoInternal(State & state, const StorePath & path);
 
     void updatePathInfo(State & state, const ValidPathInfo & info);
-
-    PathSet queryValidPathsOld();
-    ValidPathInfo queryPathInfoOld(const Path & path);
 
     void findRoots(const std::filesystem::path & path, std::filesystem::file_type type, Roots & roots);
 

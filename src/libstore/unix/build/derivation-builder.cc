@@ -895,7 +895,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     }
     pathsInChroot[tmpDirInSandbox()] = {.source = tmpDir};
 
-    PathSet allowedPaths = localSettings.allowedImpureHostPrefixes;
+    auto allowedPaths = localSettings.allowedImpureHostPrefixes.get();
 
     /* This works like the above, except on a per-derivation level */
     auto impurePaths = drvOptions.impureHostDeps;

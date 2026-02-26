@@ -15,7 +15,7 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "store-reference";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".txt");
     }

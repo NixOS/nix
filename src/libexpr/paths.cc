@@ -10,7 +10,7 @@ SourcePath EvalState::rootPath(CanonPath path)
     return {rootFS, std::move(path)};
 }
 
-SourcePath EvalState::rootPath(PathView path)
+SourcePath EvalState::rootPath(std::string_view path)
 {
     return {rootFS, CanonPath(absPath(path).string())};
 }

@@ -268,7 +268,7 @@ struct EvalSettings : Config
           See [Using the `eval-profiler`](@docroot@/advanced-topics/eval-profiler.md).
         )"};
 
-    Setting<Path> evalProfileFile{
+    Setting<std::filesystem::path> evalProfileFile{
         this,
         "nix.profile",
         "eval-profile-file",

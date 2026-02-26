@@ -10,8 +10,8 @@ namespace nix {
 struct LocalFSStoreConfig : virtual StoreConfig
 {
 private:
-    static Setting<std::optional<std::filesystem::path>>
-    makeRootDirSetting(LocalFSStoreConfig & self, std::optional<std::filesystem::path> defaultValue)
+    static Setting<std::optional<AbsolutePath>>
+    makeRootDirSetting(LocalFSStoreConfig & self, std::optional<AbsolutePath> defaultValue)
     {
         return {
             &self,
@@ -33,7 +33,7 @@ public:
      */
     LocalFSStoreConfig(const std::filesystem::path & path, const Params & params);
 
-    Setting<std::optional<std::filesystem::path>> rootDir = makeRootDirSetting(*this, std::nullopt);
+    Setting<std::optional<AbsolutePath>> rootDir = makeRootDirSetting(*this, std::nullopt);
 
 private:
 
@@ -51,21 +51,21 @@ private:
 
 public:
 
-    Setting<std::filesystem::path> stateDir{
+    Setting<AbsolutePath> stateDir{
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "var" / "nix" : getDefaultStateDir(),
         "state",
         "Directory where Nix stores state.",
     };
 
-    Setting<std::filesystem::path> logDir{
+    Setting<AbsolutePath> logDir{
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "var" / "log" / "nix" : getDefaultLogDir(),
         "log",
         "directory where Nix stores log files.",
     };
 
-    Setting<std::filesystem::path> realStoreDir{
+    Setting<AbsolutePath> realStoreDir{
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "store" : std::filesystem::path{storeDir},
         "real",

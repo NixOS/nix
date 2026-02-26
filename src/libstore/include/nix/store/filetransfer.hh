@@ -95,7 +95,7 @@ public:
           Nix to use for downloads.
         )"};
 
-    Setting<std::filesystem::path> netrcFile{
+    Setting<AbsolutePath> netrcFile{
         this,
         nixConfDir() / "netrc",
         "netrc-file",
@@ -122,7 +122,7 @@ public:
           > `.netrc`.
         )"};
 
-    Setting<std::optional<std::filesystem::path>> caFile{
+    Setting<std::optional<AbsolutePath>> caFile{
         this,
         getDefaultSSLCertFile(),
         "ssl-cert-file",

@@ -21,7 +21,7 @@ static void printValueAsXML(
     Value & v,
     XMLWriter & doc,
     NixStringContext & context,
-    PathSet & drvsSeen,
+    StringSet & drvsSeen,
     const PosIdx pos);
 
 static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
@@ -39,7 +39,7 @@ static void showAttrs(
     const Bindings & attrs,
     XMLWriter & doc,
     NixStringContext & context,
-    PathSet & drvsSeen)
+    StringSet & drvsSeen)
 {
     StringSet names;
 
@@ -61,7 +61,7 @@ static void printValueAsXML(
     Value & v,
     XMLWriter & doc,
     NixStringContext & context,
-    PathSet & drvsSeen,
+    StringSet & drvsSeen,
     const PosIdx pos)
 {
     checkInterrupt();
@@ -99,7 +99,7 @@ static void printValueAsXML(
         if (state.isDerivation(v)) {
             XMLAttrs xmlAttrs;
 
-            Path drvPath;
+            std::string drvPath;
             if (auto a = v.attrs()->get(state.s.drvPath)) {
                 if (strict)
                     state.forceValue(*a->value, a->pos);
@@ -185,7 +185,7 @@ void ExternalValueBase::printValueAsXML(
     bool location,
     XMLWriter & doc,
     NixStringContext & context,
-    PathSet & drvsSeen,
+    StringSet & drvsSeen,
     const PosIdx pos) const
 {
     doc.writeEmptyElement("unevaluated");
@@ -202,7 +202,7 @@ void printValueAsXML(
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");
-    PathSet drvsSeen;
+    StringSet drvsSeen;
     printValueAsXML(state, strict, location, v, doc, context, drvsSeen, pos);
 }
 

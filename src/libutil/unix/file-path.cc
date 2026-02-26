@@ -8,7 +8,7 @@
 
 namespace nix {
 
-std::filesystem::path pathNG(PathView path)
+std::filesystem::path toOwnedPath(PathView path)
 {
     return {std::string{path}};
 }

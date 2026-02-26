@@ -10,7 +10,7 @@
 
 namespace nix {
 
-StorePathSet scanForReferences(Sink & toTee, const Path & path, const StorePathSet & refs);
+StorePathSet scanForReferences(Sink & toTee, const std::filesystem::path & path, const StorePathSet & refs);
 
 class PathRefScanSink : public RefScanSink
 {

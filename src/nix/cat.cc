@@ -48,7 +48,7 @@ struct CmdCatStore : StoreCommand, MixCat
     void run(ref<Store> store) override
     {
         auto [storePath, rest] = store->toStorePath(path);
-        cat(store->requireStoreObjectAccessor(storePath), CanonPath{rest});
+        cat(store->requireStoreObjectAccessor(storePath), rest);
     }
 };
 

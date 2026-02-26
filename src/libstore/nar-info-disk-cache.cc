@@ -66,7 +66,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     struct Cache
     {
         int id;
-        Path storeDir;
+        std::string storeDir;
         bool wantMassQuery;
         int priority;
     };
@@ -200,7 +200,7 @@ private:
     }
 
 public:
-    int createCache(const std::string & uri, const Path & storeDir, bool wantMassQuery, int priority) override
+    int createCache(const std::string & uri, const std::string & storeDir, bool wantMassQuery, int priority) override
     {
         return retrySQLite<int>([&]() {
             auto state(_state.lock());

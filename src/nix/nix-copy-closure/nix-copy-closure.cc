@@ -16,7 +16,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
         auto dryRun = false;
         auto useSubstitutes = NoSubstitute;
         std::string sshHost;
-        PathSet storePaths;
+        StringSet storePaths;
 
         parseCmdLine(argc, argv, [&](Strings::iterator & arg, const Strings::iterator & end) {
             if (*arg == "--help")

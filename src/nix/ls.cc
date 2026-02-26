@@ -120,7 +120,7 @@ struct CmdLsStore : StoreCommand, MixLs
     void run(ref<Store> store) override
     {
         auto [storePath, rest] = store->toStorePath(path);
-        list(store->requireStoreObjectAccessor(storePath), CanonPath{rest});
+        list(store->requireStoreObjectAccessor(storePath), rest);
     }
 };
 

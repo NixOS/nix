@@ -254,7 +254,7 @@ static int main_build_remote(int argc, char ** argv)
 
         std::cerr << "# accept\n" << storeUri << "\n";
 
-        auto inputs = readStrings<PathSet>(source);
+        auto inputs = readStrings<StringSet>(source);
         auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock;

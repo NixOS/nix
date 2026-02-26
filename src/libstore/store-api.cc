@@ -69,20 +69,20 @@ StoreConfig::StoreConfig(const Params & params)
 {
 }
 
-bool StoreDirConfig::isInStore(PathView path) const
+bool StoreDirConfig::isInStore(std::string_view path) const
 {
     return isInDir(path, storeDir);
 }
 
-std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
+std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
     auto slash = path.find('/', storeDir.size() + 1);
-    if (slash == Path::npos)
-        return {parseStorePath(path), ""};
+    if (slash == std::string::npos)
+        return {parseStorePath(path), CanonPath::root};
     else
-        return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
+        return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
 }
 
 std::filesystem::path Store::followLinksToStore(std::string_view _path) const
@@ -1181,27 +1181,6 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
     if (!str || str.eof())
         throw Error("missing input");
     return std::optional<ValidPathInfo>(std::move(info));
-}
-
-std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
-{
-    std::string s;
-    for (auto & i : paths) {
-        if (s.size() != 0)
-            s += ", ";
-        s += "'" + printStorePath(i) + "'";
-    }
-    return s;
-}
-
-std::string showPaths(const std::set<std::filesystem::path> paths)
-{
-    return concatStringsSep(", ", quoteFSPaths(paths));
-}
-
-std::string showPaths(const PathSet & paths)
-{
-    return concatStringsSep(", ", quoteStrings(paths));
 }
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)

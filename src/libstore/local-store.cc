@@ -80,7 +80,7 @@ std::filesystem::path LocalBuildStoreConfig::getBuildDir() const
     auto & bd = getLocalSettings().buildDir.get();
     return bd.has_value()               ? *bd
            : buildDir.get().has_value() ? *buildDir.get()
-                                        : std::filesystem::path{stateDir.get()} / "builds";
+                                        : AbsolutePath{stateDir.get() / "builds"};
 }
 
 ref<Store> LocalStore::Config::openStore() const
@@ -884,7 +884,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
     if (hashPart.size() != StorePath::HashLen)
         throw Error("invalid hash part");
 
-    Path prefix = storeDir + "/" + hashPart;
+    std::string prefix = storeDir + "/" + hashPart;
 
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state->lock());
@@ -1310,7 +1310,9 @@ void LocalStore::invalidatePathChecked(const StorePath & path)
             referrers.erase(path); /* ignore self-references */
             if (!referrers.empty())
                 throw PathInUse(
-                    "cannot delete path '%s' because it is in use by %s", printStorePath(path), showPaths(referrers));
+                    "cannot delete path '%s' because it is in use by %s",
+                    printStorePath(path),
+                    concatMapStringsSep(", ", referrers, [&](auto & p) { return "'" + printStorePath(p) + "'"; }));
             invalidatePath(*state, path);
         }
 

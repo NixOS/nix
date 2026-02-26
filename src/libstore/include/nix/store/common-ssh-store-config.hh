@@ -14,7 +14,7 @@ struct CommonSSHStoreConfig : virtual StoreConfig
 
     CommonSSHStoreConfig(const ParsedURL::Authority & authority, const Params & params);
 
-    Setting<std::filesystem::path> sshKey{
+    Setting<AbsolutePath> sshKey{
         this, "", "ssh-key", "Path to the SSH private key used to authenticate to the remote machine."};
 
     Setting<std::string> sshPublicHostKey{

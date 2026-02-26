@@ -635,7 +635,9 @@ struct GitInputScheme : InputScheme
 
         // Why are we checking for bare repository?
         // well if it's a bare repository we want to force a git fetch rather than copying the folder
-        auto isBareRepository = [](PathView path) { return pathExists(path) && !pathExists(path + "/.git"); };
+        auto isBareRepository = [](const std::filesystem::path & path) {
+            return pathExists(path) && !pathExists(path / ".git");
+        };
 
         // FIXME: here we turn a possibly relative path into an absolute path.
         // This allows relative git flake inputs to be resolved against the
@@ -647,7 +649,7 @@ struct GitInputScheme : InputScheme
         //
         auto maybeUrlFsPathForFileUrl =
             url.scheme == "file" ? std::make_optional(urlPathToPath(url.path)) : std::nullopt;
-        if (maybeUrlFsPathForFileUrl && !forceHttp && !isBareRepository(maybeUrlFsPathForFileUrl->string())) {
+        if (maybeUrlFsPathForFileUrl && !forceHttp && !isBareRepository(*maybeUrlFsPathForFileUrl)) {
             auto & path = *maybeUrlFsPathForFileUrl;
 
             if (!path.is_absolute()) {

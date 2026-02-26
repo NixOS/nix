@@ -1020,18 +1020,6 @@ void removeTempRoots();
 StorePath resolveDerivedPath(Store &, const SingleDerivedPath &, Store * evalStore = nullptr);
 OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * evalStore = nullptr);
 
-/**
- * Display a set of paths in human-readable form (i.e., between quotes
- * and separated by commas).
- */
-std::string showPaths(const PathSet & paths);
-
-/**
- * Display a set of paths in human-readable form (i.e., between quotes
- * and separated by commas).
- */
-std::string showPaths(const std::set<std::filesystem::path> paths);
-
 std::optional<ValidPathInfo>
 decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven = std::nullopt);
 
