@@ -554,7 +554,7 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     debug("builder process for '%s' finished", store.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
-    buildResult.stopTime = time(0);
+    buildResult.stopTime = time(nullptr);
 
     /* So the child is gone now. */
     miscMethods->childTerminated();
@@ -872,7 +872,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     if (unlockpt(builderOut.get()))
         throw SysError("unlocking pseudoterminal");
 
-    buildResult.startTime = time(0);
+    buildResult.startTime = time(nullptr);
 
     /* Start a child process to build the derivation. */
     startChild();

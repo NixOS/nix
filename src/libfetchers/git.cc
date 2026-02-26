@@ -126,7 +126,7 @@ static std::optional<std::string> readHeadCached(const Settings & settings, cons
     std::filesystem::path cacheDir = getCachePath(actualUrl, shallow);
     std::filesystem::path headRefFile = cacheDir / "HEAD";
 
-    time_t now = time(0);
+    time_t now = time(nullptr);
     auto st = maybeStat(headRefFile);
     std::optional<std::string> cachedRef;
     if (st) {
@@ -830,7 +830,7 @@ struct GitInputScheme : InputScheme
             auto localRefFile = ref.compare(0, 5, "refs/") == 0 ? cacheDir / ref : cacheDir / "refs/heads" / ref;
 
             bool doFetch = false;
-            time_t now = time(0);
+            time_t now = time(nullptr);
 
             /* If a rev was specified, we need to fetch if it's not in the
                repo. */

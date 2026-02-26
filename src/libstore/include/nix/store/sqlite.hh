@@ -209,7 +209,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
 template<typename T, typename F>
 T retrySQLite(F && fun)
 {
-    time_t nextWarning = time(0) + 1;
+    time_t nextWarning = time(nullptr) + 1;
 
     while (true) {
         try {

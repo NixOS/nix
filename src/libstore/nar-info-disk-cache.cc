@@ -142,7 +142,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
 
         /* Periodically purge expired entries from the database. */
         retrySQLite<void>([&]() {
-            auto now = time(0);
+            auto now = time(nullptr);
 
             SQLiteStmt queryLastPurge(state->db, "select value from LastPurge");
             auto queryLastPurge_(queryLastPurge.use());
@@ -181,7 +181,11 @@ private:
     {
         auto i = state.caches.find(uri);
         if (i == state.caches.end()) {
-            auto queryCache(state.queryCache.use()(uri)(time(0) - settings.ttlMeta));
+            /* Important: always use int64_t even on 32 bit systems. Otherwise
+               the the subtraction would promote time_t to unsigned if time_t is
+               32 bit. */
+            auto timestamp = static_cast<int64_t>(time(nullptr)) - static_cast<int64_t>(settings.ttlMeta.get());
+            auto queryCache(state.queryCache.use()(uri)(timestamp));
             if (!queryCache.next())
                 return std::nullopt;
             auto cache = Cache{
@@ -217,7 +221,7 @@ public:
             };
 
             {
-                auto r(state->insertCache.use()(uri)(time(0))(storeDir) (wantMassQuery) (priority));
+                auto r(state->insertCache.use()(uri)(time(nullptr))(storeDir) (wantMassQuery) (priority));
                 if (!r.next()) {
                     unreachable();
                 }
@@ -251,7 +255,7 @@ public:
 
                 auto & cache(getCache(*state, uri));
 
-                auto now = time(0);
+                auto now = time(nullptr);
 
                 auto queryNAR(
                     state->queryNAR.use()(cache.id)(hashPart) (now - settings.ttlNegative)(now - settings.ttlPositive));
@@ -292,7 +296,7 @@ public:
 
                 auto & cache(getCache(*state, uri));
 
-                auto now = time(0);
+                auto now = time(nullptr);
 
                 auto queryRealisation(state->queryRealisation.use()(cache.id)(id.to_string())(
                     now - settings.ttlNegative)(now - settings.ttlPositive));
@@ -338,11 +342,11 @@ public:
                         HashFormat::Nix32, true))(info->narSize)(concatStringsSep(" ", info->shortRefs()))(
                         info->deriver ? std::string(info->deriver->to_string()) : "",
                         (bool) info->deriver)(concatStringsSep(" ", Signature::toStrings(info->sigs)))(
-                        renderContentAddress(info->ca))(time(0))
+                        renderContentAddress(info->ca))(time(nullptr))
                     .exec();
 
             } else {
-                state->insertMissingNAR.use()(cache.id)(hashPart) (time(0)).exec();
+                state->insertMissingNAR.use()(cache.id)(hashPart) (time(nullptr)).exec();
             }
         });
     }
@@ -355,7 +359,8 @@ public:
             auto & cache(getCache(*state, uri));
 
             state->insertRealisation
-                .use()(cache.id)(realisation.id.to_string())(static_cast<nlohmann::json>(realisation).dump())(time(0))
+                .use()(cache.id)(realisation.id.to_string())(static_cast<nlohmann::json>(realisation).dump())(
+                    time(nullptr))
                 .exec();
         });
     }
@@ -366,7 +371,7 @@ public:
             auto state(_state.lock());
 
             auto & cache(getCache(*state, uri));
-            state->insertMissingRealisation.use()(cache.id)(id.to_string())(time(0)).exec();
+            state->insertMissingRealisation.use()(cache.id)(id.to_string())(time(nullptr)).exec();
         });
     }
 };

@@ -616,7 +616,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     fds.insert(hook->builderOut.readSide.get());
     worker.childStarted(shared_from_this(), fds, false, false);
 
-    buildResult.startTime = time(0); // inexact
+    buildResult.startTime = time(nullptr); // inexact
 
     auto msg =
         fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
@@ -709,7 +709,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
 
     buildResult.timesBuilt++;
-    buildResult.stopTime = time(0);
+    buildResult.stopTime = time(nullptr);
 
     /* So the child is gone now. */
     worker.childTerminated(this);
