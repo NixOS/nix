@@ -412,7 +412,7 @@ ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(const j
 {
     auto & obj = getObject(json);
     auto cfg = make_ref<DummyStore::Config>(DummyStore::Config::Params{});
-    const_cast<PathSetting &>(cfg->storeDir_).set(getString(valueAt(obj, "store")));
+    cfg->storeDir_.set(getString(valueAt(obj, "store")));
     cfg->readOnly = true;
     return cfg;
 }

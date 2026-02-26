@@ -32,13 +32,35 @@ using json = nlohmann::json;
 
 namespace nix {
 
-Path StoreConfigBase::getDefaultNixStoreDir()
+std::string StoreConfigBase::getDefaultNixStoreDir()
 {
     return
 #ifndef _WIN32
         canonPath
 #endif
-        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR)));
+        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR)))
+#ifndef _WIN32
+            .string()
+#endif
+            ;
+}
+
+StoreDirSetting::StoreDirSetting(
+    Config * options,
+    const std::string & def,
+    const std::string & name,
+    const std::string & description,
+    const StringSet & aliases)
+    : BaseSetting<std::string>(def, true, name, description, aliases)
+{
+    options->addSetting(this);
+}
+
+std::string StoreDirSetting::parse(const std::string & str) const
+{
+    if (str.empty())
+        throw UsageError("setting '%s' is a path and paths cannot be empty", name);
+    return canonPath(str).string();
 }
 
 StoreConfig::StoreConfig(const Params & params)

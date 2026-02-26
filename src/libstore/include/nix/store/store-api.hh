@@ -73,6 +73,32 @@ struct MissingPaths
 };
 
 /**
+ * A setting for the Nix store directory. Automatically canonicalises the
+ * path and rejects the empty string. Stored as `std::string` because
+ * store directory are valid file paths on *some* OS, but not neccessarily the OS of this build of Nix.
+ *
+ * (For example, consider `SSHStore` from Linux to Windows, or vice versa, the foreign path will not be a valid
+ * `std::filesystem::path`.)
+ */
+class StoreDirSetting : public BaseSetting<std::string>
+{
+public:
+    StoreDirSetting(
+        Config * options,
+        const std::string & def,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {});
+
+    std::string parse(const std::string & str) const override;
+
+    void operator=(const std::string & v)
+    {
+        this->assign(v);
+    }
+};
+
+/**
  * Need to make this a separate class so I can get the right
  * initialization order in the constructor for `StoreConfig`.
  */
@@ -86,11 +112,11 @@ private:
      * Compute the default Nix store directory from environment variables
      * (`NIX_STORE_DIR`, `NIX_STORE`) or the compile-time default.
      */
-    static Path getDefaultNixStoreDir();
+    static std::string getDefaultNixStoreDir();
 
 public:
 
-    const PathSetting storeDir_{
+    StoreDirSetting storeDir_{
         this,
         getDefaultNixStoreDir(),
         "store",

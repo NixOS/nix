@@ -29,7 +29,7 @@ MakeError(BadStorePathName, BadStorePath);
  */
 struct StoreDirConfig
 {
-    const Path & storeDir;
+    const std::string & storeDir;
 
     // pure methods
 
