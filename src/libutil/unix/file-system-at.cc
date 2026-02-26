@@ -72,8 +72,7 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
             if (errno == ENOSYS)
                 fchmodat2Unsupported.test_and_set();
             else {
-                auto savedErrno = errno;
-                throw SysError(savedErrno, "fchmodat2 %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
+                throw SysError([&] { return HintFmt("fchmodat2 %s", PathFmt(descriptorToPath(dirFd) / path.rel())); });
             }
         } else
             return;
@@ -83,11 +82,11 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
 #ifdef __linux__
     AutoCloseFD pathFd = ::openat(dirFd, path.rel_c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
     if (!pathFd) {
-        auto savedErrno = errno;
-        throw SysError(
-            savedErrno,
-            "opening %s to get an O_PATH file descriptor (fchmodat2 is unsupported)",
-            PathFmt(descriptorToPath(dirFd) / path.rel()));
+        throw SysError([&] {
+            return HintFmt(
+                "opening %s to get an O_PATH file descriptor (fchmodat2 is unsupported)",
+                PathFmt(descriptorToPath(dirFd) / path.rel()));
+        });
     }
 
     struct ::stat st;
@@ -107,9 +106,9 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
             if (errno == ENOENT)
                 dontHaveProc.test_and_set();
             else {
-                auto savedErrno = errno;
-                throw SysError(
-                    savedErrno, "chmod %s (%s)", selfProcFdPath, PathFmt(descriptorToPath(dirFd) / path.rel()));
+                throw SysError([&] {
+                    return HintFmt("chmod %s (%s)", selfProcFdPath, PathFmt(descriptorToPath(dirFd) / path.rel()));
+                });
             }
         } else
             return;
@@ -131,8 +130,7 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
     );
 
     if (res == -1) {
-        auto savedErrno = errno;
-        throw SysError(savedErrno, "fchmodat %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
+        throw SysError([&] { return HintFmt("fchmodat %s", PathFmt(descriptorToPath(dirFd) / path.rel())); });
     }
 }
 
@@ -217,8 +215,8 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
         buf.resize(bufSize);
         ssize_t rlSize = ::readlinkat(dirFd, path.rel_c_str(), buf.data(), bufSize);
         if (rlSize == -1) {
-            auto savedErrno = errno;
-            throw SysError(savedErrno, "reading symbolic link %1%", PathFmt(descriptorToPath(dirFd) / path.rel()));
+            throw SysError(
+                [&] { return HintFmt("reading symbolic link %1%", PathFmt(descriptorToPath(dirFd) / path.rel())); });
         } else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
     }

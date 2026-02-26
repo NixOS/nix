@@ -20,8 +20,7 @@ std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     LARGE_INTEGER li;
     if (!GetFileSizeEx(fd, &li)) {
-        auto lastError = GetLastError();
-        throw WinError(lastError, "getting size of file %s", PathFmt(descriptorToPath(fd)));
+        throw WinError([&] { return HintFmt("getting size of file %s", PathFmt(descriptorToPath(fd))); });
     }
     return li.QuadPart;
 }
@@ -49,13 +48,10 @@ size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
         ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
     DWORD n;
     if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov)) {
-        auto lastError = GetLastError();
-        throw WinError(
-            lastError,
-            "reading %1% bytes at offset %2% from %3%",
-            buffer.size(),
-            offset,
-            PathFmt(descriptorToPath(fd)));
+        throw WinError([&] {
+            return HintFmt(
+                "reading %1% bytes at offset %2% from %3%", buffer.size(), offset, PathFmt(descriptorToPath(fd)));
+        });
     }
     return static_cast<size_t>(n);
 }
@@ -66,8 +62,8 @@ size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterru
         checkInterrupt(); // For consistency with unix
     DWORD n;
     if (!WriteFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL)) {
-        auto lastError = GetLastError();
-        throw WinError(lastError, "writing %1% bytes to %2%", buffer.size(), PathFmt(descriptorToPath(fd)));
+        throw WinError(
+            [&] { return HintFmt("writing %1% bytes to %2%", buffer.size(), PathFmt(descriptorToPath(fd))); });
     }
     return static_cast<size_t>(n);
 }
@@ -125,8 +121,7 @@ off_t lseek(HANDLE h, off_t offset, int whence)
 void syncDescriptor(Descriptor fd)
 {
     if (!::FlushFileBuffers(fd)) {
-        auto lastError = GetLastError();
-        throw WinError(lastError, "flushing file %s", PathFmt(descriptorToPath(fd)));
+        throw WinError([&] { return HintFmt("flushing file %s", PathFmt(descriptorToPath(fd))); });
     }
 }
 
