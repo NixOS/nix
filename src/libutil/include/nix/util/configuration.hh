@@ -410,27 +410,6 @@ public:
     }
 };
 
-/**
- * Like `PathSetting`, but the absence of a path is also allowed.
- *
- * `std::optional` is used instead of the empty string for clarity.
- */
-class OptionalPathSetting : public BaseSetting<std::optional<Path>>
-{
-public:
-
-    OptionalPathSetting(
-        Config * options,
-        const std::optional<Path> & def,
-        const std::string & name,
-        const std::string & description,
-        const StringSet & aliases = {});
-
-    std::optional<Path> parse(const std::string & str) const override;
-
-    void operator=(const std::optional<Path> & v);
-};
-
 struct ExperimentalFeatureSettings : Config
 {
 
