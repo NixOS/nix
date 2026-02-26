@@ -755,6 +755,22 @@ INSTANTIATE_TEST_SUITE_P(
         },
         ParseURLRelativeParam{
             .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {},
+                },
+            .description = "emptyQueryRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
             .relative = "?asdf\%20qwer=1\%202\%203",
             .expected =
                 ParsedURL{
