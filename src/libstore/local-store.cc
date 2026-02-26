@@ -688,7 +688,7 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
 
     state.stmts->RegisterValidPath
         .use()(printStorePath(info.path))(info.narHash.to_string(HashFormat::Base16, true))(
-            info.registrationTime == 0 ? time(0) : info.registrationTime)(
+            info.registrationTime == 0 ? time(nullptr) : info.registrationTime)(
             info.deriver ? printStorePath(*info.deriver) : "",
             (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
             concatStringsSep(" ", Signature::toStrings(info.sigs)),

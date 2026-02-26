@@ -234,7 +234,7 @@ time_t parseOlderThanTimeSpec(std::string_view timeSpec)
     if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
         throw UsageError("invalid number of days specifier '%1%', expected something like '14d'", timeSpec);
 
-    time_t curTime = time(0);
+    time_t curTime = time(nullptr);
     auto strDays = timeSpec.substr(0, timeSpec.size() - 1);
     auto days = string2Int<int>(strDays);
 

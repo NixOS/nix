@@ -278,7 +278,7 @@ SQLiteTxn::~SQLiteTxn()
 
 void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
 {
-    time_t now = time(0);
+    time_t now = time(nullptr);
     if (now > nextWarning) {
         nextWarning = now + 10;
         logWarning({.msg = e.info().msg});

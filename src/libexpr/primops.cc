@@ -5230,7 +5230,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
         });
 
     if (!settings.pureEval) {
-        v.mkInt(time(0));
+        v.mkInt(time(nullptr));
     }
     addConstant(
         "__currentTime",
