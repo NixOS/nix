@@ -263,7 +263,7 @@ std::filesystem::path readLink(const std::filesystem::path & path)
 
 std::string readFile(const std::filesystem::path & path)
 {
-    AutoCloseFD fd = openFileReadonly(path);
+    auto fd = openFileReadonly(path);
     if (!fd)
         throw NativeSysError("opening file %1%", PathFmt(path));
     return readFile(fd.get());
@@ -286,7 +286,7 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
     }
 
     // Stream the file instead if memory-mapping fails or is disabled.
-    AutoCloseFD fd = openFileReadonly(std::filesystem::path(path));
+    auto fd = openFileReadonly(std::filesystem::path(path));
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
     drainFD(fd.get(), sink);
