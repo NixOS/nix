@@ -38,13 +38,19 @@ nix_perl_store_cc = custom_target(
   command : [ xsubpp, '@INPUT@', '-output', '@OUTPUT@' ],
 )
 
+if host_machine.system() == 'darwin' and get_option('default_library') == 'static'
+  prelink = false
+else
+  prelink = true
+endif
+
 # Build Nix::Store Library
 #-------------------------------------------------
 nix_perl_store_lib = library(
   'Store',
   sources : nix_perl_store_cc,
   name_prefix : '',
-  prelink : true, # For C++ static initializers
+  prelink : prelink, # For C++ static initializers
   install : true,
   install_mode : 'rwxr-xr-x',
   install_dir : join_paths(nix_perl_install_dir, 'auto', 'Nix', 'Store'),
