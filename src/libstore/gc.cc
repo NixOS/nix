@@ -57,7 +57,7 @@ void LocalStore::createTempRootsFile()
         if (pathExists(fnTempRoots))
             /* It *must* be stale, since there can be no two
                processes with the same pid. */
-            unlink(fnTempRoots.string().c_str());
+            tryUnlink(fnTempRoots);
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
 
@@ -190,7 +190,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
            we don't care about its temporary roots. */
         if (lockFile(fd.get(), ltWrite, false)) {
             printInfo("removing stale temporary roots file %1%", PathFmt(path));
-            unlink(path.string().c_str());
+            tryUnlink(path);
             writeFull(fd.get(), "d");
             continue;
         }
@@ -247,7 +247,7 @@ void LocalStore::findRoots(const std::filesystem::path & path, std::filesystem::
                 if (!pathExists(target)) {
                     if (isInDir(path, config->stateDir.get() / gcRootsDir / "auto")) {
                         printInfo("removing stale link from %1% to %2%", PathFmt(path), PathFmt(target));
-                        unlink(path.string().c_str());
+                        tryUnlink(path);
                     }
                 } else {
                     if (!std::filesystem::is_symlink(target))
@@ -782,8 +782,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
             printMsg(lvlTalkative, "deleting unused link %1%", PathFmt(path));
 
-            if (unlink(path.string().c_str()) == -1)
-                throw SysError("deleting %1%", PathFmt(path));
+            unlink(path);
 
             /* Do not account for deleted file here. Rely on deletePath()
                accounting.  */

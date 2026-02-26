@@ -458,6 +458,20 @@ bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask 
 void chmod(const std::filesystem::path & path, mode_t mode);
 
 /**
+ * Remove a file, throwing an exception on error.
+ *
+ * @param path Path to the file to remove.
+ */
+void unlink(const std::filesystem::path & path);
+
+/**
+ * Try to remove a file, ignoring errors.
+ *
+ * @param path Path to the file to try to remove.
+ */
+void tryUnlink(const std::filesystem::path & path);
+
+/**
  * @brief A directory iterator that can be used to iterate over the
  * contents of a directory. It is similar to std::filesystem::directory_iterator
  * but throws NixError on failure instead of std::filesystem::filesystem_error.

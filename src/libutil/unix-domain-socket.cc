@@ -105,12 +105,7 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
 
 void bind(Socket fd, const std::filesystem::path & path)
 {
-#ifdef _WIN32
-    _wunlink
-#else
-    unlink
-#endif
-        (path.c_str());
+    tryUnlink(path);
 
     bindConnectProcHelper("bind", ::bind, fd, path.string());
 }

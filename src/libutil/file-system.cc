@@ -587,7 +587,7 @@ AutoCloseFD createAnonymousTempFile()
     if (!fd2)
         throw SysError("creating temporary file %s", PathFmt(path));
     fd = std::move(fd2);
-    unlink(requireCString(path)); /* We only care about the file descriptor. */
+    tryUnlink(path); /* We only care about the file descriptor. */
 #endif
 
     return fd;
@@ -761,6 +761,25 @@ void chmod(const std::filesystem::path & path, mode_t mode)
         == -1)
         throw SysError("setting permissions on %s", PathFmt(path));
 }
+
+#ifdef _WIN32
+#  define UNLINK_PROC ::_wunlink
+#else
+#  define UNLINK_PROC ::unlink
+#endif
+
+void unlink(const std::filesystem::path & path)
+{
+    if (UNLINK_PROC(path.c_str()) == -1)
+        throw SysError("removing %s", PathFmt(path));
+}
+
+void tryUnlink(const std::filesystem::path & path)
+{
+    UNLINK_PROC(path.c_str());
+}
+
+#undef UNLINK_PROC
 
 bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask)
 {

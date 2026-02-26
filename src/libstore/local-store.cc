@@ -450,7 +450,7 @@ LocalStore::~LocalStore()
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
             fdTempRoots->close();
-            unlink(fnTempRoots.string().c_str());
+            tryUnlink(fnTempRoots);
         }
     } catch (...) {
         ignoreExceptionInDestructor();

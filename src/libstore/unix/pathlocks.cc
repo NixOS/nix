@@ -31,9 +31,9 @@ void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
        races.  Write a (meaningless) token to the file to indicate to
        other processes waiting on this lock that the lock is stale
        (deleted). */
-    unlink(path.c_str());
+    tryUnlink(path);
     writeFull(desc, "d");
-    /* Note that the result of unlink() is ignored; removing the lock
+    /* We just try to unlink don't care if it fails; removing the lock
        file is an optimisation, not a necessity. */
 }
 
