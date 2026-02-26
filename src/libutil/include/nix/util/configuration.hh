@@ -379,37 +379,6 @@ public:
     }
 };
 
-/**
- * A special setting for Paths. These are automatically canonicalised
- * (e.g. "/foo//bar/" becomes "/foo/bar").
- *
- * It is mandatory to specify a path; i.e. the empty string is not
- * permitted.
- */
-class PathSetting : public BaseSetting<Path>
-{
-public:
-
-    PathSetting(
-        Config * options,
-        const Path & def,
-        const std::string & name,
-        const std::string & description,
-        const StringSet & aliases = {});
-
-    Path parse(const std::string & str) const override;
-
-    Path operator+(const char * p) const
-    {
-        return value + p;
-    }
-
-    void operator=(const Path & v)
-    {
-        this->assign(v);
-    }
-};
-
 struct ExperimentalFeatureSettings : Config
 {
 

@@ -514,22 +514,6 @@ template class BaseSetting<std::filesystem::path>;
 template class BaseSetting<std::optional<std::filesystem::path>>;
 template class BaseSetting<std::optional<std::string>>;
 
-PathSetting::PathSetting(
-    Config * options,
-    const Path & def,
-    const std::string & name,
-    const std::string & description,
-    const StringSet & aliases)
-    : BaseSetting<Path>(def, true, name, description, aliases)
-{
-    options->addSetting(this);
-}
-
-Path PathSetting::parse(const std::string & str) const
-{
-    return parsePath(*this, str).string();
-}
-
 bool ExperimentalFeatureSettings::isEnabled(const ExperimentalFeature & feature) const
 {
     auto & f = experimentalFeatures.get();
