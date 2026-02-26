@@ -1,0 +1,1 @@
+error: building more than one derivation output is not supported, in '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-simple-1.0.drv!out,bin'

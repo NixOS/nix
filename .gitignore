@@ -16,6 +16,10 @@ src/.wraplock
 /tests/functional/lang/*.err
 /tests/functional/lang/*.ast
 
+# /tests/functional/cli-characterisation/
+/tests/functional/cli-characterisation/*.out
+/tests/functional/cli-characterisation/*.err
+
 /outputs
 
 *~

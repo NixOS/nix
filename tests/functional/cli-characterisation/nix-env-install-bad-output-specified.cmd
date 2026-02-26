@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/bad-output-specified.nix -i bad-output-specified

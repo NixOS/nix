@@ -64,6 +64,7 @@ suites = [
       'gc-auto.sh',
       'user-envs.sh',
       'user-envs-migration.sh',
+      'cli-characterisation.sh',
       'binary-cache.sh',
       'multiple-outputs.sh',
       'nix-build.sh',

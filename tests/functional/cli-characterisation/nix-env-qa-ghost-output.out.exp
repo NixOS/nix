@@ -1,0 +1,12 @@
+{
+  "": {
+    "name": "ghost-output-1.0",
+    "outputName": "",
+    "outputs": {
+      "out": "/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-out"
+    },
+    "pname": "ghost-output",
+    "system": "unknown",
+    "version": "1.0"
+  }
+}

@@ -1,0 +1,4 @@
+error:
+       … while querying the derivation named 'no-outpath-1.0'
+
+       error: CA derivations are not yet supported

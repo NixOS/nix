@@ -1,0 +1,1 @@
+0 nix-env -f ./cli-characterisation/no-system.nix -qa --json

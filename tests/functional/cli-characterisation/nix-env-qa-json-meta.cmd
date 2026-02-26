@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/sample-package-set.nix -qa --json --meta

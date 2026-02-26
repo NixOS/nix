@@ -1,0 +1,15 @@
+{
+  "": {
+    "meta": {
+      "bad": null
+    },
+    "name": "meta-with-function-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "meta-with-function",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}
