@@ -897,6 +897,21 @@ struct ParseURLRelativeParam
 class ParseURLRelativeTestSuite : public ::testing::TestWithParam<ParseURLRelativeParam>
 {};
 
+TEST_P(ParseURLRelativeTestSuite, baseRoundTrips)
+{
+    auto & p = GetParam();
+    auto base = parseURL(p.base);
+    EXPECT_EQ(base.to_string(), p.base);
+}
+
+TEST_P(ParseURLRelativeTestSuite, relativeRoundTrips)
+{
+    auto & p = GetParam();
+    auto parsed = parsePossiblyRelativeURL(p.relative);
+    auto str = std::visit([](auto & url) { return url.to_string(); }, parsed);
+    EXPECT_EQ(str, p.relative);
+}
+
 TEST_P(ParseURLRelativeTestSuite, resolve)
 {
     auto & p = GetParam();
@@ -1176,6 +1191,94 @@ INSTANTIATE_TEST_SUITE_P(
             .description = "queryFragmentRelative",
         }),
     [](const auto & info) { return info.param.description; });
+
+/**
+ * The examples of RFC 3986, section 5.4, which all resolve against the
+ * same base, plus some with empty segments (`//`), which dot segment
+ * removal keeps (section 5.2.4) but the examples do not cover.
+ */
+TEST(ParsedURL, canonicaliseRemovesOnlyDotSegments)
+{
+    /* Like RFC 3986's dot segment removal (section 5.2.4): empty segments
+       and a trailing `/` are kept. */
+    for (auto [url, expected] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
+             {"http://a/b/./c/../d", "http://a/b/d"},
+             {"http://a/b/c/..", "http://a/b/"},
+             {"http://a/b/c/.", "http://a/b/c/"},
+             {"http://a/../../g", "http://a/g"},
+             {"http://a/b//c/./d/", "http://a/b//c/d/"},
+             {"http://a/b//../c", "http://a/b/c"},
+             {"http://a/b/", "http://a/b/"},
+         })
+        EXPECT_EQ(parseURL(url).canonicalise().to_string(), expected) << url;
+}
+
+TEST(parseURLRelative, rfc3986Examples)
+{
+    auto base = parseURL("http://a/b/c/d;p?q");
+    /* The commented-out examples test things other than resolution that
+       Nix does differently anyway: queries without `=` (`?y`, and the
+       base's `?q`), which Nix drops; `;` in paths (`;x`, and the base's
+       `d;p`), which Nix percent-encodes; and `/` in fragments (`g#s/./x`),
+       likewise. */
+    for (auto [relative, expected] : std::initializer_list<std::pair<std::string_view, std::string_view>>{
+             /* 5.4.1. Normal Examples */
+             {"g:h", "g:h"},
+             {"g", "http://a/b/c/g"},
+             {"./g", "http://a/b/c/g"},
+             {"g/", "http://a/b/c/g/"},
+             {"/g", "http://a/g"},
+             {"//g", "http://g"},
+             // {"?y", "http://a/b/c/d;p?y"},
+             // {"g?y", "http://a/b/c/g?y"},
+             // {"#s", "http://a/b/c/d;p?q#s"},
+             {"g#s", "http://a/b/c/g#s"},
+             // {"g?y#s", "http://a/b/c/g?y#s"},
+             // {";x", "http://a/b/c/;x"},
+             // {"g;x", "http://a/b/c/g;x"},
+             // {"g;x?y#s", "http://a/b/c/g;x?y#s"},
+             // {"", "http://a/b/c/d;p?q"},
+             {".", "http://a/b/c/"},
+             {"./", "http://a/b/c/"},
+             {"..", "http://a/b/"},
+             {"../", "http://a/b/"},
+             {"../g", "http://a/b/g"},
+             {"../..", "http://a/"},
+             {"../../", "http://a/"},
+             {"../../g", "http://a/g"},
+             /* 5.4.2. Abnormal Examples */
+             {"../../../g", "http://a/g"},
+             {"../../../../g", "http://a/g"},
+             {"/./g", "http://a/g"},
+             {"/../g", "http://a/g"},
+             {"g.", "http://a/b/c/g."},
+             {".g", "http://a/b/c/.g"},
+             {"g..", "http://a/b/c/g.."},
+             {"..g", "http://a/b/c/..g"},
+             {"./../g", "http://a/b/g"},
+             {"./g/.", "http://a/b/c/g/"},
+             {"g/./h", "http://a/b/c/g/h"},
+             {"g/../h", "http://a/b/c/h"},
+             // {"g;x=1/./y", "http://a/b/c/g;x=1/y"},
+             {"g;x=1/../y", "http://a/b/c/y"},
+             // {"g?y/./x", "http://a/b/c/g?y/./x"},
+             // {"g?y/../x", "http://a/b/c/g?y/../x"},
+             // {"g#s/./x", "http://a/b/c/g#s/./x"},
+             // {"g#s/../x", "http://a/b/c/g#s/../x"},
+             {"http:g", "http:g"},
+             /* Empty segments are kept, unlike by `CanonPath`. */
+             {"g//h", "http://a/b/c/g//h"},
+             {"g//h/../i", "http://a/b/c/g//i"},
+             {"g//../i", "http://a/b/c/g/i"},
+             {"g//.", "http://a/b/c/g//"},
+             /* A network-path reference has its own path. */
+             {"//g/x/../y", "http://g/y"},
+         })
+        EXPECT_EQ(parseURLRelative(relative, base).to_string(), expected) << relative;
+
+    /* A network-path reference keeps its authority as a relative URL too. */
+    EXPECT_EQ(ParsedRelativeUrl::parse("//g/x").to_string(), "//g/x");
+}
 
 /* ----------------------------------------------------------------------------
  * decodeQuery
