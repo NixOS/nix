@@ -192,8 +192,7 @@ static void update(const StringSet & channelNames)
     if (lstat(nixDefExpr.c_str(), &st) == 0) {
         if (S_ISLNK(st.st_mode))
             // old-skool ~/.nix-defexpr
-            if (unlink(nixDefExpr.c_str()) == -1)
-                throw SysError("unlinking %1%", PathFmt(nixDefExpr));
+            unlink(nixDefExpr);
     } else if (errno != ENOENT) {
         throw SysError("getting status of %1%", PathFmt(nixDefExpr));
     }
