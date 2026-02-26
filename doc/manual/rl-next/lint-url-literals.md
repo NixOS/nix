@@ -1,7 +1,7 @@
 ---
-synopsis: "New diagnostics infrastructure, with `lint-url-literals` and `lint-short-path-literals` settings"
+synopsis: "New diagnostics infrastructure, with `lint-url-literals`, `lint-short-path-literals`, and `lint-absolute-path-literals` settings"
 prs: [15326]
-issues: [10048, 10281]
+issues: [8738, 10048, 10281]
 ---
 
 A new diagnostics infrastructure has been added for controlling language features that we are considering deprecating.
@@ -32,11 +32,15 @@ with:
 lint-short-path-literals = warn
 ```
 
+## [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals)
+
+A new [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals) setting has been added to control handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
+
 ## Setting values
 
-Both settings accept three values:
-- `ignore`: Allow the feature without any diagnostic (default)
+All three settings accept three values:
+- `ignore`: Allow the feature without emitting any diagnostic (default)
 - `warn`: Emit a warning when the feature is used
 - `fatal`: Treat the feature as a parse error
 
-In the future, we may change what the defaults are.
+The defaults may change in future versions.
