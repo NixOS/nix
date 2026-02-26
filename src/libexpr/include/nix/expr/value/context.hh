@@ -83,6 +83,14 @@ struct NixStringContextElem
     static NixStringContextElem
     parse(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string to_string() const;
+
+    /**
+     * Render for use in error messages and other user-facing output.
+     *
+     * Uses store paths and `DerivedPath` syntax, unlike `to_string()`
+     * which uses the internal encoding.
+     */
+    std::string display(const StoreDirConfig & store) const;
 };
 
 /**

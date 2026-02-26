@@ -2419,10 +2419,11 @@ std::string_view EvalState::forceStringNoCtx(Value & v, const PosIdx pos, std::s
 {
     auto s = forceString(v, pos, errorCtx);
     if (v.context()) {
+        auto ctxElem = NixStringContextElem::parse((*v.context()->begin())->view());
         error<EvalError>(
             "the string '%1%' is not allowed to refer to a store path (such as '%2%')",
             v.string_view(),
-            (*v.context()->begin())->view())
+            ctxElem.display(*store))
             .withTrace(pos, errorCtx)
             .debugThrow();
     }

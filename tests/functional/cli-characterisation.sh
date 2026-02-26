@@ -25,8 +25,6 @@ normalize() {
         -e "s|/nix/store/[a-z0-9]\{32\}|/nix/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|g" \
         -e "s|/test-root/store/[a-z0-9]\{32\}|/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx|g" \
         -e "s|'[a-z0-9]\{32\}-|'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-|g" \
-        -e "s|![a-z0-9]\{32\}-|!xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-|g" \
-        -e "s|=[a-z0-9]\{32\}-|=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-|g" \
         "$@"
 }
 
