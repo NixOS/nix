@@ -8,8 +8,25 @@
 
 namespace nix {
 
+static std::filesystem::path checkBinaryCachePath(const std::filesystem::path & root, const std::string & path)
+{
+    auto p = std::filesystem::path(requireCString(path));
+    if (p.empty())
+        throw Error("local binary cache path must not be empty");
+
+    if (p.is_absolute())
+        throw Error("local binary cache path '%s' must not be absolute", path);
+
+    for (const auto & segment : p) {
+        if (segment.native() == OS_STR("..") || segment.native() == OS_STR("."))
+            throw Error("local binary cache path '%s' must not contain '..' or '.' segments", path);
+    }
+
+    return root / p.relative_path();
+}
+
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
-    std::string_view scheme, PathView binaryCacheDir, const StoreReference::Params & params)
+    const std::filesystem::path & binaryCacheDir, const StoreReference::Params & params)
     : Store::Config{params}
     , BinaryCacheStoreConfig{params}
     , binaryCacheDir(binaryCacheDir)
@@ -29,7 +46,7 @@ StoreReference LocalBinaryCacheStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = "file",
-                .authority = binaryCacheDir.string(),
+                .authority = encodeUrlPath(pathToUrlPath(binaryCacheDir)),
             },
     };
 }
@@ -56,23 +73,22 @@ protected:
     void upsertFile(
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override
     {
-        assert(!std::filesystem::path(path).is_absolute());
-        auto path2 = config->binaryCacheDir / path;
+        auto path2 = checkBinaryCachePath(config->binaryCacheDir, path);
         static std::atomic<int> counter{0};
         createDirs(path2.parent_path());
         auto tmp = path2;
         tmp += fmt(".tmp.%d.%d", getpid(), ++counter);
         AutoDelete del(tmp, false);
-        writeFile(tmp, source);
+        writeFile(tmp, source); /* TODO: Don't follow symlinks? */
         std::filesystem::rename(tmp, path2);
         del.cancel();
     }
 
     void getFile(const std::string & path, Sink & sink) override
     {
-        assert(!std::filesystem::path(path).is_absolute());
         try {
-            readFile(config->binaryCacheDir / path, sink);
+            /* TODO: Don't follow symlinks? */
+            readFile(checkBinaryCachePath(config->binaryCacheDir, path), sink);
         } catch (SystemError & e) {
             if (e.is(std::errc::no_such_file_or_directory))
                 throw NoSuchBinaryCacheFile("file '%s' does not exist in binary cache", path);
@@ -113,8 +129,7 @@ void LocalBinaryCacheStore::init()
 
 bool LocalBinaryCacheStore::fileExists(const std::string & path)
 {
-    assert(!std::filesystem::path(path).is_absolute());
-    return pathExists(config->binaryCacheDir / path);
+    return pathExists(checkBinaryCachePath(config->binaryCacheDir, path));
 }
 
 StringSet LocalBinaryCacheStoreConfig::uriSchemes()

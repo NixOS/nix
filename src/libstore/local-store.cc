@@ -56,9 +56,9 @@
 
 namespace nix {
 
-LocalStoreConfig::LocalStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+LocalStoreConfig::LocalStoreConfig(const std::filesystem::path & path, const Params & params)
     : StoreConfig(params)
-    , LocalFSStoreConfig(authority, params)
+    , LocalFSStoreConfig(path, params)
 {
 }
 
@@ -468,11 +468,13 @@ StoreReference LocalStoreConfig::getReference() const
     /* Back-compatibility kludge. Tools like nix-output-monitor expect 'local'
        and can't parse 'local://'. */
     if (params.empty())
+        /* TODO: Add the rootDir here as the authority? */
         return {.variant = StoreReference::Local{}};
     return {
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
+                /* TODO: Add the rootDir here as the authority? */
             },
         .params = std::move(params),
     };

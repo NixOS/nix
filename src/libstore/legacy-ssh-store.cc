@@ -18,9 +18,9 @@
 
 namespace nix {
 
-LegacySSHStoreConfig::LegacySSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
+LegacySSHStoreConfig::LegacySSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
     : StoreConfig(params)
-    , CommonSSHStoreConfig(scheme, ParsedURL::Authority::parse(authority), params)
+    , CommonSSHStoreConfig(authority, params)
 {
 }
 

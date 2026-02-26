@@ -31,7 +31,7 @@ public:
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
+    LocalFSStoreConfig(const std::filesystem::path & path, const Params & params);
 
     Setting<std::optional<std::filesystem::path>> rootDir = makeRootDirSetting(*this, std::nullopt);
 

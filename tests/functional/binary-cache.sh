@@ -38,6 +38,10 @@ nix log --substituters "file://$cacheDir" "$outPath" | grep FOO
 nix store copy-log --from "file://$cacheDir" "$(nix-store -qd "$outPath")"^'*'
 nix log "$outPath" | grep FOO
 
+# Test that plus sign in the URL path is handled correctly.
+cacheDir2="$TEST_ROOT/binary+cache"
+nix copy --to "file://$cacheDir2" "$outPath" && [[ -d "$cacheDir2" ]]
+
 basicDownloadTests() {
     # No uploading tests bcause upload with force HTTP doesn't work.
 

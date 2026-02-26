@@ -8,14 +8,14 @@ namespace nix {
 struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
     LocalOverlayStoreConfig(const StringMap & params)
-        : LocalOverlayStoreConfig("local-overlay", "", params)
+        : LocalOverlayStoreConfig("", params)
     {
     }
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
+    LocalOverlayStoreConfig(const std::filesystem::path & path, const Params & params)
         : StoreConfig(params)
         , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
+        , LocalStoreConfig(path, params)
     {
     }
 

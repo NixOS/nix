@@ -6,8 +6,7 @@ namespace nix {
 
 TEST(LocalBinaryCacheStore, constructConfig)
 {
-    LocalBinaryCacheStoreConfig config{"local", "/foo/bar/baz", {}};
-
+    LocalBinaryCacheStoreConfig config{std::filesystem::path("/foo/bar/baz"), {}};
     EXPECT_EQ(config.binaryCacheDir, "/foo/bar/baz");
 }
 

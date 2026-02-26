@@ -9,8 +9,7 @@ namespace nix {
 TEST(SSHStore, constructConfig)
 {
     SSHStoreConfig config{
-        "ssh-ng",
-        "me@localhost:2222",
+        ParsedURL::Authority::parse("me@localhost:2222"),
         StoreConfig::Params{
             {
                 "remote-program",
@@ -35,8 +34,7 @@ TEST(SSHStore, constructConfig)
 TEST(MountedSSHStore, constructConfig)
 {
     MountedSSHStoreConfig config{
-        "mounted-ssh",
-        "localhost",
+        {.host = "localhost"},
         StoreConfig::Params{
             {
                 "remote-program",

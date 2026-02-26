@@ -14,6 +14,7 @@
  */
 
 #include "nix/store/store-api.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -65,7 +66,16 @@ struct Implementations
             .uriSchemes = TConfig::uriSchemes(),
             .experimentalFeature = TConfig::experimentalFeature(),
             .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
-                return make_ref<TConfig>(scheme, uri, params);
+                if constexpr (std::is_constructible_v<TConfig, std::filesystem::path, StoreConfig::Params>) {
+                    std::filesystem::path path = percentDecode(uri);
+                    return make_ref<TConfig>(path.empty() ? std::filesystem::path{} : canonPath(path), params);
+                } else if constexpr (std::is_constructible_v<TConfig, ParsedURL, StoreConfig::Params>) {
+                    return make_ref<TConfig>(parseURL(concatStrings(scheme, "://", uri)), params);
+                } else if constexpr (std::is_constructible_v<TConfig, ParsedURL::Authority, StoreConfig::Params>) {
+                    return make_ref<TConfig>(ParsedURL::Authority::parse(uri), params);
+                } else {
+                    return make_ref<TConfig>(scheme, uri, params);
+                }
             }),
             .getConfig = ([]() -> ref<StoreConfig> { return make_ref<TConfig>(Store::Config::Params{}); }),
         };
