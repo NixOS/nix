@@ -956,4 +956,55 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
     nix_derivation_free(drv2);
 }
 
+TEST_F(nix_api_store_test, nix_store_build_paths)
+{
+    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::settings.getWorkerSettings().substituters = {};
+
+    auto * store = open_local_store();
+
+    std::filesystem::path unitTestData = nix::getUnitTestData();
+    std::ifstream t{unitTestData / "derivation/ca/self-contained.json"};
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+
+    // Replace the hardcoded system with the current system
+    std::string jsonStr = nix::replaceStrings(buffer.str(), "x86_64-linux", nix::settings.thisSystem.get());
+
+    auto * drv = nix_derivation_from_json(ctx, store, jsonStr.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    auto * drvPath = nix_add_derivation(ctx, store, drv);
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    // Realise the derivation - capture the order outputs are returned
+    std::map<std::string, std::string> outputs;
+    std::vector<std::string> output_order;
+    auto cb = LambdaAdapter{.fun = [&](const char * path, const char * result) {
+        ASSERT_NE(path, nullptr);
+        ASSERT_NE(result, nullptr);
+        output_order.push_back(path);
+        outputs.emplace(path, result);
+    }};
+
+    std::vector<StorePath *> paths = {drvPath};
+
+    auto ret = nix_store_build_paths(
+        ctx,
+        store,
+        const_cast<const StorePath **>(paths.data()),
+        paths.size(),
+        decltype(cb)::call_void<const char *, const char *>,
+        static_cast<void *>(&cb));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(outputs.size(), 1);
+
+    nix_store_path_free(drvPath);
+    nix_derivation_free(drv);
+    nix_store_free(store);
+}
+
 } // namespace nixC
