@@ -181,7 +181,11 @@ private:
     {
         auto i = state.caches.find(uri);
         if (i == state.caches.end()) {
-            auto queryCache(state.queryCache.use()(uri)(time(0) - settings.ttlMeta));
+            /* Important: always use int64_t even on 32 bit systems. Otherwise
+               the the subtraction would promote time_t to unsigned if time_t is
+               32 bit. */
+            auto timestamp = static_cast<int64_t>(time(nullptr)) - static_cast<int64_t>(settings.ttlMeta.get());
+            auto queryCache(state.queryCache.use()(uri)(timestamp));
             if (!queryCache.next())
                 return std::nullopt;
             auto cache = Cache{
