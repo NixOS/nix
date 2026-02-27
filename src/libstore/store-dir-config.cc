@@ -1,6 +1,8 @@
 #include "nix/util/source-path.hh"
 #include "nix/util/util.hh"
 #include "nix/store/store-dir-config.hh"
+
+#include <cctype>
 #include "nix/store/derivations.hh"
 #include "nix/store/globals.hh"
 
@@ -13,6 +15,11 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     // notion of a canonical path at all. For example, it makes to
     // support remote stores whose store dir is a non-native path (e.g.
     // Windows <-> Unix ssh-ing).
+#ifdef _WIN32
+    // CanonPath prepends '/' to all paths; strip for Windows drive letters.
+    if (path.size() >= 3 && path[0] == '/' && std::isalpha(static_cast<unsigned char>(path[1])) && path[2] == ':')
+        path = path.substr(1);
+#endif
     auto p =
 #ifdef _WIN32
         std::filesystem::path(path)

@@ -23,6 +23,7 @@
 
 #include "store-config-private.hh"
 
+#include <cctype>
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
@@ -108,11 +109,25 @@ StoreConfig::StoreConfig(const Params & params, FilePathType pathType)
 
 bool StoreDirConfig::isInStore(PathView path) const
 {
+#ifdef _WIN32
+    // CanonPath (used by the evaluator) prepends '/' to all paths.
+    // Strip it for drive-letter paths so comparison with storeDir works.
+    if (path.size() >= 3 && path[0] == '/' && std::isalpha(static_cast<unsigned char>(path[1])) && path[2] == ':')
+        path = path.substr(1);
+#endif
     return isInDir(path, storeDir);
 }
 
 std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
 {
+#ifdef _WIN32
+    // CanonPath prepends '/' to all paths; strip for Windows drive letters.
+    std::string pathBuf;
+    if (path.size() >= 3 && path[0] == '/' && std::isalpha(static_cast<unsigned char>(path[1])) && path[2] == ':') {
+        pathBuf = path.substr(1);
+        path = pathBuf;
+    }
+#endif
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
     auto slash = path.find('/', storeDir.size() + 1);
