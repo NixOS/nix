@@ -27,9 +27,7 @@ TEST(fchmodatTryNoFollow, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createDirectory(CanonPath("dir"));
         sink.createSymlink(CanonPath("filelink"), "file");
@@ -39,7 +37,7 @@ TEST(fchmodatTryNoFollow, works)
     ASSERT_NO_THROW(chmod(tmpDir / "file", 0644));
     ASSERT_NO_THROW(chmod(tmpDir / "dir", 0755));
 
-    auto dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
     ASSERT_TRUE(dirFd);
 
     struct ::stat st;
@@ -47,7 +45,7 @@ TEST(fchmodatTryNoFollow, works)
     /* Check that symlinks are not followed and targets are not changed. */
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("filelink"), 0777); } catch (SysError & e) {
+        try { fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("filelink"), 0777); } catch (SysError & e) {
             if (e.errNo != EOPNOTSUPP)
                 throw;
         });
@@ -55,7 +53,7 @@ TEST(fchmodatTryNoFollow, works)
     EXPECT_EQ(st.st_mode & 0777, 0644);
 
     EXPECT_NO_THROW(
-        try { fchmodatTryNoFollow(dirFd.get(), CanonPath("dirlink"), 0777); } catch (SysError & e) {
+        try { fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("dirlink"), 0777); } catch (SysError & e) {
             if (e.errNo != EOPNOTSUPP)
                 throw;
         });
@@ -64,11 +62,11 @@ TEST(fchmodatTryNoFollow, works)
 
     /* Check fchmodatTryNoFollow works on regular files and directories. */
 
-    EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600));
+    EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("file"), 0600));
     ASSERT_EQ(stat((tmpDir / "file").c_str(), &st), 0);
     EXPECT_EQ(st.st_mode & 0777, 0600);
 
-    EXPECT_NO_THROW((fchmodatTryNoFollow(dirFd.get(), CanonPath("dir"), 0700), 0));
+    EXPECT_NO_THROW((fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("dir"), 0700), 0));
     ASSERT_EQ(stat((tmpDir / "dir").c_str(), &st), 0);
     EXPECT_EQ(st.st_mode & 0777, 0700);
 }
@@ -84,9 +82,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createSymlink(CanonPath("link"), "file");
     }
@@ -104,18 +100,18 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
             if (mount("tmpfs", "/proc", "tmpfs", 0, 0) == -1)
                 _exit(1);
 
-            auto dirFd = openDirectory(tmpDir);
+            auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
             if (!dirFd)
                 exit(1);
 
             try {
-                fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600);
+                fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("file"), 0600);
             } catch (SysError & e) {
                 _exit(1);
             }
 
             try {
-                fchmodatTryNoFollow(dirFd.get(), CanonPath("link"), 0777);
+                fchmodatTryNoFollow(dirFd.get(), std::filesystem::path("link"), 0777);
             } catch (SysError & e) {
                 if (e.errNo == EOPNOTSUPP)
                     _exit(0); /* Success. */

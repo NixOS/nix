@@ -279,8 +279,7 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
 
 void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
 {
-    RestoreSink sink{startFsync};
-    sink.dstPath = path;
+    RestoreSink sink{DescriptorDestination::open(path, FinalSymlink::Follow), startFsync};
     parseDump(sink, source);
 }
 

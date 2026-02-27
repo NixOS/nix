@@ -1,4 +1,5 @@
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
@@ -11,6 +12,14 @@
 #include "util-unix-config-private.hh"
 
 namespace nix {
+
+AutoCloseFD dupDescriptor(Descriptor fd)
+{
+    int newFd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+    if (newFd == -1)
+        throw SysError("duplicating file descriptor");
+    return AutoCloseFD{newFd};
+}
 
 std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
