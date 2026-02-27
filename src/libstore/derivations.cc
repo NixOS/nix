@@ -541,9 +541,15 @@ static void printString(std::string & res, std::string_view s)
 
 static void printUnquotedString(std::string & res, std::string_view s)
 {
+#ifdef _WIN32
+    // TODO: This should be done on all platforms, since Windows derivation
+    // files can be encountered by Unix Nix (e.g. in binary caches).
+    printString(res, s);
+#else
     res += '"';
     res.append(s);
     res += '"';
+#endif
 }
 
 template<class ForwardIterator>
