@@ -123,9 +123,6 @@ protected:
 // Regression test for https://github.com/NixOS/nix/issues/13215
 TEST_F(GitTest, submodulePeriodSupport)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "file:// URLs with Windows paths not supported yet";
-#endif
     auto storePath = tmpDir / "store";
     auto repoPath = tmpDir / "repo";
     auto submodulePath = tmpDir / "submodule";
