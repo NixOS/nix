@@ -20,7 +20,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext({
     .doc = R"(
         Discard the [string context](@docroot@/language/string-context.md) from a value that can be coerced to a string.
     )",
-    .fun = prim_unsafeDiscardStringContext,
+    .impl = prim_unsafeDiscardStringContext,
 });
 
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -51,7 +51,7 @@ static RegisterPrimOp primop_hasContext(
       > else { ${name} = meta; }
       > ```
     )",
-     .fun = prim_hasContext});
+     .impl = prim_hasContext});
 
 static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
@@ -92,7 +92,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency(
 
       [`builtins.addDrvOutputDependencies`]: #builtins-addDrvOutputDependencies
     )",
-     .fun = prim_unsafeDiscardOutputDependency});
+     .impl = prim_unsafeDiscardOutputDependency});
 
 static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
@@ -157,7 +157,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
 
       This is the opposite of [`builtins.unsafeDiscardOutputDependency`](#builtins-unsafeDiscardOutputDependency).
     )",
-     .fun = prim_addDrvOutputDependencies});
+     .impl = prim_addDrvOutputDependencies});
 
 /* Extract the context of a string as a structured Nix value.
 
@@ -249,7 +249,7 @@ static RegisterPrimOp primop_getContext(
       { "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = { outputs = [ "out" ]; }; }
       ```
     )",
-     .fun = prim_getContext});
+     .impl = prim_getContext});
 
 /* Append the given context to a given string.
 
@@ -324,6 +324,6 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
     v.mkString(orig, context, state.mem);
 }
 
-static RegisterPrimOp primop_appendContext({.name = "__appendContext", .arity = 2, .fun = prim_appendContext});
+static RegisterPrimOp primop_appendContext({.name = "__appendContext", .arity = 2, .impl = prim_appendContext});
 
 } // namespace nix

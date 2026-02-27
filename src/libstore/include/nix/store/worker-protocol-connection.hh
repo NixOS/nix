@@ -119,10 +119,7 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
     BuildResult getBuildDerivationResponse(const StoreDirConfig & store, bool * daemonException);
 
     void narFromPath(
-        const StoreDirConfig & store,
-        bool * daemonException,
-        const StorePath & path,
-        std::function<void(Source &)> fun);
+        const StoreDirConfig & store, bool * daemonException, const StorePath & path, fun<void(Source &)> receiveNar);
 };
 
 struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection

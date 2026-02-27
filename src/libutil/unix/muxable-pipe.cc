@@ -17,8 +17,8 @@ void MuxablePipePollState::poll(std::optional<unsigned int> timeout)
 
 void MuxablePipePollState::iterate(
     std::set<MuxablePipePollState::CommChannel> & channels,
-    std::function<void(Descriptor fd, std::string_view data)> handleRead,
-    std::function<void(Descriptor fd)> handleEOF)
+    fun<void(Descriptor fd, std::string_view data)> handleRead,
+    fun<void(Descriptor fd)> handleEOF)
 {
     std::set<Descriptor> fds2(channels);
     std::vector<unsigned char> buffer(4096);

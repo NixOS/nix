@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "nix/util/compression-algo.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
@@ -441,8 +442,8 @@ struct LengthSource : Source
  */
 struct LambdaSink : Sink
 {
-    typedef std::function<void(std::string_view data)> data_t;
-    typedef std::function<void()> cleanup_t;
+    typedef fun<void(std::string_view data)> data_t;
+    typedef fun<void()> cleanup_t;
 
     data_t dataFun;
     cleanup_t cleanupFun;
@@ -475,7 +476,7 @@ struct LambdaSink : Sink
  */
 struct LambdaSource : Source
 {
-    typedef std::function<size_t(char *, size_t)> lambda_t;
+    typedef fun<size_t(char *, size_t)> lambda_t;
 
     lambda_t lambda;
 
@@ -508,14 +509,14 @@ struct ChainSource : Source
     size_t read(char * data, size_t len) override;
 };
 
-std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun);
+std::unique_ptr<FinishSink> sourceToSink(fun<void(Source &)> reader);
 
 /**
  * Convert a function that feeds data into a Sink into a Source. The
  * Source executes the function as a coroutine.
  */
-std::unique_ptr<Source> sinkToSource(
-    std::function<void(Sink &)> fun, std::function<void()> eof = []() { throw EndOfFile("coroutine has finished"); });
+std::unique_ptr<Source>
+sinkToSource(fun<void(Sink &)> writer, fun<void()> eof = []() { throw EndOfFile("coroutine has finished"); });
 
 void writePadding(size_t len, Sink & sink);
 void writeString(std::string_view s, Sink & sink);
@@ -689,9 +690,9 @@ struct FramedSource : Source
 struct FramedSink : nix::BufferedSink
 {
     BufferedSink & to;
-    std::function<void()> checkError;
+    fun<void()> checkError;
 
-    FramedSink(BufferedSink & to, std::function<void()> && checkError)
+    FramedSink(BufferedSink & to, fun<void()> && checkError)
         : to(to)
         , checkError(checkError)
     {

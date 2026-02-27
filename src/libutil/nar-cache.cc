@@ -15,7 +15,7 @@ NarCache::NarCache(std::optional<std::filesystem::path> cacheDir_)
         createDirs(*cacheDir);
 }
 
-ref<SourceAccessor> NarCache::getOrInsert(const Hash & narHash, std::function<void(Sink &)> populate)
+ref<SourceAccessor> NarCache::getOrInsert(const Hash & narHash, fun<void(Sink &)> populate)
 {
     // Check in-memory cache first
     if (auto * accessor = get(nars, narHash))

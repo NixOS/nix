@@ -470,7 +470,7 @@ void unreachable(std::source_location loc)
     panic(std::string_view(buf, std::min(static_cast<int>(sizeof(buf)), n)));
 }
 
-int handleExceptions(const std::string & programName, std::function<void()> fun)
+int handleExceptions(const std::string & programName, fun<void()> body)
 {
     ReceiveInterrupts receiveInterrupts; // FIXME: need better place for this
 
@@ -478,7 +478,7 @@ int handleExceptions(const std::string & programName, std::function<void()> fun)
 
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
-        fun();
+        body();
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {

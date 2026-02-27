@@ -38,7 +38,7 @@ struct AbstractNixRepl
     static std::unique_ptr<AbstractNixRepl> create(
         const LookupPath & lookupPath,
         ref<EvalState> state,
-        std::function<AnnotatedValues()> getValues,
+        fun<AnnotatedValues()> getValues,
         RunNix * runNix = nullptr);
 
     static ReplExitStatus runSimple(ref<EvalState> evalState, const ValMap & extraEnv);

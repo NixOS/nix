@@ -63,7 +63,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     std::list<std::filesystem::path> loadedFiles;
     // Arguments passed to :load-flake, saved so they can be reloaded with :reload
     Strings loadedFlakes;
-    std::function<AnnotatedValues()> getValues;
+    fun<AnnotatedValues()> getValues;
 
     const static int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
@@ -78,11 +78,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     std::unique_ptr<ReplInteracter> interacter;
 
-    NixRepl(
-        const LookupPath & lookupPath,
-        ref<EvalState> state,
-        std::function<AnnotatedValues()> getValues,
-        RunNix * runNix);
+    NixRepl(const LookupPath & lookupPath, ref<EvalState> state, fun<AnnotatedValues()> getValues, RunNix * runNix);
     virtual ~NixRepl() = default;
 
     ReplExitStatus mainLoop() override;
@@ -134,10 +130,7 @@ std::string removeWhitespace(std::string s)
 }
 
 NixRepl::NixRepl(
-    const LookupPath & lookupPath,
-    ref<EvalState> state,
-    std::function<NixRepl::AnnotatedValues()> getValues,
-    RunNix * runNix)
+    const LookupPath & lookupPath, ref<EvalState> state, fun<NixRepl::AnnotatedValues()> getValues, RunNix * runNix)
     : AbstractNixRepl(state)
     , debugTraceIndex(0)
     , getValues(getValues)
@@ -906,7 +899,7 @@ void NixRepl::runNix(const std::string & program, OsStrings args, const std::opt
 }
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
-    const LookupPath & lookupPath, ref<EvalState> state, std::function<AnnotatedValues()> getValues, RunNix * runNix)
+    const LookupPath & lookupPath, ref<EvalState> state, fun<AnnotatedValues()> getValues, RunNix * runNix)
 {
     return std::make_unique<NixRepl>(lookupPath, state, getValues, runNix);
 }

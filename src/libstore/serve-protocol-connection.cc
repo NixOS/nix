@@ -85,18 +85,18 @@ BuildResult ServeProto::BasicClientConnection::getBuildDerivationResponse(const 
 }
 
 void ServeProto::BasicClientConnection::narFromPath(
-    const StoreDirConfig & store, const StorePath & path, std::function<void(Source &)> fun)
+    const StoreDirConfig & store, const StorePath & path, fun<void(Source &)> receiveNar)
 {
     to << ServeProto::Command::DumpStorePath << store.printStorePath(path);
     to.flush();
 
-    fun(from);
+    receiveNar(from);
 }
 
-void ServeProto::BasicClientConnection::importPaths(const StoreDirConfig & store, std::function<void(Sink &)> fun)
+void ServeProto::BasicClientConnection::importPaths(const StoreDirConfig & store, fun<void(Sink &)> sendPaths)
 {
     to << ServeProto::Command::ImportPaths;
-    fun(to);
+    sendPaths(to);
     to.flush();
 
     if (readInt(from) != 1)

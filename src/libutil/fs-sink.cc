@@ -160,7 +160,7 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
     void preallocateContents(uint64_t size) override;
 };
 
-void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     auto p = append(dstPath, path);
 
@@ -234,7 +234,7 @@ void RestoreSink::createSymlink(const CanonPath & path, const std::string & targ
     nix::createSymlink(target, p.string());
 }
 
-void RegularFileSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+void RegularFileSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     struct CRF : CreateRegularFileSink
     {
@@ -256,8 +256,7 @@ void RegularFileSink::createRegularFile(const CanonPath & path, std::function<vo
     func(crf);
 }
 
-void NullFileSystemObjectSink::createRegularFile(
-    const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     struct : CreateRegularFileSink
     {

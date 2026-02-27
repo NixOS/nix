@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/logging.hh"
@@ -100,7 +101,7 @@ struct ProcessOptions
 };
 
 #ifndef _WIN32
-pid_t startProcess(std::function<void()> fun, const ProcessOptions & options = ProcessOptions());
+pid_t startProcess(fun<void()> processMain, const ProcessOptions & options = ProcessOptions());
 #endif
 
 /**

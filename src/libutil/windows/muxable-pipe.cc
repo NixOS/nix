@@ -24,8 +24,8 @@ void MuxablePipePollState::poll(HANDLE ioport, std::optional<unsigned int> timeo
 
 void MuxablePipePollState::iterate(
     std::set<MuxablePipePollState::CommChannel> & channels,
-    std::function<void(Descriptor fd, std::string_view data)> handleRead,
-    std::function<void(Descriptor fd)> handleEOF)
+    fun<void(Descriptor fd, std::string_view data)> handleRead,
+    fun<void(Descriptor fd)> handleEOF)
 {
     auto p = channels.begin();
     while (p != channels.end()) {

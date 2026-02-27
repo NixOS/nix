@@ -194,7 +194,7 @@ struct DerivationBuilder : RestrictionContext
  * @see man PR_SET_PDEATHSIG
  * @see https://github.com/golang/go/issues/9686
  */
-void preserveDeathSignal(std::function<void()> fn);
+void preserveDeathSignal(fun<void()> setCredentials);
 
 struct ExternalBuilder
 {

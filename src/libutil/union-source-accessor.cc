@@ -12,7 +12,7 @@ struct UnionSourceAccessor : SourceAccessor
         displayPrefix.clear();
     }
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);

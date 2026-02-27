@@ -41,7 +41,7 @@ public:
 
     DirEntries readDirectory(const CanonPath & path) override;
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override;
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
 
     using SourceAccessor::readFile;
 

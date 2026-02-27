@@ -59,7 +59,7 @@ void scanForReferencesDeep(
     SourceAccessor & accessor,
     const CanonPath & rootPath,
     const StorePathSet & refs,
-    std::function<void(FileRefScanResult)> callback);
+    fun<void(FileRefScanResult)> callback);
 
 /**
  * Scan a store path tree and return which references appear in which files.

@@ -9,7 +9,7 @@ struct NarAccessorImpl : NarAccessor
 {
     NarListing root;
 
-    GetNarBytes getNarBytes;
+    std::function<void(uint64_t, uint64_t, Sink &)> getNarBytes;
 
     const NarListing & getListing() const override
     {
@@ -114,7 +114,7 @@ struct NarAccessorImpl : NarAccessor
         return res;
     }
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         auto & i = get(path);
         auto * reg = std::get_if<NarListing::Regular>(&i.raw);

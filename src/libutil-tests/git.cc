@@ -237,8 +237,7 @@ TEST_F(GitTest, both_roundrip)
     for (const auto hashAlgo : {HashAlgorithm::SHA1, HashAlgorithm::SHA256}) {
         std::map<Hash, std::string> cas;
 
-        std::function<DumpHook> dumpHook;
-        dumpHook = [&](const SourcePath & path) {
+        fun<DumpHook> dumpHook = [&](const SourcePath & path) {
             StringSink s;
             HashSink hashSink{hashAlgo};
             TeeSink s2{s, hashSink};
@@ -251,7 +250,7 @@ TEST_F(GitTest, both_roundrip)
             };
         };
 
-        auto root = dumpHook({files});
+        auto root = dumpHook(SourcePath{files});
 
         auto files2 = make_ref<MemorySourceAccessor>();
 

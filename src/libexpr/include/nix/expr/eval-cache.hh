@@ -36,7 +36,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
-    typedef std::function<Value *()> RootLoader;
+    typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
     RootValue value;
 

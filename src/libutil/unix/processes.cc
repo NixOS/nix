@@ -180,7 +180,7 @@ void killUser(uid_t uid)
 
 //////////////////////////////////////////////////////////////////////
 
-using ChildWrapperFunction = std::function<void()>;
+using ChildWrapperFunction = fun<void()>;
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
@@ -208,7 +208,7 @@ static int childEntry(void * arg)
 }
 #endif
 
-pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
+pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 {
     auto newLogger = makeSimpleLogger();
     ChildWrapperFunction wrapper = [&] {
@@ -226,7 +226,7 @@ pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
                 throw SysError("setting death signal");
 #endif
-            fun();
+            processMain();
         } catch (std::exception & e) {
             try {
                 std::cerr << options.errorPrefix << e.what() << "\n";

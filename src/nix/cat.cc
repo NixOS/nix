@@ -88,7 +88,7 @@ struct CmdCatNar : StoreCommand, MixCat
             CanonPath neededPath = CanonPath::root;
             bool found = false;
 
-            void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> crf) override
+            void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> crf) override
             {
                 struct : CreateRegularFileSink, FdSink
                 {

@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 #include <variant>
 #include <concepts>
 
@@ -24,9 +25,8 @@ TopoSortResult<T> topoSort(std::set<T, Compare> items, F && getChildren)
     std::vector<T> sorted;
     decltype(items) visited, parents;
 
-    std::function<std::optional<Cycle<T>>(const T & path, const T * parent)> dfsVisit;
-
-    dfsVisit = [&](const T & path, const T * parent) -> std::optional<Cycle<T>> {
+    fun<std::optional<Cycle<T>>(const T & path, const T * parent)> dfsVisit =
+        [&](const T & path, const T * parent) -> std::optional<Cycle<T>> {
         if (parents.count(path)) {
             return Cycle{path, *parent};
         }

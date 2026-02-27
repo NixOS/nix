@@ -67,7 +67,7 @@ struct EvalSettings : Config
      * if `<scheme>` is a key in this map, then `<arbitrary string>` is
      * passed to the hook that is the value in this map.
      */
-    using LookupPathHooks = std::map<std::string, std::function<LookupPathHook>>;
+    using LookupPathHooks = std::map<std::string, fun<LookupPathHook>>;
 
     EvalSettings(bool & readOnlyMode, LookupPathHooks lookupPathHooks = {});
 

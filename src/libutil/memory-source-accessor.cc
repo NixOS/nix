@@ -53,7 +53,7 @@ MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, 
     return cur;
 }
 
-void MemorySourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void MemorySourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     auto * f = open(path, std::nullopt);
     if (!f)
@@ -172,7 +172,7 @@ struct CreateMemoryRegularFile : CreateRegularFileSink
     void preallocateContents(uint64_t size) override;
 };
 
-void MemorySink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+void MemorySink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {
     auto * f = dst.open(path, File{File::Regular{}});
     if (!f)

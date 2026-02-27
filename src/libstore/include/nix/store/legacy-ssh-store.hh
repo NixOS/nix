@@ -90,7 +90,7 @@ struct LegacySSHStore : public virtual Store
      *
      * This is exposed for sake of Hydra.
      */
-    void narFromPath(const StorePath & path, std::function<void(Source &)> fun);
+    void narFromPath(const StorePath & path, fun<void(Source &)> receiveNar);
 
     std::optional<StorePath> queryPathFromHashPart(const std::string & hashPart) override
     {
@@ -136,7 +136,7 @@ public:
      *
      * @todo Use C++23 `std::move_only_function`.
      */
-    std::function<BuildResult()> buildDerivationAsync(
+    fun<BuildResult()> buildDerivationAsync(
         const StorePath & drvPath, const BasicDerivation & drv, const ServeProto::BuildOptions & options);
 
     void buildPaths(

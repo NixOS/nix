@@ -68,7 +68,7 @@ void detectStackOverflow()
 #endif
 }
 
-std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler(defaultStackOverflowHandler);
+fun<void(siginfo_t * info, void * ctx)> stackOverflowHandler(defaultStackOverflowHandler);
 
 void defaultStackOverflowHandler(siginfo_t * info, void * ctx)
 {

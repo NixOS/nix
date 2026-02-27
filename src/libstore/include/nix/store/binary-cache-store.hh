@@ -161,10 +161,7 @@ private:
     void writeNarInfo(ref<NarInfo> narInfo);
 
     ref<const ValidPathInfo> addToStoreCommon(
-        Source & narSource,
-        RepairFlag repair,
-        CheckSigsFlag checkSigs,
-        std::function<ValidPathInfo(HashResult)> mkInfo);
+        Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs, fun<ValidPathInfo(HashResult)> mkInfo);
 
     /**
      * Same as `getFSAccessor`, but with a more preceise return type.

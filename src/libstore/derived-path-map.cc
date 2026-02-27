@@ -1,4 +1,5 @@
 #include "nix/store/derived-path-map.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/util.hh"
 
 namespace nix {
@@ -6,8 +7,7 @@ namespace nix {
 template<typename V>
 typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const SingleDerivedPath & k)
 {
-    std::function<ChildNode &(const SingleDerivedPath &)> initIter;
-    initIter = [&](const auto & k) -> auto & {
+    fun<ChildNode &(const SingleDerivedPath &)> initIter = [&](const auto & k) -> auto & {
         return std::visit(
             overloaded{
                 [&](const SingleDerivedPath::Opaque & bo) -> auto & {
@@ -27,8 +27,7 @@ typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const Sing
 template<typename V>
 typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const SingleDerivedPath & k)
 {
-    std::function<ChildNode *(const SingleDerivedPath &)> initIter;
-    initIter = [&](const auto & k) {
+    fun<ChildNode *(const SingleDerivedPath &)> initIter = [&](const auto & k) {
         return std::visit(
             overloaded{
                 [&](const SingleDerivedPath::Opaque & bo) {

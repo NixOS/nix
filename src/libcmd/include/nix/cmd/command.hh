@@ -300,11 +300,11 @@ struct StorePathCommand : public StorePathsCommand
  */
 struct RegisterCommand
 {
-    typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
+    typedef std::map<std::vector<std::string>, fun<ref<Command>()>> Commands;
 
     static Commands & commands();
 
-    RegisterCommand(std::vector<std::string> && name, std::function<ref<Command>()> command)
+    RegisterCommand(std::vector<std::string> && name, fun<ref<Command>()> command)
     {
         commands().emplace(name, command);
     }

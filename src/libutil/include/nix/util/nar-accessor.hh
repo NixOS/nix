@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/fun.hh"
 #include "nix/util/nar-listing.hh"
 
 #include <functional>
@@ -40,7 +41,7 @@ ref<NarAccessor> makeNarAccessor(NarListing listing);
  * readFile() method of the accessor to get the contents of files
  * inside the NAR.
  */
-using GetNarBytes = std::function<void(uint64_t, uint64_t, Sink &)>;
+using GetNarBytes = fun<void(uint64_t, uint64_t, Sink &)>;
 
 /**
  * The canonical GetNarBytes function for a seekable Source.

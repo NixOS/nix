@@ -1458,7 +1458,7 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
 
 void LocalStore::verifyPath(
     const StorePath & path,
-    std::function<bool(const StorePath &)> existsInStoreDir,
+    fun<bool(const StorePath &)> existsInStoreDir,
     StorePathSet & done,
     StorePathSet & validPaths,
     RepairFlag repair,

@@ -841,7 +841,7 @@ std::shared_ptr<SourceAccessor> RemoteStore::getFSAccessor(const StorePath & pat
     return getRemoteFSAccessor(requireValidPath)->accessObject(path);
 }
 
-void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sink)> fun)
+void RemoteStore::ConnectionHandle::withFramedSink(fun<void(Sink & sink)> sendData)
 {
     (*this)->to.flush();
 
@@ -851,7 +851,7 @@ void RemoteStore::ConnectionHandle::withFramedSink(std::function<void(Sink & sin
                from the daemon. */
             processStderr(nullptr, nullptr, false, false);
         });
-        fun(sink);
+        sendData(sink);
         sink.flush();
     }
 
