@@ -115,7 +115,7 @@ SQLite::SQLite(const std::filesystem::path & path, Settings && settings)
 SQLite::~SQLite()
 {
     try {
-        if (db && sqlite3_close(db) != SQLITE_OK)
+        if (db && sqlite3_close_v2(db) != SQLITE_OK)
             SQLiteError::throw_(db, "closing database");
     } catch (...) {
         ignoreExceptionInDestructor();
