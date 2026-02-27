@@ -34,7 +34,9 @@
   Experimental feature `no-url-literals` has been stabilised and is now controlled by the `lint-url-literals` option.
   New diagnostics infrastructure has been added for linting discouraged language features.
 
-  ### [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals)
+  ### New lint infrastructure
+
+  #### [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals)
 
   The `no-url-literals` experimental feature has been stabilised and replaced with a new [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals) setting.
 
@@ -47,7 +49,7 @@
   lint-url-literals = fatal
   ```
 
-  ### [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals)
+  #### [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals)
 
   The [`warn-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-warn-short-path-literals) boolean setting has been deprecated and replaced with [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals).
 
@@ -60,11 +62,11 @@
   lint-short-path-literals = warn
   ```
 
-  ### [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals)
+  #### [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals)
 
   A new [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals) setting has been added to control handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
 
-  ### Setting values
+  #### Setting values
 
   All three settings accept three values:
   - `ignore`: Allow the feature without emitting any diagnostic (default)
