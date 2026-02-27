@@ -425,7 +425,7 @@ path_start
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
-        Path path(canonPath(literal));
+        auto path = canonPath(literal).string();
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
@@ -442,7 +442,7 @@ path_start
         });
 
         auto basePath = std::filesystem::path(state->basePath.path.abs());
-        Path path(absPath(literal, &basePath).string());
+        auto path = absPath(literal, &basePath).string();
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';

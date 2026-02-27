@@ -19,6 +19,7 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/config.hh"
 
+#include <concepts>
 #include <cstring>
 #include <list>
 #include <memory>
@@ -287,22 +288,41 @@ protected:
     /**
      * Just here to allow derived classes to use the right constructor
      * (the protected one).
+     *
+     * This one indicates the prebuilt `HintFmt` one with the explicit `errorDetails`
      */
-    struct Disambig
+    struct DisambigHintFmt
     {};
+
+    /**
+     * Just here to allow derived classes to use the right constructor
+     * (the protected one).
+     *
+     * This one indicates the varargs one to build the `HintFmt` with the explicit `errorDetails`
+     */
+    struct DisambigVarArgs
+    {};
+
+    /**
+     * Protected constructor that takes a pre-built HintFmt.
+     * Use this when the error message needs to be constructed before
+     * capturing errno/GetLastError().
+     */
+    SystemError(DisambigHintFmt, std::error_code errorCode, std::string_view errorDetails, const HintFmt & hf)
+        : CloneableError(HintFmt{"%s: %s", Uncolored(hf.str()), errorDetails})
+        , errorCode(errorCode)
+        , errorDetails(errorDetails)
+    {
+    }
 
     /**
      * Protected constructor for subclasses that provide their own error message.
      * The error message is appended to the formatted hint.
      */
     template<typename... Args>
-    SystemError(Disambig, std::error_code errorCode, std::string_view errorDetails, Args &&... args)
-        : CloneableError("")
-        , errorCode(errorCode)
-        , errorDetails(errorDetails)
+    SystemError(DisambigVarArgs, std::error_code errorCode, std::string_view errorDetails, Args &&... args)
+        : SystemError(DisambigHintFmt{}, errorCode, errorDetails, HintFmt{std::forward<Args>(args)...})
     {
-        auto hf = HintFmt(std::forward<Args>(args)...);
-        err.msg = HintFmt("%s: %s", Uncolored(hf.str()), errorDetails);
     }
 
 public:
@@ -310,9 +330,18 @@ public:
      * Construct with an error code. The error code's message is automatically
      * appended to the error message.
      */
+    SystemError(std::error_code errorCode, const HintFmt & hf)
+        : SystemError(DisambigHintFmt{}, errorCode, errorCode.message(), hf)
+    {
+    }
+
+    /**
+     * Construct with an error code. The error code's message is automatically
+     * appended to the error message.
+     */
     template<typename... Args>
     SystemError(std::error_code errorCode, Args &&... args)
-        : SystemError(Disambig{}, errorCode, errorCode.message(), std::forward<Args>(args)...)
+        : SystemError(DisambigVarArgs{}, errorCode, errorCode.message(), std::forward<Args>(args)...)
     {
     }
 
@@ -355,10 +384,23 @@ public:
     template<typename... Args>
     SysError(int errNo, Args &&... args)
         : CloneableError(
-              Disambig{},
+              DisambigVarArgs{},
               std::make_error_code(static_cast<std::errc>(errNo)),
               strerror(errNo),
               std::forward<Args>(args)...)
+        , errNo(errNo)
+    {
+    }
+
+    /**
+     * Construct using the explicitly-provided error number. `strerror`
+     * will be used to try to add additional information to the message.
+     *
+     * Unlike above, the `HintFmt` already exists rather than being made on
+     * the spot.
+     */
+    SysError(int errNo, const HintFmt & hf)
+        : CloneableError(DisambigHintFmt{}, std::make_error_code(static_cast<std::errc>(errNo)), strerror(errNo), hf)
         , errNo(errNo)
     {
     }
@@ -372,6 +414,34 @@ public:
     template<typename... Args>
     SysError(Args &&... args)
         : SysError(errno, std::forward<Args>(args)...)
+    {
+    }
+
+    /**
+     * Construct using the ambient `errno` and a function that produces
+     * a `HintFmt`. errno is read first, then the function is called, so
+     * the function is safe to modify `errno`.
+     */
+    SysError(auto && mkHintFmt)
+        requires std::invocable<decltype(mkHintFmt)> && std::same_as<std::invoke_result_t<decltype(mkHintFmt)>, HintFmt>
+        : SysError(captureErrno(std::forward<decltype(mkHintFmt)>(mkHintFmt)))
+    {
+    }
+
+private:
+    /**
+     * Helper to ensure errno is captured before mkHintFmt is called.
+     * C++ argument evaluation order is unspecified, so we can't rely on
+     * `SysError(errno, mkHintFmt())` evaluating errno first.
+     */
+    static std::pair<int, HintFmt> captureErrno(auto && mkHintFmt)
+    {
+        int e = errno;
+        return {e, mkHintFmt()};
+    }
+
+    SysError(std::pair<int, HintFmt> && p)
+        : SysError(p.first, std::move(p.second))
     {
     }
 };
@@ -437,10 +507,25 @@ public:
     template<typename... Args>
     WinError(DWORD lastError, Args &&... args)
         : CloneableError(
-              Disambig{},
+              DisambigVarArgs{},
               std::error_code(lastError, std::system_category()),
               renderError(lastError),
               std::forward<Args>(args)...)
+        , lastError(lastError)
+    {
+    }
+
+    /**
+     * Construct using the explicitly-provided error number.
+     * `FormatMessageA` will be used to try to add additional
+     * information to the message.
+     *
+     * Unlike above, the `HintFmt` already exists rather than being made on
+     * the spot.
+     */
+    WinError(DWORD lastError, const HintFmt & hf)
+        : CloneableError(
+              DisambigHintFmt{}, std::error_code(lastError, std::system_category()), renderError(lastError), hf)
         , lastError(lastError)
     {
     }
@@ -457,7 +542,33 @@ public:
     {
     }
 
+    /**
+     * Construct using `GetLastError()` and a function that produces a
+     * `HintFmt`. `GetLastError()` is called first, then the function is
+     * called, so the function is safe to modify the last error.
+     */
+    WinError(auto && mkHintFmt)
+        requires std::invocable<decltype(mkHintFmt)> && std::same_as<std::invoke_result_t<decltype(mkHintFmt)>, HintFmt>
+        : WinError(captureLastError(std::forward<decltype(mkHintFmt)>(mkHintFmt)))
+    {
+    }
+
 private:
+    /**
+     * Helper to ensure GetLastError() is captured before mkHintFmt is called.
+     * C++ argument evaluation order is unspecified, so we can't rely on
+     * `WinError(GetLastError(), mkHintFmt())` evaluating GetLastError() first.
+     */
+    static std::pair<DWORD, HintFmt> captureLastError(auto && mkHintFmt)
+    {
+        DWORD e = GetLastError();
+        return {e, mkHintFmt()};
+    }
+
+    WinError(std::pair<DWORD, HintFmt> && p)
+        : WinError(p.first, std::move(p.second))
+    {
+    }
 
     static std::string renderError(DWORD lastError);
 };

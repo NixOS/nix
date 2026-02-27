@@ -16,8 +16,7 @@ std::chrono::microseconds getCpuUserTime()
     FILETIME userTime;
 
     if (!GetProcessTimes(GetCurrentProcess(), &creationTime, &exitTime, &kernelTime, &userTime)) {
-        auto lastError = GetLastError();
-        throw windows::WinError(lastError, "failed to get CPU time");
+        throw windows::WinError("failed to get CPU time");
     }
 
     ULARGE_INTEGER uLargeInt;
