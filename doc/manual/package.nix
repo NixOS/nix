@@ -1,5 +1,6 @@
 {
   lib,
+  stdenv,
   callPackage,
   mkMesonDerivation,
   runCommand,
@@ -93,10 +94,11 @@ mkMesonDerivation (finalAttrs: {
     mdbook
     json-schema-for-humans
   ]
-  ++ lib.optionals (!officialRelease && buildHtmlManual) [
+  ++ lib.optionals (!officialRelease && buildHtmlManual && !stdenv.hostPlatform.isi686) [
     # When not an official release, we likely have changelog entries that have
     # yet to be rendered.
     # When released, these are rendered into a committed file to save a dependency.
+    # Broken on i686.
     changelog-d
   ];
 
