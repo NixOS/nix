@@ -48,6 +48,7 @@ headers = [ config_pub_h ] + files(
   'finally.hh',
   'fmt.hh',
   'fs-sink.hh',
+  'fun.hh',
   'git.hh',
   'hash.hh',
   'hilite.hh',

@@ -62,6 +62,7 @@ sources = files(
   'file-descriptor.cc',
   'file-system-at.cc',
   'file-system.cc',
+  'fun.cc',
   'git.cc',
   'hash.cc',
   'hilite.cc',
