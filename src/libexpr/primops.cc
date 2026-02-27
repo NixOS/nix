@@ -2628,11 +2628,11 @@ static RegisterPrimOp primop_toJSON({
 });
 
 /* Parse a JSON string to a value. */
-static void prim_fromJSON(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fromJSON(EvalState & state, const PosIdx pos, Value ** args, Value & v, bool allow_comments)
 {
     auto s = state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.fromJSON");
     try {
-        parseJSON(state, s, v);
+        parseJSON(state, s, v, allow_comments);
     } catch (JSONParseError & e) {
         e.addTrace(state.positions[pos], "while decoding a JSON string");
         throw;
@@ -2651,7 +2651,38 @@ static RegisterPrimOp primop_fromJSON({
 
       returns the value `{ x = [ 1 2 3 ]; y = null; }`.
     )",
-    .fun = prim_fromJSON,
+    .fun =
+        [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
+            return prim_fromJSON(state, pos, args, v, false);
+        },
+});
+
+static RegisterPrimOp primop_fromJSONC({
+    .name = "__fromJSONC",
+    .args = {"e"},
+    .doc = R"(
+      Convert a JSON string, potentially with comments, to a Nix value.
+      For example,
+
+      ```nix
+      builtins.fromJSONC ''
+      {
+       // This is a comment
+       "x": [1, 2, 3],
+       /* This is another comment */
+       "y": null
+      }
+      ''
+      ```
+
+      returns the value `{ x = [ 1 2 3 ]; y = null; }`.
+
+      This function supports JSON with comments.
+    )",
+    .fun =
+        [](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
+            return prim_fromJSON(state, pos, args, v, true);
+        },
 });
 
 /* Store a string in the Nix store as a source file that can be used
