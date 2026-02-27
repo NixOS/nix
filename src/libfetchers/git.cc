@@ -418,10 +418,6 @@ struct GitInputScheme : InputScheme
             url.query.insert_or_assign("ref", *ref);
         if (getShallowAttr(input))
             url.query.insert_or_assign("shallow", "1");
-        if (getLfsAttr(input))
-            url.query.insert_or_assign("lfs", "1");
-        if (getSubmodulesAttr(input))
-            url.query.insert_or_assign("submodules", "1");
         if (maybeGetBoolAttr(input.attrs, "exportIgnore").value_or(false))
             url.query.insert_or_assign("exportIgnore", "1");
         if (maybeGetBoolAttr(input.attrs, "verifyCommit").value_or(false))
@@ -432,6 +428,11 @@ struct GitInputScheme : InputScheme
             url.query.insert_or_assign("publicKey", publicKeys.at(0).key);
         } else if (publicKeys.size() > 1)
             url.query.insert_or_assign("publicKeys", publicKeys_to_string(publicKeys));
+        // These are allowed as self attrs, the explicit false is important
+        if (auto lfs = maybeGetBoolAttr(input.attrs, "lfs"))
+            url.query.insert_or_assign("lfs", *lfs ? "1" : "0");
+        if (auto submodules = maybeGetBoolAttr(input.attrs, "submodules"))
+            url.query.insert_or_assign("submodules", *submodules ? "1" : "0");
         return url;
     }
 
@@ -1082,8 +1083,14 @@ struct GitInputScheme : InputScheme
     std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
     {
         auto makeFingerprint = [&](const Hash & rev) {
-            return rev.gitRev() + (getSubmodulesAttr(input) ? ";s" : "") + (getExportIgnoreAttr(input) ? ";e" : "")
-                   + (getLfsAttr(input) ? ";l" : "");
+            std::string modifiers = "";
+            if (getExportIgnoreAttr(input))
+                modifiers += ";e";
+            if (auto lfs = maybeGetBoolAttr(input.attrs, "lfs"))
+                modifiers += *lfs ? ";l1" : ";l0";
+            if (auto submodules = maybeGetBoolAttr(input.attrs, "submodules"))
+                modifiers += *submodules ? ";s1" : ";s0";
+            return rev.gitRev() + modifiers;
         };
 
         if (auto rev = input.getRev())

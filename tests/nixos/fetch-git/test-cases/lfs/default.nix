@@ -209,6 +209,7 @@
       # memorize the revision
       self_lfs_rev = client.succeed(f"{repo.git} rev-parse HEAD").strip()
 
+      # Check that LFS is now enabled by default
       with TemporaryDirectory() as tempdir:
         client.succeed(f"mkdir -p {tempdir}")
         client.succeed(f"""
@@ -223,7 +224,24 @@
           nix eval --debug --raw {tempdir}#.outPath
         """)
 
-    client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs}/beeg >&2")
+      client.succeed(f"cmp {repo.path}/beeg {fetched_self_lfs}/beeg >&2")
+
+      # Check that we can disable LFS enabled by default
+      with TemporaryDirectory() as tempdir:
+        client.succeed(f"mkdir -p {tempdir}")
+        client.succeed(f"""
+          printf '{{
+            inputs.foo = {{
+              url = "git+{repo.remote}?ref=main&rev={self_lfs_rev}&lfs=0";
+            }};
+            outputs = {{ foo, self }}: {{ inherit (foo) outPath; }};
+          }}' >{tempdir}/flake.nix
+        """)
+        fetched_self_nolfs = client.succeed(f"""
+          nix eval --debug --raw {tempdir}#.outPath
+        """)
+
+      client.succeed(f"! cmp {fetched_self_lfs}/beeg {fetched_self_nolfs}/beeg >&2")
 
 
     with subtest("Ensure fetching with SSH generates the same output"):
