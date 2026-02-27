@@ -123,6 +123,12 @@
 
   This feature requires the [`local-overlay-store` experimental feature](@docroot@/development/experimental-features.md#xp-feature-local-overlay-store).
 
+- New command `nix-nswrapper` in `libexec` [#15183](https://github.com/NixOS/nix/pull/15183)
+
+  The new command `libexec/nix-nswrapper` is used to run the Nix daemon in an unprivileged user namespace on Linux. In order to use this command, build user UIDs and GIDs must be allocated in `/etc/subuid` and `/etc/subgid`.
+
+  It can be used to run the Nix daemon with full sandboxing without executing as root. Support has been added to Nixpkgs with the new `nix.daemonUser` and `nix.daemonGroup` settings.
+
 - New setting `ignore-gc-delete-failure` for local stores [#15054](https://github.com/NixOS/nix/pull/15054)
 
   A new local store setting [`ignore-gc-delete-failure`](@docroot@/store/types/local-store.md#store-local-store-ignore-gc-delete-failure) has been added.
