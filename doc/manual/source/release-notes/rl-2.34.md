@@ -1,5 +1,7 @@
 # Release 2.34.0 (2026-02-27)
 
+## Highlights
+
 - Rust nix-installer in beta
 
   The Rust-based rewrite of the Nix installer is now in beta.
@@ -22,61 +24,19 @@
   This installer is a modified version of the [Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer) by Determinate Systems.
   Thanks to Determinate Systems for all the investment they've put into the installer.
 
-  Source for the installer is in https://github.com/NixOS/nix-installer.
+  Source for the installer is in <https://github.com/NixOS/nix-installer>.
   Report any issues in that repo.
 
-  For CI usage, a GitHub Action to install Nix using this installer is available at https://github.com/NixOS/nix-installer-action.
+  For CI usage, a GitHub Action to install Nix using this installer is available at <https://github.com/NixOS/nix-installer-action>.
 
-- C API: New store API methods [#14766](https://github.com/NixOS/nix/pull/14766)
+- Stabilisation of `no-url-literals` experimental feature and new diagnostics infrastructure, with `lint-url-literals`, `lint-short-path-literals`, and `lint-absolute-path-literals` settings [#8738](https://github.com/NixOS/nix/issues/8738) [#10048](https://github.com/NixOS/nix/issues/10048) [#10281](https://github.com/NixOS/nix/issues/10281) [#15326](https://github.com/NixOS/nix/pull/15326)
 
-  The C API now includes additional methods:
+  Experimental feature `no-url-literals` has been stabilised and is now controlled by the `lint-url-literals` option.
+  New diagnostics infrastructure has been added for linting discouraged language features.
 
-  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
-  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
+  ### [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals)
 
-- C API: Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
-
-  Nix 2.34 by default remembers the error in the thunk that triggered it.
-
-  Previously the following sequence of events worked:
-
-  1. Have a thunk that invokes a primop that's defined through the C API
-  2. The primop returns an error
-  3. Force the thunk again
-  4. The primop returns a value
-  5. The thunk evaluated successfully
-
-  **Resolution**
-
-  C API consumers that rely on this must change their recoverable error calls:
-
-  ```diff
-  -nix_set_err_msg(context, NIX_ERR_*, msg);
-  +nix_set_err_msg(context, NIX_ERR_RECOVERABLE, msg);
-  ```
-
-- New setting `ignore-gc-delete-failure` for local stores [#15054](https://github.com/NixOS/nix/pull/15054)
-
-  A new local store setting [`ignore-gc-delete-failure`](@docroot@/store/types/local-store.md#store-local-store-ignore-gc-delete-failure) has been added.
-  When enabled, garbage collection will log warnings instead of failing when it cannot delete store paths.
-  This is useful when running Nix as an unprivileged user that may not have write access to all paths in the store.
-
-  This setting is experimental and requires the [`local-overlay-store`](@docroot@/development/experimental-features.md#xp-feature-local-overlay-store) experimental feature.
-
-- Content-Encoding decompression is now handled by libcurl [#14324](https://github.com/NixOS/nix/issues/14324) [#15336](https://github.com/NixOS/nix/pull/15336)
-
-  Transparent decompression of HTTP downloads specifying `Content-Encoding` header now uses libcurl. This adds support for previously advertised, but not supported `deflate` encoding as well as deprecated `x-gzip` alias.
-  Non-standard `xz`, `bzip2` encodings that were previously advertised are no longer supported, as they do not commonly appear in the wild and should not be sent by compliant servers.
-
-  `br`, `zstd`, `gzip` continue to be supported. Distro packaging should ensure that the `libcurl` dependency is linked against required libraries to support these encodings. By default now the build system requires libcurl >= 8.17.0 which is not known to have issues around [pausing and decompression](https://github.com/curl/curl/issues/16280).
-
-- New diagnostics infrastructure, with `lint-url-literals`, `lint-short-path-literals`, and `lint-absolute-path-literals` settings [#8738](https://github.com/NixOS/nix/issues/8738) [#10048](https://github.com/NixOS/nix/issues/10048) [#10281](https://github.com/NixOS/nix/issues/10281) [#15326](https://github.com/NixOS/nix/pull/15326)
-
-  A new diagnostics infrastructure has been added for controlling language features that we are considering deprecating.
-
-  ## [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals)
-
-  The `no-url-literals` experimental feature has been stabilized and replaced with a new [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals) setting.
+  The `no-url-literals` experimental feature has been stabilised and replaced with a new [`lint-url-literals`](@docroot@/command-ref/conf-file.md#conf-lint-url-literals) setting.
 
   To migrate from the experimental feature, replace:
   ```
@@ -87,7 +47,7 @@
   lint-url-literals = fatal
   ```
 
-  ## [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals)
+  ### [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals)
 
   The [`warn-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-warn-short-path-literals) boolean setting has been deprecated and replaced with [`lint-short-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-short-path-literals).
 
@@ -100,11 +60,11 @@
   lint-short-path-literals = warn
   ```
 
-  ## [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals)
+  ### [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals)
 
   A new [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals) setting has been added to control handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
 
-  ## Setting values
+  ### Setting values
 
   All three settings accept three values:
   - `ignore`: Allow the feature without emitting any diagnostic (default)
@@ -113,21 +73,7 @@
 
   The defaults may change in future versions.
 
-- Support HTTPS binary caches using mTLS (client certificate) authentication [#13002](https://github.com/NixOS/nix/issues/13002) [#13030](https://github.com/NixOS/nix/pull/13030)
-
-  Added support for `tls-certificate` and `tls-private-key` options in substituter URLs.
-
-  Example:
-
-  ```
-  https://substituter.invalid?tls-certificate=/path/to/cert.pem&tls-private-key=/path/to/key.pem
-  ```
-
-  When these options are configured, Nix will use this certificate/private key pair to authenticate to the server.
-
-- New setting `narinfo-cache-meta-ttl` [#15287](https://github.com/NixOS/nix/pull/15287)
-
-  The new setting `narinfo-cache-meta-ttl` controls how long binary cache metadata (i.e. `/nix-cache-info`) is cached locally, in seconds. This was previously hard-coded to 7 days, which is still the default. As a result, you can now use `nix store info --refresh` to check whether a binary cache is still valid.
+## New features
 
 - `nix repl` now supports `inherit` and multiple bindings [#15082](https://github.com/NixOS/nix/pull/15082)
 
@@ -156,6 +102,62 @@
   The garbage collector can be configured to use this daemon via the [`use-roots-daemon`](@docroot@/store/types/local-store.md#store-experimental-option-use-roots-daemon) store setting.
 
   This feature requires the [`local-overlay-store` experimental feature](@docroot@/development/experimental-features.md#xp-feature-local-overlay-store).
+
+- New setting `ignore-gc-delete-failure` for local stores [#15054](https://github.com/NixOS/nix/pull/15054)
+
+  A new local store setting [`ignore-gc-delete-failure`](@docroot@/store/types/local-store.md#store-local-store-ignore-gc-delete-failure) has been added.
+  When enabled, garbage collection will log warnings instead of failing when it cannot delete store paths.
+  This is useful when running Nix as an unprivileged user that may not have write access to all paths in the store.
+
+  This setting is experimental and requires the [`local-overlay-store`](@docroot@/development/experimental-features.md#xp-feature-local-overlay-store) experimental feature.
+
+- New setting `narinfo-cache-meta-ttl` [#15287](https://github.com/NixOS/nix/pull/15287)
+
+  The new setting `narinfo-cache-meta-ttl` controls how long binary cache metadata (i.e. `/nix-cache-info`) is cached locally, in seconds. This was previously hard-coded to 7 days, which is still the default. As a result, you can now use `nix store info --refresh` to check whether a binary cache is still valid.
+
+- Support HTTPS binary caches using mTLS (client certificate) authentication [#13002](https://github.com/NixOS/nix/issues/13002) [#13030](https://github.com/NixOS/nix/pull/13030)
+
+  Added support for `tls-certificate` and `tls-private-key` options in substituter URLs.
+
+  Example:
+
+  ```
+  https://substituter.invalid?tls-certificate=/path/to/cert.pem&tls-private-key=/path/to/key.pem
+  ```
+
+  When these options are configured, Nix will use this certificate/private key pair to authenticate to the server.
+
+## C API Changes
+
+- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766)
+
+  The C API now includes additional methods:
+
+  - `nix_store_query_path_from_hash_part()` - Get the full store path given its hash part
+  - `nix_store_copy_path()` - Copy a single store path between two stores, allows repairs and configuring signature checking
+
+- Errors returned from your primops are not treated as recoverable by default [#13930](https://github.com/NixOS/nix/pull/13930) [#15286](https://github.com/NixOS/nix/pull/15286)
+
+  Nix 2.34 by default remembers the error in the thunk that triggered it.
+
+  Previously the following sequence of events worked:
+
+  1. Have a thunk that invokes a primop that's defined through the C API
+  2. The primop returns an error
+  3. Force the thunk again
+  4. The primop returns a value
+  5. The thunk evaluated successfully
+
+  **Resolution**
+
+  C API consumers that rely on this must change their recoverable error calls:
+
+  ```diff
+  -nix_set_err_msg(context, NIX_ERR_*, msg);
+  +nix_set_err_msg(context, NIX_ERR_RECOVERABLE, msg);
+  ```
+
+## Bug fixes
 
 - S3 binary caches now use virtual-hosted-style addressing by default [#15208](https://github.com/NixOS/nix/issues/15208)
 
@@ -187,9 +189,16 @@
   idle connections from being silently dropped by intermediate network devices
   (NATs, firewalls, load balancers).
 
+## Miscellaneous changes
+
+- Content-Encoding decompression is now handled by libcurl [#14324](https://github.com/NixOS/nix/issues/14324) [#15336](https://github.com/NixOS/nix/pull/15336)
+
+  Transparent decompression of HTTP downloads specifying `Content-Encoding` header now uses libcurl. This adds support for previously advertised, but not supported `deflate` encoding as well as deprecated `x-gzip` alias.
+  Non-standard `xz`, `bzip2` encodings that were previously advertised are no longer supported, as they do not commonly appear in the wild and should not be sent by compliant servers.
+
+  `br`, `zstd`, `gzip` continue to be supported. Distro packaging should ensure that the `libcurl` dependency is linked against required libraries to support these encodings. By default, the build system now requires libcurl >= 8.17.0, which is not known to have issues around [pausing and decompression](https://github.com/curl/curl/issues/16280).
 
 ## Contributors
-
 
 This release was made possible by the following 43 contributors:
 
