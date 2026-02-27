@@ -85,18 +85,17 @@ sources = files(
   'network-proxy.cc',
   'repl-interacter.cc',
   'repl.cc',
+  'unix-socket-server.cc',
 )
-
-if host_machine.system() != 'windows'
-  sources += files(
-    'unix/unix-socket-server.cc',
-  )
-endif
 
 subdir('include/nix/cmd')
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
+
+if host_machine.system() == 'windows'
+  deps_other += cxx.find_library('ws2_32')
+endif
 
 this_library = library(
   'nixcmd',

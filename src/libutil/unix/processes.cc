@@ -180,7 +180,7 @@ void killUser(uid_t uid)
 
 //////////////////////////////////////////////////////////////////////
 
-using ChildWrapperFunction = std::function<void()>;
+using ChildWrapperFunction = std::move_only_function<void()>;
 
 /* Wrapper around vfork to prevent the child process from clobbering
    the caller's stack frame in the parent. */
@@ -208,7 +208,7 @@ static int childEntry(void * arg)
 }
 #endif
 
-pid_t startProcess(std::function<void()> fun, const ProcessOptions & options)
+pid_t startProcess(std::move_only_function<void()> fun, const ProcessOptions & options)
 {
     auto newLogger = makeSimpleLogger();
     ChildWrapperFunction wrapper = [&] {
