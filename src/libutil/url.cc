@@ -408,15 +408,18 @@ ParsedURL fixGitURL(std::string url)
         url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
     if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos) {
         auto path = splitString<std::vector<std::string>>(url, "/");
+        // Windows drive letters (e.g., "C:") look like SCP hosts but are local paths
+        bool hasDriveLetter = !path.empty() && path[0].size() == 2
+            && std::isalpha(static_cast<unsigned char>(path[0][0])) && path[0][1] == ':';
         // Reject SCP-like URLs without user (e.g., "github.com:path") - colon in first component
-        if (!path.empty() && path[0].find(':') != std::string::npos)
+        if (!path.empty() && path[0].find(':') != std::string::npos && !hasDriveLetter)
             throw BadURL("SCP-like URL '%s' is not supported; use SSH URL syntax instead (ssh://...)", url);
         // Absolute paths get an empty authority (file:///path), relative paths get none (file:path)
-        if (hasPrefix(url, "/"))
+        if (hasPrefix(url, "/") || hasDriveLetter)
             return ParsedURL{
                 .scheme = "file",
                 .authority = ParsedURL::Authority{},
-                .path = path,
+                .path = hasDriveLetter ? pathToUrlPath(std::filesystem::path(url)) : path,
             };
         else
             return ParsedURL{
