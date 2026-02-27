@@ -73,6 +73,24 @@
 
   The defaults may change in future versions.
 
+- Improved parser error messages [#15092](https://github.com/NixOS/nix/pull/15092)
+
+  Parser error messages now use legible strings for tokens instead of internal names. For example, malformed expression `a ++ ++ b` now produces the following error:
+  ```
+  error: syntax error, unexpected '++'
+       at «string»:1:6:
+            1| a ++ ++ b
+             |      ^
+  ```
+
+  Instead of:
+  ```
+  error: syntax error, unexpected CONCAT
+       at «string»:1:6:
+            1| a ++ ++ b
+             |      ^
+  ```
+
 ## New features
 
 - `nix repl` now supports `inherit` and multiple bindings [#15082](https://github.com/NixOS/nix/pull/15082)
@@ -127,6 +145,21 @@
 
   When these options are configured, Nix will use this certificate/private key pair to authenticate to the server.
 
+## Performance improvements
+
+- Unpacking tarballs to `~/.cache/nix/tarball-cache-v2` is now multithreaded [#12087](https://github.com/NixOS/nix/pull/12087)
+
+  Content-addressed cache for `builtins.fetchTarball` and tarball-based flake inputs (e.g. `github:NixOS/nixpkgs`, `https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz`) now writes git blobs (files) to the `tarball-cache-v2` repository concurrently, which significantly reduces the wall time for tarball unpacking (up to ~1.8x faster unpacking for `https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz` in our testing).
+
+  Currently, Nix doesn't perform any maintenance on the `~/.cache/nix/tarball-cache-v2` repository, which will be addressed in future versions. Users that wish to reclaim disk space used by the tarball cache may want to run:
+
+  ```
+  rm -rf ~/.cache/nix/tarball-cache # Historical tarball-cache, not used by Nix >= 2.33
+  cd ~/.cache/nix/tarball-cache-v2 && git multi-pack-index write && git multi-pack-index repack && git multi-pack-index expire
+  ```
+
+- `nix nar ls` and other NAR listing operations have been optimised further [#15163](https://github.com/NixOS/nix/pull/15163)
+
 ## C API Changes
 
 - New store API methods [#14766](https://github.com/NixOS/nix/pull/14766)
@@ -159,6 +192,10 @@
 
 ## Bug fixes
 
+- Avoid dropping ssh connections with `ssh-ng://` stores for store path copying [#14998](https://github.com/NixOS/nix/pull/14998) [#6950](https://github.com/NixOS/nix/issues/6950)
+
+  Due to a bug in how Nix handled Boost.Coroutine2 suspension and resumption, copying from `ssh-ng://` stores would drop the SSH connection for each copied path. This issue has been fixed, which improves performance by avoiding multiple SSH/Nix Worker Protocol handshakes.
+
 - S3 binary caches now use virtual-hosted-style addressing by default [#15208](https://github.com/NixOS/nix/issues/15208)
 
   S3 binary caches now use virtual-hosted-style URLs
@@ -189,6 +226,15 @@
   idle connections from being silently dropped by intermediate network devices
   (NATs, firewalls, load balancers).
 
+- `nix-prefetch-url --unpack` now properly checks for empty archives [#15242](https://github.com/NixOS/nix/pull/15242)
+
+  Prior versions failed to check for empty archives and would crash with a `nullptr` dereference when unpacking empty archives.
+  This is now fixed.
+
+- Prevent runaway processes when Nix is killed with `SIGKILL` when building in a local store with build users [#15193](https://github.com/NixOS/nix/pull/15193)
+
+  When run as root, Nix doesn't run builds via the daemon and is a parent of the forked build processes. Prior versions of Nix failed to preserve the `PR_SET_PDEATHSIG` parent-death signal across `setuid` calls. This could lead to build processes being reparented and continue running in the background. This has been fixed.
+
 ## Miscellaneous changes
 
 - Content-Encoding decompression is now handled by libcurl [#14324](https://github.com/NixOS/nix/issues/14324) [#15336](https://github.com/NixOS/nix/pull/15336)
@@ -197,6 +243,8 @@
   Non-standard `xz`, `bzip2` encodings that were previously advertised are no longer supported, as they do not commonly appear in the wild and should not be sent by compliant servers.
 
   `br`, `zstd`, `gzip` continue to be supported. Distro packaging should ensure that the `libcurl` dependency is linked against required libraries to support these encodings. By default, the build system now requires libcurl >= 8.17.0, which is not known to have issues around [pausing and decompression](https://github.com/curl/curl/issues/16280).
+
+- Static builds now support S3 features (`libstore:s3-aws-auth` meson option) [#15076](https://github.com/NixOS/nix/pull/15076)
 
 ## Contributors
 
