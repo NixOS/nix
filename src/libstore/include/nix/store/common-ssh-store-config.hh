@@ -10,7 +10,10 @@ class SSHMaster;
 
 struct CommonSSHStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    CommonSSHStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+    {
+    }
 
     CommonSSHStoreConfig(const ParsedURL::Authority & authority, const Params & params);
 

@@ -80,7 +80,11 @@ struct LocalStoreConfig : std::enable_shared_from_this<LocalStoreConfig>,
                           virtual LocalFSStoreConfig,
                           virtual LocalBuildStoreConfig
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
+    LocalStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Native)
+        , LocalFSStoreConfig(params)
+    {
+    }
 
     LocalStoreConfig(const std::filesystem::path & path, const Params & params);
 

@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include <boost/format.hpp>
+#include <chrono>
 
 namespace nix {
 
@@ -23,7 +24,7 @@ void setWriteTime(
     warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
-AutoCloseFD openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
     return AutoCloseFD{CreateFileW(
         path.c_str(),
@@ -31,7 +32,7 @@ AutoCloseFD openDirectory(const std::filesystem::path & path)
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr)};
 }
 
@@ -103,6 +104,87 @@ std::filesystem::path descriptorToPath(Descriptor handle)
         dw -= 1;
     }
     return std::filesystem::path{std::wstring{buf.data(), dw}};
+}
+
+time_t windows::fileTimeToUnixTime(const FILETIME & ft)
+{
+    ULARGE_INTEGER ull;
+    ull.LowPart = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+
+    // file_clock on Windows matches FILETIME's epoch (1601-01-01) and resolution (100ns)
+    auto file_tp = std::chrono::file_clock::time_point{std::chrono::file_clock::duration{ull.QuadPart}};
+
+    auto sys_tp = std::chrono::clock_cast<std::chrono::system_clock>(file_tp);
+    return std::chrono::system_clock::to_time_t(sys_tp);
+}
+
+void windows::statFromFileInfo(
+    PosixStat & st,
+    DWORD dwFileAttributes,
+    const FILETIME & ftCreationTime,
+    const FILETIME & ftLastAccessTime,
+    const FILETIME & ftLastWriteTime,
+    DWORD nFileSizeHigh,
+    DWORD nFileSizeLow,
+    DWORD nNumberOfLinks)
+{
+    memset(&st, 0, sizeof(st));
+
+    /* Determine file type */
+    if (dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+        st.st_mode = S_IFLNK | 0777;
+    } else if (dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+        st.st_mode = S_IFDIR | 0755;
+    } else {
+        st.st_mode = S_IFREG | 0644;
+    }
+
+    /* File size (only meaningful for regular files) */
+    st.st_size = (static_cast<int64_t>(nFileSizeHigh) << 32) | nFileSizeLow;
+
+    /* Timestamps */
+    st.st_atime = fileTimeToUnixTime(ftLastAccessTime);
+    st.st_mtime = fileTimeToUnixTime(ftLastWriteTime);
+    st.st_ctime = fileTimeToUnixTime(ftCreationTime);
+
+    st.st_nlink = nNumberOfLinks;
+    st.st_uid = 0;
+    st.st_gid = 0;
+}
+
+static PosixStat statFromFileInfo(const WIN32_FILE_ATTRIBUTE_DATA & attrData)
+{
+    PosixStat st;
+    windows::statFromFileInfo(
+        st,
+        attrData.dwFileAttributes,
+        attrData.ftCreationTime,
+        attrData.ftLastAccessTime,
+        attrData.ftLastWriteTime,
+        attrData.nFileSizeHigh,
+        attrData.nFileSizeLow);
+    return st;
+}
+
+PosixStat lstat(const std::filesystem::path & path)
+{
+    WIN32_FILE_ATTRIBUTE_DATA attrData;
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attrData))
+        throw WinError("getting status of %s", PathFmt(path));
+    return statFromFileInfo(attrData);
+}
+
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
+{
+    WIN32_FILE_ATTRIBUTE_DATA attrData;
+    if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attrData)) {
+        auto lastError = GetLastError();
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+            return std::nullopt;
+        throw WinError(lastError, "getting status of %s", PathFmt(path));
+    }
+    return statFromFileInfo(attrData);
 }
 
 } // namespace nix

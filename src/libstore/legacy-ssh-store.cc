@@ -19,7 +19,7 @@
 namespace nix {
 
 LegacySSHStoreConfig::LegacySSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Unix)
     , CommonSSHStoreConfig(authority, params)
 {
 }

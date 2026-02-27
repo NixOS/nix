@@ -5,6 +5,7 @@
 #include "nix/util/util.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/file-system-at.hh"
 #include "store-config-private.hh"
 
 #if NIX_SUPPORT_ACL

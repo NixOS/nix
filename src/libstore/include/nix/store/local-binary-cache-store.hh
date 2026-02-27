@@ -6,7 +6,11 @@ struct LocalBinaryCacheStoreConfig : std::enable_shared_from_this<LocalBinaryCac
                                      virtual Store::Config,
                                      BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    LocalBinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , BinaryCacheStoreConfig(params)
+    {
+    }
 
     /**
      * @param binaryCacheDir `file://` is a short-hand for `file:///`
