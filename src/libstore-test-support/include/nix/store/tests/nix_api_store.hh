@@ -23,11 +23,18 @@ public:
 
     ~nix_api_store_test_base() override
     {
-        if (exists(std::filesystem::path{nixDir})) {
-            for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+        std::error_code ec;
+        if (exists(std::filesystem::path{nixDir}, ec)) {
+            // Best-effort cleanup - ignore errors since we're in a destructor
+            try {
+                for (auto & path : std::filesystem::recursive_directory_iterator(
+                         nixDir, std::filesystem::directory_options::skip_permission_denied)) {
+                    std::filesystem::permissions(path, std::filesystem::perms::owner_all, ec);
+                }
+            } catch (...) {
+                // Ignore iteration errors (broken symlinks, etc.)
             }
-            std::filesystem::remove_all(nixDir);
+            std::filesystem::remove_all(nixDir, ec);
         }
     }
 
