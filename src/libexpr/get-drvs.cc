@@ -101,7 +101,7 @@ StorePath PackageInfo::queryOutPath() const
                 i->pos, *i->value, context, "while evaluating the output path of a derivation");
     }
     if (!outPath)
-        throw UnimplementedError("CA derivations are not yet supported");
+        throw Error("derivation does not have attribute 'outPath'");
     return *outPath;
 }
 

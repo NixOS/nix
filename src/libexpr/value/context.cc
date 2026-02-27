@@ -1,5 +1,6 @@
 #include "nix/util/util.hh"
 #include "nix/expr/value/context.hh"
+#include "nix/store/store-dir-config.hh"
 
 #include <optional>
 
@@ -94,6 +95,21 @@ std::string NixStringContextElem::to_string() const
         raw);
 
     return res;
+}
+
+std::string NixStringContextElem::display(const StoreDirConfig & store) const
+{
+    return std::visit(
+        overloaded{
+            [&](const NixStringContextElem::Opaque & o) -> std::string {
+                return SingleDerivedPath{o}.to_string(store);
+            },
+            [&](const NixStringContextElem::DrvDeep & d) -> std::string {
+                return store.printStorePath(d.drvPath) + " (deep)";
+            },
+            [&](const NixStringContextElem::Built & b) -> std::string { return SingleDerivedPath{b}.to_string(store); },
+        },
+        raw);
 }
 
 } // namespace nix

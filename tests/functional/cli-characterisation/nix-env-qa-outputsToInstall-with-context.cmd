@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/outputsToInstall-with-context.nix -i outputsToInstall-with-context

@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/name-with-context.nix -qa --json

@@ -1,0 +1,6 @@
+error:
+       … while querying the derivation named 'outputName-with-context-1.0'
+
+       … while evaluating the output name of a derivation
+
+       error: the string '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-normal-1.0' is not allowed to refer to a store path (such as '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-normal-1.0.drv^out')

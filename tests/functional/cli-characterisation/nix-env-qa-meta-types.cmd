@@ -1,0 +1,1 @@
+0 nix-env -f ./cli-characterisation/meta-types.nix -qa --json --meta
