@@ -95,7 +95,7 @@ struct PathInputScheme : InputScheme
         query.erase("__final");
         return ParsedURL{
             .scheme = "path",
-            .path = splitString<std::vector<std::string>>(getStrAttr(input.attrs, "path"), "/"),
+            .path = pathToUrlPath(std::filesystem::path{getStrAttr(input.attrs, "path")}),
             .query = query,
         };
     }
