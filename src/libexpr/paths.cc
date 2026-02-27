@@ -12,12 +12,12 @@ SourcePath EvalState::rootPath(CanonPath path)
 
 SourcePath EvalState::rootPath(PathView path)
 {
-    return {rootFS, CanonPath(absPath(path).string())};
+    return {rootFS, CanonPath(absPath(path).generic_string())};
 }
 
 SourcePath EvalState::storePath(const StorePath & path)
 {
-    return {rootFS, CanonPath{store->printStorePath(path)}};
+    return {rootFS, CanonPath{std::filesystem::path(store->printStorePath(path)).generic_string()}};
 }
 
 StorePath
@@ -27,7 +27,7 @@ EvalState::mountInput(fetchers::Input & input, const fetchers::Input & originalI
 
     allowPath(storePath); // FIXME: should just whitelist the entire virtual store
 
-    storeFS->mount(CanonPath(store->printStorePath(storePath)), accessor);
+    storeFS->mount(CanonPath(std::filesystem::path(store->printStorePath(storePath)).generic_string()), accessor);
 
     input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
 
