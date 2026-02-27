@@ -49,4 +49,12 @@ class ImpureDerivationTest : public DerivationTest
     }
 };
 
+class DerivationMetaTest : public DerivationTest
+{
+    void SetUp() override
+    {
+        mockXpSettings.set("experimental-features", "derivation-meta");
+    }
+};
+
 } // namespace nix

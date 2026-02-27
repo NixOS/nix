@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::DerivationMeta);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -278,6 +278,27 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Enables support for BLAKE3 hashes.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
+    },
+    {
+        .tag = Xp::DerivationMeta,
+        .name = "derivation-meta",
+        .description = R"(
+            Allow derivations to include metadata via the [`__meta`](@docroot@/language/advanced-attributes.md#adv-attr-meta) attribute
+            without affecting the derivation hash or rebuild requirements.
+
+            When this feature is enabled and [structured attributes](@docroot@/language/advanced-attributes.md#adv-attr-structuredAttrs) are used,
+            metadata can be added to derivations for tooling purposes. The
+            metadata is excluded from hash computation via the [hash modulo](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv)
+            mechanism, ensuring that changes to metadata do not trigger
+            rebuilds or affect binary cache compatibility.
+
+            This requires the `derivation-meta` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features). When the
+            experimental feature is enabled, `derivation-meta` is automatically
+            added to the local system features. For remote builders, add
+            `derivation-meta` to the `builders` configuration entries, but
+            NOT to `system-features` directly.
+        )",
+        .trackingUrl = "",
     },
 }};
 

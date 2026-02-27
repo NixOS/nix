@@ -16,6 +16,10 @@ Concretely, this would cause a "mass rebuild" whenever any fetching detail chang
 To solve this problem, we compute output hashes differently, so that certain output hashes become identical.
 We call this concept quotient hashing, in reference to quotient types or sets.
 
+Similarly, the [derivation-meta][xp-feature-derivation-meta] experimental feature uses quotient hashing to allow metadata changes without affecting output paths.
+When a derivation requires the `derivation-meta` [system feature](@docroot@/command-ref/conf-file.md#conf-system-features) and uses [structured attributes](@docroot@/store/derivation/index.md#structured-attrs), both the [`__meta`](@docroot@/language/advanced-attributes.md#adv-attr-meta) attribute and `derivation-meta` from [`requiredSystemFeatures`](@docroot@/language/advanced-attributes.md#adv-attr-requiredSystemFeatures) are filtered from hash computation.
+This enables tooling to attach arbitrary metadata to derivations without invalidating binary caches or triggering unnecessary rebuilds.
+
 So how do we compute the hash part of the output paths of an input-addressed derivation?
 This is done by the function `hashQuotientDerivation`, shown below.
 
@@ -222,5 +226,6 @@ where \\(\\mathrm{caInputs}(d)\\) returns the content-addressed inputs of \\(d\\
 > It also relates derivations whose `inputDrvOutputs` have been rewritten into `inputSrcs`.
 
 [deriving-path]: @docroot@/store/derivation/index.md#deriving-path
-[xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
 [xp-feature-ca-derivations]: @docroot@/development/experimental-features.md#xp-feature-ca-derivations
+[xp-feature-derivation-meta]: @docroot@/development/experimental-features.md#xp-feature-derivation-meta
+[xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
