@@ -365,7 +365,33 @@ openDirectoryAt(Descriptor dirFd, const std::filesystem::path & path, bool creat
     if (result)
         return std::move(result.value());
 
-    return outcome::failure(std::error_code(RtlNtStatusToDosError(result.error()), std::system_category()));
+    auto lastError = RtlNtStatusToDosError(result.error());
+
+    /* Check if error is due to symlink in path */
+    if (lastError == ERROR_INVALID_NAME || lastError == ERROR_DIRECTORY) {
+        /* Scan path components to find symlink */
+        AutoCloseFD currentFd;
+        auto getCurrentFd = [&]() { return currentFd ? currentFd.get() : dirFd; };
+        std::filesystem::path currentPath;
+        for (auto & component : path) {
+            currentPath /= component;
+            std::wstring wcomponent = component.wstring();
+            auto testResult =
+                maybeNtOpenAt(getCurrentFd(), wcomponent, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+            if (!testResult)
+                break; /* Can't determine, let original error propagate */
+            if (isReparsePoint(testResult.value().get()))
+                throw SymlinkNotAllowed(currentPath);
+            /* Move to this directory for next iteration */
+            auto dirResult = maybeNtOpenAt(
+                getCurrentFd(), wcomponent, FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT);
+            if (!dirResult)
+                break;
+            currentFd = std::move(dirResult.value());
+        }
+    }
+
+    return outcome::failure(std::error_code(lastError, std::system_category()));
 }
 
 PosixStat fstat(Descriptor fd)
@@ -458,7 +484,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     /* Iterate through each path component to ensure no symlinks in intermediate directories.
      * This prevents TOCTOU issues by opening each component relative to the parent. */
     for (size_t i = 0; i + 1 < components.size(); ++i) {
-        std::wstring wcomponent = components[i].wstring();
+        const auto & wcomponent = components[i].native();
 
         /* Open directory without following symlinks */
         auto result = maybeNtOpenAt(
@@ -469,10 +495,16 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
         );
         if (!result) {
             auto lastError = RtlNtStatusToDosError(result.error());
-            /* Check if this is because it's a symlink */
-            if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_ACCESS_DENIED) {
+            /* Check if this is because it's a symlink - these errors can indicate
+               we tried to traverse through a symlink or open a symlink as a directory */
+            if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_ACCESS_DENIED ||
+                lastError == ERROR_INVALID_NAME || lastError == ERROR_DIRECTORY) {
                 throwIfSymlink(wcomponent, pathUpTo(i));
             }
+            /* ERROR_DIRECTORY means the component is not a directory (e.g., it's a file).
+               Return invalid handle to indicate the path doesn't exist. */
+            if (lastError == ERROR_DIRECTORY || lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+                return AutoCloseFD{};
             throw WinError(lastError, "opening directory component '%s'", PathFmt(pathUpTo(i)));
         }
 
@@ -485,7 +517,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     }
 
     /* Now open the final component with requested flags */
-    std::wstring finalComponent = components.back().wstring();
+    const auto & finalComponent = components.back().native();
 
     auto finalResult = maybeNtOpenAt(
         getParentFd(),
@@ -496,11 +528,12 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     if (!finalResult) {
         auto lastError = RtlNtStatusToDosError(finalResult.error());
         /* Check if final component is a symlink when we requested to not follow it */
-        if (lastError == ERROR_CANT_ACCESS_FILE) {
+        if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_INVALID_NAME) {
             throwIfSymlink(finalComponent, path);
         }
-        /* Return invalid handle for ENOENT/EEXIST style errors that caller may want to handle */
-        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_FILE_EXISTS)
+        /* Return invalid handle for ENOENT/EEXIST style errors, or when trying to
+           open a non-directory as a directory (ERROR_DIRECTORY). */
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_FILE_EXISTS || lastError == ERROR_DIRECTORY)
             return AutoCloseFD{};
         throw WinError(lastError, "opening file '%s'", PathFmt(path));
     }

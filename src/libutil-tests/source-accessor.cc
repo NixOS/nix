@@ -88,9 +88,6 @@ protected:
 
 TEST_F(FSSourceAccessorTest, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     {
         RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createDirectory(CanonPath("subdir"));
