@@ -425,7 +425,7 @@ path_start
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
-        auto path = canonPath(literal).string();
+        auto path = CanonPath(literal).abs();
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
