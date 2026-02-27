@@ -35,35 +35,39 @@ namespace nix::flake::primops {
 PrimOp getFlake(const Settings & settings)
 {
     auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
-        std::string flakeRefS(
-            state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
-        auto flakeRef = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
-        if (state.settings.pureEval && !flakeRef.input.isLocked(state.fetchSettings))
-            throw Error(
-                "cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)",
-                flakeRefS,
-                state.positions[pos]);
+        state.forceValue(*args[0], pos);
 
-        callFlake(
-            state,
-            lockFlake(
-                settings,
-                state,
-                flakeRef,
-                LockFlags{
-                    .updateLockFile = false,
-                    .writeLockFile = false,
-                    .useRegistries = !state.settings.pureEval && settings.useRegistries,
-                    .allowUnlocked = !state.settings.pureEval,
-                }),
-            v);
+        LockFlags lockFlags{
+            .updateLockFile = false,
+            .writeLockFile = false,
+            .useRegistries = !state.settings.pureEval && settings.useRegistries,
+            .allowUnlocked = !state.settings.pureEval,
+        };
+
+        if (args[0]->type() == nPath) {
+            auto path = state.realisePath(pos, *args[0]);
+            callFlake(state, lockFlake(settings, state, path, lockFlags), v);
+        } else {
+            NixStringContext context;
+            std::string flakeRefS(
+                state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
+
+            auto flakeRef = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
+            if (state.settings.pureEval && !flakeRef.input.isLocked(state.fetchSettings))
+                throw Error(
+                    "cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)",
+                    flakeRefS,
+                    state.positions[pos]);
+
+            callFlake(state, lockFlake(settings, state, flakeRef, lockFlags), v);
+        }
     };
 
     return PrimOp{
         .name = "__getFlake",
         .args = {"args"},
         .doc = R"(
-          Fetch a flake from a flake reference, and return its output attributes and some metadata. For example:
+          Fetch a flake from a flake reference or a path, and return its output attributes and some metadata. For example:
 
           ```nix
           (builtins.getFlake "nix/55bc52401966fbffa525c574c14f67b00bc4fb3a").packages.x86_64-linux.nix
