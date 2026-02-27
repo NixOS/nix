@@ -2795,9 +2795,12 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
         return;
 
     case nAttrs: {
+        const Bindings & attrs1 = *v1.attrs();
+        const Bindings & attrs2 = *v2.attrs();
+
         if (isDerivation(v1) && isDerivation(v2)) {
-            auto i = v1.attrs()->get(s.outPath);
-            auto j = v2.attrs()->get(s.outPath);
+            auto i = attrs1.get(s.outPath);
+            auto j = attrs2.get(s.outPath);
             if (i && j) {
                 try {
                     assertEqValues(*i->value, *j->value, pos, errorCtx);
@@ -2810,7 +2813,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
             }
         }
 
-        if (v1.attrs()->size() != v2.attrs()->size()) {
+        if (attrs1.size() != attrs2.size()) {
             error<AssertionError>(
                 "attribute names of attribute set '%s' differs from attribute set '%s'",
                 ValuePrinter(*this, v1, errorPrintOptions),
@@ -2818,12 +2821,8 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 .debugThrow();
         }
 
-        // Like normal comparison, we compare the attributes in non-deterministic Symbol index order.
-        // This function is called when eqValues has found a difference, so to reliably
-        // report about its result, we should follow in its literal footsteps and not
-        // try anything fancy that could lead to an error.
-        Bindings::const_iterator i, j;
-        for (i = v1.attrs()->begin(), j = v2.attrs()->begin(); i != v1.attrs()->end(); ++i, ++j) {
+        /* This mirrors what EvalState::eqValues does. See the corresponding comment there. */
+        for (auto i = attrs1.begin(), j = attrs2.begin(); i != attrs1.end(); ++i, ++j) {
             if (i->name != j->name) {
                 // A difference in a sorted list means that one attribute is not contained in the other, but we don't
                 // know which. Let's find out. Could use <, but this is more clear.
@@ -2845,6 +2844,22 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 }
                 assert(false);
             }
+        }
+
+        /* Comparing in lexicographical order is crucial for determinism. Short-circuiting
+           the comparison without a canonical ordering of iteration would mean that depending
+           on the global symbol table order this could either fail or successfully evaluate if
+           forcing an attribute leads to an error.
+           This function is called when eqValues has found a difference, so to reliably
+           report about its result, we should follow in its literal footsteps and not
+           try anything fancy that could lead to an error. */
+        boost::container::small_vector<Attr, conservativeStackReservation> sorted1;
+        v1.attrs()->lexicographicOrder(sorted1, symbols);
+        boost::container::small_vector<Attr, conservativeStackReservation> sorted2;
+        v2.attrs()->lexicographicOrder(sorted2, symbols);
+
+        for (auto i = sorted1.begin(), j = sorted2.begin(); i != sorted1.end(); ++i, ++j) {
+            assert(i->name == j->name);
             try {
                 assertEqValues(*i->value, *j->value, pos, errorCtx);
             } catch (Error & e) {
@@ -2952,23 +2967,46 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         return true;
 
     case nAttrs: {
+        const Bindings & attrs1 = *v1.attrs();
+        const Bindings & attrs2 = *v2.attrs();
+
         /* If both sets denote a derivation (type = "derivation"),
            then compare their outPaths. */
         if (isDerivation(v1) && isDerivation(v2)) {
-            auto i = v1.attrs()->get(s.outPath);
-            auto j = v2.attrs()->get(s.outPath);
+            auto i = attrs1.get(s.outPath);
+            auto j = attrs2.get(s.outPath);
             if (i && j)
                 return eqValues(*i->value, *j->value, pos, errorCtx);
         }
 
-        if (v1.attrs()->size() != v2.attrs()->size())
+        if (attrs1.size() != attrs2.size())
             return false;
 
-        /* Otherwise, compare the attributes one by one. */
-        Bindings::const_iterator i, j;
-        for (i = v1.attrs()->begin(), j = v2.attrs()->begin(); i != v1.attrs()->end(); ++i, ++j)
-            if (i->name != j->name || !eqValues(*i->value, *j->value, pos, errorCtx))
+        /* Compare in 2 passes: first make sure the attribute keys are equal
+           without evaluating or recursing into values. Historically, attribute
+           set comparison has been done in undefined symbol table order. This
+           approach is compatible with nondeterministic iteration order. */
+        for (auto i = attrs1.begin(), j = attrs2.begin(); i != attrs1.end(); ++i, ++j) {
+            /* If we do SoA transformation for Bindings then this could just be a memcmp. */
+            if (i->name != j->name)
                 return false;
+        }
+
+        /* Comparing in lexicographical order is crucial for determinism. Short-circuiting
+           the comparison without a canonical ordering of iteration would mean that depending
+           on the global symbol table order this could either fail or successfully evaluate if
+           forcing an attribute leads to an error. */
+        boost::container::small_vector<Attr, conservativeStackReservation> sorted1;
+        v1.attrs()->lexicographicOrder(sorted1, symbols);
+        boost::container::small_vector<Attr, conservativeStackReservation> sorted2;
+        v2.attrs()->lexicographicOrder(sorted2, symbols);
+
+        /* Otherwise, compare the attributes one by one. */
+        for (auto i = sorted1.begin(), j = sorted2.begin(); i != sorted1.end(); ++i, ++j) {
+            assert(i->name == j->name);
+            if (!eqValues(*i->value, *j->value, pos, errorCtx))
+                return false;
+        }
 
         return true;
     }
