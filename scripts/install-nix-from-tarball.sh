@@ -176,7 +176,7 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         rm -rf "$i_tmp"
     fi
     if ! [ -e "$dest/store/$i" ]; then
-        if [ "$OS" = "Darwin" ] || [ "$OS" = "FreeBSD" ]; then
+        if [ "$OS" = "Darwin" ] || [ "$OS" = "FreeBSD" ] || [ "$(cp --help 2>&1 | awk '{print $1; exit}')" = "BusyBox" ]; then
             cp -RPp "$self/store/$i" "$i_tmp"
         else
             cp -RP --preserve=ownership,timestamps "$self/store/$i" "$i_tmp"
