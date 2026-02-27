@@ -62,6 +62,10 @@ test(
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
     'NIX_CONFIG' : 'extra-experimental-features = flakes',
     'HOME' : meson.current_build_dir() / 'test-home',
+    # Clear NIX_STORE so tests use the default store path for the
+    # platform, and ignores anything to do with whatever dev shell we
+    # might be in
+    'NIX_STORE' : '',
   },
   protocol : 'gtest',
 )
