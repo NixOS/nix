@@ -4,6 +4,7 @@
 #include "nix/util/sync.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <cctype>
 
 namespace nix {
 
@@ -31,12 +32,23 @@ SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path,
 
 std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
 {
-    return root.empty()    ? (std::filesystem::path{path.abs()})
-           : path.isRoot() ? /* Don't append a slash for the root of the accessor, since
-                                it can be a non-directory (e.g. in the case of `fetchTree
-                                { type = "file" }`). */
-               root
-                           : root / path.rel();
+    if (root.empty()) {
+        auto abs = path.abs();
+#ifdef _WIN32
+        // CanonPath prepends '/' to all paths. On Windows, strip it
+        // for drive-letter paths so we get "C:/..." not "/C:/...".
+        if (abs.size() >= 3 && abs[0] == '/' && std::isalpha(static_cast<unsigned char>(abs[1])) && abs[2] == ':')
+            return std::filesystem::path{abs.substr(1)};
+#endif
+        return std::filesystem::path{abs};
+    } else if (path.isRoot()) {
+        /* Don't append a slash for the root of the accessor, since
+           it can be a non-directory (e.g. in the case of `fetchTree
+           { type = "file" }`). */
+        return root;
+    } else {
+        return root / path.rel();
+    }
 }
 
 void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
