@@ -54,7 +54,7 @@ std::string SourceAccessor::readFile(const CanonPath & path)
     return std::move(sink.s);
 }
 
-void SourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void SourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     auto s = readFile(path);
     sizeCallback(s.size());

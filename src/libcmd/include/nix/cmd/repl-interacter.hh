@@ -2,6 +2,7 @@
 /// @file
 
 #include "nix/util/finally.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/types.hh"
 #include <filesystem>
 #include <functional>
@@ -27,7 +28,7 @@ enum class ReplPromptType {
 class ReplInteracter
 {
 public:
-    using Guard = Finally<std::function<void()>>;
+    using Guard = Finally<fun<void()>>;
 
     virtual Guard init(detail::ReplCompleterMixin * repl) = 0;
     /** Returns a boolean of whether the interacter got EOF */

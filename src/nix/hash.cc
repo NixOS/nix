@@ -9,6 +9,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 #include "man-pages.hh"
+#include "nix/util/fun.hh"
 
 using namespace nix;
 
@@ -112,8 +113,7 @@ struct CmdHashBase : Command
             }
             case FileIngestionMethod::Git: {
                 auto sourcePath = makeSourcePath();
-                std::function<git::DumpHook> hook;
-                hook = [&](const SourcePath & path) -> git::TreeEntry {
+                fun<git::DumpHook> hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
                     auto mode = dump(path, *hashSink, hook);
                     auto hash = hashSink->finish().hash;

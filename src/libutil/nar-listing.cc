@@ -82,7 +82,7 @@ NarListing parseNarListing(Source & source)
             createMember(path, NarListing::Directory{});
         }
 
-        void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
+        void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
         {
             auto & nm = createMember(
                 path,

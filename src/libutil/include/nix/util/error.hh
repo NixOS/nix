@@ -17,6 +17,7 @@
 
 #include "nix/util/suggestions.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/config.hh"
 
 #include <concepts>
@@ -463,10 +464,10 @@ void panic(std::string_view msg);
  * Useful for wrapping a `main` function that may throw
  *
  * @param programName Name of program, usually argv[0]
- * @param fun Function to run inside the try block
+ * @param body Function to run inside the try block
  * @return exit code: 0 if success, 1 if exception does not specify.
  */
-int handleExceptions(const std::string & programName, std::function<void()> fun);
+int handleExceptions(const std::string & programName, fun<void()> body);
 
 /**
  * Print a basic error message with source position and std::terminate().

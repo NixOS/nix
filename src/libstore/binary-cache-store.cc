@@ -137,7 +137,7 @@ void BinaryCacheStore::writeNarInfo(ref<NarInfo> narInfo)
 }
 
 ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
-    Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs, std::function<ValidPathInfo(HashResult)> mkInfo)
+    Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs, fun<ValidPathInfo(HashResult)> mkInfo)
 {
     auto fdTemp = createAnonymousTempFile();
 

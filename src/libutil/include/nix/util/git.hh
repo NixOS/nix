@@ -102,7 +102,7 @@ void parseTree(
     const CanonPath & sinkPath,
     Source & source,
     HashAlgorithm hashAlgo,
-    std::function<SinkHook> hook,
+    fun<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
@@ -120,7 +120,7 @@ void parse(
     Source & source,
     BlobMode rootModeIfBlob,
     HashAlgorithm hashAlgo,
-    std::function<SinkHook> hook,
+    fun<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
@@ -141,7 +141,7 @@ using RestoreHook = SourcePath(Hash);
  *
  * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
  */
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, std::function<RestoreHook> hook);
+void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, fun<RestoreHook> hook);
 
 /**
  * Dumps a single file to a sink
@@ -171,7 +171,7 @@ using DumpHook = TreeEntry(const SourcePath & path);
 Mode dump(
     const SourcePath & path,
     Sink & sink,
-    std::function<DumpHook> hook,
+    fun<DumpHook> hook,
     PathFilter & filter = defaultPathFilter,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 

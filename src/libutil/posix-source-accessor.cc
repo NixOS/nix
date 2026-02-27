@@ -39,7 +39,7 @@ std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
                            : root / path.rel();
 }
 
-void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     assertNoSymlinks(path);
 

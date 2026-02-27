@@ -159,7 +159,7 @@ PrimOp * nix_alloc_primop(
                     .args = {},
                     .arity = (size_t) arity,
                     .doc = doc,
-                    .fun = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
+                    .impl = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
         if (args)
             for (size_t i = 0; args[i]; i++)
                 p->args.emplace_back(*args);

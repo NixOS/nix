@@ -99,6 +99,6 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** ar
     state.allowPath(storePath);
 }
 
-static RegisterPrimOp r_fetchMercurial({.name = "fetchMercurial", .arity = 1, .fun = prim_fetchMercurial});
+static RegisterPrimOp r_fetchMercurial({.name = "fetchMercurial", .arity = 1, .impl = prim_fetchMercurial});
 
 } // namespace nix

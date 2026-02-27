@@ -120,7 +120,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    std::function<PrimOpFun> fun;
+    fun<PrimOpFun> impl;
 
     /**
      * Optional experimental for this to be gated on.

@@ -40,8 +40,7 @@ struct StoreFactory
      * The `authorityPath` parameter is `<authority>/<path>`, or really
      * whatever comes after `<scheme>://` and before `?<query-params>`.
      */
-    std::function<ref<StoreConfig>(
-        std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
+    fun<ref<StoreConfig>(std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
         parseConfig;
 
     /**
@@ -49,7 +48,7 @@ struct StoreFactory
      * because it means we cannot require fields to be manually
      * specified so easily.
      */
-    std::function<ref<StoreConfig>()> getConfig;
+    fun<ref<StoreConfig>()> getConfig;
 };
 
 struct Implementations

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nix/util/fun.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/ref.hh"
@@ -41,7 +42,7 @@ public:
      * @param populate Function called with a Sink to populate the NAR if not cached
      * @return The cached or newly created accessor
      */
-    ref<SourceAccessor> getOrInsert(const Hash & narHash, std::function<void(Sink &)> populate);
+    ref<SourceAccessor> getOrInsert(const Hash & narHash, fun<void(Sink &)> populate);
 };
 
 } // namespace nix

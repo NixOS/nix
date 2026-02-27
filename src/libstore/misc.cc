@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/util/fun.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
@@ -66,7 +67,7 @@ void Store::computeFSClosure(
         paths_,
         [&](const StorePath & path, std::function<void(std::promise<std::set<StorePath>> &)> processEdges) {
             std::promise<std::set<StorePath>> promise;
-            std::function<void(std::future<ref<const ValidPathInfo>>)> getDependencies =
+            fun<void(std::future<ref<const ValidPathInfo>>)> getDependencies =
                 [&](std::future<ref<const ValidPathInfo>> fut) {
                     try {
                         promise.set_value(queryDeps(path, fut));
@@ -125,7 +126,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     Sync<State> state_;
 
-    std::function<void(DerivedPath)> doPath;
+    fun<void(DerivedPath)> doPath = [&](const DerivedPath &) { unreachable(); };
 
     auto enqueueDerivedPaths = [&](this auto self,
                                    ref<SingleDerivedPath> inputDrv,

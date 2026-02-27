@@ -5,6 +5,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/fun.hh"
 
 #include <filesystem>
 
@@ -113,7 +114,7 @@ public:
      */
     struct Suspension
     {
-        Finally<std::function<void()>> _finalize;
+        Finally<fun<void()>> _finalize;
     };
 
     Suspension suspend();

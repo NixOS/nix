@@ -4,6 +4,7 @@
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
 #endif
+#include "nix/util/fun.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/config-global.hh"
@@ -831,13 +832,11 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             struct DerivationBuildingGoalCallbacks : DerivationBuilderCallbacks
             {
                 DerivationBuildingGoal & goal;
-                std::function<void()> openLogFileFn;
-                std::function<void()> closeLogFileFn;
+                fun<void()> openLogFileFn;
+                fun<void()> closeLogFileFn;
 
                 DerivationBuildingGoalCallbacks(
-                    DerivationBuildingGoal & goal,
-                    std::function<void()> openLogFileFn,
-                    std::function<void()> closeLogFileFn)
+                    DerivationBuildingGoal & goal, fun<void()> openLogFileFn, fun<void()> closeLogFileFn)
                     : goal{goal}
                     , openLogFileFn{std::move(openLogFileFn)}
                     , closeLogFileFn{std::move(closeLogFileFn)}

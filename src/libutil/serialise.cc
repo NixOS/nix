@@ -304,17 +304,17 @@ CompressedSource::CompressedSource(RestartableSource & source, CompressionAlgo c
 {
 }
 
-std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
+std::unique_ptr<FinishSink> sourceToSink(fun<void(Source &)> reader)
 {
     struct SourceToSink : FinishSink
     {
         typedef boost::coroutines2::coroutine<bool> coro_t;
 
-        std::function<void(Source &)> fun;
+        fun<void(Source &)> reader;
         std::optional<coro_t::push_type> coro;
 
-        SourceToSink(std::function<void(Source &)> fun)
-            : fun(fun)
+        SourceToSink(fun<void(Source &)> reader)
+            : reader(reader)
         {
         }
 
@@ -339,7 +339,7 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
                         cur.remove_prefix(n);
                         return n;
                     });
-                    fun(source);
+                    reader(source);
                 });
             }
 
@@ -359,21 +359,21 @@ std::unique_ptr<FinishSink> sourceToSink(std::function<void(Source &)> fun)
         }
     };
 
-    return std::make_unique<SourceToSink>(fun);
+    return std::make_unique<SourceToSink>(reader);
 }
 
-std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
+std::unique_ptr<Source> sinkToSource(fun<void(Sink &)> writer, fun<void()> eof)
 {
     struct SinkToSource : Source
     {
         typedef boost::coroutines2::coroutine<std::string_view> coro_t;
 
-        std::function<void(Sink &)> fun;
-        std::function<void()> eof;
+        fun<void(Sink &)> writer;
+        fun<void()> eof;
         std::optional<coro_t::pull_type> coro;
 
-        SinkToSource(std::function<void(Sink &)> fun, std::function<void()> eof)
-            : fun(fun)
+        SinkToSource(fun<void(Sink &)> writer, fun<void()> eof)
+            : writer(writer)
             , eof(eof)
         {
         }
@@ -390,7 +390,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
                             yield(data);
                         }
                     });
-                    fun(sink);
+                    writer(sink);
                 });
             }
 
@@ -424,7 +424,7 @@ std::unique_ptr<Source> sinkToSource(std::function<void(Sink &)> fun, std::funct
         }
     };
 
-    return std::make_unique<SinkToSource>(fun, eof);
+    return std::make_unique<SinkToSource>(writer, eof);
 }
 
 void writePadding(size_t len, Sink & sink)

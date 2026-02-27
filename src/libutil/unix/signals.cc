@@ -1,6 +1,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/terminal.hh"
 
@@ -39,7 +40,7 @@ struct InterruptCallbacks
     Token nextToken = 0;
 
     /* Used as a list, see InterruptCallbacks comment. */
-    std::map<Token, std::function<void()>> callbacks;
+    std::map<Token, fun<void()>> callbacks;
 };
 
 static Sync<InterruptCallbacks> _interruptCallbacks;
@@ -158,7 +159,7 @@ struct InterruptCallbackImpl : InterruptCallback
     }
 };
 
-std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback)
+std::unique_ptr<InterruptCallback> createInterruptCallback(fun<void()> callback)
 {
     auto interruptCallbacks(_interruptCallbacks.lock());
     auto token = interruptCallbacks->nextToken++;

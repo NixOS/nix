@@ -174,10 +174,10 @@ void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
     narFromPath(path, [&](auto & source) { copyNAR(source, sink); });
 }
 
-void LegacySSHStore::narFromPath(const StorePath & path, std::function<void(Source &)> fun)
+void LegacySSHStore::narFromPath(const StorePath & path, fun<void(Source &)> receiveNar)
 {
     auto conn(connections->get());
-    conn->narFromPath(*this, path, fun);
+    conn->narFromPath(*this, path, receiveNar);
 }
 
 static ServeProto::BuildOptions buildSettings()
@@ -201,7 +201,7 @@ BuildResult LegacySSHStore::buildDerivation(const StorePath & drvPath, const Bas
     return conn->getBuildDerivationResponse(*this);
 }
 
-std::function<BuildResult()> LegacySSHStore::buildDerivationAsync(
+fun<BuildResult()> LegacySSHStore::buildDerivationAsync(
     const StorePath & drvPath, const BasicDerivation & drv, const ServeProto::BuildOptions & options)
 {
     // Until we have C++23 std::move_only_function

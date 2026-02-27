@@ -10,7 +10,7 @@ std::optional<std::filesystem::path> FilteringSourceAccessor::getPhysicalPath(co
     return next->getPhysicalPath(prefix / path);
 }
 
-void FilteringSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void FilteringSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     checkAccess(path);
     return next->readFile(prefix / path, sink, sizeCallback);
@@ -69,8 +69,7 @@ void FilteringSourceAccessor::invalidateCache(const CanonPath & path)
 void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 {
     if (!isAllowed(path))
-        throw makeNotAllowedError ? makeNotAllowedError(path)
-                                  : RestrictedPathError("access to path '%s' is forbidden", showPath(path));
+        throw makeNotAllowedError(path);
 }
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor

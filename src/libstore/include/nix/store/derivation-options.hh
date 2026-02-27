@@ -228,7 +228,7 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
  */
 std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,
-    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
 
 }; // namespace nix

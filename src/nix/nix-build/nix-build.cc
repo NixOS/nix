@@ -28,6 +28,7 @@
 #include "nix/util/users.hh"
 #include "nix/cmd/network-proxy.hh"
 #include "nix/cmd/compatibility-settings.hh"
+#include "nix/util/fun.hh"
 #include "man-pages.hh"
 
 using namespace nix;
@@ -586,18 +587,16 @@ static void main_nix_build(int argc, char ** argv)
         if (drv.structuredAttrs) {
             StorePathSet inputs;
 
-            std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
-
-            accumInputClosure = [&](const StorePath & inputDrv,
-                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-                auto outputs = store->queryPartialDerivationOutputMap(inputDrv, &*evalStore);
-                for (auto & i : inputNode.value) {
-                    auto o = outputs.at(i);
-                    store->computeFSClosure(*o, inputs);
-                }
-                for (const auto & [outputName, childNode] : inputNode.childMap)
-                    accumInputClosure(*outputs.at(outputName), childNode);
-            };
+            fun<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure =
+                [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+                    auto outputs = store->queryPartialDerivationOutputMap(inputDrv, &*evalStore);
+                    for (auto & i : inputNode.value) {
+                        auto o = outputs.at(i);
+                        store->computeFSClosure(*o, inputs);
+                    }
+                    for (const auto & [outputName, childNode] : inputNode.childMap)
+                        accumInputClosure(*outputs.at(outputName), childNode);
+                };
 
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);

@@ -304,12 +304,12 @@ WorkerProto::BasicClientConnection::getBuildDerivationResponse(const StoreDirCon
 }
 
 void WorkerProto::BasicClientConnection::narFromPath(
-    const StoreDirConfig & store, bool * daemonException, const StorePath & path, std::function<void(Source &)> fun)
+    const StoreDirConfig & store, bool * daemonException, const StorePath & path, fun<void(Source &)> receiveNar)
 {
     to << WorkerProto::Op::NarFromPath << store.printStorePath(path);
     processStderr(daemonException);
 
-    fun(from);
+    receiveNar(from);
 }
 
 } // namespace nix

@@ -80,7 +80,7 @@ public:
         subdirs.emplace(baseName, std::move(accessor));
     }
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         return callWithAccessorForPath(path, [&](SourceAccessor & accessor, const CanonPath & path) {
             return accessor.readFile(path, sink, sizeCallback);

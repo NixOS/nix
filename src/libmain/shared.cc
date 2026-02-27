@@ -214,8 +214,7 @@ void initNix(bool loadConfig)
 }
 
 LegacyArgs::LegacyArgs(
-    const std::string & programName,
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+    const std::string & programName, fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
     : MixCommonArgs(programName)
     , parseArg(parseArg)
 {
@@ -306,8 +305,7 @@ bool LegacyArgs::processArgs(const Strings & args, bool finish)
     return true;
 }
 
-void parseCmdLine(
-    int argc, char ** argv, std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+void parseCmdLine(int argc, char ** argv, fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     parseCmdLine(std::string(baseNameOf(argv[0])), argvToStrings(argc, argv), parseArg);
 }
@@ -315,7 +313,7 @@ void parseCmdLine(
 void parseCmdLine(
     const std::string & programName,
     const Strings & args,
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
+    fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg)
 {
     LegacyArgs(programName, parseArg).parseCmdline(args);
 }

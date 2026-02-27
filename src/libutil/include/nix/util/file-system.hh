@@ -8,6 +8,7 @@
  * possible, for the reasons given in the documentation of that header.
  */
 
+#include "nix/util/fun.hh"
 #include "nix/util/types.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
@@ -426,7 +427,7 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
  *
  * @todo type
  */
-typedef std::function<bool(const std::string & path)> PathFilter;
+typedef fun<bool(const std::string & path)> PathFilter;
 
 extern PathFilter defaultPathFilter;
 

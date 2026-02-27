@@ -28,7 +28,7 @@ struct BuiltinBuilderContext
 #endif
 };
 
-using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;
+using BuiltinBuilder = fun<void(const BuiltinBuilderContext &)>;
 
 struct RegisterBuiltinBuilder
 {
@@ -36,9 +36,9 @@ struct RegisterBuiltinBuilder
 
     static BuiltinBuilders & builtinBuilders();
 
-    RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && fun)
+    RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && builder)
     {
-        builtinBuilders().insert_or_assign(name, std::move(fun));
+        builtinBuilders().insert_or_assign(name, std::move(builder));
     }
 };
 

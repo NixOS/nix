@@ -357,7 +357,7 @@ static RegisterPrimOp primop_fetchTree({
 
         return doc;
     }(),
-    .fun = prim_fetchTree,
+    .impl = prim_fetchTree,
     .experimentalFeature = Xp::FetchTree,
 });
 
@@ -369,7 +369,7 @@ void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Val
 static RegisterPrimOp primop_fetchFinalTree({
     .name = "fetchFinalTree",
     .args = {"input"},
-    .fun = prim_fetchFinalTree,
+    .impl = prim_fetchFinalTree,
     .internal = true,
 });
 
@@ -531,7 +531,7 @@ static RegisterPrimOp primop_fetchurl({
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
-    .fun = prim_fetchurl,
+    .impl = prim_fetchurl,
 });
 
 static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -581,7 +581,7 @@ static RegisterPrimOp primop_fetchTarball({
 
       Not available in [restricted evaluation mode](@docroot@/command-ref/conf-file.md#conf-restrict-eval).
     )",
-    .fun = prim_fetchTarball,
+    .impl = prim_fetchTarball,
 });
 
 static void prim_fetchGit(EvalState & state, const PosIdx pos, Value ** args, Value & v)
@@ -797,7 +797,7 @@ static RegisterPrimOp primop_fetchGit({
       files, even if they are not committed or added to Git's index. It
       only considers files added to the Git repository, as listed by `git ls-files`.
     )",
-    .fun = prim_fetchGit,
+    .impl = prim_fetchGit,
 });
 
 } // namespace nix

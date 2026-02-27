@@ -421,9 +421,8 @@ void mainWrapped(int argc, char ** argv)
     }
 
     {
-        auto legacy = RegisterLegacyCommand::commands()[programName];
-        if (legacy)
-            return legacy(argc, argv);
+        if (auto legacy = get(RegisterLegacyCommand::commands(), programName))
+            return (*legacy)(argc, argv);
     }
 
     evalSettings.pureEval = true;

@@ -7,6 +7,7 @@
 #include <memory>
 #include <cassert>
 
+#include "nix/util/fun.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/ref.hh"
 
@@ -37,13 +38,13 @@ public:
     /**
      * A function that produces new instances of R on demand.
      */
-    typedef std::function<ref<R>()> Factory;
+    typedef fun<ref<R>()> Factory;
 
     /**
      * A function that checks whether an instance of R is still
      * usable. Unusable instances are removed from the pool.
      */
-    typedef std::function<bool(const ref<R> &)> Validator;
+    typedef fun<bool(const ref<R> &)> Validator;
 
 private:
 

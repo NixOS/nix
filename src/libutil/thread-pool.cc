@@ -92,7 +92,7 @@ void ThreadPool::doWork(bool mainThread)
     std::exception_ptr exc;
 
     while (true) {
-        work_t w;
+        std::function<void()> w;
         {
             auto state(state_.lock());
 

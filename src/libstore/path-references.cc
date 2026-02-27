@@ -62,7 +62,7 @@ void scanForReferencesDeep(
     SourceAccessor & accessor,
     const CanonPath & rootPath,
     const StorePathSet & refs,
-    std::function<void(FileRefScanResult)> callback)
+    fun<void(FileRefScanResult)> callback)
 {
     // Recursive tree walker
     auto walk = [&](this auto & self, const CanonPath & path) -> void {

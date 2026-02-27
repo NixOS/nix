@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/logging.hh"
 
 #include <functional>
@@ -47,7 +48,7 @@ struct InterruptCallback
  *
  * @note Does nothing on Windows
  */
-std::unique_ptr<InterruptCallback> createInterruptCallback(std::function<void()> callback);
+std::unique_ptr<InterruptCallback> createInterruptCallback(fun<void()> callback);
 
 /**
  * A RAII class that causes the current thread to receive SIGUSR1 when

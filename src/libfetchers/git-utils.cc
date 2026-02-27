@@ -832,7 +832,7 @@ struct GitSourceAccessor : SourceAccessor
         source.drainInto(sink);
     }
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         return readBlob(path, false, sink, sizeCallback);
     }
@@ -1214,7 +1214,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
             cur->children.insert_or_assign(name, std::move(child));
     }
 
-    void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func) override
+    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
     {
         checkInterrupt();
 

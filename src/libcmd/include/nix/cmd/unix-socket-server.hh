@@ -35,7 +35,7 @@ PeerInfo getPeerInfo(Descriptor remote);
  * @param closeListeners A callback to close the listening sockets.
  *   Useful in forked child processes to release the bound sockets.
  */
-using UnixSocketHandler = std::function<void(AutoCloseFD socket, std::function<void()> closeListeners)>;
+using UnixSocketHandler = fun<void(AutoCloseFD socket, std::function<void()> closeListeners)>;
 
 /**
  * Options for the serve loop.

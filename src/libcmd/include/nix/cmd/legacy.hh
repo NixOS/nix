@@ -1,13 +1,14 @@
 #pragma once
 ///@file
 
-#include <functional>
+#include "nix/util/fun.hh"
+
 #include <map>
 #include <string>
 
 namespace nix {
 
-typedef std::function<void(int, char **)> MainFunction;
+typedef fun<void(int, char **)> MainFunction;
 
 struct RegisterLegacyCommand
 {
@@ -15,9 +16,9 @@ struct RegisterLegacyCommand
 
     static Commands & commands();
 
-    RegisterLegacyCommand(const std::string & name, MainFunction fun)
+    RegisterLegacyCommand(const std::string & name, MainFunction command)
     {
-        commands()[name] = fun;
+        commands().insert_or_assign(name, command);
     }
 };
 

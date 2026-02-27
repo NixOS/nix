@@ -1174,7 +1174,7 @@ static bool tryResolveInput(
     const DownstreamPlaceholder * placeholderOpt,
     ref<const SingleDerivedPath> drvPath,
     const DerivedPathMap<StringSet>::ChildNode & inputNode,
-    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain)
 {
     auto getPlaceholder = [&](const std::string & outputName) {
@@ -1214,7 +1214,7 @@ static bool tryResolveInput(
 
 std::optional<BasicDerivation> Derivation::tryResolve(
     Store & store,
-    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain) const
 {
     BasicDerivation resolved{*this};

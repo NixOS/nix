@@ -115,7 +115,7 @@ void parseTree(
     const CanonPath & sinkPath,
     Source & source,
     HashAlgorithm hashAlgo,
-    std::function<SinkHook> hook,
+    fun<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings)
 {
     const unsigned long long size = std::stoi(getStringUntil(source, 0));
@@ -178,7 +178,7 @@ void parse(
     Source & source,
     BlobMode rootModeIfBlob,
     HashAlgorithm hashAlgo,
-    std::function<SinkHook> hook,
+    fun<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
@@ -217,7 +217,7 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     }
 }
 
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, std::function<RestoreHook> hook)
+void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, fun<RestoreHook> hook)
 {
     parse(sink, CanonPath::root, source, BlobMode::Regular, hashAlgo, [&](CanonPath name, TreeEntry entry) {
         auto [accessor, from] = hook(entry.hash);
@@ -275,7 +275,7 @@ void dumpTree(const Tree & entries, Sink & sink, const ExperimentalFeatureSettin
 Mode dump(
     const SourcePath & path,
     Sink & sink,
-    std::function<DumpHook> hook,
+    fun<DumpHook> hook,
     PathFilter & filter,
     const ExperimentalFeatureSettings & xpSettings)
 {
@@ -325,8 +325,7 @@ Mode dump(
 
 TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filter)
 {
-    std::function<DumpHook> hook;
-    hook = [&](const SourcePath & path) -> TreeEntry {
+    fun<DumpHook> hook = [&](const SourcePath & path) -> TreeEntry {
         auto hashSink = HashSink(ha);
         auto mode = dump(path, hashSink, hook, filter);
         auto hash = hashSink.finish().hash;

@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/ref.hh"
 
@@ -75,8 +76,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * @note subclasses of `SourceAccessor` need to implement at least
      * one of the `readFile()` variants.
      */
-    virtual void
-    readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback = [](uint64_t size) {});
+    virtual void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback = [](uint64_t size) {});
 
     virtual bool pathExists(const CanonPath & path);
 

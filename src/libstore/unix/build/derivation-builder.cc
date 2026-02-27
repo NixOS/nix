@@ -65,7 +65,7 @@ struct NotDeterministic final : CloneableError<NotDeterministic, BuildError>
     }
 };
 
-void preserveDeathSignal(std::function<void()> fn)
+void preserveDeathSignal(fun<void()> setCredentials)
 {
 #ifdef __linux__
     /* Record the old parent pid. This is to avoid a race in case the parent
@@ -78,7 +78,7 @@ void preserveDeathSignal(std::function<void()> fn)
     if (prctl(PR_GET_PDEATHSIG, &oldDeathSignal) == -1)
         throw SysError("getting death signal");
 
-    fn(); /* Invoke the callback that does setuid etc. */
+    setCredentials(); /* Invoke the callback that does setuid etc. */
 
     /* Set the old death signal. SIGKILL is set by default in startProcess,
        but it gets cleared after setuid. Without this we end up with runaway
@@ -92,7 +92,7 @@ void preserveDeathSignal(std::function<void()> fn)
     if (oldDeathSignal && getppid() != parentPid)
         raise(oldDeathSignal);
 #else
-    fn(); /* Just call the function on non-Linux. */
+    setCredentials(); /* Just call the function on non-Linux. */
 #endif
 }
 
