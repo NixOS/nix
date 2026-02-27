@@ -20,9 +20,9 @@
 namespace nix {
 
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(const std::filesystem::path & path, const StoreReference::Params & params)
-    : Store::Config{params}
+    : Store::Config{params, FilePathType::Native}
     , LocalFSStore::Config{params}
-    , RemoteStore::Config{params}
+    , RemoteStore::Config{params, FilePathType::Native}
     , path{path.empty() ? settings.nixDaemonSocketFile : path}
 {
 }

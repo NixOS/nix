@@ -185,8 +185,12 @@ TEST(machines, getMachinesWithCorrectFileReference)
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile)
 {
+#ifdef _WIN32
+    std::filesystem::path path = "NUL";
+#else
     std::filesystem::path path = "/dev/null";
     ASSERT_TRUE(std::filesystem::exists(path));
+#endif
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
     ASSERT_THAT(actual, SizeIs(0));

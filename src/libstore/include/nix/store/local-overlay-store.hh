@@ -13,7 +13,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
     }
 
     LocalOverlayStoreConfig(const std::filesystem::path & path, const Params & params)
-        : StoreConfig(params)
+        : StoreConfig(params, FilePathType::Native)
         , LocalFSStoreConfig(path, params)
         , LocalStoreConfig(path, params)
     {
@@ -31,7 +31,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const Setting<std::filesystem::path> upperLayer{
+    Setting<std::filesystem::path> upperLayer{
         (StoreConfig *) this,
         "",
         "upper-layer",

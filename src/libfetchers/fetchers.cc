@@ -499,8 +499,9 @@ void InputScheme::clone(
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
-    RestoreSink sink(/*startFsync=*/false);
-    sink.dstPath = destDir;
+    /* This is used with an arbitrary user-given path (just `nix flake
+       clone` currently) and so we better follow any symlinks. */
+    RestoreSink sink{DescriptorDestination::open(destDir, FinalSymlink::Follow), /*startFsync=*/false};
     copyRecursive(*accessor, CanonPath::root, sink, CanonPath::root);
 }
 

@@ -67,8 +67,10 @@ struct Implementations
             .experimentalFeature = TConfig::experimentalFeature(),
             .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
                 if constexpr (std::is_constructible_v<TConfig, std::filesystem::path, StoreConfig::Params>) {
-                    std::filesystem::path path = percentDecode(uri);
-                    return make_ref<TConfig>(path.empty() ? std::filesystem::path{} : canonPath(path), params);
+                    auto path = uri.empty()
+                        ? std::filesystem::path{}
+                        : canonPath(urlPathToPath(splitString<std::vector<std::string>>(percentDecode(uri), "/")));
+                    return make_ref<TConfig>(std::move(path), params);
                 } else if constexpr (std::is_constructible_v<TConfig, ParsedURL, StoreConfig::Params>) {
                     return make_ref<TConfig>(parseURL(concatStrings(scheme, "://", uri)), params);
                 } else if constexpr (std::is_constructible_v<TConfig, ParsedURL::Authority, StoreConfig::Params>) {

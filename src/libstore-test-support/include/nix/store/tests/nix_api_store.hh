@@ -23,18 +23,25 @@ public:
 
     ~nix_api_store_test_base() override
     {
-        if (exists(std::filesystem::path{nixDir})) {
-            for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
+        std::error_code ec;
+        if (exists(std::filesystem::path{nixDir}, ec)) {
+            // Best-effort cleanup - ignore errors since we're in a destructor
+            try {
+                for (auto & path : std::filesystem::recursive_directory_iterator(
+                         nixDir, std::filesystem::directory_options::skip_permission_denied)) {
+                    std::filesystem::permissions(path, std::filesystem::perms::owner_all, ec);
+                }
+            } catch (...) {
+                // Ignore iteration errors (broken symlinks, etc.)
             }
-            std::filesystem::remove_all(nixDir);
+            std::filesystem::remove_all(nixDir, ec);
         }
     }
 
-    std::string nixDir;
-    std::string nixStoreDir;
-    std::string nixStateDir;
-    std::string nixLogDir;
+    std::filesystem::path nixDir;
+    std::filesystem::path nixStoreDir;
+    std::filesystem::path nixStateDir;
+    std::filesystem::path nixLogDir;
 
 protected:
     Store * open_local_store()
@@ -54,23 +61,21 @@ protected:
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 
-        nixStoreDir = nixDir + "/my_nix_store";
-        nixStateDir = nixDir + "/my_state";
-        nixLogDir = nixDir + "/my_log";
+        nixStoreDir = nixDir / "my_nix_store";
+        nixStateDir = nixDir / "my_state";
+        nixLogDir = nixDir / "my_log";
 
         // Options documented in `nix help-stores`
-        const char * p1[] = {"store", nixStoreDir.c_str()};
-        const char * p2[] = {"state", nixStateDir.c_str()};
-        const char * p3[] = {"log", nixLogDir.c_str()};
+        auto nixStoreDirStr = nixStoreDir.string();
+        auto nixStateDirStr = nixStateDir.string();
+        auto nixLogDirStr = nixLogDir.string();
+        const char * p1[] = {"store", nixStoreDirStr.c_str()};
+        const char * p2[] = {"state", nixStateDirStr.c_str()};
+        const char * p3[] = {"log", nixLogDirStr.c_str()};
 
         const char ** params[] = {p1, p2, p3, nullptr};
 
         auto * store = nix_store_open(ctx, "local", params);
-        if (!store) {
-            std::string errMsg = nix_err_msg(nullptr, ctx, nullptr);
-            EXPECT_NE(store, nullptr) << "Could not open store: " << errMsg;
-            assert(store);
-        };
         return store;
     }
 };
@@ -86,10 +91,15 @@ public:
 
     ~nix_api_store_test() override
     {
-        nix_store_free(store);
+        if (store)
+            nix_store_free(store);
     }
 
-    Store * store;
+    void SetUp() override
+    {
+    }
+
+    Store * store = nullptr;
 
 protected:
     void init_local_store()

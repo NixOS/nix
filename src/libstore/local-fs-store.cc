@@ -19,7 +19,7 @@ std::filesystem::path LocalFSStoreConfig::getDefaultLogDir()
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Native)
     /* Default `?root` from `rootDir` if non set
      * NOTE: We would like to just do rootDir.set(...), which would take care of
      * all normalization and error checking for us. Unfortunately we cannot do
@@ -119,8 +119,8 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        auto logPath = config.logDir.get()
-                       / (j == 0 ? drvsLogDir / baseName.substr(0, 2) / baseName.substr(2) : drvsLogDir / baseName);
+        auto logPath = config.logDir.get() / drvsLogDir
+                       / (j == 0 ? std::filesystem::path{baseName.substr(0, 2)} / baseName.substr(2) : baseName);
         auto logBz2Path = logPath;
         logBz2Path += ".bz2";
 

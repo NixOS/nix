@@ -12,24 +12,38 @@ namespace nix {
 
 TEST(LocalStore, constructConfig_rootQueryParam)
 {
+    constexpr std::string_view rootPath =
+#ifdef _WIN32
+        "C:\\foo\\bar"
+#else
+        "/foo/bar"
+#endif
+        ;
     LocalStoreConfig config{
         "",
         {
             {
                 "root",
-                "/foo/bar",
+                std::string{rootPath},
             },
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{rootPath}});
 }
 
 TEST(LocalStore, constructConfig_rootPath)
 {
-    LocalStoreConfig config{"/foo/bar", {}};
+    constexpr std::string_view rootPath =
+#ifdef _WIN32
+        "C:\\foo\\bar"
+#else
+        "/foo/bar"
+#endif
+        ;
+    LocalStoreConfig config{std::string{rootPath}, {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{rootPath}});
 }
 
 TEST(LocalStore, constructConfig_to_string)

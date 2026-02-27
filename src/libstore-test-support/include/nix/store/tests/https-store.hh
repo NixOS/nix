@@ -43,7 +43,7 @@ class TestHttpBinaryCacheStoreConfig : public HttpBinaryCacheStoreConfig
 {
 public:
     TestHttpBinaryCacheStoreConfig(ParsedURL url, const Store::Config::Params & params)
-        : StoreConfig(params)
+        : StoreConfig(params, FilePathType::Unix)
         , HttpBinaryCacheStoreConfig(url, params)
     {
     }
@@ -65,7 +65,9 @@ protected:
     std::filesystem::path tmpDir, cacheDir;
     std::filesystem::path caCert, caKey, serverCert, serverKey;
     std::filesystem::path clientCert, clientKey;
+#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
     Pid serverPid;
+#endif
     uint16_t port = 8443;
     std::shared_ptr<Store> localCacheStore;
 

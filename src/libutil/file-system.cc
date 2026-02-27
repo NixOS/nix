@@ -1,5 +1,6 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/file-path-impl.hh"
 #include "nix/util/signals.hh"
@@ -171,10 +172,8 @@ bool isDirOrInDir(const std::filesystem::path & path, const std::filesystem::pat
 
 #ifdef _WIN32
 #  define STAT _wstat64
-#  define LSTAT _wstat64
 #else
 #  define STAT stat
-#  define LSTAT lstat
 #endif
 
 PosixStat stat(const std::filesystem::path & path)
@@ -185,54 +184,18 @@ PosixStat stat(const std::filesystem::path & path)
     return st;
 }
 
-PosixStat lstat(const std::filesystem::path & path)
-{
-    PosixStat st;
-    if (LSTAT(path.c_str(), &st))
-        throw SysError("getting status of %s", PathFmt(path));
-    return st;
-}
-
-PosixStat fstat(int fd)
-{
-    PosixStat st;
-    if (
-#ifdef _WIN32
-        _fstat64
-#else
-        ::fstat
-#endif
-        (fd, &st))
-        throw SysError("getting status of fd %d", fd);
-    return st;
-}
-
 std::optional<PosixStat> maybeStat(const std::filesystem::path & path)
 {
-    std::optional<PosixStat> st{std::in_place};
-    if (STAT(path.c_str(), &*st)) {
+    PosixStat st;
+    if (STAT(path.c_str(), &st)) {
         if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
-    }
-    return st;
-}
-
-std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
-{
-    std::optional<PosixStat> st{std::in_place};
-    if (LSTAT(path.c_str(), &*st)) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            st.reset();
-        else
-            throw SysError("getting status of %s", PathFmt(path));
+            return std::nullopt;
+        throw SysError("getting status of %s", PathFmt(path));
     }
     return st;
 }
 
 #undef STAT
-#undef LSTAT
 
 bool pathExists(const std::filesystem::path & path)
 {
@@ -254,11 +217,19 @@ bool pathAccessible(const std::filesystem::path & path)
 std::filesystem::path readLink(const std::filesystem::path & path)
 {
     checkInterrupt();
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::read_symlink on Windows yet
+    auto parentDir = openDirectory(path.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(path));
+    return readLinkAt(parentDir.get(), CanonPath{path.filename().string()});
+#else
     try {
         return std::filesystem::read_symlink(path);
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "reading symbolic link %s", PathFmt(path));
     }
+#endif
 }
 
 std::string readFile(const std::filesystem::path & path)
@@ -363,7 +334,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
 void syncParent(const std::filesystem::path & path)
 {
     assert(path.has_parent_path());
-    AutoCloseFD fd = openDirectory(path.parent_path());
+    AutoCloseFD fd = openDirectory(path.parent_path(), FinalSymlink::Follow);
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
@@ -408,7 +379,7 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = openDirectory(*dir); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openDirectory(*dir, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
@@ -620,10 +591,18 @@ std::filesystem::path makeTempPath(const std::filesystem::path & root, const std
 
 void createSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
 {
+#ifdef _WIN32
+    // libstdc++ doesn't implement std::filesystem::create_symlink on Windows yet
+    auto parentDir = openDirectory(link.parent_path(), FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening parent directory of %s", PathFmt(link));
+    createUnknownSymlinkAt(parentDir.get(), CanonPath{link.filename().string()}, target.native());
+#else
     std::error_code ec;
     std::filesystem::create_symlink(target, link, ec);
     if (ec)
-        throw SysError(ec.value(), "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+        throw SystemError(ec, "creating symlink %s -> %s", PathFmt(link), PathFmt(target));
+#endif
 }
 
 void replaceSymlink(const std::filesystem::path & target, const std::filesystem::path & link)
@@ -633,11 +612,11 @@ void replaceSymlink(const std::filesystem::path & target, const std::filesystem:
         tmp = tmp.lexically_normal();
 
         try {
-            std::filesystem::create_symlink(target, tmp);
-        } catch (std::filesystem::filesystem_error & e) {
-            if (e.code() == std::errc::file_exists)
+            createSymlink(target, tmp);
+        } catch (SystemError & e) {
+            if (e.is(std::errc::file_exists))
                 continue;
-            throw SystemError(e.code(), "creating symlink %1% -> %2%", PathFmt(tmp), PathFmt(target));
+            throw;
         }
 
         try {

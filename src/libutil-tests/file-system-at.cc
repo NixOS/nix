@@ -13,9 +13,6 @@ namespace nix {
 
 TEST(readLinkAt, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
@@ -29,10 +26,11 @@ TEST(readLinkAt, works)
     std::string mediumTarget(maxPathLength / 2, 'x');
     std::string longTarget(maxPathLength - 1, 'y');
 
+#ifdef _WIN32
+    try
+#endif
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createSymlink(CanonPath("link"), "target");
         sink.createSymlink(CanonPath("relative"), "../relative/path");
         sink.createSymlink(CanonPath("absolute"), "/absolute/path");
@@ -44,8 +42,13 @@ TEST(readLinkAt, works)
         sink.createRegularFile(CanonPath("regular"), [](CreateRegularFileSink &) {});
         sink.createDirectory(CanonPath("dir"));
     }
+#ifdef _WIN32
+    catch (SystemError &) {
+        GTEST_SKIP() << "This works locally for me with Wine, but fails with Wine inside a sandboxed build. Confusing!";
+    }
+#endif
 
-    auto dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
@@ -54,7 +57,7 @@ TEST(readLinkAt, works)
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
-    auto subDirFd = openDirectory(tmpDir / "a");
+    auto subDirFd = openDirectory(tmpDir / "a", FinalSymlink::Follow);
     EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
@@ -69,16 +72,11 @@ TEST(readLinkAt, works)
 
 TEST(openFileEnsureBeneathNoSymlinks, works)
 {
-#ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
-#endif
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        RestoreSink sink{openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("c"));
         sink.createDirectory(CanonPath("c/d"));
@@ -107,7 +105,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             SymlinkNotAllowed);
     }
 
-    auto dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
     // Helper to open files with platform-specific arguments
     auto openRead = [&](std::string_view path) -> AutoCloseFD {

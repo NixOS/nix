@@ -11,9 +11,6 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
                               virtual LocalFSStoreConfig,
                               virtual RemoteStoreConfig
 {
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
-
     UDSRemoteStoreConfig(const std::filesystem::path & path, const Params & params);
 
     UDSRemoteStoreConfig(const Params & params);

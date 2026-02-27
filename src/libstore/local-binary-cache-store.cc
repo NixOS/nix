@@ -27,7 +27,7 @@ static std::filesystem::path checkBinaryCachePath(const std::filesystem::path & 
 
 LocalBinaryCacheStoreConfig::LocalBinaryCacheStoreConfig(
     const std::filesystem::path & binaryCacheDir, const StoreReference::Params & params)
-    : Store::Config{params}
+    : Store::Config{params, FilePathType::Native}
     , BinaryCacheStoreConfig{params}
     , binaryCacheDir(binaryCacheDir)
 {
