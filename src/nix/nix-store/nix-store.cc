@@ -69,9 +69,10 @@ static StorePath useDeriver(const StorePath & path)
     return *info->deriver;
 }
 
-/* Realise the given path.  For a derivation that means build it; for
-   other paths it means ensure their validity. */
-static PathSet realisePath(StorePathWithOutputs path, bool build = true)
+/**
+ * Because we are downcasting first thing to a `LocalFSStore`, we know it is OK to return local paths.
+ */
+static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bool build = true)
 {
     auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
 
@@ -87,14 +88,14 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             for (auto & i : drv.outputs)
                 path.outputs.insert(i.first);
 
-        PathSet outputs;
+        std::set<std::filesystem::path> outputs;
         for (auto & j : path.outputs) {
             /* Match outputs of a store path with outputs of the derivation that produces it. */
             DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'", store2->printStorePath(path.path), j);
             auto outPath = outputPaths.at(i->first);
-            auto retPath = store->printStorePath(outPath);
+            std::filesystem::path retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
@@ -104,7 +105,7 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                         rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out")
                         rootName += "-" + i->first;
-                    retPath = store2->addPermRoot(outPath, rootName).string();
+                    retPath = store2->addPermRoot(outPath, rootName);
                 }
             }
             outputs.insert(retPath);
@@ -125,10 +126,10 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
                 rootNr++;
                 if (rootNr > 1)
                     rootName += "-" + std::to_string(rootNr);
-                return {store2->addPermRoot(path.path, rootName).string()};
+                return {store2->addPermRoot(path.path, rootName)};
             }
         }
-        return {store->printStorePath(path.path)};
+        return {std::filesystem::path{store->printStorePath(path.path)}};
     }
 }
 
@@ -181,7 +182,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
             auto paths2 = realisePath(i, false);
             if (!noOutput)
                 for (auto & j : paths2)
-                    cout << fmt("%1%\n", j);
+                    cout << fmt("%s\n", j.string());
         }
 }
 

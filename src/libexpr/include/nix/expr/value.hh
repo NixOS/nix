@@ -155,7 +155,7 @@ public:
         bool location,
         XMLWriter & doc,
         NixStringContext & context,
-        PathSet & drvsSeen,
+        StringSet & drvsSeen,
         const PosIdx pos) const;
 
     virtual ~ExternalValueBase() {};

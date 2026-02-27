@@ -73,7 +73,7 @@ TEST_P(DummyStoreJsonTest, from_json)
     using namespace nlohmann;
     /* Cannot use `readJsonTest` because need to dereference the stores
        for equality. */
-    readTest(Path{name} + ".json", [&](const auto & encodedRaw) {
+    readTest(std::string{name} + ".json", [&](const auto & encodedRaw) {
         auto encoded = json::parse(encodedRaw);
         ref<DummyStore> decoded = adl_serializer<ref<DummyStore>>::from_json(encoded);
         ASSERT_EQ(*decoded, *expected);

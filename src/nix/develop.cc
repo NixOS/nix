@@ -438,7 +438,7 @@ struct Common : InstallableCommand, MixProfile
      * that's accessible from the interactive shell session.
      */
     void fixupStructuredAttrs(
-        PathViewNG::string_view ext,
+        PathView::string_view ext,
         const std::string & envVar,
         const std::string & content,
         StringMap & rewrites,

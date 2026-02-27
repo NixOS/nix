@@ -67,7 +67,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         if (useSandbox) {
 
             /* Lots and lots and lots of file functions freak out if they can't stat their full ancestry */
-            PathSet ancestry;
+            StringSet ancestry;
 
             /* We build the ancestry before adding all inputPaths to the store because we know they'll
                all have the same parents (the store), and there might be lots of inputs. This isn't

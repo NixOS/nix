@@ -245,7 +245,7 @@ struct MercurialInputScheme : InputScheme
 
                 auto actualPath = absPath(localPath);
 
-                PathFilter filter = [&](const Path & p) -> bool {
+                PathFilter filter = [&](const std::string & p) -> bool {
                     assert(hasPrefix(p, actualPath.string()));
                     std::string file(p, actualPath.string().size() + 1);
 

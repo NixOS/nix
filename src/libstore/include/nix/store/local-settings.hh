@@ -439,7 +439,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
 #endif
 
 #if defined(__linux__) || defined(__FreeBSD__)
-    Setting<std::filesystem::path> sandboxBuildDir{
+    Setting<AbsolutePath> sandboxBuildDir{
         this,
         "/build",
         "sandbox-build-dir",
@@ -452,7 +452,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
         )"};
 #endif
 
-    Setting<std::optional<std::filesystem::path>> buildDir{
+    Setting<std::optional<AbsolutePath>> buildDir{
         this,
         std::nullopt,
         "build-dir",
@@ -462,7 +462,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
             See also the per-store [`build-dir`](@docroot@/store/types/local-store.md#store-local-store-build-dir) setting.
         )"};
 
-    Setting<PathSet> allowedImpureHostPrefixes{
+    Setting<std::set<std::filesystem::path>> allowedImpureHostPrefixes{
         this,
         {},
         "allowed-impure-host-deps",
@@ -490,7 +490,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
 
 private:
 
-    Setting<std::optional<std::filesystem::path>> diffHook{
+    Setting<std::optional<AbsolutePath>> diffHook{
         this,
         std::nullopt,
         "diff-hook",

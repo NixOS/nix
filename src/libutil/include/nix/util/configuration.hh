@@ -2,11 +2,13 @@
 ///@file
 
 #include <cassert>
+#include <filesystem>
 #include <map>
 #include <set>
 
 #include <nlohmann/json_fwd.hpp>
 
+#include "nix/util/json-non-null.hh"
 #include "nix/util/types.hh"
 #include "nix/util/experimental-features.hh"
 
@@ -217,6 +219,30 @@ protected:
 };
 
 /**
+ * For `Setting<AbsolutePath>`. `parse()` calls `canonPath`,
+ * rejecting empty and relative paths.
+ */
+struct AbsolutePath : std::filesystem::path
+{
+    using path::path;
+    using path::operator=;
+
+    AbsolutePath(const std::filesystem::path & p)
+        : path(p)
+    {
+    }
+
+    AbsolutePath(std::filesystem::path && p)
+        : path(std::move(p))
+    {
+    }
+};
+
+template<>
+struct json_avoids_null<AbsolutePath> : std::true_type
+{};
+
+/**
  * A setting of type T.
  */
 template<typename T>
@@ -378,6 +404,9 @@ public:
         this->assign(v);
     }
 };
+
+template<>
+void BaseSetting<std::set<std::filesystem::path>>::appendOrSet(std::set<std::filesystem::path> newValue, bool append);
 
 struct ExperimentalFeatureSettings : Config
 {

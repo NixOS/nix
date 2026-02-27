@@ -163,7 +163,9 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     /* Second, the input sources. */
     worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
 
-    debug("added input paths %s", worker.store.showPaths(inputPaths));
+    debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
+              return "'" + worker.store.printStorePath(p) + "'";
+          }));
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
@@ -397,7 +399,11 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 
         if (!outputLocks.lockPaths(lockFiles, "", false)) {
             Activity act(
-                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+                *logger,
+                lvlWarn,
+                actBuildWaiting,
+                fmt("waiting for lock on %s",
+                    Magenta(concatMapStringsSep(", ", lockFiles, [](auto & p) { return "'" + p.string() + "'"; }))));
 
             /* Wait then try locking again, repeat until success (returned
                boolean is true). */

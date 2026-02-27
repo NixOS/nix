@@ -39,13 +39,13 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
           fetch debug info on demand
         )"};
 
-    Setting<std::filesystem::path> secretKeyFile{
+    Setting<AbsolutePath> secretKeyFile{
         this, "", "secret-key", "Path to the secret key used to sign the binary cache."};
 
     Setting<std::string> secretKeyFiles{
         this, "", "secret-keys", "List of comma-separated paths to the secret keys used to sign the binary cache."};
 
-    Setting<std::optional<std::filesystem::path>> localNarCache{
+    Setting<std::optional<AbsolutePath>> localNarCache{
         this,
         std::nullopt,
         "local-nar-cache",

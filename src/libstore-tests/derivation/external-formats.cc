@@ -23,17 +23,17 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
-#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                \
-    TEST_P(FIXTURE, from_json)                                          \
-    {                                                                   \
-        const auto & [name, expected] = GetParam();                     \
-        readJsonTest(Path{"output-"} + name, expected, mockXpSettings); \
-    }                                                                   \
-                                                                        \
-    TEST_P(FIXTURE, to_json)                                            \
-    {                                                                   \
-        const auto & [name, value] = GetParam();                        \
-        writeJsonTest("output-" + name, value);                         \
+#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                       \
+    TEST_P(FIXTURE, from_json)                                                 \
+    {                                                                          \
+        const auto & [name, expected] = GetParam();                            \
+        readJsonTest(std::string{"output-"} + name, expected, mockXpSettings); \
+    }                                                                          \
+                                                                               \
+    TEST_P(FIXTURE, to_json)                                                   \
+    {                                                                          \
+        const auto & [name, value] = GetParam();                               \
+        writeJsonTest(std::string{"output-"} + name, value);                   \
     }
 
 struct DerivationOutputJsonTest : DerivationTest,

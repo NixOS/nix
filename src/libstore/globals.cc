@@ -120,7 +120,7 @@ Settings::Settings()
          }) {
         sandboxPaths.get().insert_or_assign(std::string{p}, ChrootPath{.source = std::string{p}});
     }
-    allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
+    allowedImpureHostPrefixes = std::set<std::filesystem::path>{"/System/Library", "/usr/lib", "/dev", "/bin/sh"};
 #endif
 }
 

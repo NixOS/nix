@@ -154,7 +154,7 @@ std::optional<std::filesystem::path> getSelfExe()
         // serialized to JSON and evaluated as a Nix string.
         path.pop_back();
 
-        return Path(path.begin(), path.end());
+        return std::string(path.begin(), path.end());
 #else
         return std::nullopt;
 #endif

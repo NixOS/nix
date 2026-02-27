@@ -248,7 +248,7 @@ TEST_P(MemorySourceAccessorJsonTest, from_json)
     auto & [name, expected] = GetParam();
     /* Cannot use `readJsonTest` because need to compare `root` field of
        the source accessors for equality. */
-    readTest(Path{name} + ".json", [&](const auto & encodedRaw) {
+    readTest(std::string{name} + ".json", [&](const auto & encodedRaw) {
         auto encoded = json::parse(encodedRaw);
         auto decoded = static_cast<MemorySourceAccessor>(encoded);
         ASSERT_EQ(decoded.root, expected.root);

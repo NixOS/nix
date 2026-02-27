@@ -14,7 +14,7 @@ class PathInfoTestV1 : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "path-info" / "json-1";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".json");
     }
@@ -24,7 +24,7 @@ class PathInfoTestV2 : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "path-info" / "json-2";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".json");
     }

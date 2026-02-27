@@ -66,7 +66,7 @@ struct GCResults
      * Depending on the action, the GC roots, or the paths that would
      * be or have been deleted.
      */
-    PathSet paths;
+    StringSet paths;
 
     /**
      * For `gcDeleteDead` and `gcDeleteSpecific`, the number of bytes that were freed.

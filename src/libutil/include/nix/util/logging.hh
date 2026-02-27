@@ -54,7 +54,7 @@ struct LoggerSettings : Config
           expression evaluation errors.
         )"};
 
-    Setting<std::optional<std::filesystem::path>> jsonLogPath{
+    Setting<std::optional<AbsolutePath>> jsonLogPath{
         this,
         {},
         "json-log-path",

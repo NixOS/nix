@@ -548,7 +548,7 @@ public:
     /**
      * Variant which accepts relative paths too.
      */
-    SourcePath rootPath(PathView path);
+    SourcePath rootPath(std::string_view path);
 
     /**
      * Return a `SourcePath` that refers to `path` in the store.
@@ -565,7 +565,7 @@ public:
      * Only for restrict eval: pure eval just whitelist store paths,
      * never arbitrary paths.
      */
-    void allowPathLegacy(const Path & path);
+    void allowPathLegacy(const std::string & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to

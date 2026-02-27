@@ -21,14 +21,14 @@ class ProtoTest : public CharacterizationTest
     }
 
 public:
-    Path storeDir = "/nix/store";
+    std::string storeDir = "/nix/store";
     StoreDirConfig store{storeDir};
 
     /**
      * Golden test for `T` JSON reading
      */
     template<typename T>
-    void readJsonTest(PathView testStem, const T & expected)
+    void readJsonTest(std::string_view testStem, const T & expected)
     {
         nix::readJsonTest(*this, testStem, expected);
     }
@@ -37,7 +37,7 @@ public:
      * Golden test for `T` JSON write
      */
     template<typename T>
-    void writeJsonTest(PathView testStem, const T & decoded)
+    void writeJsonTest(std::string_view testStem, const T & decoded)
     {
         nix::writeJsonTest(*this, testStem, decoded);
     }
@@ -51,7 +51,7 @@ public:
      * Golden test for `T` reading
      */
     template<typename T>
-    void readProtoTest(PathView testStem, typename Proto::Version version, T expected)
+    void readProtoTest(std::string_view testStem, typename Proto::Version version, T expected)
     {
         CharacterizationTest::readTest(std::string{testStem + ".bin"}, [&](const auto & encoded) {
             T got = ({
@@ -72,7 +72,7 @@ public:
      * Golden test for `T` write
      */
     template<typename T>
-    void writeProtoTest(PathView testStem, typename Proto::Version version, const T & decoded)
+    void writeProtoTest(std::string_view testStem, typename Proto::Version version, const T & decoded)
     {
         CharacterizationTest::writeTest(std::string{testStem + ".bin"}, [&]() {
             StringSink to;

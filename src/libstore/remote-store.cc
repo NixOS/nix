@@ -695,7 +695,7 @@ Roots RemoteStore::findRoots(bool censor)
     size_t count = readNum<size_t>(conn->from);
     Roots result;
     while (count--) {
-        Path link = readString(conn->from);
+        std::string link = readString(conn->from);
         result[WorkerProto::Serialise<StorePath>::read(*this, *conn)].emplace(link);
     }
     return result;
@@ -715,7 +715,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     conn.processStderr();
 
-    results.paths = readStrings<PathSet>(conn->from);
+    results.paths = readStrings<StringSet>(conn->from);
     results.bytesFreed = readLongLong(conn->from);
     readLongLong(conn->from); // obsolete
 

@@ -124,7 +124,7 @@ void setWriteTime(
 }
 
 #ifdef __FreeBSD__
-#  define MOUNTEDPATHS_PARAM , std::set<Path> & mountedPaths
+#  define MOUNTEDPATHS_PARAM , std::set<std::filesystem::path> & mountedPaths
 #  define MOUNTEDPATHS_ARG , mountedPaths
 #else
 #  define MOUNTEDPATHS_PARAM
@@ -257,7 +257,7 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     // Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
 #ifdef __FreeBSD__
-    std::set<Path> mountedPaths;
+    std::set<std::filesystem::path> mountedPaths;
     struct statfs * mntbuf;
     int count;
     if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {

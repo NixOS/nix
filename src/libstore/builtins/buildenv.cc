@@ -123,10 +123,10 @@ void buildProfile(const std::filesystem::path & out, Packages && pkgs)
 {
     State state;
 
-    PathSet done, postponed;
+    std::set<std::filesystem::path> done, postponed;
 
     auto addPkg = [&](const std::filesystem::path & pkgDir, int priority) {
-        if (!done.insert(pkgDir.string()).second)
+        if (!done.insert(pkgDir).second)
             return;
         createLinks(state, pkgDir, out, priority);
 
@@ -159,7 +159,7 @@ void buildProfile(const std::filesystem::path & out, Packages && pkgs)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        PathSet pkgDirs;
+        std::set<std::filesystem::path> pkgDirs;
         postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);

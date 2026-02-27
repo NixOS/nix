@@ -701,8 +701,7 @@ void moveFile(const std::filesystem::path & oldName, const std::filesystem::path
         auto newPath = newName;
         // For the move to be as atomic as possible, copy to a temporary
         // directory
-        std::filesystem::path temp =
-            createTempDir(os_string_to_string(PathViewNG{newPath.parent_path()}), "rename-tmp");
+        std::filesystem::path temp = createTempDir(os_string_to_string(PathView{newPath.parent_path()}), "rename-tmp");
         Finally removeTemp = [&]() { std::filesystem::remove(temp); };
         auto tempCopyTarget = temp / "copy-target";
         if (e.code().value() == EXDEV) {
@@ -710,7 +709,7 @@ void moveFile(const std::filesystem::path & oldName, const std::filesystem::path
             warn("can’t rename %s as %s, copying instead", PathFmt(oldName), PathFmt(newName));
             copyFile(oldPath, tempCopyTarget, true);
             std::filesystem::rename(
-                os_string_to_string(PathViewNG{tempCopyTarget}), os_string_to_string(PathViewNG{newPath}));
+                os_string_to_string(PathView{tempCopyTarget}), os_string_to_string(PathView{newPath}));
         }
     }
 }

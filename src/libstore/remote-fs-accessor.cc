@@ -2,8 +2,7 @@
 
 namespace nix {
 
-RemoteFSAccessor::RemoteFSAccessor(
-    ref<Store> store, bool requireValidPath, std::optional<std::filesystem::path> cacheDir)
+RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, std::optional<AbsolutePath> cacheDir)
     : store(store)
     , narCache(cacheDir)
     , requireValidPath(requireValidPath)
@@ -15,7 +14,7 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
     auto [storePath, restPath] = store->toStorePath(store->storeDir + path.abs());
     if (requireValidPath && !store->isValidPath(storePath))
         throw InvalidPath("path '%1%' is not a valid store path", store->printStorePath(storePath));
-    return {ref{accessObject(storePath)}, CanonPath{restPath}};
+    return {ref{accessObject(storePath)}, restPath};
 }
 
 std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath & storePath)
