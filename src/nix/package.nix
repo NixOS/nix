@@ -2,6 +2,7 @@
   stdenv,
   lib,
   mkMesonExecutable,
+  llvmPackages,
 
   nix-store,
   nix-expr,
@@ -69,7 +70,13 @@ mkMesonExecutable (finalAttrs: {
     nix-expr
     nix-main
     nix-cmd
-  ];
+  ]
+  ++ lib.optional (
+    stdenv.cc.isClang
+    && stdenv.hostPlatform.isStatic
+    && stdenv.cc.libcxx != null
+    && stdenv.cc.libcxx.isLLVM
+  ) llvmPackages.libunwind;
 
   mesonFlags = [
   ];
