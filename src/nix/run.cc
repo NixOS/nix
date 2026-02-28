@@ -173,7 +173,20 @@ struct CmdRun : InstallableValueCommand, MixEnvironment
 
         setEnviron();
 
-        execProgramInStore(store, UseLookupPath::DontUse, app.program.string(), allArgs);
+        try {
+            execProgramInStore(store, UseLookupPath::DontUse, app.program.string(), allArgs);
+        } catch (Error & e) {
+            if (app.mainProgramNameProvenance != MainProgramNameProvenance::Unset) {
+                if (app.mainProgramNameProvenance != MainProgramNameProvenance::MetaMainProgram)
+                    e.addTrace(nullptr, "consider setting 'meta.mainProgram' or using 'nix shell' instead");
+                e.addTrace(nullptr,
+                    "while running program '%1%' (determined from '%2%') of derivation '%3%'",
+                    app.program.filename().string(),
+                    std::string(showMainProgramNameProvenance(app.mainProgramNameProvenance)),
+                    app.derivationName);
+            }
+            throw;
+        }
     }
 };
 
