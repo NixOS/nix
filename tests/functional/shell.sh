@@ -41,6 +41,7 @@ sed -i \
   -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
   -e '/^__LLVM_PROFILE_RT_INIT_ONCE=.*$/d' \
+  -e '/^NIX_SHELL_PACKAGES=.*$/d' \
   "$TEST_ROOT/expected-env" "$TEST_ROOT/actual-env"
 sort "$TEST_ROOT/expected-env" > "$TEST_ROOT/expected-env.sorted"
 sort "$TEST_ROOT/actual-env" > "$TEST_ROOT/actual-env.sorted"
