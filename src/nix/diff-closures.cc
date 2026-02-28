@@ -4,9 +4,9 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/names.hh"
 
-#include <regex>
-
 #include "nix/util/strings.hh"
+
+#include <algorithm>
 
 namespace nix {
 
@@ -33,15 +33,20 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
         /* Strip the output name. Unfortunately this is ambiguous (we
            can't distinguish between output names like "bin" and
            version suffixes like "unstable"). */
-        static std::regex regex("(.*)-([a-z]+|lib32|lib64)");
-        std::cmatch match;
         std::string name{path.name()};
         std::string_view const origName = path.name();
         std::string outputName;
 
-        if (std::regex_match(origName.begin(), origName.end(), match, regex)) {
-            name = match[1];
-            outputName = match[2];
+        // (.*)-([a-z]+|lib32|lib64)
+        auto dash = origName.rfind('-');
+        if (dash != std::string_view::npos && dash + 1 < origName.size()) {
+            auto suffix = origName.substr(dash + 1);
+            auto isAllLower = [&] { return std::ranges::all_of(suffix, [](char c) { return c >= 'a' && c <= 'z'; }); };
+
+            if (suffix == "lib32" || suffix == "lib64" || isAllLower()) {
+                name = std::string{origName.substr(0, dash)};
+                outputName = std::string{suffix};
+            }
         }
 
         DrvName drvName(name);
