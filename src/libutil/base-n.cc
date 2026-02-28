@@ -88,25 +88,56 @@ std::string base64::decode(std::string_view s)
     // Some sequences are missing the padding consisting of up to two '='.
     //                    vvv
     res.reserve((s.size() + 2) / 4 * 3);
-    unsigned int d = 0, bits = 0;
+    unsigned int d = 0, bits = 0, char_count = 0, padding_count = 0;
+    size_t padding_idx[2] = { SIZE_MAX, SIZE_MAX };
+    size_t i = 0, parse_finished_at = 0;
 
-    for (char c : s) {
-        if (c == '=')
-            break;
+    for (; i < s.size(); i++) {
+        char c = s[i];
         if (c == '\n')
             continue;
+        if (padding_count > 0 && c != '=')
+            break;
+        if (c == '=') {
+            padding_idx[padding_count] = i;
+            padding_count += 1;
+            if (padding_count >= 2)
+                break;
+        } else {
+            char digit = base64DecodeChars[(unsigned char) c];
+            if (digit == npos)
+                throw FormatError("invalid character in Base64 string: '%c'", c);
+            char_count += 1;
 
-        char digit = base64DecodeChars[(unsigned char) c];
-        if (digit == npos)
-            throw FormatError("invalid character in Base64 string: '%c'", c);
-
-        bits += 6;
-        d = d << 6 | digit;
-        if (bits >= 8) {
-            res.push_back(d >> (bits - 8) & 0xff);
-            bits -= 8;
+            bits += 6;
+            d = d << 6 | digit;
+            if (bits >= 8) {
+                res.push_back(d >> (bits - 8) & 0xff);
+                bits -= 8;
+            }
         }
     }
+
+    unsigned int expected_padding = char_count % 3;
+
+    if (padding_count <= expected_padding) {
+        parse_finished_at = i;
+    } else {
+        parse_finished_at = padding_idx[expected_padding];
+        assert(parse_finished_at != SIZE_MAX);
+    }
+
+    auto hash_part = s.substr(0, parse_finished_at);
+    auto extraneous_part = s.substr(parse_finished_at);
+
+    if (d != 0)
+        warn("Hash '%s' has non-zero padding bits", hash_part);
+
+    if (padding_count < expected_padding)
+        warn("Hash '%s' is missing '=' padding", hash_part);
+
+    if (parse_finished_at < s.size())
+        warn("Hash '%s' has extraneous data after: '%s'", hash_part, extraneous_part);
 
     return res;
 }
