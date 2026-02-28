@@ -1,8 +1,9 @@
+#include <algorithm>
 #include <cerrno>
 #include <algorithm>
 #include <vector>
 #include <map>
-#include <regex>
+#include <boost/regex.hpp>
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/signals.hh"
@@ -147,7 +148,7 @@ void parseTree(
         }
 
         Hash hash(hashAlgo);
-        std::copy(hashs.begin(), hashs.end(), hash.hash);
+        std::ranges::copy(hashs, hash.hash);
 
         hook(
             CanonPath{name},
@@ -340,15 +341,18 @@ TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filte
 
 std::optional<LsRemoteRefLine> parseLsRemoteLine(std::string_view line)
 {
-    const static std::regex line_regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$");
-    std::match_results<std::string_view::const_iterator> match;
-    if (!std::regex_match(line.cbegin(), line.cend(), match, line_regex))
+    static const auto lineRegex = boost::regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$", boost::regex_constants::optimize);
+
+    boost::match_results<std::string_view::const_iterator> match;
+    if (!boost::regex_match(line.begin(), line.end(), match, lineRegex))
         return std::nullopt;
 
     return LsRemoteRefLine{
         .kind = match[1].length() == 0 ? LsRemoteRefLine::Kind::Object : LsRemoteRefLine::Kind::Symbolic,
-        .target = match[2],
-        .reference = match[3].length() == 0 ? std::nullopt : std::optional<std::string>{match[3]}};
+        .target = std::string(match[2].first, match[2].second),
+        .reference = match[3].length() == 0 ? std::nullopt
+                                            : std::optional<std::string>{std::string(match[3].first, match[3].second)},
+    };
 }
 
 } // namespace nix::git
