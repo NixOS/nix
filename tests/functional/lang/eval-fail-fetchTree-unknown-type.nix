@@ -1,0 +1,3 @@
+builtins.fetchTree {
+  type = "foo";
+}
