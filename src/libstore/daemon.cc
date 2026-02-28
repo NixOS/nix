@@ -84,7 +84,7 @@ struct TunnelLogger : public Logger
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, const std::string & machine = "") override
     {
         if (lvl > verbosity)
             return;
@@ -147,7 +147,8 @@ struct TunnelLogger : public Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        const std::string & machine = "") override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20}) {
             if (!s.empty())
@@ -160,7 +161,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act, const std::string & machine = "") override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
@@ -169,7 +170,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
