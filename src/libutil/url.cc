@@ -111,6 +111,7 @@ static std::string percentEncodeCharSet(std::string_view s, auto charSet)
 }
 
 static ParsedURL fromBoostUrlView(boost::urls::url_view url, bool lenient);
+static ParsedRelativeUrl fromBoostUrlViewRelative(boost::urls::url_view urlView, bool lenient);
 
 ParsedURL parseURL(std::string_view url, bool lenient)
 try {
@@ -158,6 +159,38 @@ try {
     throw BadURL("'%s' is not a valid URL: %s", url, e.code().message());
 }
 
+ParsedRelativeUrl ParsedRelativeUrl::parse(std::string_view raw, bool lenient)
+{
+    auto parsed = boost::urls::parse_relative_ref(raw);
+    if (!parsed)
+        throw BadURL("invalid relative URL '%s': %s", raw, parsed.error().message());
+
+    return fromBoostUrlViewRelative(*parsed, lenient);
+}
+
+/**
+ * Decode a percent-encoded URL path into path segments.
+ */
+static std::vector<std::string> decodeUrlPath(std::string_view encodedPath)
+{
+    return std::views::transform(splitString<std::vector<std::string_view>>(encodedPath, "/"), percentDecode)
+           | std::ranges::to<std::vector<std::string>>();
+}
+
+/**
+ * Extract path, query, and fragment from a boost url_view into a ParsedRelativeUrl.
+ */
+static ParsedRelativeUrl fromBoostUrlViewRelative(boost::urls::url_view urlView, bool lenient)
+{
+    return ParsedRelativeUrl{
+        .path = decodeUrlPath(urlView.encoded_path()),
+        /* Get the raw query. Store URI supports smuggling doubly nested queries, where
+           the inner &/? are pct-encoded. */
+        .query = urlView.has_query() ? std::optional{decodeQuery(urlView.encoded_query(), lenient)} : std::nullopt,
+        .fragment = urlView.has_fragment() ? std::string{urlView.fragment()} : std::string{},
+    };
+}
+
 static ParsedURL fromBoostUrlView(boost::urls::url_view urlView, bool lenient)
 {
     if (!urlView.has_scheme())
@@ -181,78 +214,136 @@ static ParsedURL fromBoostUrlView(boost::urls::url_view urlView, bool lenient)
     if (authority && authority->host.size() && transportIsFile)
         throw BadURL("file:// URL '%s' has unexpected authority '%s'", urlView.buffer(), *authority);
 
-    auto fragment = urlView.fragment(); /* Does pct-decoding */
+    ParsedRelativeUrl relative = fromBoostUrlViewRelative(urlView, lenient);
 
-    boost::core::string_view encodedPath = urlView.encoded_path();
-    if (transportIsFile && encodedPath.empty())
-        encodedPath = "/";
-
-    auto path = std::views::transform(splitString<std::vector<std::string_view>>(encodedPath, "/"), percentDecode)
-                | std::ranges::to<std::vector<std::string>>();
-
-    /* Get the raw query. Store URI supports smuggling doubly nested queries, where
-       the inner &/? are pct-encoded. */
-    auto query = std::string_view(urlView.encoded_query());
+    // Handle empty path for file:// URLs
+    if (transportIsFile && relative.path.empty())
+        relative.path = {""};
 
     return ParsedURL{
         .scheme = scheme,
         .authority = authority,
-        .path = std::move(path),
-        .query = decodeQuery(query, lenient),
-        .fragment = fragment,
+        .path = std::move(relative.path),
+        .query = std::move(relative.query).value_or(StringMap{}),
+        .fragment = std::move(relative.fragment),
+    };
+}
+
+std::variant<ParsedRelativeUrl, ParsedURL> parsePossiblyRelativeURL(std::string_view url)
+{
+    auto parsed = boost::urls::parse_uri_reference(url);
+    if (!parsed)
+        throw BadURL("'%s' is not a valid URL: %s", url, parsed.error().message());
+
+    if (parsed->has_scheme())
+        return fromBoostUrlView(*parsed, /*lenient=*/false);
+    else
+        return fromBoostUrlViewRelative(*parsed, /*lenient=*/false);
+}
+
+/**
+ * Check if a URL path is empty (no path or just a single empty segment).
+ */
+static bool isEmptyPath(const std::vector<std::string> & path)
+{
+    return path.empty() || (path.size() == 1 && path[0].empty());
+}
+
+/**
+ * Remove dot segments from a path per RFC 3986 Section 5.2.4.
+ */
+static std::vector<std::string> canonicalizeDotSegments(std::vector<std::string> path)
+{
+    std::vector<std::string> output;
+    for (auto & segment : path) {
+        if (segment == ".") {
+            // Skip "." segments, but preserve trailing slash
+            if (&segment == &path.back())
+                output.push_back("");
+        } else if (segment == "..") {
+            // Go up one level: remove last non-empty segment
+            if (output.size() > 1)
+                output.pop_back();
+            // Preserve trailing slash
+            if (&segment == &path.back() && !output.empty())
+                output.push_back("");
+        } else {
+            output.push_back(std::move(segment));
+        }
+    }
+    return output;
+}
+
+/**
+ * Merge a relative path with a base path per RFC 3986 Section 5.2.3.
+ */
+static std::vector<std::string>
+mergePaths(const std::vector<std::string> & base, const std::vector<std::string> & ref, bool baseHasAuthority)
+{
+    // If base has authority and empty path, result is "/" + ref
+    if (baseHasAuthority && isEmptyPath(base)) {
+        std::vector<std::string> result = {""};
+        result.insert(result.end(), ref.begin(), ref.end());
+        return result;
+    }
+
+    // Remove everything after last "/" in base (i.e., remove last segment) and append ref
+    std::vector<std::string> result = base;
+    if (!result.empty())
+        result.pop_back();
+    result.insert(result.end(), ref.begin(), ref.end());
+    return result;
+}
+
+ParsedURL resolveParsedRelativeUrl(const ParsedRelativeUrl & ref, const ParsedURL & base)
+{
+    // RFC 3986 Section 5.2.2 - Transform References
+    // Since we only handle relative references here (no scheme), we follow the R.scheme undefined branch
+
+    std::vector<std::string> targetPath;
+    StringMap targetQuery;
+
+    // Path representations:
+    // - "" parses to [""] (one empty segment)
+    // - "/" parses to ["", ""] (two empty segments)
+    // - "/foo" parses to ["", "foo"]
+    // - "foo" parses to ["foo"]
+    bool hasEmptyPath = isEmptyPath(ref.path);
+    bool hasAbsolutePath = ref.path.size() >= 2 && ref.path[0].empty();
+
+    if (hasEmptyPath) {
+        // Empty path: use base path
+        targetPath = base.path;
+        // If ref has query, use it; otherwise use base query
+        targetQuery = ref.query.value_or(base.query);
+    } else if (hasAbsolutePath) {
+        // Absolute path (starts with "/"): use ref path directly
+        targetPath = canonicalizeDotSegments(ref.path);
+        targetQuery = ref.query.value_or(StringMap{});
+    } else {
+        // Relative path: merge with base
+        targetPath = canonicalizeDotSegments(mergePaths(base.path, ref.path, base.authority.has_value()));
+        targetQuery = ref.query.value_or(StringMap{});
+    }
+
+    return ParsedURL{
+        .scheme = base.scheme,
+        .authority = base.authority,
+        .path = targetPath,
+        .query = targetQuery,
+        .fragment = ref.fragment,
     };
 }
 
 ParsedURL parseURLRelative(std::string_view urlS, const ParsedURL & base)
-try {
-
-    boost::urls::url resolved;
-
-    try {
-        resolved.set_scheme(base.scheme);
-        if (base.authority) {
-            auto & authority = *base.authority;
-            resolved.set_host_address(authority.host);
-            if (authority.user)
-                resolved.set_user(*authority.user);
-            if (authority.password)
-                resolved.set_password(*authority.password);
-            if (authority.port)
-                resolved.set_port_number(*authority.port);
-        }
-        resolved.set_encoded_path(encodeUrlPath(base.path));
-        resolved.set_encoded_query(encodeQuery(base.query));
-        resolved.set_fragment(base.fragment);
-    } catch (boost::system::system_error & e) {
-        throw BadURL("'%s' is not a valid URL: %s", base.to_string(), e.code().message());
-    }
-
-    boost::urls::url_view url;
-    try {
-        url = urlS;
-        resolved.resolve(url).value();
-    } catch (boost::system::system_error & e) {
-        throw BadURL("'%s' is not a valid URL: %s", urlS, e.code().message());
-    }
-
-    auto ret = fromBoostUrlView(resolved, /*lenient=*/false);
-
-    /* Hack: Boost `url_view` supports Zone IDs, but `url` does not.
-       Just manually take the authority from the original URL to work
-       around it. See https://github.com/boostorg/url/issues/919 for
-       details. */
-    if (!url.has_authority()) {
-        ret.authority = base.authority;
-    }
-
-    /* Hack, work around fragment of base URL improperly being preserved
-       https://github.com/boostorg/url/issues/920 */
-    ret.fragment = url.has_fragment() ? std::string{url.fragment()} : "";
-
-    return ret;
-} catch (BadURL & e) {
-    e.addTrace({}, "while resolving possibly-relative url '%s' against base URL '%s'", urlS, base);
-    throw;
+{
+    auto parsed = parsePossiblyRelativeURL(urlS);
+    return std::visit(
+        overloaded{
+            [&](ParsedRelativeUrl & relative) { return resolveParsedRelativeUrl(relative, base); },
+            [&](ParsedURL & absolute) { return std::move(absolute); },
+        },
+        parsed);
 }
 
 std::string percentDecode(std::string_view in)
@@ -333,23 +424,52 @@ std::string ParsedURL::renderPath(bool encode) const
     return renderUrlPathNoPctEncoding(path);
 }
 
-std::string ParsedURL::renderAuthorityAndPath() const
+std::string ParsedRelativeUrl::renderPath(bool encode) const
 {
-    std::string res;
-    /* The following assertions correspond to 3.3. Path [rfc3986]. URL parser
-       will never violate these properties, but hand-constructed ParsedURLs might. */
+    if (encode)
+        return encodeUrlPath(path);
+    return renderUrlPathNoPctEncoding(path);
+}
+
+/**
+ * Render the authority component, validating path constraints per RFC 3986 Section 3.3.
+ *
+ * URL parser will never violate these properties, but hand-constructed ParsedURLs might.
+ */
+static std::string
+renderAuthority(const std::optional<ParsedURL::Authority> & authority, const std::vector<std::string> & path)
+{
     if (authority.has_value()) {
         /* If a URI contains an authority component, then the path component
            must either be empty or begin with a slash ("/") character. */
         assert(path.empty() || path.front().empty());
-        res += authority->to_string();
+        return authority->to_string();
     } else if (std::ranges::equal(std::views::take(path, 3), std::views::repeat("", 3))) {
         /* If a URI does not contain an authority component, then the path cannot begin
            with two slash characters ("//") */
         unreachable();
     }
-    res += encodeUrlPath(path);
+    return "";
+}
+
+static std::string
+renderPathQueryFragment(const std::vector<std::string> & path, const StringMap * query, const std::string & fragment)
+{
+    std::string res = encodeUrlPath(path);
+    if (query) {
+        res += '?';
+        res += encodeQuery(*query);
+    }
+    if (!fragment.empty()) {
+        res += '#';
+        res += percentEncode(fragment);
+    }
     return res;
+}
+
+std::string ParsedURL::renderAuthorityAndPath() const
+{
+    return renderAuthority(authority, path) + encodeUrlPath(path);
 }
 
 std::string ParsedURL::to_string() const
@@ -359,19 +479,23 @@ std::string ParsedURL::to_string() const
     res += ":";
     if (authority.has_value())
         res += "//";
-    res += renderAuthorityAndPath();
-    if (!query.empty()) {
-        res += "?";
-        res += encodeQuery(query);
-    }
-    if (!fragment.empty()) {
-        res += "#";
-        res += percentEncode(fragment);
-    }
+    res += renderAuthority(authority, path);
+    res += renderPathQueryFragment(path, query.empty() ? nullptr : &query, fragment);
     return res;
 }
 
+std::string ParsedRelativeUrl::to_string() const
+{
+    return renderPathQueryFragment(path, get(query), fragment);
+}
+
 std::ostream & operator<<(std::ostream & os, const ParsedURL & url)
+{
+    os << url.to_string();
+    return os;
+}
+
+std::ostream & operator<<(std::ostream & os, const ParsedRelativeUrl & url)
 {
     os << url.to_string();
     return os;

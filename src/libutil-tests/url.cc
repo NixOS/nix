@@ -168,7 +168,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "http",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -179,7 +183,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -190,7 +198,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
                     .fragment = "hello",
@@ -201,7 +213,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "file+https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "video.mp4"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -212,7 +228,12 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "http",
-                    .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv4,
+                            .host = "127.0.0.1",
+                            .port = 8080,
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
                     .fragment = "hello",
@@ -225,7 +246,10 @@ INSTANTIATE_TEST_SUITE_P(
                     .scheme = "http",
                     .authority =
                         Authority{
-                            .hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c\%enp0s25",
+                            .port = 8080,
+                        },
                     .path = {""},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -277,7 +301,11 @@ TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .authority =
+            Authority{
+                .hostType = HostType::Name,
+                .host = "www.example.org",
+            },
         .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"field", "value"}},
         .fragment = "?foo=bar#",
@@ -484,7 +512,11 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .authority =
+            Authority{
+                .hostType = HostType::Name,
+                .host = "www.example.org",
+            },
         .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"foo", "bar"}},
         .fragment = "",
@@ -498,203 +530,294 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
  * parseURLRelative
  * --------------------------------------------------------------------------*/
 
-TEST(parseURLRelative, resolvesRelativePath)
+struct ParseURLRelativeParam
 {
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
+    std::string_view base;
+    std::string_view relative;
+    ParsedURL expected;
+    std::string description;
+};
+
+class ParseURLRelativeTestSuite : public ::testing::TestWithParam<ParseURLRelativeParam>
+{};
+
+TEST_P(ParseURLRelativeTestSuite, baseRoundTrips)
+{
+    auto & p = GetParam();
+    auto base = parseURL(p.base);
+    EXPECT_EQ(base.to_string(), p.base);
 }
 
-TEST(parseURLRelative, baseUrlIpv6AddressWithoutZoneId)
+TEST_P(ParseURLRelativeTestSuite, relativeRoundTrips)
 {
-    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c]/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
+    auto & p = GetParam();
+    auto parsed = parsePossiblyRelativeURL(p.relative);
+    auto str = std::visit([](auto & url) { return url.to_string(); }, parsed);
+    EXPECT_EQ(str, p.relative);
 }
 
-TEST(parseURLRelative, resolvesRelativePathIpv6AddressWithZoneId)
+TEST_P(ParseURLRelativeTestSuite, resolve)
 {
-    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file2.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
-        .path = {"", "dir", "subdir", "file2.txt"},
-        .query = {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
+    auto & p = GetParam();
+    auto base = parseURL(p.base);
+    auto parsed = parseURLRelative(p.relative, base);
+    EXPECT_EQ(parsed, p.expected);
 }
 
-TEST(parseURLRelative, resolvesRelativePathWithDot)
-{
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("./subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesParentDirectory)
-{
-    ParsedURL base = parseURL("http://example.org:234/dir/page.html");
-    auto parsed = parseURLRelative("../up.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
-        .path = {"", "up.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesParentDirectoryNotTrickedByEscapedSlash)
-{
-    ParsedURL base = parseURL("http://example.org:234/dir\%2Ffirst-trick/another-dir\%2Fsecond-trick/page.html");
-    auto parsed = parseURLRelative("../up.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
-        .path = {"", "dir/first-trick", "up.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, replacesPathWithAbsoluteRelative)
-{
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("/rooted.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "rooted.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, keepsQueryAndFragmentFromRelative)
-{
-    // But discard query params on base URL
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?z=3");
-    auto parsed = parseURLRelative("other.html?x=1&y=2#frag", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "other.html"},
-        .query = {{"x", "1"}, {"y", "2"}},
-        .fragment = "frag",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, absOverride)
-{
-    ParsedURL base = parseURL("http://example.org/path/page.html");
-    std::string_view abs = "https://127.0.0.1.org/secure";
-    auto parsed = parseURLRelative(abs, base);
-    auto parsedAbs = parseURL(abs);
-    ASSERT_EQ(parsed, parsedAbs);
-}
-
-TEST(parseURLRelative, absOverrideWithZoneId)
-{
-    ParsedURL base = parseURL("http://example.org/path/page.html");
-    std::string_view abs = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar";
-    auto parsed = parseURLRelative(abs, base);
-    auto parsedAbs = parseURL(abs);
-    ASSERT_EQ(parsed, parsedAbs);
-}
-
-TEST(parseURLRelative, bothWithoutAuthority)
-{
-    ParsedURL base = parseURL("mailto:mail-base@bar.baz?bcc=alice@asdf.com");
-    std::string_view over = "mailto:mail-override@foo.bar?subject=url-testing";
-    auto parsed = parseURLRelative(over, base);
-    auto parsedOverride = parseURL(over);
-    ASSERT_EQ(parsed, parsedOverride);
-}
-
-TEST(parseURLRelative, emptyRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"a b", "5 6"}, {"x y", "34"}},
-        .fragment = "",
-    };
-    EXPECT_EQ(base.fragment, "frag");
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, fragmentRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("#frag2", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"a b", "5 6"}, {"x y", "34"}},
-        .fragment = "frag2",
-    };
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, queryRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"asdf qwer", "1 2 3"}},
-        .fragment = "",
-    };
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, queryFragmentRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203#frag2", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"asdf qwer", "1 2 3"}},
-        .fragment = "frag2",
-    };
-    EXPECT_EQ(parsed, expected);
-}
+INSTANTIATE_TEST_SUITE_P(
+    parseURLRelative,
+    ParseURLRelativeTestSuite,
+    ::testing::Values(
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "resolvesRelativePath",
+        },
+        ParseURLRelativeParam{
+            .base = "http://[fe80::818c:da4d:8975:415c]/dir/page.html",
+            .relative = "subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "baseUrlIpv6AddressWithoutZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html",
+            .relative = "subdir/file2.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c%enp0s25",
+                            .port = 8080,
+                        },
+                    .path = {"", "dir", "subdir", "file2.txt"},
+                },
+            .description = "resolvesRelativePathIpv6AddressWithZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "./subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "resolvesRelativePathWithDot",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org:234/dir/page.html",
+            .relative = "../up.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                            .port = 234,
+                        },
+                    .path = {"", "up.txt"},
+                },
+            .description = "resolvesParentDirectory",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org:234/dir\%2Ffirst-trick/another-dir\%2Fsecond-trick/page.html",
+            .relative = "../up.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                            .port = 234,
+                        },
+                    .path = {"", "dir/first-trick", "up.txt"},
+                },
+            .description = "resolvesParentDirectoryNotTrickedByEscapedSlash",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "/rooted.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "rooted.txt"},
+                },
+            .description = "replacesPathWithAbsoluteRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?z=3",
+            .relative = "other.html?x=1&y=2#frag",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "other.html"},
+                    .query = {{"x", "1"}, {"y", "2"}},
+                    .fragment = "frag",
+                },
+            .description = "keepsQueryAndFragmentFromRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/path/page.html",
+            .relative = "https://127.0.0.1.org/secure",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "127.0.0.1.org",
+                        },
+                    .path = {"", "secure"},
+                },
+            .description = "absOverride",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/path/page.html",
+            .relative = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c%enp0s25",
+                        },
+                    .path = {"", "secure"},
+                    .query = {{"foo", "bar"}},
+                },
+            .description = "absOverrideWithZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "mailto:mail-base@bar.baz?bcc=alice@asdf.com",
+            .relative = "mailto:mail-override@foo.bar?subject=url-testing",
+            .expected =
+                ParsedURL{
+                    .scheme = "mailto",
+                    .path = {"mail-override@foo.bar"},
+                    .query = {{"subject", "url-testing"}},
+                },
+            .description = "bothWithoutAuthority",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"a b", "5 6"}, {"x y", "34"}},
+                },
+            .description = "emptyRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "#frag2",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"a b", "5 6"}, {"x y", "34"}},
+                    .fragment = "frag2",
+                },
+            .description = "fragmentRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {},
+                },
+            .description = "emptyQueryRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?asdf\%20qwer=1\%202\%203",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"asdf qwer", "1 2 3"}},
+                },
+            .description = "queryRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?asdf\%20qwer=1\%202\%203#frag2",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"asdf qwer", "1 2 3"}},
+                    .fragment = "frag2",
+                },
+            .description = "queryFragmentRelative",
+        }),
+    [](const auto & info) { return info.param.description; });
 
 /* ----------------------------------------------------------------------------
  * decodeQuery

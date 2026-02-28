@@ -253,6 +253,54 @@ struct ParsedURL
 
 std::ostream & operator<<(std::ostream & os, const ParsedURL & url);
 
+/**
+ * A relative URL (no scheme or authority) with path, query parameters, and fragment.
+ *
+ * This represents a URL reference relative to some base, such as:
+ * - A path within a binary cache: "nar/xxx.nar.xz?sig=abc"
+ * - An absolute path reference: "/foo/bar?x=1#section"
+ * - A relative path reference: "foo/bar?x=1#section"
+ *
+ * The path is represented the same way as `ParsedURL::path`:
+ * a vector of percent-decoded path segments split on '/'.
+ *
+ * @see ParsedURL::path for documentation on the path representation.
+ */
+struct ParsedRelativeUrl
+{
+    /**
+     * Path segments, same representation as `ParsedURL::path`.
+     *
+     * An absolute path starts with an empty segment (leading slash),
+     * a relative path does not.
+     */
+    std::vector<std::string> path;
+    /**
+     * Query parameters. `std::nullopt` means no query component (preserves base query
+     * during resolution), empty map means empty query (e.g., `?` with no params).
+     */
+    std::optional<StringMap> query;
+    std::string fragment;
+
+    static ParsedRelativeUrl parse(std::string_view raw, bool lenient = false);
+
+    /**
+     * Render to a string, encoding the path, query parameters, and fragment.
+     */
+    std::string to_string() const;
+
+    /**
+     * Render the path to a string.
+     *
+     * @param encode Whether to percent encode path segments.
+     */
+    std::string renderPath(bool encode = false) const;
+
+    auto operator<=>(const ParsedRelativeUrl &) const = default;
+};
+
+std::ostream & operator<<(std::ostream & os, const ParsedRelativeUrl & url);
+
 MakeError(BadURL, Error);
 
 std::string percentDecode(std::string_view in);
@@ -298,10 +346,38 @@ std::string encodeQuery(const StringMap & query);
 ParsedURL parseURL(std::string_view url, bool lenient = false);
 
 /**
- * Like `parseURL`, but also accepts relative URLs, which are resolved
- * against the given base URL.
+ * Exactly what is says.
+ *
+ * It is important that we don't use one type for both of these, because there
+ * are many cases where we must know whether we have one or the other.
+ */
+using ParsedMaybeRelativeURL = std::variant<ParsedRelativeUrl, ParsedURL>;
+
+/**
+ * Parse a URL that may be either absolute or relative.
+ *
+ * @return `ParsedURL` if the URL has a scheme, `ParsedRelativeUrl` otherwise.
+ *
+ * @throws BadURL
+ */
+ParsedMaybeRelativeURL parsePossiblyRelativeURL(std::string_view url);
+
+/**
+ * Resolve a relative URL against a base URL.
  *
  * This is specified in [IETF RFC 3986, section 5](https://datatracker.ietf.org/doc/html/rfc3986#section-5)
+ *
+ * @param url The relative URL to resolve
+ * @param base The base URL to resolve against
+ * @return The resolved absolute URL
+ *
+ * @throws BadURL
+ */
+ParsedURL resolveParsedRelativeUrl(const ParsedRelativeUrl & url, const ParsedURL & base);
+
+/**
+ * A small wrapper around @ref parsePossiblyRelativeURL and @ref
+ * resolveParsedRelativeUrl.
  *
  * @throws BadURL
  *
@@ -371,6 +447,9 @@ std::filesystem::path urlPathToPath(std::span<const std::string> urlPath);
  * not strictly RFC3986 compliant. We must preserve that information verbatim.
  *
  * Though we perform parsing and validation for internal needs.
+ *
+ * There is intentionally no `operator==` on `VerbatimURL` because
+ * equality on string-based ad-hoc URLs is not well-defined.
  */
 struct VerbatimURL
 {
