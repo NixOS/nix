@@ -18,6 +18,7 @@ struct CmdBundle : InstallableValueCommand
     {
         addFlag({
             .longName = "bundler",
+            .shortName = 'B',
             .description = fmt("Use a custom bundler instead of the default (`%s`).", bundler),
             .labels = {"flake-url"},
             .handler = {&bundler},
