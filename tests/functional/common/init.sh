@@ -52,15 +52,27 @@ gc-reserved-space = 0
 substituters =
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
-include nix.conf.extra
 trusted-users = $(whoami)
 EOF
 
-cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
+# 'include' directive not available in Nix 1.11. Exact version of introduction TBD.
+if isDaemonNewer "2.0"; then
+  cat >> "$NIX_CONF_DIR"/nix.conf <<EOF
+include nix.conf.extra
+EOF
+
+  cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
 fsync-metadata = false
 extra-experimental-features = flakes
 !include nix.conf.extra.not-there
 EOF
+else
+  # Inline the extra config for older daemons that don't support include
+  cat >> "$NIX_CONF_DIR"/nix.conf <<EOF
+fsync-metadata = false
+extra-experimental-features = flakes
+EOF
+fi
 
 # Initialise the database.
 # The flag itself does nothing, but running the command touches the store

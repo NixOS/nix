@@ -2,6 +2,9 @@
 # Purposely bypassing our usual common for this subgroup
 source ../common.sh
 
+# ca-derivations and dynamic-derivations not available in Nix 1.11. Exact version of introduction TBD.
+requireDaemonNewerThan "2.4"
+
 # Need backend to support text-hashing too
 isDaemonNewer "2.18.0pre20230906" && skipTest "Daemon is too new"
 

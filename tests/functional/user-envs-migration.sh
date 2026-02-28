@@ -9,6 +9,12 @@ if isDaemonNewer "2.4pre20211005"; then
     skipTest "Daemon is too new"
 fi
 
+# Manifest format with 'escaped' variable not available in Nix 1.11. Exact version of introduction TBD.
+# TODO: skip or conditionalize individual test cases instead of skipping the whole file
+if ! isDaemonNewer "2.0"; then
+    skipTest "Daemon too old for this test"
+fi
+
 
 killDaemon
 unset NIX_REMOTE
