@@ -245,7 +245,7 @@ jobs:
           install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
           install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
       - name: Run flake regressions tests
-        run: MAX_FLAKES=25 flake-regressions/eval-all.sh
+        run: MAX_FLAKES=100000 flake-regressions/eval-all.sh
 
   profile_build:
     needs: tests
