@@ -265,8 +265,20 @@ std::string readFile(const std::filesystem::path & path)
 {
     auto fd = openFileReadonly(path);
     if (!fd)
-        throw NativeSysError("opening file %1%", PathFmt(path));
+        throw NativeSysError("opening file %s", PathFmt(path));
     return readFile(fd.get());
+}
+
+AutoCloseFD maybeOpenFileReadonly(const std::filesystem::path & path)
+{
+    AutoCloseFD fd = openFileReadonly(path);
+    if (!fd) {
+        NativeSysError err("opening file %s", PathFmt(path));
+        if (err.is(std::errc::no_such_file_or_directory) || err.is(std::errc::not_a_directory))
+            return {};
+        throw err;
+    }
+    return fd;
 }
 
 void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
