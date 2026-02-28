@@ -798,6 +798,59 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
+    getAccessorFromCache(const Settings & settings, Store & store, const Input & input, const Hash & narHash, const Hash & rev) const
+    {
+        auto storePath = input.computeStorePath(store);
+
+        // Check if the path exists in the local store, and attempt to recreate metadata
+        if (store.isValidPath(storePath)) {
+            auto pathInfo = store.queryPathInfo(storePath);
+
+            if (pathInfo->narHash != narHash) {
+                throw Error("narHash mismatch for cached git content: expected %s, got %s",
+                        narHash.to_string(HashFormat::SRI, true),
+                        pathInfo->narHash.to_string(HashFormat::SRI, true));
+            }
+
+            debug("using cached git content from store for '%s' in '%s'",
+                    input.to_string(), store.printStorePath(storePath));
+
+            auto accessor = store.requireStoreObjectAccessor(storePath);
+
+            /* Set up the accessor with appropriate metadata. */
+            auto fingerprint = getFingerprint(store, input);
+            if (fingerprint)
+                accessor->fingerprint = *fingerprint;
+
+            accessor->setPathDisplay("«" + input.to_string() + "»");
+
+            Input final = input;
+
+            auto cache = settings.getCache();
+
+            if (auto lastModifiedAttr = input.getLastModified()) {
+                final.attrs.insert_or_assign("lastModified", uint64_t(*lastModifiedAttr));
+            } else {
+                Cache::Key lastModKey{"gitLastModified", {{"rev", rev.gitRev()}}};
+                if (auto res = cache->lookup(lastModKey))
+                    final.attrs.insert_or_assign("lastModified", getIntAttr(*res, "lastModified"));
+            }
+
+            if (auto revCountAttr = input.getRevCount()) {
+                final.attrs.insert_or_assign("revCount", uint64_t(*revCountAttr));
+            } else {
+                Cache::Key revCountKey{"gitRevCount", {{"rev", rev.gitRev()}}};
+                if (auto res = cache->lookup(revCountKey))
+                    final.attrs.insert_or_assign("revCount", getIntAttr(*res, "revCount"));
+            }
+
+            return {accessor, std::move(final)};
+        } else {
+            throw Error("store path not in local store for git input '%s'", input.to_string());
+        }
+    }
+
+    std::pair<ref<SourceAccessor>, Input>
     getAccessorFromCommit(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
     {
         assert(!repoInfo.workdirInfo.isDirty);
@@ -1070,6 +1123,15 @@ struct GitInputScheme : InputScheme
                When git may eventually implement this, we need Nix to match its
                behavior. */
             throw UnimplementedError("exportIgnore and submodules are not supported together yet");
+        }
+
+        if (auto narHash = input.getNarHash(); input.getRev() && narHash) {
+            try {
+                auto rev = input.getRev().value();
+                return getAccessorFromCache(settings, store, input, *narHash, rev);
+            } catch (Error & e) {
+                debug("cached lookup failed for git input '%s': %s", input.to_string(), e.what());
+            }
         }
 
         auto [accessor, final] = input.getRef() || input.getRev() || !repoInfo.getPath()
