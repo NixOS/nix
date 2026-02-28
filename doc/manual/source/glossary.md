@@ -58,6 +58,8 @@
   DAGs are very important to Nix.
   In particular, the non-self-[references][reference] of [store object][store object] form a cycle.
 
+  [directed acyclic graph]: #gloss-directed-acyclic-graph
+
 - [derivation path]{#gloss-derivation-path}
 
   A [store path] which uniquely identifies a [store derivation].
