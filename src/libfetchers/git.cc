@@ -982,6 +982,11 @@ struct GitInputScheme : InputScheme
             for (auto & submodule : repoInfo.workdirInfo.submodules)
                 repoInfo.workdirInfo.files.insert(submodule.path);
 
+        if (!getSubmodulesAttr(input))
+            /* Mount exclusively the empty dirs of the submodules */
+            for (auto & submodule : repoInfo.workdirInfo.submodules)
+                repoInfo.workdirInfo.emptyDirs.insert(submodule.path);
+
         auto repo = GitRepo::openRepo(repoPath, {});
 
         auto exportIgnore = getExportIgnoreAttr(input);
