@@ -1005,4 +1005,122 @@ TEST_F(PrimOpTest, genericClosure_not_strict)
     auto v = eval("builtins.genericClosure { startSet = []; }");
     ASSERT_THAT(v, IsListOfSize(0));
 }
+
+TEST_F(PrimOpTest, genericClosure_dedup_string_keys_by_content)
+{
+    /* Real-world inspired: nixpkgs commonly uses store paths / names as string
+       keys, and we need to deduplicate by string contents (not pointer
+       identity). */
+    auto v = eval(R"(
+      builtins.genericClosure {
+        startSet = [ { key = "a"; id = "start"; } ];
+        operator = x:
+          if x.id == "start" then [
+            { key = "a"; id = "dup-a"; }
+            { key = "b"; id = "b"; }
+            { key = "b"; id = "dup-b"; }
+          ] else [ ];
+      }
+    )");
+    ASSERT_THAT(v, IsListOfSize(2));
+
+    auto listView = v.listView();
+    ASSERT_THAT(*listView[0], IsAttrs());
+    ASSERT_THAT(*listView[1], IsAttrs());
+    const auto keySym = createSymbol("key");
+    const auto idSym = createSymbol("id");
+
+    auto * key0 = listView[0]->attrs()->get(keySym);
+    ASSERT_NE(key0, nullptr);
+    ASSERT_THAT(*key0->value, IsStringEq("a"));
+    auto * id0 = listView[0]->attrs()->get(idSym);
+    ASSERT_NE(id0, nullptr);
+    ASSERT_THAT(*id0->value, IsStringEq("start"));
+
+    auto * key1 = listView[1]->attrs()->get(keySym);
+    ASSERT_NE(key1, nullptr);
+    ASSERT_THAT(*key1->value, IsStringEq("b"));
+    auto * id1 = listView[1]->attrs()->get(idSym);
+    ASSERT_NE(id1, nullptr);
+    ASSERT_THAT(*id1->value, IsStringEq("b"));
+}
+
+TEST_F(PrimOpTest, genericClosure_dedup_int_then_float)
+{
+    /* Regression test for int→float mixing: CompareValues supports comparing
+       int keys with float keys, so 1 and 1.0 must be treated as the same key.
+       This specifically exercises the int→fallback promotion path. */
+    auto v = eval(R"(
+      builtins.genericClosure {
+        startSet = [ { key = 1; id = "start"; } ];
+        operator = x:
+          if x.id == "start" then [
+            { key = 1.0; id = "dup-float1"; }
+            { key = 1; id = "dup-int1"; }
+            { key = 2; id = "int2"; }
+            { key = 2.0; id = "dup-float2"; }
+          ] else [ ];
+      }
+    )");
+    ASSERT_THAT(v, IsListOfSize(2));
+
+    auto listView = v.listView();
+    ASSERT_THAT(*listView[0], IsAttrs());
+    ASSERT_THAT(*listView[1], IsAttrs());
+    const auto keySym = createSymbol("key");
+    const auto idSym = createSymbol("id");
+
+    auto * key0 = listView[0]->attrs()->get(keySym);
+    ASSERT_NE(key0, nullptr);
+    ASSERT_THAT(*key0->value, IsIntEq(1));
+    auto * id0 = listView[0]->attrs()->get(idSym);
+    ASSERT_NE(id0, nullptr);
+    ASSERT_THAT(*id0->value, IsStringEq("start"));
+
+    auto * key1 = listView[1]->attrs()->get(keySym);
+    ASSERT_NE(key1, nullptr);
+    ASSERT_THAT(*key1->value, IsIntEq(2));
+    auto * id1 = listView[1]->attrs()->get(idSym);
+    ASSERT_NE(id1, nullptr);
+    ASSERT_THAT(*id1->value, IsStringEq("int2"));
+}
+
+TEST_F(PrimOpTest, genericClosure_dedup_float_then_int)
+{
+    /* Regression test for float→int mixing. Starting with a float should use
+       the fallback key mode from the beginning, but still deduplicate 1.0 and
+       1 (and similarly 2.0 and 2). */
+    auto v = eval(R"(
+      builtins.genericClosure {
+        startSet = [ { key = 1.0; id = "start"; } ];
+        operator = x:
+          if x.id == "start" then [
+            { key = 1; id = "dup-int1"; }
+            { key = 2.0; id = "float2"; }
+            { key = 2; id = "dup-int2"; }
+          ] else [ ];
+      }
+    )");
+    ASSERT_THAT(v, IsListOfSize(2));
+
+    auto listView = v.listView();
+    ASSERT_THAT(*listView[0], IsAttrs());
+    ASSERT_THAT(*listView[1], IsAttrs());
+    const auto keySym = createSymbol("key");
+    const auto idSym = createSymbol("id");
+
+    auto * key0 = listView[0]->attrs()->get(keySym);
+    ASSERT_NE(key0, nullptr);
+    ASSERT_THAT(*key0->value, IsFloatEq(1.0));
+    auto * id0 = listView[0]->attrs()->get(idSym);
+    ASSERT_NE(id0, nullptr);
+    ASSERT_THAT(*id0->value, IsStringEq("start"));
+
+    auto * key1 = listView[1]->attrs()->get(keySym);
+    ASSERT_NE(key1, nullptr);
+    ASSERT_THAT(*key1->value, IsFloatEq(2.0));
+    auto * id1 = listView[1]->attrs()->get(idSym);
+    ASSERT_NE(id1, nullptr);
+    ASSERT_THAT(*id1->value, IsStringEq("float2"));
+}
 } /* namespace nix */
