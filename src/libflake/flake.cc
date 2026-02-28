@@ -723,6 +723,17 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             auto inputFlake = getInputFlake(
                                 *input.ref, inputIsOverride ? fetchers::UseRegistries::All : useRegistriesInputs);
 
+                            /* Propagate self-attrs (e.g. lfs, submodules)
+                               discovered from the dependency's flake.nix to
+                               the originalRef stored in the lock file. This
+                               ensures the lock entry reflects the
+                               dependency's actual fetch requirements and
+                               prevents narHash mismatches when the consuming
+                               flake doesn't explicitly specify these attrs
+                               in its input URL. (See issue #15350.) */
+                            for (auto & [name, value] : inputFlake.selfAttrs)
+                                ref.input.attrs.insert_or_assign(name, value);
+
                             auto childNode =
                                 make_ref<LockedNode>(inputFlake.lockedRef, ref, true, overriddenParentPath);
 
