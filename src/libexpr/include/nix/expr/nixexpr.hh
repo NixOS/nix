@@ -17,6 +17,7 @@
 #include "nix/expr/counter.hh"
 #include "nix/util/pos-table.hh"
 #include "nix/util/error.hh"
+#include "nix/util/chunked-vector.hh"
 
 namespace nix {
 
@@ -825,9 +826,49 @@ struct ExprBlackHole : Expr
 
 extern ExprBlackHole eBlackHole;
 
+#define NIX_FOR_EACH_EXPR(MACRO, ...)              \
+MACRO(ExprWith __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprLet __VA_OPT__(,) __VA_ARGS__)           \
+MACRO(ExprIf __VA_OPT__(,) __VA_ARGS__)            \
+MACRO(ExprAttrs __VA_OPT__(,) __VA_ARGS__)         \
+MACRO(ExprCall __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprFloat __VA_OPT__(,) __VA_ARGS__)         \
+MACRO(ExprInt __VA_OPT__(,) __VA_ARGS__)           \
+MACRO(ExprPath __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprSelect __VA_OPT__(,) __VA_ARGS__)        \
+MACRO(ExprLambda __VA_OPT__(,) __VA_ARGS__)        \
+MACRO(ExprList __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprString __VA_OPT__(,) __VA_ARGS__)        \
+MACRO(ExprAssert __VA_OPT__(,) __VA_ARGS__)        \
+MACRO(ExprPos __VA_OPT__(,) __VA_ARGS__)           \
+MACRO(ExprConcatStrings __VA_OPT__(,) __VA_ARGS__) \
+MACRO(ExprOpHasAttr __VA_OPT__(,) __VA_ARGS__)     \
+MACRO(ExprOpConcatLists __VA_OPT__(,) __VA_ARGS__) \
+MACRO(ExprOpNot __VA_OPT__(,) __VA_ARGS__)         \
+MACRO(ExprOpEq __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprOpNEq __VA_OPT__(,) __VA_ARGS__)         \
+MACRO(ExprOpAnd __VA_OPT__(,) __VA_ARGS__)         \
+MACRO(ExprOpOr __VA_OPT__(,) __VA_ARGS__)          \
+MACRO(ExprOpImpl __VA_OPT__(,) __VA_ARGS__)        \
+MACRO(ExprOpUpdate __VA_OPT__(,) __VA_ARGS__)      \
+MACRO(ExprInheritFrom __VA_OPT__(,) __VA_ARGS__)   \
+MACRO(ExprVar __VA_OPT__(,) __VA_ARGS__)
+
 class Exprs
 {
+    static constexpr int ChunkSize = 128;
     std::pmr::monotonic_buffer_resource buffer;
+
+    template<class ty>
+    inline ChunkedVector<ty, ChunkSize> & payloads();
+
+#define NIX_DEFINE_VEC(TYPE)                             \
+ChunkedVector<TYPE, ChunkSize> TYPE##_payloads;
+
+    NIX_FOR_EACH_EXPR(NIX_DEFINE_VEC)
+
+#undef NIX_DEFINE_VEC
+
 public:
     std::pmr::polymorphic_allocator<char> alloc{&buffer};
 
@@ -835,7 +876,7 @@ public:
     [[gnu::always_inline]]
     C * add(auto &&... args)
     {
-        return alloc.new_object<C>(std::forward<decltype(args)>(args)...);
+        return &payloads<C>().add(std::forward<decltype(args)>(args)...).first;
     }
 
     // we define some calls to add explicitly so that the argument can be passed in as initializer lists
@@ -844,7 +885,7 @@ public:
     C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
         requires(std::same_as<C, ExprCall>)
     {
-        return alloc.new_object<C>(pos, fun, std::move(args));
+        return &payloads<C>().add(pos, fun, std::move(args)).first;
     }
 
     template<class C>
@@ -852,7 +893,7 @@ public:
     C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         requires(std::same_as<C, ExprCall>)
     {
-        return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));
+        return &payloads<C>().add(pos, fun, std::move(args), std::move(cursedOrEndPos)).first;
     }
 
     template<class C>
@@ -864,7 +905,7 @@ public:
         std::span<std::pair<PosIdx, Expr *>> es)
         requires(std::same_as<C, ExprConcatStrings>)
     {
-        return alloc.new_object<C>(alloc, pos, forceString, es);
+        return &payloads<C>().add(alloc, pos, forceString, es).first;
     }
 
     template<class C>
@@ -876,9 +917,19 @@ public:
         std::initializer_list<std::pair<PosIdx, Expr *>> es)
         requires(std::same_as<C, ExprConcatStrings>)
     {
-        return alloc.new_object<C>(alloc, pos, forceString, es);
+        return &payloads<C>().add(alloc, pos, forceString, es).first;
     }
 };
+
+#define NIX_DEFINE_PAYLOADS(TYPE)                        \
+template<>                                               \
+inline ChunkedVector<TYPE, Exprs::ChunkSize> & Exprs::payloads<TYPE>() \
+{                                                        \
+    return TYPE##_payloads;                              \
+}
+
+NIX_FOR_EACH_EXPR(NIX_DEFINE_PAYLOADS)
+#undef NIX_DEFINE_PAYLOADS
 
 /* Static environments are used to map variable names onto (level,
    displacement) pairs used to obtain the value of the variable at
