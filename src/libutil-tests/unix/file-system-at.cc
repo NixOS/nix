@@ -11,8 +11,6 @@
 #  include <sys/mount.h>
 #endif
 
-#include <cstring>
-
 namespace nix {
 
 using namespace nix::unix;
