@@ -1,0 +1,10 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-number.nix:1:1:
+            1| builtins.derivationOf 42
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.derivationOf
+
+       error: cannot coerce an integer to a string: 42
