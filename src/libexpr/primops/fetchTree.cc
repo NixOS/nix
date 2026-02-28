@@ -600,7 +600,12 @@ static RegisterPrimOp primop_fetchGit({
 
       - `url`
 
-        The URL of the repo.
+        The [Git URL] of the repo. SCP-like syntax is supported, but relative
+        paths are rewritten to absolute ones. For example:
+
+        `git@github.com:repo/path` becomes `ssh://git@github.com/repo/path`
+
+        [Git URL]: https://git-scm.com/docs/git-clone#_git_urls
 
       - `name` (default: `source`)
 
