@@ -336,7 +336,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
 
             auto accessor = store.requireStoreObjectAccessor(storePath);
 
-            accessor->fingerprint = getFingerprint(store);
+            accessor->fingerprint = getNarHash()->to_string(HashFormat::SRI, true);
 
             // Store a cache entry for the substituted tree so later fetches
             // can reuse the existing nar instead of copying the unpacked
