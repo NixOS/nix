@@ -4,6 +4,8 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-api.hh"
 
+#include <optional>
+
 namespace nix {
 
 struct WorkerProto::BasicConnection
@@ -62,6 +64,14 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      * Flush to direction
      */
     virtual ~BasicClientConnection();
+
+    /**
+     * A description of the remote store (e.g. "ssh-ng://host").
+     * Used to tag all log messages and activities forwarded from
+     * the remote daemon so that consumers can identify their origin.
+     * Absent when the connection has no meaningful remote identity.
+     */
+    std::optional<std::string> remoteDescription;
 
     virtual void closeWrite() = 0;
 

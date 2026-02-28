@@ -78,7 +78,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) override
     {
         if (lvl > verbosity)
             return;
@@ -130,13 +130,15 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        std::optional<std::string_view> machine) override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(
+        ActivityId act, ResultType type, const Fields & fields, std::optional<std::string_view> machine = {}) override
     {
         if (type == resBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
@@ -189,11 +191,12 @@ Activity::Activity(
     ActivityType type,
     const std::string & s,
     const Logger::Fields & fields,
-    ActivityId parent)
+    ActivityId parent,
+    std::optional<std::string_view> machine)
     : logger(logger)
     , id(nextId++ + (((uint64_t) getPid()) << 32))
 {
-    logger.startActivity(id, lvl, type, s, fields, parent);
+    logger.startActivity(id, lvl, type, s, fields, parent, machine);
 }
 
 void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
@@ -269,12 +272,19 @@ struct JSONLogger : Logger
         }
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void addOrigin(nlohmann::json & json, std::optional<std::string_view> machine)
+    {
+        if (machine && !machine->empty())
+            json["machine"] = *machine;
+    }
+
+    void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) override
     {
         nlohmann::json json;
         json["action"] = "msg";
         json["level"] = lvl;
         json["msg"] = s;
+        addOrigin(json, machine);
         write(json);
     }
 
@@ -311,7 +321,8 @@ struct JSONLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        std::optional<std::string_view> machine) override
     {
         nlohmann::json json;
         json["action"] = "start";
@@ -321,24 +332,28 @@ struct JSONLogger : Logger
         json["text"] = s;
         json["parent"] = parent;
         addFields(json, fields);
+        addOrigin(json, machine);
         write(json);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act, std::optional<std::string_view> machine = {}) override
     {
         nlohmann::json json;
         json["action"] = "stop";
         json["id"] = act;
+        addOrigin(json, machine);
         write(json);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(
+        ActivityId act, ResultType type, const Fields & fields, std::optional<std::string_view> machine = {}) override
     {
         nlohmann::json json;
         json["action"] = "result";
         json["id"] = act;
         json["type"] = type;
         addFields(json, fields);
+        addOrigin(json, machine);
         write(json);
     }
 };
@@ -419,7 +434,8 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted)
+    bool trusted,
+    std::optional<std::string_view> machine)
 {
     try {
         std::string action = json["action"];
@@ -431,7 +447,13 @@ bool handleJSONLogMessage(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(
-                        *logger, (Verbosity) json["level"], type, json["text"], getFields(json["fields"]), act.id));
+                        *logger,
+                        (Verbosity) json["level"],
+                        type,
+                        json["text"],
+                        getFields(json["fields"]),
+                        act.id,
+                        machine));
         }
 
         else if (action == "stop")
@@ -450,7 +472,7 @@ bool handleJSONLogMessage(
 
         else if (action == "msg") {
             std::string msg = json["msg"];
-            logger->log((Verbosity) json["level"], msg);
+            logger->log((Verbosity) json["level"], msg, machine);
         }
 
         return true;
@@ -465,13 +487,14 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted)
+    bool trusted,
+    std::optional<std::string_view> machine)
 {
     auto json = parseJSONMessage(msg, source);
     if (!json)
         return false;
 
-    return handleJSONLogMessage(*json, act, activities, source, trusted);
+    return handleJSONLogMessage(*json, act, activities, source, trusted, machine);
 }
 
 Activity::~Activity()
