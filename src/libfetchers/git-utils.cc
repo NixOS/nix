@@ -43,7 +43,6 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <iostream>
 #include <queue>
-#include <regex>
 #include <span>
 #include <ranges>
 
@@ -663,6 +662,9 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void verifyCommit(const Hash & rev, const std::vector<fetchers::PublicKey> & publicKeys) override
     {
+        if (publicKeys.empty())
+            throw Error("Commit signature verification on commit %s failed: publicKeys is empty", rev.gitRev());
+
         // Map of SSH key types to their internal OpenSSH representations
         static const boost::unordered_flat_map<std::string_view, std::string_view> keyTypeMap = {
             {"ssh-dsa", "ssh-dsa"},
@@ -713,9 +715,13 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
            because the git command might also succeed due to the
            commit being signed by gpg keys that are present in the
            users key agent. */
-        std::string re = R"(Good "git" signature for \* with .* key SHA256:[)";
+
+        if (status != 0)
+            throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
+
+        bool fingerprintFound = false;
         for (const fetchers::PublicKey & k : publicKeys) {
-            // Calculate sha256 fingerprint from public key and escape the regex symbol '+' to match the key literally
+            // Calculate sha256 fingerprint from public key and match it literally in output.
             std::string keyDecoded;
             try {
                 keyDecoded = base64::decode(k.key);
@@ -725,14 +731,16 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             }
             auto fingerprint =
                 trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
-            auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+");
-            re += "(" + escaped_fingerprint + ")";
+            if (output.contains(std::string("SHA256:") + fingerprint)) {
+                fingerprintFound = true;
+                break;
+            }
         }
-        re += "]";
-        if (status == 0 && std::regex_search(output, std::regex(re)))
-            printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
-        else
+
+        if (!fingerprintFound)
             throw Error("Commit signature verification on commit %s failed: %s", rev.gitRev(), output);
+
+        printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
     }
 
     Hash treeHashToNarHash(const fetchers::Settings & settings, const Hash & treeHash) override
