@@ -624,7 +624,29 @@ void LocalStore::makeStoreWritable()
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
-        if (mount(0, config->realStoreDir.get().c_str(), "none", MS_REMOUNT | MS_BIND, 0) == -1)
+        /* In a user namespace, mount flags like `nodev` and `nosuid` are
+           locked and dropping them causes `EPERM`, so here we translate each
+           `statvfs` flag to the corresponding `mount` flag individually. */
+        unsigned long flags = MS_REMOUNT | MS_BIND;
+        if (stat.f_flag & ST_NODEV)
+            flags |= MS_NODEV;
+        if (stat.f_flag & ST_NOSUID)
+            flags |= MS_NOSUID;
+        if (stat.f_flag & ST_NOEXEC)
+            flags |= MS_NOEXEC;
+        if (stat.f_flag & ST_NOATIME)
+            flags |= MS_NOATIME;
+        if (stat.f_flag & ST_NODIRATIME)
+            flags |= MS_NODIRATIME;
+        if (stat.f_flag & ST_RELATIME)
+            flags |= MS_RELATIME;
+        if (stat.f_flag & ST_SYNCHRONOUS)
+            flags |= MS_SYNCHRONOUS;
+#ifdef ST_NOSYMFOLLOW
+        if (stat.f_flag & ST_NOSYMFOLLOW)
+            flags |= MS_NOSYMFOLLOW;
+#endif
+        if (mount(0, config->realStoreDir.get().c_str(), "none", flags, 0) == -1)
             throw SysError("remounting %s writable", PathFmt(config->realStoreDir.get()));
     }
 #endif

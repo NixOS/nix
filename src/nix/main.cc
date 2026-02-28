@@ -404,6 +404,7 @@ void mainWrapped(int argc, char ** argv)
             if (unshare(CLONE_NEWNS) == -1)
                 throw SysError("setting up a private mount namespace");
         } catch (Error & e) {
+            warn("failed to set up a private mount namespace: %s", e.msg());
         }
     }
 #endif
