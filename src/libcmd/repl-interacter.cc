@@ -147,6 +147,17 @@ static constexpr const char * promptForType(ReplPromptType promptType)
     assert(false);
 }
 
+void ReadlineLikeInteracter::addHistory(std::string & input)
+{
+    std::string line = trim(input);
+    // Flatten to single line for readline history file format (line-based).
+    // Handle all line ending conventions: Unix (\n), Windows (\r\n), classic Mac (\r).
+    std::replace(line.begin(), line.end(), '\n', ' ');
+    std::replace(line.begin(), line.end(), '\r', ' ');
+    if (!line.empty())
+        add_history(line.c_str());
+}
+
 bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptType)
 {
 #ifndef _WIN32 // TODO use more signals.hh for this

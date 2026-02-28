@@ -220,6 +220,7 @@ ReplExitStatus NixRepl::mainLoop()
 
         // We handled the current input fully, so we should clear it
         // and read brand new input.
+        interacter->addHistory(input);
         input.clear();
         std::cout << std::endl;
     }
