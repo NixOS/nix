@@ -748,5 +748,31 @@ struct CmdPrintDevEnv : Common, MixJSON
     }
 };
 
+struct CmdDevEnvPath : Common
+{
+    std::string description() override
+    {
+        return "print the actual path used by nix develop for the build environment of a derivation";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "dev-env-path.md"
+            ;
+    }
+
+    Category category() override
+    {
+        return catUtility;
+    }
+
+    void run(ref<Store> store, ref<Installable> installable) override
+    {
+        logger->writeToStdout(store->printStorePath(getShellOutPath(store, installable)));
+    }
+};
+
+static auto rCmdDevEnvPath = registerCommand<CmdDevEnvPath>("dev-env-path");
 static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
 static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");

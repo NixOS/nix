@@ -89,6 +89,7 @@ suites = [
       'hash-convert.sh',
       'hash-path.sh',
       'gc-non-blocking.sh',
+      'gc-closure.sh',
       'check.sh',
       'nix-shell.sh',
       'check-refs.sh',
