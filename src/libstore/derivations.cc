@@ -1461,11 +1461,7 @@ void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutpu
 DerivationOutput
 adl_serializer<DerivationOutput>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
 {
-    std::set<std::string_view> keys;
     auto & json = getObject(_json);
-
-    for (const auto & [key, _] : json)
-        keys.insert(key);
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         ContentAddressMethod method = ContentAddressMethod::parse(getString(valueAt(json, "method")));
@@ -1476,52 +1472,57 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
         return {std::move(method), std::move(hashAlgo)};
     };
 
-    if (keys == (std::set<std::string_view>{"path"})) {
-        return DerivationOutput::InputAddressed{
-            .path = valueAt(json, "path"),
-        };
-    }
-
-    else if (keys == (std::set<std::string_view>{"method", "hash"})) {
-        auto dof = DerivationOutput::CAFixed{
-            .ca = static_cast<ContentAddress>(_json),
-        };
-        if (dof.ca.method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
-        /* We no longer produce this (denormalized) field (for the
-           reasons described above), so we don't need to check it. */
-#if 0
-        if (dof.path(store, drvName, outputName) != static_cast<StorePath>(valueAt(json, "path")))
-            throw Error("Path doesn't match derivation output");
-#endif
-        return dof;
-    }
-
-    else if (keys == (std::set<std::string_view>{"method", "hashAlgo"})) {
-        xpSettings.require(Xp::CaDerivations);
-        auto [method, hashAlgo] = methodAlgo();
-        return DerivationOutput::CAFloating{
-            .method = std::move(method),
-            .hashAlgo = std::move(hashAlgo),
-        };
-    }
-
-    else if (keys == (std::set<std::string_view>{})) {
+    switch (json.size()) {
+    case 0:
         return DerivationOutput::Deferred{};
+    case 1:
+        if (auto * path = optionalValueAt(json, "path"))
+            return DerivationOutput::InputAddressed{
+                .path = *path,
+            };
+        break;
+    case 2: {
+        const bool hasMethod = optionalValueAt(json, "method");
+
+        if (hasMethod && optionalValueAt(json, "hash")) {
+            auto dof = DerivationOutput::CAFixed{
+                .ca = static_cast<ContentAddress>(_json),
+            };
+            if (dof.ca.method == ContentAddressMethod::Raw::Text)
+                xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output in JSON");
+            /* We no longer produce this (denormalized) field (for the
+               reasons described above), so we don't need to check it. */
+#if 0
+            if (dof.path(store, drvName, outputName) != static_cast<StorePath>(valueAt(json, "path")))
+                throw Error("Path doesn't match derivation output");
+#endif
+            return dof;
+        }
+
+        if (hasMethod && optionalValueAt(json, "hashAlgo")) {
+            xpSettings.require(Xp::CaDerivations);
+            auto [method, hashAlgo] = methodAlgo();
+            return DerivationOutput::CAFloating{
+                .method = std::move(method),
+                .hashAlgo = std::move(hashAlgo),
+            };
+        }
+
+        break;
+    }
+    case 3:
+        if (optionalValueAt(json, "method") && optionalValueAt(json, "hashAlgo") && optionalValueAt(json, "impure")) {
+            xpSettings.require(Xp::ImpureDerivations);
+            auto [method, hashAlgo] = methodAlgo();
+            return DerivationOutput::Impure{
+                .method = std::move(method),
+                .hashAlgo = hashAlgo,
+            };
+        }
+        break;
     }
 
-    else if (keys == (std::set<std::string_view>{"method", "hashAlgo", "impure"})) {
-        xpSettings.require(Xp::ImpureDerivations);
-        auto [method, hashAlgo] = methodAlgo();
-        return DerivationOutput::Impure{
-            .method = std::move(method),
-            .hashAlgo = hashAlgo,
-        };
-    }
-
-    else {
-        throw Error("invalid JSON for derivation output");
-    }
+    throw Error("invalid JSON for derivation output");
 }
 
 void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
