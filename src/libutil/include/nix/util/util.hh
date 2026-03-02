@@ -10,6 +10,7 @@
 #include <functional>
 #include <map>
 #include <sstream>
+#include <bit>
 #include <optional>
 #include <ranges>
 
@@ -175,8 +176,25 @@ template<typename T>
 T readLittleEndian(unsigned char * p)
 {
     T x = 0;
-    for (size_t i = 0; i < sizeof(x); ++i, ++p) {
-        x |= ((T) *p) << (i * 8);
+    /* Byte types such as char/unsigned char/std::byte are a bit special because
+       they are allowed to alias anything else. Thus a raw loop iterating
+       over the bytes here would be quite inefficient and iterate byte-by-byte
+       (the compiler cannot optimise anything because the pointer might alias
+       something). Use a memcpy + byteswap here as needed. */
+    std::memcpy(&x, p, sizeof(T));
+    /* Don't need to do anything if we are not on a big endian machine. */
+    if constexpr (std::endian::native != std::endian::little) {
+        if constexpr (std::is_same_v<T, uint64_t>) {
+            x = __builtin_bswap64(x);
+        } else if constexpr (std::is_same_v<T, uint32_t>) {
+            x = __builtin_bswap32(x);
+        } else if constexpr (std::is_same_v<T, uint16_t>) {
+            x = __builtin_bswap16(x);
+        } else {
+            /* Signed types don't make their way here. Though it would be fine
+               since C++20 mandates 2's complement representation. */
+            static_assert(false);
+        }
     }
     return x;
 }
