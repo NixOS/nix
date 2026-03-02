@@ -88,8 +88,9 @@ DECLARE_COMMON_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_COMMON_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V>
-DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V>);
+template<typename K, typename V, typename Compare>
+DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
+#undef COMMA_
 
 /**
  * These use the empty string for the null case, relying on the fact
