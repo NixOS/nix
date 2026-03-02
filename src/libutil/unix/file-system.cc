@@ -23,9 +23,10 @@
 
 namespace nix {
 
-AutoCloseFD openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return AutoCloseFD{open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
+    return AutoCloseFD{open(
+        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW))};
 }
 
 AutoCloseFD openFileReadonly(const std::filesystem::path & path)

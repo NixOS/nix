@@ -95,7 +95,7 @@ TEST_F(FSSourceAccessorTest, works)
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
 #ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir);
+        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 #endif
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });

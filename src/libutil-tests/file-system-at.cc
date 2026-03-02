@@ -32,7 +32,7 @@ TEST(readLinkAt, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
         sink.createSymlink(CanonPath("link"), "target");
         sink.createSymlink(CanonPath("relative"), "../relative/path");
         sink.createSymlink(CanonPath("absolute"), "/absolute/path");
@@ -45,7 +45,7 @@ TEST(readLinkAt, works)
         sink.createDirectory(CanonPath("dir"));
     }
 
-    auto dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
@@ -54,7 +54,7 @@ TEST(readLinkAt, works)
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
-    auto subDirFd = openDirectory(tmpDir / "a");
+    auto subDirFd = openDirectory(tmpDir / "a", FinalSymlink::Follow);
     EXPECT_EQ(readLinkAt(subDirFd.get(), CanonPath("b/link")), OS_STR("nested_target"));
 
     // Test error cases - expect SystemError on both platforms
@@ -78,7 +78,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
+        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("c"));
         sink.createDirectory(CanonPath("c/d"));
@@ -107,7 +107,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
             SymlinkNotAllowed);
     }
 
-    auto dirFd = openDirectory(tmpDir);
+    auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 
     // Helper to open files with platform-specific arguments
     auto openRead = [&](std::string_view path) -> AutoCloseFD {
