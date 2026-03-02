@@ -521,6 +521,27 @@ sinkToSource(fun<void(Sink &)> writer, fun<void()> eof = []() { throw EndOfFile(
 void writePadding(size_t len, Sink & sink);
 void writeString(std::string_view s, Sink & sink);
 
+/**
+ * Write a serialisation of an integer to the sink in little endian order.
+ *
+ * Types other than uint64_t (including signed types) get implicitly converted to uint64_t.A
+ *
+ * Negative number to unsigned conversion is actually well-defined in C++:
+ *
+ * [n4950] 7.3.9 Integral conversions:
+ * the result is the unique value of the destination type that is congruent to the source integer
+ * modulo 2^N, where N is the width of the destination type.
+ *
+ * [n4950] 6.8.2 Fundamental types:
+ * An unsigned integer type has the same object representation, value
+ * representation, and alignment requirements (6.7.6) as the corresponding signed
+ * integer type. For each value x of a signed integer type, the value of the
+ * corresponding unsigned integer type congruent to x modulo 2 N has the same value
+ * of corresponding bits in its value representation.
+ * This is also known as two's complement representation.
+ *
+ * @todo Should we even allow negative values to get serialised?
+ */
 inline Sink & operator<<(Sink & sink, uint64_t n)
 {
     unsigned char buf[8];
