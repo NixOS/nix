@@ -228,10 +228,6 @@ static Symbol getName(const AttrName & name, EvalState & state, Env & env)
 static constexpr size_t BASE_ENV_SIZE = 128;
 
 EvalMemory::EvalMemory()
-#if NIX_USE_BOEHMGC
-    : valueAllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-    , env1AllocCache(std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr))
-#endif
 {
     assertGCInitialized();
 }
