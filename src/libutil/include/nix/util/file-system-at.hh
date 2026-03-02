@@ -15,6 +15,7 @@
  */
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 
 #include <optional>
 
@@ -24,6 +25,14 @@
 #endif
 
 namespace nix {
+
+/**
+ * Get status of an open file/directory handle.
+ *
+ * @param fd File descriptor/handle
+ * @throws SystemError on I/O errors.
+ */
+PosixStat fstat(Descriptor fd);
 
 /**
  * Read a symlink relative to a directory file descriptor.
