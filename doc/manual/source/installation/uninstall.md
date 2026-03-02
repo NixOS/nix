@@ -16,30 +16,29 @@ If you are on Linux with systemd:
    sudo systemctl daemon-reload
    ```
 
-Remove files created by Nix:
+2. Remove files created by Nix:
 
-```console
-sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
-```
+   ```console
+   sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
+   ```
 
-Remove build users and their group:
+3. Remove build users and their group:
 
-```console
-for i in $(seq 1 32); do
-  sudo userdel nixbld$i
-done
-sudo groupdel nixbld
-```
+   ```console
+   for i in $(seq 1 32); do
+     sudo userdel nixbld$i
+   done
+   sudo groupdel nixbld
+   ```
 
-There may also be references to Nix in
+4. There may also be references to Nix in
+   - `/etc/bash.bashrc`
+   - `/etc/bashrc`
+   - `/etc/profile`
+   - `/etc/zsh/zshrc`
+   - `/etc/zshrc`
 
-- `/etc/bash.bashrc`
-- `/etc/bashrc`
-- `/etc/profile`
-- `/etc/zsh/zshrc`
-- `/etc/zshrc`
-
-which you may remove.
+   which you may remove.
 
 ### FreeBSD
 
