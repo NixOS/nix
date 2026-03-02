@@ -348,6 +348,9 @@ StringSet Store::Config::getDefaultSystemFeatures()
     if (experimentalFeatureSettings.isEnabled(Xp::RecursiveNix))
         res.insert("recursive-nix");
 
+    if (experimentalFeatureSettings.isEnabled(Xp::DerivationMeta))
+        res.insert("derivation-meta");
+
     return res;
 }
 

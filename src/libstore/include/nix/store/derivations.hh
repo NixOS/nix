@@ -492,6 +492,21 @@ Derivation parseDerivation(
 bool isDerivation(std::string_view fileName);
 
 /**
+ * Check if structured attributes indicate derivation-meta feature usage.
+ * Returns true when both `__meta` and `derivation-meta` system feature are present.
+ */
+bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs);
+
+/**
+ * Check if the `derivation-meta` feature should be applied to this derivation.
+ * Returns true when:
+ * - The derivation has structured attributes
+ * - The derivation has `__meta` in structured attributes
+ * - The derivation requires the `derivation-meta` system feature
+ */
+bool usesDerivationMeta(const BasicDerivation & drv);
+
+/**
  * Calculate the name that will be used for the store path for this
  * output.
  *
@@ -593,6 +608,12 @@ struct Sink;
 
 Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
+
+/**
+ * Convert a derivation to JSON, with optional experimental feature settings.
+ * This is exposed for testing purposes to allow passing mock experimental feature settings.
+ */
+void derivationToJson(nlohmann::json & res, const Derivation & d, const ExperimentalFeatureSettings & xpSettings);
 
 /**
  * This creates an opaque and almost certainly unique string

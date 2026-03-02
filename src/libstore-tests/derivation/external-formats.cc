@@ -140,34 +140,43 @@ INSTANTIATE_TEST_SUITE_P(
 
 #undef MAKE_OUTPUT_JSON_TEST_P
 
-#define MAKE_TEST_P(FIXTURE)                                                                       \
-    TEST_P(FIXTURE, from_json)                                                                     \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        readJsonTest(drv.name, drv, mockXpSettings);                                               \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, to_json)                                                                       \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        writeJsonTest(drv.name, drv);                                                              \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, from_aterm)                                                                    \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        readTest(drv.name + ".drv", [&](auto encoded) {                                            \
-            auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);      \
-            using nlohmann::json;                                                                  \
-            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                             \
-            ASSERT_EQ(got, drv);                                                                   \
-        });                                                                                        \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, to_aterm)                                                                      \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store, false); }); \
+#define MAKE_TEST_P(FIXTURE)                                                                          \
+    TEST_P(FIXTURE, from_json)                                                                        \
+    {                                                                                                 \
+        const auto & drv = GetParam();                                                                \
+        readJsonTest(drv.name, drv, mockXpSettings);                                                  \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_P(FIXTURE, to_json)                                                                          \
+    {                                                                                                 \
+        const auto & drv = GetParam();                                                                \
+        using namespace nlohmann;                                                                     \
+        writeTest(                                                                                    \
+            drv.name + ".json",                                                                       \
+            [&]() -> json {                                                                           \
+                json res;                                                                             \
+                derivationToJson(res, drv, mockXpSettings);                                           \
+                return res;                                                                           \
+            },                                                                                        \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_P(FIXTURE, from_aterm)                                                                       \
+    {                                                                                                 \
+        const auto & drv = GetParam();                                                                \
+        readTest(drv.name + ".drv", [&](auto encoded) {                                               \
+            auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);         \
+            using nlohmann::json;                                                                     \
+            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                                \
+            ASSERT_EQ(got, drv);                                                                      \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TEST_P(FIXTURE, to_aterm)                                                                         \
+    {                                                                                                 \
+        const auto & drv = GetParam();                                                                \
+        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store, false); });    \
     }
 
 struct DerivationJsonAtermTest : DerivationTest,
@@ -282,6 +291,57 @@ Derivation makeDynDepDerivation()
 }
 
 INSTANTIATE_TEST_SUITE_P(DynDerivationJSONATerm, DynDerivationJsonAtermTest, ::testing::Values(makeDynDepDerivation()));
+
+struct DerivationMetaJsonAtermTest : DerivationMetaTest,
+                                     JsonCharacterizationTest<Derivation>,
+                                     ::testing::WithParamInterface<Derivation>
+{};
+
+MAKE_TEST_P(DerivationMetaJsonAtermTest);
+
+Derivation makeMetaDerivation()
+{
+    Derivation drv;
+    drv.name = "meta-derivation";
+    drv.inputSrcs = {
+        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+    };
+    drv.platform = "x86_64-linux";
+    drv.builder = "/bin/sh";
+    drv.args = {
+        "-c",
+        "echo hello > $out",
+    };
+    drv.env = StringPairs{
+        {
+            "out",
+            "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation",
+        },
+    };
+    drv.outputs = {
+        {
+            "out",
+            DerivationOutput{DerivationOutput::InputAddressed{
+                .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"},
+            }},
+        },
+    };
+
+    // Add structured attributes with __meta
+    nlohmann::json::object_t structuredAttrs;
+    structuredAttrs["__meta"] = nlohmann::json::object_t{
+        {"description", "A test derivation"},
+        {"version", "1.0"},
+        {"maintainer", "test@example.com"},
+    };
+    structuredAttrs["requiredSystemFeatures"] = nlohmann::json::array({"derivation-meta"});
+
+    drv.structuredAttrs = StructuredAttrs{.structuredAttrs = structuredAttrs};
+
+    return drv;
+}
+
+INSTANTIATE_TEST_SUITE_P(DerivationMetaJSONATerm, DerivationMetaJsonAtermTest, ::testing::Values(makeMetaDerivation()));
 
 #undef MAKE_TEST_P
 
