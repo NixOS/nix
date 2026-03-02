@@ -137,7 +137,8 @@ public:
         }
         nix_string_context ctx{context};
         nix_string_return res{""};
-        desc.printValueAsJSON(v, (EvalState *) &state, strict, &ctx, copyToStore, &res);
+        EvalStateRef wrappedState(state);
+        desc.printValueAsJSON(v, &wrappedState.wrapper, strict, &ctx, copyToStore, &res);
         if (res.str.empty()) {
             return nix::ExternalValueBase::printValueAsJSON(state, strict, context, copyToStore);
         }
@@ -160,9 +161,10 @@ public:
             return nix::ExternalValueBase::printValueAsXML(state, strict, location, doc, context, drvsSeen, pos);
         }
         nix_string_context ctx{context};
+        EvalStateRef wrappedState(state);
         desc.printValueAsXML(
             v,
-            (EvalState *) &state,
+            &wrappedState.wrapper,
             strict,
             location,
             &doc,
