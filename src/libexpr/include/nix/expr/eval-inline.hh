@@ -30,6 +30,11 @@ inline void * EvalMemory::allocBytes(size_t n)
 Value * EvalMemory::allocValue()
 {
 #if NIX_USE_BOEHMGC
+    /* Allocation cache for GC'd Value objects. Boehm GC is already a global resource, so thread_local is
+       a natural solution. Multiple EvalState instances on the same thread will reuse the same cache. */
+    static thread_local std::shared_ptr<void *> valueAllocCache{
+        std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
+
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
        GC_malloc_many returns a linked list of objects of the given size, where the first word
        of each object is also the pointer to the next object in the list. This also means that we
@@ -63,6 +68,10 @@ Env & EvalMemory::allocEnv(size_t size)
 
 #if NIX_USE_BOEHMGC
     if (size == 1) {
+        /* Allocation cache for size-1 Env objects. Boehm GC is already a global resource, so thread_local is
+           a natural solution. Multiple EvalState instances on the same thread will reuse the same cache. */
+        static thread_local std::shared_ptr<void *> env1AllocCache{
+            std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
         /* see allocValue for explanations. */
         if (!*env1AllocCache) {
             *env1AllocCache = GC_malloc_many(sizeof(Env) + sizeof(Value *));
