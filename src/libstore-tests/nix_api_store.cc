@@ -251,8 +251,9 @@ TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 
 TEST_F(nix_api_util_context, nix_store_real_path_binary_cache)
 {
-    Store * store =
-        nix_store_open(ctx, nix::fmt("file://%s/binary-cache", nix::createTempDir().string()).c_str(), nullptr);
+    auto tmpDir = nix::createTempDir() / "binary-cache";
+    auto url = nix::ParsedURL{.scheme = "file", .path = nix::pathToUrlPath(tmpDir)};
+    Store * store = nix_store_open(ctx, url.to_string().c_str(), nullptr);
     assert_ctx_ok();
     ASSERT_NE(store, nullptr);
 
