@@ -2,6 +2,7 @@ include_dirs = [ include_directories('../..') ]
 
 headers = files(
   'attrs.hh',
+  'cache-impl.hh',
   'cache.hh',
   'fetch-settings.hh',
   'fetch-to-store.hh',
