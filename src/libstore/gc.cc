@@ -548,7 +548,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
            by another process. We need to be sure that we can acquire an
            exclusive lock before deleting them. */
         if (baseName.find("tmp-", 0) == 0) {
-            auto tmpDirFd = openDirectory(realPath);
+            /* TODO Reconsider whether Follow is the right choice, here */
+            auto tmpDirFd = openDirectory(realPath, FinalSymlink::Follow);
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
                 debug("skipping locked tempdir %s", PathFmt(realPath));
                 return;

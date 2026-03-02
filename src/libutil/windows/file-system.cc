@@ -23,7 +23,7 @@ void setWriteTime(
     warn("Changing file times is not yet implemented on Windows, path is %s", PathFmt(path));
 }
 
-AutoCloseFD openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
     return AutoCloseFD{CreateFileW(
         path.c_str(),
@@ -31,7 +31,7 @@ AutoCloseFD openDirectory(const std::filesystem::path & path)
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         OPEN_EXISTING,
-        FILE_FLAG_BACKUP_SEMANTICS,
+        FILE_FLAG_BACKUP_SEMANTICS | (finalSymlink == FinalSymlink::Follow ? 0 : FILE_FLAG_OPEN_REPARSE_POINT),
         /*hTemplateFile=*/nullptr)};
 }
 

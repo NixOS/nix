@@ -167,9 +167,16 @@ std::filesystem::path readLink(const std::filesystem::path & path);
 std::filesystem::path descriptorToPath(Descriptor fd);
 
 /**
- * Open a `Descriptor` with read-only access to the given directory.
+ * Type-safe boolean for whether to follow the final symlink component.
  */
-AutoCloseFD openDirectory(const std::filesystem::path & path);
+enum struct FinalSymlink : bool { DontFollow = false, Follow = true };
+
+/**
+ * Open a `Descriptor` with read-only access to the given directory.
+ *
+ * @param finalSymlink If `DontFollow`, fail if the path is a symlink.
+ */
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 /**
  * Open a `Descriptor` with read-only access to the given file.

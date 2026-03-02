@@ -363,7 +363,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
 void syncParent(const std::filesystem::path & path)
 {
     assert(path.has_parent_path());
-    AutoCloseFD fd = openDirectory(path.parent_path());
+    AutoCloseFD fd = openDirectory(path.parent_path(), FinalSymlink::Follow);
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
     /* TODO: Fix on windows, FlushFileBuffers requires GENERIC_WRITE. */
@@ -408,7 +408,7 @@ void recursiveSync(const std::filesystem::path & path)
 
     /* Fsync all the directories. */
     for (auto dir = dirsToFsync.rbegin(); dir != dirsToFsync.rend(); ++dir) {
-        AutoCloseFD fd = openDirectory(*dir); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openDirectory(*dir, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening directory %1%", PathFmt(*dir));
         fd.fsync();
