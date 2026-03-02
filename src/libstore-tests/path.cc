@@ -13,7 +13,6 @@
 
 namespace nix {
 
-#define STORE_DIR "/nix/store/"
 #define HASH_PART "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q"
 
 class StorePathTest : public virtual CharacterizationTest, public LibStoreTest
@@ -33,7 +32,7 @@ static std::regex nameRegex{std::string{nameRegexStr}};
 #define TEST_DONT_PARSE(NAME, STR)                                           \
     TEST_F(StorePathTest, bad_##NAME)                                        \
     {                                                                        \
-        std::string_view str = STORE_DIR HASH_PART "-" STR;                  \
+        std::string str = store->storeDir + "/" HASH_PART "-" STR;           \
         /* ASSERT_THROW generates a duplicate goto label */                  \
         /* A lambda isolates those labels. */                                \
         [&]() { ASSERT_THROW(store->parseStorePath(str), BadStorePath); }(); \
@@ -57,14 +56,14 @@ TEST_DONT_PARSE(dot_dash_a, ".-a")
 
 #undef TEST_DONT_PARSE
 
-#define TEST_DO_PARSE(NAME, STR)                            \
-    TEST_F(StorePathTest, good_##NAME)                      \
-    {                                                       \
-        std::string_view str = STORE_DIR HASH_PART "-" STR; \
-        auto p = store->parseStorePath(str);                \
-        std::string name{p.name()};                         \
-        EXPECT_EQ(p.name(), STR);                           \
-        EXPECT_TRUE(std::regex_match(name, nameRegex));     \
+#define TEST_DO_PARSE(NAME, STR)                                   \
+    TEST_F(StorePathTest, good_##NAME)                             \
+    {                                                              \
+        std::string str = store->storeDir + "/" HASH_PART "-" STR; \
+        auto p = store->parseStorePath(str);                       \
+        std::string name{p.name()};                                \
+        EXPECT_EQ(p.name(), STR);                                  \
+        EXPECT_TRUE(std::regex_match(name, nameRegex));            \
     }
 
 // 0-9 a-z A-Z + - . _ ? =
