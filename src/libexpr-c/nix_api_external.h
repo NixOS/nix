@@ -145,6 +145,7 @@ typedef struct NixCExternalValueDesc
      * Optional, the default is to throw an error
      * @todo The mechanisms for this call are incomplete. There are no C
      *       bindings to work with XML, pathsets and positions.
+     *       This callback also has no test coverage.
      * @param[in] self the void* passed to nix_create_external_value
      * @param[in] state The evaluator state
      * @param[in] strict boolean Whether to force the value before printing
