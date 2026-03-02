@@ -79,23 +79,23 @@ class nix_api_store_test : public nix_api_store_test_base
 {
 public:
     nix_api_store_test()
-        : nix_api_store_test_base{}
+        : nix_api_store_test_base{} {};
+
+    void SetUp() override
     {
-        init_local_store();
-    };
+#ifdef _WIN32
+        GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
+        store = open_local_store();
+    }
 
     ~nix_api_store_test() override
     {
-        nix_store_free(store);
+        if (store)
+            nix_store_free(store);
     }
 
-    Store * store;
-
-protected:
-    void init_local_store()
-    {
-        store = open_local_store();
-    }
+    Store * store = nullptr;
 };
 
 } // namespace nixC

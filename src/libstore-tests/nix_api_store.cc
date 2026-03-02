@@ -301,6 +301,9 @@ public:
     void SetUp() override
     {
         nix_api_store_test_base::SetUp();
+#ifdef _WIN32
+        GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
 
         nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
         nix::settings.getWorkerSettings().substituters = {};
@@ -356,6 +359,9 @@ public:
 
 TEST_F(nix_api_store_test_base, build_from_json)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // FIXME get rid of these
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -403,6 +409,9 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when the system is invalid
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -448,6 +457,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when the builder fails
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -493,6 +505,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
