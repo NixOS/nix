@@ -1,6 +1,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/file-path-impl.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
@@ -115,7 +116,7 @@ std::filesystem::path canonPath(const std::filesystem::path & path, bool resolve
         [&followCount, &temp, maxFollow, resolveSymlinks](std::string & result, std::string_view & remaining) {
             if (resolveSymlinks && std::filesystem::is_symlink(result)) {
                 if (++followCount >= maxFollow)
-                    throw Error("infinite symlink recursion in path '%1%'", remaining);
+                    throw SymlinkResolutionTooDeep(std::filesystem::path(remaining));
                 remaining = (temp = concatStrings(readLink(result).string(), remaining));
                 if (std::filesystem::path(remaining).is_absolute()) {
                     /* restart for symlinks pointing to absolute path */

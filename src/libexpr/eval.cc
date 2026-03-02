@@ -20,6 +20,7 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/expr/gc-small-vector.hh"
 #include "nix/util/url.hh"
 #include "nix/fetchers/fetch-to-store.hh"
@@ -3166,7 +3167,8 @@ SourcePath resolveExprPath(SourcePath path, bool addDefaultNix)
     while (!path.path.isRoot()) {
         // Basic cycle/depth limit to avoid infinite loops.
         if (++followCount >= maxFollow)
-            throw Error("too many symbolic links encountered while traversing the path '%s'", path);
+            throw SymlinkResolutionTooDeep(
+                path.path, "too many symbolic links encountered while traversing the path '%s'", path);
         auto p = path.parent().resolveSymlinks() / path.baseName();
         if (p.lstat().type != SourceAccessor::tSymlink)
             break;
