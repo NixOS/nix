@@ -105,7 +105,8 @@ static void nix_c_primop_wrapper(
         nix_value * external_arg = new_nix_value(args[i], state.mem);
         external_args.push_back(external_arg);
     }
-    f(userdata, &ctx, (EvalState *) &state, external_args.data(), vTmpPtr);
+    EvalState wrapper{state};
+    f(userdata, &ctx, &wrapper, external_args.data(), vTmpPtr);
 
     if (ctx.last_err_code != NIX_OK) {
         if (ctx.last_err_code == NIX_ERR_RECOVERABLE) {
