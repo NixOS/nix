@@ -299,6 +299,10 @@
 
 - Continued progress on the Windows port, including build fixes, CI improvements, and platform abstractions.
 
+- Nix docker images are now uploaded to [GHCR](https://github.com/NixOS/nix/pkgs/container/nix) as part of the release process
+
+  Historically, only pre-release builds of `amd64` docker images have been uploaded to ghcr.io with the `latest` tag pointing to the last built image from `master` branch. This has been fixed and going forward, <https://github.com/NixOS/nix/pkgs/container/nix> will include the same images as <https://hub.docker.com/r/nixos/nix/> that are built by [Hydra](https://hydra.nixos.org/project/nix) for [arm64](https://hydra.nixos.org/job/nix/maintenance-2.34/dockerImage.aarch64-linux) and [amd64](https://hydra.nixos.org/job/nix/maintenance-2.34/dockerImage.x86_64-linux). Pre-release versions are no longer pushed to the registry.
+
 ## Contributors
 
 This release was made possible by the following 43 contributors:
