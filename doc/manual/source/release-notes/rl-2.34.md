@@ -153,6 +153,8 @@
 
   When these options are configured, Nix will use this certificate/private key pair to authenticate to the server.
 
+- `nix store gc --dry-run` and `nix-collect-garbage --dry-run` now report the number of paths that would be freed [#15229](https://github.com/NixOS/nix/pull/15229) [#5704](https://github.com/NixOS/nix/issues/5704)
+
 ## Performance improvements
 
 - Unpacking tarballs to `~/.cache/nix/tarball-cache-v2` is now multithreaded [#12087](https://github.com/NixOS/nix/pull/12087)
@@ -168,9 +170,11 @@
 
 - `nix nar ls` and other NAR listing operations have been optimised further [#15163](https://github.com/NixOS/nix/pull/15163)
 
+- Evaluator hot-path optimizations [#15270](https://github.com/NixOS/nix/pull/15270) [#15271](https://github.com/NixOS/nix/pull/15271)
+
 ## C API Changes
 
-- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766)
+- New store API methods [#14766](https://github.com/NixOS/nix/pull/14766) [#14768](https://github.com/NixOS/nix/pull/14768)
 
   The C API now includes additional methods:
 
@@ -204,7 +208,7 @@
 
   Due to a bug in how Nix handled Boost.Coroutine2 suspension and resumption, copying from `ssh-ng://` stores would drop the SSH connection for each copied path. This issue has been fixed, which improves performance by avoiding multiple SSH/Nix Worker Protocol handshakes.
 
-- S3 binary caches now use virtual-hosted-style addressing by default [#15208](https://github.com/NixOS/nix/issues/15208)
+- S3 binary caches now use virtual-hosted-style addressing by default [#15208](https://github.com/NixOS/nix/issues/15208) [#15216](https://github.com/NixOS/nix/pull/15216)
 
   S3 binary caches now use virtual-hosted-style URLs
   (`https://bucket.s3.region.amazonaws.com/key`) instead of path-style URLs
@@ -243,6 +247,34 @@
 
   When run as root, Nix doesn't run builds via the daemon and is a parent of the forked build processes. Prior versions of Nix failed to preserve the `PR_SET_PDEATHSIG` parent-death signal across `setuid` calls. This could lead to build processes being reparented and continue running in the background. This has been fixed.
 
+- Fix crash when interrupting `--log-format internal-json` [#15335](https://github.com/NixOS/nix/pull/15335)
+
+  Pressing Ctrl-C during `--log-format internal-json` (used by [nix-output-monitor](https://github.com/maralorn/nix-output-monitor)) no longer causes a spurious "Nix crashed. This is a bug." report.
+
+- Fix percent-encoding in `file://` and `local://` store URIs [#15280](https://github.com/NixOS/nix/pull/15280)
+
+  Store URIs with special characters like `+` in the path (e.g. `file:///tmp/a+b`) no longer incorrectly create percent-encoded directories (e.g. `/tmp/a%2Bb`).
+
+- Fix crash during tab completion in `nix repl` [#15255](https://github.com/NixOS/nix/pull/15255)
+
+- Fix "Too many open files" on macOS [#15205](https://github.com/NixOS/nix/pull/15205)
+
+  Nix now raises the open file soft limit to the hard limit at startup, fixing "Too many open files" errors on macOS where the default soft limit is low.
+
+- `nix develop` no longer fails when `inputs.nixpkgs` has `flake = false` [#15175](https://github.com/NixOS/nix/pull/15175)
+
+- `builtins.flakeRefToString` no longer fails with "attribute is a thunk" [#15160](https://github.com/NixOS/nix/pull/15160)
+
+- Fix `QueryPathInfo` throwing on invalid paths in the daemon [#15134](https://github.com/NixOS/nix/pull/15134)
+
+- `nix-store --generate-binary-cache-key` now fsyncs key files to prevent corruption [#15107](https://github.com/NixOS/nix/pull/15107)
+
+- Fix `build-hook` setting in `nix.conf` being ignored [#15083](https://github.com/NixOS/nix/pull/15083)
+
+- Fix empty error messages when builds are cancelled due to a dependency failure [#14972](https://github.com/NixOS/nix/pull/14972)
+
+  When a build fails without `--keep-going`, other in-progress builds are cancelled. Previously, these cancelled builds were incorrectly reported as failed with empty error messages. This affected `buildPathsWithResults` callers such as `nix flake check`.
+
 ## Miscellaneous changes
 
 - Content-Encoding decompression is now handled by libcurl [#14324](https://github.com/NixOS/nix/issues/14324) [#15336](https://github.com/NixOS/nix/pull/15336)
@@ -253,6 +285,23 @@
   `br`, `zstd`, `gzip` continue to be supported. Distro packaging should ensure that the `libcurl` dependency is linked against required libraries to support these encodings. By default, the build system now requires libcurl >= 8.17.0, which is not known to have issues around [pausing and decompression](https://github.com/curl/curl/issues/16280).
 
 - Static builds now support S3 features (`libstore:s3-aws-auth` meson option) [#15076](https://github.com/NixOS/nix/pull/15076)
+
+- Improved package-related error messages [#15349](https://github.com/NixOS/nix/pull/15349)
+
+  Store path context is now rendered in the user-facing `hash^out` format instead of the internal `!out!hash` format.
+  A misleading error message in `nix-env` that incorrectly blamed content-addressed derivations has been fixed.
+
+- Improved error message for empty derivation files [#15298](https://github.com/NixOS/nix/pull/15298)
+
+  Parsing an empty `.drv` file (e.g. due to store corruption after an unclean shutdown) now produces a clear error message instead of the cryptic `expected string 'D'`.
+
+- Relative `file:` paths for tarballs are now rejected with a clear error [#14983](https://github.com/NixOS/nix/pull/14983)
+
+- Continued progress on the Windows port, including build fixes, CI improvements, and platform abstractions.
+
+- Nix docker images are now uploaded to [GHCR](https://github.com/NixOS/nix/pkgs/container/nix) as part of the release process
+
+  Historically, only pre-release builds of `amd64` docker images have been uploaded to ghcr.io with the `latest` tag pointing to the last built image from `master` branch. This has been fixed and going forward, <https://github.com/NixOS/nix/pkgs/container/nix> will include the same images as <https://hub.docker.com/r/nixos/nix/> that are built by [Hydra](https://hydra.nixos.org/project/nix) for [arm64](https://hydra.nixos.org/job/nix/maintenance-2.34/dockerImage.aarch64-linux) and [amd64](https://hydra.nixos.org/job/nix/maintenance-2.34/dockerImage.x86_64-linux). Pre-release versions are no longer pushed to the registry.
 
 ## Contributors
 
