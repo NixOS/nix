@@ -4,6 +4,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "nix/util/url.hh"
 
 #include <git2.h>
 #include <gtest/gtest.h>
@@ -190,7 +191,7 @@ TEST_F(GitTest, submodulePeriodSupport)
     auto input = fetchers::Input::fromAttrs(
         settings,
         {
-            {"url", "file://" + repoPath.string()},
+            {"url", "file://" + encodeUrlPath(pathToUrlPath(repoPath))},
             {"submodules", Explicit{true}},
             {"type", "git"},
             {"ref", "main"},
