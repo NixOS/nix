@@ -68,6 +68,15 @@ size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterru
     return static_cast<size_t>(n);
 }
 
+AutoCloseFD dupDescriptor(Descriptor fd)
+{
+    HANDLE newHandle;
+    if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+        throw WinError("duplicating handle");
+    }
+    return AutoCloseFD{newHandle};
+}
+
 //////////////////////////////////////////////////////////////////////
 
 void Pipe::create()
