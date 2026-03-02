@@ -212,6 +212,9 @@ TEST_F(nix_api_store_test, nix_store_real_path)
 
 TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine/Windows does not support symlinks needed for local store gcroots";
+#endif
     auto tmp = nix::createTempDir();
     auto storeRoot = (tmp / "store").string();
     auto stateDir = (tmp / "state").string();
