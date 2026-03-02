@@ -311,6 +311,36 @@ public:
 };
 
 /**
+ * Thrown when symlink resolution exceeds the maximum depth, indicating
+ * either infinite recursion or an excessively long symlink chain.
+ */
+class SymlinkResolutionTooDeep final : public CloneableError<SymlinkResolutionTooDeep, Error>
+{
+    void anchor() override;
+
+public:
+    /**
+     * Either a portable path, or an OS-native path on the host file
+     * system, depending on what was being resolved.
+     */
+    std::variant<CanonPath, std::filesystem::path> path;
+
+    template<typename... Args>
+    SymlinkResolutionTooDeep(CanonPath path, const std::string & fs, Args &&... args)
+        : CloneableError(fs, std::forward<Args>(args)...)
+        , path(std::move(path))
+    {
+    }
+
+    template<typename... Args>
+    SymlinkResolutionTooDeep(std::filesystem::path path, const std::string & fs, Args &&... args)
+        : CloneableError(fs, std::forward<Args>(args)...)
+        , path(std::move(path))
+    {
+    }
+};
+
+/**
  * Optional parameters for `makeFSSourceAccessor`.
  */
 struct MakeFSSourceAccessorParams
