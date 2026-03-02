@@ -185,7 +185,10 @@ TEST(machines, getMachinesWithCorrectFileReference)
 
 TEST(machines, getMachinesWithCorrectFileReferenceToEmptyFile)
 {
-    std::filesystem::path path = "/dev/null";
+    auto tmpDir = nix::createTempDir();
+    AutoDelete delTmpDir(tmpDir);
+    auto path = tmpDir / "empty-machines";
+    nix::writeFile(path, "");
     ASSERT_TRUE(std::filesystem::exists(path));
 
     auto actual = Machine::parseConfig({}, "@" + path.string());
