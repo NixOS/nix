@@ -1,5 +1,5 @@
 #include "nix/store/pathlocks.hh"
-#include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/util.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/signals.hh"

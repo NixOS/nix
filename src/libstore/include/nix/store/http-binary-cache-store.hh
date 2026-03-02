@@ -14,7 +14,11 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
                                     virtual Store::Config,
                                     BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+    HttpBinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , BinaryCacheStoreConfig(params)
+    {
+    }
 
     HttpBinaryCacheStoreConfig(ParsedURL cacheUri, const Store::Config::Params & params);
 

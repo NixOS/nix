@@ -32,6 +32,7 @@ headers = [ config_pub_h ] + files(
   'configuration.hh',
   'current-process.hh',
   'demangle.hh',
+  'descriptor-destination.hh',
   'english.hh',
   'environment-variables.hh',
   'error.hh',

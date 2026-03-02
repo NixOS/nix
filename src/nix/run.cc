@@ -79,7 +79,7 @@ void execProgramInStore(
             "store '%s' is not a local store so it does not support command execution",
             store->config.getHumanReadableURI());
 
-    if (store->storeDir != store2->getRealStoreDir()) {
+    if (store->storeDir != store2->getRealStoreDir().string()) {
         Strings helperArgs = {
             chrootHelperName,
             store->storeDir,

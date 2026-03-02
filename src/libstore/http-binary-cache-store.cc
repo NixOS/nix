@@ -21,7 +21,7 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 }
 
 HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Unix)
     , BinaryCacheStoreConfig(params)
     , cacheUri(std::move(_cacheUri))
 {

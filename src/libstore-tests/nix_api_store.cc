@@ -15,7 +15,7 @@
 
 namespace nixC {
 
-std::string PATH_SUFFIX = "/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";
+std::string PATH_SUFFIX = "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-name";
 
 TEST_F(nix_api_util_context, nix_libstore_init)
 {
@@ -30,9 +30,9 @@ TEST_F(nix_api_store_test, nix_store_get_uri)
     ASSERT_EQ(NIX_OK, ret);
     auto expectedStoreURI = "local://?"
                             + nix::encodeQuery({
-                                {"log", nixLogDir},
-                                {"state", nixStateDir},
-                                {"store", nixStoreDir},
+                                {"log", nixLogDir.string()},
+                                {"state", nixStateDir.string()},
+                                {"store", nixStoreDir.string()},
                             });
     ASSERT_EQ(expectedStoreURI, str);
 }
@@ -49,8 +49,12 @@ TEST_F(nix_api_util_context, nix_store_get_storedir_default)
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
 
-    // These tests run with a unique storeDir, but not a relocated store
+#ifdef _WIN32
+    // On Windows, the default store is under ProgramData
+    ASSERT_TRUE(str.ends_with("\\nix\\store") || str.ends_with("/nix/store"));
+#else
     ASSERT_STREQ(NIX_STORE_DIR, str.c_str());
+#endif
 
     nix_store_free(store);
 }
@@ -63,7 +67,7 @@ TEST_F(nix_api_store_test, nix_store_get_storedir)
     ASSERT_EQ(NIX_OK, ret);
 
     // These tests run with a unique storeDir, but not a relocated store
-    ASSERT_STREQ(nixStoreDir.c_str(), str.c_str());
+    ASSERT_STREQ(nixStoreDir.string().c_str(), str.c_str());
 }
 
 TEST_F(nix_api_store_test, InvalidPathFails)
@@ -74,16 +78,16 @@ TEST_F(nix_api_store_test, InvalidPathFails)
 
 TEST_F(nix_api_store_test, ReturnsValidStorePath)
 {
-    StorePath * result = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * result = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     ASSERT_NE(result, nullptr);
     ASSERT_STREQ("name", result->path.name().data());
-    ASSERT_STREQ(PATH_SUFFIX.substr(1).c_str(), result->path.to_string().data());
+    ASSERT_STREQ(PATH_SUFFIX.c_str(), result->path.to_string().data());
     nix_store_path_free(result);
 }
 
 TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 {
-    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     ASSERT_EQ(nix_err_code(ctx), NIX_OK);
     nix_store_path_free(path);
 }
@@ -91,7 +95,7 @@ TEST_F(nix_api_store_test, SetsLastErrCodeToNixOk)
 TEST_F(nix_api_store_test, DoesNotCrashWhenContextIsNull)
 {
     StorePath * path = nullptr;
-    ASSERT_NO_THROW(path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str()));
+    ASSERT_NO_THROW(path = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str()));
     nix_store_path_free(path);
 }
 
@@ -101,7 +105,7 @@ static_assert(sizeof(nix_store_path_hash_part::bytes) == sizeof(nix_store_path_h
 
 TEST_F(nix_api_store_test, nix_store_path_hash)
 {
-    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     ASSERT_NE(path, nullptr);
 
     nix_store_path_hash_part hash;
@@ -125,7 +129,7 @@ TEST_F(nix_api_store_test, nix_store_path_hash)
 TEST_F(nix_api_store_test, nix_store_create_from_parts_roundtrip)
 {
     // Parse a path
-    StorePath * original = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * original = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     EXPECT_NE(original, nullptr);
 
     // Get its hash
@@ -192,20 +196,20 @@ TEST_F(nix_api_util_context, nix_store_open_invalid)
 
 TEST_F(nix_api_store_test, nix_store_is_valid_path_not_in_store)
 {
-    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     ASSERT_EQ(false, nix_store_is_valid_path(ctx, store, path));
     nix_store_path_free(path);
 }
 
 TEST_F(nix_api_store_test, nix_store_real_path)
 {
-    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir / PATH_SUFFIX).string().c_str());
     std::string rp;
     auto ret = nix_store_real_path(ctx, store, path, OBSERVE_STRING(rp));
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
     // Assumption: we're not testing with a relocated store
-    ASSERT_STREQ((nixStoreDir + PATH_SUFFIX).c_str(), rp.c_str());
+    ASSERT_STREQ((nixStoreDir / PATH_SUFFIX).string().c_str(), rp.c_str());
 
     nix_store_path_free(path);
 }
@@ -213,14 +217,26 @@ TEST_F(nix_api_store_test, nix_store_real_path)
 TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 {
     auto tmp = nix::createTempDir();
-    auto storeRoot = (tmp / "store").string();
     auto stateDir = (tmp / "state").string();
     auto logDir = (tmp / "log").string();
-    const char * rootkv[] = {"root", storeRoot.c_str()};
+#ifdef _WIN32
+    // Don't depend on known folders which could change on windows.
+    // On Windows we can't combine two absolute paths, so we need to
+    // explicitly set the real store dir.
+    std::filesystem::path logicalStoreDir = "X:\\nix\\store";
+    auto realStoreDir = tmp / "store" / "X" / "nix" / "store";
+#else
+    std::filesystem::path logicalStoreDir = NIX_STORE_DIR;
+    auto realStoreDir = tmp / "store" / logicalStoreDir.relative_path();
+#endif
+    auto logicalStoreDirStr = logicalStoreDir.string();
+    auto realStoreDirStr = realStoreDir.string();
+    const char * realStorekv[] = {"real", realStoreDirStr.c_str()};
     const char * statekv[] = {"state", stateDir.c_str()};
     const char * logkv[] = {"log", logDir.c_str()};
+    const char * storekv[] = {"store", logicalStoreDirStr.c_str()};
     // const char * rokv[] = {"read-only", "true"};
-    const char ** kvs[] = {rootkv, statekv, logkv, NULL};
+    const char ** kvs[] = {realStorekv, statekv, logkv, storekv, NULL};
 
     nix_libstore_init(ctx);
     assert_ctx_ok();
@@ -232,9 +248,10 @@ TEST_F(nix_api_util_context, nix_store_real_path_relocated)
     std::string nixStoreDir;
     auto ret = nix_store_get_storedir(ctx, store, OBSERVE_STRING(nixStoreDir));
     ASSERT_EQ(NIX_OK, ret);
-    ASSERT_STREQ(NIX_STORE_DIR, nixStoreDir.c_str());
+    ASSERT_STREQ(logicalStoreDirStr.c_str(), nixStoreDir.c_str());
 
-    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    StorePath * path =
+        nix_store_parse_path(ctx, store, (std::filesystem::path{nixStoreDir} / PATH_SUFFIX).string().c_str());
     assert_ctx_ok();
     ASSERT_NE(path, nullptr);
 
@@ -243,20 +260,26 @@ TEST_F(nix_api_util_context, nix_store_real_path_relocated)
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
 
-    // Assumption: we're not testing with a relocated store
-    ASSERT_STREQ((storeRoot + NIX_STORE_DIR + PATH_SUFFIX).c_str(), rp.c_str());
+    auto expectedPath = realStoreDir / PATH_SUFFIX;
+    ASSERT_EQ(expectedPath, std::filesystem::path{rp});
 
     nix_store_path_free(path);
 }
 
 TEST_F(nix_api_util_context, nix_store_real_path_binary_cache)
 {
-    Store * store =
-        nix_store_open(ctx, nix::fmt("file://%s/binary-cache", nix::createTempDir().string()).c_str(), nullptr);
+    auto tempPath = nix::pathToUrlPath(nix::createTempDir() / "binary-cache");
+    Store * store = nix_store_open(ctx, ("file://" + nix::encodeUrlPath(tempPath)).c_str(), nullptr);
     assert_ctx_ok();
     ASSERT_NE(store, nullptr);
 
-    std::string path_raw = std::string(NIX_STORE_DIR) + PATH_SUFFIX;
+    std::string nixStoreDir;
+    {
+        auto ret = nix_store_get_storedir(ctx, store, OBSERVE_STRING(nixStoreDir));
+        ASSERT_EQ(NIX_OK, ret);
+    }
+
+    std::string path_raw = nixStoreDir + "/" + PATH_SUFFIX;
     StorePath * path = nix_store_parse_path(ctx, store, path_raw.c_str());
     assert_ctx_ok();
     ASSERT_NE(path, nullptr);
@@ -301,6 +324,9 @@ public:
         nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
         nix::settings.getWorkerSettings().substituters = {};
 
+#ifdef _WIN32
+        GTEST_SKIP() << "Building not yet implemented on Windows";
+#endif
         store = open_local_store();
 
         std::filesystem::path unitTestData = nix::getUnitTestData();
@@ -352,6 +378,9 @@ public:
 
 TEST_F(nix_api_store_test_base, build_from_json)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Building not yet implemented on Windows";
+#endif
     // FIXME get rid of these
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -399,6 +428,9 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Building not yet implemented on Windows";
+#endif
     // Test that nix_store_realise properly reports errors when the system is invalid
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -444,6 +476,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Building not yet implemented on Windows";
+#endif
     // Test that nix_store_realise properly reports errors when the builder fails
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -489,6 +524,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Building not yet implemented on Windows";
+#endif
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};

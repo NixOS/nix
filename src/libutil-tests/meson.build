@@ -57,6 +57,7 @@ sources = files(
   'closure.cc',
   'compression.cc',
   'config.cc',
+  'descriptor-destination.cc',
   'executable-path.cc',
   'file-content-address.cc',
   'file-descriptor.cc',

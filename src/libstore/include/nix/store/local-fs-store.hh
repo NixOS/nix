@@ -22,7 +22,10 @@ private:
     }
 
 public:
-    using StoreConfig::StoreConfig;
+    LocalFSStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Native)
+    {
+    }
 
     /**
      * Used to override the `root` settings. Can't be done via modifying

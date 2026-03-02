@@ -60,7 +60,7 @@ void HttpsBinaryCacheStoreTest::SetUp()
     openssl({"x509", "-req", "-in", (tmpDir / "client.csr").string(), "-CA", caCert.string(), "-CAkey", caKey.string(), "-CAcreateserial", "-out", clientCert.string(), "-days", "1"});
     // clang-format on
 
-#ifndef _WIN32 /* FIXME: Can't yet start processes on windows */
+#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
     auto args = serverArgs();
     serverPid = startProcess(
         [&] {
@@ -91,7 +91,9 @@ void HttpsBinaryCacheStoreTest::SetUp()
 
 void HttpsBinaryCacheStoreTest::TearDown()
 {
+#ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
     serverPid.kill();
+#endif
     delTmpDir.reset();
     testFileTransferSettings.reset();
 }

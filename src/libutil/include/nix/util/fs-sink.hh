@@ -1,9 +1,9 @@
 #pragma once
 ///@file
 
+#include "nix/util/descriptor-destination.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
-#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -42,7 +42,7 @@ struct FileSystemObjectSink
      * Create a directory and invoke a callback with a pair of sink + CanonPath
      * of the created subdirectory relative to dirSink.
      *
-     * @note This allows for UNIX RestoreSink implementations to implement
+     * @note This allows for `RestoreSink` to implement
      * *at-style accessors that always keep an open file descriptor for the
      * freshly created directory. Use this when it's important to disallow any
      * intermediate path components from being symlinks.
@@ -95,24 +95,25 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 
 /**
  * Write files at the given path
+ *
+ * This sink must *never* follow intermediate symlinks in case a file collision
+ * is encountered for various reasons like case-insensitivity or other types of
+ * normalization. Using appropriate *at system calls and traversing only one
+ * path component at a time ensures that writing is race-free and is not
+ * susceptible to symlink replacement.
  */
 struct RestoreSink : FileSystemObjectSink
 {
-    std::filesystem::path dstPath;
-    /**
-     * File descriptor for the directory located at dstPath. Used for *at
-     * operations relative to this file descriptor. This sink must *never*
-     * follow intermediate symlinks (starting from dstPath) in case a file
-     * collision is encountered for various reasons like case-insensitivity or
-     * other types on normalization. using appropriate *at system calls and traversing
-     * only one path component at a time ensures that writing is race-free and is
-     * is not susceptible to symlink replacement.
-     */
-    AutoCloseFD dirFd;
+    DescriptorDestination destination;
+
     bool startFsync = false;
 
-    explicit RestoreSink(bool startFsync)
-        : startFsync{startFsync}
+    /**
+     * Construct a sink.
+     */
+    explicit RestoreSink(DescriptorDestination dest, bool startFsync = false)
+        : destination{std::move(dest)}
+        , startFsync{startFsync}
     {
     }
 

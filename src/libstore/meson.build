@@ -243,14 +243,14 @@ endif
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
-configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
-configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
-# On Windows, NIX_CONF_DIR is determined at runtime using the Windows known
-# folders API (FOLDERID_ProgramData), so we don't define it at compile time.
+# On Windows, NIX_STATE_DIR, NIX_LOG_DIR, and NIX_CONF_DIR are determined at
+# runtime using the Windows known folders API (FOLDERID_ProgramData), so we
+# don't define them at compile time.
 if host_machine.system() != 'windows'
+  configdata_priv.set_quoted('NIX_STATE_DIR', localstatedir / 'nix')
+  configdata_priv.set_quoted('NIX_LOG_DIR', log_dir)
   configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
 endif
-configdata_priv.set_quoted('NIX_MAN_DIR', mandir)
 
 lsof = find_program('lsof', required : false)
 configdata_priv.set_quoted(
