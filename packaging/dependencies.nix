@@ -65,4 +65,6 @@ scope: {
         buildPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.buildPhase;
         installPhase = lib.replaceStrings [ "--without-python" ] [ "" ] old.installPhase;
       });
+
+  wasmtime = pkgs.callPackage ./wasmtime.nix { };
 }
