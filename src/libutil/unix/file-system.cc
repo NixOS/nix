@@ -77,6 +77,25 @@ std::filesystem::path defaultTempDir()
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
 }
 
+PosixStat lstat(const std::filesystem::path & path)
+{
+    PosixStat st;
+    if (::lstat(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
+}
+
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
+    if (::lstat(path.c_str(), &*st)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            return std::nullopt;
+        throw SysError("getting status of %s", PathFmt(path));
+    }
+    return st;
+}
+
 void setWriteTime(
     const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
 {

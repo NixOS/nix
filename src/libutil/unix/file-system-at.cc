@@ -89,10 +89,9 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
         });
     }
 
-    struct ::stat st;
-    /* Possible since https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
-    if (::fstat(pathFd.get(), &st) == -1)
-        throw SysError("statting '%s' relative to parent directory via O_PATH file descriptor", path.rel());
+    /* Possible to use with O_PATH fd since
+     * https://github.com/torvalds/linux/commit/55815f70147dcfa3ead5738fd56d3574e2e3c1c2 (3.6) */
+    auto st = fstat(pathFd.get());
 
     if (S_ISLNK(st.st_mode))
         throw SysError(EOPNOTSUPP, "can't change mode of symlink %s", PathFmt(descriptorToPath(dirFd) / path.rel()));
@@ -220,6 +219,15 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
         } else if (rlSize < bufSize)
             return {buf.data(), static_cast<std::size_t>(rlSize)};
     }
+}
+
+PosixStat fstat(Descriptor fd)
+{
+    PosixStat st;
+    if (::fstat(fd, &st)) {
+        throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(fd))); });
+    }
+    return st;
 }
 
 } // namespace nix
