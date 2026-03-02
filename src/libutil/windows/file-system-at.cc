@@ -210,6 +210,26 @@ bool isReparsePoint(HANDLE handle)
 
 } // namespace windows
 
+PosixStat fstat(Descriptor fd)
+{
+    BY_HANDLE_FILE_INFORMATION info;
+    if (!GetFileInformationByHandle(fd, &info))
+        throw WinError("getting file information for %s", PathFmt(descriptorToPath(fd)));
+
+    PosixStat st;
+    windows::statFromFileInfo(
+        st,
+        info.dwFileAttributes,
+        info.ftCreationTime,
+        info.ftLastAccessTime,
+        info.ftLastWriteTime,
+        info.nFileSizeHigh,
+        info.nFileSizeLow,
+        info.nNumberOfLinks);
+
+    return st;
+}
+
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
 {

@@ -23,9 +23,10 @@
 
 namespace nix {
 
-AutoCloseFD openDirectory(const std::filesystem::path & path)
+AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink finalSymlink)
 {
-    return AutoCloseFD{open(path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC)};
+    return AutoCloseFD{open(
+        path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC | (finalSymlink == FinalSymlink::Follow ? 0 : O_NOFOLLOW))};
 }
 
 AutoCloseFD openFileReadonly(const std::filesystem::path & path)
@@ -74,6 +75,25 @@ std::filesystem::path descriptorToPath(Descriptor fd)
 std::filesystem::path defaultTempDir()
 {
     return getEnvNonEmpty("TMPDIR").value_or("/tmp");
+}
+
+PosixStat lstat(const std::filesystem::path & path)
+{
+    PosixStat st;
+    if (::lstat(path.c_str(), &st))
+        throw SysError("getting status of %s", PathFmt(path));
+    return st;
+}
+
+std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
+{
+    std::optional<PosixStat> st{std::in_place};
+    if (::lstat(path.c_str(), &*st)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            return std::nullopt;
+        throw SysError("getting status of %s", PathFmt(path));
+    }
+    return st;
 }
 
 void setWriteTime(
