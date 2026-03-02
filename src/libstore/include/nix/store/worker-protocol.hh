@@ -21,6 +21,8 @@ namespace nix {
 #define STDERR_STOP_ACTIVITY 0x53544f50
 #define STDERR_RESULT 0x52534c54
 
+constexpr auto FEATURE_GC_CLOSURE = "gc-closure";
+
 struct StoreDirConfig;
 struct Source;
 
