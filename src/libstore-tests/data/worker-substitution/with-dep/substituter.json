@@ -23,7 +23,7 @@
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
-        "version": 2
+        "version": 3
       }
     },
     "k09ldq9fvxb6vfwq0cmv6j1jgqx08y1n-main": {
@@ -47,7 +47,7 @@
         "signatures": [],
         "storeDir": "/nix/store",
         "ultimate": false,
-        "version": 2
+        "version": 3
       }
     }
   },

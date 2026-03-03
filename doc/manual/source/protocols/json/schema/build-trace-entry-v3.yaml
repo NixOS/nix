@@ -1,5 +1,5 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/build-trace-entry-v2.json"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/build-trace-entry-v3.json"
 title: Build Trace Entry
 description: |
   A record of a successful build outcome for a specific derivation output.
@@ -12,14 +12,17 @@ description: |
   > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-ca-derivations)
   > and subject to change.
 
-  Verision history:
+  ## Version History
 
   - Version 1: Original format
 
   - Version 2:
-    - Use `drvPath` not `drvHash` to refer to derivation in a more conventional way.
     - Remove `dependentRealisations`
+
+  - Version 3:
+    - Use `drvPath` not `drvHash` to refer to derivation in a more conventional way.
     - Separate into `key` and `value`
+    - Use 2nd version of signatures format (objects, not strings)
 
 type: object
 required:
@@ -77,6 +80,4 @@ additionalProperties: false
         description: |
           A set of cryptographic signatures attesting to the authenticity of this build trace entry.
         items:
-          type: string
-          title: Signature
-          description: A single cryptographic signature
+          "$ref": "signature-v2.yaml"
