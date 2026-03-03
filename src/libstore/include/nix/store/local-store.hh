@@ -7,9 +7,11 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/indirect-root-store.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/os-filename.hh"
 
 #include <chrono>
 #include <future>
+#include <list>
 #include <string>
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -523,7 +525,7 @@ private:
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
-    Strings readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
+    std::list<OsFilename> readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
     void optimisePath_(
         Activity * act,
         OptimiseStats & stats,

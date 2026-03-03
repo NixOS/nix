@@ -6,6 +6,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/user-lock.hh"
+#include "nix/util/os-filename.hh"
 
 namespace nix {
 
@@ -298,7 +299,7 @@ protected:
      *
      * Otherwise this function throws an Error.
      */
-    void writeBuilderFile(const std::string & name, std::string_view contents);
+    void writeBuilderFile(const OsFilename & name, std::string_view contents);
 
     /**
      * Arguments passed to runChild().

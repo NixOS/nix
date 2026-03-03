@@ -11,6 +11,7 @@
 #include "nix/util/cgroup.hh"
 #include "nix/util/linux-namespaces.hh"
 #include "nix/util/file-system-at.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "linux/fchmodat2-compat.hh"
@@ -375,7 +376,7 @@ static void doBind(
            since https://github.com/torvalds/linux/commit/65cfc6722361 (v2.6.39).
            See also: https://github.com/cyphar/libpathrs/issues/18 */
         auto symlinkTarget = readLinkAt(sourceFd.get(), CanonPath::root);
-        auto filename = target.filename();
+        auto filename = OsFilename{target.filename()};
         auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
         if (::symlinkat(symlinkTarget.data(), parentFd, filename.c_str()) == -1)
             throw SysError("creating symlink %s", PathFmt(chrootRootDirPath / target));
@@ -384,10 +385,11 @@ static void doBind(
         if (::utimensat(parentFd, filename.c_str(), times.data(), AT_SYMLINK_NOFOLLOW) == -1)
             throw SysError("changing write time of %s", PathFmt(chrootRootDirPath / target));
     } else {
+        auto filename = OsFilename{target.filename()};
         auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
         /* Strictly speaking, O_NOFOLLOW is redundant because O_CREAT | O_EXCL would never follow links anyway. */
         AutoCloseFD destFd =
-            ::openat(parentFd, target.filename().c_str(), O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0666);
+            ::openat(parentFd, filename.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0666);
         if (!destFd)
             throw SysError("creating regular file %s", PathFmt(chrootRootDirPath / target));
         bindMount(sourceFd.get(), destFd.get());

@@ -4,6 +4,7 @@
 #include "nix/util/sync.hh"
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -206,7 +207,7 @@ private:
     AutoCloseFD dirFd;
     std::filesystem::path fsPath;
 
-    std::shared_ptr<Sync<LRUCache<CanonPath, ref<AutoCloseFD>>>> dirFdCache;
+    std::shared_ptr<Sync<LRUCache<OsCanonPath, ref<AutoCloseFD>>>> dirFdCache;
 
     static inline std::atomic<unsigned> globalDirFdCount = 0;
 
@@ -240,7 +241,7 @@ private:
         }
     }
 
-    void insertIntoDirFdCache(const CanonPath & key, ref<AutoCloseFD> fd)
+    void insertIntoDirFdCache(const OsCanonPath & key, ref<AutoCloseFD> fd)
     {
         assert(dirFdCache);
         auto cache = dirFdCache->lock();
@@ -262,7 +263,7 @@ private:
      */
     std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParent(const CanonPath & path);
 
-    std::function<void(AutoCloseFD, CanonPath)> makeDirFdCallback();
+    std::function<void(AutoCloseFD, OsCanonPath)> makeDirFdCallback();
 
     AutoCloseFD openSubdirectory(const CanonPath & path);
 
@@ -277,7 +278,7 @@ public:
         setPathDisplay(fsPath.generic_string());
 
         if (dirFdCacheSize)
-            dirFdCache = std::make_shared<Sync<LRUCache<CanonPath, ref<AutoCloseFD>>>>(dirFdCacheSize);
+            dirFdCache = std::make_shared<Sync<LRUCache<OsCanonPath, ref<AutoCloseFD>>>>(dirFdCacheSize);
     }
 
     PosixDirectorySourceAccessor(PosixDirectorySourceAccessor &&) = delete;
@@ -328,12 +329,35 @@ public:
     }
 };
 
-std::function<void(AutoCloseFD, CanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
+/**
+ * The path carried by a `SymlinkNotAllowed` from `file-system-at.hh`, as a
+ * `CanonPath` so it can be re-prefixed and fed to `showPath`.
+ */
+static CanonPath portablePathOf(const SymlinkNotAllowed & e)
+{
+    return std::visit(
+        overloaded{
+            [](const CanonPath & p) { return p; },
+            [](const OsCanonPath & p) { return p.toPortable(); },
+        },
+        e.path);
+}
+
+/**
+ * The last component of a non-root `CanonPath`. `CanonPath` already
+ * guarantees it is a plain filename, so the asserting constructor is fine.
+ */
+static OsFilename osBaseNameOf(const CanonPath & path)
+{
+    return OsFilename{std::filesystem::path{std::string{path.baseName().value()}}};
+}
+
+std::function<void(AutoCloseFD, OsCanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
 {
     if (!dirFdCache)
         return nullptr;
 
-    return [this](AutoCloseFD fd, CanonPath key) {
+    return [this](AutoCloseFD fd, OsCanonPath key) {
         assert(fd);
         insertIntoDirFdCache(std::move(key), make_ref<AutoCloseFD>(std::move(fd)));
     };
@@ -342,14 +366,17 @@ std::function<void(AutoCloseFD, CanonPath)> PosixDirectorySourceAccessor::makeDi
 std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor::openParent(const CanonPath & path)
 {
     assert(!path.isRoot());
-    auto parent = path.parent().value();
-    if (parent.isRoot())
+    /* Everything below is in OS-native terms: these are keys for a cache of
+       real directory handles, not positions in the accessor's virtual
+       namespace. `path` is the last portable thing we see. */
+    OsCanonPath parent = path.parent().value();
+    if (parent.empty())
         return {dirFd.get(), nullptr};
 
     maybeEvictFromGlobalCaches();
 
     std::shared_ptr<AutoCloseFD> intermediateParentFd;
-    CanonPath anchor = CanonPath::root;
+    OsCanonPath anchor;
 
     if (dirFdCache) {
         auto cache = dirFdCache->lock();
@@ -362,24 +389,23 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
                 anchor = p;
                 break;
             }
-            if (p.isRoot())
+            if (p.empty())
                 break;
             p.pop();
         }
     }
 
     Descriptor startFd = intermediateParentFd ? intermediateParentFd->get() : dirFd.get();
-    CanonPath relPath = intermediateParentFd ? parent.removePrefix(anchor) : parent;
+    OsCanonPath relPath = parent.removePrefix(anchor);
 
-    std::function<void(AutoCloseFD, CanonPath)> cb;
+    std::function<void(AutoCloseFD, OsCanonPath)> cb;
     if (auto base = makeDirFdCallback()) {
-        if (intermediateParentFd) {
-            cb = [base = std::move(base), prefix = anchor](AutoCloseFD fd, CanonPath relKey) {
-                base(std::move(fd), prefix / relKey);
-            };
-        } else {
-            cb = std::move(base);
-        }
+        /* The walk reports keys relative to `startFd`; the cache is keyed
+           relative to the accessor root, so re-anchor them. `anchor` is empty
+           (the identity) when there was no cache hit, so this covers both. */
+        cb = [base = std::move(base), prefix = anchor](AutoCloseFD fd, OsCanonPath relKey) {
+            base(std::move(fd), prefix / relKey);
+        };
     }
 
     try {
@@ -400,7 +426,8 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
         return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
     } catch (SymlinkNotAllowed & e) {
         /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */
-        throw SymlinkNotAllowed(anchor / e.path, "path '%s' (or its ancestor) is a symlink", showPath(anchor / e.path));
+        auto p = anchor.toPortable() / portablePathOf(e);
+        throw SymlinkNotAllowed(p, "path '%s' (or its ancestor) is a symlink", showPath(p));
     }
 }
 
@@ -438,8 +465,7 @@ std::optional<SourceAccessor::Stat> PosixDirectorySourceAccessor::maybeLstat(con
         if (parentFd == INVALID_DESCRIPTOR)
             return std::nullopt;
 
-        /* We know that CanonPath returns a NUL-terminated string_view, so the use of ->data() here is safe. */
-        if (::fstatat(parentFd, path.baseName()->data(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
+        if (::fstatat(parentFd, osBaseNameOf(path).c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
             if (errno == ENOENT)
                 return std::nullopt;
             throw SysError("getting status of '%1%'", showPath(path));
@@ -460,10 +486,11 @@ void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink,
     AutoCloseFD fileFd;
 
     try {
-        fileFd = openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_RDONLY | O_CLOEXEC);
+        fileFd = openFileEnsureBeneathNoSymlinks(parentFd, osBaseNameOf(path), O_RDONLY | O_CLOEXEC);
     } catch (SymlinkNotAllowed & e) {
         auto parent = path.parent().value();
-        throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+        auto p = parent / portablePathOf(e);
+        throw SymlinkNotAllowed(p, "path '%s' is a symlink", showPath(p));
     }
 
     if (!fileFd) {
@@ -495,10 +522,11 @@ AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & pat
 
         try {
             dirFdOwning =
-                openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+                openFileEnsureBeneathNoSymlinks(parentFd, osBaseNameOf(path), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
         } catch (SymlinkNotAllowed & e) {
             auto parent = path.parent().value();
-            throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+            auto p = parent / portablePathOf(e);
+            throw SymlinkNotAllowed(p, "path '%s' is a symlink", showPath(p));
         }
 
         if (!dirFdOwning) {
@@ -563,7 +591,8 @@ try {
 
     return entries;
 } catch (SymlinkNotAllowed & e) {
-    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+    auto p = portablePathOf(e);
+    throw SymlinkNotAllowed(p, "path '%s' is a symlink", showPath(p));
 }
 
 void PosixDirectorySourceAccessor::readDirectory(
@@ -585,14 +614,15 @@ try {
     auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
 
     try {
-        return readLinkAt(parentFd, CanonPath(path.baseName().value()));
+        return readLinkAt(parentFd, osBaseNameOf(path));
     } catch (SysError & e) {
         if (e.errNo == EINVAL)
             throw NotASymlink("file '%s' is not a symlink", showPath(path));
         throw;
     }
 } catch (SymlinkNotAllowed & e) {
-    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+    auto p = portablePathOf(e);
+    throw SymlinkNotAllowed(p, "path '%s' is a symlink", showPath(p));
 }
 
 #else
@@ -870,7 +900,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
         if (!parentFd)
             throw SysError("opening %1%", PathFmt(root));
 
-        auto relPath = CanonPath::fromFilename(root.filename().native());
+        auto relPath = OsFilename{root.filename()};
         if (trackLastModified) {
             auto st = fstatat(parentFd.get(), root.filename());
             mtime = st.st_mtime;

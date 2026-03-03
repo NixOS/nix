@@ -4,6 +4,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/os-filename.hh"
 
 namespace nix {
 
@@ -196,7 +197,7 @@ public:
      * @param parentFd Directory file descriptor of the symlink parent (immediate one).
      * @param name Relative path of the symlink beneath the parent directory.
      */
-    virtual void symlinkCreated(Descriptor parentFd, const CanonPath & name) = 0;
+    virtual void symlinkCreated(Descriptor parentFd, const OsFilename & name) = 0;
 };
 
 /**
