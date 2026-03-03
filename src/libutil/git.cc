@@ -1,5 +1,6 @@
 #include <cerrno>
 #include <algorithm>
+#include <charconv>
 #include <regex>
 #include <strings.h> // for strcasecmp
 
@@ -9,24 +10,12 @@
 
 #include "nix/util/git.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/util.hh"
 
 namespace nix::git {
 
 using namespace nix;
 using namespace std::string_literals;
-
-std::optional<Mode> decodeMode(RawMode m)
-{
-    switch (m) {
-    case (RawMode) Mode::Directory:
-    case (RawMode) Mode::Executable:
-    case (RawMode) Mode::Regular:
-    case (RawMode) Mode::Symlink:
-        return (Mode) m;
-    default:
-        return std::nullopt;
-    }
-}
 
 static std::string getStringUntil(Source & source, char byte)
 {
@@ -48,78 +37,44 @@ static std::string getString(Source & source, int n)
     return v;
 }
 
-void parseBlob(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
+uint64_t parseBlob(Source & source, const ExperimentalFeatureSettings & xpSettings)
+{
+    xpSettings.require(Xp::GitHashing);
+
+    auto sizeStr = getStringUntil(source, 0);
+    uint64_t size;
+    auto [ptr, ec] = std::from_chars(sizeStr.data(), sizeStr.data() + sizeStr.size(), size);
+    if (ec != std::errc{})
+        throw Error("invalid blob size '%s'", sizeStr);
+    return size;
+}
+
+void parseTree(
+    merkle::DirectorySink & sink,
     Source & source,
-    BlobMode blobMode,
+    HashAlgorithm hashAlgo,
     const ExperimentalFeatureSettings & xpSettings)
 {
     xpSettings.require(Xp::GitHashing);
 
-    const unsigned long long size = std::stoi(getStringUntil(source, 0));
-
-    auto doRegularFile = [&](bool executable) {
-        sink.createRegularFile(sinkPath, [&](auto & crf) {
-            if (executable)
-                crf.isExecutable();
-
-            crf.preallocateContents(size);
-
-            source.drainInto(crf, size);
-        });
-    };
-
-    switch (blobMode) {
-
-    case BlobMode::Regular:
-        doRegularFile(false);
-        break;
-
-    case BlobMode::Executable:
-        doRegularFile(true);
-        break;
-
-    case BlobMode::Symlink: {
-        std::string target;
-        target.resize(size, '0');
-        target.reserve(size);
-        for (size_t n = 0; n < target.size();) {
-            checkInterrupt();
-            n += source.read(const_cast<char *>(target.c_str()) + n, target.size() - n);
-        }
-
-        sink.createSymlink(sinkPath, target);
-        break;
-    }
-
-    default:
-        assert(false);
-    }
-}
-
-void parseTree(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
-    Source & source,
-    HashAlgorithm hashAlgo,
-    fun<SinkHook> hook,
-    const ExperimentalFeatureSettings & xpSettings)
-{
-    const unsigned long long size = std::stoi(getStringUntil(source, 0));
-    unsigned long long left = size;
-
-    sink.createDirectory(sinkPath);
+    auto sizeStr = getStringUntil(source, 0);
+    uint64_t left;
+    auto [ptr, ec] = std::from_chars(sizeStr.data(), sizeStr.data() + sizeStr.size(), left);
+    if (ec != std::errc{})
+        throw Error("invalid tree size '%s'", sizeStr);
 
     while (left) {
         std::string perms = getStringUntil(source, ' ');
         left -= perms.size();
         left -= 1;
 
-        RawMode rawMode = std::stoi(perms, 0, 8);
+        RawMode rawMode;
+        auto [ptr, ec] = std::from_chars(perms.data(), perms.data() + perms.size(), rawMode, 8);
+        if (ec != std::errc{})
+            throw Error("invalid Git permission: %s", perms);
         auto modeOpt = decodeMode(rawMode);
         if (!modeOpt)
-            throw Error("Unknown Git permission: %o", rawMode);
+            throw Error("unknown Git permission: %o", rawMode);
         auto mode = std::move(*modeOpt);
 
         std::string name = getStringUntil(source, '\0');
@@ -137,12 +92,7 @@ void parseTree(
         Hash hash(hashAlgo);
         std::copy(hashs.begin(), hashs.end(), hash.hash);
 
-        hook(
-            CanonPath{name},
-            TreeEntry{
-                .mode = mode,
-                .hash = hash,
-            });
+        sink.insertChild(name, TreeEntry{.mode = mode, .hash = hash});
     }
 }
 
@@ -158,31 +108,6 @@ ObjectType parseObjectType(Source & source, const ExperimentalFeatureSettings & 
         return ObjectType::Tree;
     } else
         throw Error("input doesn't look like a Git object");
-}
-
-void parse(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
-    Source & source,
-    BlobMode rootModeIfBlob,
-    HashAlgorithm hashAlgo,
-    fun<SinkHook> hook,
-    const ExperimentalFeatureSettings & xpSettings)
-{
-    xpSettings.require(Xp::GitHashing);
-
-    auto type = parseObjectType(source, xpSettings);
-
-    switch (type) {
-    case ObjectType::Blob:
-        parseBlob(sink, sinkPath, source, rootModeIfBlob, xpSettings);
-        break;
-    case ObjectType::Tree:
-        parseTree(sink, sinkPath, source, hashAlgo, hook, xpSettings);
-        break;
-    default:
-        assert(false);
-    };
 }
 
 std::optional<Mode> convertMode(SourceAccessor::Type type)
@@ -203,29 +128,6 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     default:
         unreachable();
     }
-}
-
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, fun<RestoreHook> hook)
-{
-    parse(sink, CanonPath::root, source, BlobMode::Regular, hashAlgo, [&](CanonPath name, TreeEntry entry) {
-        auto [accessor, from] = hook(entry.hash);
-        auto stat = accessor->lstat(from);
-        auto gotOpt = convertMode(stat.type);
-        if (!gotOpt)
-            throw Error(
-                "file '%s' (git hash %s) has an unsupported type",
-                from,
-                entry.hash.to_string(HashFormat::Base16, false));
-        auto & got = *gotOpt;
-        if (got != entry.mode)
-            throw Error(
-                "git mode of file '%s' (git hash %s) is %o but expected %o",
-                from,
-                entry.hash.to_string(HashFormat::Base16, false),
-                (RawMode) got,
-                (RawMode) entry.mode);
-        copyRecursive(*accessor, from, sink, name);
-    });
 }
 
 void dumpBlobPrefix(uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
