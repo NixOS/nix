@@ -56,6 +56,14 @@ size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterru
     return static_cast<size_t>(n);
 }
 
+AutoCloseFD dupDescriptor(Descriptor fd)
+{
+    int newFd = fcntl(fd, F_DUPFD_CLOEXEC, 0);
+    if (newFd == -1)
+        throw SysError("duplicating file descriptor");
+    return AutoCloseFD{newFd};
+}
+
 //////////////////////////////////////////////////////////////////////
 
 void Pipe::create()

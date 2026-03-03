@@ -285,6 +285,14 @@ public:
     void startFsync() const;
 };
 
+/**
+ * Duplicate a file descriptor.
+ *
+ * Returns a new file descriptor that refers to the same open file
+ * description as the original.
+ */
+AutoCloseFD dupDescriptor(Descriptor fd);
+
 class Pipe
 {
 public:
