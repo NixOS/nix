@@ -2,108 +2,114 @@
 #include "nix/util/archive.hh"
 #include "nix/util/error.hh"
 
-#include <stack>
-
 namespace nix {
 
 NarListing parseNarListing(Source & source)
 {
-    struct NarMemberConstructor : CreateRegularFileSink
-    {
-    private:
-
-        NarListing::Regular & regular;
-
-        uint64_t & pos;
-
-    public:
-
-        NarMemberConstructor(NarListing::Regular & reg, uint64_t & pos)
-            : regular(reg)
-            , pos(pos)
-        {
-        }
-
-        void isExecutable() override
-        {
-            regular.executable = true;
-        }
-
-        void preallocateContents(uint64_t size) override
-        {
-            regular.contents.fileSize = size;
-            regular.contents.narOffset = pos;
-        }
-
-        void operator()(std::string_view data) override {}
-    };
-
     struct NarIndexer : FileSystemObjectSink, Source
     {
         std::optional<NarListing> root;
         Source & source;
-
-        std::stack<NarListing *> parents;
-
         uint64_t pos = 0;
+
+        /**
+         * Pointer to where the next created member should be stored.
+         * For root, this points to `root`. For children, it points into
+         * the parent directory's entries map.
+         */
+        NarListing * currentDst = nullptr;
 
         NarIndexer(Source & source)
             : source(source)
         {
         }
 
-        NarListing & createMember(const CanonPath & path, NarListing member)
+        void createDirectory(DirectoryCreatedCallback callback) override
         {
-            size_t level = 0;
-            for (auto _ : path) {
-                (void) _;
-                ++level;
-            }
-
-            while (parents.size() > level)
-                parents.pop();
-
-            if (parents.empty()) {
-                root = std::move(member);
-                parents.push(&*root);
-                return *root;
+            if (currentDst) {
+                *currentDst = NarListing::Directory{};
             } else {
-                auto * parentDir = std::get_if<NarListing::Directory>(&parents.top()->raw);
-                if (!parentDir)
-                    throw Error("NAR file missing parent directory of path '%s'", path);
-                auto result = parentDir->entries.emplace(*path.baseName(), std::move(member));
-                parents.push(&result.first->second);
-                return result.first->second;
+                root = NarListing::Directory{};
+                currentDst = &*root;
             }
+
+            struct Dir : OnDirectory
+            {
+                NarIndexer & indexer;
+                NarListing::Directory & dir;
+
+                Dir(NarIndexer & indexer, NarListing::Directory & dir)
+                    : indexer(indexer)
+                    , dir(dir)
+                {
+                }
+
+                void createChild(std::string_view name, ChildCreatedCallback callback) override
+                {
+                    auto [it, inserted] = dir.entries.emplace(std::string{name}, NarListing{});
+                    auto oldDst = indexer.currentDst;
+                    indexer.currentDst = &it->second;
+
+                    callback(indexer);
+
+                    indexer.currentDst = oldDst;
+                }
+            } dir{*this, std::get<NarListing::Directory>(currentDst->raw)};
+
+            callback(dir);
         }
 
-        void createDirectory(const CanonPath & path) override
+        void createRegularFile(bool isExecutable, RegularFileCreatedCallback func) override
         {
-            createMember(path, NarListing::Directory{});
-        }
+            auto reg = NarListing::Regular{
+                .executable = isExecutable,
+                .contents =
+                    NarListingRegularFile{
+                        .fileSize = 0,
+                        .narOffset = pos,
+                    },
+            };
 
-        void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
-        {
-            auto & nm = createMember(
-                path,
-                NarListing::Regular{
-                    .executable = false,
-                    .contents =
-                        NarListingRegularFile{
-                            .fileSize = 0,
-                            .narOffset = pos,
-                        },
-                });
-            /* We know the downcast will succeed because we just added this */
-            auto & reg = std::get<NarListing::Regular>(nm.raw);
-            NarMemberConstructor nmc{reg, pos};
-            nmc.skipContents = true; /* Don't care about contents. */
+            if (currentDst) {
+                *currentDst = std::move(reg);
+            } else {
+                root = std::move(reg);
+                currentDst = &*root;
+            }
+
+            auto & regRef = std::get<NarListing::Regular>(currentDst->raw);
+
+            struct NarMemberConstructor : OnRegularFile
+            {
+                NarListing::Regular & regular;
+                uint64_t & pos;
+
+                NarMemberConstructor(NarListing::Regular & reg, uint64_t & pos)
+                    : regular(reg)
+                    , pos(pos)
+                {
+                    skipContents = true; /* Don't care about contents. */
+                }
+
+                void preallocateContents(uint64_t size) override
+                {
+                    regular.contents.fileSize = size;
+                    regular.contents.narOffset = pos;
+                }
+
+                void operator()(std::string_view data) override {}
+            } nmc{regRef, pos};
+
             func(nmc);
         }
 
-        void createSymlink(const CanonPath & path, const std::string & target) override
+        void createSymlink(const std::string & target) override
         {
-            createMember(path, NarListing::Symlink{.target = target});
+            if (currentDst) {
+                *currentDst = NarListing::Symlink{.target = target};
+            } else {
+                root = NarListing::Symlink{.target = target};
+            }
         }
 
         size_t read(char * data, size_t len) override

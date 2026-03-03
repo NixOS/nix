@@ -1,10 +1,12 @@
 #include "nix/util/memory-source-accessor.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/tests/json-characterization.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <string_view>
 
 namespace nix {
@@ -73,17 +75,20 @@ class MemorySourceAccessorTestErrors : public ::testing::Test
 {
 protected:
     ref<MemorySourceAccessor> accessor = make_ref<MemorySourceAccessor>();
-    MemorySink sink{*accessor};
+    MemorySink sink{[&](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+        return accessor->root.emplace(std::move(file));
+    }};
 
     void SetUp() override
     {
         accessor->setPathDisplay("somepath");
-        sink.createDirectory(CanonPath::root);
     }
 };
 
 TEST_F(MemorySourceAccessorTestErrors, readFileNotFound)
 {
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+
     EXPECT_THAT(
         [&] { accessor->readFile(CanonPath("nonexistent")); },
         ThrowsMessage<FileNotFound>(
@@ -92,7 +97,11 @@ TEST_F(MemorySourceAccessorTestErrors, readFileNotFound)
 
 TEST_F(MemorySourceAccessorTestErrors, readFileNotARegularFile)
 {
-    sink.createDirectory(CanonPath("subdir"));
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("subdir", [](FileSystemObjectSink & child) {
+            child.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+    });
 
     EXPECT_THAT(
         [&] { accessor->readFile(CanonPath("subdir")); },
@@ -102,6 +111,8 @@ TEST_F(MemorySourceAccessorTestErrors, readFileNotARegularFile)
 
 TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotFound)
 {
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+
     EXPECT_THAT(
         [&] { accessor->readDirectory(CanonPath("nonexistent")); },
         ThrowsMessage<FileNotFound>(
@@ -110,7 +121,11 @@ TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotFound)
 
 TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotADirectory)
 {
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file", [](FileSystemObjectSink & child) {
+            child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+        });
+    });
 
     EXPECT_THAT(
         [&] { accessor->readDirectory(CanonPath("file")); },
@@ -120,6 +135,8 @@ TEST_F(MemorySourceAccessorTestErrors, readDirectoryNotADirectory)
 
 TEST_F(MemorySourceAccessorTestErrors, readLinkNotFound)
 {
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+
     EXPECT_THAT(
         [&] { accessor->readLink(CanonPath("nonexistent")); },
         ThrowsMessage<FileNotFound>(
@@ -128,7 +145,11 @@ TEST_F(MemorySourceAccessorTestErrors, readLinkNotFound)
 
 TEST_F(MemorySourceAccessorTestErrors, readLinkNotASymlink)
 {
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file", [](FileSystemObjectSink & child) {
+            child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+        });
+    });
 
     EXPECT_THAT(
         [&] { accessor->readLink(CanonPath("file")); },
@@ -138,7 +159,11 @@ TEST_F(MemorySourceAccessorTestErrors, readLinkNotASymlink)
 
 TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 {
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file", [](FileSystemObjectSink & child) {
+            child.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+        });
+    });
 
     EXPECT_THAT(
         [&] { accessor->addFile(CanonPath("file/child"), "contents"); },
@@ -149,7 +174,11 @@ TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
 
 TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
 {
-    sink.createDirectory(CanonPath("subdir"));
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("subdir", [](FileSystemObjectSink & child) {
+            child.createDirectory([](FileSystemObjectSink::OnDirectory &) {});
+        });
+    });
 
     EXPECT_THAT(
         [&] { accessor->addFile(CanonPath("subdir"), "contents"); },
@@ -157,95 +186,44 @@ TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/subdir"), HasSubstrIgnoreANSIMatcher("is not a regular file"))));
 }
 
-TEST_F(MemorySourceAccessorTestErrors, createDirectoryParentNotDirectory)
-{
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
-
-    EXPECT_THAT(
-        [&] { sink.createDirectory(CanonPath("file/child")); },
-        ThrowsMessage<Error>(AllOf(
-            HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
-}
-
-TEST_F(MemorySourceAccessorTestErrors, createDirectoryNotADirectory)
-{
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
-
-    EXPECT_THAT(
-        [&] { sink.createDirectory(CanonPath("file")); },
-        ThrowsMessage<NotADirectory>(
-            AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a directory"))));
-}
-
-TEST_F(MemorySourceAccessorTestErrors, createRegularFileParentNotDirectory)
-{
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
-
-    EXPECT_THAT(
-        [&] { sink.createRegularFile(CanonPath("file/child"), [](CreateRegularFileSink &) {}); },
-        ThrowsMessage<Error>(AllOf(
-            HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
-}
-
-TEST_F(MemorySourceAccessorTestErrors, createRegularFileNotARegularFile)
-{
-    sink.createDirectory(CanonPath("subdir"));
-
-    EXPECT_THAT(
-        [&] { sink.createRegularFile(CanonPath("subdir"), [](CreateRegularFileSink &) {}); },
-        ThrowsMessage<NotARegularFile>(
-            AllOf(HasSubstrIgnoreANSIMatcher("somepath/subdir"), HasSubstrIgnoreANSIMatcher("is not a regular file"))));
-}
-
-TEST_F(MemorySourceAccessorTestErrors, createSymlinkParentNotDirectory)
-{
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
-
-    EXPECT_THAT(
-        [&] { sink.createSymlink(CanonPath("file/child"), "target"); },
-        ThrowsMessage<Error>(AllOf(
-            HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
-}
-
-TEST_F(MemorySourceAccessorTestErrors, createSymlinkNotASymlink)
-{
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
-
-    EXPECT_THAT(
-        [&] { sink.createSymlink(CanonPath("file"), "target"); },
-        ThrowsMessage<NotASymlink>(
-            AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a symbolic link"))));
-}
-
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughRegularFile)
 {
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file", [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+        });
+    });
     EXPECT_FALSE(accessor->pathExists(CanonPath("file/child")));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, maybeLstatThroughRegularFile)
 {
-    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("file", [](FileSystemObjectSink & s) {
+            s.createRegularFile(false, [](FileSystemObjectSink::OnRegularFile &) {});
+        });
+    });
     EXPECT_FALSE(accessor->maybeLstat(CanonPath("file/child")));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughSymlink)
 {
-    sink.createSymlink(CanonPath("link"), "target");
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+    });
     EXPECT_THAT(
         [&] { accessor->pathExists(CanonPath("link/child")); },
         ThrowsMessage<SymlinkNotAllowed>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
 }
 
-TEST_F(MemorySourceAccessorTestErrors, createFileThroughSymlink)
+TEST_F(MemorySourceAccessorTestErrors, addFileThroughSymlink)
 {
-    sink.createSymlink(CanonPath("link"), "target");
+    sink.createDirectory([](FileSystemObjectSink::OnDirectory & dir) {
+        dir.createChild("link", [](FileSystemObjectSink & s) { s.createSymlink("target"); });
+    });
     EXPECT_THAT(
-        [&] { sink.createRegularFile(CanonPath("link/child"), [](CreateRegularFileSink &) {}); },
+        [&] { accessor->addFile(CanonPath("link/child"), "contents"); },
         ThrowsMessage<SymlinkNotAllowed>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
 }

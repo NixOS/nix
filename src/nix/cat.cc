@@ -84,19 +84,48 @@ struct CmdCatNar : StoreCommand, MixCat
 
         struct CatRegularFileSink : NullFileSystemObjectSink
         {
-            CanonPath neededPath = CanonPath::root;
-            bool found = false;
+            CanonPath currentPath;
+            CanonPath neededPath;
+            bool & found;
 
-            void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> crf) override
+            CatRegularFileSink(CanonPath currentPath, CanonPath neededPath, bool & found)
+                : currentPath(std::move(currentPath))
+                , neededPath(std::move(neededPath))
+                , found(found)
             {
-                struct : CreateRegularFileSink, FdSink
+            }
+
+            void createDirectory(DirectoryCreatedCallback callback) override
+            {
+                struct Dir : OnDirectory
                 {
-                    void isExecutable() override {}
+                    CatRegularFileSink & parent;
+
+                    Dir(CatRegularFileSink & parent)
+                        : parent(parent)
+                    {
+                    }
+
+                    void createChild(std::string_view name, ChildCreatedCallback callback) override
+                    {
+                        CatRegularFileSink childSink{
+                            parent.currentPath / std::string{name}, parent.neededPath, parent.found};
+                        callback(childSink);
+                    }
+                } dir{*this};
+
+                callback(dir);
+            }
+
+            void createRegularFile(bool isExecutable, RegularFileCreatedCallback crf) override
+            {
+                struct CRF : OnRegularFile, FdSink
+                {
                 } crfSink;
 
                 crfSink.fd = INVALID_DESCRIPTOR;
 
-                if (path == neededPath) {
+                if (currentPath == neededPath) {
                     logger->stop();
                     crfSink.skipContents = false;
                     crfSink.fd = getStandardOutput();
@@ -107,13 +136,14 @@ struct CmdCatNar : StoreCommand, MixCat
 
                 crf(crfSink);
             }
-        } sink;
+        };
 
-        sink.neededPath = CanonPath(path);
+        bool found = false;
+        CatRegularFileSink sink{CanonPath::root, CanonPath(path), found};
         /* NOTE: We still parse the whole file to validate that it's a correct NAR. */
         parseDump(sink, source);
 
-        if (!sink.found)
+        if (!found)
             throw Error("NAR does not contain regular file '%1%'", path);
     }
 };

@@ -1269,8 +1269,8 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path &
 
 void DerivationBuilderImpl::writeBuilderFile(const OsFilename & name, std::string_view contents)
 {
-    AutoCloseFD fd =
-        openFileEnsureBeneathNoSymlinks(tmpDirFd.get(), name, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
+    AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
+        tmpDirFd.get(), name, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
     auto path = tmpDir / name.path(); /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
@@ -1639,10 +1639,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     dumpPath(actualPath, rsink);
                     rsink.flush();
                 });
-                std::filesystem::path tmpPath = actualPath.native() + ".tmp";
-                restorePath(tmpPath, *source);
+                auto tmpName = actualPath.filename();
+                tmpName += ".tmp";
+                auto parentDir = actualPath.parent_path();
+                restorePath(parentDir, tmpName, *source);
                 deletePath(actualPath);
-                movePath(tmpPath, actualPath);
+                movePath(parentDir / tmpName, actualPath);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
@@ -1760,7 +1762,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                serialisation/deserialisation. TODO: Use copyRecursive here and
                make use of reflinking. */
             auto source = sinkToSource([&](Sink & nextSink) { dumpPath(actualPath, nextSink); });
-            restorePath(tmpOutput, *source, store.config->getLocalSettings().fsyncStorePaths);
+            restorePath(
+                tmpOutput.parent_path(),
+                tmpOutput.filename(),
+                *source,
+                store.config->getLocalSettings().fsyncStorePaths);
             /* This makes it slightly harder to make sense of the control flow. The rule
                of thumb is that actualPath points to the current location of the stuff
                that we'll end up registering. */

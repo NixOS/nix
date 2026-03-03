@@ -219,12 +219,14 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const std::filesystem
        are asking for a path reference, and interior symlinks are
        already guarded by the component-by-component walk above. */
 
+
     return res;
 }
 
 AutoCloseFD
 openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const std::filesystem::path & path, int flags, mode_t mode)
 {
+    /* Just in case the invariant is somehow broken. */
     assert(path.is_relative());
     assert(!path.empty());
 
@@ -232,6 +234,8 @@ openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const std::filesystem::path & 
        absence of `O_NOFOLLOW`. "ensure beneath no symlinks" is in the name, so
        we want them to trust us to handle it instead. */
     assert(!(flags & O_NOFOLLOW));
+
+    /* See doxygen in `file-system-at.hh` for why we reject this. */
 
 #if HAVE_OPENAT2
     /* Two things are being fixed here:

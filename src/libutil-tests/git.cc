@@ -23,7 +23,6 @@ struct TestDirectorySink : merkle::DirectorySink
     }
 };
 
-
 class GitTest : public CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "git";

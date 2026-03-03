@@ -343,8 +343,10 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
                 , mtime(mtime)
                 , fsPath(std::move(fsPath_))
             {
-                MemorySink sink{*this};
-                sink.createSymlink(CanonPath::root, target);
+                MemorySink sink{[&](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+                    return root.emplace(std::move(file));
+                }};
+                sink.createSymlink(target);
                 displayPrefix = fsPath.native();
             }
 

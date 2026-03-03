@@ -277,8 +277,8 @@ bool isReparsePoint(HANDLE handle)
 
 OsString readLinkAt(Descriptor dirFd, const std::filesystem::path & path)
 {
-    auto linkHandle = windows::openSymlinkAt(dirFd, path);
-    return windows::readSymlinkTarget(linkHandle.get());
+    auto linkHandle = openSymlinkAt(dirFd, path);
+    return readSymlinkTarget(linkHandle.get());
 }
 
 void createFileSymlinkAt(Descriptor dirFd, const std::filesystem::path & path, const OsString & target)

@@ -1060,10 +1060,15 @@ struct GitRepoHandle
 {
     std::variant<Pool<GitRepoImpl>::Handle, ref<GitRepoImpl>> inner;
 
-    GitRepoImpl & operator*() {
+    GitRepoImpl & operator*()
+    {
         return std::visit([](auto & h) -> GitRepoImpl & { return *h; }, inner);
     }
-    GitRepoImpl * operator->() { return &**this; }
+
+    GitRepoImpl * operator->()
+    {
+        return &**this;
+    }
 };
 
 struct GitRegularFileSinkImpl : merkle::RegularFileSinkWithFlush
@@ -1188,9 +1193,8 @@ ref<merkle::DirectorySinkWithFlush> GitRepoImpl::makeDirectorySink()
 
 ref<merkle::RegularFileSinkWithFlush> GitRepoImpl::makeRegularFileSink()
 {
-    return make_ref<GitRegularFileSinkImpl>([self = ref<GitRepoImpl>(shared_from_this())]() -> GitRepoHandle {
-        return {self};
-    });
+    return make_ref<GitRegularFileSinkImpl>(
+        [self = ref<GitRepoImpl>(shared_from_this())]() -> GitRepoHandle { return {self}; });
 }
 
 ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, const GitAccessorOptions & options)
@@ -1397,7 +1401,6 @@ struct GitRepoPoolImpl : GitRepoPool
 
         return done.size();
     }
-
 };
 
 ref<GitRepoPool> GitRepoPool::create(const std::filesystem::path & path, GitRepo::Options options)

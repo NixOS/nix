@@ -1056,7 +1056,11 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 TeeSource wrapperSource{source, hashSink};
 
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                restorePath(
+                    realPath.parent_path(),
+                    realPath.filename(),
+                    wrapperSource,
+                    config->getLocalSettings().fsyncStorePaths);
 
                 auto hashResult = hashSink.finish();
 
@@ -1208,7 +1212,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath.string(), bothSource, dumpMethod, localSettings.fsyncStorePaths);
+        restorePath(tempDir, "x", bothSource, dumpMethod, localSettings.fsyncStorePaths);
 
         dumpBuffer.reset();
         dump = {};
@@ -1252,7 +1256,12 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, localSettings.fsyncStorePaths);
+                    restorePath(
+                        realPath.parent_path(),
+                        realPath.filename(),
+                        dumpSource,
+                        (FileSerialisationMethod) fim,
+                        localSettings.fsyncStorePaths);
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so

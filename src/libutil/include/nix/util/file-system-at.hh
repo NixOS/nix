@@ -17,7 +17,6 @@
 #include "nix/util/error.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/source-accessor.hh"
 
 #include <boost/outcome.hpp>
 #include <optional>
