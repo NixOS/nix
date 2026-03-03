@@ -81,13 +81,12 @@ AutoCloseFD ntOpenAt(
  * @param path Relative path to the symlink
  * @return Handle to the symlink
  */
-AutoCloseFD openSymlinkAt(Descriptor dirFd, const CanonPath & path)
+AutoCloseFD openSymlinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
-    assert(!path.isRoot());
-    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    assert(!path.empty());
 
-    std::wstring wpath = string_to_os_string(path.rel());
-    return ntOpenAt(dirFd, wpath, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+    auto wpath = path.path().lexically_normal().make_preferred();
+    return ntOpenAt(dirFd, wpath.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
 }
 
 /**
@@ -229,10 +228,9 @@ PosixStat fstat(Descriptor fd)
 }
 
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
-    Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
+    Descriptor dirFd, const OsCanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
 {
-    assert(!path.isRoot());
-    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    assert(!path.empty());
 
     AutoCloseFD parentFd;
     auto nrComponents = std::ranges::distance(path);
@@ -240,21 +238,19 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     auto components = std::views::take(path, nrComponents - 1); /* Everything but last component */
     auto getParentFd = [&]() { return parentFd ? parentFd.get() : dirFd; };
 
-    /* Helper to construct CanonPath from components up to (and including) the given iterator */
+    /* Helper to construct OsCanonPath from components up to (and including) the given iterator */
     auto pathUpTo = [&](auto it) {
-        return std::ranges::fold_left(components.begin(), it, CanonPath::root, [](auto lhs, auto rhs) {
-            lhs.push(rhs);
-            return lhs;
-        });
+        return std::ranges::fold_left(
+            components.begin(), it, OsCanonPath{}, [](OsCanonPath acc, const OsFilename & comp) { return acc / comp; });
     };
 
     /* Helper to check if a component is a symlink and throw SymlinkNotAllowed if so */
-    auto throwIfSymlink = [&](std::wstring_view component, const CanonPath & pathForError) {
+    auto throwIfSymlink = [&](std::wstring_view component, const OsCanonPath & pathForError) {
         try {
             auto testHandle = windows::ntOpenAt(
                 getParentFd(), component, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
             if (windows::isReparsePoint(testHandle.get()))
-                throw SymlinkNotAllowed(pathForError);
+                throw SymlinkNotAllowed(pathForError.path());
         } catch (SymlinkNotAllowed &) {
             throw;
         } catch (...) {
@@ -265,7 +261,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     /* Iterate through each path component to ensure no symlinks in intermediate directories.
      * This prevents TOCTOU issues by opening each component relative to the parent. */
     for (auto it = components.begin(); it != components.end(); ++it) {
-        std::wstring wcomponent = string_to_os_string(std::string(*it));
+        const auto & wcomponent = (*it).path().native();
 
         /* Open directory without following symlinks */
         AutoCloseFD parentFd2;
@@ -286,14 +282,14 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 
         /* Check if what we opened is actually a symlink */
         if (windows::isReparsePoint(parentFd2.get())) {
-            throw SymlinkNotAllowed(pathUpTo(std::next(it)));
+            throw SymlinkNotAllowed(pathUpTo(std::next(it)).path());
         }
 
         parentFd = std::move(parentFd2);
     }
 
     /* Now open the final component with requested flags */
-    std::wstring finalComponent = string_to_os_string(std::string(path.baseName().value()));
+    auto finalComponent = path.path().filename().native();
 
     AutoCloseFD finalHandle;
     try {
@@ -313,12 +309,12 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 
     /* Final check: did we accidentally open a symlink? */
     if (windows::isReparsePoint(finalHandle.get()))
-        throw SymlinkNotAllowed(path);
+        throw SymlinkNotAllowed(path.path());
 
     return finalHandle;
 }
 
-OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
+OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
     AutoCloseFD linkHandle(windows::openSymlinkAt(dirFd, path));
     return windows::readSymlinkTarget(linkHandle.get());
