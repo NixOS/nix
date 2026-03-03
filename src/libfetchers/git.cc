@@ -738,7 +738,7 @@ struct GitInputScheme : InputScheme
         Activity act(
             *logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
 
-        auto revCount = GitRepo::openRepo(repoDir, {})->getRevCount(rev);
+        auto revCount = GitRepoPool::create(repoDir, {})->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
