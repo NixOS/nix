@@ -68,17 +68,7 @@ void parseBlob(
 
             crf.preallocateContents(size);
 
-            unsigned long long left = size;
-            std::string buf;
-            buf.reserve(65536);
-
-            while (left) {
-                checkInterrupt();
-                buf.resize(std::min((unsigned long long) buf.capacity(), left));
-                source(buf);
-                crf(buf);
-                left -= buf.size();
-            }
+            source.drainInto(crf, size);
         });
     };
 
