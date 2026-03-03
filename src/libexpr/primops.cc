@@ -5131,6 +5131,56 @@ static RegisterPrimOp primop_splitVersion({
     .impl = prim_splitVersion,
 });
 
+
+static void prim_trampoline(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.trampoline");
+
+    Value * vElem = state.allocValue();
+    *vElem = *args[1];
+
+    while (true) {
+        // Force to get the actual value, not a thunk
+        state.forceValue(*vElem, pos);
+
+        Value * res = state.allocValue();
+        res->mkApp(args[0], vElem);
+
+        state.forceList(*res, pos, "while evaluating the return value of pred");
+
+        auto len = res->listSize();
+        if (len != 2) {
+            throw Error("Wrong size :(");
+        }
+
+        auto recurse = res->listView()[0];
+        if (!state.forceBool(*recurse, pos, "while evaluating recurse")) {
+            // Assign the current result
+            v = *res->listView()[1];
+            state.forceValue(v, pos);
+            return;
+        }
+
+        vElem = res->listView()[1];
+    }
+}
+
+static RegisterPrimOp primop_trampoline({
+    .name = "trampoline",
+    .args = {"function", "value"},
+    .doc = R"(
+      Remove the attributes listed in *list* from *set*. The attributes
+      don’t have to exist in *set*. For instance,
+
+      ```nix
+      removeAttrs { x = 1; y = 2; z = 3; } [ "a" "x" "z" ]
+      ```
+
+      evaluates to `{ y = 2; }`.
+    )",
+    .fun = prim_trampoline,
+});
+
 /*************************************************************
  * Primop registration
  *************************************************************/
