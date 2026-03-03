@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nix/fetchers/filtering-source-accessor.hh"
-#include "nix/util/fs-sink.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
 
 namespace nix {
 
@@ -10,27 +10,15 @@ struct PublicKey;
 struct Settings;
 } // namespace fetchers
 
-/**
- * A sink that writes into a Git repository. Note that nothing may be written
- * until `flush()` is called.
- */
-struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
-{
-    /**
-     * Flush builder and return a final Git hash.
-     */
-    virtual Hash flush() = 0;
-};
-
 struct GitAccessorOptions
 {
     bool exportIgnore = false;
     bool smudgeLfs = false;
 };
 
-struct GitRepo
+struct GitRepo : merkle::FileSinkBuilder
 {
-    virtual ~GitRepo() {}
+    virtual ~GitRepo() = default;
 
     struct Options
     {
@@ -106,8 +94,6 @@ struct GitRepo
 
     virtual ref<SourceAccessor> getAccessor(
         const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError) = 0;
-
-    virtual ref<GitFileSystemObjectSink> getFileSystemObjectSink() = 0;
 
     virtual void flush() = 0;
 
