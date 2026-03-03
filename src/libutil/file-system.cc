@@ -338,7 +338,7 @@ void recursiveSync(const std::filesystem::path & path)
     /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
-        AutoCloseFD fd = openFileReadonly(path); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openFileReadonly(path, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening file %s", PathFmt(path));
         fd.fsync();
@@ -359,7 +359,7 @@ void recursiveSync(const std::filesystem::path & path)
             if (std::filesystem::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
             } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = openFileReadonly(entry.path()); /* TODO: O_NOFOLLOW? */
+                AutoCloseFD fd = openFileReadonly(entry.path(), FinalSymlink::DontFollow);
                 if (!fd)
                     throw NativeSysError("opening file %1%", PathFmt(entry.path()));
                 fd.fsync();
