@@ -8,6 +8,7 @@
 #else
 #  include <sys/socket.h>
 #  include <sys/un.h>
+#  include <sys/wait.h>
 #  include "nix/util/processes.hh"
 #endif
 #include <unistd.h>
@@ -88,7 +89,19 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
             }
         });
         pipe.writeSide.close();
+        // If drainFD throws, Pid::~Pid() still runs before
+        // release(), and may crash in a SIGCHLD auto-reaping
+        // context (see below). Unlikely since the pipe has data.
         auto errNo = string2Int<int>(chomp(drainFD(pipe.readSide.get())));
+        // The child has written its result and will now exit.
+        // Release the Pid to avoid Pid::~Pid() trying to kill/wait it,
+        // which crashes when a SIGCHLD handler (e.g. in nix daemon)
+        // has already reaped the child.
+        pid_t childPid = pid.release();
+        // Best-effort reap to avoid zombies; may get ECHILD if a
+        // SIGCHLD handler already reaped it, which is fine.
+        while (waitpid(childPid, nullptr, 0) == -1 && errno == EINTR)
+            ;
         if (!errNo || *errNo == -1)
             throw Error("cannot %s to socket at '%s'", operationName, path);
         else if (*errNo > 0) {
