@@ -60,7 +60,11 @@ std::string StoreDirSetting::parse(const std::string & str) const
 {
     if (str.empty())
         throw UsageError("setting '%s' is a path and paths cannot be empty", name);
+#ifdef _WIN32
+    return str;
+#else
     return canonPath(str).string();
+#endif
 }
 
 StoreConfig::StoreConfig(const Params & params)
