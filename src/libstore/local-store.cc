@@ -1407,7 +1407,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 if (isValidPath(i))
                     logError(e.info());
                 else
-                    warn(e.msg());
+                    logWarning(e.info());
                 errors = true;
             }
         }
