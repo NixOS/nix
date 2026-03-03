@@ -221,6 +221,8 @@ struct curlFileTransfer : public FileTransfer
             done = true;
             try {
                 std::rethrow_exception(ex);
+            } catch (FileTransferError & e) {
+                /* Already descriptive enough. */
             } catch (nix::Error & e) {
                 /* Add more context to the error message. */
                 e.addTrace({}, "during %s of '%s'", Uncolored(request.noun()), request.uri.to_string());
@@ -628,7 +630,7 @@ struct curlFileTransfer : public FileTransfer
 
             debug(
                 "finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
-                request.noun(),
+                Uncolored(request.noun()),
                 request.uri,
                 code,
                 httpStatus,
@@ -723,14 +725,14 @@ struct curlFileTransfer : public FileTransfer
                                                                                        Interrupted,
                                                                                        std::move(response),
                                                                                        "%s of '%s' was interrupted",
-                                                                                       request.noun(),
+                                                                                       Uncolored(request.noun()),
                                                                                        request.uri)
                            : httpStatus != 0
                                ? FileTransferError(
                                      err,
                                      std::move(response),
                                      "unable to %s '%s': HTTP error %d%s",
-                                     request.verb(),
+                                     Uncolored(request.verb()),
                                      request.uri,
                                      httpStatus,
                                      code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
@@ -738,7 +740,7 @@ struct curlFileTransfer : public FileTransfer
                                      err,
                                      std::move(response),
                                      "unable to %s '%s': %s (%d) %s",
-                                     request.verb(),
+                                     Uncolored(request.verb()),
                                      request.uri,
                                      curl_easy_strerror(code),
                                      code,
@@ -753,10 +755,24 @@ struct curlFileTransfer : public FileTransfer
                     int ms = retryTimeMs
                              * std::pow(
                                  2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
-                    if (writtenToSink)
-                        warn("%s; retrying from offset %d in %d ms", exc.what(), writtenToSink, ms);
-                    else
-                        warn("%s; retrying in %d ms", exc.what(), ms);
+
+                    if (writtenToSink) {
+                        warn(
+                            "%s; retrying from offset %d in %d ms (attempt %d/%d)",
+                            exc.message(),
+                            writtenToSink,
+                            ms,
+                            attempt,
+                            fileTransfer.settings.tries);
+                    } else {
+                        warn(
+                            "%s; retrying in %d ms (attempt %d/%d)",
+                            exc.message(),
+                            ms,
+                            attempt,
+                            fileTransfer.settings.tries);
+                    }
+
                     errorSink.reset();
                     embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
                     try {
@@ -937,7 +953,7 @@ struct curlFileTransfer : public FileTransfer
             }
 
             for (auto & item : incoming) {
-                debug("starting %s of %s", item->request.noun(), item->request.uri);
+                debug("starting %s of '%s'", Uncolored(item->request.noun()), item->request.uri);
                 item->init();
                 curl_multi_add_handle(curlm.get(), item->req);
                 item->active = true;

@@ -51,7 +51,7 @@ DownloadFileResult downloadFile(
         res = getFileTransfer()->download(request);
     } catch (FileTransferError & e) {
         if (cached) {
-            warn("%s; using cached version", e.msg());
+            warn("%s; using cached version", e.message());
             return useCached();
         } else
             throw;

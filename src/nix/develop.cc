@@ -676,9 +676,10 @@ struct CmdDevelop : Common, MixEnvironment
 
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
-        setEnv("SHELL", shell.string().c_str());
-        // https://github.com/NixOS/nix/issues/5873
-        script += fmt("SHELL=%s\n", PathFmt(shell));
+        setEnvOs(OS_STR("SHELL"), shell.c_str());
+        /* See: https://github.com/NixOS/nix/issues/5873
+           Format via .string() and not PathFmt intentionally. */
+        script += fmt("SHELL=\"%s\"\n", shell.string());
         if (foundInteractive)
             script += fmt("PATH=\"%s${PATH:+:$PATH}\"\n", std::filesystem::path(shell).parent_path().string());
         writeFull(rcFileFd.get(), script);

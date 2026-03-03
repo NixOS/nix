@@ -400,7 +400,7 @@ void completeFlakeRefWithFragment(
             }
         }
     } catch (Error & e) {
-        warn(e.msg());
+        logWarning(e.info());
     }
 }
 
