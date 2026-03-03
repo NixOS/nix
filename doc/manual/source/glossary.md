@@ -39,7 +39,7 @@
   This sandbox by default only allows reading from store objects specified as inputs, and only allows writing to designated [outputs][output] to be [captured as store objects](@docroot@/store/building.md#processing-outputs).
 
   A derivation is typically specified as a [derivation expression] in the [Nix language], and [instantiated][instantiate] to a [store derivation].
-  There are multiple ways of obtaining store objects from store derivatons, collectively called [realisation][realise].
+  There are multiple ways of obtaining store objects from store derivations, collectively called [realisation][realise].
 
   [derivation]: #gloss-derivation
 
