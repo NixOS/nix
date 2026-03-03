@@ -791,7 +791,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
         if (!parentFd)
             throw SysError("opening %1%", PathFmt(root));
 
-        auto relPath = CanonPath::fromFilename(root.filename().native());
+        auto relPath = OsFilename{root.filename()};
         if (trackLastModified) {
             auto st = fstatat(parentFd.get(), root.filename());
             mtime = st.st_mtime;

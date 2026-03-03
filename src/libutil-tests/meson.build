@@ -84,6 +84,8 @@ sources = files(
   'nar-listing.cc',
   'nix_api_util.cc',
   'nix_api_util_internal.cc',
+  'os-canon-path.cc',
+  'os-filename.cc',
   'pool.cc',
   'position.cc',
   'processes.cc',
