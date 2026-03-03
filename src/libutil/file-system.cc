@@ -254,14 +254,15 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
     drainFD(fd.get(), sink);
 }
 
-void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync)
+void writeFile(
+    const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     AutoCloseFD fd = openNewFileForWrite(
         path,
         mode,
         {
             .truncateExisting = true,
-            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
         });
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
@@ -287,14 +288,14 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
     }
 }
 
-void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync)
+void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     AutoCloseFD fd = openNewFileForWrite(
         path,
         mode,
         {
             .truncateExisting = true,
-            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
         });
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
@@ -338,7 +339,7 @@ void recursiveSync(const std::filesystem::path & path)
     /* If it's a file or symlink, just fsync and return. */
     auto st = lstat(path);
     if (S_ISREG(st.st_mode)) {
-        AutoCloseFD fd = openFileReadonly(path); /* TODO: O_NOFOLLOW? */
+        AutoCloseFD fd = openFileReadonly(path, FinalSymlink::DontFollow);
         if (!fd)
             throw NativeSysError("opening file %s", PathFmt(path));
         fd.fsync();
@@ -359,7 +360,7 @@ void recursiveSync(const std::filesystem::path & path)
             if (std::filesystem::is_directory(st)) {
                 dirsToEnumerate.emplace_back(entry.path());
             } else if (std::filesystem::is_regular_file(st)) {
-                AutoCloseFD fd = openFileReadonly(entry.path()); /* TODO: O_NOFOLLOW? */
+                AutoCloseFD fd = openFileReadonly(entry.path(), FinalSymlink::DontFollow);
                 if (!fd)
                     throw NativeSysError("opening file %1%", PathFmt(entry.path()));
                 fd.fsync();

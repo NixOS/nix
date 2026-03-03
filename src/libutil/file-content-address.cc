@@ -79,7 +79,7 @@ void restorePath(const std::filesystem::path & path, Source & source, FileSerial
 {
     switch (method) {
     case FileSerialisationMethod::Flat:
-        writeFile(path, source, 0666, startFsync ? FsSync::Yes : FsSync::No);
+        writeFile(path, source, 0666, startFsync ? FsSync::Yes : FsSync::No, FinalSymlink::DontFollow);
         break;
     case FileSerialisationMethod::NixArchive:
         restorePath(path, source, startFsync);
