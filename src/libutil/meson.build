@@ -161,6 +161,7 @@ sources = [ config_priv_h ] + files(
   'nar-accessor.cc',
   'nar-cache.cc',
   'nar-listing.cc',
+  'os-filename.cc',
   'pos-table.cc',
   'position.cc',
   'posix-source-accessor.cc',

@@ -65,6 +65,7 @@ headers = [ config_pub_h ] + files(
   'nar-accessor.hh',
   'nar-cache.hh',
   'nar-listing.hh',
+  'os-filename.hh',
   'os-string.hh',
   'pool.hh',
   'pos-idx.hh',
