@@ -14,29 +14,28 @@
 
 namespace nix {
 
-void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystemObjectSink & sink, const CanonPath & to)
+void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystemObjectSink & sink)
 {
     auto stat = accessor.lstat(from);
 
     switch (stat.type) {
     case SourceAccessor::tSymlink: {
-        sink.createSymlink(to, accessor.readLink(from));
+        sink.createSymlink(accessor.readLink(from));
         break;
     }
 
     case SourceAccessor::tRegular: {
-        sink.createRegularFile(to, [&](CreateRegularFileSink & crf) {
-            if (stat.isExecutable)
-                crf.isExecutable();
+        sink.createRegularFile(stat.isExecutable, [&](FileSystemObjectSink::OnRegularFile & crf) {
             accessor.readFile(from, crf, [&](uint64_t size) { crf.preallocateContents(size); });
         });
         break;
     }
 
     case SourceAccessor::tDirectory: {
-        sink.createDirectory(to, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
+        sink.createDirectory([&](FileSystemObjectSink::OnDirectory & dirSink) {
             for (auto & [name, _] : accessor.readDirectory(from)) {
-                copyRecursive(accessor, from / name, dirSink, relDirPath / name);
+                dirSink.createChild(
+                    name, [&](FileSystemObjectSink & childSink) { copyRecursive(accessor, from / name, childSink); });
             }
         });
         break;
@@ -62,79 +61,45 @@ static RestoreSinkSettings restoreSinkSettings;
 
 static GlobalConfig::Register r1(&restoreSinkSettings);
 
-static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
+void RestoreSink::Directory::createChild(std::string_view name, ChildCreatedCallback callback)
 {
-    auto dst = src;
-    if (!path.rel().empty())
-        dst /= path.rel();
-    return dst;
+    RestoreSink childSink{back.startFsync};
+    childSink.parentPath = dirPath;
+    childSink.childName = name;
+    childSink.dirFd = dirFd.get();
+    callback(childSink);
 }
 
-void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallback callback)
+void RestoreSink::createDirectory(DirectoryCreatedCallback callback)
 {
-    if (path.isRoot()) {
-        createDirectory(path);
-        callback(*this, path);
-        return;
+    auto dstPath = parentPath / childName;
+#ifndef _WIN32
+    if (dirFd != INVALID_DESCRIPTOR) {
+        if (::mkdirat(dirFd, childName.c_str(), 0777) == -1)
+            throw SysError("creating directory %s", PathFmt(dstPath));
+    } else
+#endif
+    {
+        if (!std::filesystem::create_directory(dstPath))
+            throw Error("path %s already exists", PathFmt(dstPath));
     }
 
-    createDirectory(path);
-    assert(dirFd); // If that's not true the above call must have thrown an exception.
-
-    RestoreSink dirSink{startFsync};
-    dirSink.dstPath = append(dstPath, path);
-    dirSink.dirFd = openFileEnsureBeneathNoSymlinks(
-        dirFd.get(),
-        path,
-#ifdef _WIN32
-        FILE_READ_ATTRIBUTES | SYNCHRONIZE,
-        FILE_DIRECTORY_FILE
-#else
-        O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC,
-        0
+    AutoCloseFD newDirFd;
+#ifndef _WIN32
+    if (dirFd != INVALID_DESCRIPTOR) {
+        newDirFd = AutoCloseFD{::openat(dirFd, childName.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)};
+    } else {
+        newDirFd = AutoCloseFD{::open(dstPath.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC)};
+    }
+    if (!newDirFd)
+        throw SysError("opening directory %s", PathFmt(dstPath));
 #endif
-    );
 
-    if (!dirSink.dirFd)
-        throw SysError("opening directory %s", PathFmt(dirSink.dstPath));
-
-    callback(dirSink, CanonPath::root);
+    Directory dir{*this, dstPath, std::move(newDirFd)};
+    callback(dir);
 }
 
-void RestoreSink::createDirectory(const CanonPath & path)
-{
-    auto p = append(dstPath, path);
-
-#ifndef _WIN32
-    if (dirFd) {
-        if (path.isRoot())
-            /* Trying to create a directory that we already have a file descriptor for. */
-            throw Error("path %s already exists", PathFmt(p));
-
-        if (::mkdirat(dirFd.get(), path.rel_c_str(), 0777) == -1)
-            throw SysError("creating directory %s", PathFmt(p));
-
-        return;
-    }
-#endif
-
-    if (!std::filesystem::create_directory(p))
-        throw Error("path '%s' already exists", p.string());
-
-#ifndef _WIN32
-    if (path.isRoot()) {
-        assert(!dirFd); // Handled above
-
-        /* Open directory for further *at operations relative to the sink root
-           directory. */
-        dirFd = open(p.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-        if (!dirFd)
-            throw SysError("creating directory %1%", PathFmt(p));
-    }
-#endif
-};
-
-struct RestoreRegularFile : CreateRegularFileSink, FdSink
+struct RestoreRegularFile : FileSystemObjectSink::OnRegularFile, FdSink
 {
     AutoCloseFD fd;
     bool startFsync = false;
@@ -156,19 +121,17 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
             fd.startFsync();
     }
 
-    void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
 
-void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
+void RestoreSink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
 {
-    auto p = append(dstPath, path);
-
+    auto dstPath = parentPath / childName;
     auto crf = RestoreRegularFile(
         startFsync,
 #ifdef _WIN32
         CreateFileW(
-            p.c_str(),
+            dstPath.c_str(),
             GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE,
             NULL,
@@ -180,26 +143,24 @@ void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegul
             /* O_EXCL together with O_CREAT ensures symbolic links in the last
                component are not followed. */
             constexpr int flags = O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC;
-            if (!dirFd)
-                return AutoCloseFD{::open(p.c_str(), flags, 0666)};
-            return openFileEnsureBeneathNoSymlinks(dirFd.get(), path, flags, 0666);
+            if (dirFd == INVALID_DESCRIPTOR)
+                return AutoCloseFD{::open(dstPath.c_str(), flags, 0666)};
+            return AutoCloseFD{::openat(dirFd, childName.c_str(), flags, 0666)};
         }()
 #endif
     );
     if (!crf.fd)
-        throw NativeSysError("creating file %1%", PathFmt(p));
+        throw NativeSysError("creating file %1%", PathFmt(dstPath));
     func(crf);
     crf.flush();
-}
-
-void RestoreRegularFile::isExecutable()
-{
     // Windows doesn't have a notion of executable file permissions we
     // care about here, right?
 #ifndef _WIN32
-    auto st = nix::fstat(fd.get());
-    if (fchmod(fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
-        throw SysError("fchmod");
+    if (isExecutable) {
+        auto st = nix::fstat(crf.fd.get());
+        if (fchmod(crf.fd.get(), st.st_mode | (S_IXUSR | S_IXGRP | S_IXOTH)) == -1)
+            throw SysError("fchmod");
+    }
 #endif
 }
 
@@ -221,22 +182,22 @@ void RestoreRegularFile::preallocateContents(uint64_t len)
 #endif
 }
 
-void RestoreSink::createSymlink(const CanonPath & path, const std::string & target)
+void RestoreSink::createSymlink(const std::string & target)
 {
-    auto p = append(dstPath, path);
+    auto dstPath = parentPath / childName;
 #ifndef _WIN32
-    if (dirFd) {
-        if (::symlinkat(requireCString(target), dirFd.get(), path.rel_c_str()) == -1)
-            throw SysError("creating symlink from %1% -> '%2%'", PathFmt(p), target);
+    if (dirFd != INVALID_DESCRIPTOR) {
+        if (::symlinkat(requireCString(target), dirFd, childName.c_str()) == -1)
+            throw SysError("creating symlink from %1% -> '%2%'", PathFmt(dstPath), target);
         return;
     }
 #endif
-    nix::createSymlink(target, p.string());
+    nix::createSymlink(target, dstPath.string());
 }
 
-void RegularFileSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
+void RegularFileSink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
 {
-    struct CRF : CreateRegularFileSink
+    struct CRF : OnRegularFile
     {
         RegularFileSink & back;
 
@@ -249,20 +210,30 @@ void RegularFileSink::createRegularFile(const CanonPath & path, fun<void(CreateR
         {
             back.sink(data);
         }
-
-        void isExecutable() override {}
     } crf{*this};
 
     func(crf);
 }
 
-void NullFileSystemObjectSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
+void NullFileSystemObjectSink::createDirectory(DirectoryCreatedCallback func)
 {
-    struct : CreateRegularFileSink
+    struct : OnDirectory
+    {
+        void createChild(std::string_view, ChildCreatedCallback callback) override
+        {
+            NullFileSystemObjectSink childSink;
+            callback(childSink);
+        }
+    } dir;
+
+    func(dir);
+}
+
+void NullFileSystemObjectSink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
+{
+    struct : OnRegularFile
     {
         void operator()(std::string_view data) override {}
-
-        void isExecutable() override {}
     } crf;
 
     crf.skipContents = true;

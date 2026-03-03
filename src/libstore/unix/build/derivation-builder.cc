@@ -1633,10 +1633,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     dumpPath(actualPath, rsink);
                     rsink.flush();
                 });
-                std::filesystem::path tmpPath = actualPath.native() + ".tmp";
-                restorePath(tmpPath, *source);
+                auto tmpName = actualPath.filename();
+                tmpName += ".tmp";
+                auto parentDir = actualPath.parent_path();
+                restorePath(parentDir, tmpName, *source);
                 deletePath(actualPath);
-                movePath(tmpPath, actualPath);
+                movePath(parentDir / tmpName, actualPath);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
