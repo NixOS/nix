@@ -115,7 +115,7 @@ struct CmdHashBase : Command
                 auto sourcePath = makeSourcePath();
                 fun<git::DumpHook> hook = [&](const SourcePath & path) -> git::TreeEntry {
                     auto hashSink = makeSink();
-                    auto mode = dump(path, *hashSink, hook);
+                    auto mode = git::dump(path, *hashSink, hook);
                     auto hash = hashSink->finish().hash;
                     return {
                         .mode = mode,
