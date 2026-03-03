@@ -212,6 +212,9 @@ TEST_F(nix_api_store_test, nix_store_real_path)
 
 TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine/Windows does not support symlinks needed for local store gcroots";
+#endif
     auto tmp = nix::createTempDir();
     auto storeRoot = (tmp / "store").string();
     auto stateDir = (tmp / "state").string();
@@ -251,8 +254,9 @@ TEST_F(nix_api_util_context, nix_store_real_path_relocated)
 
 TEST_F(nix_api_util_context, nix_store_real_path_binary_cache)
 {
-    Store * store =
-        nix_store_open(ctx, nix::fmt("file://%s/binary-cache", nix::createTempDir().string()).c_str(), nullptr);
+    auto tmpDir = nix::createTempDir() / "binary-cache";
+    auto url = nix::ParsedURL{.scheme = "file", .path = nix::pathToUrlPath(tmpDir)};
+    Store * store = nix_store_open(ctx, url.to_string().c_str(), nullptr);
     assert_ctx_ok();
     ASSERT_NE(store, nullptr);
 
@@ -297,6 +301,9 @@ public:
     void SetUp() override
     {
         nix_api_store_test_base::SetUp();
+#ifdef _WIN32
+        GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
 
         nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
         nix::settings.getWorkerSettings().substituters = {};
@@ -352,6 +359,9 @@ public:
 
 TEST_F(nix_api_store_test_base, build_from_json)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // FIXME get rid of these
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -399,6 +409,9 @@ TEST_F(nix_api_store_test_base, build_from_json)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when the system is invalid
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -444,6 +457,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when the builder fails
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};
@@ -489,6 +505,9 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
 
 TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
     nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
     nix::settings.getWorkerSettings().substituters = {};

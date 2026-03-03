@@ -105,14 +105,19 @@ this_exe = executable(
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
+test_env = {
+  '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+  'HOME' : meson.current_build_dir() / 'test-home',
+}
+
+if host_machine.system() != 'windows'
+  test_env += {'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store'}
+endif
+
 test(
   meson.project_name(),
   this_exe,
-  env : {
-    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-    'HOME' : meson.current_build_dir() / 'test-home',
-    'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store',
-  },
+  env : test_env,
   protocol : 'gtest',
 )
 
