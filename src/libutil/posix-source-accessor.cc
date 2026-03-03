@@ -58,8 +58,11 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void
     auto size = getFileSize(fd.get());
 
     sizeCallback(size);
-
-    drainFD(fd.get(), sink, {.expectedSize = size});
+    FdSource source(fd.get());
+    /* The most important invariant we care about here is writing exactly size
+       bytes to the sink. drainInto should throw an EndOfFile if we fail to read
+       `size` bytes. */
+    source.drainInto(sink, size);
 }
 
 bool PosixSourceAccessor::pathExists(const CanonPath & path)
