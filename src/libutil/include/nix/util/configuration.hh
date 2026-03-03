@@ -222,19 +222,73 @@ protected:
  * For `Setting<AbsolutePath>`. `parse()` calls `canonPath`,
  * rejecting empty and relative paths.
  */
-struct AbsolutePath : std::filesystem::path
+struct AbsolutePath
 {
-    using path::path;
-    using path::operator=;
+    std::filesystem::path path;
 
-    AbsolutePath(const std::filesystem::path & p)
-        : path(p)
+    AbsolutePath(std::filesystem::path p)
+        : path(std::move(p))
     {
     }
 
-    AbsolutePath(std::filesystem::path && p)
-        : path(std::move(p))
+    AbsolutePath(const char * s)
+        : path(s)
     {
+    }
+
+    operator const std::filesystem::path &() const
+    {
+        return path;
+    }
+
+    std::string string() const
+    {
+        return path.string();
+    }
+
+    const auto & native() const
+    {
+        return path.native();
+    }
+
+    const char * c_str() const
+    {
+        return path.c_str();
+    }
+
+    bool empty() const
+    {
+        return path.empty();
+    }
+
+    std::filesystem::path operator/(const std::filesystem::path & rhs) const
+    {
+        return path / rhs;
+    }
+
+    bool operator==(const AbsolutePath & rhs) const
+    {
+        return path == rhs.path;
+    }
+
+    bool operator==(const std::filesystem::path & rhs) const
+    {
+        return path == rhs;
+    }
+
+    bool operator==(const std::string & rhs) const
+    {
+        return path == rhs;
+    }
+
+    auto operator<=>(const AbsolutePath & rhs) const
+    {
+        return path <=> rhs.path;
+    }
+
+    friend std::ostream & operator<<(std::ostream & os, const AbsolutePath & p)
+    {
+        return os << p.path.string();
     }
 };
 
@@ -402,6 +456,37 @@ public:
     void operator=(const T & v)
     {
         this->assign(v);
+    }
+};
+
+template<>
+class Setting<AbsolutePath> : public BaseSetting<AbsolutePath>
+{
+public:
+    using BaseSetting<AbsolutePath>::BaseSetting;
+    using BaseSetting<AbsolutePath>::operator=;
+
+    Setting(
+        Config * options,
+        const AbsolutePath & def,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {},
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<AbsolutePath>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+    {
+        options->addSetting(this);
+    }
+
+    void operator=(const AbsolutePath & v)
+    {
+        this->assign(v);
+    }
+
+    operator const std::filesystem::path &() const
+    {
+        return this->value.path;
     }
 };
 

@@ -22,14 +22,14 @@ TEST(LocalStore, constructConfig_rootQueryParam)
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{"/foo/bar"});
 }
 
 TEST(LocalStore, constructConfig_rootPath)
 {
     LocalStoreConfig config{"/foo/bar", {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{"/foo/bar"});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{"/foo/bar"});
 }
 
 TEST(LocalStore, constructConfig_to_string)
