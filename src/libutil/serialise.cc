@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <cerrno>
+#include <limits>
 #include <memory>
 
 #include <boost/coroutine2/coroutine.hpp>
@@ -101,6 +102,20 @@ void Source::drainInto(Sink & sink)
         } catch (EndOfFile &) {
             break;
         }
+    }
+}
+
+void Source::drainInto(Sink & sink, uint64_t len)
+{
+    std::array<char, 65536> buf;
+    while (len) {
+        checkInterrupt();
+        // Until std::saturate_cast is available (C++26)
+        auto lenTrunc = static_cast<size_t>(std::min<uint64_t>(len, std::numeric_limits<size_t>::max()));
+        auto n = read(buf.data(), std::min(lenTrunc, buf.size()));
+        sink({buf.data(), n});
+        assert(n <= len);
+        len -= n;
     }
 }
 

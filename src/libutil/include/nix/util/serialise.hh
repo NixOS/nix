@@ -96,7 +96,19 @@ struct Source
         return true;
     }
 
+    /**
+     * Read the rest of this `Source` into `sink`.
+     */
     void drainInto(Sink & sink);
+
+    /**
+     * Read exactly 'len' bytes and write them to 'sink'.
+     *
+     * Virtual in anticipation that some `Source` implementations, like
+     * `FdSource` may eventually be able to provide more performant
+     * implementations of this function.
+     */
+    virtual void drainInto(Sink & sink, uint64_t len);
 
     std::string drain();
 
