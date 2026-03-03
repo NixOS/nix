@@ -254,14 +254,15 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
     drainFD(fd.get(), sink);
 }
 
-void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync)
+void writeFile(
+    const std::filesystem::path & path, std::string_view s, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     AutoCloseFD fd = openNewFileForWrite(
         path,
         mode,
         {
             .truncateExisting = true,
-            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
         });
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
@@ -287,14 +288,14 @@ void writeFile(Descriptor fd, std::string_view s, FsSync sync, const std::filesy
     }
 }
 
-void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync)
+void writeFile(const std::filesystem::path & path, Source & source, mode_t mode, FsSync sync, FinalSymlink finalSymlink)
 {
     AutoCloseFD fd = openNewFileForWrite(
         path,
         mode,
         {
             .truncateExisting = true,
-            .followSymlinksOnTruncate = true, /* FIXME: Do we want this? */
+            .followSymlinksOnTruncate = (finalSymlink == FinalSymlink::Follow),
         });
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
