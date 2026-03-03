@@ -220,7 +220,7 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
  *
  * @note For directories use @ref openDirectory.
  */
-AutoCloseFD openFileReadonly(const std::filesystem::path & path);
+AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 struct OpenNewFileForWriteParams
 {
