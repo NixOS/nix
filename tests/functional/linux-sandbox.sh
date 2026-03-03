@@ -127,12 +127,14 @@ for badPath in "${badPaths[@]}"; do
     done
 done
 
-# Trailing slash in the destination should fail for non-directory files.
-expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$cert" | grepQuiet "error: creating regular file.*: No such file or directory"
-expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$symlinkcert" | grepQuiet "error: creating symlink.*: No such file or directory"
+# Trailing slash in the destination asserts that it is a directory, so it should
+# be rejected for non-directory sources.
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$cert" | grepQuiet "error: .*trailing slash.*is not a directory"
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$symlinkcert" | grepQuiet "error: .*trailing slash.*is not a directory"
 
-# Escaping to chroot directory.
-expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/foo/../=$cert" | grepQuiet "error: creating regular file.*: No such file or directory"
+# Escaping to chroot directory. The trailing slash is reported first, since a
+# regular file can never be created at a name ending in a separator.
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/foo/../=$cert" | grepQuiet "error: .*trailing slash.*is not a directory"
 
 # Can't overmount the chroot.
 expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/foo/../=$TEST_ROOT" | grepQuiet "error: .*escapes the chroot"
