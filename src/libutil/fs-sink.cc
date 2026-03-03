@@ -80,7 +80,7 @@ static std::filesystem::path append(const std::filesystem::path & src, const Can
  * `Descriptor` borrows from `dirFd`. When `dirFd` is not set,
  * temporarily opens the parent of `dstPath`.
  */
-static std::tuple<AutoCloseFD, Descriptor, CanonPath>
+static std::tuple<AutoCloseFD, Descriptor, OsFilename>
 getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, const CanonPath & path)
 {
     if (dirFd != INVALID_DESCRIPTOR) {
@@ -89,13 +89,14 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
            root) within it. */
         assert(!path.isRoot());
         auto parent = path.parent();
+        auto name = OsFilename{std::filesystem::path{std::string{*path.baseName()}}};
         if (parent->isRoot())
-            return {AutoCloseFD{}, dirFd, CanonPath::fromFilename(*path.baseName())};
+            return {AutoCloseFD{}, dirFd, std::move(name)};
         auto parentFd = openFileEnsureBeneathNoSymlinks(dirFd, *parent, O_RDONLY | O_DIRECTORY | O_CLOEXEC, 0);
         if (!parentFd)
             throw SysError("opening parent directory of %s", PathFmt(append(dstPath, path)));
         auto fd = parentFd.get();
-        return {std::move(parentFd), fd, CanonPath::fromFilename(*path.baseName())};
+        return {std::move(parentFd), fd, std::move(name)};
     }
 
     /* Without dirFd, we're creating the root entry itself, so path
@@ -121,7 +122,7 @@ getParentFdAndName(Descriptor dirFd, const std::filesystem::path & dstPath, cons
     if (!parentFd)
         throw SysError("opening parent directory of %s", PathFmt(p));
     auto fd = parentFd.get();
-    return {std::move(parentFd), fd, CanonPath::fromFilename(p.filename().native())};
+    return {std::move(parentFd), fd, OsFilename{p.filename()}};
 }
 #endif
 
@@ -165,7 +166,7 @@ void RestoreSink::createDirectory(const CanonPath & path)
 
     auto [_parentFd, fd, name] = getParentFdAndName(dirFd.get(), dstPath, path);
 
-    if (::mkdirat(fd, name.rel_c_str(), 0777) == -1)
+    if (::mkdirat(fd, name.c_str(), 0777) == -1)
         throw SysError("creating directory %s", PathFmt(append(dstPath, path)));
 
     if (!dirFd) {
@@ -280,7 +281,7 @@ void RestoreSink::createSymlink(const CanonPath & path, const std::string & targ
 {
 #ifndef _WIN32
     auto [_parentFd, fd, name] = getParentFdAndName(dirFd.get(), dstPath, path);
-    if (::symlinkat(requireCString(target), fd, name.rel_c_str()) == -1)
+    if (::symlinkat(requireCString(target), fd, name.c_str()) == -1)
         throw SysError("creating symlink from %1% -> '%2%'", PathFmt(append(dstPath, path)), target);
 #else
     nix::createSymlink(target, append(dstPath, path).string());
