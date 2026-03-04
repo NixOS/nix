@@ -28,6 +28,14 @@ struct GitAccessorOptions
     bool smudgeLfs = false;
     bool submodules = false; // Currently implemented in GitInputScheme rather than GitAccessor
 
+    /**
+     * When set, use this commit hash for git-lfs attribute lookup instead of
+     * the tree hash passed to getAccessor(). Required when the accessor is
+     * created from a tree SHA rather than a commit SHA, since lfs::Fetch needs
+     * a commit OID for GIT_ATTR_CHECK_INCLUDE_COMMIT to find .gitattributes.
+     */
+    std::optional<Hash> lfsCommitRev;
+
     std::string makeFingerprint(const Hash & rev) const;
 };
 

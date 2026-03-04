@@ -795,7 +795,10 @@ StorePath EvalState::getZoneStorePath(std::string_view zonePath)
         // Eager mode: immediate copy from git ODB
         auto repo = getWorldRepo();
         // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
-        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+        // smudgeLfs=true + lfsCommitRev: zones may contain LFS files; the accessor uses a tree
+        // SHA so we must pass the commit SHA separately for lfs::Fetch attribute lookup.
+        auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
+        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = true, .lfsCommitRev = commitHash};
         auto accessor = repo->getAccessor(treeSha, opts, "zone");
 
         std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
@@ -840,7 +843,10 @@ StorePath EvalState::mountZoneByTreeSha(const Hash & treeSha, std::string_view z
     // race to mount the same zone, but we check again before inserting.
     auto repo = getWorldRepo();
     // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
-    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+    // smudgeLfs=true + lfsCommitRev: zones may contain LFS files; the accessor uses a tree
+    // SHA so we must pass the commit SHA separately for lfs::Fetch attribute lookup.
+    auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
+    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = true, .lfsCommitRev = commitHash};
     auto accessor = repo->getAccessor(treeSha, opts, "zone");
 
     // Generate name from zone path (sanitized for store path requirements)
@@ -947,8 +953,9 @@ StorePath EvalState::getZoneFromCheckout(std::string_view zonePath, const boost:
 
     auto makeDirtyAccessor = [&]() -> ref<SourceAccessor> {
         auto repo = getWorldRepo();
+        auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
         auto baseAccessor = repo->getAccessor(
-            getWorldTreeSha(zone), {.exportIgnore = true, .smudgeLfs = false}, "zone");
+            getWorldTreeSha(zone), {.exportIgnore = true, .smudgeLfs = true, .lfsCommitRev = commitHash}, "zone");
         boost::unordered_flat_set<std::string> zoneDirtyFiles;
         if (dirtyFiles) {
             auto zonePrefix = zone + "/";

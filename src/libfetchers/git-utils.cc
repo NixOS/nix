@@ -799,7 +799,8 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Opti
 
 std::string GitAccessorOptions::makeFingerprint(const Hash & rev) const
 {
-    return "git:" + rev.gitRev() + (exportIgnore ? ";e" : "") + (smudgeLfs ? ";l" : "");
+    return "git:" + rev.gitRev() + (exportIgnore ? ";e" : "") + (smudgeLfs ? ";l" : "")
+        + (lfsCommitRev ? ";lc:" + lfsCommitRev->gitRev() : "");
 }
 
 /**
@@ -821,7 +822,8 @@ struct GitSourceAccessor : SourceAccessor
         : state_{State{
               .repo = repo_,
               .root = peelToTreeOrBlob(lookupObject(*repo_, hashToOID(rev)).get()),
-              .lfsFetch = options.smudgeLfs ? std::make_optional(lfs::Fetch(*repo_, hashToOID(rev))) : std::nullopt,
+              .lfsFetch = options.smudgeLfs ? std::make_optional(lfs::Fetch(*repo_,
+                  options.lfsCommitRev ? hashToOID(*options.lfsCommitRev) : hashToOID(rev))) : std::nullopt,
               .options = options,
           }}
     {
