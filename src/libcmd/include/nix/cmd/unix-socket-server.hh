@@ -53,6 +53,19 @@ struct ServeUnixSocketOptions
      * Mode for the created socket file.
      */
     mode_t socketMode = 0666;
+
+#ifndef _WIN32
+    /**
+     * Additional file descriptor to poll. Useful for doing a self-pipe trick
+     * https://cr.yp.to/docs/selfpipe.html.
+     */
+    Descriptor auxiliaryFd = INVALID_DESCRIPTOR;
+
+    /**
+     * Optional callback invoked on POLLIN event for auxiliaryFd.
+     */
+    std::function<void()> onAuxiliaryFdPollin = nullptr;
+#endif
 };
 
 /**

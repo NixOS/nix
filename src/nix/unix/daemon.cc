@@ -120,13 +120,20 @@ static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size
 }
 #endif
 
+static Pipe sigChldPipe;
+
 static void sigChldHandler(int sigNo)
 {
     // Ensure we don't modify errno of whatever we've interrupted
     auto saved_errno = errno;
-    //  Reap all dead children.
-    while (waitpid(-1, 0, WNOHANG) > 0)
-        ;
+    /* Write to the self-pipe that gets polled in the accept loop. Pipe
+       is non-blocking. https://man7.org/tlpi/code/online/dist/altio/self_pipe.c.html */
+    auto res = ::write(sigChldPipe.writeSide.get(), "x", 1);
+    if (res == -1 && errno != EAGAIN) {
+        /* Something is deeply wrong. Can't call std::terminate here because our terminate
+           handler is not safe for that. */
+        abort();
+    }
     errno = saved_errno;
 }
 
@@ -243,7 +250,13 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    //  Get rid of children automatically; don't let them become zombies.
+    sigChldPipe.create();
+
+    for (auto fd : {sigChldPipe.readSide.get(), sigChldPipe.writeSide.get()})
+        if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+            throw SysError("making self-pipe non-blocking");
+
+    // Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
 
 #ifdef __linux__
@@ -272,6 +285,27 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
             {
                 .socketPath = settings.nixDaemonSocketFile,
                 .socketMode = 0666,
+                .auxiliaryFd = sigChldPipe.readSide.get(),
+                .onAuxiliaryFdPollin =
+                    []() {
+                        std::array<char, 64> buf;
+
+                        /* Drain the self-pipe. */
+                        while (true) {
+                            if (::read(sigChldPipe.readSide.get(), buf.data(), buf.size()) == -1) {
+                                if (errno == EAGAIN)
+                                    break;
+                                else
+                                    throw SysError("reading from self-pipe for SIGCHLD");
+                            }
+                        }
+
+                        /* Reap all dead children. */
+                        pid_t pid = -1;
+                        int status;
+                        while (pid = ::waitpid(/*pid (any child process)=*/-1, &status, WNOHANG), pid > 0)
+                            printInfo("reaped child process %1%, status = %2%", pid, statusToString(status));
+                    },
             },
             [&](AutoCloseFD remote, std::function<void()> closeListeners) {
                 unix::closeOnExec(remote.get());
