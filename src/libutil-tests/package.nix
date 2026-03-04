@@ -98,9 +98,8 @@ mkMesonExecutable (finalAttrs: {
           withUnitTests && stdenv.hostPlatform.isLinux && stdenv.buildPlatform.canExecute stdenv.hostPlatform
         )
         {
-          # Run the same tests with newer syscalls disabled via seccomp,
-          # to exercise fallback paths (iterative openat for openat2,
-          # /proc/self/fd for fchmodat2).
+          # Run the same tests with newer syscalls disabled via seccomp, to
+          # exercise fallback paths.
           run-without-new-syscalls =
             runCommand "${finalAttrs.pname}-run-without-new-syscalls"
               {
@@ -113,6 +112,7 @@ mkMesonExecutable (finalAttrs: {
                   --syscall openat2 \
                   --syscall fchmodat2 \
                   --syscall close_range \
+                  --syscall copy_file_range \
                   -- ${lib.getExe finalAttrs.finalPackage}
                 touch $out
               '';

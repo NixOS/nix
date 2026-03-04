@@ -5,8 +5,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <span>
+#include <atomic>
 
 #include "util-unix-config-private.hh"
+#include "../file-descriptor-private.hh"
 
 namespace nix {
 
@@ -190,6 +192,74 @@ void unix::SelfPipe::drain()
                 throw SysError("reading from self-pipe");
         }
     }
+}
+
+bool tryCopyFdRangeFast(Descriptor from, Descriptor to, off_t offset, size_t nbytes, size_t & written)
+{
+#if HAVE_COPY_FILE_RANGE
+
+    /* Otherwise trying block cloning is pretty pointless. Also used to error
+       out on partial copies (unless we happen to hit block alignment boundary,
+       but that seems unlikely to be useful). */
+    assert(written == 0);
+    size_t left = nbytes;
+    static std::atomic_flag copyFileRangeUnsupported = {};
+
+    if (copyFileRangeUnsupported.test(std::memory_order_relaxed))
+        return false;
+
+    while (left) {
+        checkInterrupt();
+
+        ssize_t n = ::copy_file_range(
+            from,
+            &offset,
+            to,
+            nullptr,
+            left,
+            0
+#  ifdef COPY_FILE_RANGE_CLONE /* FreeBSD */
+                | COPY_FILE_RANGE_CLONE
+#  endif
+        );
+
+        /* Reached EOF too early. */
+        if (n == 0)
+            throw EndOfFile(
+                "unexpected end-of-file copying from %1% to %2%",
+                PathFmt(descriptorToPath(from)),
+                PathFmt(descriptorToPath(to)));
+
+        if (n == -1) {
+            if (errno == EINTR)
+                continue; /* Loop over to hit checkInterrupt. */
+
+            if (written == 0 && (errno == EINVAL || errno == EOPNOTSUPP || errno == EXDEV || errno == EBADF)) {
+                /* Retry with fallback. */
+            } else if (written == 0 && errno == ENOSYS) {
+                /* Cache ENOSYS. */
+                copyFileRangeUnsupported.test_and_set();
+            } else {
+                throw SysError([&] {
+                    return HintFmt(
+                        "copying contents of %1% to %2% via copy_file_range",
+                        PathFmt(descriptorToPath(from)),
+                        PathFmt(descriptorToPath(to)));
+                });
+            }
+
+            return false;
+        }
+
+        assert(static_cast<uint64_t>(n) <= left);
+        left -= n;
+        written += n;
+    }
+
+    return true;
+#else
+    return false;
+#endif
 }
 
 } // namespace nix
