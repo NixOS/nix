@@ -6,6 +6,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/indirect-root-store.hh"
@@ -296,9 +297,10 @@ struct ClientSettings
                     trusted || name == settings.getWorkerSettings().buildTimeout.name
                     || name == settings.getWorkerSettings().maxSilentTime.name
                     || name == settings.getWorkerSettings().pollInterval.name || name == "connect-timeout"
-                    || (name == "builders" && value == ""))
+                    || (name == "builders" && value == "")) {
                     settings.set(name, value);
-                else if (setSubstituters(settings.getWorkerSettings().substituters))
+                    fileTransferSettings.set(name, value);
+                } else if (setSubstituters(settings.getWorkerSettings().substituters))
                     ;
                 else
                     warn(
