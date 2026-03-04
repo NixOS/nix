@@ -28,6 +28,10 @@
 #  include <sys/mount.h>
 #endif
 
+#ifdef __APPLE__
+#  include <sys/xattr.h>
+#endif
+
 #ifdef _WIN32
 #  include <io.h>
 #endif
@@ -462,6 +466,16 @@ static void _deletePath(
             return;
         throw SysError("getting status of %1%", path);
     }
+
+#ifdef __APPLE__
+    /* Strip com.apple.macl extended attribute if present. On macOS,
+       Spotlight and Gatekeeper add this xattr to .app bundles in
+       /nix/store. It prevents chmod and unlink even for root (TCC
+       enforcement), causing GC to corrupt store paths.
+       Best-effort: ignore errors (ENOATTR when xattr is absent).
+       See: https://github.com/NixOS/nix/issues/6765 */
+    removexattr(path.c_str(), "com.apple.macl", XATTR_NOFOLLOW);
+#endif
 
     if (!S_ISDIR(st.st_mode)) {
         /* We are about to delete a file. Will it likely free space? */
