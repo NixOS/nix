@@ -623,7 +623,7 @@ static void main_nix_build(int argc, char ** argv)
         auto tz = getEnv("TZ");
         auto tzExport = tz ? "export TZ=" + escapeShellArgAlways(*tz) + "; " : "";
         std::string rc = fmt(
-                (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
+                ("#!%8%\n" + R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
                   "trap _nix_shell_clean_tmpdir EXIT; "
                   "exitHooks+=(_nix_shell_clean_tmpdir); "
                   "failureHooks+=(_nix_shell_clean_tmpdir); ") +
@@ -656,7 +656,7 @@ static void main_nix_build(int argc, char ** argv)
                 escapeShellArgAlways(std::filesystem::path(*shell).parent_path().string()),
                 escapeShellArgAlways(*shell),
                 tzExport,
-                envCommand);
+                envCommand, *shell);
         vomit("Sourcing nix-shell with file %s and contents:\n%s", rcfile, rc);
         writeFile(rcfile, rc);
 
