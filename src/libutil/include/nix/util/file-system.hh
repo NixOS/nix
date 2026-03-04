@@ -220,7 +220,7 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
  *
  * @note For directories use @ref openDirectory.
  */
-AutoCloseFD openFileReadonly(const std::filesystem::path & path);
+AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 struct OpenNewFileForWriteParams
 {
@@ -256,9 +256,19 @@ enum struct FsSync { Yes, No };
 /**
  * Write a string to a file.
  */
-void writeFile(const std::filesystem::path & path, std::string_view s, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(
+    const std::filesystem::path & path,
+    std::string_view s,
+    mode_t mode = 0666,
+    FsSync sync = FsSync::No,
+    FinalSymlink finalSymlink = FinalSymlink::Follow);
 
-void writeFile(const std::filesystem::path & path, Source & source, mode_t mode = 0666, FsSync sync = FsSync::No);
+void writeFile(
+    const std::filesystem::path & path,
+    Source & source,
+    mode_t mode = 0666,
+    FsSync sync = FsSync::No,
+    FinalSymlink finalSymlink = FinalSymlink::Follow);
 
 void writeFile(
     Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const std::filesystem::path * origPath = nullptr);

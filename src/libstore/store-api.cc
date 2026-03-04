@@ -1200,7 +1200,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
 
         return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
+        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.message());
     }
 }
 

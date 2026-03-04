@@ -135,18 +135,7 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
         return;
     }
 
-    uint64_t left = size;
-    std::array<char, 65536> buf;
-
-    while (left) {
-        checkInterrupt();
-        auto n = buf.size();
-        if ((uint64_t) n > left)
-            n = left;
-        source(buf.data(), n);
-        sink({buf.data(), n});
-        left -= n;
-    }
+    source.drainInto(sink, size);
 
     readPadding(size, source);
 }
