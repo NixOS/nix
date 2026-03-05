@@ -434,6 +434,15 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 sandboxGid(),
                 store.config->getLocalSettings().sandboxBuildDir));
 
+        /* Write /etc/group to prevent build failures
+           on systems with unprivileged_userns_clone=0. */
+        writeFile(
+            chrootRootDir / "etc" / "group",
+            fmt("root:x:0:\n",
+                "nixbld:!:%1%:\n",
+                "nogroup:x:65534:\n",
+                sandboxGid()));
+
         /* Save the mount- and user namespace of the child. We have to do this
          *before* the child does a chroot. */
         auto sandboxPath = thisProcPath / "ns";
