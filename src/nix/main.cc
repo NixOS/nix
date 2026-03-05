@@ -523,6 +523,8 @@ void mainWrapped(int argc, char ** argv)
 
     applyJSONLogger();
 
+    printTalkative("Nix %s", nixVersion);
+
     if (args.helpRequested) {
         std::vector<std::string> subcommand;
         MultiCommand * command = &args;
