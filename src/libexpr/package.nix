@@ -13,6 +13,7 @@
   boost,
   boehmgc,
   nlohmann_json,
+  sqlite,
   toml11,
 
   # Configuration Options
@@ -63,6 +64,7 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   buildInputs = [
+    sqlite
     toml11
   ];
 
