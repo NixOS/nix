@@ -2384,6 +2384,26 @@ static RegisterPrimOp primop_readFileType({
     .impl = prim_readFileType,
 });
 
+/* Read the target of a symlink. */
+static void prim_readSymlink(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    const auto path = state.realisePath(pos, *args[0], SymlinkResolution::Ancestors);
+    const auto target = path.readLink();
+    const auto parent = path.parent();
+    v.mkPath(SourcePath(path.accessor, CanonPath(target, parent.path)), state.mem);
+}
+
+static RegisterPrimOp primop_readSymlink({
+    .name = "__readSymlink",
+    .args = {"path"},
+    .doc = R"(
+      Return the target of the symlink at *path*.
+
+      If *path* does not refer to a symlink, an error is thrown.
+    )",
+    .fun = prim_readSymlink,
+});
+
 /* Read a directory (without . or ..) */
 static void prim_readDir(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
