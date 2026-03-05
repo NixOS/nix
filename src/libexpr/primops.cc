@@ -5457,4 +5457,57 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
     evalFile(derivationInternal, *vDerivation);
 }
 
+static void prim_derivationOf(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    NixStringContext context;
+    auto s =
+        state
+            .coerceToString(
+                pos, *args[0], context, "while evaluating the argument passed to builtins.derivationOf", false, false)
+            .toOwned();
+
+    if (s.empty() || !state.store->isStorePath(s)) {
+        state.error<EvalError>("'%s' is not a valid store path", s).atPos(pos).debugThrow();
+    }
+
+    if (context.empty()) {
+        state.error<EvalError>("'%s' has no derivation in its context", s).atPos(pos).debugThrow();
+    }
+
+    if (context.size() > 1) {
+        state.error<EvalError>("'%s' has more than one item in its context", s).atPos(pos).debugThrow();
+    }
+
+    // we have exactly one context item.
+    auto & c = *context.begin();
+    if (auto * b = std::get_if<NixStringContextElem::Built>(&c.raw)) {
+        auto drvPath = b->drvPath->getBaseStorePath();
+        v.mkString(
+            state.store->printStorePath(drvPath),
+            NixStringContext{NixStringContextElem::Opaque{.path = drvPath}},
+            state.mem);
+        return;
+    }
+    if (auto * d = std::get_if<NixStringContextElem::DrvDeep>(&c.raw)) {
+        v.mkString(
+            state.store->printStorePath(d->drvPath),
+            NixStringContext{NixStringContextElem::Opaque{.path = d->drvPath}},
+            state.mem);
+        return;
+    }
+
+    // Context item exists but is not a derivation
+    state.error<EvalError>("'%s' has no derivation in its context", s).atPos(pos).debugThrow();
+}
+
+static RegisterPrimOp primop_derivationOf({
+    .name = "derivationOf",
+    .args = {"s"},
+    .doc = R"(
+      Return the store path of the derivation that produces the given output path.
+      The string must have a derivation in its string context.
+    )",
+    .fun = prim_derivationOf,
+});
+
 } // namespace nix
