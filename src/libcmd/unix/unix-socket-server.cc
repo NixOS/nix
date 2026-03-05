@@ -9,6 +9,8 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
 
+#include <ranges>
+
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <poll.h>
@@ -83,6 +85,9 @@ PeerInfo getPeerInfo(Descriptor remote)
     for (auto & i : listeningSockets)
         fds.push_back({.fd = i.get(), .events = POLLIN});
 
+    if (options.auxiliaryFd != INVALID_DESCRIPTOR)
+        fds.push_back({.fd = options.auxiliaryFd, .events = POLLIN});
+
     //  Loop accepting connections.
     while (1) {
         try {
@@ -95,7 +100,11 @@ PeerInfo getPeerInfo(Descriptor remote)
                 throw SysError("polling for incoming connections");
             }
 
-            for (auto & fd : fds) {
+            if (options.auxiliaryFd != INVALID_DESCRIPTOR && options.onAuxiliaryFdPollin && fds.back().revents & POLLIN)
+                /* Useful for reaping children. */
+                options.onAuxiliaryFdPollin();
+
+            for (auto & fd : std::views::take(fds, listeningSockets.size())) {
                 if (!fd.revents)
                     continue;
 
