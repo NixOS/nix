@@ -325,12 +325,14 @@ rec {
     system:
     let
       pkgs = nixpkgsFor.${system}.native;
+      nix-1_11 = pkgs.callPackage ./testing/nix-1.11.nix { };
     in
     pkgs.runCommand "install-tests" {
       againstSelf = testNixVersions pkgs pkgs.nix;
       againstCurrentLatest =
         # FIXME: temporarily disable this on macOS because of #3605.
         if system == "x86_64-linux" then testNixVersions pkgs pkgs.nixVersions.latest else null;
+      against-1_11 = if system == "x86_64-linux" then testNixVersions pkgs nix-1_11 else null;
       # Disabled because the latest stable version doesn't handle
       # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
       # againstLatestStable = testNixVersions pkgs pkgs.nixStable;

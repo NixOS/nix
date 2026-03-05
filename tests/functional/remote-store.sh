@@ -2,6 +2,10 @@
 
 source common.sh
 
+# 'nix store info' protocol not compatible with Nix 1.11 daemon. Exact version of introduction TBD.
+# TODO: skip or conditionalize individual test cases instead of skipping the whole file
+requireDaemonNewerThan "2.0"
+
 TODO_NixOS
 
 clearStore
