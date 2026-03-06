@@ -84,8 +84,11 @@ class SymbolStr
 {
     friend class SymbolTable;
 
-    constexpr static size_t chunkSize{8192};
-    using SymbolValueStore = ChunkedVector<SymbolValue, chunkSize>;
+    constexpr static size_t chunkSize{65536};
+    using SymbolValueStore = ChunkedVector<
+        SymbolValue,
+        chunkSize,
+        /*MaxChunks=*/std::numeric_limits<decltype(SymbolValue::idx)>::max() / chunkSize>;
 
     const SymbolValue * s;
 
@@ -265,7 +268,7 @@ private:
      * During its lifetime the monotonic buffer holds all strings and nodes, if the symbol set is node based.
      */
     std::pmr::monotonic_buffer_resource buffer;
-    SymbolStr::SymbolValueStore store{16};
+    SymbolStr::SymbolValueStore store;
 
     /**
      * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
