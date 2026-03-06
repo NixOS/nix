@@ -294,7 +294,7 @@ void parseCmdLine(
 
 std::string version()
 {
-    return fmt("(Tecnix, based on Determinate Nix %s) %s", determinateNixVersion, nixVersion);
+    return fmt("(Tecnix %s, based on Determinate Nix %s) %s", tecnixVersion, determinateNixVersion, nixVersion);
 }
 
 void printVersion(const std::string & programName)

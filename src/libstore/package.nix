@@ -43,6 +43,7 @@ mkMesonLibrary (finalAttrs: {
     ../../.version
     ./.version
     ../../.version-determinate
+    ../../.version-tecnix
     ./meson.build
     ./meson.options
     ./include/nix/store/meson.build

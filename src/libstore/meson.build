@@ -30,6 +30,11 @@ configdata_priv.set_quoted(
   fs.read('../../.version-determinate').strip(),
 )
 
+configdata_priv.set_quoted(
+  'TECNIX_VERSION',
+  fs.read('../../.version-tecnix').strip(),
+)
+
 subdir('nix-meson-build-support/default-system-cpu')
 
 # Used in public header.

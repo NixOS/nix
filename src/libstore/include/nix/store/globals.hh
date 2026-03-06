@@ -1468,6 +1468,7 @@ std::vector<Path> getUserConfigFiles();
 extern std::string nixVersion;
 
 extern const std::string determinateNixVersion;
+extern const std::string tecnixVersion;
 
 /**
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
