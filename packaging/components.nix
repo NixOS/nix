@@ -209,8 +209,13 @@ let
   enableSanitizersLayer =
     finalAttrs: prevAttrs:
     let
-      sanitizers = lib.optional scope.withASan "address" ++ lib.optional scope.withUBSan "undefined";
+      sanitizers =
+        lib.optional scope.withASan "address"
+        ++ lib.optional scope.withUBSan "undefined"
+        ++ lib.optional scope.withTSan "thread";
     in
+    # Thread sanitizer can't be used with ASan or UBSan
+    assert scope.withTSan -> !(scope.withASan || scope.withUBSan);
     {
       mesonFlags =
         (prevAttrs.mesonFlags or [ ])
@@ -276,6 +281,11 @@ in
     Whether meson components are built with [UndefinedBehaviorSanitizer](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html).
   */
   withUBSan = false;
+
+  /**
+    Whether meson components are built with [ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html).
+  */
+  withTSan = false;
 
   /**
     A user-provided extension function to apply to each component derivation.
