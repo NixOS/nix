@@ -94,7 +94,7 @@ inline void checkInterrupt()
 }
 
 /**
- * A RAII class that causes the current thread to receive SIGUSR1 when
+ * A RAII class that causes the current thread to receive NIX_SIG_MULTI_INT when
  * the signal handler thread receives SIGINT. That is, this allows
  * SIGINT to be multiplexed to multiple threads.
  */
@@ -105,7 +105,7 @@ struct ReceiveInterrupts
 
     ReceiveInterrupts()
         : target(pthread_self())
-        , callback(createInterruptCallback([&]() { pthread_kill(target, SIGUSR1); }))
+        , callback(createInterruptCallback([&]() { pthread_kill(target, NIX_SIG_MULTI_INT); }))
     {
     }
 };

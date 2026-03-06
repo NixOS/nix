@@ -164,10 +164,10 @@ void initNix(bool loadConfig)
     if (sigaction(SIGCHLD, &act, 0))
         throw SysError("resetting SIGCHLD");
 
-    /* Install a dummy SIGUSR1 handler for use with pthread_kill(). */
+    /* Install a dummy NIX_SIG_MULTI_INT handler for use with pthread_kill(). */
     act.sa_handler = sigHandler;
-    if (sigaction(SIGUSR1, &act, 0))
-        throw SysError("handling SIGUSR1");
+    if (sigaction(NIX_SIG_MULTI_INT, &act, 0))
+        throw SysError("handling multiplexed interrupt");
 #endif
 
 #ifdef __APPLE__
