@@ -270,6 +270,7 @@ const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const
 std::string nixVersion = PACKAGE_VERSION;
 
 const std::string determinateNixVersion = DETERMINATE_NIX_VERSION;
+const std::string tecnixVersion = TECNIX_VERSION;
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     SandboxMode,
