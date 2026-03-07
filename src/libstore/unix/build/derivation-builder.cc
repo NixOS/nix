@@ -1324,6 +1324,9 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         if (chdir(tmpDirInSandbox().c_str()) == -1)
             throw SysError("changing into %1%", PathFmt(tmpDir));
 
+        /* Close all other file descriptors. */
+        unix::closeExtraFDs();
+
         /* Disable core dumps by default. */
         struct rlimit limit = {0, RLIM_INFINITY};
         setrlimit(RLIMIT_CORE, &limit);

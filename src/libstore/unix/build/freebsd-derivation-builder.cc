@@ -1,10 +1,12 @@
 #ifdef __FreeBSD__
 
+#  include "nix/util/freebsd-jail.hh"
+#  include "nix/util/util.hh"
+
 #  include <stdlib.h>
 #  include <string.h>
 
 #  include <db.h>
-#  include <net/if.h>
 #  include <pwd.h>
 #  include <sys/mount.h>
 #  include <netlink/netlink_snl.h>
@@ -14,9 +16,6 @@
 #  include <sys/jail.h>
 #  include <sys/sockio.h>
 #  include <jail.h>
-
-#  include "nix/util/freebsd-jail.hh"
-#  include "nix/util/util.hh"
 
 namespace nix {
 
@@ -32,15 +31,13 @@ struct PasswordEntry
     std::filesystem::path shell;
 };
 
-static void free_db(DB * db)
-{
-    if (db != nullptr) {
-        (db->close)(db);
-    }
-}
+using UniqueDB = std::unique_ptr<::DB, decltype([](::DB * db) {
+                                     if (db)
+                                         (db->close)(db);
+                                 })>;
 
 // Database open flags from FreeBSD, in case they're necessary for compatibility
-static const HASHINFO db_flags = {
+static constexpr HASHINFO dbFlags = {
     .bsize = 4096,
     .ffactor = 32,
     .nelem = 256,
@@ -55,14 +52,12 @@ static const uint8_t dbVersion = 4;
 
 static void serializeString(std::vector<uint8_t> & buf, std::string const & str)
 {
-    buf.reserve(buf.size() + str.size() + 1);
     buf.insert(buf.end(), str.begin(), str.end());
     buf.push_back(0);
 }
 
 static void serializeInt(std::vector<uint8_t> & buf, uint32_t num)
 {
-    buf.reserve(buf.size() + sizeof(num));
     // Always big endian
     buf.push_back((num >> 24) & 0xff);
     buf.push_back((num >> 16) & 0xff);
@@ -74,7 +69,7 @@ static std::vector<uint8_t> byNameKey(std::string const & name)
 {
     std::vector<uint8_t> buf{_PW_VERSIONED(_PW_KEYBYNAME, dbVersion)};
     buf.reserve(1 + name.size());
-    // We can't use serializeString since that's null terimated
+    // We can't use serializeString since that's null terminated
     buf.insert(buf.end(), name.begin(), name.end());
 
     return buf;
@@ -98,19 +93,18 @@ static std::vector<uint8_t> byUidKey(uid_t uid)
 
 static void createPasswordFiles(std::filesystem::path & chrootRootDir, std::vector<PasswordEntry> & users)
 {
-    std::unique_ptr<DB, decltype(&free_db)> db(
-        dbopen((chrootRootDir + "/etc/pwd.db").c_str(), O_CREAT | O_RDWR | O_EXCL, 0644, DB_HASH, &db_flags), &free_db);
+    auto db =
+        UniqueDB(::dbopen((chrootRootDir / "etc/pwd.db").c_str(), O_CREAT | O_RDWR | O_EXCL, 0644, DB_HASH, &dbFlags));
 
-    if (db == nullptr) {
-        throw SysError("Could not create password database");
-    }
+    if (!db)
+        throw SysError("could not create password database");
 
-    auto dbInsert = [&db](std::vector<uint8_t> key_buf, std::vector<uint8_t> & value_buf) {
-        DBT key = {key_buf.data(), key_buf.size()};
-        DBT value = {value_buf.data(), value_buf.size()};
+    auto dbInsert = [&db](std::vector<uint8_t> keyBuf, std::vector<uint8_t> & valueBuf) {
+        DBT key = {keyBuf.data(), keyBuf.size()};
+        DBT value = {valueBuf.data(), valueBuf.size()};
 
         if ((db->put)(db.get(), &key, &value, R_NOOVERWRITE) == -1) {
-            throw SysError("Could not write to password database");
+            throw SysError("could not write to password database");
         }
     };
 
@@ -120,9 +114,7 @@ static void createPasswordFiles(std::filesystem::path & chrootRootDir, std::vect
     std::vector<uint8_t> versionValue{dbVersion};
     dbInsert(versionKey, versionValue);
 
-    for (size_t i = 0; i < users.size(); i++) {
-        auto user = users[i];
-
+    for (const auto & [i, user] : enumerate(users)) {
         // flags for non-empty fields
         uint32_t fields = _PWF_NAME | _PWF_PASSWD | _PWF_UID | _PWF_GID | _PWF_GECOS | _PWF_DIR | _PWF_SHELL;
 
@@ -150,19 +142,19 @@ static void createPasswordFiles(std::filesystem::path & chrootRootDir, std::vect
     }
 
     // FreeBSD libc doesn't use /etc/passwd, but some software might
-    std::string passwdContent = "";
-    for (auto user : users) {
+    std::string passwdContent;
+    for (const auto & user : users) {
         passwdContent.append(
             fmt("%s:*:%d:%d:%s:%s:%s\n",
                 user.name,
                 user.uid,
                 user.gid,
                 user.description,
-                PathFmt(user.home),
-                PathFmt(user.shell)));
+                user.home.native(),
+                user.shell.native()));
     }
 
-    writeFile(chrootRootDir + "/etc/passwd", passwdContent);
+    writeFile(chrootRootDir / "etc/passwd", passwdContent);
 
     // No need to make /etc/master.passwd or /etc/spwd.db,
     // our build user wouldn't be able to read them anyway
@@ -175,12 +167,21 @@ struct FreeBSDDerivationBuilder : virtual DerivationBuilderImpl
     using DerivationBuilderImpl::DerivationBuilderImpl;
 };
 
-template<size_t n>
-struct iovec iovFromStaticSizedString(const char (&array)[n])
+template<size_t N>
+struct iovec iovFromMutableBuffer(std::array<char, N> & array)
 {
     return {
-        .iov_base = const_cast<void *>(static_cast<const void *>(&array[0])),
-        .iov_len = n,
+        .iov_base = static_cast<void *>(array.data()),
+        .iov_len = N,
+    };
+}
+
+template<size_t N>
+struct iovec iovFromStaticSizedString(const char (&array)[N])
+{
+    return {
+        .iov_base = const_cast<void *>(static_cast<const void *>(array)),
+        .iov_len = N,
     };
 }
 
@@ -245,7 +246,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
         // FreeBSD doesn't have a group database, just write a text file
         writeFile(
-            chrootRootDir + "/etc/group",
+            chrootRootDir / "etc/group",
             fmt("root:x:0:\n"
                 "nixbld:!:%1%:\n"
                 "nogroup:x:65534:\n",
@@ -255,60 +256,66 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
         // pollute the root mount namespace.
         // FreeBSD doesn't have mount namespaces, so there's no reason to wait.
 
-        auto devpath = chrootRootDir + "/dev";
-        mkdir(devpath.c_str(), 0555);
-        mkdir((chrootRootDir + "/bin").c_str(), 0555);
-        char errmsg[255] = "";
-        struct iovec iov[8] = {
+        auto devpath = chrootRootDir / "dev";
+        createDir(devpath, 0555);
+        createDir(chrootRootDir / "bin", 0555);
+
+        std::array<char, 255> errmsg{};
+        std::array<::iovec, 8> iov = {
             iovFromStaticSizedString("fstype"),
             iovFromStaticSizedString("devfs"),
             iovFromStaticSizedString("fspath"),
-            iovFromDynamicSizeString(devpath),
+            iovFromDynamicSizeString(devpath.native()),
             iovFromStaticSizedString("ruleset"),
             iovFromStaticSizedString("4"),
             iovFromStaticSizedString("errmsg"),
-            iovFromStaticSizedString(errmsg),
+            iovFromMutableBuffer(errmsg),
         };
-        if (nmount(iov, 6, 0) < 0) {
-            throw SysError("Failed to mount jail /dev: %1%", PathFmt(errmsg));
-        }
+
+        if (nmount(iov.data(), iov.size(), 0) < 0)
+            throw SysError("failed to mount jail /dev: %1%", std::string_view(errmsg.data()));
+
         autoDelJail->childrenMounts.emplace_back(devpath);
 
-        for (auto & i : pathsInChroot) {
-            char errmsg[255];
-            errmsg[0] = 0;
+        for (const auto & [target, chrootPath] : pathsInChroot) {
+            std::filesystem::path path = chrootRootDir / target.relative_path();
 
-            if (i.second.source == "/proc") {
-                continue; // backwards compatibility
-            }
-            std::filesystem::path path = chrootRootDir + i.first.c_str();
-
-            struct stat stat_buf;
-            if (stat(i.second.source.c_str(), &stat_buf) < 0) {
-                throw SysError("stat");
+            auto maybeSt = maybeLstat(chrootPath.source);
+            if (!maybeSt) {
+                if (chrootPath.optional)
+                    continue; /* Skip mounting this path. */
+                else
+                    throw SysError("getting attributes of path %1%", PathFmt(chrootPath.source));
             }
 
-            // mount points must exist and be the right type
-            if (S_ISDIR(stat_buf.st_mode)) {
+            /* Mount points must exist and be the right type. */
+            if (S_ISDIR(maybeSt->st_mode)) {
                 createDirs(path);
+            } else if (S_ISLNK(maybeSt->st_mode)) {
+                createDirs(path.parent_path());
+                copyFile(chrootPath.source, path, /*andDelete=*/false, /*contents=*/false);
+                continue;
             } else {
                 createDirs(path.parent_path());
                 writeFile(path, "");
             }
 
-            struct iovec iov[8] = {
+            std::array<::iovec, 8> iov = {
                 iovFromStaticSizedString("fstype"),
                 iovFromStaticSizedString("nullfs"),
                 iovFromStaticSizedString("fspath"),
-                iovFromDynamicSizeString(path),
+                iovFromDynamicSizeString(path.native()),
                 iovFromStaticSizedString("target"),
-                iovFromDynamicSizeString(i.second.source),
+                iovFromDynamicSizeString(chrootPath.source.native()),
                 iovFromStaticSizedString("errmsg"),
-                iovFromStaticSizedString(errmsg),
+                iovFromMutableBuffer(errmsg),
             };
-            if (nmount(iov, 8, 0) < 0) {
-                throw SysError("Failed to mount nullfs for %1% - %2%", PathFmt(path), errmsg);
-            }
+
+            debug("setting up a nullfs mount from %1% to %2%", PathFmt(chrootPath.source), PathFmt(path));
+
+            if (nmount(iov.data(), iov.size(), 0) < 0)
+                throw SysError("failed to mount nullfs for %1%: %2%", PathFmt(path), std::string_view(errmsg.data()));
+
             autoDelJail->childrenMounts.emplace_back(path);
         }
 
@@ -320,7 +327,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             // services. Don’t use it for anything else that may
             // be configured for this system. This limits the
             // potential impurities introduced in fixed-outputs.
-            writeFile(chrootRootDir + "/etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
+            writeFile(chrootRootDir / "etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
             /* N.B. it is realistic that these paths might not exist. It
                happens when testing Nix building fixed-output derivations
@@ -346,10 +353,10 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             if (fileTransferSettings.caFile.get() && pathExists(fileTransferSettings.caFile.get().value())) {
                 // For the same reasons as above, copy the CA certificates file too.
                 // It should be even less likely to change during the build than resolv.conf.
-                createDirs(chrootRootDir + "/etc/ssl/certs");
+                createDirs(chrootRootDir / "etc/ssl/certs");
                 copyFile(
                     fileTransferSettings.caFile.get().value(),
-                    chrootRootDir + "/etc/ssl/certs/ca-certificates.crt",
+                    chrootRootDir / "etc/ssl/certs/ca-certificates.crt",
                     false,
                     true);
             }
@@ -378,9 +385,9 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 // TODO: Make our own ruleset
                 "vnet",
                 "new",
-                NULL);
+                nullptr);
             if (jid < 0) {
-                throw SysError("Failed to create jail (isolated network): %1%", jail_errmsg);
+                throw SysError("failed to create jail (isolated network): %1%", jail_errmsg);
             }
             autoDelJail->jid = jid;
 
@@ -411,21 +418,22 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
                 if (!(hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
                     snl_free(&ss);
-                    throw SysError("Failed to sendoff netlink message");
+                    throw SysError("failed to sendoff netlink message");
                 }
 
                 struct snl_errmsg_data e = {};
                 snl_read_reply_code(&ss, hdr->nlmsg_seq, &e);
                 if (e.error_str != NULL) {
                     snl_free(&ss);
-                    throw SysError("Failed to configure loopback interface: %1%", e.error_str);
+                    throw SysError("failed to configure loopback interface: %1%", e.error_str);
                 }
                 snl_free(&ss);
                 _exit(0);
             });
 
+            /* TODO: Capture the error from the helper? */
             if (helper.wait() != 0) {
-                throw SysError("Failed to configure loopback address");
+                throw SysError("failed to configure loopback address");
             }
         } else {
             jid = jail_setv(
@@ -449,7 +457,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 "true",
                 NULL);
             if (jid < 0) {
-                throw SysError("Failed to create jail (networked): %1%", jail_errmsg);
+                throw SysError("failed to create jail (networked): %1%", jail_errmsg);
             }
             autoDelJail->jid = jid;
         }
@@ -467,14 +475,14 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
         unix::closeExtraFDs();
 
         if (jail_attach(autoDelJail->jid) < 0) {
-            throw SysError("Failed to attach to jail");
+            throw SysError("failed to attach to jail");
         }
     }
 
     void addDependency(const StorePath & path)
     {
-        auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
-        throw Error("Unimplemented");
+        throw UnimplementedError(
+            "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
     }
 };
 
