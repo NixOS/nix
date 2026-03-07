@@ -104,27 +104,40 @@ public:
  */
 struct StoreConfigBase : Config
 {
-    using Config::Config;
+protected:
+
+    /**
+     * Whether to return a Unix-style path or a native path.
+     *
+     * On Unix, these are the same. On Windows, Unix paths use forward slashes
+     * and are used for store path computations (which must be consistent
+     * across platforms), while native paths use the OS conventions.
+     */
+    enum struct FilePathType {
+        /**
+         * Unix-style path (e.g., `/nix/store`). Used for store path computations.
+         */
+        Unix,
+        /**
+         * Native path for the current platform.
+         */
+        Native,
+    };
+    StoreConfigBase(const StoreReference::Params & params, FilePathType pathType);
 
 private:
-
     /**
      * Compute the default Nix store directory from environment variables
      * (`NIX_STORE_DIR`, `NIX_STORE`) or the compile-time default.
+     *
+     * @param pathType Whether to return a Unix-style or native path. Different
+     * stores will use different types for the default store path.
      */
-    static std::string getDefaultNixStoreDir();
+    static std::string getDefaultNixStoreDir(FilePathType pathType);
 
 public:
 
-    StoreDirSetting storeDir_{
-        this,
-        getDefaultNixStoreDir(),
-        "store",
-        R"(
-          Logical location of the Nix store, usually
-          `/nix/store`. Note that you can only copy store paths
-          between stores if they have the same `store` setting.
-        )"};
+    StoreDirSetting storeDir_;
 };
 
 /**
@@ -163,7 +176,7 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
     using Params = StoreReference::Params;
 
-    StoreConfig(const Params & params);
+    StoreConfig(const Params & params, FilePathType pathType);
 
     StoreConfig() = delete;
 

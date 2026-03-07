@@ -19,7 +19,7 @@ std::filesystem::path LocalFSStoreConfig::getDefaultLogDir()
 }
 
 LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Native)
     /* Default `?root` from `rootDir` if non set
      * NOTE: We would like to just do rootDir.set(...), which would take care of
      * all normalization and error checking for us. Unfortunately we cannot do
