@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::WasmBuiltin);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -278,6 +278,15 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Enables support for BLAKE3 hashes.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
+    },
+    {
+        .tag = Xp::WasmBuiltin,
+        .name = "wasm-builtin",
+        .description = R"(
+            Enable the use of the [`builtins.wasm`](@docroot@/language/builtins.md) built-in function in the Nix language.
+            `builtins.wasm` allows calling WebAssembly functions from Nix expressions.
+        )",
+        .trackingUrl = "",
     },
 }};
 
