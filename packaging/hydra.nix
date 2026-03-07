@@ -187,6 +187,26 @@ rec {
       ) (forAllSystems (system: components.${system}.${pkgName}))
     );
 
+  # Separate build because one cannot mix ASan + UBSan with TSan.
+  buildWithTSan =
+    let
+      components =
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        pkgs.nixComponents2.overrideScope (
+          self: super: {
+            withTSan = true;
+            # Dies at startup.
+            nix-perl-bindings = null;
+            # TSan has issues with fork and threads.
+            nix-functional-tests = super.nix-functional-tests.overrideAttrs { doCheck = false; };
+          }
+        );
+    in
+    forAllPackages (pkgName: lib.genAttrs linux64BitSystems (system: (components system).${pkgName}));
+
   buildNoTests = forAllSystems (system: nixpkgsFor.${system}.native.nixComponents2.nix-cli);
 
   # Toggles some settings for better coverage. Windows needs these
