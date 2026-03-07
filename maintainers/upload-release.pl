@@ -72,6 +72,9 @@ my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix-everything.x86_64-linu
 my $releaseName = $buildInfo->{nixname};
 $releaseName =~ /nix-(.*)$/ or die;
 my $version = $1;
+$version =~ /^([0-9]+)\.([0-9]+)\.([0-9]+)$/ or die;
+my $versionMajor = $1;
+my $versionMajorMinor = "$1.$2";
 
 print STDERR "Flake URL is $flakeUrl, Nix revision is $nixRev, version is $version\n";
 
@@ -216,12 +219,21 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     system("docker load -i $tmpDir/$fn") == 0 or die;
 
     my $tag = $opt->docker_owner . ":$version-$dockerPlatform";
+    my $tagMajor = $opt->docker_owner . ":$versionMajor-$dockerPlatform";
+    my $tagMajorMinor = $opt->docker_owner . ":$versionMajorMinor-$dockerPlatform";
     my $latestTag = $opt->docker_owner . ":latest-$dockerPlatform";
 
     print STDERR "tagging $version docker image for $dockerPlatform...\n";
     system("docker tag nix:$version $tag") == 0 or die;
 
+    # Assume non-latest is a backport release, so we still want to tag MajorMinor
+    print STDERR "tagging $versionMajorMinor docker image for $dockerPlatform...\n";
+    system("docker tag nix:$version $tagMajorMinor") == 0 or die;
+
     if ($isLatest) {
+        print STDERR "tagging $versionMajor docker image for $dockerPlatform...\n";
+        system("docker tag nix:$version $tagMajor") == 0 or die;
+
         print STDERR "tagging latest docker image for $dockerPlatform...\n";
         system("docker tag nix:$version $latestTag") == 0 or die;
     }
@@ -229,7 +241,13 @@ for my $platforms (["x86_64-linux", "amd64"], ["aarch64-linux", "arm64"]) {
     print STDERR "pushing $version docker image for $dockerPlatform...\n";
     system("docker push -q $tag") == 0 or die;
 
+    print STDERR "pushing $versionMajorMinor docker image for $dockerPlatform...\n";
+    system("docker push -q $tagMajorMinor") == 0 or die;
+
     if ($isLatest) {
+        print STDERR "pushing $versionMajor docker image for $dockerPlatform...\n";
+        system("docker push -q $tagMajor") == 0 or die;
+
         print STDERR "pushing latest docker image for $dockerPlatform...\n";
         system("docker push -q $latestTag") == 0 or die;
     }
