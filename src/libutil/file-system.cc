@@ -440,47 +440,6 @@ void AutoDelete::cancel() noexcept
     del = false;
 }
 
-//////////////////////////////////////////////////////////////////////
-
-#ifdef __FreeBSD__
-AutoUnmount::AutoUnmount()
-    : del{false}
-{
-}
-
-AutoUnmount::AutoUnmount(const std::filesystem::path & p)
-    : path(p)
-    , del(true)
-{
-}
-
-AutoUnmount::~AutoUnmount()
-{
-    try {
-        unmount();
-    } catch (...) {
-        ignoreExceptionInDestructor();
-    }
-}
-
-void AutoUnmount::cancel() noexcept
-{
-    del = false;
-}
-
-void AutoUnmount::unmount()
-{
-    if (del) {
-        if (::unmount(path.c_str(), 0) < 0) {
-            throw SysError("Failed to unmount path %1%", PathFmt(path));
-        }
-    }
-    cancel();
-}
-#endif
-
-//////////////////////////////////////////////////////////////////////
-
 std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const std::string & prefix, mode_t mode)
 {
     while (1) {
@@ -620,7 +579,7 @@ void setWriteTime(const std::filesystem::path & path, const PosixStat & st)
     setWriteTime(path, st.st_atime, st.st_mtime, S_ISLNK(st.st_mode));
 }
 
-void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete)
+void copyFile(const std::filesystem::path & from, const std::filesystem::path & to, bool andDelete, bool contents)
 {
     auto fromStatus = std::filesystem::symlink_status(from);
 
@@ -633,8 +592,14 @@ void copyFile(const std::filesystem::path & from, const std::filesystem::path & 
     }
 
     if (std::filesystem::is_symlink(fromStatus) || std::filesystem::is_regular_file(fromStatus)) {
-        std::filesystem::copy(
-            from, to, std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+        if (contents) {
+            std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing);
+        } else {
+            std::filesystem::copy(
+                from,
+                to,
+                std::filesystem::copy_options::copy_symlinks | std::filesystem::copy_options::overwrite_existing);
+        }
     } else if (std::filesystem::is_directory(fromStatus)) {
         std::filesystem::create_directory(to);
         for (auto & entry : DirectoryIterator(from)) {
