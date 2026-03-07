@@ -144,22 +144,35 @@ struct MemorySourceAccessor : virtual SourceAccessor
 };
 
 /**
- * Write to a `MemorySourceAccessor` at the given path
+ * Write to a `MemorySourceAccessor::File`
  */
 struct MemorySink : FileSystemObjectSink
 {
-    MemorySourceAccessor & dst;
+    using CreateRoot = fun<MemorySourceAccessor::File &(MemorySourceAccessor::File)>;
+    CreateRoot createRoot;
 
-    MemorySink(MemorySourceAccessor & dst)
-        : dst(dst)
+    MemorySink(CreateRoot createRoot)
+        : createRoot(std::move(createRoot))
     {
     }
 
-    void createDirectory(const CanonPath & path) override;
+    struct MemoryDirectory : OnDirectory
+    {
+        MemorySourceAccessor::File::Directory & dir;
 
-    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
+        MemoryDirectory(MemorySourceAccessor::File::Directory & dir)
+            : dir(dir)
+        {
+        }
 
-    void createSymlink(const CanonPath & path, const std::string & target) override;
+        void createChild(std::string_view name, ChildCreatedCallback callback) override;
+    };
+
+    void createDirectory(DirectoryCreatedCallback callback) override;
+
+    void createRegularFile(bool isExecutable, RegularFileCreatedCallback callback) override;
+
+    void createSymlink(const std::string & target) override;
 };
 
 template<>

@@ -65,7 +65,11 @@ void dumpPath(
  * \todo use an arbitrary `FileSystemObjectSink`.
  */
 void restorePath(
-    const std::filesystem::path & path, Source & source, FileSerialisationMethod method, bool startFsync = false);
+    const std::filesystem::path & parentPath,
+    const std::string & childName,
+    Source & source,
+    FileSerialisationMethod method,
+    bool startFsync = false);
 
 /**
  * Compute the hash of the given file system object according to the
