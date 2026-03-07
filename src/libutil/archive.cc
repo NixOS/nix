@@ -8,10 +8,11 @@
 #include "nix/util/archive.hh"
 #include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
-#include "nix/util/posix-source-accessor.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/fs-sink.hh"
+#include "nix/util/posix-source-accessor.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/source-path.hh"
 
 namespace nix {
 
@@ -124,7 +125,7 @@ static SerialisationError badArchive(std::string_view s, const Args &... args)
     return SerialisationError("bad archive: " + s, args...);
 }
 
-static void parseContents(CreateRegularFileSink & sink, Source & source)
+static void parseContents(FileSystemObjectSink::OnRegularFile & sink, Source & source)
 {
     uint64_t size = readLongLong(source);
 
@@ -148,7 +149,7 @@ struct CaseInsensitiveCompare
     }
 };
 
-static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
+static void parse(FileSystemObjectSink & sink, Source & source)
 {
     auto getString = [&]() {
         checkInterrupt();
@@ -168,28 +169,27 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     auto type = getString();
 
     if (type == "regular") {
-        sink.createRegularFile(path, [&](auto & crf) {
-            auto tag = getString();
+        auto tag = getString();
 
-            if (tag == "executable") {
-                auto s2 = getString();
-                if (s2 != "")
-                    throw badArchive("executable marker has non-empty value");
-                crf.isExecutable();
-                tag = getString();
-            }
+        bool isExecutable = false;
+        if (tag == "executable") {
+            auto s2 = getString();
+            if (s2 != "")
+                throw badArchive("executable marker has non-empty value");
+            isExecutable = true;
+            tag = getString();
+        }
 
-            if (tag != "contents")
-                throw badArchive("expected tag 'contents', got '%s'", tag);
+        if (tag != "contents")
+            throw badArchive("expected tag 'contents', got '%s'", tag);
 
-            parseContents(crf, source);
+        sink.createRegularFile(isExecutable, [&](auto & crf) { parseContents(crf, source); });
 
-            expectTag(")");
-        });
+        expectTag(")");
     }
 
     else if (type == "directory") {
-        sink.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & relDirPath) {
+        sink.createDirectory([&](FileSystemObjectSink::OnDirectory & dirSink) {
             std::map<std::string, int, CaseInsensitiveCompare> names;
 
             std::string prevName;
@@ -232,7 +232,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
                 expectTag("node");
 
-                parse(dirSink, source, relDirPath / name);
+                dirSink.createChild(name, [&](FileSystemObjectSink & childSink) { parse(childSink, source); });
 
                 expectTag(")");
             }
@@ -243,7 +243,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
         expectTag("target");
 
         auto target = getString();
-        sink.createSymlink(path, target);
+        sink.createSymlink(target);
 
         expectTag(")");
     }
@@ -263,13 +263,17 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, CanonPath::root);
+    parse(sink, source);
 }
 
-void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
+void restorePath(
+    const std::filesystem::path & parentPath, const std::string & childName, Source & source, bool startFsync)
 {
-    RestoreSink sink{startFsync};
-    sink.dstPath = path;
+    auto parentDir = openDirectory(parentPath, FinalSymlink::Follow);
+    if (!parentDir)
+        throw NativeSysError("opening directory %s", PathFmt(parentPath));
+
+    RestoreSink sink{parentDir.get(), childName, startFsync};
     parseDump(sink, source);
 }
 

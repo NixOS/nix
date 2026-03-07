@@ -301,7 +301,7 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 TEST(WriteFull, RespectsAllowInterrupts)
 {
 #ifdef _WIN32
-    GTEST_SKIP() << "Broken on Windows";
+    GTEST_SKIP() << "Interrupt support on Windows not expected to work";
 #endif
     Pipe pipe;
     pipe.create();

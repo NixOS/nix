@@ -10,6 +10,7 @@
 #include "nix/fetchers/tarball.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
 
 #include <optional>
 #include <nlohmann/json.hpp>
@@ -309,14 +310,14 @@ struct GitArchiveInputScheme : InputScheme
 
         TarArchive archive{*source};
         auto tarballCache = settings.getTarballCache();
-        auto parseSink = tarballCache->getFileSystemObjectSink();
+        auto parseSink = merkle::makeTarSink(*tarballCache);
         auto lastModified = unpackTarfileToSink(archive, *parseSink);
         auto tree = parseSink->flush();
 
         act.reset();
 
         TarballInfo tarballInfo{
-            .treeHash = tarballCache->dereferenceSingletonDirectory(tree), .lastModified = lastModified};
+            .treeHash = tarballCache->dereferenceSingletonDirectory(tree.hash), .lastModified = lastModified};
 
         cache->upsert(treeHashKey, Attrs{{"treeHash", tarballInfo.treeHash.gitRev()}});
         cache->upsert(lastModifiedKey, Attrs{{"lastModified", (uint64_t) tarballInfo.lastModified}});

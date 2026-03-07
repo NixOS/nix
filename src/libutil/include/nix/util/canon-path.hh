@@ -244,6 +244,13 @@ public:
         return ((std::string_view) path).substr(path.rfind('/') + 1);
     }
 
+    /**
+     * Combination of `parent` and `baseName`.
+     *
+     * @note that because of the `std::string_view`, we are borrowing for the base name.
+     */
+    std::optional<std::pair<CanonPath, std::string_view>> parentAndChild() const;
+
     bool operator==(const CanonPath & x) const
     {
         return path == x.path;
