@@ -313,7 +313,15 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
             debug("setting up a nullfs mount from %1% to %2%", PathFmt(chrootPath.source), PathFmt(path));
 
-            if (nmount(iov.data(), iov.size(), 0) < 0)
+            int flags = 0;
+            if (store.isInStore(target.native()))
+                /* While we are at it, enforce invariants about store paths. Anything located at the "logical" store
+                   location must be readonly (file permission canonicalisation enforces this on the host filesystem).
+                   Also the store must never contain setuid binaries for the same reason. This is just defense-in-depth.
+                 */
+                flags = MNT_RDONLY | MNT_NOSUID;
+
+            if (nmount(iov.data(), iov.size(), flags) < 0)
                 throw SysError("failed to mount nullfs for %1%: %2%", PathFmt(path), std::string_view(errmsg.data()));
 
             autoDelJail->childrenMounts.emplace_back(path);
