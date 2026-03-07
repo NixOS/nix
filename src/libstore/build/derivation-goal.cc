@@ -13,6 +13,7 @@
 #include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
+#include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
 
 #include <fstream>
@@ -98,18 +99,17 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             if (!checkResult) {
                 DrvOutput id{drvPath, wantedOutput};
                 auto g = worker.makeDrvOutputSubstitutionGoal(id);
-                waitees.insert(g);
+                waitees.insert(upcast_goal(g));
                 co_await await(std::move(waitees));
 
                 if (nrFailed == 0) {
+                    assert(g->outputInfo);
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
                     co_await await(std::move(waitees));
 
                     trace("output path substituted");
 
-                    if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id});
-                    else
+                    if (nrFailed > 0)
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
             } else {
@@ -209,18 +209,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     wantedOutput);
             }();
 
-            if (!drv->type().isImpure()) {
-                Realisation newRealisation{
-                    realisation,
-                    {
-                        .drvPath = drvPath,
-                        .outputName = wantedOutput,
-                    }};
-                newRealisation.signatures.clear();
-                worker.store.signRealisation(newRealisation);
-                worker.store.registerDrvOutput(newRealisation);
-            }
-
             auto status = success.status;
             if (status == BuildResult::Success::AlreadyValid)
                 status = BuildResult::Success::ResolvesToAlreadyValid;
@@ -299,7 +287,7 @@ Goal::Co DerivationGoal::repairClosure()
     auto outputs = [&] {
         for (auto * drvStore : {&worker.evalStore, &worker.store})
             if (drvStore->isValidPath(drvPath))
-                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+                return deepQueryDerivationOutputMap(worker.store, drvPath, drvStore);
 
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
