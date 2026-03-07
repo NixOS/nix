@@ -22,6 +22,7 @@ extern "C" {
 #include "nix/util/finally.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/serialise.hh"
 #include "nix/cmd/repl.hh"
 #include "nix/util/environment-variables.hh"
 
@@ -124,8 +125,22 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
     }
 #if !USE_READLINE
     el_hist_size = 1000;
-#endif
+    // editline's read_history uses a fixed 256-byte buffer (SCREEN_INC),
+    // which silently splits lines longer than 255 characters into separate
+    // history entries. Read the file ourselves to avoid the length limit.
+    try {
+        if (auto fd = maybeOpenFileReadonly(historyFile)) {
+            FdSource source(fd.get());
+            while (true)
+                add_history(source.readLine().c_str());
+        }
+    } catch (EndOfFile &) {
+    } catch (SystemError & e) {
+        logWarning(e.info());
+    }
+#else
     read_history(historyFile.string().c_str());
+#endif
     auto oldRepl = curRepl;
     curRepl = repl;
     Guard restoreRepl([oldRepl] { curRepl = oldRepl; });

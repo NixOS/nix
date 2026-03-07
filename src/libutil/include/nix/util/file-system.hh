@@ -222,6 +222,13 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
  */
 AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
+/**
+ * Like @ref openFileReadonly, but returns a falsy `AutoCloseFD` if
+ * the file does not exist instead of failing. Throws on all other
+ * errors (permission denied, I/O error, etc.).
+ */
+AutoCloseFD maybeOpenFileReadonly(const std::filesystem::path & path);
+
 struct OpenNewFileForWriteParams
 {
     /**
