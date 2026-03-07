@@ -112,7 +112,13 @@ int Pid::wait(bool allowInterrupts)
 
 void Pid::setSeparatePG(bool separatePG)
 {
+    /* Cygwin only partially emulates process groups and trying to kill them
+       gives errors. This only logs warnings during builds, but let's not even
+       allow setting this value.
+     */
+#ifndef __CYGWIN__
     this->separatePG = separatePG;
+#endif
 }
 
 void Pid::setKillSignal(int signal)
