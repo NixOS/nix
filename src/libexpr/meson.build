@@ -7,6 +7,8 @@ project(
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
+    'unity=on',
+    'unity_size=1024',
   ],
   meson_version : '>= 1.1',
   license : 'LGPL-2.1-or-later',
@@ -153,18 +155,15 @@ endforeach
 sources = files(
   'attr-path.cc',
   'attr-set.cc',
-  'diagnose.cc',
   'eval-cache.cc',
   'eval-error.cc',
   'eval-gc.cc',
-  'eval-profiler-settings.cc',
   'eval-profiler.cc',
   'eval-settings.cc',
   'eval.cc',
   'function-trace.cc',
   'get-drvs.cc',
   'json-to-value.cc',
-  'lexer-helpers.cc',
   'nixexpr.cc',
   'paths.cc',
   'primops.cc',
@@ -215,6 +214,8 @@ parser_library = static_library(
   'nixexpr-parser',
   parser_tab,
   lexer_tab,
+  # Putting eval-profiler-settings.cc here to work around an inscrutable gcc compiler error when doing a unity build.
+  files('diagnose.cc', 'eval-profiler-settings.cc', 'lexer-helpers.cc'),
   cpp_args : parser_library_cpp_args,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
@@ -225,6 +226,7 @@ parser_library = static_library(
   override_options : [
     'b_ndebug=@0@'.format(not get_option('debug')),
     'b_lto=@0@'.format(get_option('b_lto') and cxx.get_id() != 'gcc'),
+    'unity=off',
   ],
 )
 
@@ -240,7 +242,7 @@ this_library = library(
   include_directories : include_dirs,
   link_args : linker_export_flags,
   link_whole : [ parser_library ],
-  prelink : true, # For C++ static initializers
+  prelink : prelink, # For C++ static initializers
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
