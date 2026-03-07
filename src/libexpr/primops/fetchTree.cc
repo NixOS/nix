@@ -625,6 +625,13 @@ static RegisterPrimOp primop_fetchGit({
         By default, the `ref` value is prefixed with `refs/heads/`.
         As of 2.3.0, Nix doesn't prefix `refs/heads/` if `ref` starts with `refs/`.
 
+      - `narHash` (optional)
+
+        The hash of the NAR serialization of the contents of the tree.
+        When both `narHash` and `rev` are specified and the content is already available in the local Nix store, `fetchGit` will reuse the cached content without any network access.
+
+        The hash should be specified in SRI format, e.g. `"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="`.
+
       - `submodules` (default: `false`)
 
         A Boolean parameter that specifies whether submodules should be checked out.
