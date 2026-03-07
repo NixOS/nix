@@ -35,7 +35,7 @@ version is installed.
 - `--leq`
 
   In addition to upgrading to newer versions, also “upgrade” to
-  derivations that have the same version. Version are not a unique
+  derivations that have the same version. Versions are not a unique
   identification of a derivation, so there may be many derivations
   that have the same version. This flag may be useful to force
   “synchronisation” between the installed and available derivations.
