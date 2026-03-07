@@ -431,7 +431,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
                 struct snl_errmsg_data e = {};
                 snl_read_reply_code(&ss, hdr->nlmsg_seq, &e);
-                if (e.error_str != NULL) {
+                if (e.error_str != nullptr) {
                     snl_free(&ss);
                     throw SysError("failed to configure loopback interface: %1%", e.error_str);
                 }
@@ -463,7 +463,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
                 "inherit",
                 "allow.raw_sockets",
                 "true",
-                NULL);
+                nullptr);
             if (jid < 0) {
                 throw SysError("failed to create jail (networked): %1%", jail_errmsg);
             }
