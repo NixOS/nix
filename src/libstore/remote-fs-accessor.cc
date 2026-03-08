@@ -94,6 +94,8 @@ std::shared_ptr<SourceAccessor> RemoteFSAccessor::accessObject(const StorePath &
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
 {
+    if (path.isRoot())
+        return Stat{.type = tDirectory};
     auto res = fetch(path);
     return res.first->maybeLstat(res.second);
 }
