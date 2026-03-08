@@ -350,3 +350,25 @@ This release was made possible by the following 43 contributors:
 - Michael Daniels [**(@mdaniels5757)**](https://github.com/mdaniels5757)
 - Matthew Kenigsberg [**(@mkenigs)**](https://github.com/mkenigs)
 - Shea Levy [**(@shlevy)**](https://github.com/shlevy)
+
+# Release 2.34.1 (2026-03-08)
+
+## Changes
+
+- C API: Fix `EvalState` pointer passed to primop callbacks [#15300](https://github.com/NixOS/nix/pull/15300) [#15383](https://github.com/NixOS/nix/pull/15383)
+
+  The `EvalState *` passed to C API primop callbacks was incorrectly pointing to
+  the internal `nix::EvalState` rather than the C API wrapper struct. This caused
+  a segfault when the callback used the pointer with C API functions such as
+  `nix_alloc_value()`. The same issue affected `printValueAsJSON` and
+  `printValueAsXML` callbacks on external values.
+
+- Fix daemon not applying `FileTransferSettings` from `trusted-users` [#15408](https://github.com/NixOS/nix/pull/15408)
+
+  Previously `nix-daemon` failed to apply settings for `libcurl` configuration configured by client connections from [`trusted-users`](@docroot@/command-ref/conf-file.md#conf-trusted-users). This was a pre-existing bug, which has been exacerbated by 2.34.0 moving more settings from the global `settings` into libcurl-specific `fileTransferSettings` (e.g. `netrc-file`, `http-connections` or `ssl-cert-file`). Note that the use of `trusted-users` is heavily discouraged unless you are fine with:
+
+  > Adding a user to `trusted-users` is essentially equivalent to giving that user root access to the system.
+  > For example, the user can access or replace store path contents that are critical for system security.
+
+- Improve formatting of error messages and warnings [#15397](https://github.com/NixOS/nix/pull/15397)
+
