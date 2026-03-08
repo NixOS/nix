@@ -37,6 +37,7 @@ headers = files(
   'nix_api_store.h',
   'nix_api_store/derivation.h',
   'nix_api_store/store_path.h',
+  'nix_api_store/path_info.h',
 )
 
 # TODO don't install this once tests don't use it and/or move the header into `libstore`, non-`c`

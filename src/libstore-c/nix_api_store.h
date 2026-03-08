@@ -14,6 +14,7 @@
 #include "nix_api_util.h"
 #include "nix_api_store/store_path.h"
 #include "nix_api_store/derivation.h"
+#include "nix_api_store/path_info.h"
 #include <stdbool.h>
 
 #ifdef __cplusplus
@@ -125,6 +126,63 @@ StorePath * nix_store_parse_path(nix_c_context * context, Store * store, const c
  * @return true or false, error info in context
  */
 bool nix_store_is_valid_path(nix_c_context * context, Store * store, const StorePath * path);
+
+/**
+ * @brief Query information about a valid store path
+ *
+ * This returns detailed information about a store path including its references,
+ * deriver, NAR hash, and size.
+ *
+ * @note Don't forget to free the returned ValidPathInfo using nix_valid_path_info_free()!
+ * @param[out] context Optional, stores error information
+ * @param[in] store Nix Store reference
+ * @param[in] path The path to query
+ * @return ValidPathInfo pointer, NULL on error
+ */
+ValidPathInfo * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path);
+
+/**
+ * @brief Query the paths that reference the given store path (inverse of references)
+ *
+ * This finds all paths in the store that have the given path in their references.
+ *
+ * @note The callback borrows each StorePath only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store Nix Store reference
+ * @param[in] path The path to query
+ * @param[in] userdata The userdata to pass to the callback
+ * @param[in] callback The function to call for every referrer
+ * @return NIX_OK on success, error code on failure
+ */
+nix_err nix_store_query_referrers(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * referrer));
+
+/**
+ * @brief Query all requisites (transitive dependencies) of a store path
+ *
+ * This returns all store paths that the given path transitively depends on,
+ * including the path itself. This is equivalent to the closure of references.
+ *
+ * @note The callback borrows each StorePath only for the duration of the call.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store Nix Store reference
+ * @param[in] path The path to query
+ * @param[in] userdata The userdata to pass to the callback
+ * @param[in] callback The function to call for every requisite path
+ * @return NIX_OK on success, error code on failure
+ */
+nix_err nix_store_query_requisites(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * requisite));
 
 /**
  * @brief Get the physical location of a store path

@@ -380,4 +380,124 @@ nix_err nix_store_copy_path(
     NIXC_CATCH_ERRS
 }
 
+ValidPathInfo * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(path->path);
+        return new ValidPathInfo{info};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_store_query_referrers(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * referrer))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::StorePathSet referrers;
+        store->ptr->queryReferrers(path->path, referrers);
+
+        if (callback) {
+            for (const auto & referrer : referrers) {
+                const StorePath tmp{referrer};
+                callback(userdata, &tmp);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_store_query_requisites(
+    nix_c_context * context,
+    Store * store,
+    const StorePath * path,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * requisite))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        nix::StorePathSet requisites;
+        // Compute the forward closure (all transitive dependencies)
+        // flip_direction=false: forward closure (dependencies)
+        // include_outputs=false: don't include derivation outputs
+        // include_derivers=false: don't include derivers
+        store->ptr->computeFSClosure(path->path, requisites, false, false, false);
+
+        if (callback) {
+            for (const auto & requisite : requisites) {
+                const StorePath tmp{requisite};
+                callback(userdata, &tmp);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+void nix_valid_path_info_free(ValidPathInfo * info)
+{
+    delete info;
+}
+
+nix_err nix_valid_path_info_get_references(
+    nix_c_context * context,
+    const ValidPathInfo * info,
+    void * userdata,
+    void (*callback)(void * userdata, const StorePath * reference))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & ref : info->ptr->references) {
+                const StorePath tmp{ref};
+                callback(userdata, &tmp);
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+StorePath * nix_valid_path_info_get_deriver(nix_c_context * context, const ValidPathInfo * info)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (info->ptr->deriver) {
+            return new StorePath{*info->ptr->deriver};
+        }
+        return nullptr;
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_valid_path_info_get_nar_hash(
+    nix_c_context * context, const ValidPathInfo * info, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto hashStr = info->ptr->narHash.to_string(nix::HashFormat::SRI, true);
+        return call_nix_get_string_callback(hashStr, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
+uint64_t nix_valid_path_info_get_nar_size(const ValidPathInfo * info)
+{
+    return info->ptr->narSize;
+}
+
+time_t nix_valid_path_info_get_registration_time(const ValidPathInfo * info)
+{
+    return info->ptr->registrationTime;
+}
+
 } // extern "C"
