@@ -2,7 +2,8 @@
 
 #include "nix/util/source-path.hh"
 
-#include <boost/unordered/unordered_flat_set_fwd.hpp>
+#include <set>
+#include <unordered_set>
 
 namespace nix {
 
@@ -79,8 +80,8 @@ struct AllowListSourceAccessor : public FilteringSourceAccessor
 
     static ref<AllowListSourceAccessor> create(
         ref<SourceAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
-        boost::unordered_flat_set<CanonPath> && allowedPaths,
+        const std::set<CanonPath> & allowedPrefixes,
+        const std::unordered_set<CanonPath> & allowedPaths,
         MakeNotAllowedError && makeNotAllowedError);
 
     using FilteringSourceAccessor::FilteringSourceAccessor;

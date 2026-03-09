@@ -50,6 +50,13 @@ public:
     {
     }
 
+    template<typename... Ts>
+    SyncBase(Ts &&... args)
+        requires requires { T{std::forward<Ts>(args)...}; }
+        : data(std::forward<Ts>(args)...)
+    {
+    }
+
     SyncBase(SyncBase && other) noexcept
         : data(std::move(*other.lock()))
     {

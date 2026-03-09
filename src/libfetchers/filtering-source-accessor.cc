@@ -1,6 +1,7 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
+#include "nix/util/sync.hh"
 
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 namespace nix {
 
@@ -74,39 +75,39 @@ void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 {
-    std::set<CanonPath> allowedPrefixes;
-    boost::unordered_flat_set<CanonPath> allowedPaths;
+    SharedSync<std::set<CanonPath>> allowedPrefixes;
+    boost::concurrent_flat_set<CanonPath> allowedPaths;
 
     AllowListSourceAccessorImpl(
         ref<SourceAccessor> next,
-        std::set<CanonPath> && allowedPrefixes,
-        boost::unordered_flat_set<CanonPath> && allowedPaths,
+        const std::set<CanonPath> & allowedPrefixes,
+        const std::unordered_set<CanonPath> & allowedPaths,
         MakeNotAllowedError && makeNotAllowedError)
         : AllowListSourceAccessor(SourcePath(next), std::move(makeNotAllowedError))
-        , allowedPrefixes(std::move(allowedPrefixes))
-        , allowedPaths(std::move(allowedPaths))
+        , allowedPrefixes(allowedPrefixes.begin(), allowedPrefixes.end())
+        , allowedPaths(allowedPaths.begin(), allowedPaths.end())
     {
     }
 
     bool isAllowed(const CanonPath & path) override
     {
-        return allowedPaths.contains(path) || path.isAllowed(allowedPrefixes);
+        /* Read lock is held for the duration of the full expression if the || doesn't short-circuit. */
+        return allowedPaths.contains(path) || path.isAllowed(*allowedPrefixes.readLock());
     }
 
     void allowPrefix(CanonPath prefix) override
     {
-        allowedPrefixes.insert(std::move(prefix));
+        allowedPrefixes.lock()->insert(std::move(prefix));
     }
 };
 
 ref<AllowListSourceAccessor> AllowListSourceAccessor::create(
     ref<SourceAccessor> next,
-    std::set<CanonPath> && allowedPrefixes,
-    boost::unordered_flat_set<CanonPath> && allowedPaths,
+    const std::set<CanonPath> & allowedPrefixes,
+    const std::unordered_set<CanonPath> & allowedPaths,
     MakeNotAllowedError && makeNotAllowedError)
 {
-    return make_ref<AllowListSourceAccessorImpl>(
-        next, std::move(allowedPrefixes), std::move(allowedPaths), std::move(makeNotAllowedError));
+    return make_ref<AllowListSourceAccessorImpl>(next, allowedPrefixes, allowedPaths, std::move(makeNotAllowedError));
 }
 
 bool CachingFilteringSourceAccessor::isAllowed(const CanonPath & path)
