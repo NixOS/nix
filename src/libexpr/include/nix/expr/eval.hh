@@ -1006,6 +1006,20 @@ public:
     void concatLists(Value & v, std::span<Value * const> lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
+     * @brief Concatenate values with an n-ary version of the `+` operator.
+     *
+     * Values must already be forced.
+     */
+    void concatValues(
+        Value & v,
+        const PosIdx pos,
+        std::span<Value> values,
+        bool forceString,
+        std::string_view errorCtx,
+        Env & env,
+        Expr & expr);
+
+    /**
      * Print statistics, if enabled.
      *
      * Performs a full memory GC before printing the statistics, so that the
