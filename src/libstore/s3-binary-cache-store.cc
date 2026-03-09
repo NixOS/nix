@@ -417,7 +417,7 @@ StringSet S3BinaryCacheStoreConfig::uriSchemes()
 }
 
 S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(ParsedURL cacheUri_, const Params & params)
-    : StoreConfig(params)
+    : StoreConfig(params, FilePathType::Unix)
     , HttpBinaryCacheStoreConfig(std::move(cacheUri_), params)
 {
     assert(cacheUri.query.empty());

@@ -10,6 +10,30 @@
 
 namespace nix {
 
+TEST(LocalStore, storeDir_absolutePath)
+{
+    std::filesystem::path storeDir =
+#ifdef _WIN32
+        "C:\\";
+#else
+        "/";
+#endif
+    storeDir /= "nix";
+    storeDir /= "store";
+    LocalStoreConfig config{"", {{"store", storeDir.string()}}};
+    EXPECT_EQ(config.storeDir, storeDir.string());
+}
+
+TEST(LocalStore, storeDir_relativePath_rejected)
+{
+    EXPECT_THROW(LocalStoreConfig("", {{"store", (std::filesystem::path{"nix"} / "store").string()}}), UsageError);
+}
+
+TEST(LocalStore, storeDir_empty_rejected)
+{
+    EXPECT_THROW(LocalStoreConfig("", {{"store", ""}}), UsageError);
+}
+
 TEST(LocalStore, constructConfig_rootQueryParam)
 {
 #ifdef _WIN32

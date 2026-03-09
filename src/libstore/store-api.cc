@@ -28,43 +28,90 @@
 
 #include "nix/util/strings.hh"
 
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
+
 using json = nlohmann::json;
 
 namespace nix {
 
-std::string StoreConfigBase::getDefaultNixStoreDir()
+static std::string canonStoreDir(std::string path)
 {
-    return
-#ifndef _WIN32
-        canonPath
-#endif
-        (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR)))
-#ifndef _WIN32
-            .string()
-#endif
-            ;
+    if (path.empty() || path[0] != '/')
+        throw UsageError("store directory path \"%s\" is not an absolute path", path);
+    return CanonPath(std::move(path)).abs();
 }
 
-StoreDirSetting::StoreDirSetting(
-    Config * options,
-    const std::string & def,
-    const std::string & name,
-    const std::string & description,
-    const StringSet & aliases)
-    : BaseSetting<std::string>(def, true, name, description, aliases)
+static std::string canonStoreDir(std::filesystem::path path)
+{
+    if (!path.is_absolute())
+        throw UsageError("store directory path %s is not an absolute path", PathFmt(path));
+    return canonPath(std::move(path)).string();
+}
+
+StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType pathType)
+    : BaseSetting<std::string>(
+          [pathType]() -> std::string {
+              auto envOverrides = getEnvOsNonEmpty(OS_STR("NIX_STORE_DIR")).or_else([] {
+                  return getEnvOsNonEmpty(OS_STR("NIX_STORE"));
+              });
+
+              switch (pathType) {
+              case FilePathType::Unix:
+                  return canonStoreDir(
+                      envOverrides.transform([](auto && s) { return os_string_to_string(std::move(s)); })
+                          .value_or(NIX_STORE_DIR));
+
+              case FilePathType::Native:
+                  return canonStoreDir(
+                      envOverrides.transform([](auto && s) { return std::filesystem::path(std::move(s)); })
+                          .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+                              return windows::known_folders::getProgramData() / "nix" / "store";
+#else
+                              return std::filesystem::path{NIX_STORE_DIR};
+#endif
+                          })
+                          .value());
+              }
+              assert(false);
+          }(),
+          true,
+          "store",
+          R"(
+            Logical location of the Nix store, usually
+            `/nix/store`. Note that you can only copy store paths
+            between stores if they have the same `store` setting.
+          )",
+          {})
+    , pathType(pathType)
 {
     options->addSetting(this);
 }
 
-std::string StoreDirSetting::parse(const std::string & str) const
+std::string StoreConfigBase::StoreDirSetting::parse(const std::string & str) const
 {
     if (str.empty())
         throw UsageError("setting '%s' is a path and paths cannot be empty", name);
-    return canonPath(str).string();
+
+    switch (pathType) {
+    case FilePathType::Unix:
+        return canonStoreDir(str);
+    case FilePathType::Native:
+        return canonStoreDir(std::filesystem::path(str));
+    }
+    assert(false);
 }
 
-StoreConfig::StoreConfig(const Params & params)
-    : StoreConfigBase(params)
+StoreConfigBase::StoreConfigBase(const StoreReference::Params & params, FilePathType pathType)
+    : Config(params)
+    , storeDir_{this, pathType}
+{
+}
+
+StoreConfig::StoreConfig(const Params & params, FilePathType pathType)
+    : StoreConfigBase(params, pathType)
     , StoreDirConfig{storeDir_}
 {
 }
