@@ -1,3 +1,4 @@
+#include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/util/signals.hh"
@@ -208,7 +209,7 @@ void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
         auto limit = std::min<size_t>(left, buf.size());
         auto n = readOffset(fd, offset, std::span(buf.data(), limit));
         if (n == 0)
-            throw EndOfFile("unexpected end-of-file");
+            throw EndOfFile("unexpected end-of-file reading from %1%", PathFmt(descriptorToPath(fd)));
         assert(n <= left);
         sink(std::string_view(reinterpret_cast<const char *>(buf.data()), n));
         offset += n;

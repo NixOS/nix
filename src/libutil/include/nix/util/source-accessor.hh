@@ -259,6 +259,8 @@ ref<SourceAccessor> getFSSourceAccessor();
  * that it is not possible to escape `root` by appending `..` path
  * elements, and that absolute symlinks are resolved relative to
  * `root`.
+ *
+ * Symlinks in parents of `root` are resolved. Final symlink is not.
  */
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
 

@@ -1,4 +1,6 @@
 #include "nix/util/posix-source-accessor.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/memory-source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/sync.hh"
@@ -7,9 +9,125 @@
 
 namespace nix {
 
+static SourceAccessor::Stat sourceAccessorStatFromPosixStat(const PosixStat & st)
+{
+    using enum SourceAccessor::Type;
+    return SourceAccessor::Stat{
+        .type = S_ISREG(st.st_mode)   ? tRegular
+                : S_ISDIR(st.st_mode) ? tDirectory
+                : S_ISLNK(st.st_mode) ? tSymlink
+                : S_ISCHR(st.st_mode) ? tChar
+                : S_ISBLK(st.st_mode) ? tBlock
+                :
+#ifdef S_ISSOCK
+                S_ISSOCK(st.st_mode) ? tSocket
+                :
+#endif
+                S_ISFIFO(st.st_mode) ? tFifo
+                                     : tUnknown,
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
+    };
+}
+
+namespace {
+
+class PosixFileSourceAccessor : public detail::PosixSourceAccessorBase
+{
+    AutoCloseFD fd;
+    std::filesystem::path fsPath;
+    /**
+     * Stat is memoised once opened. This does mean that modifying the same file
+     * while we are reading is busted, but caching it might be considered an
+     * improvement. Since we have a file descriptor for a regular file it can't
+     * be swapped out for another file type. Thus, we are only really caching
+     * the file size and mtime, which shouldn't change. Providing a consistent
+     * size value here is also fine. If the file becomes smaller than we expect
+     * then readFile will barf with an EOF exception. If it becomes larger then
+     * we are just going to silently ignore the extra bytes.
+     */
+    PosixStat st;
+
+public:
+    PosixFileSourceAccessor(AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, const PosixStat & st_)
+        : PosixSourceAccessorBase(trackLastModified)
+        , fd(std::move(fd))
+        , fsPath(std::move(path))
+        , st(st_)
+    {
+        assert(S_ISREG(st.st_mode));
+        assert(fsPath.is_absolute()); /* Only used for error messages, but still nice to enforce this invariant. */
+        setPathDisplay(fsPath.generic_string());
+        maybeUpdateMtime(st.st_mtime);
+    }
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+
+    bool pathExists(const CanonPath & path) override;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return fsPath;
+        return std::nullopt; /* Definitely doesn't exist. */
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return displayPrefix; /* No trailing slash. */
+        return displayPrefix + path.abs();
+    }
+};
+
+void PosixFileSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
+{
+    if (!path.isRoot()) /* We are the parent and also a regular file. */
+        throw NotADirectory("reading file '%1%': %2%", showPath(path), "Not a directory");
+
+    auto size = st.st_size;
+    sizeCallback(size);
+    /* The most important invariant we care about here is writing exactly size
+       bytes to the sink. copyFdRange should throw an EndOfFile if we fail to read
+       `size` bytes. */
+    copyFdRange(fd.get(), /*offset=*/0, size, sink);
+}
+
+bool PosixFileSourceAccessor::pathExists(const CanonPath & path)
+{
+    return path.isRoot();
+}
+
+std::optional<SourceAccessor::Stat> PosixFileSourceAccessor::maybeLstat(const CanonPath & path)
+{
+    if (!path.isRoot())
+        return std::nullopt;
+    return sourceAccessorStatFromPosixStat(st);
+}
+
+SourceAccessor::DirEntries PosixFileSourceAccessor::readDirectory(const CanonPath & path)
+{
+    throw NotADirectory("reading directory '%1%': %2%", showPath(path), "Not a directory");
+}
+
+std::string PosixFileSourceAccessor::readLink(const CanonPath & path)
+{
+    if (!path.isRoot())
+        throw NotADirectory("reading symlink '%1%': %2%", showPath(path), "Not a directory");
+    throw NotASymlink("path '%1%' is not a symlink", showPath(path));
+}
+
+} // namespace
+
 PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
-    : root(std::move(argRoot))
-    , trackLastModified(trackLastModified)
+    : PosixSourceAccessorBase(trackLastModified)
+    , root(std::move(argRoot))
 {
     assert(root.empty() || root.is_absolute());
     displayPrefix = root.string();
@@ -106,27 +224,8 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     if (!st)
         return std::nullopt;
 
-    /* The contract is that trackLastModified implies that the caller uses the accessor
-       from a single thread. Thus this is not a CAS loop. */
-    if (trackLastModified)
-        mtime = std::max(mtime, st->st_mtime);
-
-    return Stat{
-        .type = S_ISREG(st->st_mode)   ? tRegular
-                : S_ISDIR(st->st_mode) ? tDirectory
-                : S_ISLNK(st->st_mode) ? tSymlink
-                : S_ISCHR(st->st_mode) ? tChar
-                : S_ISBLK(st->st_mode) ? tBlock
-                :
-#ifdef S_ISSOCK
-                S_ISSOCK(st->st_mode) ? tSocket
-                :
-#endif
-                S_ISFIFO(st->st_mode) ? tFifo
-                                      : tUnknown,
-        .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
-        .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
-    };
+    PosixSourceAccessorBase::maybeUpdateMtime(st->st_mtime);
+    return sourceAccessorStatFromPosixStat(*st);
 }
 
 SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & path)
@@ -211,6 +310,40 @@ ref<SourceAccessor> getFSSourceAccessor()
 
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
 {
+#ifndef _WIN32
+    /* Die if the path ends in a / or /. That is a footgun that matters
+       for symlink resolution. TODO: Strip them or make this a proper error if
+       this becomes an issue. Defense-in-depth. */
+    assert(!root.native().ends_with(OS_STR("/.")));
+    assert(!root.native().ends_with(OS_STR("/")));
+
+    AutoCloseFD fd = openFileReadonly(root, FinalSymlink::DontFollow);
+
+    if (!fd) {
+        if (errno == ELOOP) {
+            /* This branch is taken either if the final component is a symlink
+               or we hit a symlink loop. If that's the latter this will also
+               throw. This can be done with O_PATH descriptor for the symlink
+               itself, but it's not portable. */
+            auto linkTarget = readLink(root);
+            auto res = make_ref<MemorySourceAccessor>();
+            /* Create an in-memory accessor with the symlink at the root. */
+            MemorySink sink{*res};
+            sink.createSymlink(CanonPath::root, os_string_to_string(linkTarget));
+            return res;
+        }
+
+        throw NativeSysError("opening file %1%", PathFmt(root));
+    }
+
+    auto st = nix::fstat(fd.get());
+    if (S_ISREG(st.st_mode))
+        return make_ref<PosixFileSourceAccessor>(std::move(fd), std::move(root), trackLastModified, st);
+
+    /* TODO: Use the file descriptor for fd-relative operations on the directory. */
+#endif
+
     return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
+
 } // namespace nix
