@@ -34,20 +34,26 @@ namespace nix {
 const unsigned int RETRY_TIME_MS_DEFAULT = 250;
 const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
 
-std::filesystem::path FileTransferSettings::getDefaultSSLCertFile()
+std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
     for (auto & fn :
          {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
         if (pathAccessible(fn))
             return fn;
-    return "";
+    return std::nullopt;
 }
 
 FileTransferSettings::FileTransferSettings()
 {
-    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (sslOverride != "")
-        caFile = sslOverride;
+    std::optional<AbsolutePath> sslOverride =
+        getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
+            .or_else([] { return getEnvOs(OS_STR("SSL_CERT_FILE")); })
+            .and_then([](OsString s) -> std::optional<OsString> {
+                return s.empty() ? std::nullopt : std::optional{std::move(s)};
+            })
+            .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
+    if (sslOverride)
+        caFile = *sslOverride;
 }
 
 FileTransferSettings fileTransferSettings;

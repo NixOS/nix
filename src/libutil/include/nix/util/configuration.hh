@@ -221,21 +221,38 @@ protected:
 /**
  * For `Setting<AbsolutePath>`. `parse()` calls `canonPath`,
  * rejecting empty and relative paths.
+ *
+ * Constructors assert that the path is absolute.
  */
 struct AbsolutePath : std::filesystem::path
 {
-    using path::path;
     using path::operator=;
 
     AbsolutePath(const std::filesystem::path & p)
         : path(p)
     {
+        assert(is_absolute());
     }
 
     AbsolutePath(std::filesystem::path && p)
         : path(std::move(p))
     {
+        assert(is_absolute());
     }
+
+    AbsolutePath(const char * s)
+        : path(s)
+    {
+        assert(is_absolute());
+    }
+
+#ifdef _WIN32
+    AbsolutePath(const wchar_t * s)
+        : path(s)
+    {
+        assert(is_absolute());
+    }
+#endif
 };
 
 template<>
