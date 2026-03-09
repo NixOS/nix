@@ -5,6 +5,8 @@
 #ifdef __linux__
 #  include "nix/util/file-system.hh"
 #  include "nix/util/linux-namespaces.hh"
+#  include <algorithm>
+#  include <string_view>
 #  include <sched.h>
 #  include <sys/ioctl.h>
 #  include <net/if.h>
@@ -34,8 +36,9 @@ static void enterNetworkNamespace()
     if (!fd)
         throw SysError("cannot open IP socket for loopback interface");
 
+    using namespace std::string_view_literals;
     struct ::ifreq ifr = {};
-    strcpy(ifr.ifr_name, "lo");
+    std::ranges::copy("lo"sv, ifr.ifr_name);
     ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
     if (::ioctl(fd.get(), SIOCSIFFLAGS, &ifr) == -1)
         throw SysError("cannot set loopback interface flags");
