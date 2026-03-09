@@ -1433,11 +1433,16 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
+
+    // Allow access to empty (submodule) directories without their content.
+    auto allowedPaths = boost::unordered_flat_set<CanonPath>{wd.emptyDirs};
+    // Always allow access to the root, but not its children.
+    allowedPaths.insert(CanonPath::root);
+
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
                                            makeFSSourceAccessor(path),
                                            std::set<CanonPath>{wd.files},
-                                           // Always allow access to the root, but not its children.
-                                           boost::unordered_flat_set<CanonPath>{CanonPath::root},
+                                           std::move(allowedPaths),
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
