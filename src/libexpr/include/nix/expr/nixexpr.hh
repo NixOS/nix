@@ -747,6 +747,7 @@ MakeBinOp(ExprOpAnd, "&&");
 MakeBinOp(ExprOpOr, "||");
 MakeBinOp(ExprOpImpl, "->");
 MakeBinOp(ExprOpConcatLists, "++");
+MakeBinOp(ExprOpConcatStrings, "+");
 
 struct ExprOpUpdate : Expr
 {
