@@ -33,7 +33,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     const Setting<AbsolutePath> upperLayer{
         (StoreConfig *) this,
-        "",
+        "/upper-layer-must-be-set",
         "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.

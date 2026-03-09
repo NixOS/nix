@@ -189,6 +189,8 @@ public:
 
     std::optional<ExperimentalFeature> experimentalFeature;
 
+    bool isOverridden() const;
+
 protected:
 
     AbstractSetting(
@@ -214,8 +216,6 @@ protected:
     virtual std::map<std::string, nlohmann::json> toJSONObject() const;
 
     virtual void convertToArg(Args & args, const std::string & category);
-
-    bool isOverridden() const;
 };
 
 /**

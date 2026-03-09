@@ -46,6 +46,9 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , config{config}
     , lowerStore(openStore(config->lowerStoreUri.get()).dynamic_pointer_cast<LocalFSStore>())
 {
+    if (!config->upperLayer.isOverridden())
+        throw Error("overlay store at %s requires the 'upper-layer' setting", PathFmt(config->realStoreDir.get()));
+
     if (config->checkMount.get()) {
         std::smatch match;
         std::string mountInfo;
