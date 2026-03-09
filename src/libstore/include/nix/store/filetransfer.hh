@@ -24,7 +24,7 @@ const std::filesystem::path & nixConfDir();
 struct FileTransferSettings : Config
 {
 private:
-    static std::filesystem::path getDefaultSSLCertFile();
+    static std::optional<std::filesystem::path> getDefaultSSLCertFile();
 
 public:
     FileTransferSettings();

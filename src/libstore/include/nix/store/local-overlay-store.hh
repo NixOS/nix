@@ -33,7 +33,7 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 
     const Setting<AbsolutePath> upperLayer{
         (StoreConfig *) this,
-        "",
+        "/upper-layer-must-be-set",
         "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.
@@ -53,9 +53,9 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const Setting<AbsolutePath> remountHook{
+    const Setting<std::optional<AbsolutePath>> remountHook{
         (StoreConfig *) this,
-        "",
+        std::nullopt,
         "remount-hook",
         R"(
           Script or other executable to run when overlay filesystem needs remounting.

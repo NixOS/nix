@@ -36,4 +36,22 @@ TEST(LocalOverlayStore, constructConfig_rootPath)
     EXPECT_EQ(config.rootDir.get(), std::optional{std::string{root}});
 }
 
+TEST(LocalOverlayStore, upperLayer_notOverridden)
+{
+    LocalOverlayStoreConfig config{"", {}};
+    EXPECT_FALSE(config.upperLayer.isOverridden());
+}
+
+TEST(LocalOverlayStore, upperLayer_overridden)
+{
+    LocalOverlayStoreConfig config{
+        "",
+        {
+            {"upper-layer", "/some/upper"},
+        },
+    };
+    EXPECT_TRUE(config.upperLayer.isOverridden());
+    EXPECT_EQ(config.upperLayer.get(), std::filesystem::path{"/some/upper"});
+}
+
 } // namespace nix
