@@ -72,7 +72,7 @@ schemas = [
     'schema' : schema_dir / 'build-trace-entry-v3.yaml',
     'files' : [
       'simple.json',
-      'with-structured-signature.json',
+      'with-signature.json',
     ],
   },
   {
