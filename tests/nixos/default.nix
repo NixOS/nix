@@ -205,4 +205,6 @@ in
   fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
+
+  storeRemount = runNixOSTest ./store-remount.nix;
 }
