@@ -556,6 +556,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
+            /* Note: libcurl copies string arguments, so temporaries from
+               .string().c_str() are safe. See the comment near CURLOPT_SSLKEY below. */
             if (auto & caFile = fileTransfer.settings.caFile.get())
                 curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
 

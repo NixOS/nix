@@ -224,35 +224,90 @@ protected:
  *
  * Constructors assert that the path is absolute.
  */
-struct AbsolutePath : std::filesystem::path
+struct AbsolutePath
 {
-    using path::operator=;
-
-    AbsolutePath(const std::filesystem::path & p)
-        : path(p)
+    AbsolutePath(std::filesystem::path p)
+        : _path(std::move(p))
     {
-        assert(is_absolute());
-    }
-
-    AbsolutePath(std::filesystem::path && p)
-        : path(std::move(p))
-    {
-        assert(is_absolute());
+        assert(_path.is_absolute());
     }
 
     AbsolutePath(const char * s)
-        : path(s)
+        : _path(s)
     {
-        assert(is_absolute());
+        assert(_path.is_absolute());
     }
 
 #ifdef _WIN32
     AbsolutePath(const wchar_t * s)
-        : path(s)
+        : _path(s)
     {
-        assert(is_absolute());
+        assert(_path.is_absolute());
     }
 #endif
+
+    const std::filesystem::path & path() const
+    {
+        return _path;
+    }
+
+    operator const std::filesystem::path &() const
+    {
+        return _path;
+    }
+
+    std::string string() const
+    {
+        return _path.string();
+    }
+
+    const auto & native() const
+    {
+        return _path.native();
+    }
+
+    const std::filesystem::path::value_type * c_str() const
+    {
+        return _path.c_str();
+    }
+
+    bool empty() const
+    {
+        return _path.empty();
+    }
+
+    std::filesystem::path operator/(const std::filesystem::path & rhs) const
+    {
+        return _path / rhs;
+    }
+
+    bool operator==(const AbsolutePath & rhs) const
+    {
+        return _path == rhs._path;
+    }
+
+    bool operator==(const std::filesystem::path & rhs) const
+    {
+        return _path == rhs;
+    }
+
+    bool operator==(const std::string & rhs) const
+    {
+        return _path == rhs;
+    }
+
+    auto operator<=>(const AbsolutePath & rhs) const
+    {
+        return _path <=> rhs._path;
+    }
+
+    friend std::ostream & operator<<(std::ostream & os, const AbsolutePath & p)
+    {
+        return os << p._path.string();
+    }
+
+private:
+    std::filesystem::path _path;
 };
 
 template<>
@@ -419,6 +474,46 @@ public:
     void operator=(const T & v)
     {
         this->assign(v);
+    }
+};
+
+/**
+ * `AbsolutePath` wraps `std::filesystem::path`, so implicit conversion
+ * from `Setting<AbsolutePath>` to `const path &` requires two
+ * user-defined conversions (`Setting` -> `AbsolutePath` -> `path`),
+ * which C++ does not allow in a single implicit conversion sequence.
+ * This specialization provides a direct conversion operator.
+ *
+ * See https://en.cppreference.com/w/cpp/language/implicit_conversion.html
+ */
+template<>
+class Setting<AbsolutePath> : public BaseSetting<AbsolutePath>
+{
+public:
+    using BaseSetting<AbsolutePath>::BaseSetting;
+    using BaseSetting<AbsolutePath>::operator=;
+
+    Setting(
+        Config * options,
+        const AbsolutePath & def,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {},
+        const bool documentDefault = true,
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
+        : BaseSetting<AbsolutePath>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+    {
+        options->addSetting(this);
+    }
+
+    void operator=(const AbsolutePath & v)
+    {
+        this->assign(v);
+    }
+
+    operator const std::filesystem::path &() const
+    {
+        return this->value.path();
     }
 };
 

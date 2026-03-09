@@ -21,7 +21,7 @@ TEST(LocalOverlayStore, constructConfig_rootQueryParam)
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{root}});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{std::string{root}});
 }
 
 TEST(LocalOverlayStore, constructConfig_rootPath)
@@ -33,7 +33,7 @@ TEST(LocalOverlayStore, constructConfig_rootPath)
 #endif
     LocalOverlayStoreConfig config{std::string{root}, {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{root}});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{std::string{root}});
 }
 
 TEST(LocalOverlayStore, upperLayer_notOverridden)

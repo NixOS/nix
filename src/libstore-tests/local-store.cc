@@ -51,7 +51,7 @@ TEST(LocalStore, constructConfig_rootQueryParam)
         },
     };
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{root}});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{std::string{root}});
 }
 
 TEST(LocalStore, constructConfig_rootPath)
@@ -63,7 +63,7 @@ TEST(LocalStore, constructConfig_rootPath)
 #endif
     LocalStoreConfig config{std::string{root}, {}};
 
-    EXPECT_EQ(config.rootDir.get(), std::optional{std::string{root}});
+    EXPECT_EQ(config.rootDir.get(), std::optional<AbsolutePath>{std::string{root}});
 }
 
 TEST(LocalStore, constructConfig_to_string)
