@@ -49,8 +49,10 @@ TEST_F(nix_api_util_context, nix_store_get_storedir_default)
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
 
-    // These tests run with a unique storeDir, but not a relocated store
-    ASSERT_STREQ(NIX_STORE_DIR, str.c_str());
+    // NIX_STORE_DIR env override changes the default (needed on Windows
+    // to avoid static init crashes), so compare against that if set.
+    auto envStore = nix::getEnv("NIX_STORE_DIR").value_or(nix::getEnv("NIX_STORE").value_or(NIX_STORE_DIR));
+    ASSERT_EQ(envStore, str);
 
     nix_store_free(store);
 }
