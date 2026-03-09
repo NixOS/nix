@@ -84,7 +84,7 @@ protected:
     struct Handler
     {
         std::function<void(std::vector<std::string>)> fun;
-        size_t arity;
+        size_t arity = 0;
 
         Handler() = default;
 
