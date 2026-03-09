@@ -53,9 +53,9 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const Setting<AbsolutePath> remountHook{
+    const Setting<std::optional<AbsolutePath>> remountHook{
         (StoreConfig *) this,
-        "",
+        std::nullopt,
         "remount-hook",
         R"(
           Script or other executable to run when overlay filesystem needs remounting.
