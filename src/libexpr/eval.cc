@@ -2183,6 +2183,16 @@ void EvalState::concatValues(
     }
 }
 
+void ExprOpConcatStrings::eval(EvalState & state, Env & env, Value & v)
+{
+    Value v1;
+    e1->eval(state, env, v1);
+    Value v2;
+    e2->eval(state, env, v2);
+    Value values[2] = {v1, v2};
+    state.concatValues(v, pos, values, false, "while evaluating a path segment", env, *this);
+}
+
 void ExprPos::eval(EvalState & state, Env & env, Value & v)
 {
     state.mkPos(v, pos);
