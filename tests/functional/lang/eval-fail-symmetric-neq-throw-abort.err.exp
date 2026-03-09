@@ -1,0 +1,8 @@
+error:
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail-symmetric-neq-throw-abort.nix:1:2:
+            1| (throw "x") != (abort "y")
+             |  ^
+            2|
+
+       error: x

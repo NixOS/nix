@@ -1,0 +1,14 @@
+error:
+       … while calling the 'div' builtin
+         at /pwd/lang/eval-fail-symmetric-div-throw-abort.nix:1:1:
+            1| builtins.div (throw "x") (abort "y")
+             | ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-symmetric-div-throw-abort.nix:1:27:
+            1| builtins.div (throw "x") (abort "y")
+             |                           ^
+            2|
+
+       error: evaluation aborted with the following error message: 'y'

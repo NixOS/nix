@@ -1,0 +1,14 @@
+error:
+       … while calling the 'bitOr' builtin
+         at /pwd/lang/eval-fail-symmetric-bitOr-abort-throw.nix:1:1:
+            1| builtins.bitOr (abort "x") (throw "y")
+             | ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-symmetric-bitOr-abort-throw.nix:1:17:
+            1| builtins.bitOr (abort "x") (throw "y")
+             |                 ^
+            2|
+
+       error: evaluation aborted with the following error message: 'x'

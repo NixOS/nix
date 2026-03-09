@@ -682,6 +682,15 @@ public:
     void forceValueDeep(Value & v);
 
     /**
+     * Force multiple thunks symmetrically.
+     *
+     * The order of values in the span does not affect the result or any
+     * errors produced. This is useful when evaluating operands that should
+     * be treated symmetrically.
+     */
+    void forceThunksSymmetric(std::span<std::pair<Value *, std::string_view>> values, const PosIdx pos);
+
+    /**
      * Force `v`, and then verify that it has the expected type.
      */
     NixInt forceInt(Value & v, const PosIdx pos, std::string_view errorCtx);

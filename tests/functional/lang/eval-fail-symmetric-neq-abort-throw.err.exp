@@ -1,0 +1,8 @@
+error:
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-symmetric-neq-abort-throw.nix:1:2:
+            1| (abort "x") != (throw "y")
+             |  ^
+            2|
+
+       error: evaluation aborted with the following error message: 'x'
