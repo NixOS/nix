@@ -330,12 +330,12 @@ void printVersion(const std::string & programName)
         std::cout << "System type: " << settings.thisSystem << "\n";
         std::cout << "Additional system types: " << concatStringsSep(", ", settings.extraPlatforms.get()) << "\n";
         std::cout << "Features: " << concatStringsSep(", ", cfg) << "\n";
-        std::cout << "System configuration file: " << nixConfFile() << "\n";
+        std::cout << "System configuration file: " << os_string_to_string(nixConfFile().native()) << "\n";
         std::cout << "User configuration files: "
                   << os_string_to_string(ExecutablePath{.directories = nixUserConfFiles()}.render()) << "\n";
         std::cout << "Store directory: " << resolveStoreConfig(StoreReference{settings.storeUri.get()})->storeDir
                   << "\n";
-        std::cout << "State directory: " << settings.nixStateDir << "\n";
+        std::cout << "State directory: " << os_string_to_string(settings.nixStateDir.native()) << "\n";
     }
     throw Exit();
 }
