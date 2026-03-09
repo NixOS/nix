@@ -499,9 +499,20 @@ void InputScheme::clone(
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
-    RestoreSink sink(/*startFsync=*/false);
-    sink.dstPath = destDir;
-    copyRecursive(*accessor, CanonPath::root, sink, CanonPath::root);
+    /* This is used with an arbitrary user-given path (just `nix flake
+       clone` currently) and so we better follow any symlinks. */
+    auto absPath = std::filesystem::absolute(destDir);
+    auto parentPath = absPath.parent_path();
+
+    auto parentDirFd = openDirectory(parentPath, FinalSymlink::Follow);
+    if (!parentDirFd)
+        throw NativeSysError("opening directory %s", PathFmt(parentPath));
+
+    RestoreSink sink{/*startFsync=*/false};
+    sink.parentPath = parentPath;
+    sink.childName = absPath.filename();
+    sink.dirFd = parentDirFd.get();
+    copyRecursive(*accessor, CanonPath::root, sink);
 }
 
 std::optional<ExperimentalFeature> InputScheme::experimentalFeature() const

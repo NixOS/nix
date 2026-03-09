@@ -166,7 +166,7 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
     extract_archive(archive, destDir);
 }
 
-time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & parseSink)
+time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
 {
     time_t lastModified = 0;
 
@@ -203,10 +203,8 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
             break;
 
         case AE_IFREG: {
-            parseSink.createRegularFile(cpath, [&](auto & crf) {
-                if (archive_entry_mode(entry) & S_IXUSR)
-                    crf.isExecutable();
-
+            bool isExecutable = archive_entry_mode(entry) & S_IXUSR;
+            parseSink.createRegularFile(cpath, isExecutable, [&](auto & crf) {
                 while (true) {
                     auto n = archive_read_data(archive.archive, buf.data(), buf.size());
                     if (n < 0)
