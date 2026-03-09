@@ -11,18 +11,18 @@ rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 echo foo > "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 mkdir -p "$TEST_ROOT/out2"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 # The same, but for a regular file.
 nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"
@@ -114,7 +114,7 @@ if (( unicodeTestCode == 1 )); then
     # If the command failed (MacOS or ZFS + normalization), checks that it failed
     # with the expected "already exists" error, and that this is the same
     # behavior as `touch`
-    echo "$unicodeTestOut" | grepQuiet "creating directory \".*/out/â\": File exists"
+    echo "$unicodeTestOut" | grepQuiet 'creating directory ".*/out/â": File exists'
 
     (( touchFilesCount == 1 ))
 elif (( unicodeTestCode == 0 )); then

@@ -758,7 +758,8 @@ static void opRestore(Strings opFlags, Strings opArgs)
         throw UsageError("only one argument allowed");
 
     FdSource source(STDIN_FILENO);
-    restorePath(*opArgs.begin(), source);
+    auto path = std::filesystem::absolute(*opArgs.begin());
+    restorePath(path.parent_path(), path.filename(), source);
 }
 
 static void opExport(Strings opFlags, Strings opArgs)

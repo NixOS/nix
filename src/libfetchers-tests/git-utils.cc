@@ -1,4 +1,5 @@
 #include "nix/fetchers/git-utils.hh"
+#include "nix/util/merkle-files.hh"
 #include "nix/util/file-system.hh"
 #include <gmock/gmock.h>
 #include <git2/global.h>
@@ -8,7 +9,6 @@
 #include <git2/object.h>
 #include <git2/tag.h>
 #include <gtest/gtest.h>
-#include "nix/util/fs-sink.hh"
 #include "nix/util/serialise.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"
 
@@ -57,41 +57,65 @@ public:
     }
 };
 
-void writeString(CreateRegularFileSink & fileSink, std::string contents, bool executable)
+merkle::TreeEntry writeString(merkle::FileSinkBuilder & store, std::string contents, bool executable = false)
 {
-    if (executable)
-        fileSink.isExecutable();
-    fileSink.preallocateContents(contents.size());
-    fileSink(contents);
+    auto sink = store.makeRegularFileSink();
+    (*sink)(contents);
+    return merkle::TreeEntry{
+        executable ? merkle::Mode::Executable : merkle::Mode::Regular,
+        std::move(*sink).flush(),
+    };
 }
 
 TEST_F(GitUtilsTest, sink_basic)
 {
     auto repo = openRepo();
-    auto sink = repo->getFileSystemObjectSink();
 
-    // TODO/Question: It seems a little odd that we use the tarball-like convention of requiring a top-level directory
-    // here
-    //                The sync method does not document this behavior, should probably renamed because it's not very
-    //                general, and I can't imagine that "non-conventional" archives or any other source to be handled by
-    //                this sink.
+    // Build tree bottom-up using insertChild
+    // hello file
+    auto hello = writeString(*repo, "hello world");
 
-    sink->createDirectory(CanonPath("foo-1.1"));
+    // bye file
+    auto bye = writeString(*repo, "thanks for all the fish");
 
-    sink->createRegularFile(CanonPath("foo-1.1/hello"), [](CreateRegularFileSink & fileSink) {
-        writeString(fileSink, "hello world", false);
-    });
-    sink->createRegularFile(CanonPath("foo-1.1/bye"), [](CreateRegularFileSink & fileSink) {
-        writeString(fileSink, "thanks for all the fish", false);
-    });
-    sink->createSymlink(CanonPath("foo-1.1/bye-link"), "bye");
-    sink->createDirectory(CanonPath("foo-1.1/empty"));
-    sink->createDirectory(CanonPath("foo-1.1/links"));
-    sink->createHardlink(CanonPath("foo-1.1/links/foo"), CanonPath("foo-1.1/hello"));
+    // bye-link symlink
+    auto byeLink = repo->makeSymlink("bye");
 
-    // sink->createHardlink("foo-1.1/links/foo-2", CanonPath("foo-1.1/hello"));
+    // empty directory
+    auto empty = [&] {
+        auto emptyDir = repo->makeDirectorySink();
+        return merkle::TreeEntry{merkle::Mode::Directory, std::move(*emptyDir).flush()};
+    }();
 
-    auto result = repo->dereferenceSingletonDirectory(sink->flush());
+    // links/foo file
+    auto linksFoo = writeString(*repo, "hello world");
+
+    // links directory
+    auto links = [&] {
+        auto linksDir = repo->makeDirectorySink();
+        linksDir->insertChild("foo", linksFoo);
+        return merkle::TreeEntry{merkle::Mode::Directory, std::move(*linksDir).flush()};
+    }();
+
+    // foo-1.1 directory (contains hello, bye, bye-link, empty, links)
+    auto foo = [&] {
+        auto fooDir = repo->makeDirectorySink();
+        fooDir->insertChild("hello", hello);
+        fooDir->insertChild("bye", bye);
+        fooDir->insertChild("bye-link", byeLink);
+        fooDir->insertChild("empty", empty);
+        fooDir->insertChild("links", links);
+        return merkle::TreeEntry{merkle::Mode::Directory, std::move(*fooDir).flush()};
+    }();
+
+    // root directory (contains foo-1.1)
+    auto rootHash = [&] {
+        auto rootDir = repo->makeDirectorySink();
+        rootDir->insertChild("foo-1.1", foo);
+        return std::move(*rootDir).flush();
+    }();
+
+    auto result = repo->dereferenceSingletonDirectory(rootHash);
     auto accessor = repo->getAccessor(result, {}, getRepoName());
     auto entries = accessor->readDirectory(CanonPath::root);
     ASSERT_EQ(entries.size(), 5u);
@@ -100,29 +124,7 @@ TEST_F(GitUtilsTest, sink_basic)
     ASSERT_EQ(accessor->readLink(CanonPath("bye-link")), "bye");
     ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0u);
     ASSERT_EQ(accessor->readFile(CanonPath("links/foo")), "hello world");
-};
-
-TEST_F(GitUtilsTest, sink_hardlink)
-{
-    auto repo = openRepo();
-    auto sink = repo->getFileSystemObjectSink();
-
-    sink->createDirectory(CanonPath("foo-1.1"));
-
-    sink->createRegularFile(CanonPath("foo-1.1/hello"), [](CreateRegularFileSink & fileSink) {
-        writeString(fileSink, "hello world", false);
-    });
-
-    try {
-        sink->createHardlink(CanonPath("foo-1.1/link"), CanonPath("hello"));
-        sink->flush();
-        FAIL() << "Expected an exception";
-    } catch (const nix::Error & e) {
-        ASSERT_THAT(e.msg(), testing::HasSubstr("does not exist"));
-        ASSERT_THAT(e.msg(), testing::HasSubstr("/hello"));
-        ASSERT_THAT(e.msg(), testing::HasSubstr("foo-1.1/link"));
-    }
-};
+}
 
 TEST_F(GitUtilsTest, peel_reference)
 {

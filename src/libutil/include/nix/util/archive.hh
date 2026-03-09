@@ -71,7 +71,8 @@ void dumpString(std::string_view s, Sink & sink);
 
 void parseDump(FileSystemObjectSink & sink, Source & source);
 
-void restorePath(const std::filesystem::path & path, Source & source, bool startFsync = false);
+void restorePath(
+    const std::filesystem::path & parentPath, const std::string & childName, Source & source, bool startFsync = false);
 
 /**
  * Read a NAR from 'source' and write it to 'sink'.
