@@ -84,7 +84,7 @@ INSTANTIATE_TEST_SUITE_P(
             simple,
         },
         std::pair{
-            "with-signature-structured",
+            "with-signature",
             withSignature,
         }));
 
@@ -93,7 +93,7 @@ INSTANTIATE_TEST_SUITE_P(
  */
 TEST_F(RealisationTest, with_signature_from_json)
 {
-    readJsonTest("with-signature", withSignature);
+    readJsonTest("with-signature-unstructured", withSignature);
 }
 
 /* ----------------------------------------------------------------------------

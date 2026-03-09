@@ -6,7 +6,10 @@
   "value": {
     "outPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv",
     "signatures": [
-      "asdf:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      {
+        "keyName": "asdf",
+        "sig": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+      }
     ]
   }
 }
