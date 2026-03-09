@@ -77,6 +77,17 @@ endif
 # Used in public header. Affects ABI!
 configdata_pub.set('NIX_USE_BOEHMGC', bdw_gc.found().to_int())
 
+link_args = []
+
+wasmtime_required = get_option('wasm').disable_if(
+  get_option('default_library') == 'static',
+  error_message : 'Building with wasmtime and static linking is not supported',
+)
+
+if wasmtime_required.enabled()
+  link_args += '-lwasmtime'
+endif
+
 toml11 = dependency(
   'toml11',
   version : '>=3.7.0',
@@ -238,7 +249,7 @@ this_library = library(
   soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
-  link_args : linker_export_flags,
+  link_args : linker_export_flags + link_args,
   link_whole : [ parser_library ],
   prelink : true, # For C++ static initializers
   install : true,

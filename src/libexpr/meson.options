@@ -3,3 +3,9 @@ option(
   type : 'feature',
   description : 'enable garbage collection in the Nix expression evaluator (requires Boehm GC)',
 )
+
+option(
+  'wasm',
+  type : 'feature',
+  description : 'enable wasmtime integration into the Nix expression evaluator',
+)
