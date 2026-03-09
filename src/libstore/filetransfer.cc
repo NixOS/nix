@@ -551,7 +551,7 @@ struct curlFileTransfer : public FileTransfer
             }
 
             if (auto & caFile = fileTransfer.settings.caFile.get())
-                curl_easy_setopt(req, CURLOPT_CAINFO, caFile->c_str());
+                curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
 
 #if !defined(_WIN32)
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
@@ -569,7 +569,7 @@ struct curlFileTransfer : public FileTransfer
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().c_str());
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().string().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             if (writtenToSink)
