@@ -4268,15 +4268,17 @@ static RegisterPrimOp primop_concatMap({
 
 static void prim_add(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceValue(*args[0], pos);
-    state.forceValue(*args[1], pos);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument of the addition"},
+        {args[1], "while evaluating the second argument of the addition"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(
-            state.forceFloat(*args[0], pos, "while evaluating the first argument of the addition")
-            + state.forceFloat(*args[1], pos, "while evaluating the second argument of the addition"));
+            state.forceFloat(*args[0], pos, argPairs[0].second) + state.forceFloat(*args[1], pos, argPairs[1].second));
     else {
-        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the addition");
-        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the addition");
+        auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+        auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
 
         auto result_ = i1 + i2;
         if (auto result = result_.valueChecked(); result.has_value()) {
@@ -4292,21 +4294,26 @@ static RegisterPrimOp primop_add({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the sum of the numbers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_add,
 });
 
 static void prim_sub(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceValue(*args[0], pos);
-    state.forceValue(*args[1], pos);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument of the subtraction"},
+        {args[1], "while evaluating the second argument of the subtraction"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(
-            state.forceFloat(*args[0], pos, "while evaluating the first argument of the subtraction")
-            - state.forceFloat(*args[1], pos, "while evaluating the second argument of the subtraction"));
+            state.forceFloat(*args[0], pos, argPairs[0].second) - state.forceFloat(*args[1], pos, argPairs[1].second));
     else {
-        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the subtraction");
-        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the subtraction");
+        auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+        auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
 
         auto result_ = i1 - i2;
 
@@ -4323,21 +4330,26 @@ static RegisterPrimOp primop_sub({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the difference between the numbers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_sub,
 });
 
 static void prim_mul(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceValue(*args[0], pos);
-    state.forceValue(*args[1], pos);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument of the multiplication"},
+        {args[1], "while evaluating the second argument of the multiplication"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     if (args[0]->type() == nFloat || args[1]->type() == nFloat)
         v.mkFloat(
-            state.forceFloat(*args[0], pos, "while evaluating the first of the multiplication")
-            * state.forceFloat(*args[1], pos, "while evaluating the second argument of the multiplication"));
+            state.forceFloat(*args[0], pos, argPairs[0].second) * state.forceFloat(*args[1], pos, argPairs[1].second));
     else {
-        auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument of the multiplication");
-        auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument of the multiplication");
+        auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+        auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
 
         auto result_ = i1 * i2;
 
@@ -4354,24 +4366,30 @@ static RegisterPrimOp primop_mul({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the product of the numbers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_mul,
 });
 
 static void prim_div(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceValue(*args[0], pos);
-    state.forceValue(*args[1], pos);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first operand of the division"},
+        {args[1], "while evaluating the second operand of the division"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
 
-    NixFloat f2 = state.forceFloat(*args[1], pos, "while evaluating the second operand of the division");
+    NixFloat f2 = state.forceFloat(*args[1], pos, argPairs[1].second);
     if (f2 == 0)
         state.error<EvalError>("division by zero").atPos(pos).debugThrow();
 
     if (args[0]->type() == nFloat || args[1]->type() == nFloat) {
-        v.mkFloat(state.forceFloat(*args[0], pos, "while evaluating the first operand of the division") / f2);
+        v.mkFloat(state.forceFloat(*args[0], pos, argPairs[0].second) / f2);
     } else {
-        NixInt i1 = state.forceInt(*args[0], pos, "while evaluating the first operand of the division");
-        NixInt i2 = state.forceInt(*args[1], pos, "while evaluating the second operand of the division");
+        NixInt i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+        NixInt i2 = state.forceInt(*args[1], pos, argPairs[1].second);
         /* Avoid division overflow as it might raise SIGFPE. */
         auto result_ = i1 / i2;
         if (auto result = result_.valueChecked(); result.has_value()) {
@@ -4387,14 +4405,22 @@ static RegisterPrimOp primop_div({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the quotient of the numbers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_div,
 });
 
 static void prim_bitAnd(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitAnd");
-    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitAnd");
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument passed to builtins.bitAnd"},
+        {args[1], "while evaluating the second argument passed to builtins.bitAnd"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
+    auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+    auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
     v.mkInt(i1.value & i2.value);
 }
 
@@ -4403,14 +4429,22 @@ static RegisterPrimOp primop_bitAnd({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the bitwise AND of the integers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_bitAnd,
 });
 
 static void prim_bitOr(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitOr");
-    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitOr");
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument passed to builtins.bitOr"},
+        {args[1], "while evaluating the second argument passed to builtins.bitOr"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
+    auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+    auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
 
     v.mkInt(i1.value | i2.value);
 }
@@ -4420,14 +4454,22 @@ static RegisterPrimOp primop_bitOr({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the bitwise OR of the integers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_bitOr,
 });
 
 static void prim_bitXor(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto i1 = state.forceInt(*args[0], pos, "while evaluating the first argument passed to builtins.bitXor");
-    auto i2 = state.forceInt(*args[1], pos, "while evaluating the second argument passed to builtins.bitXor");
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument passed to builtins.bitXor"},
+        {args[1], "while evaluating the second argument passed to builtins.bitXor"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
+    auto i1 = state.forceInt(*args[0], pos, argPairs[0].second);
+    auto i2 = state.forceInt(*args[1], pos, argPairs[1].second);
 
     v.mkInt(i1.value ^ i2.value);
 }
@@ -4437,14 +4479,20 @@ static RegisterPrimOp primop_bitXor({
     .args = {"e1", "e2"},
     .doc = R"(
       Return the bitwise XOR of the integers *e1* and *e2*.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_bitXor,
 });
 
 static void prim_lessThan(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceValue(*args[0], pos);
-    state.forceValue(*args[1], pos);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {args[0], "while evaluating the first argument passed to builtins.lessThan"},
+        {args[1], "while evaluating the second argument passed to builtins.lessThan"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     // pos is exact here, no need for a message.
     CompareValues comp(state, noPos, "");
     v.mkBool(comp(args[0], args[1]));
@@ -4457,6 +4505,9 @@ static RegisterPrimOp primop_lessThan({
       Return `true` if the value *e1* is less than the value *e2*, and `false` otherwise.
       Evaluation aborts if either *e1* or *e2* does not evaluate to a number, string or path.
       Furthermore, it aborts if *e2* does not match *e1*'s type according to the aforementioned classification of number, string or path.
+
+      If either operand [aborts](@docroot@/language/evaluation.md#aborts), this expression aborts.
+      Otherwise, if either operand [fails with an assertion error](@docroot@/language/evaluation.md#assertion-errors), this expression also fails with an assertion error.
     )",
     .impl = prim_lessThan,
 });

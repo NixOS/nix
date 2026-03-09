@@ -3,7 +3,7 @@
 Evaluation is the process of turning a Nix expression into a [Nix value](types.md).
 
 This happens by a number of rules, such as:
-- Constructing values from literals. 
+- Constructing values from literals.
   For example the number literal `1` is turned into the number value `1`.
 - Applying operators
   For example the addition operator `+` is applied to two number values to produce a new number value.
@@ -87,11 +87,38 @@ The order in which side effects such as [`builtins.trace`](@docroot@/language/bu
 In a lazy language, evaluation order is often opposite to expectations from strict languages.
 For example, in `let wrap = x: { wrapped = x; }; in wrap (1 + 2)`, the function body produces a result (`{ wrapped = ...; }`) *before* evaluating `x`.
 
-## Infinite recursion and stack overflow
+## Errors
+
+Nix supports two sorts of manual error values: [assertion errors], and [aborts].
+It also has language-defined [type errors] if the wrong type of value is passed to various operators, and implementation-defined [stack overflow and infinite recursion].
+Errors can be divided into catchable and uncatchable errors: assertion errors are catchable and all other error kinds are uncatchable.
+
+[assertion errors]: #assertion-errors
+[aborts]: #aborts
+[type errors]: #type-errors
+[stack overflow and infinite recursion]: #infinite-recursion-and-stack-overflow
+
+### Assertion errors
+
+Assertion errors are user-written errors.
+They are created with [`builtins.throw`](@docroot@/language/builtins.md#builtins-throw).
+These are the only type of errors which can be caught; they are caught with [`builtins.tryEval`](@docroot@/language/builtins.md#builtins-tryEval).
+
+### Aborts
+
+Aborts are user-written hard errors which cannot be caught.
+These are created with [`builtins.abort`](@docroot@/language/builtins.md#builtins-abort).
+
+### Type errors
+
+Type errors occur when an operator or built-in function receives a value of an unexpected type.
+These errors cannot be caught.
+
+### Infinite recursion and stack overflow
 
 During evaluation, two types of errors can occur when expressions reference themselves or call functions too deeply:
 
-### Infinite recursion
+#### Infinite recursion
 
 This error occurs when a value depends on itself through a cycle, making it impossible to compute.
 
@@ -105,7 +132,7 @@ Infinite recursion happens at the value level when evaluating an expression requ
 Despite the name, infinite recursion is cheap to compute and does not involve a stack overflow.
 The cycle is finite and fairly easy to detect.
 
-### Stack overflow
+#### Stack overflow
 
 This error occurs when the call depth exceeds the maximum allowed limit.
 
@@ -119,3 +146,12 @@ Stack overflow happens when too many function calls are nested without returning
 The maximum call depth is controlled by the [`max-call-depth` setting](@docroot@/command-ref/conf-file.md#conf-max-call-depth).
 
 [C API]: @docroot@/c-api.md
+
+From within the language, these should have the same semantics as type errors.
+
+### Equivalence of uncatchable errors
+
+For mathematical reasons, it is important that all the non-catchable (i.e. non-assertion) errors be formally equivalent in the language semantics.
+As a human user, the difference between error message strings, and the difference between the evaluator failing with a message and hanging indefinitely are obvious, but *within* the language, these differences are not visible.
+The fatal errors should be treated as an "optimization" of infinite recursion.
+In particular, since infinite recursion is not detectable in general—this would require solving the [halting problem](https://en.wikipedia.org/wiki/Halting_problem)—the implementation likewise cannot special case non-assertion errors in many ways.

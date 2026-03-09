@@ -1,0 +1,14 @@
+error:
+       … while calling the 'bitAnd' builtin
+         at /pwd/lang/eval-fail-symmetric-bitAnd-throw-abort.nix:1:1:
+            1| builtins.bitAnd (throw "x") (abort "y")
+             | ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-symmetric-bitAnd-throw-abort.nix:1:30:
+            1| builtins.bitAnd (throw "x") (abort "y")
+             |                              ^
+            2|
+
+       error: evaluation aborted with the following error message: 'y'

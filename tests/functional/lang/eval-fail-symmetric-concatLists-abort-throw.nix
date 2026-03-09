@@ -1,0 +1,1 @@
+(abort "x") ++ (throw "y")

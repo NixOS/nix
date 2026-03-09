@@ -2031,6 +2031,11 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     e1->eval(state, env, v1);
     Value v2;
     e2->eval(state, env, v2);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {&v1, "while evaluating the first argument of the list concatenation"},
+        {&v2, "while evaluating the second argument of the list concatenation"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     Value * lists[2] = {&v1, &v2};
     state.concatLists(v, lists, pos, "while evaluating one of the elements to concatenate");
 }
@@ -2144,8 +2149,8 @@ void EvalState::concatValues(
             if (strings.empty())
                 strings.reserve(values.size());
             /* skip canonization of first path, which would only be not
-            canonized in the first place if it's coming from a ./${foo} type
-            path */
+               canonized in the first place if it's coming from a ./${foo} type
+               path */
             auto part = coerceToString(
                 pos, vTmp, context, errorCtx, false, firstType == nString, !first);
             sSize += part->size();
@@ -2189,6 +2194,11 @@ void ExprOpConcatStrings::eval(EvalState & state, Env & env, Value & v)
     e1->eval(state, env, v1);
     Value v2;
     e2->eval(state, env, v2);
+    std::array<std::pair<Value *, std::string_view>, 2> argPairs = {{
+        {&v1, "while evaluating the first argument of the addition"},
+        {&v2, "while evaluating the second argument of the addition"},
+    }};
+    state.forceThunksSymmetric(argPairs, pos);
     Value values[2] = {v1, v2};
     state.concatValues(v, pos, values, false, "while evaluating a path segment", env, *this);
 }
@@ -2317,6 +2327,67 @@ void EvalState::forceValueDeep(Value & v)
                 }
         }
     }(v);
+}
+
+void EvalState::forceThunksSymmetric(std::span<std::pair<Value *, std::string_view>> values, const PosIdx pos)
+{
+    /* We assume the span is short, so in the Many case we iterate through it
+       again rather than storing errors in a container. */
+    enum class Count { Zero, One, Many };
+    Count errorCount = Count::Zero;
+    Value * firstFailed = nullptr;
+
+    for (auto & [value, errorCtx] : values) {
+        try {
+            forceValue(*value, pos);
+        } catch (AssertionError &) {
+            switch (errorCount) {
+            case Count::Zero:
+                errorCount = Count::One;
+                firstFailed = value;
+                break;
+            case Count::One:
+                errorCount = Count::Many;
+                break;
+            case Count::Many:
+                break;
+            }
+        }
+    }
+
+    switch (errorCount) {
+    case Count::Zero:
+        // No errors, nothing to do
+        break;
+    case Count::One:
+        firstFailed->failed().rethrow();
+        break;
+    case Count::Many:
+        /* Construct a new `AssertionError` combining all the assertion
+           `ErrorInfo`s */
+        AssertionError combined(*this, "multiple assertions failed");
+        for (auto & [value, errorCtx] : values) {
+            if (value->isFailed()) {
+                try {
+                    std::rethrow_exception(value->failed().ex);
+                } catch (AssertionError & e) {
+                    // Merge the ErrorInfo from each assertion error
+                    auto & info = e.info();
+                    combined.unsafeInfo().traces.push_back(
+                        Trace{
+                            .pos = info.pos,
+                            .hint = info.msg,
+                        });
+                    // Also include the original error's traces
+                    /* TODO support tree traces, what we currently do
+                       will make for a nonsense ordering. */
+                    for (auto & trace : info.traces)
+                        combined.unsafeInfo().traces.push_back(trace);
+                }
+            }
+        }
+        throw std::move(combined);
+    }
 }
 
 NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCtx)
@@ -2718,8 +2789,11 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
     auto _level = addCallDepth(pos);
 
     // This implementation must match eqValues.
-    forceValue(v1, pos);
-    forceValue(v2, pos);
+    std::pair<Value *, std::string_view> args[] = {
+        {&v1, "while evaluating the left-hand side of the equality"},
+        {&v2, "while evaluating the right-hand side of the equality"},
+    };
+    forceThunksSymmetric(args, pos);
 
     if (&v1 == &v2)
         return;
@@ -2928,8 +3002,11 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 {
     auto _level = addCallDepth(pos);
 
-    forceValue(v1, pos);
-    forceValue(v2, pos);
+    std::pair<Value *, std::string_view> args[] = {
+        {&v1, "while evaluating the left-hand side of the equality"},
+        {&v2, "while evaluating the right-hand side of the equality"},
+    };
+    forceThunksSymmetric(args, pos);
 
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls

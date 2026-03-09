@@ -1,0 +1,14 @@
+error:
+       … while calling the 'add' builtin
+         at /pwd/lang/eval-fail-symmetric-add-abort-abort.nix:1:1:
+            1| builtins.add (abort "x") (abort "y")
+             | ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-symmetric-add-abort-abort.nix:1:15:
+            1| builtins.add (abort "x") (abort "y")
+             |               ^
+            2|
+
+       error: evaluation aborted with the following error message: 'x'
