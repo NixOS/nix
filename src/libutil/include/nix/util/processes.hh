@@ -23,6 +23,7 @@
 #include <map>
 #include <sstream>
 #include <optional>
+#include <thread>
 
 namespace nix {
 
@@ -35,6 +36,8 @@ class Pid
     pid_t pid = -1;
     bool separatePG = false;
     int killSignal = SIGKILL;
+    std::chrono::milliseconds killTimeout;
+    std::thread killThread;
 #else
     AutoCloseFD pid = INVALID_DESCRIPTOR;
 #endif
@@ -60,6 +63,7 @@ public:
 #ifndef _WIN32
     void setSeparatePG(bool separatePG);
     void setKillSignal(int signal);
+    void setKillTimeout(std::chrono::milliseconds duration);
     pid_t release();
 #endif
 
