@@ -77,30 +77,8 @@ static void doBind(const std::filesystem::path & source, const std::filesystem::
 
 static const std::filesystem::path procPath = "/proc";
 
-struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
 {
-    Pid pid;
-
-    LocalStore & store;
-
-    const LocalSettings & localSettings = store.config->getLocalSettings();
-
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
-
-    std::unique_ptr<UserLock> buildUser;
-
-    std::filesystem::path tmpDir;
-
-    std::filesystem::path topTmpDir;
-
-    const DerivationType derivationType;
-
-    std::map<StorePath, StorePath> redirectedOutputs;
-
-    OutputPathMap scratchOutputs;
-
-    RecursiveNixDaemon daemon;
-
     std::filesystem::path chrootRootDir;
 
     std::optional<AutoDelete> autoDelChroot;
@@ -118,24 +96,13 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilder{params.inputPaths}
         , DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , miscMethods{std::move(miscMethods)}
-        , derivationType{drv.type()}
+        , BuilderCore{store, std::move(miscMethods), drv}
     {
     }
 
     void cleanupOnDestruction() noexcept override
     {
-        try {
-            killChild();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
-            daemon.stop();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
+        BuilderCore::cleanupOnDestruction(*this);
         try {
             cleanupBuild(false);
         } catch (...) {
@@ -801,42 +768,15 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         sandboxMountNamespace = -1;
         sandboxUserNamespace = -1;
 
-        int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
-
-        killSandbox(true);
-
-        daemon.stop();
-
-        nix::logCpuUsage(store, drvPath, buildResult, status);
-
-        if (!statusOk(status)) {
-            bool diskFull = nix::isDiskFull(store, tmpDir);
-
-            cleanupBuild(false);
-
-            throw BuilderFailureError{
-                !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
-                                                          : BuildResult::Failure::PermanentFailure,
-                status,
-                diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
-            };
-        }
-
-        auto builtOutputs = nix::registerOutputs(
-            store,
-            localSettings,
+        return unprepareBuildCommon(
             *this,
+            builderOut,
             addedPaths,
-            scratchOutputs,
-            buildUser.get(),
-            tmpDir,
+            [this](bool s) { killSandbox(s); },
+            [this](bool f) { cleanupBuild(f); },
             [this](const std::filesystem::path & p) -> std::filesystem::path {
                 return chrootRootDir / p.relative_path();
             });
-
-        cleanupBuild(true);
-
-        return builtOutputs;
     }
 };
 

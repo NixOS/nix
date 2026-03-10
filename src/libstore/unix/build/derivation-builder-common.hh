@@ -128,6 +128,48 @@ struct RecursiveNixDaemon
 };
 
 /**
+ * Common state shared by all derivation builder implementations.
+ *
+ * Every standalone builder (generic-unix, darwin, external, linux,
+ * linux-chroot, freebsd) holds the same set of core fields. This struct
+ * groups them so builders compose via `BuilderCore core;` rather than
+ * repeating ~12 identical member declarations.
+ */
+struct BuilderCore
+{
+    Pid pid;
+    LocalStore & store;
+    const LocalSettings & localSettings;
+    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
+    std::unique_ptr<UserLock> buildUser;
+    std::filesystem::path tmpDir;
+    std::filesystem::path topTmpDir;
+    const DerivationType derivationType;
+    std::map<StorePath, StorePath> redirectedOutputs;
+    OutputPathMap scratchOutputs;
+    RecursiveNixDaemon daemon;
+
+    BuilderCore(
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, const BasicDerivation & drv);
+
+    void killSandboxBase(bool getStats);
+    bool killChild(DerivationBuilderCallbacks & miscMethods);
+    void cleanupOnDestruction(DerivationBuilder & builder) noexcept;
+
+    /**
+     * Common implementation of `unprepareBuild()`. Builder-specific
+     * behavior is injected through callbacks.
+     */
+    SingleDrvOutputs unprepareBuildCommon(
+        DerivationBuilderParams & params,
+        AutoCloseFD & builderOut,
+        const StorePathSet & addedPaths,
+        std::function<void(bool)> killSandbox,
+        std::function<void(bool)> cleanupBuild,
+        std::function<std::filesystem::path(const std::filesystem::path &)> realPathInHost);
+};
+
+/**
  * Read and process sandbox setup messages from the builder child process.
  * Waits for the "\2" ready signal, handles "\1" error reports.
  */

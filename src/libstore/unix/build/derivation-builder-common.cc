@@ -1171,4 +1171,85 @@ void parsePreBuildHook(PathsInChroot & pathsInChroot, const std::string & hookOu
     }
 }
 
+BuilderCore::BuilderCore(
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, const BasicDerivation & drv)
+    : store{store}
+    , localSettings{store.config->getLocalSettings()}
+    , miscMethods{std::move(miscMethods)}
+    , derivationType{drv.type()}
+{
+}
+
+void BuilderCore::killSandboxBase(bool getStats)
+{
+    if (buildUser) {
+        auto uid = buildUser->getUID();
+        assert(uid != 0);
+        killUser(uid);
+    }
+}
+
+bool BuilderCore::killChild(DerivationBuilderCallbacks & miscMethods)
+{
+    bool ret = pid != -1;
+    if (ret) {
+        ::kill(-pid, SIGKILL);
+        killSandboxBase(true);
+        pid.wait();
+        miscMethods.childTerminated();
+    }
+    return ret;
+}
+
+void BuilderCore::cleanupOnDestruction(DerivationBuilder & builder) noexcept
+{
+    try {
+        builder.killChild();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+    try {
+        daemon.stop();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
+SingleDrvOutputs BuilderCore::unprepareBuildCommon(
+    DerivationBuilderParams & params,
+    AutoCloseFD & builderOut,
+    const StorePathSet & addedPaths,
+    std::function<void(bool)> killSandbox,
+    std::function<void(bool)> cleanupBuild,
+    std::function<std::filesystem::path(const std::filesystem::path &)> realPathInHost)
+{
+    int status = commonUnprepare(pid, store, params.drvPath, params.buildResult, *miscMethods, builderOut);
+
+    killSandbox(true);
+
+    daemon.stop();
+
+    logCpuUsage(store, params.drvPath, params.buildResult, status);
+
+    if (!statusOk(status)) {
+        bool diskFull = isDiskFull(store, tmpDir);
+
+        cleanupBuild(false);
+
+        throw BuilderFailureError{
+            !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
+                                                      : BuildResult::Failure::PermanentFailure,
+            status,
+            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+        };
+    }
+
+    auto builtOutputs = registerOutputs(
+        store, localSettings, params, addedPaths, scratchOutputs, buildUser.get(), tmpDir, realPathInHost);
+
+    cleanupBuild(true);
+
+    return builtOutputs;
+}
+
 } // namespace nix

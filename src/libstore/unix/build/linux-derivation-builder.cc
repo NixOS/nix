@@ -93,52 +93,19 @@ static void setupLandlock()
 
 #  endif
 
-struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
 {
-    Pid pid;
-
-    LocalStore & store;
-
-    const LocalSettings & localSettings = store.config->getLocalSettings();
-
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
-
-    std::unique_ptr<UserLock> buildUser;
-
-    std::filesystem::path tmpDir;
-
-    std::filesystem::path topTmpDir;
-
-    const DerivationType derivationType;
-
-    std::map<StorePath, StorePath> redirectedOutputs;
-
-    OutputPathMap scratchOutputs;
-
-    RecursiveNixDaemon daemon;
-
     LinuxDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilder{params.inputPaths}
         , DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , miscMethods{std::move(miscMethods)}
-        , derivationType{drv.type()}
+        , BuilderCore{store, std::move(miscMethods), drv}
     {
     }
 
     void cleanupOnDestruction() noexcept override
     {
-        try {
-            killChild();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
-            daemon.stop();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
+        BuilderCore::cleanupOnDestruction(*this);
         try {
             cleanupBuild(false);
         } catch (...) {
@@ -154,23 +121,12 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     void killSandbox(bool getStats)
     {
-        if (buildUser) {
-            auto uid = buildUser->getUID();
-            assert(uid != 0);
-            killUser(uid);
-        }
+        killSandboxBase(getStats);
     }
 
     bool killChild() override
     {
-        bool ret = pid != -1;
-        if (ret) {
-            ::kill(-pid, SIGKILL);
-            killSandbox(true);
-            pid.wait();
-            miscMethods->childTerminated();
-        }
-        return ret;
+        return BuilderCore::killChild(*miscMethods);
     }
 
     void cleanupBuild(bool force)
@@ -351,40 +307,13 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     SingleDrvOutputs unprepareBuild() override
     {
-        int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
-
-        killSandbox(true);
-
-        daemon.stop();
-
-        nix::logCpuUsage(store, drvPath, buildResult, status);
-
-        if (!statusOk(status)) {
-            bool diskFull = nix::isDiskFull(store, tmpDir);
-
-            cleanupBuild(false);
-
-            throw BuilderFailureError{
-                !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
-                                                          : BuildResult::Failure::PermanentFailure,
-                status,
-                diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
-            };
-        }
-
-        auto builtOutputs = nix::registerOutputs(
-            store,
-            localSettings,
+        return unprepareBuildCommon(
             *this,
+            builderOut,
             addedPaths,
-            scratchOutputs,
-            buildUser.get(),
-            tmpDir,
+            [this](bool s) { killSandbox(s); },
+            [this](bool f) { cleanupBuild(f); },
             [this](const std::filesystem::path & p) { return store.toRealPath(store.parseStorePath(p.native())); });
-
-        cleanupBuild(true);
-
-        return builtOutputs;
     }
 };
 

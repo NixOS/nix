@@ -209,30 +209,8 @@ struct iovec iovFromDynamicSizeString(const std::string & s)
 
 } // namespace
 
-struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
 {
-    Pid pid;
-
-    LocalStore & store;
-
-    const LocalSettings & localSettings = store.config->getLocalSettings();
-
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
-
-    std::unique_ptr<UserLock> buildUser;
-
-    std::filesystem::path tmpDir;
-
-    std::filesystem::path topTmpDir;
-
-    const DerivationType derivationType;
-
-    std::map<StorePath, StorePath> redirectedOutputs;
-
-    OutputPathMap scratchOutputs;
-
-    RecursiveNixDaemon daemon;
-
     std::filesystem::path chrootRootDir;
 
     std::optional<AutoDelete> autoDelChroot;
@@ -243,24 +221,13 @@ struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderPara
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilder{params.inputPaths}
         , DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , miscMethods{std::move(miscMethods)}
-        , derivationType{drv.type()}
+        , BuilderCore{store, std::move(miscMethods), drv}
     {
     }
 
     void cleanupOnDestruction() noexcept override
     {
-        try {
-            killChild();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
-            daemon.stop();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
+        BuilderCore::cleanupOnDestruction(*this);
         try {
             cleanupBuild(false);
         } catch (...) {
@@ -286,23 +253,12 @@ struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderPara
 
     void killSandbox(bool getStats)
     {
-        if (buildUser) {
-            auto uid = buildUser->getUID();
-            assert(uid != 0);
-            killUser(uid);
-        }
+        killSandboxBase(getStats);
     }
 
     bool killChild() override
     {
-        bool ret = pid != -1;
-        if (ret) {
-            ::kill(-pid, SIGKILL);
-            killSandbox(true);
-            pid.wait();
-            miscMethods->childTerminated();
-        }
-        return ret;
+        return BuilderCore::killChild(*miscMethods);
     }
 
     void cleanupBuild(bool force)
@@ -592,152 +548,6 @@ struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderPara
             int jid;
 
             if (derivationType.isSandboxed()) {
-            jid = jail_setv(
-                JAIL_CREATE,
-                "persist",
-                "true",
-                "path",
-                chrootRootDir.c_str(),
-                "host.hostname",
-                "localhost",
-                // TODO: Make our own ruleset
-                "vnet",
-                "new",
-                nullptr);
-            if (jid < 0) {
-                throw SysError("failed to create jail (isolated network): %1%", jail_errmsg);
-            }
-            autoDelJail->jid = jid;
-
-            // Everything from here to the end of the block is setting up the network
-            // code adapted from freebsd/sbin/ifconfig/af_inet.c, in_exec_nl
-            Pid helper = startProcess([&]() {
-                unix::closeExtraFDs();
-                enterChroot();
-
-                struct snl_state ss = {};
-                if (!snl_init(&ss, NETLINK_ROUTE)) {
-                    throw SysError("Failed to init netlink connection");
-                }
-
-                struct snl_writer nw = {};
-                snl_init_writer(&ss, &nw);
-                struct nlmsghdr * hdr = snl_create_msg_request(&nw, NL_RTM_NEWADDR);
-                struct ifaddrmsg * ifahdr = snl_reserve_msg_object(&nw, struct ifaddrmsg);
-
-                ifahdr->ifa_family = AF_INET;
-                ifahdr->ifa_prefixlen = 8;
-                ifahdr->ifa_index = if_nametoindex("lo0");
-                snl_add_msg_attr_ip4(&nw, IFA_LOCAL, (const struct in_addr *) "\x7f\x00\x00\x01");
-
-                int off = snl_add_msg_attr_nested(&nw, IFA_FREEBSD);
-                snl_add_msg_attr_u32(&nw, IFAF_FLAGS, IFF_LOOPBACK | IFF_UP);
-                snl_end_attr_nested(&nw, off);
-
-                if (!(hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
-                    snl_free(&ss);
-                    throw SysError("failed to sendoff netlink message");
-                }
-
-                struct snl_errmsg_data e = {};
-                snl_read_reply_code(&ss, hdr->nlmsg_seq, &e);
-                if (e.error_str != nullptr) {
-                    snl_free(&ss);
-                    throw SysError("failed to configure loopback interface: %1%", e.error_str);
-                }
-                snl_free(&ss);
-                _exit(0);
-            });
-
-            /* TODO: Capture the error from the helper? */
-            if (auto status = helper.wait(); !statusOk(status)) {
-                throw Error("failed to configure loopback address: %s", statusToString(status));
-            }
-        } else {
-            jid = jail_setv(
-                JAIL_CREATE,
-                "persist",
-                "true",
-                // 4 is the most restrictive devfs ruleset that meets our needs
-                // which is found in the default installation. Trying to add
-                // another one is a huge pain...
-                "devfs_ruleset",
-                "4",
-                "path",
-                chrootRootDir.c_str(),
-                "host.hostname",
-                "localhost",
-                "ip4",
-                "inherit",
-                "ip6",
-                "inherit",
-                "allow.raw_sockets",
-                "true",
-                nullptr);
-            if (jid < 0) {
-                throw SysError("failed to create jail (networked): %1%", jail_errmsg);
-            }
-            autoDelJail->jid = jid;
-        }
-
-        pid = startProcess([&]() {
-            openSlave();
-            runChild(args);
-        });
-    }
-
-    void enterChroot() override
-    {
-        /* Close all other file descriptors. This must happen before
-           jail_attach for FreeBSD. */
-        unix::closeExtraFDs();
-
-        if (jail_attach(autoDelJail->jid) < 0) {
-            throw SysError("failed to attach to jail");
-        }
-    }
-
-    void addDependency(const StorePath & path)
-    {
-        throw UnimplementedError(
-            "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
-        auto [rootDir, cleanup] = setupBuildChroot(chrootParams);
-        chrootRootDir = std::move(rootDir);
-        autoDelChroot.emplace(std::move(cleanup));
-
-        // Set up FreeBSD-specific sandbox content (password DB, devfs, nullfs mounts)
-        prepareSandbox(pathsInChroot);
-
-        if (localSettings.preBuildHook != "") {
-            printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
-            assert(!chrootRootDir.empty());
-            auto lines = runProgram(
-                localSettings.preBuildHook.get(),
-                false,
-                Strings({store.printStorePath(drvPath), chrootRootDir.native()}));
-            nix::parsePreBuildHook(pathsInChroot, lines);
-        }
-
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            daemon.start(store, *this, env, tmpDir, tmpDirInSandbox(), buildUser.get());
-
-        nix::logBuilderInfo(drv);
-
-        miscMethods->openLogFile();
-
-        nix::setupPTYMaster(builderOut, buildUser.get());
-
-        buildResult.startTime = time(0);
-
-        // Create jail and start child
-        {
-#  if NIX_WITH_AWS_AUTH
-            auto awsCredentials = nix::preResolveAwsCredentials(drv);
-#  endif
-
-            int jid;
-
-            if (derivationType.isSandboxed()) {
                 jid = jail_setv(
                     JAIL_CREATE,
                     "persist",
@@ -826,60 +636,153 @@ struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderPara
                 autoDelJail->jid = jid;
             }
 
-            pid = startProcess([this,
-                                env,
-                                inputRewrites,
+            pid = startProcess([&]() {
+                openSlave();
+                runChild(args);
+            });
+        }
+
+        void enterChroot() override
+        {
+            /* Close all other file descriptors. This must happen before
+               jail_attach for FreeBSD. */
+            unix::closeExtraFDs();
+
+            if (jail_attach(autoDelJail->jid) < 0) {
+                throw SysError("failed to attach to jail");
+            }
+        }
+
+        void addDependency(const StorePath & path)
+        {
+            throw UnimplementedError(
+                "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
+            auto [rootDir, cleanup] = setupBuildChroot(chrootParams);
+            chrootRootDir = std::move(rootDir);
+            autoDelChroot.emplace(std::move(cleanup));
+
+            // Set up FreeBSD-specific sandbox content (password DB, devfs, nullfs mounts)
+            prepareSandbox(pathsInChroot);
+
+            if (localSettings.preBuildHook != "") {
+                printMsg(lvlChatty, "executing pre-build hook '%1%'", localSettings.preBuildHook);
+                assert(!chrootRootDir.empty());
+                auto lines = runProgram(
+                    localSettings.preBuildHook.get(),
+                    false,
+                    Strings({store.printStorePath(drvPath), chrootRootDir.native()}));
+                nix::parsePreBuildHook(pathsInChroot, lines);
+            }
+
+            if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+                daemon.start(store, *this, env, tmpDir, tmpDirInSandbox(), buildUser.get());
+
+            nix::logBuilderInfo(drv);
+
+            miscMethods->openLogFile();
+
+            nix::setupPTYMaster(builderOut, buildUser.get());
+
+            buildResult.startTime = time(0);
+
+            // Create jail and start child
+            {
 #  if NIX_WITH_AWS_AUTH
-                                awsCredentials,
+                auto awsCredentials = nix::preResolveAwsCredentials(drv);
 #  endif
-                                jid]() mutable {
-                nix::setupPTYSlave(builderOut.get());
 
-                bool sendException = true;
+                int jid;
 
-                try {
-                    commonChildInit();
-
-                    BuiltinBuilderContext ctx{
-                        .drv = drv,
-                        .hashedMirrors = settings.getLocalSettings().hashedMirrors,
-                        .tmpDirInSandbox = tmpDirInSandbox(),
-#  if NIX_WITH_AWS_AUTH
-                        .awsCredentials = awsCredentials,
-#  endif
-                    };
-
-                    nix::setupBuiltinFetchurlContext(ctx, drv);
-
-                    /* Close all other file descriptors. This must happen before
-                       jail_attach for FreeBSD. */
-                    unix::closeExtraFDs();
-
-                    if (jail_attach(jid) < 0) {
-                        throw SysError("failed to attach to jail");
+                if (derivationType.isSandboxed()) {
+                    jid = jail_setv(
+                        JAIL_CREATE,
+                        "persist",
+                        "true",
+                        "path",
+                        chrootRootDir.c_str(),
+                        "host.hostname",
+                        "localhost",
+                        // TODO: Make our own ruleset
+                        "vnet",
+                        "new",
+                        nullptr);
+                    if (jid < 0) {
+                        throw SysError("failed to create jail (isolated network): %1%", jail_errmsg);
                     }
+                    autoDelJail->jid = jid;
 
-                    if (chdir(tmpDirInSandbox().c_str()) == -1)
-                        throw SysError("changing into %1%", PathFmt(tmpDir));
+                    // Set up loopback interface inside the jail's vnet
+                    // Code adapted from freebsd/sbin/ifconfig/af_inet.c, in_exec_nl
+                    Pid helper = startProcess([&]() {
+                        unix::closeExtraFDs();
 
-                    struct rlimit limit = {0, RLIM_INFINITY};
-                    setrlimit(RLIMIT_CORE, &limit);
+                        if (jail_attach(autoDelJail->jid) < 0) {
+                            throw SysError("failed to attach to jail");
+                        }
 
-                    if (buildUser)
-                        nix::dropPrivileges(*buildUser);
+                        struct snl_state ss = {};
+                        if (!snl_init(&ss, NETLINK_ROUTE)) {
+                            throw SysError("Failed to init netlink connection");
+                        }
 
-                    writeFull(STDERR_FILENO, std::string("\2\n"));
+                        struct snl_writer nw = {};
+                        snl_init_writer(&ss, &nw);
+                        struct nlmsghdr * hdr = snl_create_msg_request(&nw, NL_RTM_NEWADDR);
+                        struct ifaddrmsg * ifahdr = snl_reserve_msg_object(&nw, struct ifaddrmsg);
 
-                    sendException = false;
+                        ifahdr->ifa_family = AF_INET;
+                        ifahdr->ifa_prefixlen = 8;
+                        ifahdr->ifa_index = if_nametoindex("lo0");
+                        snl_add_msg_attr_ip4(&nw, IFA_LOCAL, (const struct in_addr *) "\x7f\x00\x00\x01");
 
-                    if (drv.isBuiltin())
-                        nix::runBuiltinBuilder(ctx, drv, scratchOutputs, store);
+                        int off = snl_add_msg_attr_nested(&nw, IFA_FREEBSD);
+                        snl_add_msg_attr_u32(&nw, IFAF_FLAGS, IFF_LOOPBACK | IFF_UP);
+                        snl_end_attr_nested(&nw, off);
 
-                    nix::execBuilder(drv, inputRewrites, env);
+                        if (!(hdr = snl_finalize_msg(&nw)) || !snl_send_message(&ss, hdr)) {
+                            snl_free(&ss);
+                            throw SysError("failed to sendoff netlink message");
+                        }
 
-                } catch (...) {
-                    handleChildException(sendException);
-                    _exit(1);
+                        struct snl_errmsg_data e = {};
+                        snl_read_reply_code(&ss, hdr->nlmsg_seq, &e);
+                        if (e.error_str != nullptr) {
+                            snl_free(&ss);
+                            throw SysError("failed to configure loopback interface: %1%", e.error_str);
+                        }
+                        snl_free(&ss);
+                        _exit(0);
+                    });
+
+                    /* TODO: Capture the error from the helper? */
+                    if (helper.wait() != 0) {
+                        throw SysError("failed to configure loopback address");
+                    }
+                } else {
+                    jid = jail_setv(
+                        JAIL_CREATE,
+                        "persist",
+                        "true",
+                        // 4 is the most restrictive devfs ruleset that meets our needs
+                        // which is found in the default installation. Trying to add
+                        // another one is a huge pain...
+                        "devfs_ruleset",
+                        "4",
+                        "path",
+                        chrootRootDir.c_str(),
+                        "host.hostname",
+                        "localhost",
+                        "ip4",
+                        "inherit",
+                        "ip6",
+                        "inherit",
+                        "allow.raw_sockets",
+                        "true",
+                        nullptr);
+                    if (jid < 0) {
+                        throw SysError("failed to create jail (networked): %1%", jail_errmsg);
+                    }
+                    autoDelJail->jid = jid;
                 }
 
                 pid = startProcess([this,
@@ -974,57 +877,9 @@ struct FreeBSDChrootDerivationBuilder : DerivationBuilder, DerivationBuilderPara
     DerivationBuilderUnique makeFreeBSDChrootDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
     {
-        int status = nix::commonUnprepare(pid, store, drvPath, buildResult, *miscMethods, builderOut);
-
-        killSandbox(true);
-
-        daemon.stop();
-
-        nix::logCpuUsage(store, drvPath, buildResult, status);
-
-        if (!statusOk(status)) {
-            bool diskFull = nix::isDiskFull(store, tmpDir);
-
-            cleanupBuild(false);
-
-            throw BuilderFailureError{
-                !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
-                                                          : BuildResult::Failure::PermanentFailure,
-                status,
-                diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
-            };
-        }
-
-        auto builtOutputs = nix::registerOutputs(
-            store,
-            localSettings,
-            *this,
-            addedPaths,
-            scratchOutputs,
-            buildUser.get(),
-            tmpDir,
-            [this](const std::filesystem::path & p) -> std::filesystem::path {
-                return chrootRootDir / p.relative_path();
-            });
-
-        cleanupBuild(true);
-
-        return builtOutputs;
+        return DerivationBuilderUnique(
+            new FreeBSDChrootDerivationBuilder(store, std::move(miscMethods), std::move(params)));
     }
-};
-
-DerivationBuilderUnique makeFreeBSDDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-{
-    return makeGenericUnixDerivationBuilder(store, std::move(miscMethods), std::move(params));
-}
-
-DerivationBuilderUnique makeFreeBSDChrootDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-{
-    return DerivationBuilderUnique(
-        new FreeBSDChrootDerivationBuilder(store, std::move(miscMethods), std::move(params)));
-}
 
 } // namespace nix
 
