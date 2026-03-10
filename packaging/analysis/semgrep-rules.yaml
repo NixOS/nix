@@ -1,0 +1,290 @@
+rules:
+  # ── Category 1: Unsafe C String/Memory Functions ──────────────
+  - id: dangerous-system-call
+    pattern: system($ARG)
+    message: Use of system() is dangerous — consider execve() or posix_spawn()
+    languages: [cpp, c]
+    severity: WARNING
+  - id: unsafe-sprintf
+    pattern: sprintf($BUF, ...)
+    message: sprintf() has no bounds checking — use snprintf() instead
+    languages: [cpp, c]
+    severity: WARNING
+  - id: unsafe-strcpy
+    pattern: strcpy($DST, $SRC)
+    message: strcpy() has no bounds checking — use strncpy() or std::string
+    languages: [cpp, c]
+    severity: WARNING
+  - id: unsafe-strcat
+    pattern: strcat($DST, $SRC)
+    message: strcat() has no bounds checking — use strncat() or std::string
+    languages: [cpp, c]
+    severity: WARNING
+  - id: potential-format-string
+    patterns:
+      - pattern: printf($FMT)
+      - pattern-not: printf("...")
+    message: Potential format string vulnerability — ensure format string is a literal
+    languages: [cpp, c]
+    severity: WARNING
+  - id: unsafe-vsprintf
+    pattern: vsprintf($BUF, ...)
+    message: vsprintf() has no bounds checking — use vsnprintf() instead
+    languages: [cpp, c]
+    severity: WARNING
+  - id: unsafe-gets
+    pattern: gets($BUF)
+    message: gets() is always unsafe (unbounded read) — use fgets() instead
+    languages: [cpp, c]
+    severity: ERROR
+  - id: unsafe-strncpy-strlen
+    pattern: strncpy($D, $S, strlen($S))
+    message: strncpy with strlen(src) as length defeats the purpose of bounds checking
+    languages: [cpp, c]
+    severity: WARNING
+
+  # ── Category 2: Memory Management ─────────────────────────────
+  - id: raw-malloc
+    pattern: malloc(...)
+    message: Prefer C++ allocation (new/make_unique) over raw malloc in C++ code
+    languages: [cpp]
+    severity: INFO
+  - id: raw-realloc
+    pattern: realloc($PTR, $SIZE)
+    message: Prefer C++ containers over raw realloc — risk of memory leak on failure
+    languages: [cpp]
+    severity: INFO
+  - id: raw-free-in-cpp
+    pattern: free($PTR)
+    message: Prefer C++ RAII (unique_ptr/shared_ptr) over raw free() in C++ code
+    languages: [cpp]
+    severity: INFO
+  - id: delete-this
+    pattern: delete this
+    message: "'delete this' is dangerous — ensure no member access after this point"
+    languages: [cpp]
+    severity: WARNING
+  - id: memset-zero-length
+    pattern: memset($B, $V, 0)
+    message: memset with length 0 is a no-op — check arguments
+    languages: [cpp, c]
+    severity: WARNING
+  - id: memcpy-sizeof-pointer
+    pattern: memcpy($D, $S, sizeof($PTR))
+    message: memcpy with sizeof(pointer) likely copies only pointer size, not data
+    languages: [cpp, c]
+    severity: WARNING
+
+  # ── Category 3: Race Conditions / TOCTOU ─────────────────────
+  - id: toctou-access
+    pattern: access($PATH, ...)
+    message: access() is prone to TOCTOU races — use faccessat() or open-then-check
+    languages: [cpp, c]
+    severity: WARNING
+  - id: chmod-on-pathname
+    pattern: chmod($PATH, $MODE)
+    message: chmod on pathname is TOCTOU-prone — prefer fchmod() on an open fd
+    languages: [cpp, c]
+    severity: INFO
+  - id: chown-on-pathname
+    patterns:
+      - pattern-either:
+          - pattern: chown($PATH, $UID, $GID)
+          - pattern: lchown($PATH, $UID, $GID)
+    message: chown/lchown on pathname is TOCTOU-prone — prefer fchown() on an open fd
+    languages: [cpp, c]
+    severity: INFO
+  - id: insecure-rand
+    patterns:
+      - pattern-either:
+          - pattern: rand()
+          - pattern: srand(...)
+    message: rand()/srand() are not cryptographically secure — use <random> or getrandom()
+    languages: [cpp, c]
+    severity: WARNING
+  - id: toctou-stat
+    patterns:
+      - pattern-either:
+          - pattern: stat($PATH, $BUF)
+          - pattern: lstat($PATH, $BUF)
+    message: stat/lstat on pathname is TOCTOU-prone — prefer fstat() on an open fd
+    languages: [cpp, c]
+    severity: INFO
+
+  # ── Category 4: Type Safety and Casts ─────────────────────────
+  - id: const-cast
+    pattern: const_cast<$T>($E)
+    message: const_cast removes const — ensure this is intentional and safe
+    languages: [cpp]
+    severity: WARNING
+  - id: reinterpret-cast
+    pattern: reinterpret_cast<$T>($E)
+    message: reinterpret_cast is unsafe — verify type punning is valid
+    languages: [cpp]
+    severity: INFO
+  - id: c-style-pointer-cast
+    pattern: ($TYPE *) $EXPR
+    message: C-style pointer cast — prefer static_cast/reinterpret_cast for clarity
+    languages: [cpp]
+    severity: INFO
+  - id: stoi-unchecked
+    patterns:
+      - pattern-either:
+          - pattern: std::stoi(...)
+          - pattern: std::stol(...)
+          - pattern: std::stoul(...)
+    message: std::stoi/stol/stoul throw on invalid input — ensure exception handling
+    languages: [cpp]
+    severity: INFO
+
+  # ── Category 5: Error Handling ────────────────────────────────
+  - id: catch-all-no-rethrow
+    patterns:
+      - pattern: "catch (...) { ... }"
+      - pattern-not-inside: "catch (...) { ... throw; ... }"
+    message: Catch-all without rethrow may silently swallow errors
+    languages: [cpp]
+    severity: WARNING
+  - id: empty-catch-block
+    pattern: "catch ($T $E) { }"
+    message: Empty catch block silently ignores exception
+    languages: [cpp]
+    severity: WARNING
+  - id: throw-in-destructor
+    pattern: |
+      ~$CLASS(...) { ... throw $EXC; ... }
+    message: Throwing in destructor can cause std::terminate — use noexcept
+    languages: [cpp]
+    severity: ERROR
+  - id: strerror-thread-unsafe
+    pattern: strerror($E)
+    message: strerror() is not thread-safe — use strerror_r() or std::system_category()
+    languages: [cpp, c]
+    severity: INFO
+
+  # ── Category 6: Resource Management ──────────────────────────
+  - id: fopen-raw-file-pointer
+    pattern: fopen($P, $M)
+    message: Raw FILE* from fopen — prefer RAII wrapper or std::fstream in C++
+    languages: [cpp]
+    severity: INFO
+  - id: signal-not-sigaction
+    pattern: signal($SIG, $H)
+    message: signal() has portability issues — prefer sigaction()
+    languages: [cpp, c]
+    severity: WARNING
+  - id: vfork-usage
+    pattern: vfork()
+    message: vfork() shares address space with parent — prefer posix_spawn() or fork()
+    languages: [cpp, c]
+    severity: WARNING
+  - id: detached-thread
+    pattern: $T.detach()
+    message: Detached threads are hard to clean up — ensure this is intentional
+    languages: [cpp]
+    severity: WARNING
+  - id: popen-usage
+    pattern: popen($CMD, $MODE)
+    message: popen() invokes shell — risk of command injection, prefer posix_spawn()
+    languages: [cpp, c]
+    severity: WARNING
+
+  # ── Category 7: Privilege and Command Execution ───────────────
+  - id: setuid-setgid
+    patterns:
+      - pattern-either:
+          - pattern: setuid(...)
+          - pattern: setgid(...)
+    message: setuid/setgid changes process privileges — ensure proper error checking
+    languages: [cpp, c]
+    severity: WARNING
+  - id: chroot-usage
+    pattern: chroot($PATH)
+    message: chroot alone is not a security boundary — ensure chdir+drop privileges
+    languages: [cpp, c]
+    severity: WARNING
+  - id: getenv-unchecked
+    pattern: getenv($VAR)
+    message: getenv() returns nullable pointer — check for NULL before use
+    languages: [cpp, c]
+    severity: INFO
+  - id: sqlite-exec-non-literal
+    patterns:
+      - pattern: sqlite3_exec($DB, $SQL, ...)
+      - pattern-not: sqlite3_exec($DB, "...", ...)
+    message: Non-literal SQL in sqlite3_exec — risk of SQL injection, use prepared statements
+    languages: [cpp, c]
+    severity: WARNING
+  - id: exec-family
+    patterns:
+      - pattern-either:
+          - pattern: execvp(...)
+          - pattern: execv(...)
+          - pattern: execve(...)
+    message: exec-family call — ensure arguments are validated and paths are absolute
+    languages: [cpp, c]
+    severity: INFO
+
+  # ── Category 8: Concurrency ───────────────────────────────────
+  - id: lock-guard-temporary
+    pattern: std::lock_guard<$T>($M);
+    message: Lock guard as temporary is destroyed immediately — assign to a variable
+    languages: [cpp]
+    severity: ERROR
+  - id: relaxed-memory-order
+    patterns:
+      - pattern-either:
+          - pattern: $X.load(std::memory_order_relaxed)
+          - pattern: $X.store(..., std::memory_order_relaxed)
+    message: memory_order_relaxed provides no synchronization — ensure this is intentional
+    languages: [cpp]
+    severity: INFO
+  - id: thread-creation
+    pattern: std::thread($FN, ...)
+    message: std::thread creation — ensure the thread is joined or detached before scope exit
+    languages: [cpp]
+    severity: INFO
+
+  # ── Category 9: Code Quality / Defensive Programming ─────────
+  - id: goto-usage
+    pattern: goto $LABEL
+    message: goto usage — consider structured control flow alternatives
+    languages: [cpp, c]
+    severity: INFO
+  - id: assert-side-effect
+    patterns:
+      - pattern-either:
+          - pattern: assert($X = $Y)
+          - pattern: assert($X++)
+    message: Side effect in assert() — expression is removed in release builds (NDEBUG)
+    languages: [cpp, c]
+    severity: ERROR
+  - id: dangling-c-str
+    pattern: $E.str().c_str()
+    message: Dangling pointer — temporary std::string from str() is destroyed after c_str()
+    languages: [cpp]
+    severity: WARNING
+  - id: using-namespace-std
+    pattern: using namespace std;
+    message: "'using namespace std' pollutes the global namespace — use specific imports"
+    languages: [cpp]
+    severity: INFO
+  - id: fprintf-stderr
+    pattern: fprintf(stderr, ...)
+    message: Direct stderr output — consider using the project logging infrastructure
+    languages: [cpp, c]
+    severity: INFO
+  - id: atoi-atol-usage
+    patterns:
+      - pattern-either:
+          - pattern: atoi(...)
+          - pattern: atol(...)
+          - pattern: atof(...)
+    message: atoi/atol/atof have no error checking — use strtol/strtod or std::stoi with try/catch
+    languages: [cpp, c]
+    severity: WARNING
+  - id: alloca-usage
+    pattern: alloca($SIZE)
+    message: alloca() allocates on stack with no overflow check — prefer heap allocation
+    languages: [cpp, c]
+    severity: WARNING
