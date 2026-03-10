@@ -124,10 +124,20 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
         logWarning(e.info());
     }
 #if !USE_READLINE
-    el_hist_size = 1000;
-    // editline's read_history uses a fixed 256-byte buffer (SCREEN_INC),
-    // which silently splits lines longer than 255 characters into separate
-    // history entries. Read the file ourselves to avoid the length limit.
+    /* editline's read_history uses a fixed 256-byte buffer (SCREEN_INC),
+       which silently splits lines longer than 255 characters into separate
+       history entries. Read the file ourselves to avoid the length limit. See:
+       https://github.com/troglobit/editline/blob/2e0504d31e6878208036a4dd91f44841dabb1ee7/src/editline.c#L1617-L1635
+
+       ::rl_initialize must be called before the subsequent calls to
+       ::add_history to ensure that the buffer has actually been allocated
+       (but before setting ::el_hist_size).
+       Best I can tell it's supposed to idempotent, e.g. ::readline calls it
+       unconditionally anyway. */
+
+    ::el_hist_size = 1000; /* FIXME: Why the arbitrary limit? */
+    ::rl_initialize();
+
     auto fd = openFileReadonly(historyFile);
     if (!fd) {
         NativeSysError err("opening file %s", PathFmt(historyFile));
