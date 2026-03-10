@@ -322,6 +322,7 @@ pkgs.nixComponents2.nix-util.overrideAttrs (
             pkgs.buildPackages.nixfmt-rfc-style
             pkgs.buildPackages.shellcheck
             pkgs.buildPackages.include-what-you-use
+            pkgs.buildPackages.sqlite-interactive
           ]
           ++ lib.optional stdenv.hostPlatform.isUnix pkgs.buildPackages.gdb
           ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (

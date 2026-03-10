@@ -606,6 +606,11 @@ void LocalStore::upgradeDBSchema(State & state)
             "20251016-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
+
+    doUpgrade(
+        "20260309-drop-redundant-indexreferrer",
+        "drop index if exists IndexReferrer"
+    );
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
