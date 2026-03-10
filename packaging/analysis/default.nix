@@ -109,6 +109,18 @@ let
       ;
   };
 
+  clang-analyzer = import ./clang-analyzer.nix {
+    inherit
+      lib
+      pkgs
+      src
+      nixComponents
+      mesonConfigureArgs
+      analysisNativeBuildInputs
+      analysisBuildInputs
+      ;
+  };
+
   sanitizers = import ./sanitizers.nix {
     inherit pkgs nixComponents;
   };
@@ -135,14 +147,16 @@ let
     ln -s ${clang-tidy} $out/clang-tidy
     ln -s ${cppcheck} $out/cppcheck
     ln -s ${flawfinder} $out/flawfinder
+    ln -s ${clang-analyzer} $out/clang-analyzer
     ln -s ${gccTargets.gcc-warnings} $out/gcc-warnings
     {
       echo "=== Analysis Summary (standard) ==="
       echo ""
-      echo "clang-tidy:   $(cat ${clang-tidy}/count.txt) findings"
-      echo "cppcheck:     $(cat ${cppcheck}/count.txt) findings"
-      echo "flawfinder:   $(cat ${flawfinder}/count.txt) findings"
-      echo "gcc-warnings: $(cat ${gccTargets.gcc-warnings}/count.txt) findings"
+      echo "clang-tidy:      $(cat ${clang-tidy}/count.txt) findings"
+      echo "cppcheck:        $(cat ${cppcheck}/count.txt) findings"
+      echo "flawfinder:      $(cat ${flawfinder}/count.txt) findings"
+      echo "clang-analyzer:  $(cat ${clang-analyzer}/count.txt) findings"
+      echo "gcc-warnings:    $(cat ${gccTargets.gcc-warnings}/count.txt) findings"
       echo ""
       echo "Run 'nix build .#analysis-deep' for full analysis including"
       echo "GCC -fanalyzer, semgrep, and sanitizer builds."
@@ -155,6 +169,7 @@ let
     ln -s ${clang-tidy} $out/clang-tidy
     ln -s ${cppcheck} $out/cppcheck
     ln -s ${flawfinder} $out/flawfinder
+    ln -s ${clang-analyzer} $out/clang-analyzer
     ln -s ${gccTargets.gcc-warnings} $out/gcc-warnings
     ln -s ${gccTargets.gcc-analyzer} $out/gcc-analyzer
     ln -s ${semgrep} $out/semgrep
@@ -162,13 +177,14 @@ let
     {
       echo "=== Analysis Summary (deep) ==="
       echo ""
-      echo "clang-tidy:   $(cat ${clang-tidy}/count.txt) findings"
-      echo "cppcheck:     $(cat ${cppcheck}/count.txt) findings"
-      echo "flawfinder:   $(cat ${flawfinder}/count.txt) findings"
-      echo "gcc-warnings: $(cat ${gccTargets.gcc-warnings}/count.txt) findings"
-      echo "gcc-analyzer: $(cat ${gccTargets.gcc-analyzer}/count.txt) findings"
-      echo "semgrep:      $(cat ${semgrep}/count.txt) findings"
-      echo "sanitizers:   $(cat ${sanitizers}/count.txt) findings"
+      echo "clang-tidy:      $(cat ${clang-tidy}/count.txt) findings"
+      echo "cppcheck:        $(cat ${cppcheck}/count.txt) findings"
+      echo "flawfinder:      $(cat ${flawfinder}/count.txt) findings"
+      echo "clang-analyzer:  $(cat ${clang-analyzer}/count.txt) findings"
+      echo "gcc-warnings:    $(cat ${gccTargets.gcc-warnings}/count.txt) findings"
+      echo "gcc-analyzer:    $(cat ${gccTargets.gcc-analyzer}/count.txt) findings"
+      echo "semgrep:         $(cat ${semgrep}/count.txt) findings"
+      echo "sanitizers:      $(cat ${sanitizers}/count.txt) findings"
       echo ""
       echo "All analysis tools completed."
     } > $out/summary.txt
@@ -181,6 +197,7 @@ in
     clang-tidy
     cppcheck
     flawfinder
+    clang-analyzer
     semgrep
     sanitizers
     quick
