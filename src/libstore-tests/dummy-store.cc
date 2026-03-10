@@ -27,6 +27,34 @@ public:
     }
 };
 
+TEST(DummyStore, storeDir_default)
+{
+    DummyStoreConfig config{{}};
+    EXPECT_EQ(config.storeDir, "/nix/store");
+}
+
+TEST(DummyStore, storeDir_absolutePath)
+{
+    DummyStoreConfig config{{{"store", "/my/store"}}};
+    EXPECT_EQ(config.storeDir, "/my/store");
+}
+
+TEST(DummyStore, storeDir_canonicalized)
+{
+    DummyStoreConfig config{{{"store", "/my//store/../store"}}};
+    EXPECT_EQ(config.storeDir, "/my/store");
+}
+
+TEST(DummyStore, storeDir_relativePath_rejected)
+{
+    EXPECT_THROW((DummyStoreConfig{{{"store", "my/store"}}}), UsageError);
+}
+
+TEST(DummyStore, storeDir_empty_rejected)
+{
+    EXPECT_THROW((DummyStoreConfig{{{"store", ""}}}), UsageError);
+}
+
 TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);

@@ -4,6 +4,8 @@
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
 
+using namespace std::chrono_literals;
+
 namespace nix {
 
 HookInstance::HookInstance(const Strings & _buildHook)
@@ -69,6 +71,10 @@ HookInstance::HookInstance(const Strings & _buildHook)
 
         throw SysError("executing %s", PathFmt(buildHook));
     });
+
+    /* Give custom build hooks the chance to cleanup. */
+    pid.setKillSignal(SIGTERM);
+    pid.setKillTimeout(500ms);
 
     pid.setSeparatePG(true);
     fromHook.writeSide = -1;

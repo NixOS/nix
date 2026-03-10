@@ -10,12 +10,15 @@ class SSHMaster;
 
 struct CommonSSHStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    CommonSSHStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+    {
+    }
 
     CommonSSHStoreConfig(const ParsedURL::Authority & authority, const Params & params);
 
-    Setting<AbsolutePath> sshKey{
-        this, "", "ssh-key", "Path to the SSH private key used to authenticate to the remote machine."};
+    Setting<std::optional<AbsolutePath>> sshKey{
+        this, std::nullopt, "ssh-key", "Path to the SSH private key used to authenticate to the remote machine."};
 
     Setting<std::string> sshPublicHostKey{
         this, "", "base64-ssh-public-host-key", "The public host key of the remote machine."};

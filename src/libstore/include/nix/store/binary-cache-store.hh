@@ -16,7 +16,10 @@ class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+    BinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+    {
+    }
 
     Setting<CompressionAlgo> compression{
         this,
@@ -39,8 +42,8 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
           fetch debug info on demand
         )"};
 
-    Setting<AbsolutePath> secretKeyFile{
-        this, "", "secret-key", "Path to the secret key used to sign the binary cache."};
+    Setting<std::optional<AbsolutePath>> secretKeyFile{
+        this, std::nullopt, "secret-key", "Path to the secret key used to sign the binary cache."};
 
     Setting<std::string> secretKeyFiles{
         this, "", "secret-keys", "List of comma-separated paths to the secret keys used to sign the binary cache."};

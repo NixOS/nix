@@ -66,7 +66,7 @@ OsStrings getNixSshOpts()
 
 SSHMaster::SSHMaster(
     const ParsedURL::Authority & authority,
-    std::filesystem::path keyFile,
+    std::optional<std::filesystem::path> keyFile,
     std::string_view sshPublicHostKey,
     bool useMaster,
     bool compress,
@@ -95,8 +95,8 @@ void SSHMaster::addCommonSSHOpts(OsStrings & args)
     auto sshArgs = getNixSshOpts();
     args.insert(args.end(), sshArgs.begin(), sshArgs.end());
 
-    if (!keyFile.empty())
-        args.insert(args.end(), {OS_STR("-i"), keyFile.native()});
+    if (keyFile)
+        args.insert(args.end(), {OS_STR("-i"), keyFile->native()});
     if (!sshPublicHostKey.empty()) {
         std::filesystem::path fileName = tmpDir->path() / "host-key";
         writeFile(fileName, authority.host + " " + sshPublicHostKey + "\n");

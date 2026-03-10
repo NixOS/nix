@@ -54,6 +54,23 @@ static bool allSupportedLocally(Store & store, const StringSet & requiredFeature
 static int main_build_remote(int argc, char ** argv)
 {
     {
+        /* Upon exiting, Nix will attempt to terminate this process with
+           SIGTERM. initNix will block or handle SIGTERM, so we need to unblock
+           and unhandle it here.
+        */
+        struct sigaction act;
+        sigemptyset(&act.sa_mask);
+        act.sa_flags = 0;
+        act.sa_handler = SIG_DFL;
+        if (sigaction(SIGTERM, &act, 0))
+            throw SysError("resetting SIGTERM");
+
+        sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGTERM);
+        if (pthread_sigmask(SIG_UNBLOCK, &set, nullptr))
+            throw SysError("unblocking SIGTERM");
+
         logger = makeJSONLogger(getStandardError());
 
         /* Ensure we don't get any SSH passphrase or host key popups. */

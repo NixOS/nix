@@ -227,7 +227,7 @@ std::string readFile(const std::filesystem::path & path)
 {
     auto fd = openFileReadonly(path);
     if (!fd)
-        throw NativeSysError("opening file %1%", PathFmt(path));
+        throw NativeSysError("opening file %s", PathFmt(path));
     return readFile(fd.get());
 }
 

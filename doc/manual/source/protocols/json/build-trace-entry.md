@@ -11,7 +11,7 @@
 ### Build trace entry with signature
 
 ```json
-{{#include schema/build-trace-entry-v3/with-structured-signature.json}}
+{{#include schema/build-trace-entry-v3/with-signature.json}}
 ```
 
 <!--

@@ -4,6 +4,20 @@
 
 namespace nix {
 
+TEST(LegacySSHStore, storeDir_absolutePath)
+{
+    LegacySSHStoreConfig config{
+        ParsedURL::Authority::parse("localhost"),
+        {{"store", "/my/store"}},
+    };
+    EXPECT_EQ(config.storeDir, "/my/store");
+}
+
+TEST(LegacySSHStore, storeDir_relativePath_rejected)
+{
+    EXPECT_THROW(LegacySSHStoreConfig(ParsedURL::Authority::parse("localhost"), {{"store", "my/store"}}), UsageError);
+}
+
 TEST(LegacySSHStore, constructConfig)
 {
     LegacySSHStoreConfig config(

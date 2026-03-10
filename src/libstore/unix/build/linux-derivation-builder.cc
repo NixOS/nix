@@ -9,6 +9,8 @@
 #  include "nix/util/serialise.hh"
 #  include "linux/fchmodat2-compat.hh"
 
+#  include <algorithm>
+#  include <string_view>
 #  include <sys/ioctl.h>
 #  include <net/if.h>
 #  include <netinet/ip.h>
@@ -472,8 +474,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             if (!fd)
                 throw SysError("cannot open IP socket");
 
-            struct ifreq ifr;
-            strcpy(ifr.ifr_name, "lo");
+            using namespace std::string_view_literals;
+            struct ifreq ifr = {};
+            std::ranges::copy("lo"sv, ifr.ifr_name);
             ifr.ifr_flags = IFF_UP | IFF_LOOPBACK | IFF_RUNNING;
             if (ioctl(fd.get(), SIOCSIFFLAGS, &ifr) == -1)
                 throw SysError("cannot set loopback interface flags");

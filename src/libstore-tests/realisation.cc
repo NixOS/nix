@@ -11,6 +11,43 @@
 
 namespace nix {
 
+using nlohmann::json;
+
+/* ----------------------------------------------------------------------------
+ * Test data
+ * --------------------------------------------------------------------------*/
+
+UnkeyedRealisation unkeyedSimple{
+    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
+};
+
+UnkeyedRealisation unkeyedWithSignature{
+    .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
+    .signatures =
+        {
+            Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+        },
+};
+
+DrvOutput testDrvOutput{
+    .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
+    .outputName = "foo",
+};
+
+Realisation simple{
+    unkeyedSimple,
+    testDrvOutput,
+};
+
+Realisation withSignature{
+    unkeyedWithSignature,
+    testDrvOutput,
+};
+
+/* ----------------------------------------------------------------------------
+ * Realisation JSON
+ * --------------------------------------------------------------------------*/
+
 class RealisationTest : public JsonCharacterizationTest<Realisation>, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "realisation";
@@ -22,12 +59,6 @@ public:
         return unitTestData / testStem;
     }
 };
-
-/* ----------------------------------------------------------------------------
- * JSON
- * --------------------------------------------------------------------------*/
-
-using nlohmann::json;
 
 struct RealisationJsonTest : RealisationTest, ::testing::WithParamInterface<std::pair<std::string_view, Realisation>>
 {};
@@ -44,30 +75,6 @@ TEST_P(RealisationJsonTest, to_json)
     writeJsonTest(name, value);
 }
 
-Realisation simple{
-    {
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo"},
-    },
-    {
-        .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
-        .outputName = "foo",
-    },
-};
-
-Realisation withSignature{
-    {
-        .outPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"},
-        .signatures =
-            {
-                Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
-            },
-    },
-    {
-        .drvPath = StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv"},
-        .outputName = "foo",
-    },
-};
-
 INSTANTIATE_TEST_SUITE_P(
     RealisationJSON,
     RealisationJsonTest,
@@ -77,7 +84,7 @@ INSTANTIATE_TEST_SUITE_P(
             simple,
         },
         std::pair{
-            "with-signature-structured",
+            "with-signature",
             withSignature,
         }));
 
@@ -86,7 +93,52 @@ INSTANTIATE_TEST_SUITE_P(
  */
 TEST_F(RealisationTest, with_signature_from_json)
 {
-    readJsonTest("with-signature", withSignature);
+    readJsonTest("with-signature-unstructured", withSignature);
 }
+
+/* ----------------------------------------------------------------------------
+ * UnkeyedRealisation JSON
+ * --------------------------------------------------------------------------*/
+
+class UnkeyedRealisationTest : public JsonCharacterizationTest<UnkeyedRealisation>, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "realisation";
+
+public:
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
+
+struct UnkeyedRealisationJsonTest : UnkeyedRealisationTest,
+                                    ::testing::WithParamInterface<std::pair<std::string_view, UnkeyedRealisation>>
+{};
+
+TEST_P(UnkeyedRealisationJsonTest, from_json)
+{
+    const auto & [name, expected] = GetParam();
+    readJsonTest(name, expected);
+}
+
+TEST_P(UnkeyedRealisationJsonTest, to_json)
+{
+    const auto & [name, value] = GetParam();
+    writeJsonTest(name, value);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    UnkeyedRealisationJSON,
+    UnkeyedRealisationJsonTest,
+    ::testing::Values(
+        std::pair{
+            "unkeyed-simple",
+            unkeyedSimple,
+        },
+        std::pair{
+            "unkeyed-with-signature",
+            unkeyedWithSignature,
+        }));
 
 } // namespace nix

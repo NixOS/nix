@@ -14,12 +14,13 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
     if (ctx.netrcData != "") {
-        fileTransferSettings.netrcFile = "netrc";
+        fileTransferSettings.netrcFile = ctx.tmpDirInSandbox / "netrc";
         writeFile(fileTransferSettings.netrcFile.get(), ctx.netrcData, 0600);
     }
 
-    fileTransferSettings.caFile = "ca-certificates.crt";
-    writeFile(*fileTransferSettings.caFile.get(), ctx.caFileData, 0600);
+    auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";
+    fileTransferSettings.caFile = std::optional<AbsolutePath>{caFilePath};
+    writeFile(caFilePath, ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
     if (!out)

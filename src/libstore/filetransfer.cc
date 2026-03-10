@@ -34,20 +34,26 @@ namespace nix {
 const unsigned int RETRY_TIME_MS_DEFAULT = 250;
 const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
 
-std::filesystem::path FileTransferSettings::getDefaultSSLCertFile()
+std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
     for (auto & fn :
          {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
         if (pathAccessible(fn))
             return fn;
-    return "";
+    return std::nullopt;
 }
 
 FileTransferSettings::FileTransferSettings()
 {
-    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (sslOverride != "")
-        caFile = sslOverride;
+    std::optional<AbsolutePath> sslOverride =
+        getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
+            .or_else([] { return getEnvOs(OS_STR("SSL_CERT_FILE")); })
+            .and_then([](OsString s) -> std::optional<OsString> {
+                return s.empty() ? std::nullopt : std::optional{std::move(s)};
+            })
+            .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
+    if (sslOverride)
+        caFile = *sslOverride;
 }
 
 FileTransferSettings fileTransferSettings;
@@ -550,8 +556,10 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
+            /* Note: libcurl copies string arguments, so temporaries from
+               .string().c_str() are safe. See the comment near CURLOPT_SSLKEY below. */
             if (auto & caFile = fileTransfer.settings.caFile.get())
-                curl_easy_setopt(req, CURLOPT_CAINFO, caFile->c_str());
+                curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
 
 #if !defined(_WIN32)
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
@@ -569,7 +577,7 @@ struct curlFileTransfer : public FileTransfer
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().c_str());
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().string().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             if (writtenToSink)

@@ -12,6 +12,7 @@
 #include "nix/store/names.hh"
 #include "nix/util/url.hh"
 #include "nix/flake/url-name.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -688,6 +689,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
     void run(ref<Store> store) override
     {
+        fetchSettings.tarballTtl = 0;
         ProfileManifest manifest(*getEvalState(), *profile);
 
         Installables installables;
