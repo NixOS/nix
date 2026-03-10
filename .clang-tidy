@@ -1,3 +1,49 @@
-# We use pointers to aggregates in a couple of places, intentionally.
-# void * would look weird.
-Checks: '-bugprone-sizeof-expression'
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-sizeof-expression,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  cert-*,
+  -cert-err58-cpp,
+  clang-analyzer-*,
+  cppcoreguidelines-*,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-avoid-non-const-global-variables,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  modernize-*,
+  -modernize-use-trailing-return-type,
+  -modernize-avoid-c-arrays,
+  performance-*,
+  readability-*,
+  -readability-magic-numbers,
+  -readability-identifier-length,
+  -readability-function-cognitive-complexity,
+  security-*,
+
+WarningsAsErrors: ''
+HeaderFilterRegex: 'src/.*'
+
+# Rationale for disabled checks:
+#
+# bugprone-sizeof-expression: intentional pointer-to-aggregate patterns
+# bugprone-easily-swappable-parameters: fires on nearly every function with 2+ same-type params
+# bugprone-narrowing-conversions: too noisy with existing codebase patterns
+# cert-err58-cpp: fires on global registrations with static object exceptions
+# cppcoreguidelines-avoid-magic-numbers: fires on all numeric literals
+# cppcoreguidelines-pro-bounds-pointer-arithmetic: impractical for systems code
+# cppcoreguidelines-pro-type-reinterpret-cast: needed for FFI boundaries
+# cppcoreguidelines-owning-memory: project does not use GSL
+# cppcoreguidelines-avoid-non-const-global-variables: too strict for existing patterns
+# misc-non-private-member-variables-in-classes: too strict for existing struct patterns
+# misc-no-recursion: recursive algorithms are intentional
+# modernize-use-trailing-return-type: style choice not adopted by this project
+# modernize-avoid-c-arrays: C arrays used in FFI and low-level code
+# readability-magic-numbers: duplicate of cppcoreguidelines-avoid-magic-numbers
+# readability-identifier-length: fires on idiomatic short names (i, n, etc.)
+# readability-function-cognitive-complexity: too strict for existing complex functions
