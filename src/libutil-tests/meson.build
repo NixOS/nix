@@ -51,6 +51,7 @@ sources = files(
   'archive.cc',
   'args.cc',
   'base-n.cc',
+  'bump-memory-resource.cc',
   'canon-path.cc',
   'checked-arithmetic.cc',
   'chunked-vector.cc',
