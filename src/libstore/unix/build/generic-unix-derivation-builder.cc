@@ -1,5 +1,4 @@
-#include "linux-derivation-builder.hh"
-#include "linux-derivation-builder-common.hh"
+#include "generic-unix-derivation-builder.hh"
 #include "derivation-builder-common.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/util/file-system.hh"
@@ -10,7 +9,6 @@
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/restricted-store.hh"
-#include "nix/store/personality.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -22,9 +20,7 @@
 
 namespace nix {
 
-using namespace nix::linux;
-
-struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
+struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 {
     Pid pid;
 
@@ -48,7 +44,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
     RecursiveNixDaemon daemon;
 
-    LinuxDerivationBuilder(
+    GenericUnixDerivationBuilder(
         LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilder{params.inputPaths}
         , DerivationBuilderParams{std::move(params)}
@@ -204,13 +200,6 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
                     nix::setupBuiltinFetchurlContext(ctx, drv);
 
-                    setupSeccomp(localSettings);
-
-                    linux::setPersonality({
-                        .system = drv.platform,
-                        .impersonateLinux26 = localSettings.impersonateLinux26,
-                    });
-
                     if (chdir(tmpDirInSandbox().c_str()) == -1)
                         throw SysError("changing into %1%", PathFmt(tmpDir));
 
@@ -284,10 +273,10 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams
     }
 };
 
-DerivationBuilderUnique makeLinuxDerivationBuilder(
+DerivationBuilderUnique makeGenericUnixDerivationBuilder(
     LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
-    return DerivationBuilderUnique(new LinuxDerivationBuilder(store, std::move(miscMethods), std::move(params)));
+    return DerivationBuilderUnique(new GenericUnixDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 }
 
 } // namespace nix

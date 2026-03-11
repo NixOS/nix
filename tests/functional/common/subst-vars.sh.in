@@ -5,6 +5,7 @@ if [[ -z "${COMMON_SUBST_VARS_SH_SOURCED-}" ]]; then
 COMMON_SUBST_VARS_SH_SOURCED=1
 
 bash=@bash@
+shell=@bash@
 bindir=@bindir@
 coreutils=@coreutils@
 
