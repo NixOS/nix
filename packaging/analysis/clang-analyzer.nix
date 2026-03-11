@@ -18,7 +18,7 @@ pkgs.stdenv.mkDerivation {
   inherit src;
 
   nativeBuildInputs = analysisNativeBuildInputs ++ [
-    llvmPkgs.clang-tools # provides scan-build
+    pkgs.clang-analyzer
   ];
   buildInputs = analysisBuildInputs;
 
