@@ -58,21 +58,33 @@ public:
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "var" / "nix" : getDefaultStateDir(),
         "state",
-        "Directory where Nix stores state.",
+        R"(
+          Directory where Nix stores state.
+
+          Defaults to [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) when [`root`](#store-setting-root) is not set.
+        )",
     };
 
     Setting<AbsolutePath> logDir{
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "var" / "log" / "nix" : getDefaultLogDir(),
         "log",
-        "directory where Nix stores log files.",
+        R"(
+          Directory where Nix stores log files.
+
+          Defaults to [`NIX_LOG_DIR`](@docroot@/command-ref/env-common.md#env-NIX_LOG_DIR) when [`root`](#store-setting-root) is not set.
+        )",
     };
 
     Setting<AbsolutePath> realStoreDir{
         this,
         rootDir.get() ? *rootDir.get() / "nix" / "store" : std::filesystem::path{storeDir},
         "real",
-        "Physical path of the Nix store.",
+        R"(
+          Physical path of the Nix store.
+
+          Defaults to [`store`](#store-setting-store) when [`root`](#store-setting-root) is not set.
+        )",
     };
 };
 

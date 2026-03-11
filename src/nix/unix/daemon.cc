@@ -522,8 +522,10 @@ struct CmdDaemon : StoreConfigCommand
 
         addFlag({
             .longName = "force-untrusted",
-            .description =
-                "Force the daemon to not trust connecting clients. The connection is processed by the receiving daemon before forwarding commands.",
+            .description = R"(
+              Force the daemon to not trust connecting clients.
+              The connection is processed by the receiving daemon before forwarding commands.
+            )",
             .handler = {[&]() { isTrustedOpt = NotTrusted; }},
             .experimentalFeature = Xp::DaemonTrustOverride,
         });
