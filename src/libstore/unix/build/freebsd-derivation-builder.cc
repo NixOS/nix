@@ -440,8 +440,8 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             });
 
             /* TODO: Capture the error from the helper? */
-            if (helper.wait() != 0) {
-                throw SysError("failed to configure loopback address");
+            if (auto status = helper.wait(); !statusOk(status)) {
+                throw Error("failed to configure loopback address: %s", statusToString(status));
             }
         } else {
             jid = jail_setv(

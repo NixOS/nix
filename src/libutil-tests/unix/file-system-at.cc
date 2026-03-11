@@ -96,22 +96,22 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     Pid pid = startProcess(
         [&] {
             if (unshare(CLONE_NEWNS) == -1)
-                _exit(1);
+                _exit(2);
 
             if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
-                _exit(1);
+                _exit(2);
 
             if (mount("tmpfs", "/proc", "tmpfs", 0, 0) == -1)
-                _exit(1);
+                _exit(2);
 
             auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
             if (!dirFd)
-                exit(1);
+                _exit(3);
 
             try {
                 fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600);
             } catch (SysError & e) {
-                _exit(1);
+                _exit(4);
             }
 
             try {
@@ -121,12 +121,15 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
                     _exit(0); /* Success. */
             }
 
-            _exit(1); /* Didn't throw the expected exception. */
+            _exit(5); /* Didn't throw the expected exception. */
         },
         {.cloneFlags = CLONE_NEWUSER});
 
     int status = pid.wait();
-    ASSERT_TRUE(statusOk(status));
+    EXPECT_TRUE(WIFEXITED(status));
+    if (WEXITSTATUS(status) == 2)
+        GTEST_SKIP() << "Could not mount, system may be misconfigured";
+    EXPECT_EQ(WEXITSTATUS(status), 0);
 
     struct ::stat st;
     ASSERT_EQ(stat((tmpDir / "file").c_str(), &st), 0);
