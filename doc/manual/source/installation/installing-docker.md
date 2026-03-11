@@ -64,10 +64,10 @@ $ docker run -ti nix:2.5pre20211105
 
 If you would like to run Nix in a container under a user other than `root`,
 you can build an image with a non-root single-user installation of Nix
-by specifying the `uid`, `gid`, `uname`, and `gname` arguments to `docker.nix`:
+by specifying the `uid`, `gid`, `uname`, and `gname` arguments to `packaging/docker.nix`:
 
 ```console
-$ nix build --file docker.nix \
+$ nix build --file packaging/docker.nix \
     --arg uid 1000 \
     --arg gid 1000 \
     --argstr uname user \
