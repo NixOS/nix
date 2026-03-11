@@ -8,7 +8,7 @@
 #include "nix/util/error.hh"
 
 #include <boost/version.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 namespace nix {
 
@@ -274,7 +274,7 @@ private:
      * Transparent lookup of string view for a pointer to a ChunkedVector entry -> return offset into the store.
      * ChunkedVector references are never invalidated.
      */
-    boost::unordered_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
+    boost::concurrent_flat_set<SymbolStr, SymbolStr::Hash, SymbolStr::Equal> symbols{SymbolStr::chunkSize};
 
 public:
     SymbolTable(const StaticSymbolTable & staticSymtab)
@@ -287,10 +287,12 @@ public:
      */
     Symbol create(std::string_view s)
     {
-        // Most symbols are looked up more than once, so we trade off insertion performance
-        // for lookup performance.
-        // FIXME: make this thread-safe.
-        return Symbol(*symbols.insert(SymbolStr::Key{store, s, buffer}).first);
+        Symbol res;
+        symbols.insert_and_cvisit(
+            SymbolStr::Key{store, s, buffer},
+            [&](const auto & key) { res = Symbol(key); },
+            [&](const auto & key) { res = Symbol(key); });
+        return res;
     }
 
     std::vector<SymbolStr> resolve(const std::span<const Symbol> & symbols) const
@@ -307,6 +309,16 @@ public:
         uint32_t idx = s.id - uint32_t(1);
         if (idx >= store.size())
             unreachable();
+
+        /* Since ChunkedVector itself doesn't provide happens-before guarantees
+           about the object construction, we rely on other synchronisation
+           primitives to ensure happens-before relation between insertion
+           into the ChunkedVector and the load here. If another thread interns
+           the symbol via the symbols map, then the happens-before guarantee
+           should be provided by the concurrent_map itself. If thread B gets
+           Symbol from thread A through other means then it should also ensure
+           happens-before relation. */
+
         return store[idx];
     }
 
