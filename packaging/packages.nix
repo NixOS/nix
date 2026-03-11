@@ -124,7 +124,7 @@ forAllSystems (
     dockerImage =
       let
         pkgs = nixpkgsFor.${system}.native;
-        image = pkgs.callPackage ../docker.nix {
+        image = pkgs.callPackage ./docker.nix {
           tag = pkgs.nix.version;
         };
       in
