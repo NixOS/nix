@@ -69,8 +69,15 @@ int Pid::kill(bool allowInterrupts)
 
     debug("killing process %1%", pid.get());
 
-    if (!TerminateProcess(pid.get(), 1))
-        logError(WinError("terminating process %1%", pid.get()).info());
+    if (!TerminateProcess(pid.get(), 1)) {
+        // TerminateProcess fails with ERROR_ACCESS_DENIED when the
+        // process has already exited or is mid-exit. This commonly
+        // happens when commonUnprepare calls kill after detecting
+        // EOF on the builder pipe.
+        auto err = GetLastError();
+        if (err != ERROR_ACCESS_DENIED)
+            logError(WinError(err, "terminating process %1%", pid.get()).info());
+    }
 
     return wait(allowInterrupts);
 }
