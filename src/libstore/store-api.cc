@@ -80,9 +80,11 @@ StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType
           true,
           "store",
           R"(
-            Logical location of the Nix store, usually
-            `/nix/store`. Note that you can only copy store paths
-            between stores if they have the same `store` setting.
+            Logical location of the Nix store, usually `/nix/store`.
+
+            Defaults to [`NIX_STORE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STORE_DIR) if unset.
+
+            Note that you can only copy store paths between stores if they have the same `store` setting.
           )",
           {})
     , pathType(pathType)

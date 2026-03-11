@@ -75,7 +75,7 @@ std::filesystem::path descriptorToPath(Descriptor fd)
 
 std::filesystem::path defaultTempDir()
 {
-    return getEnvNonEmpty("TMPDIR").value_or("/tmp");
+    return getEnvOsNonEmpty("TMPDIR").value_or("/tmp");
 }
 
 PosixStat lstat(const std::filesystem::path & path)
