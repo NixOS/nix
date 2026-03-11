@@ -390,7 +390,7 @@ struct SizedSource : Source
 
     size_t read(char * data, size_t len) override
     {
-        if (this->remain <= 0) {
+        if (this->remain == 0) {
             throw EndOfFile("sized: unexpected end-of-file");
         }
         len = std::min(len, this->remain);
