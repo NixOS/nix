@@ -5,6 +5,7 @@
 #include "nix/expr/value.hh"
 #include "nix/expr/static-string-data.hh"
 #include "nix/util/chunked-vector.hh"
+#include "nix/util/bump-memory-resource.hh"
 #include "nix/util/error.hh"
 
 #include <boost/version.hpp>
@@ -263,11 +264,13 @@ public:
 class SymbolTable
 {
 private:
+    /* Thread-safe fallback resource, which might be a bit slower. */
+    std::pmr::synchronized_pool_resource fallbackResource{};
     /**
      * SymbolTable is an append only data structure.
      * During its lifetime the monotonic buffer holds all strings and nodes, if the symbol set is node based.
      */
-    std::pmr::monotonic_buffer_resource buffer;
+    BumpMemoryResource buffer{BumpMemoryResource::defaultReserveSize, &fallbackResource};
     SymbolStr::SymbolValueStore store;
 
     /**
