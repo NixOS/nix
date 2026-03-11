@@ -73,6 +73,25 @@ unset NIX_CONFIG
 # Test conflicting package add.
 nix profile add "$flake1Dir" 2>&1 | grep "warning: 'flake1' is already added"
 
+# Test tab completion of profile elements
+# The profile should have 'foo' and 'flake1' installed at this point
+completion_output=$(NIX_GET_COMPLETIONS=3 nix profile remove '' 2>&1)
+echo "$completion_output" | grep -q "^normal$"
+echo "$completion_output" | grep -q "^flake1"
+echo "$completion_output" | grep -q "^foo"
+
+# Test prefix matching - should only complete 'flake1' when prefix is 'fl'
+completion_output=$(NIX_GET_COMPLETIONS=3 nix profile remove 'fl' 2>&1)
+echo "$completion_output" | grep -q "^normal$"
+echo "$completion_output" | grep -q "^flake1"
+echo "$completion_output" | grepQuietInverse "^foo"
+
+# Test completion with upgrade command
+completion_output=$(NIX_GET_COMPLETIONS=3 nix profile upgrade '' 2>&1)
+echo "$completion_output" | grep -q "^normal$"
+echo "$completion_output" | grep -q "^flake1"
+echo "$completion_output" | grep -q "^foo"
+
 # Test upgrading a package.
 printf NixOS > "$flake1Dir"/who
 printf 2.0 > "$flake1Dir"/version

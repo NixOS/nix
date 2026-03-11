@@ -559,9 +559,23 @@ struct AllMatcher final : public Matcher
 
 AllMatcher all;
 
-class MixProfileElementMatchers : virtual Args, virtual StoreCommand
+class MixProfileElementMatchers : virtual Args, virtual StoreCommand, public virtual MixDefaultProfile
 {
     std::vector<ref<Matcher>> _matchers;
+
+    void completeProfileElements(AddCompletions & completions, std::string_view prefix)
+    {
+        auto * evalCmd = dynamic_cast<EvalCommand *>(this);
+        if (!evalCmd)
+            return;
+
+        auto evalState = evalCmd->getEvalState();
+        ProfileManifest manifest(*evalState, *profile);
+
+        for (auto & [name, element] : manifest.elements)
+            if (name.starts_with(prefix))
+                completions.add(name, element.identifier());
+    }
 
 public:
 
@@ -593,6 +607,9 @@ public:
                          _matchers.push_back(make_ref<NameMatcher>(arg));
                      }
                  }
+             }},
+             .completer = {[this](AddCompletions & completions, size_t, std::string_view prefix) {
+                 completeProfileElements(completions, prefix);
              }}});
     }
 
@@ -633,7 +650,7 @@ public:
     }
 };
 
-struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElementMatchers
+struct CmdProfileRemove : virtual EvalCommand, MixProfileElementMatchers
 {
     std::string description() override
     {
@@ -673,7 +690,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixDefaultProfile, MixProfileElem
     }
 };
 
-struct CmdProfileUpgrade : virtual SourceExprCommand, MixDefaultProfile, MixProfileElementMatchers
+struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers
 {
     std::string description() override
     {
