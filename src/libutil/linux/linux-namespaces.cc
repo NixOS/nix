@@ -39,7 +39,10 @@ bool userNamespacesSupported()
             Pid pid = startProcess([&]() { _exit(0); }, {.cloneFlags = CLONE_NEWUSER});
 
             auto r = pid.wait();
-            assert(!r);
+            /* The assert is OK because if we cannot do CLONE_NEWUSER we will
+               throw above, and if the process does run, it must exit this way
+               (or something else is really wrong). */
+            assert(statusOk(r));
         } catch (SysError & e) {
             debug("user namespaces do not work on this system: %s", e.msg());
             return false;
@@ -72,8 +75,8 @@ bool mountAndPidNamespacesSupported()
                 },
                 {.cloneFlags = CLONE_NEWNS | CLONE_NEWPID | (userNamespacesSupported() ? CLONE_NEWUSER : 0)});
 
-            if (pid.wait()) {
-                debug("PID namespaces do not work on this system: cannot remount /proc");
+            if (auto status = pid.wait(); !statusOk(status)) {
+                debug("PID namespaces do not work on this system: cannot remount /proc: %s", statusToString(status));
                 return false;
             }
 
