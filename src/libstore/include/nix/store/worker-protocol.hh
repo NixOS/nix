@@ -125,6 +125,11 @@ struct WorkerProto
     static constexpr std::string_view featureRealisationWithPath = "realisation-with-path-not-hash";
 
     /**
+     * Ability to run asynchronous post build hooks.
+     */
+    static constexpr std::string_view featureAsyncPostBuildHook = "async-post-build-hook";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
