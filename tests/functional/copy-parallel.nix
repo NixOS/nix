@@ -45,4 +45,22 @@ with import ./config.nix;
         ${builtins.concatStringsSep "\n" (map (l: "echo ${l} >> $out/deps") leaves)}
       '';
     };
+
+  # Dedup test: two derivations that each contain a file with the same
+  # content.  After `nix copy` with auto-optimise-store, the files
+  # should be hardlinked together (same inode).
+  dedup-a = mkDerivation {
+    name = "dedup-a";
+    buildCommand = ''
+      mkdir $out
+      echo "identical-content-for-dedup-test" > $out/samefile
+    '';
+  };
+  dedup-b = mkDerivation {
+    name = "dedup-b";
+    buildCommand = ''
+      mkdir $out
+      echo "identical-content-for-dedup-test" > $out/samefile
+    '';
+  };
 }

@@ -97,7 +97,12 @@ Strings LocalStore::readDirectoryIgnoringInodes(const std::filesystem::path & pa
 }
 
 void LocalStore::optimisePath_(
-    Activity * act, OptimiseStats & stats, const std::filesystem::path & path, InodeHash & inodeHash, RepairFlag repair)
+    Activity * act,
+    OptimiseStats & stats,
+    const std::filesystem::path & path,
+    InodeHash & inodeHash,
+    RepairFlag repair,
+    const FileNarHashes * precomputedHashes)
 {
     checkInterrupt();
 
@@ -119,7 +124,7 @@ void LocalStore::optimisePath_(
     if (S_ISDIR(st.st_mode)) {
         Strings names = readDirectoryIgnoringInodes(path, inodeHash);
         for (auto & i : names)
-            optimisePath_(act, stats, path / i, inodeHash, repair);
+            optimisePath_(act, stats, path / i, inodeHash, repair, precomputedHashes);
         return;
     }
 
@@ -155,13 +160,18 @@ void LocalStore::optimisePath_(
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = ({
-        hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path.string())},
-            FileSerialisationMethod::NixArchive,
-            HashAlgorithm::SHA256)
+    Hash hash = [&]() {
+        if (precomputedHashes) {
+            auto it = precomputedHashes->find(path);
+            if (it != precomputedHashes->end())
+                return it->second;
+        }
+        return hashPath(
+                   {make_ref<PosixSourceAccessor>(), CanonPath(path.string())},
+                   FileSerialisationMethod::NixArchive,
+                   HashAlgorithm::SHA256)
             .hash;
-    });
+    }();
     debug("%s has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */
@@ -327,6 +337,15 @@ void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag rep
 
     if (config->getLocalSettings().autoOptimiseStore)
         optimisePath_(nullptr, stats, path, inodeHash, repair);
+}
+
+void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag repair, const FileNarHashes & fileHashes)
+{
+    OptimiseStats stats;
+    InodeHash inodeHash;
+
+    if (config->getLocalSettings().autoOptimiseStore)
+        optimisePath_(nullptr, stats, path, inodeHash, repair, &fileHashes);
 }
 
 } // namespace nix
