@@ -76,7 +76,11 @@ public:
         )"};
 
     Setting<unsigned int> tries{
-        this, 5, "download-attempts", "The number of times Nix attempts to download a file before giving up."};
+        this,
+        5,
+        "http-retry-attempts",
+        "The number of times Nix attempts an HTTP transfer (download or upload) before giving up.",
+        {"download-attempts"}};
 
     Setting<unsigned int> retryDelayMs{
         this,

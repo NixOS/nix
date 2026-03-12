@@ -148,39 +148,56 @@ in
     print(f"  OK: delay {retry_delays[0]}ms respects Retry-After=3s floor")
 
     # ========================================================================
-    # Test 3: retry exhaustion fails after download-attempts
+    # Test 3: retry exhaustion fails after http-retry-attempts
     # ========================================================================
     print("\n=== Test: retry exhaustion fails ===")
 
     set_failures(100, retry_after=0)  # never succeed
     status, out = fetch(
-        extra_opts="--option download-attempts 3 --option http-retry-delay-rate-limited 100"
+        extra_opts="--option http-retry-attempts 3 --option http-retry-delay-rate-limited 100"
     )
 
     assert status != 0, f"Expected failure after exhausting retries: {out}"
     assert "HTTP error 503" in out, f"Expected 503 error message: {out}"
     retry_count = len(re.findall(r"retrying in \d+ ms", out))
-    # download-attempts=3 means 1 initial + 2 retries = 2 "retrying" messages
+    # http-retry-attempts=3 means 1 initial + 2 retries = 2 "retrying" messages
     assert retry_count == 2, f"Expected 2 retries before giving up, got {retry_count}: {out}"
     print(f"  OK: failed after {retry_count} retries with HTTP 503")
 
     # ========================================================================
-    # Test 4: raising download-attempts allows more retries to succeed
+    # Test 4: raising http-retry-attempts allows more retries to succeed
     # ========================================================================
-    print("\n=== Test: raising download-attempts allows success ===")
+    print("\n=== Test: raising http-retry-attempts allows success ===")
 
     set_failures(6, retry_after=0)  # needs 7 attempts total
     # Default is 5 attempts — would fail. Override to 8.
     status, out = fetch(
-        extra_opts="--option download-attempts 8 --option http-retry-delay-rate-limited 50"
+        extra_opts="--option http-retry-attempts 8 --option http-retry-delay-rate-limited 50"
     )
 
     assert status == 0, (
-        f"Expected success with download-attempts=8 after 6 failures: {out}"
+        f"Expected success with http-retry-attempts=8 after 6 failures: {out}"
     )
+
     retry_count = len(re.findall(r"retrying in \d+ ms", out))
     assert retry_count == 6, f"Expected 6 retries, got {retry_count}: {out}"
     print(f"  OK: succeeded after {retry_count} retries with raised attempt limit")
+
+    # ========================================================================
+    # Test 5: download-attempts alias still works (backwards compat)
+    # ========================================================================
+    print("\n=== Test: download-attempts alias still works ===")
+
+    set_failures(100, retry_after=0)
+    status, out = fetch(
+        extra_opts="--option download-attempts 2 --option http-retry-delay-rate-limited 50"
+    )
+    assert status != 0, f"Expected failure: {out}"
+    retry_count = len(re.findall(r"retrying in \d+ ms", out))
+    assert retry_count == 1, (
+        f"download-attempts=2 alias should allow 1 retry, got {retry_count}: {out}"
+    )
+    print(f"  OK: download-attempts alias respected ({retry_count} retry)")
 
     print("\n=== All http-retry-backoff tests passed ===")
   '';
