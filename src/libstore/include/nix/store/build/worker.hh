@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/error.hh"
 #include "nix/util/types.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derived-path-map.hh"
@@ -8,9 +9,12 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
+#include "nix/util/processes.hh"
 
 #include <functional>
 #include <future>
+#include <memory>
+#include <semaphore>
 #include <thread>
 
 namespace nix {
@@ -65,6 +69,88 @@ struct Child
 /* Forward definition. */
 struct HookInstance;
 #endif
+
+struct LogSink : Sink
+{
+    Activity & act;
+    std::string currentLine;
+
+    LogSink(Activity & act)
+        : act(act)
+    {
+    }
+
+    void operator()(std::string_view data) override
+    {
+        for (auto c : data) {
+            if (c == '\n') {
+                flushLine();
+            } else {
+                currentLine += c;
+            }
+        }
+    }
+
+    void flushLine()
+    {
+        act.result(resPostBuildLogLine, currentLine);
+        currentLine.clear();
+    }
+
+    ~LogSink()
+    {
+        if (currentLine != "") {
+            currentLine += '\n';
+            flushLine();
+        }
+    }
+};
+
+struct AsyncPostBuildHookState
+{
+    const std::string hook;
+    Activity act;
+    std::unique_ptr<LogSink> sink;
+    std::unique_ptr<Pipe> out;
+    std::thread outputThread;
+    std::atomic<bool> ready = false;
+    Pid pid;
+
+    AsyncPostBuildHookState(Logger & logger, const std::string hook, const std::string drvPath)
+        : hook(hook)
+        , act(logger,
+              lvlTalkative,
+              actPostBuildHook,
+              fmt("running async-post-build-hook '%s'", hook),
+              Logger::Fields{drvPath})
+        , out(std::make_unique<Pipe>())
+    {
+        out->create();
+        sink = std::make_unique<LogSink>(act);
+        outputThread = std::thread([&]() {
+            drainFD(out->readSide.get(), *sink);
+            ready = true;
+        });
+    }
+
+    void complete()
+    {
+        if (int ret = pid.wait()) {
+            throw Error("program \"%s\" %s", hook, statusToString(ret));
+        }
+    }
+
+    ~AsyncPostBuildHookState()
+    {
+        outputThread.join();
+    }
+};
+
+struct PendingAsyncPostBuildHook
+{
+    StorePath drvPath;
+    StorePathSet outputPaths;
+};
 
 /**
  * Coordinates one or more realisations and their interdependencies.
@@ -343,6 +429,18 @@ public:
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
+
+    void submitAsyncPostBuildHook(const StorePath & drvPath, const StorePathSet & outputPaths);
+
+private:
+    unsigned int asyncPostBuildHookSlots;
+    std::set<std::unique_ptr<AsyncPostBuildHookState>> asyncPostBuildHooks;
+    std::queue<PendingAsyncPostBuildHook> pendingAsyncPostBuildHooks;
+
+    void serviceAsyncPostBuildHooks();
+    void runAsyncPostBuildHook(const StorePath & drvPath, const StorePathSet & outputPaths);
+    bool tryAcquireAsyncPostBuildHookSlot();
+    void releaseAsyncPostBuildHookSlot();
 };
 
 } // namespace nix

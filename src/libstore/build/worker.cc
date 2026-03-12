@@ -8,6 +8,11 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
+#include "nix/util/config-global.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
+#include <thread>
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
@@ -29,6 +34,7 @@ Worker::Worker(Store & store, Store & evalStore)
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
+    , asyncPostBuildHookSlots(std::max({settings.maxAsyncPostBuildHookJobs.get(), 1U}))
 {
 #ifdef _WIN32
     if (!ioport)
@@ -319,6 +325,78 @@ void Worker::waitForAWhile(GoalPtr goal)
     addToWeakGoals(waitingForAWhile, goal);
 }
 
+void Worker::submitAsyncPostBuildHook(const StorePath & drvPath, const StorePathSet & outputPaths)
+{
+    if (settings.asyncPostBuildHook.get().empty())
+        return;
+
+    if (tryAcquireAsyncPostBuildHookSlot())
+        runAsyncPostBuildHook(drvPath, outputPaths);
+    else
+        pendingAsyncPostBuildHooks.emplace(drvPath, outputPaths);
+}
+
+void Worker::runAsyncPostBuildHook(const StorePath & drvPath, const StorePathSet & outputPaths)
+{
+    auto state = std::make_unique<AsyncPostBuildHookState>(
+        *logger, settings.asyncPostBuildHook.get(), store.printStorePath(drvPath));
+
+    auto hook = settings.asyncPostBuildHook.get();
+
+    OsStringMap hookEnvironment = getEnvOs();
+
+    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
+    hookEnvironment.emplace(
+        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
+    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
+
+    ProcessOptions processOptions;
+    processOptions.allowVfork = false;
+
+    state->pid = startProcess(
+        [&] {
+            replaceEnv(hookEnvironment);
+            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw SysError("cannot dup stdout into stderr");
+
+            Strings args_;
+            args_.push_front(hook);
+
+            unix::closeExtraFDs();
+
+            restoreProcessContext();
+
+            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
+
+            throw SysError("executing %s", PathFmt(hook));
+        },
+        processOptions);
+
+    state->out->writeSide.close();
+
+    asyncPostBuildHooks.insert(std::move(state));
+}
+
+void Worker::serviceAsyncPostBuildHooks()
+{
+    std::erase_if(asyncPostBuildHooks, [&](auto & state) {
+        if (state->ready) {
+            state->complete();
+            releaseAsyncPostBuildHookSlot();
+            return true;
+        }
+        return false;
+    });
+
+    while (!pendingAsyncPostBuildHooks.empty() && tryAcquireAsyncPostBuildHookSlot()) {
+        auto pending = pendingAsyncPostBuildHooks.front();
+        pendingAsyncPostBuildHooks.pop();
+        runAsyncPostBuildHook(pending.drvPath, pending.outputPaths);
+    }
+}
+
 void Worker::run(const Goals & _topGoals)
 {
     std::vector<nix::DerivedPath> topPaths;
@@ -344,6 +422,8 @@ void Worker::run(const Goals & _topGoals)
     while (1) {
 
         checkInterrupt();
+
+        serviceAsyncPostBuildHooks();
 
         // TODO GC interface?
         if (auto localStore = dynamic_cast<LocalStore *>(&store))
@@ -386,6 +466,12 @@ void Worker::run(const Goals & _topGoals)
                     "For more information run 'man nix.conf' and search for '/machines'.");
         } else
             assert(!awake.empty());
+    }
+
+    /* Complete any remaining hooks */
+    while (!asyncPostBuildHooks.empty() || !pendingAsyncPostBuildHooks.empty()) {
+        serviceAsyncPostBuildHooks();
+        std::this_thread::yield();
     }
 
     /* If --keep-going is not set, it's possible that the main goal
@@ -536,6 +622,20 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!res)
         printError("path '%s' is corrupted or missing!", store.printStorePath(path));
     return res;
+}
+
+bool Worker::tryAcquireAsyncPostBuildHookSlot()
+{
+    if (asyncPostBuildHookSlots > 0) {
+        asyncPostBuildHookSlots--;
+        return true;
+    }
+    return false;
+}
+
+void Worker::releaseAsyncPostBuildHookSlot()
+{
+    asyncPostBuildHookSlots++;
 }
 
 void Worker::markContentsGood(const StorePath & path)

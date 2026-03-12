@@ -15,6 +15,7 @@
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
 
 #include <algorithm>
 #include <fstream>
@@ -761,6 +762,9 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     StorePathSet outputPaths;
     for (auto & [_, output] : builtOutputs)
         outputPaths.insert(output.outPath);
+
+    worker.submitAsyncPostBuildHook(drvPath, outputPaths);
+
     runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
     /* It is now safe to delete the lock files, since all future
@@ -991,6 +995,9 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
+
+        worker.submitAsyncPostBuildHook(drvPath, outputPaths);
+
         runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
@@ -1028,42 +1035,6 @@ static void runPostBuildHook(
     hookEnvironment.emplace(
         OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
-
-    struct LogSink : Sink
-    {
-        Activity & act;
-        std::string currentLine;
-
-        LogSink(Activity & act)
-            : act(act)
-        {
-        }
-
-        void operator()(std::string_view data) override
-        {
-            for (auto c : data) {
-                if (c == '\n') {
-                    flushLine();
-                } else {
-                    currentLine += c;
-                }
-            }
-        }
-
-        void flushLine()
-        {
-            act.result(resPostBuildLogLine, currentLine);
-            currentLine.clear();
-        }
-
-        ~LogSink()
-        {
-            if (currentLine != "") {
-                currentLine += '\n';
-                flushLine();
-            }
-        }
-    };
 
     LogSink sink(act);
 
