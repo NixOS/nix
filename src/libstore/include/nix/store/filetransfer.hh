@@ -113,6 +113,31 @@ public:
         R"(
           Maximum delay in milliseconds between retry attempts. The exponentially
           increasing delay is capped at this value.
+
+          Note: this does **not** cap server-provided `Retry-After` values.
+          Those are governed by `http-retry-after-max` and `http-retry-after-min`.
+        )"};
+
+    Setting<unsigned int> retryAfterMaxMs{
+        this,
+        600000,
+        "http-retry-after-max",
+        R"(
+          Maximum value in milliseconds that Nix will accept from a server's
+          `Retry-After` header. Values above this are clamped down.  The default
+          of 600 000 ms (10 minutes) prevents a malicious or misconfigured server
+          from stalling Nix indefinitely.
+        )"};
+
+    Setting<unsigned int> retryAfterMinMs{
+        this,
+        1000,
+        "http-retry-after-min",
+        R"(
+          Minimum value in milliseconds that Nix will accept from a server's
+          `Retry-After` header. Values below this are clamped up.  The default
+          of 1 000 ms (1 second) prevents a malicious server from using a
+          near-zero `Retry-After` to trick Nix into an aggressive retry loop.
         )"};
 
     Setting<bool> retryJitter{
@@ -204,18 +229,29 @@ extern FileTransferSettings fileTransferSettings;
  * Uses exponential backoff with optional AWS "full jitter":
  * sleep = random(0, min(cap, base * 2^(attempt-1)))
  *
- * @param attempt       1-based retry attempt number (1 = first retry)
- * @param baseMs        base delay in ms for this error class
- * @param maxMs         maximum per-attempt delay cap
- * @param retryAfterMs  server-provided minimum delay (from Retry-After header)
- * @param jitter        apply full jitter (false = deterministic)
- * @param rng           random number generator (unused if jitter is false)
+ * When a server provides a Retry-After value (RFC 7231 §7.1.3), it is
+ * honored even if it exceeds @p maxMs, since maxMs only caps exponential
+ * backoff.  The server value is clamped to [@p retryAfterMinMs,
+ * @p retryAfterMaxMs] to defend against malicious or misconfigured
+ * servers.  If @p retryAfterMinMs > @p retryAfterMaxMs, the min is
+ * lowered to equal the max (the anti-stall cap wins).
+ *
+ * @param attempt          1-based retry attempt number (1 = first retry)
+ * @param baseMs           base delay in ms for this error class
+ * @param maxMs            maximum per-attempt delay cap (for exponential backoff only)
+ * @param retryAfterMs     server-provided minimum delay (from Retry-After header)
+ * @param retryAfterMinMs  minimum accepted Retry-After value (anti-DDoS floor)
+ * @param retryAfterMaxMs  maximum accepted Retry-After value (anti-stall cap)
+ * @param jitter           apply full jitter (false = deterministic)
+ * @param rng              random number generator (unused if jitter is false)
  */
 unsigned int computeRetryDelayMs(
     unsigned int attempt,
     unsigned int baseMs,
     unsigned int maxMs,
     std::optional<unsigned int> retryAfterMs,
+    unsigned int retryAfterMinMs,
+    unsigned int retryAfterMaxMs,
     bool jitter,
     std::mt19937 & rng);
 
