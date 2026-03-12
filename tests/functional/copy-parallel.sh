@@ -8,20 +8,28 @@ needLocalStore "tests LocalStore::addMultipleToStore override"
 
 clearStore
 
-# Build an 8-deep dependency chain in the source store. This is the
-# pathological case that previously serialized on topological ordering.
-outPath=$(nix-build copy-parallel.nix --no-out-link)
+freshDst() {
+    local d="$TEST_ROOT/dest-store-$1"
+    chmod -R u+w "$d" 2>/dev/null || true
+    rm -rf "$d"
+    echo "$d"
+}
 
-# Destination: fresh chroot store (local store, exercises the override)
-dstStore="$TEST_ROOT/dest-store"
-rm -rf "$dstStore"
-
+# --- Test 1: deep chain, single chunk ---
+# 8-deep dependency chain. Previously serialized on topological ordering.
+dstStore=$(freshDst chain)
+outPath=$(nix-build copy-parallel.nix -A chain --no-out-link)
 nix copy --to "$dstStore" --no-check-sigs "$outPath"
-
-# Closure invariant: top path must be valid in the destination.
 nix-store --store "$dstStore" --check-validity "$outPath"
+count=$(nix-store --store "$dstStore" -qR "$outPath" | grep -c chain-)
+[[ "$count" -eq 8 ]] || fail "expected 8 chain paths, got $count"
 
-# Full closure is present: all 8 chain paths registered.
-refs=$(nix-store --store "$dstStore" -qR "$outPath")
-count=$(echo "$refs" | grep -c chain-)
-[[ "$count" -eq 8 ]] || fail "expected 8 chain paths in closure, got $count"
+# --- Test 2: wide closure, forced chunking ---
+# 21 paths / chunk size 8 = 3 chunks. wide-top references leaves spread
+# across all chunks, exercising cross-chunk dependency resolution.
+dstStore=$(freshDst wide)
+outPath=$(nix-build copy-parallel.nix -A wide --no-out-link)
+_NIX_TEST_CHUNK_SIZE=8 nix copy --to "$dstStore" --no-check-sigs "$outPath"
+nix-store --store "$dstStore" --check-validity "$outPath"
+count=$(nix-store --store "$dstStore" -qR "$outPath" | grep -c wide-)
+[[ "$count" -eq 21 ]] || fail "expected 21 wide paths (20 leaves + top), got $count"
