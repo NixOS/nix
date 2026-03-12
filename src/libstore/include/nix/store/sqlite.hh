@@ -205,29 +205,36 @@ struct SQLiteRetryState
 {
     unsigned int attempt = 0;
     time_t nextWarning;
+    unsigned int jitter; // random factor, computed once per retry sequence
 
-    SQLiteRetryState()
+    SQLiteRetryState(std::mt19937 & rng)
         : nextWarning(time(nullptr) + 1)
+        , jitter(rng())
     {
     }
 };
 
-std::chrono::milliseconds
-sqliteRetryBackoff(unsigned int attempt, unsigned int baseMs, unsigned int maxMs, std::mt19937 & rng);
+struct BackoffConfig
+{
+    unsigned int baseMs;
+    unsigned int capMs;
+};
 
-void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state, std::mt19937 & rng);
+std::chrono::milliseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config);
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
 
 template<typename T, typename F>
 T retrySQLite(F && fun)
 {
     thread_local std::mt19937 rng{std::random_device{}()};
-    SQLiteRetryState state;
+    SQLiteRetryState state{rng};
 
     while (true) {
         try {
             return fun();
         } catch (SQLiteBusy & e) {
-            handleSQLiteBusy(e, state, rng);
+            handleSQLiteBusy(e, state);
         }
     }
 }
