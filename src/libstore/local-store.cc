@@ -2,6 +2,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/git.hh"
 #include "nix/util/archive.hh"
+#include "nix/util/fs-sink.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/derivations.hh"
@@ -1017,6 +1018,123 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
+/**
+ * Wrapper around RestoreSink that computes per-file NAR hashes inline
+ * during restore, so that optimisePath can skip re-reading files from
+ * disk.  Feeds the same NAR framing that dumpPath would produce for
+ * each file/symlink into a HashSink.
+ */
+struct HashingRestoreSink : FileSystemObjectSink
+{
+    RestoreSink & inner;
+    LocalStore::FileNarHashes & fileHashes;
+
+    HashingRestoreSink(RestoreSink & inner, LocalStore::FileNarHashes & fileHashes)
+        : inner(inner)
+        , fileHashes(fileHashes)
+    {
+    }
+
+    void createDirectory(const CanonPath & path) override
+    {
+        inner.createDirectory(path);
+    }
+
+    void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override
+    {
+        inner.createDirectory(path, [&](FileSystemObjectSink & dirSink, const CanonPath & dirRelPath) {
+            auto & child = dynamic_cast<RestoreSink &>(dirSink);
+            HashingRestoreSink wrapped{child, fileHashes};
+            callback(wrapped, dirRelPath);
+        });
+    }
+
+    void createSymlink(const CanonPath & path, const std::string & target) override
+    {
+        inner.createSymlink(path, target);
+        HashSink h{HashAlgorithm::SHA256};
+        h << narVersionMagic1 << "(" << "type" << "symlink" << "target" << target << ")";
+        recordHash(path, h);
+    }
+
+    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
+    {
+        HashSink h{HashAlgorithm::SHA256};
+        bool isExec = false;
+        uint64_t fileSize = 0;
+        bool headerDone = false;
+
+        auto emitNarFileHeader = [&] {
+            headerDone = true;
+            h << narVersionMagic1 << "(" << "type" << "regular";
+            if (isExec)
+                h << "executable" << "";
+            h << "contents" << fileSize;
+        };
+
+        inner.createRegularFile(path, [&](CreateRegularFileSink & crf) {
+            /* Tee: forward everything to crf while mirroring data into h. */
+            struct Tee : CreateRegularFileSink
+            {
+                CreateRegularFileSink & crf;
+                HashSink & h;
+                bool & isExec;
+                uint64_t & fileSize;
+                fun<void()> emitHeader;
+
+                Tee(CreateRegularFileSink & crf,
+                    HashSink & h,
+                    bool & isExec,
+                    uint64_t & fileSize,
+                    fun<void()> emitHeader)
+                    : crf(crf)
+                    , h(h)
+                    , isExec(isExec)
+                    , fileSize(fileSize)
+                    , emitHeader(std::move(emitHeader))
+                {
+                }
+
+                void isExecutable() override
+                {
+                    crf.isExecutable();
+                    isExec = true;
+                }
+                void preallocateContents(uint64_t size) override
+                {
+                    crf.preallocateContents(size);
+                    fileSize = size;
+                }
+                void operator()(std::string_view data) override
+                {
+                    crf(data);
+                    emitHeader();
+                    h(data);
+                }
+            } tee(crf, h, isExec, fileSize, [&] {
+                if (!headerDone)
+                    emitNarFileHeader();
+            });
+            func(tee);
+        });
+
+        if (!headerDone)
+            emitNarFileHeader();
+        writePadding(fileSize, h);
+        h << ")";
+        recordHash(path, h);
+    }
+
+private:
+    void recordHash(const CanonPath & path, HashSink & h)
+    {
+        auto absPath = inner.dstPath;
+        if (!path.rel().empty())
+            absPath /= path.rel();
+        fileHashes.emplace(absPath, h.finish().hash);
+    }
+};
+
 std::optional<PathLocks>
 LocalStore::importPathToDisk(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
@@ -1057,13 +1175,25 @@ LocalStore::importPathToDisk(const ValidPathInfo & info, Source & source, Repair
                 deletePath(realPath);
 
                 /* While restoring the path from the NAR, compute the hash
-                of the NAR. */
+                of the NAR.  When auto-optimise-store is enabled, also
+                compute per-file NAR hashes inline so that optimisePath
+                can skip re-reading files from disk. */
                 HashSink hashSink(HashAlgorithm::SHA256);
 
                 TeeSource wrapperSource{source, hashSink};
 
+                bool doOptimise = config->getLocalSettings().autoOptimiseStore;
+                FileNarHashes fileHashes;
+
                 narRead = true;
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                if (doOptimise) {
+                    RestoreSink restoreSink{config->getLocalSettings().fsyncStorePaths};
+                    restoreSink.dstPath = realPath;
+                    HashingRestoreSink hashingRestoreSink{restoreSink, fileHashes};
+                    parseDump(hashingRestoreSink, wrapperSource);
+                } else {
+                    restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                }
 
                 auto hashResult = hashSink.finish();
 
@@ -1121,7 +1251,10 @@ LocalStore::importPathToDisk(const ValidPathInfo & info, Source & source, Repair
 
                 canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
-                optimisePath(realPath, repair); // FIXME: combine with hashPath()
+                if (doOptimise)
+                    optimisePath(realPath, repair, fileHashes);
+                else
+                    optimisePath(realPath, repair);
 
                 if (config->getLocalSettings().fsyncStorePaths) {
                     recursiveSync(realPath);

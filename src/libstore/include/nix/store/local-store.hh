@@ -386,10 +386,23 @@ public:
     void optimiseStore() override;
 
     /**
+     * Map from absolute filesystem path to the NAR-serialisation hash
+     * of that file/symlink, precomputed during restorePath to avoid
+     * redundant re-reading and re-hashing in optimisePath.
+     */
+    using FileNarHashes = std::map<std::filesystem::path, Hash>;
+
+    /**
      * Optimise a single store path. Optionally, test the encountered
      * symlinks for corruption.
      */
     void optimisePath(const std::filesystem::path & path, RepairFlag repair);
+
+    /**
+     * Like optimisePath, but uses precomputed per-file NAR hashes to
+     * avoid re-reading and re-hashing files from disk.
+     */
+    void optimisePath(const std::filesystem::path & path, RepairFlag repair, const FileNarHashes & fileHashes);
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -517,7 +530,8 @@ private:
         OptimiseStats & stats,
         const std::filesystem::path & path,
         InodeHash & inodeHash,
-        RepairFlag repair);
+        RepairFlag repair,
+        const FileNarHashes * precomputedHashes = nullptr);
 
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
