@@ -10,7 +10,9 @@
 
 #include <sqlite3.h>
 
+#include <algorithm>
 #include <atomic>
+#include <random>
 #include <thread>
 
 namespace nix {
@@ -254,6 +256,8 @@ bool SQLiteStmt::Use::isNull(int col)
 SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;
+    // TODO: use "begin immediate" when multiple SQLite connections are used,
+    // to acquire the write lock early and avoid deferred-to-write deadlocks.
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "starting transaction");
     active = true;
@@ -276,19 +280,55 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
+namespace {
+
+unsigned int clampedExponential(unsigned int base, unsigned int attempt, unsigned int max)
+{
+    unsigned int value = base;
+    for (unsigned int i = 1; i < attempt; ++i) {
+        if (value >= max / 2)
+            return max;
+        value *= 2;
+    }
+    return std::min(value, max);
+}
+
+unsigned int uniformRandomUpTo(unsigned int ceiling, std::mt19937 & rng)
+{
+    return std::uniform_int_distribution<unsigned int>(0, ceiling)(rng);
+}
+
+void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 {
     time_t now = time(nullptr);
-    if (now > nextWarning) {
-        nextWarning = now + 10;
+    if (now > state.nextWarning) {
+        state.nextWarning = now + 10;
         logWarning({.msg = e.info().msg});
     }
+}
 
-    /* Sleep for a while since retrying the transaction right away
-       is likely to fail again. */
+} // anonymous namespace
+
+std::chrono::milliseconds
+sqliteRetryBackoff(unsigned int attempt, unsigned int baseMs, unsigned int maxMs, std::mt19937 & rng)
+{
+    if (baseMs == 0)
+        return std::chrono::milliseconds{0};
+
+    auto ceiling = clampedExponential(baseMs, attempt, maxMs);
+    return std::chrono::milliseconds{uniformRandomUpTo(ceiling, rng)};
+}
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state, std::mt19937 & rng)
+{
+    ++state.attempt;
+
+    throttledWarning(e, state);
     checkInterrupt();
-    /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 100});
+
+    constexpr unsigned int baseDelayMs = 1;
+    constexpr unsigned int maxDelayMs = 100;
+    std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, baseDelayMs, maxDelayMs, rng));
 }
 
 } // namespace nix
