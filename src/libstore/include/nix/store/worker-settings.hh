@@ -81,6 +81,17 @@ public:
         )",
         {"substitution-max-jobs"}};
 
+    Setting<unsigned int> maxAsyncPostBuildHookJobs{
+        this,
+        16,
+        "max-async-post-build-hook-jobs",
+        R"(
+          This option defines the maximum number of async-post-build-hook jobs
+          that Nix tries to run in parallel. The default is `16`. The minimum
+          value one can choose is `1` and lower values are interpreted as `1`.
+        )",
+    };
+
     Setting<time_t> maxSilentTime{
         this,
         0,
@@ -360,6 +371,16 @@ public:
               /nix/store/c5cxjywi66iwn9dcx5yvwjkvl559ay6p-bash-4.4-p23-info
               /nix/store/scz72lskj03ihkcn42ias5mlp4i4gr1k-bash-4.4-p23-man
               /nix/store/a724znygmd1cac856j3gfsyvih3lw07j-bash-4.4-p23`.
+        )"};
+
+    Setting<std::string> asyncPostBuildHook{
+        this,
+        "",
+        "async-post-build-hook",
+        R"(
+            Optional. The path to a program to execute asynchronously after each build.
+
+            See post-build-hook.
         )"};
 };
 

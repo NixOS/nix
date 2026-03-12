@@ -8,6 +8,8 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
+#include "nix/util/error.hh"
+#include "nix/util/logging.hh"
 #ifndef _WIN32 // TODO Enable building on Windows
 #  include "nix/store/build/hook-instance.hh"
 #endif
@@ -29,6 +31,7 @@ Worker::Worker(Store & store, Store & evalStore)
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
+    , asyncPostBuildHookSlots(std::max({settings.maxAsyncPostBuildHookJobs.get(), 1U}))
 {
 #ifdef _WIN32
     if (!ioport)
@@ -345,6 +348,20 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
+        asyncPostBuildHooks.erase(
+            std::remove_if(
+                asyncPostBuildHooks.begin(),
+                asyncPostBuildHooks.end(),
+                [&](auto & state) {
+                    if (state->ready) {
+                        state->complete();
+                        asyncPostBuildHookSlots.release();
+                        return true;
+                    }
+                    return false;
+                }),
+            asyncPostBuildHooks.end());
+
         // TODO GC interface?
         if (auto localStore = dynamic_cast<LocalStore *>(&store))
             localStore->autoGC(false);
@@ -387,6 +404,12 @@ void Worker::run(const Goals & _topGoals)
         } else
             assert(!awake.empty());
     }
+
+    /* Complete any remaining hooks */
+    for (auto & state : asyncPostBuildHooks) {
+        state->complete();
+    }
+    asyncPostBuildHooks.clear();
 
     /* If --keep-going is not set, it's possible that the main goal
        exited while some of its subgoals were still active.  But if
@@ -536,6 +559,12 @@ bool Worker::pathContentsGood(const StorePath & path)
     if (!res)
         printError("path '%s' is corrupted or missing!", store.printStorePath(path));
     return res;
+}
+
+void Worker::acquireAsyncPostBuildHookSlot()
+{
+    Activity act(*logger, lvlWarn, actPostBuildHook, "waiting for async-post-build-hook slot");
+    asyncPostBuildHookSlots.acquire();
 }
 
 void Worker::markContentsGood(const StorePath & path)
