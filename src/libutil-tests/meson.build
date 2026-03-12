@@ -36,6 +36,12 @@ deps_private += gtest
 gmock = dependency('gmock')
 deps_private += gmock
 
+if host_machine.system() == 'windows'
+  # Boost.ASIO needs this unconditionally.
+  socket = cxx.find_library('ws2_32')
+  deps_other += socket
+endif
+
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
