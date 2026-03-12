@@ -13,6 +13,10 @@ new `nix.conf` settings:
 - `http-retry-max-delay` (default 60000ms): per-attempt delay cap
 - `http-retry-jitter` (default true): enable full jitter
 
+The existing `download-attempts` setting has been renamed to
+`http-retry-attempts` to reflect that it applies to uploads as well as
+downloads. The old name remains as an alias for backwards compatibility.
+
 Per-substituter overrides are available as store URL parameters
 (`retry-delay`, `retry-delay-rate-limited`, `retry-max-delay`,
 `retry-attempts`), e.g. `s3://my-cache?retry-attempts=8`.

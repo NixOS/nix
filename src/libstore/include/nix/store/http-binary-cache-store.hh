@@ -59,7 +59,7 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
         this, 0, "retry-max-delay", "Override `http-retry-max-delay` for requests to this store (milliseconds)."};
 
     Setting<unsigned int> retryAttempts{
-        this, 0, "retry-attempts", "Override `download-attempts` for requests to this store."};
+        this, 0, "retry-attempts", "Override `http-retry-attempts` for requests to this store."};
 
     static const std::string name()
     {
