@@ -212,6 +212,18 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         }
     }
 
+    // Propagate per-substituter retry overrides to the transfer request.
+    // Only set when the user actually specified the URL parameter; otherwise
+    // the transfer falls back to the global FileTransferSettings.
+    if (config->retryDelayMs.overridden)
+        request.retryDelayMs = config->retryDelayMs.get();
+    if (config->retryDelayRateLimitedMs.overridden)
+        request.retryDelayRateLimitedMs = config->retryDelayRateLimitedMs.get();
+    if (config->retryMaxDelayMs.overridden)
+        request.retryMaxDelayMs = config->retryMaxDelayMs.get();
+    if (config->retryAttempts.overridden)
+        request.retryAttempts = config->retryAttempts.get();
+
     return request;
 }
 
