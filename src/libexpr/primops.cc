@@ -3653,8 +3653,9 @@ static void prim_elemAt(EvalState & state, const PosIdx pos, Value ** args, Valu
         state.error<EvalError>("'builtins.elemAt' called with index %d on a list of size %d", n, args[0]->listSize())
             .atPos(pos)
             .debugThrow();
-    state.forceValue(*args[0]->listView()[n], pos);
-    v = *args[0]->listView()[n];
+    auto ptr = args[0]->listView()[n];
+    state.forceValue(*ptr, pos);
+    v = *ptr;
 }
 
 static RegisterPrimOp primop_elemAt({
