@@ -3,6 +3,9 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/environment-variables.hh"
+
+#include <filesystem>
 
 namespace nix {
 
@@ -30,29 +33,55 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     auto storeConfig = std::visit(
         overloaded{
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
-                auto stateDir = getOr(params, "state", settings.nixStateDir.string());
-                if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+                /* In the `auto` case, we are deciding between
+                   `UdsRemoteStore::Config` and `LocalStore::Config`. Both of
+                   them inherit from `LocalFSStore::Config`, so we are making a
+                   valid assumption if we try to parse the params with that in
+                   order to figure out exactly where sort of store config we're
+                   supposed to resolve. */
+
+                /* Concrete subclass of `LocalFSStoreConfig` for testing, since
+                   `LocalFSStoreConfig` is abstract (`openStore()` is pure
+                   virtual). */
+                struct TempLocalFSStoreConfig : LocalFSStore::Config
+                {
+                    TempLocalFSStoreConfig(const Params & params)
+                        : StoreConfig(params, FilePathType::Native)
+                        , LocalFSStoreConfig(params)
+                    {
+                    }
+
+                    ref<Store> openStore() const override
+                    {
+                        unreachable();
+                    }
+                } localFSStoreConfig{params};
+                if (access(localFSStoreConfig.stateDir.get().c_str(), R_OK | W_OK) == 0)
                     return make_ref<LocalStore::Config>(params);
-                else if (pathExists(settings.nixDaemonSocketFile))
+                else if (pathExists(getDaemonSocketPath()))
                     return make_ref<UDSRemoteStore::Config>(params);
 #ifdef __linux__
                 else if (
-                    !pathExists(stateDir) && params.empty() && !isRootUser() && !getEnv("NIX_STORE_DIR").has_value()
-                    && !getEnv("NIX_STATE_DIR").has_value()) {
+                    !pathExists(localFSStoreConfig.stateDir.get()) && params.empty() && !isRootUser()
+                    && !getEnvOs("NIX_STORE_DIR").has_value() && !getEnvOs("NIX_STATE_DIR").has_value()) {
                     /* If /nix doesn't exist, there is no daemon socket, and
                        we're not root, then automatically set up a chroot
                        store in ~/.local/share/nix/root. */
                     auto chrootStore = getDataDir() / "root";
+                    auto logLevel = lvlDebug;
                     if (!pathExists(chrootStore)) {
                         try {
                             createDirs(chrootStore);
                         } catch (SystemError & e) {
                             return make_ref<LocalStore::Config>(params);
                         }
-                        warn("%s does not exist, so Nix will use %s as a chroot store", stateDir, PathFmt(chrootStore));
-                    } else
-                        debug(
-                            "%s does not exist, so Nix will use %s as a chroot store", stateDir, PathFmt(chrootStore));
+                        logLevel = lvlWarn;
+                    }
+                    printMsg(
+                        logLevel,
+                        "%s does not exist, so Nix will use %s as a chroot store",
+                        PathFmt(localFSStoreConfig.stateDir.get()),
+                        PathFmt(chrootStore));
                     return make_ref<LocalStore::Config>(std::filesystem::path(chrootStore), params);
                 }
 #endif
