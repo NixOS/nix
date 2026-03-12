@@ -82,9 +82,14 @@ public:
         assertNonNull();
     }
 
+    T * get() const
+    {
+        return p.get();
+    }
+
     T * operator->() const
     {
-        return &*p;
+        return get();
     }
 
     T & operator*() const

@@ -7,6 +7,14 @@
 
 namespace nix {
 
+/**
+ * Get the daemon socket path.
+ *
+ * Returns `NIX_DAEMON_SOCKET_PATH` if set, otherwise
+ * `settings.nixStateDir / "daemon-socket" / "socket"`.
+ */
+std::filesystem::path getDaemonSocketPath();
+
 struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>,
                               virtual LocalFSStoreConfig,
                               virtual RemoteStoreConfig
@@ -25,8 +33,7 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
     /**
      * The path to the unix domain socket.
      *
-     * The default is `settings.nixDaemonSocketFile`, but we don't write
-     * that below, instead putting in the constructor.
+     * The default is given by `getDaemonSocketPath`.
      */
     std::filesystem::path path;
 

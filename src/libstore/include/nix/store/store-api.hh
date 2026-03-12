@@ -320,6 +320,24 @@ struct StoreConfig : public StoreConfigBase, public StoreDirConfig
     virtual bool getReadOnly() const;
 
     /**
+     * @return The state directory for this store.
+     *
+     * By default, returns the global `settings.nixStateDir`. Subclasses
+     * like `LocalFSStoreConfig` may override to return a store-specific
+     * state directory.
+     */
+    virtual const std::filesystem::path & getStateDir() const;
+
+    /**
+     * @return The log directory for this store.
+     *
+     * By default, returns the global log directory. Subclasses
+     * like `LocalFSStoreConfig` may override to return a store-specific
+     * log directory.
+     */
+    virtual const std::filesystem::path & getLogDir() const;
+
+    /**
      * Open a store of the type corresponding to this configuration
      * type.
      */

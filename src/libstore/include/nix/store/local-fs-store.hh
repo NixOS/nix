@@ -38,25 +38,9 @@ public:
 
     Setting<std::optional<AbsolutePath>> rootDir = makeRootDirSetting(*this, std::nullopt);
 
-private:
-
-    /**
-     * An indirection so that we don't need to refer to global settings
-     * in headers.
-     */
-    static std::filesystem::path getDefaultStateDir();
-
-    /**
-     * An indirection so that we don't need to refer to global settings
-     * in headers.
-     */
-    static std::filesystem::path getDefaultLogDir();
-
-public:
-
     Setting<AbsolutePath> stateDir{
         this,
-        rootDir.get() ? *rootDir.get() / "nix" / "var" / "nix" : getDefaultStateDir(),
+        rootDir.get() ? *rootDir.get() / "nix" / "var" / "nix" : StoreConfig::getStateDir(),
         "state",
         R"(
           Directory where Nix stores state.
@@ -67,7 +51,7 @@ public:
 
     Setting<AbsolutePath> logDir{
         this,
-        rootDir.get() ? *rootDir.get() / "nix" / "var" / "log" / "nix" : getDefaultLogDir(),
+        rootDir.get() ? *rootDir.get() / "nix" / "var" / "log" / "nix" : StoreConfig::getLogDir(),
         "log",
         R"(
           Directory where Nix stores log files.
@@ -86,6 +70,16 @@ public:
           Defaults to [`store`](#store-setting-store) when [`root`](#store-setting-root) is not set.
         )",
     };
+
+    const std::filesystem::path & getStateDir() const override
+    {
+        return stateDir.get();
+    }
+
+    const std::filesystem::path & getLogDir() const override
+    {
+        return logDir.get();
+    }
 };
 
 struct alignas(8) /* Work around ASAN failures on i686-linux. */

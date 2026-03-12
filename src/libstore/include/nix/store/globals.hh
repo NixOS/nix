@@ -19,15 +19,6 @@ struct ProfileDirsOptions;
 
 struct LogFileSettings : public virtual Config
 {
-    /**
-     * The directory where we log various operations.
-     */
-    std::filesystem::path nixLogDir;
-
-protected:
-    LogFileSettings();
-
-public:
     Setting<bool> keepLog{
         this,
         true,
@@ -173,11 +164,6 @@ public:
      * The directory where state is stored.
      */
     std::filesystem::path nixStateDir;
-
-    /**
-     * File name of the socket the daemon listens to.
-     */
-    std::filesystem::path nixDaemonSocketFile;
 
     Setting<StoreReference> storeUri{
         this,

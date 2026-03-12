@@ -5,6 +5,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/uds-remote-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
 #include "nix/store/store-open.hh"
@@ -283,7 +284,7 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
     try {
         unix::serveUnixSocket(
             {
-                .socketPath = settings.nixDaemonSocketFile,
+                .socketPath = getDaemonSocketPath(),
                 .socketMode = 0666,
                 .auxiliaryFd = sigChldPipe.readSide.get(),
                 .onAuxiliaryFdPollin =
