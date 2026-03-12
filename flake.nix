@@ -394,6 +394,9 @@
           }
         );
 
+      # Formatting: nix develop -c ./maintainers/format.sh (nixfmt + clang-format + shellcheck)
+      # formatter = forAllSystems (system: nixpkgsFor.${system}.native.nixfmt-rfc-style);
+
       lib = {
         /**
           Creates a package set for a given Nixpkgs instance and stdenv.
