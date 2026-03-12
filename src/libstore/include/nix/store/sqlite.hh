@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <random>
 #include <string>
 
 #include "nix/util/error.hh"
@@ -200,22 +201,33 @@ protected:
 
 MakeError(SQLiteBusy, SQLiteError);
 
-void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
+struct SQLiteRetryState
+{
+    unsigned int attempt = 0;
+    time_t nextWarning;
 
-/**
- * Convenience function for retrying a SQLite transaction when the
- * database is busy.
- */
+    SQLiteRetryState()
+        : nextWarning(time(nullptr) + 1)
+    {
+    }
+};
+
+std::chrono::milliseconds
+sqliteRetryBackoff(unsigned int attempt, unsigned int baseMs, unsigned int maxMs, std::mt19937 & rng);
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state, std::mt19937 & rng);
+
 template<typename T, typename F>
 T retrySQLite(F && fun)
 {
-    time_t nextWarning = time(nullptr) + 1;
+    thread_local std::mt19937 rng{std::random_device{}()};
+    SQLiteRetryState state;
 
     while (true) {
         try {
             return fun();
         } catch (SQLiteBusy & e) {
-            handleSQLiteBusy(e, nextWarning);
+            handleSQLiteBusy(e, state, rng);
         }
     }
 }
