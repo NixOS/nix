@@ -5,6 +5,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
@@ -22,7 +23,7 @@
 
 #include <curl/curl.h>
 
-#include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <queue>
 #include <random>
@@ -31,8 +32,29 @@
 
 namespace nix {
 
-const unsigned int RETRY_TIME_MS_DEFAULT = 250;
-const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
+unsigned int computeRetryDelayMs(
+    unsigned int attempt,
+    unsigned int baseMs,
+    unsigned int maxMs,
+    std::optional<unsigned int> retryAfterMs,
+    bool jitter,
+    std::mt19937 & rng)
+{
+    // Exponential backoff: base * 2^(attempt-1), with overflow guard
+    unsigned int shift = std::min(attempt == 0 ? 0u : attempt - 1, 30u);
+    unsigned long exponential = (unsigned long) baseMs << shift;
+    unsigned int capped = (unsigned int) std::min(exponential, (unsigned long) maxMs);
+
+    // Retry-After is a minimum — take max(retryAfter, capped), then re-cap for sanity
+    if (retryAfterMs)
+        capped = std::min(std::max(*retryAfterMs, capped), maxMs);
+
+    if (!jitter || capped == 0)
+        return capped;
+
+    // Full jitter: uniform [0, capped]
+    return std::uniform_int_distribution<unsigned int>(0, capped)(rng);
+}
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
@@ -136,6 +158,13 @@ struct curlFileTransfer : public FileTransfer
          * Whether the response has a non-trivial (not "identity") Content-Encoding.
          */
         bool hasContentEncoding:1 = false;
+
+        /**
+         * Server-provided minimum retry delay, parsed from the `Retry-After`
+         * response header (delta-seconds form only). Reset on each new status
+         * line so it doesn't leak across redirects or retries.
+         */
+        std::optional<unsigned int> retryAfterMs;
 
         curl_off_t writtenToSink = 0;
 
@@ -305,6 +334,7 @@ struct curlFileTransfer : public FileTransfer
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 hasContentEncoding = false;
+                retryAfterMs = std::nullopt;
                 appendCurrentUrl();
             } else {
 
@@ -343,6 +373,17 @@ struct curlFileTransfer : public FileTransfer
                             result.immutableUrl = match.str(1);
                         else
                             debug("got invalid link header '%s'", value);
+                    }
+
+                    else if (name == "retry-after") {
+                        auto value = trim(line.substr(i + 1));
+                        // RFC 7231 §7.1.3: Retry-After = HTTP-date / delay-seconds.
+                        // We parse delay-seconds only; HTTP-date is uncommon and
+                        // harder to get right without timezone ambiguity.
+                        if (auto seconds = string2Int<unsigned int>(value))
+                            retryAfterMs = *seconds * 1000;
+                        else
+                            debug("ignoring non-integer Retry-After header: '%s'", value);
                     }
                 }
             }
@@ -632,8 +673,6 @@ struct curlFileTransfer : public FileTransfer
         {
             auto finishTime = std::chrono::steady_clock::now();
 
-            auto retryTimeMs = request.baseRetryTimeMs;
-
             auto httpStatus = getHTTPStatus();
 
             debug(
@@ -681,10 +720,7 @@ struct curlFileTransfer : public FileTransfer
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus == 429) {
-                    // 429 means too many requests, so we retry (with a substantially longer delay)
-                    retryTimeMs = RETRY_TIME_MS_TOO_MANY_REQUESTS;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
                     err = Misc;
@@ -758,11 +794,28 @@ struct curlFileTransfer : public FileTransfer
                    download after a while. If we're writing to a
                    sink, we can only retry if the server supports
                    ranged requests. */
-                if (err == Transient && attempt < fileTransfer.settings.tries
+
+                // Resolve effective retry config (request overrides > global settings)
+                auto effAttempts = request.retryAttempts.value_or(fileTransfer.settings.tries);
+                auto effBaseMs = request.retryDelayMs.value_or(fileTransfer.settings.retryDelayMs);
+                auto effRateLimitMs =
+                    request.retryDelayRateLimitedMs.value_or(fileTransfer.settings.retryDelayRateLimitedMs);
+                auto effMaxMs = request.retryMaxDelayMs.value_or(fileTransfer.settings.retryMaxDelayMs);
+
+                // Pick base delay by error class: 429/503 indicate the server is
+                // rate-limiting or overloaded, so use the longer rate-limit delay.
+                unsigned int baseMs = (httpStatus == 429 || httpStatus == 503) ? effRateLimitMs : effBaseMs;
+
+                if (err == Transient && attempt < effAttempts
                     && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && !hasContentEncoding))) {
-                    int ms = retryTimeMs
-                             * std::pow(
-                                 2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+
+                    unsigned int ms = computeRetryDelayMs(
+                        attempt,
+                        baseMs,
+                        effMaxMs,
+                        retryAfterMs,
+                        fileTransfer.settings.retryJitter,
+                        fileTransfer.mt19937);
 
                     if (writtenToSink) {
                         warn(
@@ -771,14 +824,9 @@ struct curlFileTransfer : public FileTransfer
                             writtenToSink,
                             ms,
                             attempt,
-                            fileTransfer.settings.tries);
+                            effAttempts);
                     } else {
-                        warn(
-                            "%s; retrying in %d ms (attempt %d/%d)",
-                            exc.message(),
-                            ms,
-                            attempt,
-                            fileTransfer.settings.tries);
+                        warn("%s; retrying in %d ms (attempt %d/%d)", exc.message(), ms, attempt, effAttempts);
                     }
 
                     errorSink.reset();
