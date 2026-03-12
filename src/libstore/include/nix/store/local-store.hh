@@ -285,6 +285,9 @@ public:
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    void
+    addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
+
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,

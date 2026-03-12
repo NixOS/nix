@@ -12,6 +12,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/thread-pool.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
@@ -34,6 +35,7 @@
 
 #ifndef _WIN32
 #  include <grp.h>
+#  include <sys/resource.h>
 #endif
 
 #ifdef __linux__
@@ -1146,6 +1148,170 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         registerValidPath(info);
         lock->setDeletion(true);
     }
+}
+
+void LocalStore::addMultipleToStore(
+    PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    /* Fall back to the topological-order implementation if holding a lock
+       FD for every path simultaneously would risk exhausting the file
+       descriptor limit. */
+#ifndef _WIN32
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY
+        && pathsToCopy.size() * 2 > (size_t) limit.rlim_cur) {
+        debug(
+            "closure size %d exceeds half of fd limit %d, using topological copy",
+            pathsToCopy.size(),
+            (size_t) limit.rlim_cur);
+        Store::addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
+        return;
+    }
+#endif
+
+    std::atomic<size_t> nrDone{0};
+    std::atomic<size_t> nrFailed{0};
+    std::atomic<uint64_t> nrRunning{0};
+
+    uint64_t bytesExpected = 0;
+    for (auto & [info, _] : pathsToCopy)
+        bytesExpected += info.narSize;
+    act.setExpected(actCopyPath, bytesExpected);
+
+    auto nrTotal = pathsToCopy.size();
+    auto showProgress = [&]() { act.progress(nrDone, nrTotal, nrRunning, nrFailed); };
+
+    /* Phase 1: write all paths to disk in parallel, no topological gating.
+       Locks are held until registration to prevent concurrent writers. */
+
+    struct WriteResult
+    {
+        PathLocks lock;
+        ValidPathInfo info;
+    };
+
+    struct State
+    {
+        std::vector<std::optional<WriteResult>> results;
+        StorePathSet failed;
+    };
+
+    Sync<State> state_(State{.results = std::vector<std::optional<WriteResult>>(pathsToCopy.size())});
+
+    {
+        ThreadPool pool;
+        for (size_t i = 0; i < pathsToCopy.size(); ++i) {
+            pool.enqueue([&, i]() {
+                checkInterrupt();
+
+                auto & [info_, source_] = pathsToCopy[i];
+                auto info = info_;
+                info.ultimate = false;
+
+                /* Ensure the Source is destroyed when we're done —
+                   see comment in Store::addMultipleToStore. */
+                auto source = std::move(source_);
+
+                if (isValidPath(info.path)) {
+                    nrDone++;
+                    showProgress();
+                    return;
+                }
+
+                MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                showProgress();
+
+                try {
+                    auto lock = importPathToDisk(info, *source, repair, checkSigs);
+                    if (lock) {
+                        auto state(state_.lock());
+                        state->results[i].emplace(WriteResult{std::move(*lock), std::move(info)});
+                    }
+                } catch (Error & e) {
+                    nrFailed++;
+                    {
+                        auto state(state_.lock());
+                        state->failed.insert(info.path);
+                    }
+                    if (!settings.getWorkerSettings().keepGoing)
+                        throw;
+                    printMsg(lvlError, "could not copy %s: %s", printStorePath(info.path), e.what());
+                    showProgress();
+                    return;
+                }
+
+                nrDone++;
+                showProgress();
+            });
+        }
+        pool.process();
+    }
+
+    auto state(state_.lock());
+
+    /* Phase 2: compute the topologically-closed subset of successfully
+       written paths. A path is registrable only if every reference that
+       was in this batch either succeeded or was already valid. */
+
+    StorePathSet inBatch;
+    for (auto & [info, _] : pathsToCopy)
+        inBatch.insert(info.path);
+
+    std::map<StorePath, const ValidPathInfo *> written;
+    for (auto & r : state->results)
+        if (r)
+            written.insert_or_assign(r->info.path, &r->info);
+
+    StorePathSet registrable;
+    for (auto & [path, _] : written)
+        registrable.insert(path);
+
+    /* Fixed-point: drop paths whose in-batch references are unregistrable. */
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (auto it = registrable.begin(); it != registrable.end();) {
+            auto & refs = written.at(*it)->references;
+            bool ok = true;
+            for (auto & ref : refs) {
+                if (ref == *it)
+                    continue;
+                if (inBatch.count(ref) && !registrable.count(ref)) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (!ok) {
+                it = registrable.erase(it);
+                changed = true;
+            } else
+                ++it;
+        }
+    }
+
+    /* Phase 3: register all registrable paths in a single SQLite
+       transaction. registerValidPaths inserts all ValidPaths rows
+       before any Refs rows, so mutual references resolve. */
+
+    ValidPathInfos infos;
+    for (auto & r : state->results)
+        if (r && registrable.count(r->info.path))
+            infos.insert_or_assign(r->info.path, r->info);
+
+    if (!infos.empty())
+        registerValidPaths(infos);
+
+    /* Phase 4: release locks, report any unregistered paths. */
+
+    for (auto & r : state->results)
+        if (r) {
+            r->lock.setDeletion(true);
+            if (!registrable.count(r->info.path))
+                printMsg(
+                    lvlError,
+                    "could not register %s: one or more references failed to copy",
+                    printStorePath(r->info.path));
+        }
 }
 
 StorePath LocalStore::addToStoreFromDump(
