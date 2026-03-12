@@ -17,6 +17,7 @@ headers = [ config_pub_h ] + files(
   'array-from-string-literal.hh',
   'base-n.hh',
   'base-nix-32.hh',
+  'bump-memory-resource.hh',
   'callback.hh',
   'canon-path.hh',
   'checked-arithmetic.hh',
