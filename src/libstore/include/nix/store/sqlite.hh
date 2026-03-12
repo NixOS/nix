@@ -12,6 +12,8 @@ struct sqlite3_stmt;
 
 namespace nix {
 
+class StorePath;
+
 enum class SQLiteOpenMode {
     /**
      * Open the database in read-write mode.
@@ -124,6 +126,7 @@ struct SQLiteStmt
         Use & operator()(std::string_view value, bool notNull = true);
         Use & operator()(const unsigned char * data, size_t len, bool notNull = true);
         Use & operator()(int64_t value, bool notNull = true);
+        Use & operator()(const StorePath & path, bool notNull = true);
         Use & bind(); // null
 
         int step();

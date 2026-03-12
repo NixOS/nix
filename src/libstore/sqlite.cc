@@ -1,4 +1,5 @@
 #include "nix/store/sqlite.hh"
+#include "nix/store/path.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
@@ -203,6 +204,11 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator()(int64_t value, bool notNull)
     } else
         bind();
     return *this;
+}
+
+SQLiteStmt::Use & SQLiteStmt::Use::operator()(const StorePath & path, bool notNull)
+{
+    return operator()(std::string(path.to_string()), notNull);
 }
 
 SQLiteStmt::Use & SQLiteStmt::Use::bind()

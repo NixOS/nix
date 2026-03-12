@@ -465,6 +465,8 @@ private:
 
     void upgradeDBSchema(State & state);
 
+    void migrateStorePathsToBaseNames(State & state, StringSet & schemaMigrations);
+
     void makeStoreWritable();
 
     uint64_t queryValidPathId(State & state, const StorePath & path);

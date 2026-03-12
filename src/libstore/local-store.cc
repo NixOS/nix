@@ -56,6 +56,16 @@
 
 namespace nix {
 
+/* Read a store path from a DB column, handling both legacy (with /nix/store/ prefix)
+   and new (baseName-only) formats during migration. */
+static StorePath storePathFromColumn(const StoreDirConfig & store, std::string_view s)
+{
+    auto prefix = store.storeDir + "/";
+    if (hasPrefix(s, prefix))
+        return StorePath(s.substr(prefix.size()));
+    return StorePath(s);
+}
+
 LocalStoreConfig::LocalStoreConfig(const std::filesystem::path & path, const Params & params)
     : StoreConfig(params, FilePathType::Native)
     , LocalFSStoreConfig(path, params)
@@ -606,6 +616,55 @@ void LocalStore::upgradeDBSchema(State & state)
             "20251016-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
+
+    migrateStorePathsToBaseNames(state, schemaMigrations);
+}
+
+/* One-time migration to strip the /nix/store/ prefix from path columns
+   in the local store DB.  Previously the local store wrote full paths
+   (e.g. /nix/store/hash-name) while the NAR info cache already used
+   bare baseNames (hash-name).  New code always writes baseNames, so
+   existing rows need to be converted once.
+
+   The storePathFromColumn() read helper tolerates both formats as a
+   safety net, so this migration is not strictly required for
+   correctness — but without it, equality-based SQL queries would fail
+   to match old (prefixed) rows against new (baseName) bind values.
+
+   TODO(2027-03): once all production databases have been migrated,
+   this function and the storePathFromColumn() fallback can be removed. */
+void LocalStore::migrateStorePathsToBaseNames(State & state, StringSet & schemaMigrations)
+{
+    auto prefix = storeDir + "/";
+    auto prefixLen = static_cast<int64_t>(prefix.size());
+
+    if (schemaMigrations.contains("20260312-strip-store-path-prefix"))
+        return;
+
+    debug("executing Nix database schema migration '20260312-strip-store-path-prefix'...");
+    SQLiteTxn txn(state.db);
+
+    SQLiteStmt stmtPath;
+    stmtPath.create(state.db,
+        "UPDATE ValidPaths SET path = substr(path, ? + 1) "
+        "WHERE substr(path, 1, ?) = ?;");
+    stmtPath.use()(prefixLen)(prefixLen)(prefix).exec();
+
+    SQLiteStmt stmtDeriver;
+    stmtDeriver.create(state.db,
+        "UPDATE ValidPaths SET deriver = substr(deriver, ? + 1) "
+        "WHERE deriver IS NOT NULL AND substr(deriver, 1, ?) = ?;");
+    stmtDeriver.use()(prefixLen)(prefixLen)(prefix).exec();
+
+    SQLiteStmt stmtDrvOut;
+    stmtDrvOut.create(state.db,
+        "UPDATE DerivationOutputs SET path = substr(path, ? + 1) "
+        "WHERE substr(path, 1, ?) = ?;");
+    stmtDrvOut.use()(prefixLen)(prefixLen)(prefix).exec();
+
+    state.db.exec("INSERT INTO SchemaMigrations VALUES('20260312-strip-store-path-prefix')");
+    txn.commit();
+    schemaMigrations.insert("20260312-strip-store-path-prefix");
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
@@ -684,7 +743,7 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             }
         } else {
             state->stmts->RegisterRealisedOutput
-                .use()(info.id.drvPath.to_string())(info.id.outputName)(printStorePath(info.outPath))(
+                .use()(info.id.drvPath.to_string())(info.id.outputName)(info.outPath)(
                     concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
@@ -695,7 +754,7 @@ void LocalStore::cacheDrvOutputMapping(
     State & state, const uint64_t deriver, const std::string & outputName, const StorePath & output)
 {
     retrySQLite<void>(
-        [&]() { state.stmts->AddDerivationOutput.use()(deriver)(outputName) (printStorePath(output)).exec(); });
+        [&]() { state.stmts->AddDerivationOutput.use()(deriver)(outputName)(output).exec(); });
 }
 
 uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
@@ -706,9 +765,9 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
             printStorePath(info.path));
 
     state.stmts->RegisterValidPath
-        .use()(printStorePath(info.path))(info.narHash.to_string(HashFormat::Base16, true))(
+        .use()(info.path)(info.narHash.to_string(HashFormat::Base16, true))(
             info.registrationTime == 0 ? time(nullptr) : info.registrationTime)(
-            info.deriver ? printStorePath(*info.deriver) : "",
+            info.deriver ? std::string(info.deriver->to_string()) : "",
             (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
             concatStringsSep(" ", Signature::toStrings(info.sigs)),
             !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
@@ -758,7 +817,7 @@ void LocalStore::queryPathInfoUncached(
 std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & state, const StorePath & path)
 {
     /* Get the path info. */
-    auto useQueryPathInfo(state.stmts->QueryPathInfo.use()(printStorePath(path)));
+    auto useQueryPathInfo(state.stmts->QueryPathInfo.use()(path));
 
     if (!useQueryPathInfo.next())
         return std::shared_ptr<ValidPathInfo>();
@@ -780,7 +839,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
     if (s)
-        info->deriver = parseStorePath(s);
+        info->deriver = storePathFromColumn(*this, s);
 
     /* Note that narSize = NULL yields 0. */
     info->narSize = useQueryPathInfo.getInt(4);
@@ -799,7 +858,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
 
     while (useQueryReferences.next())
-        info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
+        info->references.insert(storePathFromColumn(*this, useQueryReferences.getStr(0)));
 
     return info;
 }
@@ -811,13 +870,13 @@ void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
         .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(
             info.ultimate ? 1 : 0,
             info.ultimate)(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())(
-            renderContentAddress(info.ca), (bool) info.ca)(printStorePath(info.path))
+            renderContentAddress(info.ca), (bool) info.ca)(info.path)
         .exec();
 }
 
 uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
-    auto use(state.stmts->QueryPathInfo.use()(printStorePath(path)));
+    auto use(state.stmts->QueryPathInfo.use()(path));
     if (!use.next())
         throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
@@ -825,7 +884,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 
 bool LocalStore::isValidPath_(State & state, const StorePath & path)
 {
-    return state.stmts->QueryPathInfo.use()(printStorePath(path)).next();
+    return state.stmts->QueryPathInfo.use()(path).next();
 }
 
 bool LocalStore::isValidPathUncached(const StorePath & path)
@@ -849,17 +908,17 @@ StorePathSet LocalStore::queryAllValidPaths()
         auto use(state->stmts->QueryValidPaths.use());
         StorePathSet res;
         while (use.next())
-            res.insert(parseStorePath(use.getStr(0)));
+            res.insert(storePathFromColumn(*this, use.getStr(0)));
         return res;
     });
 }
 
 void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
 {
-    auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
+    auto useQueryReferrers(state.stmts->QueryReferrers.use()(path));
 
     while (useQueryReferrers.next())
-        referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
+        referrers.insert(storePathFromColumn(*this, useQueryReferrers.getStr(0)));
 }
 
 void LocalStore::queryReferrers(const StorePath & path, StorePathSet & referrers)
@@ -872,11 +931,11 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state->lock());
 
-        auto useQueryValidDerivers(state->stmts->QueryValidDerivers.use()(printStorePath(path)));
+        auto useQueryValidDerivers(state->stmts->QueryValidDerivers.use()(path));
 
         StorePathSet derivers;
         while (useQueryValidDerivers.next())
-            derivers.insert(parseStorePath(useQueryValidDerivers.getStr(1)));
+            derivers.insert(storePathFromColumn(*this, useQueryValidDerivers.getStr(1)));
 
         return derivers;
     });
@@ -892,7 +951,7 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
         drvId = queryValidPathId(*state, path);
         auto use(state->stmts->QueryDerivationOutputs.use()(drvId));
         while (use.next())
-            outputs.insert_or_assign(use.getStr(0), parseStorePath(use.getStr(1)));
+            outputs.insert_or_assign(use.getStr(0), storePathFromColumn(*this, use.getStr(1)));
 
         return outputs;
     });
@@ -903,19 +962,17 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
     if (hashPart.size() != StorePath::HashLen)
         throw Error("invalid hash part");
 
-    std::string prefix = storeDir + "/" + hashPart;
-
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state->lock());
 
-        auto useQueryPathFromHashPart(state->stmts->QueryPathFromHashPart.use()(prefix));
+        auto useQueryPathFromHashPart(state->stmts->QueryPathFromHashPart.use()(hashPart));
 
         if (!useQueryPathFromHashPart.next())
             return {};
 
         const char * s = (const char *) sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0);
-        if (s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0)
-            return parseStorePath(s);
+        if (s && hashPart.compare(0, hashPart.size(), s, hashPart.size()) == 0)
+            return storePathFromColumn(*this, s);
         return {};
     });
 }
@@ -988,7 +1045,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 {
     debug("invalidating path '%s'", printStorePath(path));
 
-    state.stmts->InvalidatePath.use()(printStorePath(path)).exec();
+    state.stmts->InvalidatePath.use()(path).exec();
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
@@ -1566,7 +1623,7 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
     if (!useQueryRealisedOutput.next())
         return std::nullopt;
     auto realisationDbId = useQueryRealisedOutput.getInt(0);
-    auto outputPath = parseStorePath(useQueryRealisedOutput.getStr(1));
+    auto outputPath = storePathFromColumn(*this, useQueryRealisedOutput.getStr(1));
     auto signatures = tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
 
     return {

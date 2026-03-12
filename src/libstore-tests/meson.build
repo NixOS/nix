@@ -68,6 +68,7 @@ sources = files(
   'local-binary-cache-store.cc',
   'local-overlay-store.cc',
   'local-store.cc',
+  'local-store-db.cc',
   'machines.cc',
   'main.cc',
   'nar-info-disk-cache.cc',
@@ -130,6 +131,7 @@ if get_option('benchmarks')
     'derivation-parser-bench.cc',
     'ref-scan-bench.cc',
     'register-valid-paths-bench.cc',
+    'local-store-db-bench.cc',
   )
 
   benchmark_exe = executable(
