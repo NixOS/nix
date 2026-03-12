@@ -1076,6 +1076,10 @@ std::map<StorePath, StorePath> copyPaths(
         if (!valid.count(path))
             missing.insert(path);
 
+    /* Don't start an activity if there's no work to do. */
+    if (missing.empty())
+        return {};
+
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
