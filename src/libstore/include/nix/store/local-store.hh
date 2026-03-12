@@ -298,6 +298,21 @@ public:
 
 private:
 
+    /**
+     * Write a path to disk without registering it as valid.
+     *
+     * Takes the path lock, restores the NAR, verifies hashes,
+     * canonicalises metadata, optimises, and fsyncs if configured.
+     * Does NOT call registerValidPath.
+     *
+     * @return nullopt if the path was already valid (nothing written).
+     *         On success, returns the still-held PathLocks. Caller must
+     *         call registerValidPath and then setDeletion(true) on the lock.
+     * @throws on signature failure, hash mismatch, IO error.
+     */
+    std::optional<PathLocks>
+    importPathToDisk(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs);
+
     void createTempRootsFile();
 
     /**

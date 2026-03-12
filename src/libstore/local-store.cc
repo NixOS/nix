@@ -1014,10 +1014,13 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
-void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+std::optional<PathLocks>
+LocalStore::importPathToDisk(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
+
+    std::optional<PathLocks> result;
 
     {
         /* In case we are not interested in reading the NAR: discard it. */
@@ -1122,15 +1125,27 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     syncParent(realPath);
                 }
 
-                registerValidPath(info);
+                result.emplace(std::move(outputLock));
+            } else {
+                /* Path became valid after we took the lock — release it. */
+                outputLock.setDeletion(true);
             }
-
-            outputLock.setDeletion(true);
         }
     }
 
     // In case `cleanup` ignored an `Interrupted` exception
     checkInterrupt();
+
+    return result;
+}
+
+void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    auto lock = importPathToDisk(info, source, repair, checkSigs);
+    if (lock) {
+        registerValidPath(info);
+        lock->setDeletion(true);
+    }
 }
 
 StorePath LocalStore::addToStoreFromDump(
