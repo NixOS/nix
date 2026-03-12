@@ -25,6 +25,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
 #include <queue>
 #include <random>
 #include <thread>
@@ -32,28 +33,61 @@
 
 namespace nix {
 
+namespace {
+
+unsigned int exponentialBackoffMs(unsigned int attempt, unsigned int baseMs, unsigned int maxMs)
+{
+    unsigned int shift = std::min(attempt == 0 ? 0u : attempt - 1, 30u);
+    unsigned long exponential = (unsigned long) baseMs << shift;
+    return (unsigned int) std::min(exponential, (unsigned long) maxMs);
+}
+
+unsigned int clampRetryAfter(unsigned int value, unsigned int minMs, unsigned int maxMs)
+{
+    return std::clamp(value, std::min(minMs, maxMs), maxMs);
+}
+
+unsigned int saturatingAdd(unsigned int a, unsigned int b)
+{
+    unsigned long sum = (unsigned long) a + b;
+    return (unsigned int) std::min(sum, (unsigned long) std::numeric_limits<unsigned int>::max());
+}
+
+unsigned int jitteredDelayMs(unsigned int lo, unsigned int hi, std::mt19937 & rng)
+{
+    return std::uniform_int_distribution<unsigned int>(lo, hi)(rng);
+}
+
+} // namespace
+
 unsigned int computeRetryDelayMs(
     unsigned int attempt,
     unsigned int baseMs,
     unsigned int maxMs,
     std::optional<unsigned int> retryAfterMs,
+    unsigned int retryAfterMinMs,
+    unsigned int retryAfterMaxMs,
     bool jitter,
     std::mt19937 & rng)
 {
-    // Exponential backoff: base * 2^(attempt-1), with overflow guard
-    unsigned int shift = std::min(attempt == 0 ? 0u : attempt - 1, 30u);
-    unsigned long exponential = (unsigned long) baseMs << shift;
-    unsigned int capped = (unsigned int) std::min(exponential, (unsigned long) maxMs);
+    unsigned int backoff = exponentialBackoffMs(attempt, baseMs, maxMs);
 
-    // Retry-After is a minimum — take max(retryAfter, capped), then re-cap for sanity
-    if (retryAfterMs)
-        capped = std::min(std::max(*retryAfterMs, capped), maxMs);
+    if (retryAfterMs) {
+        unsigned int serverDelay = clampRetryAfter(*retryAfterMs, retryAfterMinMs, retryAfterMaxMs);
+        if (serverDelay > backoff) {
+            if (!jitter)
+                return serverDelay;
+            return jitteredDelayMs(serverDelay, saturatingAdd(serverDelay, backoff), rng);
+        }
+    }
 
-    if (!jitter || capped == 0)
-        return capped;
+    if (!jitter || backoff == 0)
+        return backoff;
 
-    // Full jitter: uniform [0, capped]
-    return std::uniform_int_distribution<unsigned int>(0, capped)(rng);
+    unsigned int floor = retryAfterMs
+        ? clampRetryAfter(*retryAfterMs, retryAfterMinMs, retryAfterMaxMs)
+        : 0;
+    return jitteredDelayMs(floor, backoff, rng);
 }
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
@@ -377,13 +411,14 @@ struct curlFileTransfer : public FileTransfer
 
                     else if (name == "retry-after") {
                         auto value = trim(line.substr(i + 1));
-                        // RFC 7231 §7.1.3: Retry-After = HTTP-date / delay-seconds.
-                        // We parse delay-seconds only; HTTP-date is uncommon and
-                        // harder to get right without timezone ambiguity.
-                        if (auto seconds = string2Int<unsigned int>(value))
+                        if (auto seconds = string2Int<unsigned int>(value)) {
                             retryAfterMs = *seconds * 1000;
-                        else
-                            debug("ignoring non-integer Retry-After header: '%s'", value);
+                        } else if (auto date = curl_getdate(value.c_str(), nullptr); date != -1) {
+                            time_t now = time(nullptr);
+                            retryAfterMs = date > now ? (unsigned int) (date - now) * 1000 : 0;
+                        } else {
+                            debug("ignoring unparseable Retry-After header: '%s'", value);
+                        }
                     }
                 }
             }
@@ -814,6 +849,8 @@ struct curlFileTransfer : public FileTransfer
                         baseMs,
                         effMaxMs,
                         retryAfterMs,
+                        fileTransfer.settings.retryAfterMinMs,
+                        fileTransfer.settings.retryAfterMaxMs,
                         fileTransfer.settings.retryJitter,
                         fileTransfer.mt19937);
 
