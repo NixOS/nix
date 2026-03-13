@@ -98,6 +98,10 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                     if (maybePathsOut)
                         maybePathsOut->emplace(d.drvPath);
                 },
+                [&](const NixStringContextElem::SelfOutput &) {
+                    /* Self-output placeholders are only meaningful inside
+                       derivationStrict; ignore here. */
+                },
             },
             c.raw);
     }
@@ -1727,6 +1731,18 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
                 },
                 [&](const NixStringContextElem::Opaque & o) { drv.inputSrcs.insert(o.path); },
+                [&](const NixStringContextElem::SelfOutput & s) {
+                    /* Validate that the referenced output is actually declared. */
+                    if (outputs.find(s.output) == outputs.end())
+                        state
+                            .error<EvalError>(
+                                "derivation '%s' references its own output '%s' via placeholder, "
+                                "but this output is not declared",
+                                drvName,
+                                s.output)
+                            .atPos(v)
+                            .debugThrow();
+                },
             },
             c.raw);
     }
@@ -1866,10 +1882,11 @@ static RegisterPrimOp primop_derivationStrict(
    ‘out’. */
 static void prim_placeholder(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    v.mkString(
-        hashPlaceholder(state.forceStringNoCtx(
-            *args[0], pos, "while evaluating the first argument passed to builtins.placeholder")),
-        state.mem);
+    auto outputName = state.forceStringNoCtx(
+        *args[0], pos, "while evaluating the first argument passed to builtins.placeholder");
+    NixStringContext context;
+    context.insert(NixStringContextElem::SelfOutput{.output = std::string{outputName}});
+    v.mkString(hashPlaceholder(outputName), context, state.mem);
 }
 
 static RegisterPrimOp primop_placeholder({

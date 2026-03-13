@@ -133,6 +133,13 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                      above does not make much sense. */
                     return std::move(c);
                 },
+                [&](const NixStringContextElem::SelfOutput &) -> NixStringContextElem::DrvDeep {
+                    state
+                        .error<EvalError>(
+                            "`addDrvOutputDependencies` cannot act on a self-output placeholder")
+                        .atPos(pos)
+                        .debugThrow();
+                },
             },
             context.begin()->raw)}),
     };
@@ -201,6 +208,10 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
                     contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
                 },
                 [&](NixStringContextElem::Opaque && o) { contextInfos[std::move(o.path)].path = true; },
+                [&](NixStringContextElem::SelfOutput &&) {
+                    /* Self-output placeholders don't map to a store path;
+                       skip them in the context representation. */
+                },
             },
             ((NixStringContextElem &&) i).raw);
     }

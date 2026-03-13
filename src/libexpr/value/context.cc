@@ -51,6 +51,11 @@ NixStringContextElem NixStringContextElem::parse(std::string_view s0, const Expe
             .drvPath = StorePath{s.substr(1)},
         };
     }
+    case '^': {
+        return NixStringContextElem::SelfOutput{
+            .output = std::string{s.substr(1)},
+        };
+    }
     default: {
         // Ensure no '!'
         if (s.find("!") != std::string_view::npos) {
@@ -91,6 +96,10 @@ std::string NixStringContextElem::to_string() const
                 res += '=';
                 res += d.drvPath.to_string();
             },
+            [&](const NixStringContextElem::SelfOutput & s) {
+                res += '^';
+                res += s.output;
+            },
         },
         raw);
 
@@ -108,6 +117,9 @@ std::string NixStringContextElem::display(const StoreDirConfig & store) const
                 return store.printStorePath(d.drvPath) + " (deep)";
             },
             [&](const NixStringContextElem::Built & b) -> std::string { return SingleDerivedPath{b}.to_string(store); },
+            [&](const NixStringContextElem::SelfOutput & s) -> std::string {
+                return "self-output:" + s.output;
+            },
         },
         raw);
 }
