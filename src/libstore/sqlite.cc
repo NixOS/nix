@@ -282,12 +282,13 @@ SQLiteTxn::~SQLiteTxn()
 
 namespace {
 
-unsigned int clampedExponential(unsigned int base, unsigned int attempt, unsigned int cap)
+// Precondition: attempt >= 1
+constexpr unsigned int clampedExponential(unsigned int base, unsigned int attempt, unsigned int ceil)
 {
-    // Clamp shift to [0, 63] to stay within unsigned long long range.
+    // Clamp shift to [0, 63] so base << shift is valid for unsigned long long.
     auto shift = std::min(attempt - 1, 63u);
     auto unclamped = static_cast<unsigned long long>(base) << shift;
-    return static_cast<unsigned int>(std::min(unclamped, static_cast<unsigned long long>(cap)));
+    return static_cast<unsigned int>(std::min(unclamped, static_cast<unsigned long long>(ceil)));
 }
 
 void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
@@ -307,15 +308,13 @@ SQLiteRetryState newSQLiteRetryState()
     return SQLiteRetryState{rng()};
 }
 
-std::chrono::milliseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
+constexpr std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
 {
-    if (config.baseMs == 0)
-        return std::chrono::milliseconds{0};
-
-    auto ceiling = clampedExponential(config.baseMs, attempt, config.capMs);
-    // Scale ceiling by jitter factor: delay = ceiling * (jitter / 2^32)
-    auto delay = static_cast<unsigned int>((static_cast<unsigned long long>(ceiling) * jitter) >> 32);
-    return std::chrono::milliseconds{delay};
+    auto ceiling = clampedExponential(config.baseUs, attempt, config.ceilUs);
+    auto jitterRange = (config.jitterShift >= 32u) ? 0u : (ceiling >> config.jitterShift);
+    auto jitterAmount = static_cast<unsigned int>((static_cast<unsigned long long>(jitterRange) * jitter) >> 32);
+    auto delay = ceiling + jitterAmount;
+    return std::chrono::microseconds{delay};
 }
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
@@ -325,7 +324,11 @@ void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
     throttledWarning(e, state);
     checkInterrupt();
 
-    constexpr BackoffConfig config{.baseMs = 1, .capMs = 100};
+    BackoffConfig config{
+        .baseUs = settings.sqliteRetryBaseUs,
+        .ceilUs = settings.sqliteRetryCeilUs,
+        .jitterShift = settings.sqliteRetryJitterShift,
+    };
     std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, state.jitter, config));
 }
 
