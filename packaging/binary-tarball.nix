@@ -41,6 +41,9 @@ runCommand "nix-binary-tarball-${version}" env ''
   substitute ${../scripts/install-systemd-multi-user.sh} $TMPDIR/install-systemd-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
+  substitute ${../scripts/install-openrc-multi-user.sh} $TMPDIR/install-openrc-multi-user.sh \
+    --subst-var-by nix ${nix} \
+    --subst-var-by cacert ${cacert}
   substitute ${../scripts/install-freebsd-multi-user.sh} $TMPDIR/install-freebsd-multi-user.sh \
     --subst-var-by nix ${nix} \
     --subst-var-by cacert ${cacert}
@@ -56,6 +59,7 @@ runCommand "nix-binary-tarball-${version}" env ''
     shellcheck $TMPDIR/create-darwin-volume.sh
     shellcheck $TMPDIR/install-darwin-multi-user.sh
     shellcheck $TMPDIR/install-systemd-multi-user.sh
+    shellcheck $TMPDIR/install-openrc-multi-user.sh
     shellcheck $TMPDIR/install-freebsd-multi-user.sh
 
     # SC1091: Don't panic about not being able to source
@@ -73,6 +77,7 @@ runCommand "nix-binary-tarball-${version}" env ''
   chmod +x $TMPDIR/create-darwin-volume.sh
   chmod +x $TMPDIR/install-darwin-multi-user.sh
   chmod +x $TMPDIR/install-systemd-multi-user.sh
+  chmod +x $TMPDIR/install-openrc-multi-user.sh
   chmod +x $TMPDIR/install-freebsd-multi-user.sh
   chmod +x $TMPDIR/install-multi-user
   dir=nix-${version}-${system}
@@ -92,6 +97,7 @@ runCommand "nix-binary-tarball-${version}" env ''
     $TMPDIR/create-darwin-volume.sh \
     $TMPDIR/install-darwin-multi-user.sh \
     $TMPDIR/install-systemd-multi-user.sh \
+    $TMPDIR/install-openrc-multi-user.sh \
     $TMPDIR/install-freebsd-multi-user.sh \
     $TMPDIR/install-multi-user \
     $TMPDIR/reginfo \
