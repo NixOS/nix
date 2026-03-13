@@ -38,6 +38,21 @@ foreach funcspec : check_funcs
   configdata_priv.set(define_name, define_value, description : funcspec[1])
 endforeach
 
+have_copy_file_range = cxx.links(
+  '''#include <unistd.h>
+int main() {
+  copy_file_range(0, nullptr, 0, nullptr, 0, 0);
+}
+  ''',
+  name : 'have copy_file_range',
+)
+
+configdata_priv.set(
+  'HAVE_COPY_FILE_RANGE',
+  have_copy_file_range.to_int(),
+  description : 'Optionally used for optimised file copying',
+)
+
 configdata_pub.set(
   'NIX_UBSAN_ENABLED',
   ('undefined' in get_option('b_sanitize')).to_int(),

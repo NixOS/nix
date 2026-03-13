@@ -64,6 +64,14 @@ struct BufferedSink : virtual Sink
 
     void flush();
 
+    /**
+     * Check whether the buffer has unflushed data.
+     */
+    bool hasData() const noexcept
+    {
+        return bufPos;
+    }
+
 protected:
 
     virtual void writeUnbuffered(std::string_view data) = 0;
@@ -163,6 +171,12 @@ struct FdSink : BufferedSink
 {
     Descriptor fd;
     size_t written = 0;
+    /**
+     * A hint to the sink as to whether the destination is a regular file.
+     * Specifying a true for a non regular file doesn't affect correctness - only
+     * efficiency.
+     */
+    bool isRegularFile:1 = false;
 
     FdSink()
         : fd(INVALID_DESCRIPTOR)
@@ -205,7 +219,13 @@ struct FdSource : BufferedSource, RestartableSource
     Descriptor fd;
     size_t read = 0;
     BackedStringView endOfFileError{"unexpected end-of-file"};
-    bool isSeekable = true;
+    bool isSeekable:1 = true;
+    /**
+     * A hint to the source as to whether the source being copied from is a
+     * regular file. Specifying a true for a non regular file doesn't affect
+     * correctness - only efficiency.
+     */
+    bool isRegularFile:1 = false;
 
     FdSource()
         : fd(INVALID_DESCRIPTOR)
@@ -233,6 +253,8 @@ struct FdSource : BufferedSource, RestartableSource
     bool hasData();
 
     void skip(size_t len) override;
+
+    void drainInto(Sink & sink, uint64_t len) override;
 
 protected:
     size_t readUnbuffered(char * data, size_t len) override;

@@ -177,6 +177,7 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void
 
     sizeCallback(size);
     FdSource source(fd.get());
+    source.isRegularFile = true; /* Try to use optimised copying if possible. */
     /* The most important invariant we care about here is writing exactly size
        bytes to the sink. drainInto should throw an EndOfFile if we fail to read
        `size` bytes. */
