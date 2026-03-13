@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <random>
 #include <thread>
 
 namespace nix {
@@ -299,6 +300,12 @@ void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 }
 
 } // anonymous namespace
+
+SQLiteRetryState newSQLiteRetryState()
+{
+    thread_local std::mt19937 rng{std::random_device{}()};
+    return SQLiteRetryState{rng()};
+}
 
 std::chrono::milliseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
 {
