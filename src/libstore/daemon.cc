@@ -85,7 +85,7 @@ struct TunnelLogger : public Logger
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) override
     {
         if (lvl > verbosity)
             return;
@@ -148,7 +148,8 @@ struct TunnelLogger : public Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        std::optional<std::string_view> machine) override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20}) {
             if (!s.empty())
@@ -156,12 +157,15 @@ struct TunnelLogger : public Logger
             return;
         }
 
+        // Note: `machine` is intentionally not serialized on the wire.
+        // Adding it would require a worker protocol version bump.
         StringSink buf;
         buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
         enqueueMsg(buf.s);
     }
 
-    void stopActivity(ActivityId act) override
+    // machine is intentionally unused here; see startActivity.
+    void stopActivity(ActivityId act, std::optional<std::string_view> machine = {}) override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
@@ -170,7 +174,9 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    // machine is intentionally unused here; see startActivity.
+    void result(
+        ActivityId act, ResultType type, const Fields & fields, std::optional<std::string_view> machine = {}) override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
