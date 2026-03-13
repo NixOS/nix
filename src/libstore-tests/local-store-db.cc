@@ -7,12 +7,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/hash.hh"
 
-
 #ifndef _WIN32
 
-#include <filesystem>
-#include <fstream>
-#include <sqlite3.h>
+#  include <filesystem>
+#  include <fstream>
+#  include <sqlite3.h>
 
 using namespace nix;
 
@@ -79,9 +78,8 @@ protected:
     /**
      * Create a dummy non-derivation store path and return its ValidPathInfo.
      */
-    ValidPathInfo createDummyPath(const std::string & name,
-                                  std::optional<StorePath> deriver = std::nullopt,
-                                  StorePathSet refs = {})
+    ValidPathInfo
+    createDummyPath(const std::string & name, std::optional<StorePath> deriver = std::nullopt, StorePathSet refs = {})
     {
         auto path = StorePath::random(name);
 
@@ -93,8 +91,7 @@ protected:
     }
 
     /**
-     * Query raw column values from the DB via direct SQLite access
-     * to verify the stored format (baseName, not full path).
+     * Query raw column values from the DB via direct SQLite access.
      */
     std::vector<std::string> queryRawColumn(const std::string & table, const std::string & column)
     {
@@ -138,25 +135,34 @@ TEST_F(LocalStoreDbTest, registerAndQueryPathInfo)
 }
 
 /**
- * Verify that paths are stored in the DB as baseNames (no /nix/store/ prefix).
+ * Verify dual-column format: pathName has baseName, path has full /nix/store/... path.
  */
-TEST_F(LocalStoreDbTest, pathsStoredAsBaseNames)
+TEST_F(LocalStoreDbTest, dualColumnFormat)
 {
-    auto info = createDummyPath("test-basename");
+    auto info = createDummyPath("test-dual-column");
     ValidPathInfos infos;
     infos.emplace(info.path, info);
     localStore->registerValidPaths(infos);
 
+    // pathName column should have baseName (no prefix)
+    auto rawPathNames = queryRawColumn("ValidPaths", "pathName");
+    ASSERT_FALSE(rawPathNames.empty());
+    for (auto & raw : rawPathNames) {
+        EXPECT_FALSE(raw.starts_with("/")) << "pathName should be baseName: " << raw;
+    }
+
+    // path column should have full /nix/store/... path (backward compat)
     auto rawPaths = queryRawColumn("ValidPaths", "path");
     ASSERT_FALSE(rawPaths.empty());
     for (auto & raw : rawPaths) {
-        EXPECT_FALSE(raw.starts_with("/")) << "DB should store baseName, not full path: " << raw;
+        EXPECT_TRUE(raw.starts_with("/")) << "path should be full store path: " << raw;
+        EXPECT_TRUE(raw.find("/nix/store/") != std::string::npos) << "path should contain /nix/store/: " << raw;
     }
 }
 
 /**
  * Register a path with a deriver, verify it round-trips correctly
- * and is stored as a baseName in the DB.
+ * and both columns are populated correctly.
  */
 TEST_F(LocalStoreDbTest, deriverRoundTrip)
 {
@@ -172,10 +178,16 @@ TEST_F(LocalStoreDbTest, deriverRoundTrip)
     ASSERT_TRUE(queried->deriver.has_value());
     EXPECT_EQ(*queried->deriver, drvInfo.path);
 
-    // Verify deriver is stored as baseName in DB
+    // deriverName should be baseName
+    auto rawDeriverNames = queryRawColumn("ValidPaths", "deriverName");
+    for (auto & raw : rawDeriverNames) {
+        EXPECT_FALSE(raw.starts_with("/")) << "deriverName should be baseName: " << raw;
+    }
+
+    // deriver (legacy) should be full path
     auto rawDerivers = queryRawColumn("ValidPaths", "deriver");
     for (auto & raw : rawDerivers) {
-        EXPECT_FALSE(raw.starts_with("/")) << "Deriver should be baseName: " << raw;
+        EXPECT_TRUE(raw.starts_with("/")) << "deriver should be full path: " << raw;
     }
 }
 
@@ -270,14 +282,13 @@ TEST_F(LocalStoreDbTest, queryValidDerivers)
             auto outPath = *outputAndPath.second;
             // queryValidDerivers should find the derivation for this output
             auto derivers = localStore->queryValidDerivers(outPath);
-            EXPECT_TRUE(derivers.count(drvInfo.path))
-                << "Expected drv to be a deriver of output " << name;
+            EXPECT_TRUE(derivers.count(drvInfo.path)) << "Expected drv to be a deriver of output " << name;
         }
     }
 }
 
 /**
- * Derivation outputs are stored as baseNames and queryable.
+ * Derivation outputs have dual-column format: pathName (baseName) and path (full).
  */
 TEST_F(LocalStoreDbTest, derivationOutputsRoundTrip)
 {
@@ -291,29 +302,35 @@ TEST_F(LocalStoreDbTest, derivationOutputsRoundTrip)
     // contain an entry for "out"
     EXPECT_TRUE(outputs.count("out"));
 
-    // If there are output paths in DerivationOutputs, verify they're baseNames
-    auto rawOutputs = queryRawColumn("DerivationOutputs", "path");
-    for (auto & raw : rawOutputs) {
-        EXPECT_FALSE(raw.starts_with("/")) << "DerivationOutputs.path should be baseName: " << raw;
+    // pathName column should have baseNames
+    auto rawPathNames = queryRawColumn("DerivationOutputs", "pathName");
+    for (auto & raw : rawPathNames) {
+        EXPECT_FALSE(raw.starts_with("/")) << "DerivationOutputs.pathName should be baseName: " << raw;
+    }
+
+    // path column (legacy) should have full paths
+    auto rawPaths = queryRawColumn("DerivationOutputs", "path");
+    for (auto & raw : rawPaths) {
+        EXPECT_TRUE(raw.starts_with("/")) << "DerivationOutputs.path should be full path: " << raw;
     }
 }
 
 /**
- * Migration test: manually insert legacy (prefixed) paths into the DB,
- * then reopen the store — migration should strip prefixes.
+ * Backfill test: simulate older Nix inserting rows with only legacy columns
+ * (path, deriver) and NULL pathName/deriverName. Reopen store — backfill
+ * should populate the new columns from the legacy data.
  */
-TEST_F(LocalStoreDbTest, migrationStripsPrefix)
+TEST_F(LocalStoreDbTest, backfillFromLegacyColumns)
 {
-    // Register a path normally (baseName format)
-    auto info = createDummyPath("test-migration");
+    // Register a path normally first
+    auto info = createDummyPath("test-backfill-normal");
     ValidPathInfos infos;
     infos.emplace(info.path, info);
     localStore->registerValidPaths(infos);
 
-    // Now manually insert a legacy-format path directly in the DB
     auto dbPath = tmpRoot / "nix/var/nix/db/db.sqlite";
 
-    // Close the store first
+    // Close the store
     localStore.reset();
     store.reset();
 
@@ -321,35 +338,44 @@ TEST_F(LocalStoreDbTest, migrationStripsPrefix)
         sqlite3 * db;
         ASSERT_EQ(sqlite3_open(dbPath.c_str(), &db), SQLITE_OK);
 
-        // Insert a legacy path with /nix/store/ prefix
-        auto legacyPath = localStore ? localStore->storeDir : "/nix/store";
-        std::string sql = fmt(
-            "INSERT INTO ValidPaths (path, hash, registrationTime, narSize) "
-            "VALUES ('%s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1-legacy-path', "
-            "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
-            "%d, 100);",
-            legacyPath, time(nullptr));
+        // Simulate older Nix: insert a row with only legacy columns, NULL pathName
+        std::string sql =
+            fmt("INSERT INTO ValidPaths (path, hash, registrationTime, narSize) "
+                "VALUES ('%s/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1-legacy-path', "
+                "'sha256:0000000000000000000000000000000000000000000000000000000000000000', "
+                "%d, 100);",
+                "/nix/store",
+                time(nullptr));
         char * errMsg = nullptr;
         ASSERT_EQ(sqlite3_exec(db, sql.c_str(), nullptr, nullptr, &errMsg), SQLITE_OK)
             << (errMsg ? errMsg : "unknown error");
 
-        // Also remove the migration record so it re-runs
-        sqlite3_exec(db, "DELETE FROM SchemaMigrations WHERE migration = '20260312-strip-store-path-prefix';",
-                     nullptr, nullptr, nullptr);
+        // Verify pathName is NULL for the inserted row
+        sqlite3_stmt * stmt;
+        sqlite3_prepare_v2(db, "SELECT pathName FROM ValidPaths WHERE path LIKE '%legacy-path'", -1, &stmt, nullptr);
+        ASSERT_EQ(sqlite3_step(stmt), SQLITE_ROW);
+        EXPECT_EQ(sqlite3_column_type(stmt, 0), SQLITE_NULL) << "pathName should be NULL before backfill";
+        sqlite3_finalize(stmt);
 
         sqlite3_close(db);
     }
 
-    // Reopen the store — migration should run
+    // Reopen the store — backfill should run
     store = openStore(fmt("local?root=%s", tmpRoot.string()));
     localStore = std::dynamic_pointer_cast<LocalStore>(store);
     ASSERT_NE(localStore, nullptr);
 
-    // All paths in DB should now be baseName format
-    auto rawPaths = queryRawColumn("ValidPaths", "path");
-    for (auto & raw : rawPaths) {
-        EXPECT_FALSE(raw.starts_with("/")) << "After migration, path should be baseName: " << raw;
+    // pathName should now be populated for all rows
+    auto rawPathNames = queryRawColumn("ValidPaths", "pathName");
+    ASSERT_GE(rawPathNames.size(), 2u); // at least the normal + legacy row
+    for (auto & raw : rawPathNames) {
+        EXPECT_FALSE(raw.starts_with("/")) << "pathName should be baseName after backfill: " << raw;
     }
+
+    // The backfilled row should be queryable via pathName
+    auto found = localStore->queryPathFromHashPart("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1");
+    ASSERT_TRUE(found.has_value());
+    EXPECT_EQ(found->to_string(), "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1-legacy-path");
 
     // The originally registered path should still be queryable
     EXPECT_TRUE(localStore->isValidPath(info.path));
@@ -421,10 +447,14 @@ TEST_F(LocalStoreDbTest, fullIntegration)
     ASSERT_TRUE(found.has_value());
     EXPECT_EQ(*found, mainInfo.path);
 
-    // Verify raw DB has only baseNames
+    // Verify dual-column format in raw DB
+    auto rawPathNames = queryRawColumn("ValidPaths", "pathName");
+    for (auto & raw : rawPathNames) {
+        EXPECT_FALSE(raw.starts_with("/")) << "pathName should be baseName: " << raw;
+    }
     auto rawPaths = queryRawColumn("ValidPaths", "path");
     for (auto & raw : rawPaths) {
-        EXPECT_FALSE(raw.starts_with("/")) << "All paths should be baseNames: " << raw;
+        EXPECT_TRUE(raw.starts_with("/")) << "path should be full store path: " << raw;
     }
 }
 

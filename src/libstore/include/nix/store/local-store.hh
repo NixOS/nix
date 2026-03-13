@@ -465,7 +465,14 @@ private:
 
     void upgradeDBSchema(State & state);
 
-    void migrateStorePathsToBaseNames(State & state, StringSet & schemaMigrations);
+    void backfillPathNames(State & state);
+
+    /**
+     * Backward-compat hack: write full store paths to the legacy 'path' and
+     * 'deriver' columns so older Nix versions can still read this database.
+     * TODO(2027-03): Remove this function and the legacy columns from the INSERT.
+     */
+    void writeLegacyPathColumns(SQLiteStmt::Use & use, const ValidPathInfo & info);
 
     void makeStoreWritable();
 

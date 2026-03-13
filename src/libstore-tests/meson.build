@@ -67,8 +67,8 @@ sources = files(
   'legacy-ssh-store.cc',
   'local-binary-cache-store.cc',
   'local-overlay-store.cc',
-  'local-store.cc',
   'local-store-db.cc',
+  'local-store.cc',
   'machines.cc',
   'main.cc',
   'nar-info-disk-cache.cc',
@@ -129,9 +129,9 @@ if get_option('benchmarks')
   benchmark_sources = files(
     'bench-main.cc',
     'derivation-parser-bench.cc',
+    'local-store-db-bench.cc',
     'ref-scan-bench.cc',
     'register-valid-paths-bench.cc',
-    'local-store-db-bench.cc',
   )
 
   benchmark_exe = executable(

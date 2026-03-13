@@ -8,8 +8,8 @@
 
 #ifndef _WIN32
 
-#include <filesystem>
-#include <fstream>
+#  include <filesystem>
+#  include <fstream>
 
 using namespace nix;
 
@@ -127,8 +127,8 @@ BENCHMARK(BM_QueryPathFromHashPart)->Arg(100)->Arg(1000);
 /**
  * Benchmark: queryAllValidPaths with various store sizes.
  *
- * Measures read-back of all paths, which now uses storePathFromColumn
- * instead of parseStorePath.
+ * Measures read-back of all paths, which now reads from the pathName
+ * column and uses StorePath() constructor directly.
  */
 static void BM_QueryAllValidPaths(benchmark::State & state)
 {

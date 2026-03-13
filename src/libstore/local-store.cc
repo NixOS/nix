@@ -56,16 +56,6 @@
 
 namespace nix {
 
-/* Read a store path from a DB column, handling both legacy (with /nix/store/ prefix)
-   and new (baseName-only) formats during migration. */
-static StorePath storePathFromColumn(const StoreDirConfig & store, std::string_view s)
-{
-    auto prefix = store.storeDir + "/";
-    if (hasPrefix(s, prefix))
-        return StorePath(s.substr(prefix.size()));
-    return StorePath(s);
-}
-
 LocalStoreConfig::LocalStoreConfig(const std::filesystem::path & path, const Params & params)
     : StoreConfig(params, FilePathType::Native)
     , LocalFSStoreConfig(path, params)
@@ -338,37 +328,58 @@ LocalStore::LocalStore(ref<const Config> config)
 
     upgradeDBSchema(*state);
 
-    /* Prepare SQL statements. */
+    /* Prepare SQL statements.
+
+       NOTE: The pathName and deriverName columns store the efficient baseName
+       format (e.g. "hash-name").  The legacy path and deriver columns store the
+       full format (e.g. "/nix/store/hash-name") for backward compatibility with
+       older Nix versions that read those columns.
+
+       All reads use the new pathName/deriverName columns.  Writes populate both
+       old and new columns.
+
+       TODO(2027-03): Drop the legacy columns.  Correct final INSERT:
+       "INSERT INTO ValidPaths (pathName, hash, registrationTime, deriverName,
+        narSize, ultimate, sigs, ca) VALUES (?, ?, ?, ?, ?, ?, ?, ?);" */
     state->stmts->RegisterValidPath.create(
         state->db,
-        "insert into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
+        "insert into ValidPaths (pathName, hash, registrationTime, deriverName, "
+        "narSize, ultimate, sigs, ca, path, deriver) "
+        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    /* TODO(2027-03): Drop legacy columns.  Correct final UPDATE:
+       "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ?
+        where pathName = ?;" */
     state->stmts->UpdatePathInfo.create(
-        state->db, "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where path = ?;");
+        state->db, "update ValidPaths set narSize = ?, hash = ?, ultimate = ?, sigs = ?, ca = ? where pathName = ?;");
     state->stmts->AddReference.create(state->db, "insert or replace into Refs (referrer, reference) values (?, ?);");
     state->stmts->QueryPathInfo.create(
         state->db,
-        "select id, hash, registrationTime, deriver, narSize, ultimate, sigs, ca from ValidPaths where path = ?;");
+        "select id, hash, registrationTime, deriverName, narSize, ultimate, sigs, ca from ValidPaths where pathName = ?;");
     state->stmts->QueryReferences.create(
-        state->db, "select path from Refs join ValidPaths on reference = id where referrer = ?;");
+        state->db, "select pathName from Refs join ValidPaths on reference = id where referrer = ?;");
     state->stmts->QueryReferrers.create(
         state->db,
-        "select path from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where path = ?);");
-    state->stmts->InvalidatePath.create(state->db, "delete from ValidPaths where path = ?;");
+        "select pathName from Refs join ValidPaths on referrer = id where reference = (select id from ValidPaths where pathName = ?);");
+    state->stmts->InvalidatePath.create(state->db, "delete from ValidPaths where pathName = ?;");
+    /* TODO(2027-03): Drop legacy path column.  Correct final INSERT:
+       "insert or replace into DerivationOutputs (drv, id, pathName) values (?, ?, ?);" */
     state->stmts->AddDerivationOutput.create(
-        state->db, "insert or replace into DerivationOutputs (drv, id, path) values (?, ?, ?);");
+        state->db, "insert or replace into DerivationOutputs (drv, id, pathName, path) values (?, ?, ?, ?);");
     state->stmts->QueryValidDerivers.create(
-        state->db, "select v.id, v.path from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.path = ?;");
-    state->stmts->QueryDerivationOutputs.create(state->db, "select id, path from DerivationOutputs where drv = ?;");
-    // Use "path >= ?" with limit 1 rather than "path like '?%'" to
+        state->db,
+        "select v.id, v.pathName from DerivationOutputs d join ValidPaths v on d.drv = v.id where d.pathName = ?;");
+    state->stmts->QueryDerivationOutputs.create(state->db, "select id, pathName from DerivationOutputs where drv = ?;");
+    // Use "pathName >= ?" with limit 1 rather than "pathName like '?%'" to
     // ensure efficient lookup.
-    state->stmts->QueryPathFromHashPart.create(state->db, "select path from ValidPaths where path >= ? limit 1;");
-    state->stmts->QueryValidPaths.create(state->db, "select path from ValidPaths");
+    state->stmts->QueryPathFromHashPart.create(
+        state->db, "select pathName from ValidPaths where pathName >= ? limit 1;");
+    state->stmts->QueryValidPaths.create(state->db, "select pathName from ValidPaths");
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         state->stmts->RegisterRealisedOutput.create(
             state->db,
             R"(
                 insert into BuildTraceV2 (drvPath, outputName, outputPath, signatures)
-                values (?, ?, (select id from ValidPaths where path = ?), ?)
+                values (?, ?, (select id from ValidPaths where pathName = ?), ?)
                 ;
             )");
         state->stmts->UpdateRealisedOutput.create(
@@ -384,7 +395,7 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
-                select BuildTraceV2.id, Output.path, BuildTraceV2.signatures from BuildTraceV2
+                select BuildTraceV2.id, Output.pathName, BuildTraceV2.signatures from BuildTraceV2
                     inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
                     where drvPath = ? and outputName = ?
                     ;
@@ -392,7 +403,7 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryAllRealisedOutputs.create(
             state->db,
             R"(
-                select outputName, Output.path from BuildTraceV2
+                select outputName, Output.pathName from BuildTraceV2
                     inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
                     where drvPath = ?
                     ;
@@ -617,54 +628,59 @@ void LocalStore::upgradeDBSchema(State & state)
 #include "ca-specific-schema.sql.gen.hh"
         );
 
-    migrateStorePathsToBaseNames(state, schemaMigrations);
+    doUpgrade(
+        "20260312-add-pathName-columns",
+        "ALTER TABLE ValidPaths ADD COLUMN pathName text;\n"
+        "ALTER TABLE ValidPaths ADD COLUMN deriverName text;\n"
+        "ALTER TABLE DerivationOutputs ADD COLUMN pathName text;\n"
+        "CREATE UNIQUE INDEX IndexValidPathsPathName ON ValidPaths(pathName);\n"
+        "CREATE INDEX IndexDerivationOutputsPathName ON DerivationOutputs(pathName)");
+
+    backfillPathNames(state);
 }
 
-/* One-time migration to strip the /nix/store/ prefix from path columns
-   in the local store DB.  Previously the local store wrote full paths
-   (e.g. /nix/store/hash-name) while the NAR info cache already used
-   bare baseNames (hash-name).  New code always writes baseNames, so
-   existing rows need to be converted once.
+/* Backfill the pathName / deriverName columns for any rows inserted by
+   an older Nix that does not know about them.  Runs on every startup
+   but is a fast no-op when all rows are already populated.
 
-   The storePathFromColumn() read helper tolerates both formats as a
-   safety net, so this migration is not strictly required for
-   correctness — but without it, equality-based SQL queries would fail
-   to match old (prefixed) rows against new (baseName) bind values.
+   This is the core of the backward-compatibility story: older Nix
+   writes only to the legacy columns (path, deriver), so after a
+   rollback-then-upgrade cycle we just fill in the missing pathName
+   values from the legacy data.
 
-   TODO(2027-03): once all production databases have been migrated,
-   this function and the storePathFromColumn() fallback can be removed. */
-void LocalStore::migrateStorePathsToBaseNames(State & state, StringSet & schemaMigrations)
+   TODO(2027-03): Remove once all users have migrated. */
+void LocalStore::backfillPathNames(State & state)
 {
+    // Fast check — skip entirely when nothing needs backfill
+    {
+        SQLiteStmt check;
+        check.create(state.db, "SELECT EXISTS(SELECT 1 FROM ValidPaths WHERE pathName IS NULL)");
+        auto use(check.use());
+        if (!use.next() || use.getInt(0) == 0)
+            return;
+    }
+
+    debug("backfilling pathName columns for rows inserted by older Nix...");
     auto prefix = storeDir + "/";
     auto prefixLen = static_cast<int64_t>(prefix.size());
-
-    if (schemaMigrations.contains("20260312-strip-store-path-prefix"))
-        return;
-
-    debug("executing Nix database schema migration '20260312-strip-store-path-prefix'...");
     SQLiteTxn txn(state.db);
 
-    SQLiteStmt stmtPath;
-    stmtPath.create(state.db,
-        "UPDATE ValidPaths SET path = substr(path, ? + 1) "
-        "WHERE substr(path, 1, ?) = ?;");
-    stmtPath.use()(prefixLen)(prefixLen)(prefix).exec();
+    SQLiteStmt s1;
+    s1.create(state.db, "UPDATE ValidPaths SET pathName = substr(path, ? + 1) WHERE pathName IS NULL;");
+    s1.use()(prefixLen).exec();
 
-    SQLiteStmt stmtDeriver;
-    stmtDeriver.create(state.db,
-        "UPDATE ValidPaths SET deriver = substr(deriver, ? + 1) "
-        "WHERE deriver IS NOT NULL AND substr(deriver, 1, ?) = ?;");
-    stmtDeriver.use()(prefixLen)(prefixLen)(prefix).exec();
+    SQLiteStmt s2;
+    s2.create(
+        state.db,
+        "UPDATE ValidPaths SET deriverName = substr(deriver, ? + 1) "
+        "WHERE deriver IS NOT NULL AND deriverName IS NULL;");
+    s2.use()(prefixLen).exec();
 
-    SQLiteStmt stmtDrvOut;
-    stmtDrvOut.create(state.db,
-        "UPDATE DerivationOutputs SET path = substr(path, ? + 1) "
-        "WHERE substr(path, 1, ?) = ?;");
-    stmtDrvOut.use()(prefixLen)(prefixLen)(prefix).exec();
+    SQLiteStmt s3;
+    s3.create(state.db, "UPDATE DerivationOutputs SET pathName = substr(path, ? + 1) WHERE pathName IS NULL;");
+    s3.use()(prefixLen).exec();
 
-    state.db.exec("INSERT INTO SchemaMigrations VALUES('20260312-strip-store-path-prefix')");
     txn.commit();
-    schemaMigrations.insert("20260312-strip-store-path-prefix");
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
@@ -753,8 +769,17 @@ void LocalStore::registerDrvOutput(const Realisation & info)
 void LocalStore::cacheDrvOutputMapping(
     State & state, const uint64_t deriver, const std::string & outputName, const StorePath & output)
 {
-    retrySQLite<void>(
-        [&]() { state.stmts->AddDerivationOutput.use()(deriver)(outputName)(output).exec(); });
+    /* TODO(2027-03): Remove printStorePath(output) — it's the legacy 'path' column.
+       Correct final call: state.stmts->AddDerivationOutput.use()(deriver)(outputName)(output).exec(); */
+    retrySQLite<void>([&]() {
+        state.stmts->AddDerivationOutput.use()(deriver)(outputName) (output) (printStorePath(output)).exec();
+    });
+}
+
+/* TODO(2027-03): Remove this function and the legacy columns from the INSERT. */
+void LocalStore::writeLegacyPathColumns(SQLiteStmt::Use & use, const ValidPathInfo & info)
+{
+    use(printStorePath(info.path))(info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver);
 }
 
 uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
@@ -764,14 +789,16 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
             "cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
-    state.stmts->RegisterValidPath
-        .use()(info.path)(info.narHash.to_string(HashFormat::Base16, true))(
-            info.registrationTime == 0 ? time(nullptr) : info.registrationTime)(
-            info.deriver ? std::string(info.deriver->to_string()) : "",
-            (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
-            concatStringsSep(" ", Signature::toStrings(info.sigs)),
-            !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
-        .exec();
+    auto use = state.stmts->RegisterValidPath
+        .use()(info.path)(info.narHash.to_string(HashFormat::Base16, true))(                      // 1: pathName, 2: hash
+            info.registrationTime == 0 ? time(nullptr) : info.registrationTime)(                  // 3: registrationTime
+            info.deriver ? std::string(info.deriver->to_string()) : "",                           // 4: deriverName
+            (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)( // 5: narSize, 6: ultimate
+            concatStringsSep(" ", Signature::toStrings(info.sigs)),                               // 7: sigs
+            !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca);                   // 8: ca
+    // Backward compat: append full paths for legacy columns (positions 9-10)
+    writeLegacyPathColumns(use, info);
+    use.exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
     /* If this is a derivation, then store the derivation outputs in
@@ -839,7 +866,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
     if (s)
-        info->deriver = storePathFromColumn(*this, s);
+        info->deriver = StorePath(s);
 
     /* Note that narSize = NULL yields 0. */
     info->narSize = useQueryPathInfo.getInt(4);
@@ -858,7 +885,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
     auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
 
     while (useQueryReferences.next())
-        info->references.insert(storePathFromColumn(*this, useQueryReferences.getStr(0)));
+        info->references.insert(StorePath(useQueryReferences.getStr(0)));
 
     return info;
 }
@@ -908,7 +935,7 @@ StorePathSet LocalStore::queryAllValidPaths()
         auto use(state->stmts->QueryValidPaths.use());
         StorePathSet res;
         while (use.next())
-            res.insert(storePathFromColumn(*this, use.getStr(0)));
+            res.insert(StorePath(use.getStr(0)));
         return res;
     });
 }
@@ -918,7 +945,7 @@ void LocalStore::queryReferrers(State & state, const StorePath & path, StorePath
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(path));
 
     while (useQueryReferrers.next())
-        referrers.insert(storePathFromColumn(*this, useQueryReferrers.getStr(0)));
+        referrers.insert(StorePath(useQueryReferrers.getStr(0)));
 }
 
 void LocalStore::queryReferrers(const StorePath & path, StorePathSet & referrers)
@@ -935,7 +962,7 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
 
         StorePathSet derivers;
         while (useQueryValidDerivers.next())
-            derivers.insert(storePathFromColumn(*this, useQueryValidDerivers.getStr(1)));
+            derivers.insert(StorePath(useQueryValidDerivers.getStr(1)));
 
         return derivers;
     });
@@ -951,7 +978,7 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
         drvId = queryValidPathId(*state, path);
         auto use(state->stmts->QueryDerivationOutputs.use()(drvId));
         while (use.next())
-            outputs.insert_or_assign(use.getStr(0), storePathFromColumn(*this, use.getStr(1)));
+            outputs.insert_or_assign(use.getStr(0), StorePath(use.getStr(1)));
 
         return outputs;
     });
@@ -972,7 +999,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
 
         const char * s = (const char *) sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0);
         if (s && hashPart.compare(0, hashPart.size(), s, hashPart.size()) == 0)
-            return storePathFromColumn(*this, s);
+            return StorePath(s);
         return {};
     });
 }
@@ -1623,7 +1650,7 @@ LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & i
     if (!useQueryRealisedOutput.next())
         return std::nullopt;
     auto realisationDbId = useQueryRealisedOutput.getInt(0);
-    auto outputPath = storePathFromColumn(*this, useQueryRealisedOutput.getStr(1));
+    auto outputPath = StorePath(useQueryRealisedOutput.getStr(1));
     auto signatures = tokenizeString<StringSet>(useQueryRealisedOutput.getStr(2));
 
     return {
