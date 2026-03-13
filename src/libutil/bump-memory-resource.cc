@@ -37,7 +37,7 @@ static bool checkRlimit(std::size_t reserveSize)
         return true;
     if (rl.rlim_cur == RLIM_INFINITY)
         return true;
-    return reserveSize <= rl.rlim_cur / 16; /* Have some headroom too. */
+    return reserveSize <= static_cast<std::size_t>(rl.rlim_cur) / 16; /* Have some headroom too. */
 }
 
 static bool canOvercommit(std::size_t reserveSize)
