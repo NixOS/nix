@@ -296,6 +296,7 @@ sources = files(
   'common-ssh-store-config.cc',
   'content-address.cc',
   'daemon.cc',
+  'dependency-graph.cc',
   'derivation-options.cc',
   'derivations.cc',
   'derived-path-map.cc',
