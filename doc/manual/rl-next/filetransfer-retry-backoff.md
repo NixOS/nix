@@ -10,7 +10,7 @@ new `nix.conf` settings:
 
 - `filetransfer-retry-delay` (default 100ms): base delay for transient errors
 - `filetransfer-retry-delay-rate-limited` (default 5000ms): base delay for 429/503
-- `filetransfer-retry-max-delay` (default 60000ms): per-attempt delay cap
+- `filetransfer-retry-max-delay` (default 60000ms): per-attempt delay ceiling
 - `filetransfer-retry-jitter` (default true): enable full jitter
 
 The existing `download-attempts` setting has been renamed to

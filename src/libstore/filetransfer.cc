@@ -32,30 +32,59 @@
 
 namespace nix {
 
-uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng)
+namespace {
+
+namespace HttpStatus {
+constexpr long ok = 200;
+constexpr long created = 201;
+constexpr long noContent = 204;
+constexpr long partialContent = 206;
+constexpr long notModified = 304;
+constexpr long unauthorized = 401;
+constexpr long forbidden = 403;
+constexpr long notFound = 404;
+constexpr long proxyAuthRequired = 407;
+constexpr long requestTimeout = 408;
+constexpr long gone = 410;
+constexpr long tooManyRequests = 429;
+constexpr long notImplemented = 501;
+constexpr long serviceUnavailable = 503;
+constexpr long httpVersionNotSupported = 505;
+constexpr long networkAuthRequired = 511;
+
+constexpr long clientErrorMin = 400;
+constexpr long serverErrorMin = 500;
+} // namespace HttpStatus
+
+constexpr uint32_t clampedExponential(uint32_t base, uint32_t attempt, uint32_t ceil)
 {
-    // Exponential backoff: base * 2^(attempt-1), capped at maxMs.
-    // Overflow check: shifting baseMs left by `shift` would exceed maxMs
-    // iff baseMs > (maxMs >> shift). Guard shift < 32 to avoid UB on uint32_t.
-    uint32_t shift = p.attempt == 0 ? 0 : p.attempt - 1;
-    uint32_t backoff = (shift >= 32 || p.baseMs > (p.maxMs >> shift)) ? p.maxMs : p.baseMs << shift;
+    auto shift = std::min(attempt == 0 ? 0u : attempt - 1, 31u);
+    auto unclamped = static_cast<unsigned long long>(base) << shift;
+    return static_cast<uint32_t>(std::min(unclamped, static_cast<unsigned long long>(ceil)));
+}
+
+} // namespace
+
+std::chrono::milliseconds computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng)
+{
+    uint32_t backoff = clampedExponential(p.baseMs, p.attempt, p.ceilMs);
 
     // Retry-After is a hard minimum — the server explicitly asked us to wait
-    // at least this long. maxMs caps the backoff algorithm, not the server's
+    // at least this long. ceilMs caps the backoff algorithm, not the server's
     // signal: retrying before the server is ready just burns an attempt.
     uint32_t floor = p.retryAfterMs.value_or(0);
 
     if (!p.jitter)
-        return std::max(floor, backoff);
+        return std::chrono::milliseconds(std::max(floor, backoff));
 
     // Jitter spreads retries over [floor, floor+backoff] so that concurrent
     // clients receiving the same Retry-After don't all retry simultaneously.
     // Saturating add: clamp to UINT32_MAX if floor + backoff would overflow.
     uint32_t ceiling = (backoff > UINT32_MAX - floor) ? UINT32_MAX : floor + backoff;
     if (ceiling <= floor)
-        return floor;
+        return std::chrono::milliseconds(floor);
 
-    return std::uniform_int_distribution<uint32_t>(floor, ceiling)(rng);
+    return std::chrono::milliseconds(std::uniform_int_distribution<uint32_t>(floor, ceiling)(rng));
 }
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
@@ -172,7 +201,13 @@ struct curlFileTransfer : public FileTransfer
 
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 
-        inline static const std::set<long> successfulStatuses{200, 201, 204, 206, 304, 0 /* other protocol */};
+        inline static const std::set<long> successfulStatuses{
+            HttpStatus::ok,
+            HttpStatus::created,
+            HttpStatus::noContent,
+            HttpStatus::partialContent,
+            HttpStatus::notModified,
+            0 /* other protocol */};
 
         /* Get the HTTP status code, or 0 for other protocols. */
         long getHTTPStatus()
@@ -353,7 +388,7 @@ struct curlFileTransfer : public FileTransfer
                            data. */
                         long httpStatus = 0;
                         curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
-                        if (result.etag == request.expectedETag && httpStatus == 200) {
+                        if (result.etag == request.expectedETag && httpStatus == HttpStatus::ok) {
                             debug("shutting down on 200 HTTP response with expected ETag");
                             return 0;
                         }
@@ -693,19 +728,19 @@ struct curlFileTransfer : public FileTransfer
 
             if (code == CURLE_WRITE_ERROR && result.etag == request.expectedETag) {
                 code = CURLE_OK;
-                httpStatus = 304;
+                httpStatus = HttpStatus::notModified;
             }
 
             if (callbackException)
                 failEx(callbackException);
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
-                result.cached = httpStatus == 304;
+                result.cached = httpStatus == HttpStatus::notModified;
 
                 // In 2021, GitHub responds to If-None-Match with 304,
                 // but omits ETag. We just use the If-None-Match etag
                 // since 304 implies they are the same.
-                if (httpStatus == 304 && result.etag == "")
+                if (httpStatus == HttpStatus::notModified && result.etag == "")
                     result.etag = request.expectedETag;
 
                 curl_off_t dlSize = 0;
@@ -719,17 +754,24 @@ struct curlFileTransfer : public FileTransfer
                 // We treat most errors as transient, but won't retry when hopeless
                 Error err = Transient;
 
-                if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
+                if (httpStatus == HttpStatus::notFound || httpStatus == HttpStatus::gone
+                    || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
-                } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
+                } else if (
+                    httpStatus == HttpStatus::unauthorized || httpStatus == HttpStatus::forbidden
+                    || httpStatus == HttpStatus::proxyAuthRequired) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
+                } else if (
+                    httpStatus >= HttpStatus::clientErrorMin && httpStatus < HttpStatus::serverErrorMin
+                    && httpStatus != HttpStatus::requestTimeout && httpStatus != HttpStatus::tooManyRequests) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
                     err = Misc;
-                } else if (httpStatus == 501 || httpStatus == 505 || httpStatus == 511) {
+                } else if (
+                    httpStatus == HttpStatus::notImplemented || httpStatus == HttpStatus::httpVersionNotSupported
+                    || httpStatus == HttpStatus::networkAuthRequired) {
                     // Let's treat most 5xx (server) errors as transient, except for a handful:
                     //   * 501 not implemented
                     //   * 505 http version not supported
@@ -813,7 +855,10 @@ struct curlFileTransfer : public FileTransfer
 
             // Pick base delay by error class: 429/503 indicate the server is
             // rate-limiting or overloaded, so use the longer rate-limit delay.
-            uint32_t baseMs = (httpStatus == 429 || httpStatus == 503) ? effRateLimitMs : effBaseMs;
+            uint32_t baseMs =
+                (httpStatus == HttpStatus::tooManyRequests || httpStatus == HttpStatus::serviceUnavailable)
+                    ? effRateLimitMs
+                    : effBaseMs;
 
             if (err != Transient || attempt >= effAttempts
                 || (request.dataCallback && writtenToSink != 0 && !(acceptRanges && !hasContentEncoding))) {
@@ -821,11 +866,11 @@ struct curlFileTransfer : public FileTransfer
                 return;
             }
 
-            uint32_t ms = computeRetryDelayMs(
+            auto delay = computeRetryDelayMs(
                 {
                     .attempt = attempt,
                     .baseMs = baseMs,
-                    .maxMs = effMaxMs,
+                    .ceilMs = effMaxMs,
                     .retryAfterMs = retryAfterMs,
                     .jitter = fileTransfer.settings.retryJitter,
                 },
@@ -836,15 +881,15 @@ struct curlFileTransfer : public FileTransfer
                     "%s; retrying from offset %d in %d ms (attempt %d/%d)",
                     exc.message(),
                     writtenToSink,
-                    ms,
+                    delay.count(),
                     attempt,
                     effAttempts);
             } else {
-                warn("%s; retrying in %d ms (attempt %d/%d)", exc.message(), ms, attempt, effAttempts);
+                warn("%s; retrying in %d ms (attempt %d/%d)", exc.message(), delay.count(), attempt, effAttempts);
             }
 
             errorSink.reset();
-            embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+            embargo = std::chrono::steady_clock::now() + delay;
             try {
                 fileTransfer.enqueueItem(ref{shared_from_this()});
             } catch (const nix::Error & e) {
