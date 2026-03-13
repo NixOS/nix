@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <chrono>
 #include <optional>
 #include <cstdint>
 #include <random>
@@ -209,8 +210,8 @@ struct RetryDelayParams
     uint32_t attempt;
     /** Base delay in ms for this error class. */
     uint32_t baseMs;
-    /** Cap on the exponential backoff growth (does not cap retryAfterMs). */
-    uint32_t maxMs;
+    /** Per-attempt delay ceiling (does not cap retryAfterMs). */
+    uint32_t ceilMs;
     /** Server-provided minimum delay (from Retry-After header). */
     std::optional<uint32_t> retryAfterMs = {};
     /** Apply full jitter (false = deterministic). */
@@ -224,12 +225,12 @@ struct RetryDelayParams
  * Retry-After is present, jitter spreads *above* it so that concurrent
  * clients don't all retry at the same instant:
  *     sleep = random(floor, floor + backoff)
- * where floor = retryAfter (or 0) and backoff = min(maxMs, base * 2^(attempt-1)).
- * maxMs caps the backoff growth, not the server-provided floor.
+ * where floor = retryAfter (or 0) and backoff = min(ceilMs, base * 2^(attempt-1)).
+ * ceilMs caps the backoff growth, not the server-provided floor.
  *
  * @param rng  random number generator (unused if p.jitter is false)
  */
-uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng);
+std::chrono::milliseconds computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng);
 
 /**
  * HTTP methods supported by FileTransfer.
