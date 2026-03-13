@@ -12,12 +12,13 @@ namespace nix::tidy {
 ///   const char *p = someString().c_str();  // bug: dangling
 ///   const char *p = (a + b).c_str();       // bug: dangling
 ///   std::string s = foo(); const char *p = s.c_str();  // ok
-class DanglingCStrCheck : public clang::tidy::ClangTidyCheck {
+class DanglingCStrCheck : public clang::tidy::ClangTidyCheck
+{
 public:
-  using ClangTidyCheck::ClangTidyCheck;
+    using ClangTidyCheck::ClangTidyCheck;
 
-  void registerMatchers(clang::ast_matchers::MatchFinder *Finder) override;
-  void check(const clang::ast_matchers::MatchFinder::MatchResult &Result) override;
+    void registerMatchers(clang::ast_matchers::MatchFinder * Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult & Result) override;
 };
 
 } // namespace nix::tidy

@@ -68,7 +68,10 @@ _HIGH_CONF_EXCLUDED_PREFIXES = (
     'misc-include-cleaner', 'misc-use-internal-linkage',
     'misc-use-anonymous-namespace', 'misc-unused-parameters',
     'misc-const-correctness', 'misc-header-include-cycle',
-    'cert-', 'nix.store.c-style-pointer-cast',
+    'cert-',
+    # Verification checks emit notes, not findings
+    'nix-verify-',
+    'nix.store.c-style-pointer-cast',
     'nix.store.using-namespace-std', 'nix.store.reinterpret-cast',
     'nix.store.const-cast', 'nix.store.raw-free-in-cpp',
     'nix.store.raw-malloc', 'nix.store.thread-creation',

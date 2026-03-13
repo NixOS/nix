@@ -11,12 +11,13 @@ namespace nix::tidy {
 ///
 ///   std::lock_guard<std::mutex>(mtx);  // bug: temporary, no lock held
 ///   std::lock_guard<std::mutex> lock(mtx);  // ok: named variable
-class LockGuardTemporaryCheck : public clang::tidy::ClangTidyCheck {
+class LockGuardTemporaryCheck : public clang::tidy::ClangTidyCheck
+{
 public:
-  using ClangTidyCheck::ClangTidyCheck;
+    using ClangTidyCheck::ClangTidyCheck;
 
-  void registerMatchers(clang::ast_matchers::MatchFinder *Finder) override;
-  void check(const clang::ast_matchers::MatchFinder::MatchResult &Result) override;
+    void registerMatchers(clang::ast_matchers::MatchFinder * Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult & Result) override;
 };
 
 } // namespace nix::tidy

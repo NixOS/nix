@@ -20,10 +20,10 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = [ pkgs.cmake ];
 
   buildInputs = [
-    llvmPkgs.clang-unwrapped.dev  # clang-tidy headers + ClangConfig.cmake
-    llvmPkgs.clang-unwrapped.lib  # libclang-cpp.so
-    llvmPkgs.llvm.dev             # LLVMConfig.cmake + LLVM headers
-    llvmPkgs.llvm.lib             # LLVM shared libraries
+    llvmPkgs.clang-unwrapped.dev # clang-tidy headers + ClangConfig.cmake
+    llvmPkgs.clang-unwrapped.lib # libclang-cpp.so
+    llvmPkgs.llvm.dev # LLVMConfig.cmake + LLVM headers
+    llvmPkgs.llvm.lib # LLVM shared libraries
   ];
 
   cmakeFlags = [

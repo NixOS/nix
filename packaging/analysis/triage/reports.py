@@ -157,10 +157,11 @@ def capture_output(func, *args, **kwargs) -> str:
     return buf.getvalue()
 
 
-def _print_anomaly_entry(f: Finding, anom: Anomaly):
+def _print_anomaly_entry(f: Finding, anom: Anomaly, verification_tag: str | None = None):
     """Print a single anomaly entry."""
     status_label = _STATUS_LABELS.get(anom.status, anom.status)
-    print(f'  [{anom.id}] ({status_label})')
+    tag_str = f' [{verification_tag}]' if verification_tag else ''
+    print(f'  [{anom.id}] ({status_label}){tag_str}')
     print(f'    {f.tool}: {f.file}:{f.line} [{f.check_id}]')
     print(f'    Reason: {anom.reason}')
     if anom.remediations:
@@ -171,29 +172,50 @@ def _print_anomaly_entry(f: Finding, anom: Anomaly):
     print()
 
 
-def print_suppressed_report(suppressed: list[tuple[Finding, Anomaly]]):
-    """Print suppressed false positives."""
+def print_suppressed_report(suppressed):
+    """Print suppressed false positives.
+
+    Accepts either list[tuple[Finding, Anomaly]] or
+    list[tuple[Finding, Anomaly, str | None]] (with verification tags).
+    """
     if not suppressed:
         print('No findings suppressed.')
         return
 
     print(f'\n=== Suppressed Anomalies ({len(suppressed)}) ===\n')
-    for f, anom in suppressed:
-        _print_anomaly_entry(f, anom)
+    for entry in suppressed:
+        if len(entry) == 3:
+            f, anom, tag = entry
+        else:
+            f, anom = entry
+            tag = None
+        _print_anomaly_entry(f, anom, tag)
 
 
-def print_flagged_report(flagged: list[tuple[Finding, Anomaly]]):
-    """Print flagged anomalies (needs-review, confirmed-bug) for maintainer attention."""
+def print_flagged_report(flagged):
+    """Print flagged anomalies (needs-review, confirmed-bug) for maintainer attention.
+
+    Accepts either list[tuple[Finding, Anomaly]] or
+    list[tuple[Finding, Anomaly, str | None]] (with verification tags).
+    """
     if not flagged:
         print('No flagged anomalies.')
         return
 
-    # Group by status for clear presentation
-    by_status: dict[str, list[tuple[Finding, Anomaly]]] = defaultdict(list)
-    for f, anom in flagged:
-        by_status[anom.status].append((f, anom))
+    # Normalize entries to (Finding, Anomaly, tag)
+    normalized = []
+    for entry in flagged:
+        if len(entry) == 3:
+            normalized.append(entry)
+        else:
+            normalized.append((entry[0], entry[1], None))
 
-    total = len(flagged)
+    # Group by status for clear presentation
+    by_status: dict[str, list[tuple[Finding, Anomaly, str | None]]] = defaultdict(list)
+    for f, anom, tag in normalized:
+        by_status[anom.status].append((f, anom, tag))
+
+    total = len(normalized)
     print(f'\n=== Flagged Anomalies ({total}) — Maintainer Review Requested ===\n')
 
     # Show confirmed bugs first, then needs-review
@@ -203,8 +225,8 @@ def print_flagged_report(flagged: list[tuple[Finding, Anomaly]]):
             continue
         label = _STATUS_LABELS.get(status, status)
         print(f'  --- {label} ({len(items)}) ---\n')
-        for f, anom in items:
-            _print_anomaly_entry(f, anom)
+        for f, anom, tag in items:
+            _print_anomaly_entry(f, anom, tag)
 
 
 def write_all_reports(findings: list[Finding], output_dir: str,

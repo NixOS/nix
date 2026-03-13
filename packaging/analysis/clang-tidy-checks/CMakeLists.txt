@@ -15,6 +15,11 @@ add_library(nix-tidy MODULE
   LockGuardTemporaryCheck.cc
   SqliteNonLiteralCheck.cc
   DanglingCStrCheck.cc
+  VerifyCheckBase.cc
+  VerifyRethrowContextCheck.cc
+  VerifyConstrainedCtorCheck.cc
+  VerifyMoveFromFlagCheck.cc
+  VerifyDeleteThisSafetyCheck.cc
 )
 
 target_include_directories(nix-tidy PRIVATE

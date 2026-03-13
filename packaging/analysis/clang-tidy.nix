@@ -5,10 +5,7 @@
 }:
 
 let
-  loadFlag =
-    if nixTidyChecks != null
-    then "--load=${nixTidyChecks}/lib/libnix-tidy.so"
-    else "";
+  loadFlag = if nixTidyChecks != null then "--load=${nixTidyChecks}/lib/libnix-tidy.so" else "";
 
   runner = pkgs.writeShellApplication {
     name = "run-clang-tidy-analysis";

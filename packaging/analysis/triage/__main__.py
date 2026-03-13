@@ -13,8 +13,10 @@ import os
 import sys
 
 from parsers import load_all_findings
+from parsers.clang import parse_verification_lines
 from filters import filter_findings, deduplicate, is_test_code
-from anomalies import load_anomalies, apply_anomalies
+from anomalies import load_anomalies, apply_anomalies, apply_verification_tags
+from verification import parse_verification_diagnostics, cross_reference
 from reports import (
     print_summary, print_high_confidence, print_cross_ref,
     print_category, print_full_report, write_all_reports,
@@ -60,14 +62,34 @@ def main():
     suppressed = []
     flagged = []
     findings = deduped
+    anomalies = []
     if not args.no_anomalies and args.source_root and os.path.isfile(ANOMALIES_FILE):
         anomalies = load_anomalies(ANOMALIES_FILE)
         findings, suppressed, flagged = apply_anomalies(deduped, anomalies, args.source_root)
+
+    # Cross-reference with AST verification diagnostics if available
+    verification_xrefs = []
+    clang_tidy_report = os.path.join(args.result_dir, 'clang-tidy', 'report.txt')
+    if anomalies and os.path.isfile(clang_tidy_report):
+        ver_lines = parse_verification_lines(clang_tidy_report)
+        if ver_lines:
+            ver_results = parse_verification_diagnostics(ver_lines)
+            verification_xrefs = cross_reference(anomalies, ver_results)
+            if verification_xrefs:
+                suppressed, flagged = apply_verification_tags(
+                    suppressed, flagged, verification_xrefs
+                )
 
     parts = [f'Loaded {len(raw)} raw → {len(filtered)} filtered → {len(deduped)} dedup']
     if suppressed or flagged:
         parts.append(f' → {len(findings)} after anomalies '
                      f'({len(suppressed)} suppressed, {len(flagged)} flagged)')
+    if verification_xrefs:
+        n_verified = sum(1 for _, _, t in verification_xrefs if t == 'AST-VERIFIED')
+        n_contra = sum(1 for _, _, t in verification_xrefs if t == 'AST-CONTRADICTION')
+        n_incon = sum(1 for _, _, t in verification_xrefs if t == 'AST-INCONCLUSIVE')
+        parts.append(f'\n  AST verification: {n_verified} verified, '
+                     f'{n_contra} contradictions, {n_incon} inconclusive')
     print(''.join(parts))
 
     if args.output_dir:

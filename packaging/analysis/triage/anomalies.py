@@ -10,11 +10,16 @@ Each anomaly has a status:
   - needs-review:   keep visible, flag for maintainer review
   - confirmed-bug:  verified real bug, track until fixed
   - wont-fix:       real issue but accepted risk
+
+Anomalies may optionally be cross-referenced with AST verification results
+from nix-verify-* clang-tidy checks, producing [AST-VERIFIED], [AST-CONTRADICTION],
+or [AST-INCONCLUSIVE] tags.
 """
 
 import os
 import tomllib
 from dataclasses import dataclass, field
+from typing import Optional
 
 from finding import Finding
 
@@ -125,3 +130,32 @@ def apply_anomalies(
             remaining.append(f)
 
     return remaining, suppressed, flagged
+
+
+def apply_verification_tags(
+    suppressed: list[tuple[Finding, "Anomaly"]],
+    flagged: list[tuple[Finding, "Anomaly"]],
+    verification_xrefs: list[tuple["Anomaly", object, str]],
+) -> tuple[list[tuple[Finding, "Anomaly", Optional[str]]],
+           list[tuple[Finding, "Anomaly", Optional[str]]]]:
+    """Augment suppressed/flagged lists with AST verification tags.
+
+    Returns new lists where each entry is (Finding, Anomaly, tag_or_None).
+    """
+    # Build index: anomaly id -> tag
+    tag_by_anom_id: dict[str, str] = {}
+    for anom, _ver, tag in verification_xrefs:
+        # If multiple verifications exist, CONTRADICTION takes priority
+        existing = tag_by_anom_id.get(anom.id)
+        if existing is None or tag == "AST-CONTRADICTION":
+            tag_by_anom_id[anom.id] = tag
+
+    tagged_suppressed = [
+        (f, anom, tag_by_anom_id.get(anom.id))
+        for f, anom in suppressed
+    ]
+    tagged_flagged = [
+        (f, anom, tag_by_anom_id.get(anom.id))
+        for f, anom in flagged
+    ]
+    return tagged_suppressed, tagged_flagged
