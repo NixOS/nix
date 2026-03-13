@@ -336,8 +336,15 @@ void Worker::run(const Goals & _topGoals)
         }
     }
 
-    /* Call queryMissing() to efficiently query substitutes. */
-    store.queryMissing(topPaths);
+    /* Call queryMissing() to efficiently query substitutes and get upfront totals. */
+    auto missing = store.queryMissing(topPaths);
+    upfrontBuilds = missing.willBuild.size();
+    upfrontSubstitutions = missing.willSubstitute.size();
+    upfrontDownloadSize = missing.downloadSize;
+    upfrontNarSize = missing.narSize;
+
+    /* Signal upfront totals before starting work. */
+    updateProgress();
 
     debug("entered goal loop");
 

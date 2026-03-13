@@ -186,6 +186,15 @@ public:
     uint64_t doneNarSize = 0;
 
     /**
+     * Upfront totals from queryMissing(), signaled before work begins.
+     * These represent the total expected work computed at the start.
+     */
+    uint64_t upfrontBuilds = 0;
+    uint64_t upfrontSubstitutions = 0;
+    uint64_t upfrontDownloadSize = 0;
+    uint64_t upfrontNarSize = 0;
+
+    /**
      * Whether to ask the build hook if it can build a derivation. If
      * it answers with "decline-permanently", we don't try again.
      */
@@ -337,11 +346,24 @@ public:
 
     void updateProgress()
     {
-        actDerivations.progress(doneBuilds, expectedBuilds + doneBuilds, runningBuilds, failedBuilds);
-        actSubstitutions.progress(
-            doneSubstitutions, expectedSubstitutions + doneSubstitutions, runningSubstitutions, failedSubstitutions);
-        act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
-        act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
+        // Report done/running/failed via progress(), but set expected=0 to avoid double-counting
+        // with the setExpected() calls below which set the total expected counts.
+        actDerivations.progress(doneBuilds, 0, runningBuilds, failedBuilds);
+        actSubstitutions.progress(doneSubstitutions, 0, runningSubstitutions, failedSubstitutions);
+
+        // Use upfront totals if available (from queryMissing), otherwise fall back to dynamic tracking.
+        // setExpected() signals the total expected count for each activity type.
+        auto totalBuilds = upfrontBuilds > 0 ? upfrontBuilds : expectedBuilds + doneBuilds;
+        auto totalSubstitutions =
+            upfrontSubstitutions > 0 ? upfrontSubstitutions : expectedSubstitutions + doneSubstitutions;
+        auto totalDownloadSize =
+            upfrontDownloadSize > 0 ? upfrontDownloadSize : expectedDownloadSize + doneDownloadSize;
+        auto totalNarSize = upfrontNarSize > 0 ? upfrontNarSize : expectedNarSize + doneNarSize;
+
+        act.setExpected(actBuilds, totalBuilds);
+        act.setExpected(actCopyPaths, totalSubstitutions);
+        act.setExpected(actFileTransfer, totalDownloadSize);
+        act.setExpected(actCopyPath, totalNarSize);
     }
 };
 
