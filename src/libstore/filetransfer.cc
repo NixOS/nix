@@ -32,29 +32,30 @@
 
 namespace nix {
 
-unsigned int computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng)
+uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng)
 {
-    // Exponential backoff: base * 2^(attempt-1), with overflow guard
-    unsigned int shift = std::min(p.attempt == 0 ? 0u : p.attempt - 1, 30u);
-    uint64_t exponential = (uint64_t) p.baseMs << shift;
-    unsigned int backoff = (unsigned int) std::min(exponential, (uint64_t) p.maxMs);
+    // Exponential backoff: base * 2^(attempt-1), capped at maxMs.
+    // Overflow check: shifting baseMs left by `shift` would exceed maxMs
+    // iff baseMs > (maxMs >> shift). Guard shift < 32 to avoid UB on uint32_t.
+    uint32_t shift = p.attempt == 0 ? 0 : p.attempt - 1;
+    uint32_t backoff = (shift >= 32 || p.baseMs > (p.maxMs >> shift)) ? p.maxMs : p.baseMs << shift;
 
     // Retry-After is a hard minimum — the server explicitly asked us to wait
     // at least this long. maxMs caps the backoff algorithm, not the server's
     // signal: retrying before the server is ready just burns an attempt.
-    unsigned int floor = p.retryAfterMs.value_or(0);
+    uint32_t floor = p.retryAfterMs.value_or(0);
 
     if (!p.jitter)
         return std::max(floor, backoff);
 
     // Jitter spreads retries over [floor, floor+backoff] so that concurrent
     // clients receiving the same Retry-After don't all retry simultaneously.
-    uint64_t ceiling64 = (uint64_t) floor + backoff;
-    unsigned int ceiling = ceiling64 > UINT_MAX ? UINT_MAX : (unsigned int) ceiling64;
+    // Saturating add: clamp to UINT32_MAX if floor + backoff would overflow.
+    uint32_t ceiling = (backoff > UINT32_MAX - floor) ? UINT32_MAX : floor + backoff;
     if (ceiling <= floor)
         return floor;
 
-    return std::uniform_int_distribution<unsigned int>(floor, ceiling)(rng);
+    return std::uniform_int_distribution<uint32_t>(floor, ceiling)(rng);
 }
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
@@ -165,7 +166,7 @@ struct curlFileTransfer : public FileTransfer
          * response header (delta-seconds form only). Reset on each new status
          * line so it doesn't leak across redirects or retries.
          */
-        std::optional<unsigned int> retryAfterMs;
+        std::optional<uint32_t> retryAfterMs;
 
         curl_off_t writtenToSink = 0;
 
@@ -379,12 +380,12 @@ struct curlFileTransfer : public FileTransfer
                     else if (name == "retry-after") {
                         auto value = trim(line.substr(i + 1));
                         // RFC 7231 §7.1.3: Retry-After = HTTP-date / delay-seconds.
-                        if (auto seconds = string2Int<unsigned int>(value)) {
-                            retryAfterMs = *seconds * 1000;
+                        if (auto seconds = string2Int<uint32_t>(value)) {
+                            retryAfterMs = std::min(*seconds, UINT32_MAX / 1000) * 1000;
                         } else if (time_t date = curl_getdate(value.c_str(), nullptr); date != -1) {
                             time_t now = time(nullptr);
                             time_t delta = date > now ? date - now : 0;
-                            retryAfterMs = (unsigned int) std::min<time_t>(delta, UINT_MAX / 1000) * 1000;
+                            retryAfterMs = (uint32_t) std::min<time_t>(delta, UINT32_MAX / 1000) * 1000;
                         } else {
                             debug("ignoring unparseable Retry-After header: '%s'", value);
                         }
@@ -812,7 +813,7 @@ struct curlFileTransfer : public FileTransfer
 
             // Pick base delay by error class: 429/503 indicate the server is
             // rate-limiting or overloaded, so use the longer rate-limit delay.
-            unsigned int baseMs = (httpStatus == 429 || httpStatus == 503) ? effRateLimitMs : effBaseMs;
+            uint32_t baseMs = (httpStatus == 429 || httpStatus == 503) ? effRateLimitMs : effBaseMs;
 
             if (err != Transient || attempt >= effAttempts
                 || (request.dataCallback && writtenToSink != 0 && !(acceptRanges && !hasContentEncoding))) {
@@ -820,7 +821,7 @@ struct curlFileTransfer : public FileTransfer
                 return;
             }
 
-            unsigned int ms = computeRetryDelayMs(
+            uint32_t ms = computeRetryDelayMs(
                 {
                     .attempt = attempt,
                     .baseMs = baseMs,

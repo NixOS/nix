@@ -2,6 +2,7 @@
 ///@file
 
 #include <optional>
+#include <cstdint>
 #include <random>
 #include <string>
 #include <future>
@@ -205,13 +206,13 @@ extern FileTransferSettings fileTransferSettings;
 struct RetryDelayParams
 {
     /** 1-based retry attempt number (1 = first retry). */
-    unsigned int attempt;
+    uint32_t attempt;
     /** Base delay in ms for this error class. */
-    unsigned int baseMs;
+    uint32_t baseMs;
     /** Cap on the exponential backoff growth (does not cap retryAfterMs). */
-    unsigned int maxMs;
+    uint32_t maxMs;
     /** Server-provided minimum delay (from Retry-After header). */
-    std::optional<unsigned int> retryAfterMs = {};
+    std::optional<uint32_t> retryAfterMs = {};
     /** Apply full jitter (false = deterministic). */
     bool jitter = true;
 };
@@ -228,7 +229,7 @@ struct RetryDelayParams
  *
  * @param rng  random number generator (unused if p.jitter is false)
  */
-unsigned int computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng);
+uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng);
 
 /**
  * HTTP methods supported by FileTransfer.
