@@ -163,6 +163,34 @@ nix_err nix_store_get_fs_closure(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        std::vector<nix::DerivedPath> derived_paths;
+        for (size_t i = 0; i < num_store_paths; i++) {
+            const StorePath * store_path = store_paths[i];
+            derived_paths.push_back(nix::SingleDerivedPath::Opaque{store_path->path});
+        }
+
+        auto results = store->ptr->buildPathsWithResults(derived_paths);
+        for (auto & result : results) {
+            if (callback) {
+                auto json = static_cast<nlohmann::json>(result).dump();
+                callback(userdata, result.path.to_string(store->ptr->config).c_str(), json.c_str());
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
 nix_err nix_store_realise(
     nix_c_context * context,
     Store * store,
