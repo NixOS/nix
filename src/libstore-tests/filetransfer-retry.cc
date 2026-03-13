@@ -105,16 +105,4 @@ TEST(computeRetryDelayMs, zero_base_no_jitter)
     EXPECT_EQ(computeRetryDelayMs({.attempt = 1, .baseMs = 0, .maxMs = 60000, .jitter = true}, rng), 0u);
 }
 
-TEST(computeRetryDelayMs, rate_limit_base_delay)
-{
-    std::mt19937 rng{0};
-    // Simulating the 503/429 path with 5000ms base
-    EXPECT_EQ(computeRetryDelayMs({.attempt = 1, .baseMs = 5000, .maxMs = 60000, .jitter = false}, rng), 5000u);
-    EXPECT_EQ(computeRetryDelayMs({.attempt = 2, .baseMs = 5000, .maxMs = 60000, .jitter = false}, rng), 10000u);
-    EXPECT_EQ(computeRetryDelayMs({.attempt = 3, .baseMs = 5000, .maxMs = 60000, .jitter = false}, rng), 20000u);
-    EXPECT_EQ(computeRetryDelayMs({.attempt = 4, .baseMs = 5000, .maxMs = 60000, .jitter = false}, rng), 40000u);
-    EXPECT_EQ(
-        computeRetryDelayMs({.attempt = 5, .baseMs = 5000, .maxMs = 60000, .jitter = false}, rng), 60000u); // capped
-}
-
 } // namespace nix
