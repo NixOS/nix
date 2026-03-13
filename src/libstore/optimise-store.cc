@@ -302,6 +302,8 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         addTempRoot(i);
         if (!isValidPath(i))
             continue; /* path was GC'ed, probably */
+        if (config->derivationsInDatabase && i.isDerivation())
+            continue; /* DB-stored derivations have no filesystem entry */
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
             optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);

@@ -15,20 +15,19 @@ nix build -f issue-13247.nix --json a a-prime use-a-more-outputs --no-link > "$T
 
 cache="file://$TEST_ROOT/cache"
 
-# Copy all outputs and realisations to cache
+# Copy all outputs and realisations to cache (including resolved derivations)
 declare -a drvs
-for d in "$NIX_STORE_DIR"/*-issue-13247-a.drv "$NIX_STORE_DIR"/*-use-a-more-outputs.drv; do
+for d in $(nix path-info --all | grep -E 'issue-13247-a\.drv$|use-a-more-outputs\.drv$'); do
     drvs+=("$d" "$d"^*)
 done
 nix copy --to "$cache" "${drvs[@]}"
 
 function delete () {
-    # Delete local copy
+    # Delete local copy (including resolved derivations)
     # shellcheck disable=SC2046
     nix-store --delete \
         $(jq -r <"$TEST_ROOT"/a.json '.[] | .drvPath, .outputs.[]') \
-        "$NIX_STORE_DIR"/*-issue-13247-a.drv \
-        "$NIX_STORE_DIR"/*-use-a-more-outputs.drv
+        $(nix path-info --all | grep -E 'issue-13247-a\.drv$|use-a-more-outputs\.drv$')
 
     [[ ! -e "$(jq -r <"$TEST_ROOT"/a.json '.[0].outputs.out')" ]]
     [[ ! -e "$(jq -r <"$TEST_ROOT"/a.json '.[1].outputs.out')" ]]

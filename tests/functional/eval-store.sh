@@ -24,16 +24,16 @@ if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
     # between scratch storage for building and the final destination
     # store, we'll be able to make this unconditional again -- resolved
     # derivations should only appear in the scratch store.
-    (! ls "$NIX_STORE_DIR"/*.drv)
+    nix path-info --all | grepQuietInverse '\.drv$'
 fi
-ls "$eval_store"/nix/store/*.drv
+nix path-info --store "$eval_store" --all | grepQuiet '\.drv$'
 
 clearStore
 rm -rf "$eval_store"
 
 nix-instantiate dependencies.nix --eval-store "$eval_store"
-(! ls "$NIX_STORE_DIR"/*.drv)
-ls "$eval_store"/nix/store/*.drv
+nix path-info --all | grepQuietInverse '\.drv$'
+nix path-info --store "$eval_store" --all | grepQuiet '\.drv$'
 
 clearStore
 rm -rf "$eval_store"
@@ -42,9 +42,9 @@ nix-build dependencies.nix --eval-store "$eval_store" -o "$TEST_ROOT/result"
 [[ -e $TEST_ROOT/result/foobar ]]
 if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
     # See above
-    (! ls "$NIX_STORE_DIR"/*.drv)
+    nix path-info --all | grepQuietInverse '\.drv$'
 fi
-ls "$eval_store"/nix/store/*.drv
+nix path-info --store "$eval_store" --all | grepQuiet '\.drv$'
 
 clearStore
 rm -rf "$eval_store"

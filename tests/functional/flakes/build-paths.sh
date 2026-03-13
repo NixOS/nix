@@ -103,7 +103,7 @@ expectStderr 1 nix build --impure --json --out-link "$TEST_ROOT/result" "$flake1
   | grepQuiet "has 0 entries in its context. It should only have exactly one entry"
 
 nix build --json --out-link "$TEST_ROOT/result" "$flake1Dir"#a10
-[[ $(readlink -e "$TEST_ROOT/result") = *simple.drv ]]
+[[ $(readlink "$TEST_ROOT/result") = *simple.drv ]]
 
 expectStderr 1 nix build --json --out-link "$TEST_ROOT/result" "$flake1Dir#a11" \
   | grepQuiet "has a context which refers to a complete source and binary closure"

@@ -135,6 +135,12 @@ private:
     void registerDrvOutput(const Realisation & info) override;
 
     /**
+     * Check lower store for DB-stored derivations if upper store
+     * does not have them (neither in DB nor on disk).
+     */
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
+
+    /**
      * Check lower store if upper DB does not have.
      */
     void queryPathInfoUncached(
@@ -147,6 +153,11 @@ private:
      * closure). (I.e. Optimistically cache in the upper DB.)
      */
     bool isValidPathUncached(const StorePath & path) override;
+
+    /**
+     * Read derivation from lower store when not in upper DB or on disk.
+     */
+    std::optional<Derivation> readDerivationForAddValidPath(const StorePath & path) override;
 
     /**
      * Check the lower store and upper DB.

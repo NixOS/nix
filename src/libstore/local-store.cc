@@ -53,6 +53,7 @@
 #include "nix/util/strings.hh"
 
 #include "store-config-private.hh"
+#include "local-store-stmts.hh"
 
 namespace nix {
 
@@ -93,26 +94,10 @@ bool LocalStoreConfig::getDefaultRequireSigs()
     return settings.requireSigs;
 }
 
-struct LocalStore::State::Stmts
+bool LocalStoreConfig::getDefaultDerivationsInDatabase()
 {
-    /* Some precompiled SQLite statements. */
-    SQLiteStmt RegisterValidPath;
-    SQLiteStmt UpdatePathInfo;
-    SQLiteStmt AddReference;
-    SQLiteStmt QueryPathInfo;
-    SQLiteStmt QueryReferences;
-    SQLiteStmt QueryReferrers;
-    SQLiteStmt InvalidatePath;
-    SQLiteStmt AddDerivationOutput;
-    SQLiteStmt RegisterRealisedOutput;
-    SQLiteStmt UpdateRealisedOutput;
-    SQLiteStmt QueryValidDerivers;
-    SQLiteStmt QueryDerivationOutputs;
-    SQLiteStmt QueryRealisedOutput;
-    SQLiteStmt QueryAllRealisedOutputs;
-    SQLiteStmt QueryPathFromHashPart;
-    SQLiteStmt QueryValidPaths;
-};
+    return getEnv("_NIX_TEST_DERIVATIONS_IN_DB") == "1";
+}
 
 LocalStore::LocalStore(ref<const Config> config)
     : Store{*config}
@@ -388,6 +373,82 @@ LocalStore::LocalStore(ref<const Config> config)
                     ;
             )");
     }
+    if (config->derivationsInDatabase) {
+        state->stmts->RegisterOrUpdateValidPath.create(
+            state->db,
+            "insert or replace into ValidPaths (path, hash, registrationTime, deriver, narSize, ultimate, sigs, ca) values (?, ?, ?, ?, ?, ?, ?, ?);");
+        state->stmts->InsertDerivation.create(
+            state->db,
+            R"(
+                insert or replace into Derivations
+                    (id, path, platform, builder, args, outputType, hasStructuredAttrs)
+                values (?, ?, ?, ?, ?, ?, ?);
+            )");
+        state->stmts->InsertDerivationOutput.create(
+            state->db,
+            R"(
+                insert or replace into DerivationOutputsV2
+                    (drv, id, outputType, path, method, hashAlgo, hash)
+                values (?, ?, ?, ?, ?, ?, ?);
+            )");
+        state->stmts->InsertDerivationInput.create(
+            state->db,
+            R"(
+                insert or replace into DerivationInputs (drv, path, outputs)
+                values (?, ?, ?);
+            )");
+        state->stmts->InsertDerivationInputSrc.create(
+            state->db,
+            R"(
+                insert or replace into DerivationInputSrcs (drv, src)
+                values (?, ?);
+            )");
+        state->stmts->InsertDerivationEnv.create(
+            state->db,
+            R"(
+                insert or replace into DerivationEnv (drv, key, value)
+                values (?, ?, ?);
+            )");
+        state->stmts->InsertDerivationStructuredAttr.create(
+            state->db,
+            R"(
+                insert or replace into DerivationStructuredAttrs
+                    (drv, hasStructuredAttrs, key, value)
+                values (?, 1, ?, ?);
+            )");
+        state->stmts->QueryDerivation.create(
+            state->db,
+            R"(
+                select id, platform, builder, args, outputType, hasStructuredAttrs
+                from Derivations where path = ?;
+            )");
+        state->stmts->QueryDerivationOutputsV2.create(
+            state->db,
+            R"(
+                select id, outputType, path, method, hashAlgo, hash
+                from DerivationOutputsV2 where drv = ?;
+            )");
+        state->stmts->QueryDerivationInputs.create(
+            state->db,
+            R"(
+                select path, outputs from DerivationInputs where drv = ?;
+            )");
+        state->stmts->QueryDerivationInputSrcs.create(
+            state->db,
+            R"(
+                select src from DerivationInputSrcs where drv = ?;
+            )");
+        state->stmts->QueryDerivationEnvs.create(
+            state->db,
+            R"(
+                select key, value from DerivationEnv where drv = ?;
+            )");
+        state->stmts->QueryDerivationStructuredAttrs.create(
+            state->db,
+            R"(
+                select key, value from DerivationStructuredAttrs where drv = ?;
+            )");
+    }
 }
 
 AutoCloseFD LocalStore::openGCLock()
@@ -608,6 +669,12 @@ void LocalStore::upgradeDBSchema(State & state)
         );
 
     doUpgrade("20260309-drop-redundant-indexreferrer", "drop index if exists IndexReferrer");
+
+    if (config->derivationsInDatabase)
+        doUpgrade(
+            "20260312-derivations-in-db",
+#include "drv-in-db-schema.sql.gen.hh"
+        );
 }
 
 /* To improve purity, users may want to make the Nix store a read-only
@@ -722,7 +789,26 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
        efficiently query whether a path is an output of some
        derivation. */
     if (info.path.isDerivation()) {
-        auto parsedDrv = readInvalidDerivation(info.path);
+        /* We cannot call readInvalidDerivation() here because it would
+           try to re-acquire _state, which is already held by our caller
+           (registerValidPaths).  Use queryDerivationFromDB directly
+           since we already have the locked state.  In the new setting
+           case there is no .drv file to fall back to — the derivation
+           was just inserted into the DB by writeDerivation, so it must
+           be there. */
+        Derivation parsedDrv = [&] {
+            if (config->derivationsInDatabase) {
+                auto drv = queryDerivationFromDB(state, info.path);
+                if (drv) return std::move(*drv);
+            }
+            /* Try subclass hook (e.g. overlay store reads from lower store) */
+            if (auto drv = readDerivationForAddValidPath(info.path))
+                return std::move(*drv);
+            /* Read directly from disk, bypassing getFSAccessor which
+               would try to re-acquire _state. */
+            auto path = toRealPath(info.path);
+            return parseDerivation(*this, readFile(path), Derivation::nameFromPath(info.path));
+        }();
 
         /* Verify that the output paths in the derivation are correct
            (i.e., follow the scheme for computing output paths from
@@ -1080,7 +1166,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 if (info.ca) {
                     auto & specified = *info.ca;
                     auto actualHash = ({
-                        auto accessor = getFSAccessor(false);
+                        auto accessor = LocalFSStore::getFSAccessor(false);
                         CanonPath path{info.path.to_string()};
                         Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
                         auto fim = specified.method.getFileIngestionMethod();
@@ -1390,7 +1476,13 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
 
                 auto hashSink = HashSink(info->narHash.algo);
 
-                dumpPath(toRealPath(i), hashSink);
+                if (config->derivationsInDatabase && i.isDerivation()) {
+                    /* DB-stored derivations have no filesystem entry;
+                       verify by reconstructing the NAR from the DB content. */
+                    auto drv = readDerivation(i);
+                    dumpString(drv.unparse(*this, false), hashSink);
+                } else
+                    dumpPath(toRealPath(i), hashSink);
                 auto current = hashSink.finish();
 
                 if (info->narHash != nullHash && info->narHash != current.hash) {
@@ -1465,7 +1557,14 @@ LocalStore::VerificationResult LocalStore::verifyAllValidPaths(RepairFlag repair
 
     StorePathSet done;
 
-    auto existsInStoreDir = [&](const StorePath & storePath) { return storePathsInStoreDir.count(storePath); };
+    auto existsInStoreDir = [&](const StorePath & storePath) {
+        if (storePathsInStoreDir.count(storePath))
+            return true;
+        /* DB-stored derivations have no filesystem entry */
+        if (config->derivationsInDatabase && storePath.isDerivation())
+            return true;
+        return false;
+    };
 
     bool errors = false;
     StorePathSet validPaths;

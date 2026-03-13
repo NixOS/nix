@@ -123,6 +123,12 @@ protected:
 
     std::unique_ptr<DerivationBuilderCallbacks> miscMethods;
 
+    /**
+     * Paths of .drv files materialized on disk for DB-stored derivations.
+     * Cleaned up after the build.
+     */
+    std::vector<std::filesystem::path> materializedDrvs;
+
 public:
 
     DerivationBuilderImpl(
@@ -963,6 +969,19 @@ void DerivationBuilderImpl::prepareSandbox()
 {
     if (drvOptions.useUidRange(drv))
         throw Error("feature 'uid-range' is not supported on this platform");
+
+    /* For non-sandboxed builds with DB-stored derivations, materialize
+       .drv files into the store so builders can access them. */
+    if (store.config->derivationsInDatabase) {
+        for (auto & i : inputPaths) {
+            if (!i.isDerivation()) continue;
+            auto realPath = store.toRealPath(i);
+            if (pathExists(realPath)) continue;
+            auto content = store.readDerivation(i).unparse(store, false);
+            writeFile(realPath, content);
+            materializedDrvs.push_back(realPath);
+        }
+    }
 }
 
 void DerivationBuilderImpl::openSlave()
@@ -1990,6 +2009,11 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
         for (auto & i : redirectedOutputs)
             deletePath(store.toRealPath(i.second));
     }
+
+    /* Clean up materialized .drv files for DB-stored derivations. */
+    for (auto & p : materializedDrvs)
+        deletePath(p);
+    materializedDrvs.clear();
 
     if (topTmpDir != "") {
         /* As an extra precaution, even in the event of `deletePath` failing to

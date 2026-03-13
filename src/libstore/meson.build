@@ -174,6 +174,7 @@ generated_headers = []
 foreach header : [
   'schema.sql',
   'ca-specific-schema.sql',
+  'drv-in-db-schema.sql',
 ]
   generated_headers += gen_header.process(header)
 endforeach
@@ -314,6 +315,7 @@ sources = files(
   'local-fs-store.cc',
   'local-gc.cc',
   'local-overlay-store.cc',
+  'local-store-drv.cc',
   'local-store.cc',
   'log-store.cc',
   'machines.cc',

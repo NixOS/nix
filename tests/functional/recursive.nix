@@ -16,6 +16,8 @@ mkDerivation rec {
   requiredSystemFeatures = [ "recursive-nix" ];
 
   buildCommand = ''
+    set -x
+
     mkdir $out
     opts="--experimental-features nix-command ${
       if (NIX_TESTS_CA_BY_DEFAULT == "1") then "--extra-experimental-features ca-derivations" else ""

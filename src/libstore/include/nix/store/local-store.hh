@@ -95,6 +95,7 @@ private:
      * in headers.
      */
     bool getDefaultRequireSigs();
+    bool getDefaultDerivationsInDatabase();
 
 public:
     Setting<bool> requireSigs{
@@ -154,6 +155,19 @@ public:
         {},
         true,
         Xp::LocalOverlayStore,
+    };
+
+    Setting<bool> derivationsInDatabase{
+        this,
+        getDefaultDerivationsInDatabase(),
+        "derivations-in-database",
+        R"(
+          Store derivation content in the SQLite database instead of as
+          `.drv` files in the store directory.
+        )",
+        {},
+        true,
+        Xp::DerivationsInDB,
     };
 
     std::filesystem::path getRootsSocketPath() const;
@@ -282,6 +296,14 @@ public:
 
     bool pathInfoIsUntrusted(const ValidPathInfo &) override;
     bool realisationIsUntrusted(const Realisation &) override;
+
+    StorePath writeDerivation(const Derivation & drv, RepairFlag repair = NoRepair) override;
+
+    Derivation readDerivation(const StorePath & drvPath) override;
+
+    Derivation readInvalidDerivation(const StorePath & drvPath) override;
+
+    std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath & path, bool requireValidPath = true) override;
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
@@ -445,6 +467,22 @@ public:
 
 protected:
 
+    /**
+     * Read a derivation from the DB, handling locking and SQLite retries.
+     * Returns std::nullopt if not found.
+     */
+    std::optional<Derivation> readDerivationFromDB(const StorePath & drvPath);
+
+    /**
+     * Called by addValidPath (while holding _state lock) when it needs
+     * to read a derivation that is not in our DB and not on our
+     * filesystem.  Subclasses (e.g. LocalOverlayStore) can override to
+     * fetch from an alternative source such as a lower store.
+     *
+     * The default implementation returns std::nullopt.
+     */
+    virtual std::optional<Derivation> readDerivationForAddValidPath(const StorePath & path);
+
     void verifyPath(
         const StorePath & path,
         fun<bool(const StorePath &)> existsInStoreDir,
@@ -504,6 +542,10 @@ private:
     // Internal versions that are not wrapped in retry_sqlite.
     bool isValidPath_(State & state, const StorePath & path);
     void queryReferrers(State & state, const StorePath & path, StorePathSet & referrers);
+
+    /* Derivations-in-DB helpers (local-store-drv.cc) */
+    void insertDerivationIntoDB(State & state, uint64_t id, const std::string & pathStr, const Derivation & drv);
+    std::optional<Derivation> queryDerivationFromDB(State & state, const StorePath & drvPath);
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
