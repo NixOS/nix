@@ -689,6 +689,32 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (!dead.insert(path).second)
                 continue;
             if (shouldDelete) {
+                /* Re-check tempRoots before deleting and set pending
+                   to synchronise with addTempRoot. Between the BFS
+                   and this deletion loop, new temproots may have been
+                   added via the GC socket by a concurrent process
+                   (e.g. an evaluator calling addTempRoot). The BFS
+                   only checks tempRoots when it first visits a path,
+                   but the "pending" mechanism only blocks the socket
+                   handler for the single path currently being visited,
+                   not for paths already queued for deletion. */
+                {
+                    auto hashPart = std::string(path.hashPart());
+                    auto shared(_shared.lock());
+                    if (shared->tempRoots.count(hashPart)) {
+                        debug(
+                            "not deleting '%s' because it became a temporary root after initial scan",
+                            printStorePath(path));
+                        alive.insert(path);
+                        continue;
+                    }
+                    shared->pending = hashPart;
+                }
+                Finally resetPending([&]() {
+                    auto shared(_shared.lock());
+                    shared->pending.reset();
+                    wakeup.notify_all();
+                });
                 try {
                     invalidatePathChecked(path);
                     deleteFromStore(path.to_string(), true);
