@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <algorithm>
 
 namespace nix {
 
@@ -151,7 +152,16 @@ void deleteGenerations(
 }
 
 /**
- * Advanced the iterator until the given predicate `cond` returns `true`.
+ * Advance the iterator `count` times.
+ */
+static inline void iterDrop(Generations & gens, auto && i, GenerationNumber count = 1)
+{
+    for (GenerationNumber keep = 0; i != gens.rend() && keep < count; ++i, ++keep)
+        ;
+}
+
+/**
+ * Advance the iterator until the given predicate `cond` returns `true`.
  */
 static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
 {
@@ -159,74 +169,80 @@ static inline void iterDropUntil(Generations & gens, auto && i, auto && cond)
         ;
 }
 
-void deleteGenerationsGreaterThan(const std::filesystem::path & profile, GenerationNumber max, bool dryRun)
+void deleteGenerationsFilter(
+    const std::filesystem::path & profile,
+    std::optional<time_t> olderThan,
+    std::optional<GenerationNumber> keepMin,
+    std::optional<GenerationNumber> keepMax,
+    bool dryRun)
 {
-    if (max == 0)
-        throw Error("Must keep at least one generation, otherwise the current one would be deleted");
+    if (keepMin.has_value() && keepMax.has_value() && *keepMin > *keepMax)
+        throw Error("--keep-min cannot be greater than --keep-max");
 
     PathLocks lock;
     lockProfile(lock, profile);
 
-    auto [gens, _curGen] = findGenerations(profile);
-    auto curGen = _curGen;
+    auto [gens, curGen] = findGenerations(profile);
 
-    auto i = gens.rbegin();
+    // Keep current and future generations
+    auto current = gens.rbegin();
+    iterDropUntil(gens, current, [&](auto & g) { return g.number == curGen; });
+    iterDrop(gens, current);
 
-    // Find the current generation
-    iterDropUntil(gens, i, [&](auto & g) { return g.number == curGen; });
+    // Compute minimum bound for kept generations
+    auto start = current;
+    if (keepMin.has_value())
+        iterDrop(gens, start, *keepMin);
 
-    // Skip over `max` generations, preserving them
-    for (GenerationNumber keep = 0; i != gens.rend() && keep < max; ++i, ++keep)
-        ;
+    // Compute maximum bound for kept generations
+    auto end = gens.rend();
+    if (keepMax.has_value()) {
+        end = current;
+        iterDrop(gens, end, *keepMax);
+    }
 
-    // Delete the rest
-    for (; i != gens.rend(); ++i)
-        deleteGeneration2(profile, i->number, dryRun);
+    // Find the first older generation, if one exists
+    auto older = gens.rend();
+    if (olderThan.has_value()) {
+        older = current;
+        iterDropUntil(gens, older, [&](auto & g) { return g.creationTime < *olderThan; });
+        /* Take the previous generation
+
+           We don't want delete this one yet because it
+           existed at the requested point in time, and
+           we want to be able to roll back to it. */
+        iterDrop(gens, older);
+    }
+
+    // Find first generation to delete by clamping between keepMin and keepMax
+    auto toDelete = older;
+
+    auto clampBackward = std::distance(gens.rbegin(), older) - std::distance(gens.rbegin(), end);
+    for (int i = clampBackward; i > 0; --i)
+        --toDelete;
+
+    auto clampForward = std::distance(gens.rbegin(), start) - std::distance(gens.rbegin(), older);
+    for (int i = clampForward; i > 0; --i)
+        ++toDelete;
+
+    // Delete
+    for (; toDelete != gens.rend(); ++toDelete)
+        deleteGeneration2(profile, toDelete->number, dryRun);
+}
+
+void deleteGenerationsGreaterThan(const std::filesystem::path & profile, GenerationNumber max, bool dryRun)
+{
+    deleteGenerationsFilter(profile, std::nullopt, std::nullopt, std::optional(max), dryRun);
 }
 
 void deleteOldGenerations(const std::filesystem::path & profile, bool dryRun)
 {
-    PathLocks lock;
-    lockProfile(lock, profile);
-
-    auto [gens, curGen] = findGenerations(profile);
-
-    for (auto & i : gens)
-        if (i.number != curGen)
-            deleteGeneration2(profile, i.number, dryRun);
+    deleteGenerationsFilter(profile, std::nullopt, std::nullopt, std::optional(0), dryRun);
 }
 
 void deleteGenerationsOlderThan(const std::filesystem::path & profile, time_t t, bool dryRun)
 {
-    PathLocks lock;
-    lockProfile(lock, profile);
-
-    auto [gens, curGen] = findGenerations(profile);
-
-    auto i = gens.rbegin();
-
-    // Predicate that the generation is older than the given time.
-    auto older = [&](auto & g) { return g.creationTime < t; };
-
-    // Find the first older generation, if one exists
-    iterDropUntil(gens, i, older);
-
-    /* Take the previous generation
-
-       We don't want delete this one yet because it
-       existed at the requested point in time, and
-       we want to be able to roll back to it. */
-    if (i != gens.rend())
-        ++i;
-
-    // Delete all previous generations (unless current).
-    for (; i != gens.rend(); ++i) {
-        /* Creating date and generations should be monotonic, so lower
-           numbered derivations should also be older. */
-        assert(older(*i));
-        if (i->number != curGen)
-            deleteGeneration2(profile, i->number, dryRun);
-    }
+    deleteGenerationsFilter(profile, std::optional(t), std::nullopt, std::nullopt, dryRun);
 }
 
 time_t parseOlderThanTimeSpec(std::string_view timeSpec)
