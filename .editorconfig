@@ -21,6 +21,11 @@ indent_size = 2
 indent_style = space
 indent_size = 4
 
+# Match SQL files, set indent to spaces with width of four
+[*.sql]
+indent_style = space
+indent_size = 4
+
 # Match diffs, avoid to trim trailing whitespace
 [*.{diff,patch}]
 trim_trailing_whitespace = false

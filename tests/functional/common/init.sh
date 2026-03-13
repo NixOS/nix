@@ -62,6 +62,10 @@ extra-experimental-features = flakes
 !include nix.conf.extra.not-there
 EOF
 
+if [[ "${_NIX_TEST_DERIVATIONS_IN_DB:-}" = 1 ]]; then
+    enableFeatures "derivations-in-database"
+fi
+
 # Initialise the database.
 # The flag itself does nothing, but running the command touches the store
 nix-store --init

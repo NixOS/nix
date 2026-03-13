@@ -2,6 +2,7 @@
 
 #include "nix/store/local-overlay-store.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/memory-source-accessor.hh"
 #include "nix/util/os-string.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
@@ -74,6 +75,41 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
             throw Error("overlay filesystem %s mounted incorrectly", PathFmt(config->realStoreDir.get()));
         }
     }
+}
+
+std::shared_ptr<SourceAccessor> LocalOverlayStore::getFSAccessor(const StorePath & path, bool requireValidPath)
+{
+    /* When derivationsInDatabase is enabled, we also consider that it
+       might be true in the lower store. In that case, derivations in
+       the lower store exist only in its DB — not on the overlayfs
+       filesystem.
+
+       We cannot simply call `LocalStore::getFSAccessor` here, because
+       its fallthrough to `LocalFSStore::getFSAccessor` calls
+       isValidPath(), which on the overlay store returns true for
+       lower-store paths, yielding a `PosixSourceAccessor` that points
+       to a non-existent overlayfs file.
+
+       Instead, check the upper DB directly, then delegate to the lower
+       store. */
+    if (LocalStore::config->derivationsInDatabase && path.isDerivation()) {
+        /* Check upper store's DB */
+        auto drv = readDerivationFromDB(path);
+
+        if (drv) {
+            auto accessor = std::make_shared<MemorySourceAccessor>();
+            accessor->root = MemorySourceAccessor::File::Regular{
+                .contents = drv->unparse(*this, false),
+            };
+            return accessor;
+        }
+
+        /* Not in upper DB; try the lower store (which may have it in
+           its own DB or on disk). */
+        return lowerStore->getFSAccessor(path, requireValidPath);
+    }
+
+    return LocalStore::getFSAccessor(path, requireValidPath);
 }
 
 void LocalOverlayStore::registerDrvOutput(const Realisation & info)
@@ -153,6 +189,17 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
         LocalStore::registerValidPath(*p);
     }
     return res;
+}
+
+std::optional<Derivation> LocalOverlayStore::readDerivationForAddValidPath(const StorePath & path)
+{
+    /* When addValidPath needs a derivation that isn't in the upper DB
+       or on disk (because the lower store uses DB storage too), read
+       it from the lower store.  This is safe to call while the upper
+       _state lock is held because the lower store has its own lock. */
+    if (lowerStore->isValidPath(path))
+        return lowerStore->readDerivation(path);
+    return std::nullopt;
 }
 
 void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & referrers)

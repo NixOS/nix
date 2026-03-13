@@ -131,7 +131,14 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         for (auto & i : inputPaths) {
             auto p = store.printStorePath(i);
-            pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
+            if (store.config->derivationsInDatabase && i.isDerivation()) {
+                /* DB-stored derivations have no filesystem entry;
+                   write the content directly into the chroot. */
+                auto drvContent = store.readDerivation(i).unparse(store, false);
+                auto chrootDrvPath = chrootStoreDir / i.to_string();
+                writeFile(chrootDrvPath, drvContent);
+            } else
+                pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
         }
 
         /* If we're repairing, checking or rebuilding part of a

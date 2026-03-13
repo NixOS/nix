@@ -23,7 +23,8 @@ fi
 for nixFile in derivation/*.nix; do
     drvPath=$(env -u NIX_STORE nix-instantiate --store "$store" --pure-eval "${flags[@]}" --expr "$(< "$nixFile")")
     testName=$(basename "$nixFile" .nix)
-    got="${store}${drvPath}"
+    got="$TEST_ROOT/got"
+    nix store cat --extra-experimental-features nix-command --store "$store" "$drvPath" > "$got"
     expected="derivation/${drvDir}/${testName}.drv"
     diffAndAcceptInner "$testName" "$got" "$expected"
 done
