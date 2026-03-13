@@ -79,10 +79,16 @@ let
         ${lib.getExe script} ${src} $out
       '';
 
+  # ── Custom clang-tidy plugin ─────────────────────────────────
+
+  nixTidyChecks = import ./clang-tidy-checks.nix {
+    inherit pkgs src;
+  };
+
   # ── Individual tool targets ────────────────────────────────────
 
   clang-tidy = import ./clang-tidy.nix {
-    inherit pkgs mkCompileDbReport;
+    inherit pkgs mkCompileDbReport nixTidyChecks;
   };
 
   cppcheck = import ./cppcheck.nix {

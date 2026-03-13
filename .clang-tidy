@@ -25,6 +25,7 @@ Checks: >
   -readability-identifier-length,
   -readability-function-cognitive-complexity,
   security-*,
+  nix-*,
 
 WarningsAsErrors: ''
 HeaderFilterRegex: 'src/.*'

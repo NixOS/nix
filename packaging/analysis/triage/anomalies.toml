@@ -273,3 +273,18 @@ remediations = [
     "Consider using /proc/self/mounts for process-specific view",
     "Accept as inherent procfs limitation and document",
 ]
+
+# ─── Custom clang-tidy check anomalies ───────────────────────────────
+
+[[anomaly]]
+id = "nix-sqlite-non-literal-sqlite-cc"
+tool = "clang-tidy"
+check_id = "nix-sqlite-non-literal-sql"
+file = "src/libstore/sqlite.cc"
+code_anchor = "sqlite3_exec(db, stmt.c_str(), 0, 0, 0)"
+status = "false-positive"
+reason = "Internal SQLite::exec() wrapper — stmt comes from trusted internal callers, not user input"
+remediations = [
+    "Add NOLINT comment for nix-sqlite-non-literal-sql",
+    "Use prepared statements instead of exec for parameterized queries",
+]

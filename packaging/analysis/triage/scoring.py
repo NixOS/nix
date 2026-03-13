@@ -25,6 +25,10 @@ BUG_CLASS_CHECKS = {
     'nix.store.dangling-c-str', 'nix.store.delete-this',
     'bugprone-forwarding-reference-overload',
     'bugprone-move-forwarding-reference',
+    # Custom clang-tidy AST matcher checks
+    'nix-dangling-cstr',
+    'nix-lock-guard-temporary',
+    'nix-sqlite-non-literal-sql',
     # Best practice with real impact
     'missingOverride',
 }
