@@ -14,15 +14,35 @@
 #include "nix/util/signals.hh"
 #include "nix/util/archive.hh"
 
+#include <algorithm>
 #include <chrono>
 #include <future>
-#include <regex>
 #include <fstream>
 #include <sstream>
 
 #include <nlohmann/json.hpp>
 
 namespace nix {
+
+static constexpr bool isLowerHex(char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+}
+
+static bool isBuildIdDirName(std::string_view s)
+{
+    // ^[0-9a-f]{2}$
+    return s.size() == 2 && std::ranges::all_of(s, isLowerHex);
+}
+
+static bool isBuildIdDebugFileName(std::string_view s)
+{
+    // ^[0-9a-f]{38}\\.debug$
+    static constexpr std::string_view suffix = ".debug";
+
+    return (s.size() == 38 + suffix.size()) && s.ends_with(suffix)
+           && std::all_of(s.begin(), s.begin() + 38, isLowerHex);
+}
 
 BinaryCacheStore::BinaryCacheStore(Config & config)
     : config{config}
@@ -239,19 +259,16 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 upsertFile(key, json.dump(), "application/json");
             };
 
-            std::regex regex1("^[0-9a-f]{2}$");
-            std::regex regex2("^[0-9a-f]{38}\\.debug$");
-
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
                 auto dir = buildIdDir / s1;
 
-                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory || !std::regex_match(s1, regex1))
+                if (narAccessor->lstat(dir).type != SourceAccessor::tDirectory || !isBuildIdDirName(s1))
                     continue;
 
                 for (auto & [s2, _type] : narAccessor->readDirectory(dir)) {
                     auto debugPath = dir / s2;
 
-                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular || !std::regex_match(s2, regex2))
+                    if (narAccessor->lstat(debugPath).type != SourceAccessor::tRegular || !isBuildIdDebugFileName(s2))
                         continue;
 
                     auto buildId = s1 + s2;
