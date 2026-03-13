@@ -9,7 +9,6 @@
 #include <cassert>
 #include <cstring>
 #include <ranges>
-#include <regex>
 #include <span>
 
 namespace nix {
@@ -323,11 +322,19 @@ std::string S3BinaryCacheStore::createMultipartUpload(
 
     auto result = getFileTransfer()->enqueueFileTransfer(req).get();
 
-    std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
-    std::smatch match;
+    // <UploadId>([^<]+)</UploadId>
+    constexpr std::string_view uploadIdOpen = "<UploadId>";
+    constexpr std::string_view uploadIdClose = "</UploadId>";
 
-    if (std::regex_search(result.data, match, uploadIdRegex)) {
-        return match[1];
+    auto start = result.data.find(uploadIdOpen);
+    if (start != std::string::npos) {
+        start += uploadIdOpen.size();
+        auto end = result.data.find(uploadIdClose, start);
+        if (end != std::string::npos) {
+            auto uploadId = std::string_view{result.data}.substr(start, end - start);
+            if (!uploadId.empty() && !uploadId.contains('<'))
+                return std::string(uploadId);
+        }
     }
 
     throw Error("S3 CreateMultipartUpload response missing <UploadId>");
