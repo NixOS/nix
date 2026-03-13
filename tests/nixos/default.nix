@@ -182,7 +182,7 @@ in
 
   content-encoding = runNixOSTest ./content-encoding.nix;
 
-  http-retry-backoff = runNixOSTest ./http-retry-backoff.nix;
+  filetransfer-retry-backoff = runNixOSTest ./filetransfer-retry-backoff.nix;
 
   functional_user = runNixOSTest ./functional/as-user.nix;
 

@@ -78,27 +78,27 @@ public:
     Setting<unsigned int> tries{
         this,
         5,
-        "http-retry-attempts",
-        "The number of times Nix attempts an HTTP transfer (download or upload) before giving up.",
+        "filetransfer-retry-attempts",
+        "The number of times Nix attempts a file transfer (download or upload) before giving up.",
         {"download-attempts"}};
 
     Setting<unsigned int> retryDelayMs{
         this,
         100,
-        "http-retry-delay",
+        "filetransfer-retry-delay",
         R"(
-          Initial delay in milliseconds before retrying a failed HTTP transfer
+          Initial delay in milliseconds before retrying a failed file transfer
           (download or upload). The delay doubles with each subsequent attempt
           (exponential backoff) and is subject to random jitter (see
-          `http-retry-jitter`).
+          `filetransfer-retry-jitter`).
         )"};
 
     Setting<unsigned int> retryDelayRateLimitedMs{
         this,
         5000,
-        "http-retry-delay-rate-limited",
+        "filetransfer-retry-delay-rate-limited",
         R"(
-          Initial delay in milliseconds before retrying an HTTP transfer that
+          Initial delay in milliseconds before retrying a file transfer that
           failed with a rate-limit response (HTTP 429 or 503). The delay doubles
           with each subsequent attempt.
 
@@ -109,7 +109,7 @@ public:
     Setting<unsigned int> retryMaxDelayMs{
         this,
         60000,
-        "http-retry-max-delay",
+        "filetransfer-retry-max-delay",
         R"(
           Cap on the exponential backoff delay in milliseconds. This does not
           cap server-provided `Retry-After` values, which are honored as-is
@@ -119,7 +119,7 @@ public:
     Setting<bool> retryJitter{
         this,
         true,
-        "http-retry-jitter",
+        "filetransfer-retry-jitter",
         R"(
           Whether to apply random jitter to retry delays. When enabled, each
           retry waits for a random duration between 0 and the computed delay
