@@ -3,7 +3,6 @@
 
 #include <filesystem>
 #include <functional>
-#include <random>
 #include <string>
 
 #include "nix/util/error.hh"
@@ -210,9 +209,9 @@ struct SQLiteRetryState
     time_t nextWarning;
     unsigned int jitter; // random factor, computed once per retry sequence
 
-    SQLiteRetryState(std::mt19937 & rng)
+    explicit SQLiteRetryState(unsigned int jitter)
         : nextWarning(time(nullptr) + 1)
-        , jitter(rng())
+        , jitter(jitter)
     {
     }
 };
@@ -227,11 +226,12 @@ std::chrono::milliseconds sqliteRetryBackoff(unsigned int attempt, unsigned int 
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
 
+SQLiteRetryState newSQLiteRetryState();
+
 template<typename T, typename F>
 T retrySQLite(const F & fun)
 {
-    thread_local std::mt19937 rng{std::random_device{}()};
-    SQLiteRetryState state{rng};
+    auto state = newSQLiteRetryState();
 
     while (true) {
         try {
