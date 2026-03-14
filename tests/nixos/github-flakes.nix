@@ -57,24 +57,60 @@ let
 
   private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
 
-  private-flake-api = pkgs.runCommand "private-flake" { } ''
-    mkdir -p $out/{commits,tarball}
+  private-flake-git-refs = pkgs.runCommand "private-flake-git-refs" { } ''
+        mkdir -p $out/info
+        pkt_line() {
+          local content="$1"
+          local len=$(( ''${#content} + 4 ))
+          printf '%04x%s' "$len" "$content"
+        }
+        # First ref line needs a null byte to separate ref name from capabilities (git smart HTTP protocol)
+        first_ref_pkt_line() {
+          local content="$1"
+          local len=$(( ''${#content} + 4 + 2 ))
+          printf '%04x%s\0\n' "$len" "$content"
+        }
+        {
+          pkt_line "# service=git-upload-pack
+    "
+          printf '0000'
+          first_ref_pkt_line "${private-flake-rev} HEAD"
+          pkt_line "${private-flake-rev} refs/heads/master
+    "
+          printf '0000'
+        } > $out/info/refs
+  '';
 
-    # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-    echo '{"sha": "${private-flake-rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
-
-    # Setup tarball download via API
+  private-flake-tarball = pkgs.runCommand "private-flake-tarball" { } ''
+    mkdir -p $out/tarball
     dir=private-flake
     mkdir $dir
     echo '{ outputs = {...}: {}; }' > $dir/flake.nix
     tar cfz $out/tarball/${private-flake-rev} $dir --hard-dereference
   '';
 
-  nixpkgs-api = pkgs.runCommand "nixpkgs-flake" { } ''
-    mkdir -p $out/commits
-
-    # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-    echo '{"sha": "${nixpkgs.rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
+  nixpkgs-git-refs = pkgs.runCommand "nixpkgs-git-refs" { } ''
+        mkdir -p $out/info
+        pkt_line() {
+          local content="$1"
+          local len=$(( ''${#content} + 4 ))
+          printf '%04x%s' "$len" "$content"
+        }
+        # First ref line needs a null byte to separate ref name from capabilities (git smart HTTP protocol)
+        first_ref_pkt_line() {
+          local content="$1"
+          local len=$(( ''${#content} + 4 + 2 ))
+          printf '%04x%s\0\n' "$len" "$content"
+        }
+        {
+          pkt_line "# service=git-upload-pack
+    "
+          printf '0000'
+          first_ref_pkt_line "${nixpkgs.rev} HEAD"
+          pkt_line "${nixpkgs.rev} refs/heads/master
+    "
+          printf '0000'
+        } > $out/info/refs
   '';
 
   archive = pkgs.runCommand "nixpkgs-flake" { } ''
@@ -124,12 +160,8 @@ in
           sslServerCert = "${cert}/server.crt";
           servedDirs = [
             {
-              urlPath = "/repos/NixOS/nixpkgs";
-              dir = nixpkgs-api;
-            }
-            {
               urlPath = "/repos/fancy-enterprise/private-flake";
-              dir = private-flake-api;
+              dir = private-flake-tarball;
             }
           ];
         };
@@ -137,10 +169,23 @@ in
           forceSSL = true;
           sslServerKey = "${cert}/server.key";
           sslServerCert = "${cert}/server.crt";
+          extraConfig = ''
+            <LocationMatch "\.git/info/refs$">
+              ForceType application/x-git-upload-pack-advertisement
+            </LocationMatch>
+          '';
           servedDirs = [
             {
               urlPath = "/NixOS/nixpkgs";
               dir = archive;
+            }
+            {
+              urlPath = "/NixOS/nixpkgs.git";
+              dir = nixpkgs-git-refs;
+            }
+            {
+              urlPath = "/fancy-enterprise/private-flake.git";
+              dir = private-flake-git-refs;
             }
           ];
         };

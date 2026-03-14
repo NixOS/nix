@@ -19,6 +19,7 @@
 #include <git2/branch.h>
 #include <git2/commit.h>
 #include <git2/config.h>
+#include <git2/credential.h>
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
@@ -1539,6 +1540,55 @@ bool isLegalRefName(const std::string & refName)
     }
 
     return false;
+}
+
+/**
+ * Set up libgit2 remote callbacks that authenticate using a token
+ * via x-access-token basic auth. The token string must outlive the
+ * returned callbacks struct.
+ */
+static git_remote_callbacks makeTokenCallbacks(const std::string & token)
+{
+    git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+    callbacks.payload = const_cast<void *>(static_cast<const void *>(&token));
+    callbacks.credentials =
+        [](git_credential ** out, const char *, const char *, unsigned int allowed_types, void * payload) -> int {
+        auto * tok = static_cast<const std::string *>(payload);
+        if (tok->empty())
+            return GIT_PASSTHROUGH;
+        if (allowed_types & GIT_CREDENTIAL_USERPASS_PLAINTEXT)
+            return git_credential_userpass_plaintext_new(out, "x-access-token", tok->c_str());
+        return GIT_PASSTHROUGH;
+    };
+    return callbacks;
+}
+
+Hash resolveRemoteRef(const std::string & url, const std::string & ref, const std::string & token)
+{
+    Remote remote;
+    if (git_remote_create_detached(Setter(remote), url.c_str()))
+        throw GitError("creating detached remote for '%s'", url);
+
+    auto callbacks = makeTokenCallbacks(token);
+
+    if (git_remote_connect(remote.get(), GIT_DIRECTION_FETCH, &callbacks, nullptr, nullptr))
+        throw GitError("connecting to remote '%s'", url);
+
+    const git_remote_head ** refs;
+    size_t refCount;
+    if (git_remote_ls(&refs, &refCount, remote.get()))
+        throw GitError("listing remote refs for '%s'", url);
+
+    auto headsRef = "refs/heads/" + ref;
+    auto tagsRef = "refs/tags/" + ref;
+
+    for (size_t i = 0; i < refCount; i++) {
+        std::string_view name(refs[i]->name);
+        if (ref == "HEAD" ? name == "HEAD" : (name == headsRef || name == tagsRef))
+            return toHash(refs[i]->oid);
+    }
+
+    throw Error("could not find ref '%s' in remote '%s'", ref, url);
 }
 
 } // namespace nix

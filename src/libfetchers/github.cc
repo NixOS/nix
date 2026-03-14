@@ -414,22 +414,14 @@ struct GitHubInputScheme : GitArchiveInputScheme
     RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
     {
         auto host = getHost(input);
-        auto url = fmt(
-            host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s" : "https://%s/api/v3/repos/%s/%s/commits/%s",
-            host,
-            getOwner(input),
-            getRepo(input),
-            *input.getRef());
+        auto owner = getOwner(input);
+        auto repo = getRepo(input);
+        auto url = fmt("https://%s/%s/%s.git", host, owner, repo);
+        auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
+        auto token = getAccessToken(settings, host, hostAndPath).value_or("");
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
-
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
-        auto json = nlohmann::json::parse(
-            store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
-
-        return RefInfo{
-            .rev = Hash::parseAny(std::string{json["sha"]}, HashAlgorithm::SHA1),
-            .treeHash = Hash::parseAny(std::string{json["commit"]["tree"]["sha"]}, HashAlgorithm::SHA1)};
+        auto rev = resolveRemoteRef(url, *input.getRef(), token);
+        return RefInfo{.rev = rev};
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
