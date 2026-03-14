@@ -2648,8 +2648,7 @@ std::pair<SingleDerivedPath, std::string_view> EvalState::coerceToSingleDerivedP
             [&](NixStringContextElem::Built && b) -> SingleDerivedPath { return std::move(b); },
             [&](NixStringContextElem::SelfOutput &&) -> SingleDerivedPath {
                 error<EvalError>(
-                    "string '%s' has a context with a self-output placeholder, which is not supported here",
-                    s)
+                    "string '%s' has a context with a self-output placeholder, which is not supported here", s)
                     .withTrace(pos, errorCtx)
                     .debugThrow();
             },

@@ -134,9 +134,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
                     return std::move(c);
                 },
                 [&](const NixStringContextElem::SelfOutput &) -> NixStringContextElem::DrvDeep {
-                    state
-                        .error<EvalError>(
-                            "`addDrvOutputDependencies` cannot act on a self-output placeholder")
+                    state.error<EvalError>("`addDrvOutputDependencies` cannot act on a self-output placeholder")
                         .atPos(pos)
                         .debugThrow();
                 },

@@ -1735,8 +1735,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     /* Validate that the referenced output is actually declared. */
                     if (outputs.find(s.output) == outputs.end())
                         diagnose(
-                            state.settings.lintUndeclaredPlaceholderOutputs,
-                            [&](bool) -> std::optional<EvalError> {
+                            state.settings.lintUndeclaredPlaceholderOutputs, [&](bool) -> std::optional<EvalError> {
                                 return EvalError(
                                     state,
                                     ErrorInfo{
@@ -1888,8 +1887,8 @@ static RegisterPrimOp primop_derivationStrict(
    ‘out’. */
 static void prim_placeholder(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto outputName = state.forceStringNoCtx(
-        *args[0], pos, "while evaluating the first argument passed to builtins.placeholder");
+    auto outputName =
+        state.forceStringNoCtx(*args[0], pos, "while evaluating the first argument passed to builtins.placeholder");
     NixStringContext context;
     context.insert(NixStringContextElem::SelfOutput{.output = std::string{outputName}});
     v.mkString(hashPlaceholder(outputName), context, state.mem);

@@ -117,9 +117,7 @@ std::string NixStringContextElem::display(const StoreDirConfig & store) const
                 return store.printStorePath(d.drvPath) + " (deep)";
             },
             [&](const NixStringContextElem::Built & b) -> std::string { return SingleDerivedPath{b}.to_string(store); },
-            [&](const NixStringContextElem::SelfOutput & s) -> std::string {
-                return "self-output:" + s.output;
-            },
+            [&](const NixStringContextElem::SelfOutput & s) -> std::string { return "self-output:" + s.output; },
         },
         raw);
 }
