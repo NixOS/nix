@@ -2613,7 +2613,7 @@ SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext
     auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
     if (path == "" || path[0] != '/')
         error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(path);
+    return rootPath(CanonPath(path));
 }
 
 StorePath

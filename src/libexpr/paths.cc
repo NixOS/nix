@@ -12,6 +12,8 @@ SourcePath EvalState::rootPath(CanonPath path)
 
 SourcePath EvalState::rootPath(std::string_view path)
 {
+    /* FIXME: Move this out of EvalState, since it's using native
+       std::filesystem::path and current working directory. */
     return {rootFS, CanonPath(absPath(path).string())};
 }
 
