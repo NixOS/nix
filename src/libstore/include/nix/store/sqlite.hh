@@ -230,7 +230,7 @@ struct BackoffConfig
     unsigned int jitterShift;
 };
 
-constexpr std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config);
+std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config);
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
 
