@@ -1541,4 +1541,39 @@ bool isLegalRefName(const std::string & refName)
     return false;
 }
 
+Hash resolveRemoteRef(const std::string & url, const std::string & ref, const Headers & headers)
+{
+    initLibGit2();
+
+    Remote remote;
+    if (git_remote_create_detached(Setter(remote), url.c_str()))
+        throw GitError("creating detached remote for '%s'", url);
+
+    // Convert Headers (vector<pair<string,string>>) to git_strarray
+    std::vector<std::string> headerStrs;
+    for (auto & [name, value] : headers)
+        headerStrs.push_back(name + ": " + value);
+    std::vector<char *> headerPtrs;
+    for (auto & s : headerStrs)
+        headerPtrs.push_back(s.data());
+    git_strarray customHeaders = {headerPtrs.data(), headerPtrs.size()};
+
+    if (git_remote_connect(remote.get(), GIT_DIRECTION_FETCH, nullptr, nullptr, &customHeaders))
+        throw GitError("connecting to remote '%s'", url);
+
+    const git_remote_head ** refs;
+    size_t refCount;
+    if (git_remote_ls(&refs, &refCount, remote.get()))
+        throw GitError("listing remote refs for '%s'", url);
+
+    std::regex refRegex(ref == "HEAD" ? "HEAD" : fmt("refs/(heads|tags)/%s", ref));
+
+    for (size_t i = 0; i < refCount; i++) {
+        if (std::regex_match(refs[i]->name, refRegex))
+            return toHash(refs[i]->oid);
+    }
+
+    throw Error("could not find ref '%s' in remote '%s'", ref, url);
+}
+
 } // namespace nix

@@ -2,6 +2,7 @@
 
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/types.hh"
 
 namespace nix {
 
@@ -177,5 +178,12 @@ struct Setter
  * that Git can make sense of.
  */
 bool isLegalRefName(const std::string & refName);
+
+/**
+ * Resolve a ref on a remote repository to a commit hash using
+ * libgit2's smart HTTP transport. The ref can be "HEAD" or a branch/tag
+ * name (matched against refs/heads and refs/tags).
+ */
+Hash resolveRemoteRef(const std::string & url, const std::string & ref, const Headers & headers);
 
 } // namespace nix
