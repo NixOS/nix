@@ -412,6 +412,39 @@ struct EvalSettings : Config
         )",
     };
 
+    Setting<Diagnose> lintUndeclaredPlaceholderOutputs{
+        this,
+        Diagnose::Ignore,
+        "lint-undeclared-placeholder-outputs",
+        R"(
+          Controls handling of `builtins.placeholder` references to outputs that
+          are not declared by the derivation.
+
+          - `ignore`: Ignore without warning (default)
+          - `warn`: Emit a warning about the undeclared output reference
+          - `fatal`: Treat as an evaluation error
+
+          When a derivation uses `builtins.placeholder` to reference an output
+          name that is not listed in its `outputs` attribute, it typically
+          indicates a mistake that would produce a cryptic hash path failing at
+          build time.
+
+          For example, with this setting set to `warn` or `fatal`:
+
+          ```nix
+          derivation {
+            name = "example";
+            builder = "/bin/sh";
+            system = builtins.currentSystem;
+            outputs = [ "out" ];
+            foo = builtins.placeholder "bar"; # "bar" is not a declared output
+          }
+          ```
+
+          would produce a diagnostic.
+        )",
+    };
+
     Setting<Diagnose> lintUrlLiterals{
         this,
         Diagnose::Ignore,

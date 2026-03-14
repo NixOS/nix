@@ -1734,14 +1734,20 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 [&](const NixStringContextElem::SelfOutput & s) {
                     /* Validate that the referenced output is actually declared. */
                     if (outputs.find(s.output) == outputs.end())
-                        state
-                            .error<EvalError>(
-                                "derivation '%s' references its own output '%s' via placeholder, "
-                                "but this output is not declared",
-                                drvName,
-                                s.output)
-                            .atPos(v)
-                            .debugThrow();
+                        diagnose(
+                            state.settings.lintUndeclaredPlaceholderOutputs,
+                            [&](bool) -> std::optional<EvalError> {
+                                return EvalError(
+                                    state,
+                                    ErrorInfo{
+                                        .msg = HintFmt(
+                                            "derivation '%s' references its own output '%s' via placeholder, "
+                                            "but this output is not declared",
+                                            drvName,
+                                            s.output),
+                                        .pos = state.positions[v.determinePos(noPos)],
+                                    });
+                            });
                 },
             },
             c.raw);
