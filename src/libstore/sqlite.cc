@@ -305,10 +305,10 @@ void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 SQLiteRetryState newSQLiteRetryState()
 {
     thread_local std::mt19937 rng{std::random_device{}()};
-    return SQLiteRetryState{rng()};
+    return SQLiteRetryState{static_cast<unsigned int>(rng())};
 }
 
-constexpr std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
+std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
 {
     auto ceiling = clampedExponential(config.baseUs, attempt, config.ceilUs);
     auto jitterRange = (config.jitterShift >= 32u) ? 0u : (ceiling >> config.jitterShift);
