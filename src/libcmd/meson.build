@@ -44,6 +44,10 @@ configdata.set(
   'HAVE_LOWDOWN_1_4',
   lowdown.version().version_compare('>= 1.4.0').to_int(),
 )
+configdata.set(
+  'HAVE_LOWDOWN_3',
+  lowdown.version().version_compare('>= 3.0.0').to_int(),
+)
 
 readline_flavor = get_option('readline-flavor')
 if readline_flavor == 'editline'
