@@ -167,115 +167,48 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
         std::rethrow_exception(ex);
 }
 
+static void collectDerivedPaths(
+    std::set<DerivedPath> & out, ref<SingleDerivedPath> inputDrv, const DerivedPathMap<StringSet>::ChildNode & node)
+{
+    if (!node.value.empty())
+        out.insert(DerivedPath::Built{inputDrv, node.value});
+    for (const auto & [outputName, childNode] : node.childMap)
+        collectDerivedPaths(
+            out, make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
+}
+
 MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
 
-    // FIXME: make async.
-    ThreadPool pool(fileTransferSettings.httpConnections);
+    MissingPaths res;
 
-    struct State
-    {
-        boost::unordered_flat_set<std::string> done;
-        MissingPaths res;
+    auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv, std::set<DerivedPath> & edges) {
+        res.willBuild.insert(drvPath);
+        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+            collectDerivedPaths(edges, makeConstantStorePathRef(inputDrv), inputNode);
     };
 
-    struct DrvState
-    {
-        size_t left;
-        bool done = false;
-        StorePathSet outPaths;
+    GetEdgesAsync<DerivedPath> getEdges = [&](const DerivedPath & req) -> asio::awaitable<std::set<DerivedPath>> {
+        std::set<DerivedPath> edges;
 
-        DrvState(size_t left)
-            : left(left)
-        {
-        }
-    };
-
-    Sync<State> state_;
-
-    fun<void(DerivedPath)> doPath = [&](const DerivedPath &) { unreachable(); };
-
-    auto enqueueDerivedPaths = [&](this auto self,
-                                   ref<SingleDerivedPath> inputDrv,
-                                   const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
-        if (!inputNode.value.empty())
-            pool.enqueue(std::bind(doPath, DerivedPath::Built{inputDrv, inputNode.value}));
-        for (const auto & [outputName, childNode] : inputNode.childMap)
-            self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
-    };
-
-    auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv) {
-        {
-            auto state(state_.lock());
-            state->res.willBuild.insert(drvPath);
-        }
-
-        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map) {
-            enqueueDerivedPaths(makeConstantStorePathRef(inputDrv), inputNode);
-        }
-    };
-
-    auto checkOutput =
-        [&](const StorePath & drvPath, ref<Derivation> drv, const StorePath & outPath, ref<Sync<DrvState>> drvState_) {
-            if (drvState_->lock()->done)
-                return;
-
-            SubstitutablePathInfos infos;
-            auto * cap = getDerivationCA(*drv);
-            querySubstitutablePathInfos(
-                {
-                    {
-                        outPath,
-                        cap ? std::optional{*cap} : std::nullopt,
-                    },
-                },
-                infos);
-
-            if (infos.empty()) {
-                drvState_->lock()->done = true;
-                mustBuildDrv(drvPath, *drv);
-            } else {
-                {
-                    auto drvState(drvState_->lock());
-                    if (drvState->done)
-                        return;
-                    assert(drvState->left);
-                    drvState->left--;
-                    drvState->outPaths.insert(outPath);
-                    if (!drvState->left) {
-                        for (auto & path : drvState->outPaths)
-                            pool.enqueue(std::bind(doPath, DerivedPath::Opaque{path}));
-                    }
-                }
-            }
-        };
-
-    doPath = [&](const DerivedPath & req) {
-        {
-            auto state(state_.lock());
-            if (!state->done.insert(req.to_string(*this)).second)
-                return;
-        }
-
-        std::visit(
+        co_await std::visit(
             overloaded{
-                [&](const DerivedPath::Built & bfd) {
+                [&](const DerivedPath::Built & bfd) -> asio::awaitable<void> {
                     auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
                     if (!drvPathP) {
                         // TODO make work in this case.
                         warn(
                             "Ignoring dynamic derivation %s while querying missing paths; not yet implemented",
                             bfd.drvPath->to_string(*this));
-                        return;
+                        co_return;
                     }
                     auto & drvPath = drvPathP->path;
 
                     if (!isValidPath(drvPath)) {
                         // FIXME: we could try to substitute the derivation.
-                        auto state(state_.lock());
-                        state->res.unknown.insert(drvPath);
-                        return;
+                        res.unknown.insert(drvPath);
+                        co_return;
                     }
 
                     StorePathSet invalid;
@@ -291,7 +224,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                             invalid.insert(*pathOpt);
                     }
                     if (knownOutputPaths && invalid.empty())
-                        return;
+                        co_return;
 
                     auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
                     DerivationOptions<SingleDerivedPath> drvOptions;
@@ -319,6 +252,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
                             bool found = false;
                             for (auto & sub : getDefaultSubstituters()) {
+                                /* TODO: Asyncify this. */
                                 auto realisation = sub->queryRealisation({drvPath, outputName});
                                 if (!realisation)
                                     continue;
@@ -337,48 +271,68 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
                     if (knownOutputPaths && settings.getWorkerSettings().useSubstitutes
                         && drvOptions.substitutesAllowed(settings.getWorkerSettings())) {
-                        auto drvState = make_ref<Sync<DrvState>>(DrvState(invalid.size()));
-                        for (auto & output : invalid)
-                            pool.enqueue(std::bind(checkOutput, drvPath, drv, output, drvState));
-                    } else
-                        mustBuildDrv(drvPath, *drv);
+                        bool mustBuild = false;
+                        StorePathSet substitutable;
+                        auto * cap = getDerivationCA(*drv);
+
+                        /* Query all outputs concurrently (but not in parallel,
+                           computeClosure runs on a strand). If any one is not
+                           substitutable then discard all other outputs. */
+                        co_await forEachAsync(invalid, [&](const StorePath & outPath) -> asio::awaitable<void> {
+                            if (mustBuild)
+                                co_return;
+
+                            SubstitutablePathInfos infos;
+                            co_await querySubstitutablePathInfosAsync(
+                                *this, {{outPath, cap ? std::optional{*cap} : std::nullopt}}, infos);
+
+                            if (infos.empty())
+                                mustBuild = true;
+                            else
+                                substitutable.insert(outPath);
+                        });
+
+                        if (mustBuild)
+                            mustBuildDrv(drvPath, *drv, edges);
+                        else
+                            for (auto & path : substitutable)
+                                edges.insert(DerivedPath::Opaque{path});
+                    } else {
+                        mustBuildDrv(drvPath, *drv, edges);
+                    }
                 },
-                [&](const DerivedPath::Opaque & bo) {
+                [&](const DerivedPath::Opaque & bo) -> asio::awaitable<void> {
                     if (isValidPath(bo.path))
-                        return;
+                        co_return;
 
                     SubstitutablePathInfos infos;
-                    querySubstitutablePathInfos({{bo.path, std::nullopt}}, infos);
+                    co_await querySubstitutablePathInfosAsync(*this, {{bo.path, std::nullopt}}, infos);
 
                     if (infos.empty()) {
-                        auto state(state_.lock());
-                        state->res.unknown.insert(bo.path);
-                        return;
+                        res.unknown.insert(bo.path);
+                        co_return;
                     }
 
                     auto info = infos.find(bo.path);
                     assert(info != infos.end());
-
-                    {
-                        auto state(state_.lock());
-                        state->res.willSubstitute.insert(bo.path);
-                        state->res.downloadSize += info->second.downloadSize;
-                        state->res.narSize += info->second.narSize;
-                    }
+                    res.willSubstitute.insert(bo.path);
+                    res.downloadSize += info->second.downloadSize;
+                    res.narSize += info->second.narSize;
 
                     for (auto & ref : info->second.references)
-                        pool.enqueue(std::bind(doPath, DerivedPath::Opaque{ref}));
+                        edges.insert(DerivedPath::Opaque{ref});
                 },
             },
             req.raw());
+
+        co_return edges;
     };
 
-    for (auto & path : targets)
-        pool.enqueue(std::bind(doPath, path));
+    std::set<DerivedPath> startElts(targets.begin(), targets.end());
+    std::set<DerivedPath> visited;
+    computeClosure(std::move(startElts), visited, std::move(getEdges));
 
-    pool.process();
-
-    return std::move(state_.lock()->res);
+    return res;
 }
 
 StorePaths Store::topoSortPaths(const StorePathSet & paths)
