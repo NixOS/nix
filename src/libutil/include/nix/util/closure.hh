@@ -57,7 +57,7 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
             /**
              * Maximum number of concurrent coroutines. Implements primitive rate limiting.
              */
-            std::size_t maxConcurrent = 64;
+            std::size_t maxConcurrent = 1024;
             /**
              * Nodes to handle next.
              */
