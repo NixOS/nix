@@ -1,25 +1,32 @@
 {
   description = "The purely functional package manager";
 
-  inputs.nixpkgs.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
+  inputs = {
+    nixpkgs.url = "https://channels.nixos.org/nixos-25.11/nixexprs.tar.xz";
 
-  inputs.nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
-  inputs.nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
-  inputs.flake-compat = {
-    url = "github:NixOS/flake-compat";
-    flake = false;
+    nixpkgs-regression.url = "github:NixOS/nixpkgs/215d4d0fd80ca5163643b03a33fde804a29cc1e2";
+    nixpkgs-23-11.url = "github:NixOS/nixpkgs/a62e6edd6d5e1fa0329b8653c801147986f8d446";
+    flake-compat = {
+      url = "github:NixOS/flake-compat";
+      flake = false;
+    };
+
+    # dev tooling
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      # work around https://github.com/NixOS/nix/issues/7730
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+    git-hooks-nix = {
+      url = "github:cachix/git-hooks.nix";
+      # work around https://github.com/NixOS/nix/issues/7730
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-stable.follows = "nixpkgs";
+      # work around 7730 and https://github.com/NixOS/nix/issues/7807
+      inputs.flake-compat.follows = "";
+      inputs.gitignore.follows = "";
+    };
   };
-
-  # dev tooling
-  inputs.flake-parts.url = "github:hercules-ci/flake-parts";
-  inputs.git-hooks-nix.url = "github:cachix/git-hooks.nix";
-  # work around https://github.com/NixOS/nix/issues/7730
-  inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
-  inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
-  # work around 7730 and https://github.com/NixOS/nix/issues/7807
-  inputs.git-hooks-nix.inputs.flake-compat.follows = "";
-  inputs.git-hooks-nix.inputs.gitignore.follows = "";
 
   outputs =
     inputs@{
@@ -292,21 +299,9 @@
 
     in
     {
-      overlays.internal = overlayFor (p: p.stdenv);
-
-      /**
-        A Nixpkgs overlay that sets `nix` to something like `packages.<system>.nix-everything`,
-        except dependencies aren't taken from (flake) `nix.inputs.nixpkgs`, but from the Nixpkgs packages
-        where the overlay is used.
-      */
-      overlays.default =
-        final: prev:
-        let
-          packageSets = packageSetsFor { pkgs = final; };
-        in
-        {
-          nix = packageSets.nixComponents.nix-everything;
-        };
+      overlays = import ./packaging/overlays.nix {
+        inherit overlayFor packageSetsFor;
+      };
 
       hydraJobs = import ./packaging/hydra.nix {
         inherit
@@ -321,189 +316,36 @@
           ;
       };
 
-      checks = forAllSystems (
-        system:
-        (import ./ci/gha/tests {
-          inherit system;
-          pkgs = nixpkgsFor.${system}.native;
-          nixFlake = self;
-        }).topLevel
-        // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
-          dockerImage = self.hydraJobs.dockerImage.${system};
-        }
-        // (lib.optionalAttrs (!(builtins.elem system linux32BitSystems))) {
-          # Some perl dependencies are broken on i686-linux.
-          # Since the support is only best-effort there, disable the perl
-          # bindings
-          perlBindings = self.hydraJobs.perlBindings.${system};
-        }
-        # Add "passthru" tests
-        //
+      checks = import ./packaging/checks.nix {
+        inherit
+          lib
+          self
+          nixpkgsFor
           flatMapAttrs
-            {
-              "" = {
-                pkgs = nixpkgsFor.${system}.native;
-              };
-            }
-            (
-              nixpkgsPrefix: args:
-              (import ./ci/gha/tests (
-                args
-                // {
-                  nixFlake = self;
-                  componentTestsPrefix = nixpkgsPrefix;
-                }
-              )).componentTests
-            )
-        // devFlake.checks.${system} or { }
-      );
+          forAllSystems
+          linux32BitSystems
+          linux64BitSystems
+          devFlake
+          ;
+      };
 
-      packages = forAllSystems (
-        system:
-        {
-          # Here we put attributes that map 1:1 into packages.<system>, ie
-          # for which we don't apply the full build matrix such as cross or static.
-          inherit (nixpkgsFor.${system}.native)
-            changelog-d
-            ;
-          default = self.packages.${system}.nix;
-          installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
-          binaryTarball = self.hydraJobs.binaryTarball.${system};
-          # TODO probably should be `nix-cli`
-          nix = self.packages.${system}.nix-everything;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
-          nix-manual-manpages-only = nixpkgsFor.${system}.native.nixComponents2.nix-manual-manpages-only;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
-        }
-        # We need to flatten recursive attribute sets of derivations to pass `flake check`.
-        //
+      packages = import ./packaging/packages.nix {
+        inherit
+          lib
+          self
+          nixpkgsFor
           flatMapAttrs
-            {
-              # Components we'll iterate over in the upcoming lambda
-              "nix-util" = { };
-              "nix-util-c" = { };
-              "nix-util-test-support" = { };
-              "nix-util-tests" = { };
+          forAllSystems
+          forAllCrossSystems
+          stdenvs
+          crossSystems
+          linux64BitSystems
+          ;
+      };
 
-              "nix-store" = { };
-              "nix-store-c" = { };
-              "nix-store-test-support" = { };
-              "nix-store-tests" = { };
-
-              "nix-fetchers" = { };
-              "nix-fetchers-c" = { };
-              "nix-fetchers-tests" = { };
-
-              "nix-expr" = { };
-              "nix-expr-c" = { };
-              "nix-expr-test-support" = { };
-              "nix-expr-tests" = { };
-
-              "nix-flake" = { };
-              "nix-flake-c" = { };
-              "nix-flake-tests" = { };
-
-              "nix-main" = { };
-              "nix-main-c" = { };
-
-              "nix-cmd" = { };
-
-              "nix-nswrapper" = {
-                linuxOnly = true;
-              };
-
-              "nix-cli" = { };
-
-              "nix-everything" = { };
-
-              "nix-functional-tests" = {
-                supportsCross = false;
-              };
-
-              "nix-json-schema-checks" = {
-                supportsCross = false;
-              };
-
-              "nix-perl-bindings" = {
-                supportsCross = false;
-              };
-            }
-            (
-              pkgName:
-              {
-                supportsCross ? true,
-                linuxOnly ? false,
-              }:
-              lib.optionalAttrs (linuxOnly -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux) (
-                {
-                  # These attributes go right into `packages.<system>`.
-                  "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
-                  "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
-                  "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
-                }
-                // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (
-                  stdenvName:
-                  { }:
-                  {
-                    # These attributes go right into `packages.<system>`.
-                    "${pkgName}-${stdenvName}" =
-                      nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
-                  }
-                )
-              )
-              // lib.optionalAttrs supportsCross (
-                flatMapAttrs (lib.genAttrs crossSystems (_: { })) (
-                  crossSystem:
-                  { }:
-                  lib.optionalAttrs
-                    (linuxOnly -> nixpkgsFor.${system}.cross.${crossSystem}.stdenv.hostPlatform.isLinux)
-                    {
-                      # These attributes go right into `packages.<system>`.
-                      "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
-                    }
-                )
-              )
-            )
-        // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
-          dockerImage =
-            let
-              pkgs = nixpkgsFor.${system}.native;
-              image = pkgs.callPackage ./docker.nix {
-                tag = pkgs.nix.version;
-              };
-            in
-            pkgs.runCommand "docker-image-tarball-${pkgs.nix.version}"
-              { meta.description = "Docker image with Nix for ${system}"; }
-              ''
-                mkdir -p $out/nix-support
-                image=$out/image.tar.gz
-                ln -s ${image} $image
-                echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
-              '';
-        }
-      );
-
-      apps = forAllSystems (
-        system:
-        let
-          pkgs = nixpkgsFor.${system}.native;
-          opener = if pkgs.stdenv.isDarwin then "open" else "xdg-open";
-        in
-        {
-          open-manual = {
-            type = "app";
-            program = "${pkgs.writeShellScript "open-nix-manual" ''
-              path="${self.packages.${system}.nix-manual.site}/index.html"
-              if ! ${opener} "$path"; then
-                echo "Failed to open manual with ${opener}. Manual is located at:"
-                echo "$path"
-              fi
-            ''}";
-            meta.description = "Open the Nix manual in your browser";
-          };
-        }
-      );
+      apps = import ./packaging/apps.nix {
+        inherit self nixpkgsFor forAllSystems;
+      };
 
       devShells =
         let
@@ -551,6 +393,9 @@
             default = self.devShells.${system}.native;
           }
         );
+
+      # Formatting: nix develop -c ./maintainers/format.sh (nixfmt + clang-format + shellcheck)
+      # formatter = forAllSystems (system: nixpkgsFor.${system}.native.nixfmt-rfc-style);
 
       lib = {
         /**
