@@ -19,15 +19,6 @@ struct ProfileDirsOptions;
 
 struct LogFileSettings : public virtual Config
 {
-    /**
-     * The directory where we log various operations.
-     */
-    std::filesystem::path nixLogDir;
-
-protected:
-    LogFileSettings();
-
-public:
     Setting<bool> keepLog{
         this,
         true,
@@ -174,11 +165,6 @@ public:
      */
     std::filesystem::path nixStateDir;
 
-    /**
-     * File name of the socket the daemon listens to.
-     */
-    std::filesystem::path nixDaemonSocketFile;
-
     Setting<StoreReference> storeUri{
         this,
         StoreReference::parse(getEnv("NIX_REMOTE").value_or("auto")),
@@ -186,9 +172,14 @@ public:
         R"(
           The [URL of the Nix store](@docroot@/store/types/index.md#store-url-format)
           to use for most operations.
+
           See the
           [Store Types](@docroot@/store/types/index.md)
           section of the manual for supported store types and settings.
+
+          Can be overridden by the [`NIX_REMOTE`](@docroot@/command-ref/env-common.md#env-NIX_REMOTE) environment variable.
+
+          The default value is [`auto`](@docroot@/store/types/index.md#auto).
         )"};
 
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal", "Whether SQLite should use WAL mode."};

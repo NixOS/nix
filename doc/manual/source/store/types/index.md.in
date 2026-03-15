@@ -26,6 +26,8 @@ tells Nix to access the store on a remote machine via the SSH
 protocol, using `/path/to/my/key` as the SSH private key. The
 supported settings for each store type are documented below.
 
+### `auto` special URL {#auto}
+
 The special store URL `auto` causes Nix to automatically select a
 store as follows:
 
@@ -35,7 +37,7 @@ store as follows:
 * Otherwise, if `/nix/var/nix/daemon-socket/socket` exists, [connect
   to the Nix daemon listening on that socket](./local-daemon-store.md).
 
-* Otherwise, on Linux only, use the [local chroot store](./local-store.md)
+* Otherwise, on Linux only, use the [local chroot store](./local-store.md#chroot)
   `~/.local/share/nix/root`, which will be created automatically if it
   does not exist.
 

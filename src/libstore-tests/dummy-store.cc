@@ -55,6 +55,14 @@ TEST(DummyStore, storeDir_empty_rejected)
     EXPECT_THROW((DummyStoreConfig{{{"store", ""}}}), UsageError);
 }
 
+TEST(DummyStore, getStateDir_default)
+{
+    // DummyStore uses the base StoreConfig::getStateDir which returns
+    // the global settings.nixStateDir
+    DummyStoreConfig config{{}};
+    EXPECT_EQ(config.getStateDir(), settings.nixStateDir);
+}
+
 TEST(DummyStore, realisation_read)
 {
     initLibStore(/*loadConfig=*/false);

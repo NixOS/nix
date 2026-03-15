@@ -8,16 +8,6 @@
 
 namespace nix {
 
-std::filesystem::path LocalFSStoreConfig::getDefaultStateDir()
-{
-    return settings.nixStateDir;
-}
-
-std::filesystem::path LocalFSStoreConfig::getDefaultLogDir()
-{
-    return settings.getLogFileSettings().nixLogDir;
-}
-
 LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, const Params & params)
     : StoreConfig(params, FilePathType::Native)
     /* Default `?root` from `rootDir` if non set
