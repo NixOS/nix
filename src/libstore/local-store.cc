@@ -12,6 +12,8 @@
 #include "nix/util/finally.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
@@ -34,6 +36,7 @@
 
 #ifndef _WIN32
 #  include <grp.h>
+#  include <sys/resource.h>
 #endif
 
 #ifdef __linux__
@@ -1016,10 +1019,13 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
-void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+std::optional<PathLocks>
+LocalStore::importPathToDisk(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
+
+    std::optional<PathLocks> result;
 
     {
         /* In case we are not interested in reading the NAR: discard it. */
@@ -1124,15 +1130,170 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     syncParent(realPath);
                 }
 
-                registerValidPath(info);
+                result.emplace(std::move(outputLock));
+            } else {
+                /* Path became valid after we took the lock — release it. */
+                outputLock.setDeletion(true);
             }
-
-            outputLock.setDeletion(true);
         }
     }
 
     // In case `cleanup` ignored an `Interrupted` exception
     checkInterrupt();
+
+    return result;
+}
+
+void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    auto lock = importPathToDisk(info, source, repair, checkSigs);
+    if (lock) {
+        registerValidPath(info);
+        lock->setDeletion(true);
+    }
+}
+
+void LocalStore::addMultipleToStore(
+    PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    /* Process paths in chunks so peak FD count (one .lock held per
+       path in the current chunk) stays bounded regardless of closure
+       size. pathsToCopy arrives topo-sorted (dependencies first) per
+       the addMultipleToStore contract, so consecutive slices respect
+       dependencies: in-batch refs of a chunk-N path are always in
+       chunk N or earlier. */
+    size_t chunkSize = 16;
+#ifndef _WIN32
+    struct rlimit limit;
+    if (getrlimit(RLIMIT_NOFILE, &limit) == 0 && limit.rlim_cur != RLIM_INFINITY)
+        chunkSize = std::max<size_t>(16, (size_t) limit.rlim_cur / 2);
+#endif
+    if (auto s = getEnv("_NIX_TEST_CHUNK_SIZE"))
+        chunkSize = std::max<size_t>(1, string2Int<size_t>(*s).value_or(chunkSize));
+
+    std::atomic<size_t> nrDone{0};
+    std::atomic<size_t> nrFailed{0};
+    std::atomic<uint64_t> nrRunning{0};
+
+    uint64_t bytesExpected = 0;
+    for (auto & [info, _] : pathsToCopy)
+        bytesExpected += info.narSize;
+    act.setExpected(actCopyPath, bytesExpected);
+
+    auto nrTotal = pathsToCopy.size();
+    auto showProgress = [&]() { act.progress(nrDone, nrTotal, nrRunning, nrFailed); };
+
+    StorePathSet inBatch;
+    for (auto & [info, _] : pathsToCopy)
+        inBatch.insert(info.path);
+
+    struct WriteResult
+    {
+        PathLocks lock;
+        ValidPathInfo info;
+    };
+
+    struct State
+    {
+        std::vector<std::optional<WriteResult>> results;
+    };
+
+    for (size_t chunkBegin = 0; chunkBegin < pathsToCopy.size(); chunkBegin += chunkSize) {
+        size_t chunkEnd = std::min(chunkBegin + chunkSize, pathsToCopy.size());
+        size_t chunkLen = chunkEnd - chunkBegin;
+
+        Sync<State> state_(State{.results = std::vector<std::optional<WriteResult>>(chunkLen)});
+
+        /* Phase 1: write all paths in this chunk to disk in parallel,
+           no topological gating. Locks are held until registration. */
+        {
+            ThreadPool pool;
+            for (size_t i = chunkBegin; i < chunkEnd; ++i) {
+                pool.enqueue([&, i]() {
+                    checkInterrupt();
+
+                    auto & [info_, source_] = pathsToCopy[i];
+                    auto info = info_;
+                    info.ultimate = false;
+
+                    /* Ensure the Source is destroyed when we're done —
+                       see comment in Store::addMultipleToStore. */
+                    auto source = std::move(source_);
+
+                    if (isValidPath(info.path)) {
+                        nrDone++;
+                        showProgress();
+                        return;
+                    }
+
+                    MaintainCount<decltype(nrRunning)> mc(nrRunning);
+                    showProgress();
+
+                    try {
+                        auto lock = importPathToDisk(info, *source, repair, checkSigs);
+                        if (lock) {
+                            auto state(state_.lock());
+                            state->results[i - chunkBegin].emplace(WriteResult{std::move(*lock), std::move(info)});
+                        }
+                    } catch (Error & e) {
+                        nrFailed++;
+                        if (!settings.getWorkerSettings().keepGoing)
+                            throw;
+                        printMsg(lvlError, "could not copy %s: %s", printStorePath(info.path), e.what());
+                        showProgress();
+                        return;
+                    }
+
+                    nrDone++;
+                    showProgress();
+                });
+            }
+            pool.process();
+        }
+
+        auto state(state_.lock());
+
+        /* Phase 2: compute the topologically-closed registrable subset
+           for this chunk. A ref blocks registration iff it's in the
+           batch AND not already valid (covers "prior chunk registered
+           it") AND not about to be registered by this chunk. */
+        StorePathSet registrable;
+        for (auto & r : state->results) {
+            if (!r)
+                continue;
+            bool ok = true;
+            for (auto & ref : r->info.references) {
+                if (ref == r->info.path)
+                    continue;
+                if (inBatch.count(ref) && !registrable.count(ref) && !isValidPath(ref)) {
+                    ok = false;
+                    break;
+                }
+            }
+            if (ok)
+                registrable.insert(r->info.path);
+        }
+
+        /* Phase 3: register this chunk in a single SQLite transaction. */
+        ValidPathInfos infos;
+        for (auto & r : state->results)
+            if (r && registrable.count(r->info.path))
+                infos.insert_or_assign(r->info.path, r->info);
+
+        if (!infos.empty())
+            registerValidPaths(infos);
+
+        /* Phase 4: release locks, report skipped paths. */
+        for (auto & r : state->results)
+            if (r) {
+                r->lock.setDeletion(true);
+                if (!registrable.count(r->info.path))
+                    printMsg(
+                        lvlError,
+                        "could not register %s: one or more references failed to copy",
+                        printStorePath(r->info.path));
+            }
+    }
 }
 
 StorePath LocalStore::addToStoreFromDump(
