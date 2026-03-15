@@ -1082,6 +1082,46 @@ std::map<StorePath, StorePath> copyPaths(
 
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
+    /* Query path info for all missing paths in parallel. For HTTP binary
+       cache stores the async callback API multiplexes over a single
+       HTTP/2 connection; for other store types it still issues queries
+       concurrently and blocks only on the slowest one rather than on
+       the sum. This also pre-warms the pathInfoCache so that
+       topoSortPaths() and the per-path loop below become cache hits. */
+    if (!missing.empty()) {
+        struct State
+        {
+            size_t left;
+            std::exception_ptr exc;
+        };
+
+        Sync<State> state_(State{missing.size(), nullptr});
+        std::condition_variable wakeup;
+
+        for (auto & path : missing) {
+            srcStore.queryPathInfo(path, {[&state_, &wakeup](std::future<ref<const ValidPathInfo>> fut) {
+                                       std::exception_ptr exc;
+                                       try {
+                                           (void) fut.get();
+                                       } catch (...) {
+                                           exc = std::current_exception();
+                                       }
+                                       auto state(state_.lock());
+                                       if (exc && !state->exc)
+                                           state->exc = exc;
+                                       assert(state->left);
+                                       if (!--state->left)
+                                           wakeup.notify_one();
+                                   }});
+        }
+
+        auto state(state_.lock());
+        while (state->left)
+            state.wait(wakeup);
+        if (state->exc)
+            std::rethrow_exception(state->exc);
+    }
+
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
     auto sortedMissing = srcStore.topoSortPaths(missing);
