@@ -5,6 +5,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/get-drvs.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-open.hh"
@@ -316,6 +317,7 @@ struct CmdFlakeCheck : FlakeCommand
 {
     bool build = true;
     bool checkAllSystems = false;
+    bool printOutputPaths = false;
 
     CmdFlakeCheck()
     {
@@ -328,6 +330,11 @@ struct CmdFlakeCheck : FlakeCommand
             .longName = "all-systems",
             .description = "Check the outputs for all systems.",
             .handler = {&checkAllSystems, true},
+        });
+        addFlag({
+            .longName = "print-out-paths",
+            .description = "Print the resulting output paths",
+            .handler = {&printOutputPaths, true},
         });
     }
 
@@ -785,6 +792,7 @@ struct CmdFlakeCheck : FlakeCommand
             });
         }
 
+        std::vector<KeyedBuildResult> results;
         if (build && !attrPathsByDrv.empty()) {
             auto keys = std::views::keys(attrPathsByDrv);
             std::vector<DerivedPath> drvPaths(keys.begin(), keys.end());
@@ -811,7 +819,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            auto results = store->buildPathsWithResults(toBuild);
+            results = store->buildPathsWithResults(printOutputPaths ? drvPaths : toBuild);
 
             // Report build failures with attribute paths
             for (auto & result : results) {
@@ -845,6 +853,22 @@ struct CmdFlakeCheck : FlakeCommand
                 "Use '--all-systems' to check all.",
                 concatStringsSep(", ", omittedSystems));
         };
+
+        if (printOutputPaths) {
+            for (auto & result : results) {
+                auto & success = std::get<nix::BuildResult::Success>(result.inner);
+                std::visit(
+                    overloaded{
+                        [&](const DerivedPath::Opaque & bo) { logger->cout(store->printStorePath(bo.path)); },
+                        [&](const DerivedPath::Built & bfd) {
+                            for (auto & output : success.builtOutputs) {
+                                logger->cout(store->printStorePath(output.second.outPath));
+                            }
+                        },
+                    },
+                    result.path.raw());
+            }
+        }
     };
 };
 

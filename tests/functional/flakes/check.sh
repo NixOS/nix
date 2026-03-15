@@ -156,6 +156,11 @@ cp "${config_nix}" "$flakeDir/"
 
 expectStderr 0 nix flake check "$flakeDir" | grepQuiet 'running 1 flake check'
 
+# Test that `nix flake check --print-out-paths` produces the same out path as `nix build --print-out-paths`
+outPath=$(nix flake check "$flakeDir" --print-out-paths)
+outPathBuild=$(nix build "${flakeDir}#checks.$system.foo" --print-out-paths)
+[[ "$outPath" = "$outPathBuild" ]] || fail "out paths from flake check and build don't match"
+
 cat > "$flakeDir"/flake.nix <<EOF
 {
   outputs = { self }: {
