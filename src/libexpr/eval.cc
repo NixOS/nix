@@ -303,6 +303,7 @@ EvalState::EvalState(
     , srcToStore(make_ref<decltype(srcToStore)::element_type>())
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
+    , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
@@ -1525,12 +1526,12 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
     Value vCur(fun);
 
     auto makeAppChain = [&]() {
-        vRes = vCur;
         for (auto arg : args) {
             auto fun2 = allocValue();
-            *fun2 = vRes;
-            vRes.mkPrimOpApp(fun2, arg);
+            *fun2 = vCur;
+            vCur.mkPrimOpApp(fun2, arg);
         }
+        vRes = vCur;
     };
 
     const Attr * functor;
@@ -3345,18 +3346,20 @@ Expr * EvalState::parse(
     const SourcePath & basePath,
     const std::shared_ptr<StaticEnv> & staticEnv)
 {
-    DocCommentMap tmpDocComments; // Only used when not origin is not a SourcePath
-    DocCommentMap * docComments = &tmpDocComments;
+    auto tmpDocComments = make_ref<DocCommentMap>();
 
-    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
-        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
-        docComments = &it->second;
-    }
-
-    auto result =
-        parseExprFromBuf(text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
+    auto result = parseExprFromBuf(
+        text, length, origin, basePath, mem.exprs, symbols, settings, positions, *tmpDocComments, rootFS);
 
     result->bindVars(*this, staticEnv);
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin))
+        /* A single file might appear multiple times in PosTable if it's
+           parsed by scopedImport. If we are the first then emplace into the map, otherwise
+           copy our positions into the existing map. */
+        positionToDocComment->emplace_or_visit(*sourcePath, tmpDocComments, [&tmpDocComments](auto & kv) {
+            kv.second->insert(tmpDocComments->begin(), tmpDocComments->end());
+        });
 
     return result;
 }
@@ -3368,19 +3371,21 @@ ExprAttrs * EvalState::parseReplBindings(
     const SourcePath & basePath,
     const std::shared_ptr<StaticEnv> & staticEnv)
 {
-    DocCommentMap tmpDocComments;
-    DocCommentMap * docComments = &tmpDocComments;
-
-    if (auto sourcePath = std::get_if<SourcePath>(&origin)) {
-        auto [it, _] = positionToDocComment.try_emplace(*sourcePath);
-        docComments = &it->second;
-    }
+    auto tmpDocComments = make_ref<DocCommentMap>();
 
     auto bindings = parseReplBindingsFromBuf(
-        text, length, origin, basePath, mem.exprs, symbols, settings, positions, *docComments, rootFS);
+        text, length, origin, basePath, mem.exprs, symbols, settings, positions, *tmpDocComments, rootFS);
     assert(bindings);
 
     bindings->bindVars(*this, staticEnv);
+
+    if (auto sourcePath = std::get_if<SourcePath>(&origin))
+        /* A single file might appear multiple times in PosTable if it's
+           parsed by scopedImport. If we are the first then emplace into the map, otherwise
+           copy our positions into the existing map. */
+        positionToDocComment->emplace_or_visit(*sourcePath, tmpDocComments, [&tmpDocComments](auto & kv) {
+            kv.second->insert(tmpDocComments->begin(), tmpDocComments->end());
+        });
 
     return bindings;
 }
@@ -3392,14 +3397,12 @@ DocComment EvalState::getDocCommentForPos(PosIdx pos)
     if (!path)
         return {};
 
-    auto table = positionToDocComment.find(*path);
-    if (table == positionToDocComment.end())
-        return {};
-
-    auto it = table->second.find(pos);
-    if (it == table->second.end())
-        return {};
-    return it->second;
+    DocComment result;
+    positionToDocComment->visit(*path, [&](const auto & kv) {
+        if (auto it = kv.second->find(pos); it != kv.second->end())
+            result = it->second;
+    });
+    return result;
 }
 
 std::string ExternalValueBase::coerceToString(
