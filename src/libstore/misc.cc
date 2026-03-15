@@ -4,6 +4,7 @@
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/nar-info.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/topo-sort.hh"
@@ -84,6 +85,86 @@ const ContentAddress * getDerivationCA(const BasicDerivation & drv)
         return &dof->ca;
     }
     return nullptr;
+}
+
+static asio::awaitable<void>
+querySubstitutablePathInfosAsync(Store & store, const StorePathCAMap & paths, SubstitutablePathInfos & infos)
+{
+    if (!settings.getWorkerSettings().useSubstitutes)
+        co_return;
+
+    co_await forEachAsync(paths, [&store, &infos](auto path) -> asio::awaitable<void> {
+        std::optional<Error> lastStoresException = std::nullopt;
+        for (auto & sub : getDefaultSubstituters()) {
+            if (lastStoresException.has_value()) {
+                logError(lastStoresException->info());
+                lastStoresException.reset();
+            }
+
+            auto subPath(path.first);
+
+            // Recompute store path so that we can use a different store root.
+            if (path.second) {
+                subPath = store.makeFixedOutputPathFromCA(
+                    path.first.name(), ContentAddressWithReferences::withoutRefs(*path.second));
+                if (sub->storeDir == store.storeDir)
+                    assert(subPath == path.first);
+                if (subPath != path.first)
+                    debug(
+                        "replaced path '%s' with '%s' for substituter '%s'",
+                        store.printStorePath(path.first),
+                        sub->printStorePath(subPath),
+                        sub->config.getHumanReadableURI());
+            } else if (sub->storeDir != store.storeDir)
+                continue;
+
+            debug(
+                "checking substituter '%s' for path '%s'",
+                sub->config.getHumanReadableURI(),
+                sub->printStorePath(subPath));
+            try {
+                auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                    [subPath, &sub](Callback<ref<const ValidPathInfo>> cb) {
+                        sub->queryPathInfo(subPath, std::move(cb));
+                    });
+
+                if (sub->storeDir != store.storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
+                    continue;
+
+                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(std::shared_ptr<const ValidPathInfo>(info));
+                infos.insert_or_assign(
+                    path.first,
+                    SubstitutablePathInfo{
+                        .deriver = info->deriver,
+                        .references = info->references,
+                        .downloadSize = narInfo ? narInfo->fileSize : 0,
+                        .narSize = info->narSize,
+                    });
+
+                break; /* We are done. */
+            } catch (InvalidPath &) {
+            } catch (SubstituterDisabled &) {
+            } catch (Error & e) {
+                lastStoresException = std::make_optional(std::move(e));
+            }
+        }
+        if (lastStoresException.has_value()) {
+            if (!settings.getWorkerSettings().tryFallback) {
+                throw *lastStoresException;
+            } else
+                logError(lastStoresException->info());
+        }
+    });
+}
+
+void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
+{
+    asio::io_context ctx;
+    std::exception_ptr ex;
+    asio::co_spawn(ctx, querySubstitutablePathInfosAsync(*this, paths, infos), [&](std::exception_ptr e) { ex = e; });
+    ctx.run();
+    if (ex)
+        std::rethrow_exception(ex);
 }
 
 MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
