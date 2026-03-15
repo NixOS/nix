@@ -332,6 +332,25 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme);
  * them by removing the `:` and assuming a scheme of `ssh://`. Also
  * drops `git+` from the scheme (e.g. `git+https://` to `https://`)
  * and changes absolute paths into `file://` URLs.
+ *
+ * @see https://git-scm.com/docs/git-clone#_git_urls
+ *
+ * ssh://[<user>@]<host>[:<port>]/<path-to-git-repo>
+ * git://<host>[:<port>]/<path-to-git-repo>
+ * http[s]://<host>[:<port>]/<path-to-git-repo>
+ * ftp[s]://<host>[:<port>]/<path-to-git-repo>
+ *
+ * An alternative scp-like syntax may also be used with the ssh protocol:
+ * [<user>@]<host>:/<path-to-git-repo>
+ * This syntax is only recognized if there are no slashes before the first colon.
+ *
+ * For local repositories, also supported by Git natively, the following syntaxes may be used:
+ * /path/to/repo.git/
+ * file:///path/to/repo.git/
+ *
+ * @note file:/path/to/repo is recognised by libfetchers, but not git so this functions accepts
+ * it too. Technically this conflicts with the SCP-like syntax where file is the hostname, but
+ * it's special-cased.
  */
 ParsedURL fixGitURL(std::string url);
 

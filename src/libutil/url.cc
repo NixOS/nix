@@ -8,6 +8,8 @@
 
 #include <boost/url.hpp>
 
+#include <unordered_set>
+
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
@@ -401,41 +403,302 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
     };
 }
 
+/**
+ * If is SCP style, return the parsed URL.
+ *
+ * This syntax is only recognized if there are no slashes before the
+ * first colon, and no double slash immediately after the colon (://).
+ *
+ * When Git encounters a URL of the form <transport>://<address>, where
+ * <transport> is a protocol that it cannot handle natively, it
+ * automatically invokes git remote-<transport> with the full URL as the
+ * second argument. https://git-scm.com/docs/gitremote-helpers. If the
+ * url doesn't look like it would be accepted by the remote helper,
+ * treat it as a SCP-style one. Don't do any pct-decoding in that case.
+ * Schemes supported by git are excluded.
+ *
+ * Use
+ *
+ * ```bash GIT_TRACE=1 git ls-remote "$URL" ```
+ *
+ * to manual test this, e.g. with out unit test URLs that should cover
+ * all code paths.
+ *
+ * @note This function is called in one spot, where we've already
+ * deduced that `url` is not valid as an absolute path on the current
+ * OS.
+ */
+static std::optional<ParsedURL> tryParseScpStyle(std::string_view url)
+{
+    /* The funny functional structure indicates how this happens in two
+       parts.
+
+       The first part decides whether we have a SCP-style pseudo-URL or not ---
+       any throwing errors rather than returning std::nullopt is just a chance
+       to improve error messages and should not change the meaning (i.e. regular
+       `parseURL` would have thrown in that case).
+
+       The second part, if we have committed to parsing as SCP-style, finishes
+       the job without any bailing out --- either we throw and error, or we
+       finish parsing. */
+
+    auto opt = [&]() -> std::optional<std::pair<std::string_view, std::string_view>> {
+        /* If the URL contains `://`, it's not SCP-style. This matches git's
+           `parse_connect_url()` which checks for `://` first. Note: this
+           doesn't catch all valid URLs per RFC 3986 (e.g. `scheme:path` without
+           authority is valid), but SCP URLs do "steal syntax" from that. */
+        if (url.find("://") != url.npos)
+            return std::nullopt;
+
+        /* SCP-style requires a `:` separator (`host:path`). If there
+           is no `:` at all, or if a `/` appears before the first `:`, then this
+           is a local path, not SCP. This matches git's `url_is_local_not_ssh()`
+           in `connect.c` [1].
+
+           The caller (`fixGitURL`) already handles some absolute paths via
+           `is_absolute()`, `foo/bar:baz` is not an absolute path, so the
+           `/`-before-`:` check is still needed for all platforms.
+
+           (Also note that on windows Windows `/foo/bar:baz` is also not
+           absolute (root-relative without a drive letter), so this
+           check is *especially* needed there, as more strings will
+           reach this point in the control flow.)
+
+           [1]: https://github.com/git/git/blob/68cb7f9e92a5d8e9824f5b52ac3d0a9d8f653dbe/connect.c#L966-L970 */
+        auto firstColon = url.find(':');
+        if (firstColon == url.npos)
+            return std::nullopt;
+        auto schemeOrHost = url.substr(0, firstColon);
+        if (schemeOrHost.find('/') != schemeOrHost.npos)
+            return std::nullopt;
+
+        /* Intentionally diverging from Git's algorithm in this next bit!
+
+           Purely to improve diagnostics for cases like
+           `git+https:/host/owner/repo` when users forget to specify an
+           authority (`://)`. Otherwise we'd recognize it as an SCP-like URL
+           (as we rightfully should).
+
+           HACK: Also include `file` / `git+file` in this set. SCP
+           syntax overlaps with `file:/path/to/repo`. Git itself doesn't
+           recognize it (or rather treats `file` as the host name), but Nix
+           accepts `file:/path/to/repo` as well as `file:///path/to/repo`.
+         */
+        static const auto schemesSupportedByGit = []() {
+            std::unordered_set<std::string, StringViewHash, std::equal_to<>> res;
+            for (auto scheme : {"ssh", "http", "https", "file", "ftp", "ftps", "git"}) {
+                res.insert(scheme);
+                res.insert(std::string("git+") + scheme);
+            }
+            return res;
+        }();
+        if (schemesSupportedByGit.contains(schemeOrHost))
+            return std::nullopt;
+
+        /* Only enter the IPv6 bracket parsing path when brackets are in the
+           host position. Following git's `host_end()` in `connect.c` [1], first
+           look for `@[` (e.g. `user@[::1]:path`); only if not found, check for
+           a leading `[` (e.g. `[::1]:path`).
+
+           This is, frankly, super janky, but we need to match it exactly (for
+           URLs that will succeed) for compat.
+
+           For an example of this jankiness, this algorithm has
+           `[user]@[::1]:path` parsed with `[::1]` being the host, and `[user]`
+           as the user.
+
+           Brackets elsewhere (e.g. `host[1]:repo`) go through the normal
+           colon-based path instead. This matters because SSH's
+           `valid_hostname()` [2] accepts `[` and `]` — they are not in its
+           reject set (`'` `` ` `` `"$\;&<>|(){},` plus whitespace and control
+           chars) — so such hostnames are legal SSH aliases even though they are
+           not valid DNS names.
+
+           [1]: https://github.com/git/git/blob/68cb7f9e92a5d8e9824f5b52ac3d0a9d8f653dbe/connect.c#L747-L769
+           [2]: https://github.com/openssh/openssh-portable/blob/master/ssh.c */
+
+        // We become an index != url.npos if found
+        size_t bracketStart = url.npos;
+        if (auto atBracketPos = url.find("@["); atBracketPos != url.npos)
+            bracketStart = atBracketPos + 1;
+        else if (url.starts_with('['))
+            bracketStart = 0;
+
+        if (bracketStart != url.npos) {
+            assert(url[bracketStart] == '[');
+            auto closeBracket = url.find(']', bracketStart + 1);
+            if (closeBracket == url.npos) {
+                /* No `]` at all — fall through to colon-based path.
+                   Git's `host_end()` also falls back to `end = host`
+                   in this case. */
+            } else {
+                /* Found `]`. Expect `:` immediately after for SCP-style. */
+                if (closeBracket + 1 < url.size() && url[closeBracket + 1] == ':') {
+                    schemeOrHost = url.substr(0, closeBracket + 1);
+                } else if (url.find(':', closeBracket + 1) != url.npos) {
+                    /* `:` exists after `]` but not immediately — git's
+                       `strchr(end, ':')` would find it, silently discarding
+                       characters between `]` and `:` (e.g.
+                       `user@[::1]foo:path` → host `::1`, `foo` is lost).
+                       This is a git bug; bail out of SCP parsing. */
+                    debug(
+                        "not treating '%s' as SCP-style: `:` after `]` is not immediate (git would silently discard characters in between)",
+                        url);
+                    return std::nullopt;
+                } else {
+                    /* No `:` after `]` at all — not SCP-style.
+                       Git intentionally rejects this ("no path specified"). */
+                    return std::nullopt;
+                }
+            }
+        }
+
+        /* schemeOrHost is a prefix of url in memory in both code paths. That it
+           is in memory makes this check cheaper (don't have to check for
+           character equality), but the next step just relies on it being a
+           semantic prefix. */
+        assert(schemeOrHost.data() == url.data());
+        auto possiblyPathView = url.substr(schemeOrHost.size());
+
+        assert(possiblyPathView.starts_with(':'));
+        /* Trim the colon. */
+        possiblyPathView.remove_prefix(1);
+
+        return std::pair{schemeOrHost, possiblyPathView};
+    }();
+
+    return opt.transform([&](std::pair<std::string_view, std::string_view> pair) -> ParsedURL {
+        auto [host, pathView] = pair;
+        ParsedURL::Authority authority;
+
+        /* Handle userinfo. SCP-like case thankfully can't provide a
+           password in the userinfo component. */
+        auto username = splitPrefixTo(host, '@');
+
+        auto maybeIPv6 = [](std::string_view host) -> std::optional<ParsedURL::Authority> {
+            if (host.starts_with('[') && host.ends_with(']')) {
+                host.remove_prefix(1);
+                host.remove_suffix(1);
+                auto ipv6 = boost::urls::parse_ipv6_address(host);
+                if (!ipv6)
+                    throw BadURL("Git SCP bracketed URL is not valid: '%s' is not a valid IPv6 address", host);
+                return ParsedURL::Authority{
+                    .hostType = ParsedURL::Authority::HostType::IPv6,
+                    .host = ipv6->to_string(),
+                };
+            }
+            return std::nullopt;
+        };
+
+        if (auto ipv4 = boost::urls::parse_ipv4_address(host)) {
+            authority = ParsedURL::Authority{
+                .hostType = ParsedURL::Authority::HostType::IPv4,
+                .host = ipv4->to_string(),
+            };
+        } else if (auto ipv6Authority = maybeIPv6(host)) {
+            authority = *ipv6Authority;
+        } else {
+            authority = ParsedURL::Authority{
+                .hostType = ParsedURL::Authority::HostType::Name,
+                .host = std::string(host),
+            };
+        }
+
+        authority.user = username;
+
+        if (pathView.empty())
+            throw BadURL("SCP-style Git URL '%s' has an empty path", url);
+
+        ParsedURL res = {
+            .scheme = "ssh",
+            .authority = std::move(authority),
+            /* Everything else is the path. */
+            .path = splitString<std::vector<std::string>>(pathView, "/"),
+        };
+
+        /* Force path to be absolute.
+
+           SCP-style relative paths (e.g.
+           `host:repo`) cannot be faithfully represented as ssh:// URLs,
+           since the path component of a URL is always absolute. Git
+           sends relative paths as-is (resolved from the remote user's
+           home directory), but `ssh://host/repo` sends `/repo`
+           (absolute). This works with forges like GitHub that ignore
+           the leading `/`, but would break on a real SSH server.
+
+           Paths starting with `~` are also fine: git strips the `/` before
+           `~` at the transport layer (see git's `connect.c`).
+
+           FIXME: Turn warning into hard error, or talk to upstream git about
+           some way to make this possible to represent.
+         */
+        if (auto & path = res.path; !path.empty() && !path.front().empty()) {
+            /* Make the path absolute for the ssh:// URL. */
+            path.insert(path.begin(), "");
+
+            if (!path[1].starts_with("~")) {
+                auto scpAbsolute = host + ":/" + std::string(pathView);
+                auto scpTilde = host + ":~/" + std::string(pathView);
+                auto sshAbsolute = res.to_string();
+                /* Construct the ssh:// tilde equivalent. Git strips
+                   the `/` before `~` at the transport layer (see
+                   connect.c), so ssh://host/~/path works. */
+                auto sshTildeUrl = res;
+                sshTildeUrl.path.insert(sshTildeUrl.path.begin() + 1, "~");
+                warn(
+                    "SCP-style URL '%s' has a relative path which cannot be faithfully converted to an SSH URL: "
+                    "we will convert it to an absolute path when making an SSH URL.\n\n"
+                    "Use an explicit absolute path:\n\n"
+                    "    %s\n\n"
+                    "or with an explicit SSH URL:\n\n"
+                    "    %s\n\n"
+                    "instead, to explicitly use an absolute path (and silence this warning). "
+                    "Or, to be relative to the remote user's home directory:\n\n"
+                    "    %s\n\n"
+                    "or with an explicit SSH URL:\n\n"
+                    "    %s",
+                    url,
+                    scpAbsolute,
+                    sshAbsolute,
+                    scpTilde,
+                    sshTildeUrl.to_string());
+            }
+        }
+
+        return res;
+    });
+}
+
 ParsedURL fixGitURL(std::string url)
 {
-    std::regex scpRegex("([^/]*)@(.*):(.*)");
-    if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
-        url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
-    if (!hasPrefix(url, "file:") && !hasPrefix(url, "git+file:") && url.find("://") == std::string::npos) {
-        auto path = splitString<std::vector<std::string>>(url, "/");
-#ifdef _WIN32
-        // Windows drive letters (e.g., "C:") look like SCP hosts but are local paths
-        bool hasDriveLetter = !path.empty() && path[0].size() == 2
-                              && std::isalpha(static_cast<unsigned char>(path[0][0])) && path[0][1] == ':';
-#else
-        constexpr bool hasDriveLetter = false;
-#endif
-        // Reject SCP-like URLs without user (e.g., "github.com:path") - colon in first component
-        if (!path.empty() && path[0].find(':') != std::string::npos && !hasDriveLetter)
-            throw BadURL("SCP-like URL '%s' is not supported; use SSH URL syntax instead (ssh://...)", url);
-        // Absolute paths get an empty authority (file:///path), relative paths get none (file:path)
-        if (hasPrefix(url, "/") || hasDriveLetter)
-            return ParsedURL{
-                .scheme = "file",
-                .authority = ParsedURL::Authority{},
-                .path = hasDriveLetter ? pathToUrlPath(std::filesystem::path(url)) : path,
-            };
-        else
-            return ParsedURL{
-                .scheme = "file",
-                .path = path,
-            };
+    /* First handle the absolute path case. TODO: Windows file:// URLs are tricky. See RFC8089.
+       Needs a forward slash before the drive letter: file:///C:/
+       > Instead, such a reference ought to be constructed with a
+       > leading slash "/" character (e.g., "/c:/foo.txt").
+       Git is non-compliant here and doesn't handle the necessary triple slash it seems.
+       https://github.com/git/git/blob/68cb7f9e92a5d8e9824f5b52ac3d0a9d8f653dbe/connect.c#L1122-L1123 */
+    if (std::filesystem::path path = url; path.is_absolute()) {
+        /* Note that we don't do any percent decoding here, as we shouldn't since the input is not a URL but a local
+         * path. Any pct-encoded sequences get treated as literals. Should probably use
+         * std::filesystem::path::generic_string here for normalization, but that would be a slight behaviour change. */
+        return ParsedURL{
+            .scheme = "file",
+            .authority = ParsedURL::Authority{},
+            .path = pathToUrlPath(path),
+        };
     }
+
+    /* Next, try parsing as an SCP-style URL. */
+    if (auto scpStyle = tryParseScpStyle(url))
+        return *scpStyle;
+
+    /* TODO: What to do about query parameters? Git should pass those to the * http(s) remotes. Ignore for now and
+     * just pass through. Will fail later. */
     auto parsed = parseURL(url);
     // Drop the superfluous "git+" from the scheme.
-    auto scheme = parseUrlScheme(parsed.scheme);
-    if (scheme.application == "git")
+    if (auto scheme = parseUrlScheme(parsed.scheme); scheme.application == "git") {
         parsed.scheme = scheme.transport;
+    }
     return parsed;
 }
 
