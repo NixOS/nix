@@ -541,6 +541,21 @@ struct ParseURLRelativeParam
 class ParseURLRelativeTestSuite : public ::testing::TestWithParam<ParseURLRelativeParam>
 {};
 
+TEST_P(ParseURLRelativeTestSuite, baseRoundTrips)
+{
+    auto & p = GetParam();
+    auto base = parseURL(p.base);
+    EXPECT_EQ(base.to_string(), p.base);
+}
+
+TEST_P(ParseURLRelativeTestSuite, relativeRoundTrips)
+{
+    auto & p = GetParam();
+    auto parsed = parsePossiblyRelativeURL(p.relative);
+    auto str = std::visit([](auto & url) { return url.to_string(); }, parsed);
+    EXPECT_EQ(str, p.relative);
+}
+
 TEST_P(ParseURLRelativeTestSuite, resolve)
 {
     auto & p = GetParam();
