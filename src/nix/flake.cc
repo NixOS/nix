@@ -318,6 +318,7 @@ struct CmdFlakeCheck : FlakeCommand
     bool build = true;
     bool checkAllSystems = false;
     bool printOutputPaths = false;
+    std::filesystem::path outLink;
 
     CmdFlakeCheck()
     {
@@ -335,6 +336,15 @@ struct CmdFlakeCheck : FlakeCommand
             .longName = "print-out-paths",
             .description = "Print the resulting output paths",
             .handler = {&printOutputPaths, true},
+        });
+        addFlag({
+            .longName = "out-link",
+            .shortName = 'o',
+            .description =
+                "Use *path* as prefix for the symlinks to the check results. By default, no out links are created.",
+            .labels = {"path"},
+            .handler = {&outLink},
+            .completer = completePath,
         });
     }
 
@@ -819,7 +829,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            results = store->buildPathsWithResults(printOutputPaths ? drvPaths : toBuild);
+            results = store->buildPathsWithResults((printOutputPaths || outLink != "") ? drvPaths : toBuild);
 
             // Report build failures with attribute paths
             for (auto & result : results) {
@@ -869,6 +879,10 @@ struct CmdFlakeCheck : FlakeCommand
                     result.path.raw());
             }
         }
+
+        if (outLink != "")
+            if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
+                createOutLinks(outLink, results, *store2);
     };
 };
 
