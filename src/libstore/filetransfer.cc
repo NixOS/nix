@@ -5,6 +5,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
@@ -22,7 +23,7 @@
 
 #include <curl/curl.h>
 
-#include <cmath>
+#include <algorithm>
 #include <cstring>
 #include <queue>
 #include <random>
@@ -31,8 +32,31 @@
 
 namespace nix {
 
-const unsigned int RETRY_TIME_MS_DEFAULT = 250;
-const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
+uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng)
+{
+    // Exponential backoff: base * 2^(attempt-1), capped at maxMs.
+    // Overflow check: shifting baseMs left by `shift` would exceed maxMs
+    // iff baseMs > (maxMs >> shift). Guard shift < 32 to avoid UB on uint32_t.
+    uint32_t shift = p.attempt == 0 ? 0 : p.attempt - 1;
+    uint32_t backoff = (shift >= 32 || p.baseMs > (p.maxMs >> shift)) ? p.maxMs : p.baseMs << shift;
+
+    // Retry-After is a hard minimum — the server explicitly asked us to wait
+    // at least this long. maxMs caps the backoff algorithm, not the server's
+    // signal: retrying before the server is ready just burns an attempt.
+    uint32_t floor = p.retryAfterMs.value_or(0);
+
+    if (!p.jitter)
+        return std::max(floor, backoff);
+
+    // Jitter spreads retries over [floor, floor+backoff] so that concurrent
+    // clients receiving the same Retry-After don't all retry simultaneously.
+    // Saturating add: clamp to UINT32_MAX if floor + backoff would overflow.
+    uint32_t ceiling = (backoff > UINT32_MAX - floor) ? UINT32_MAX : floor + backoff;
+    if (ceiling <= floor)
+        return floor;
+
+    return std::uniform_int_distribution<uint32_t>(floor, ceiling)(rng);
+}
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
@@ -140,6 +164,13 @@ struct curlFileTransfer : public FileTransfer
          * Whether the response has a non-trivial (not "identity") Content-Encoding.
          */
         bool hasContentEncoding:1 = false;
+
+        /**
+         * Server-provided minimum retry delay, parsed from the `Retry-After`
+         * response header (delta-seconds form only). Reset on each new status
+         * line so it doesn't leak across redirects or retries.
+         */
+        std::optional<uint32_t> retryAfterMs;
 
         curl_off_t writtenToSink = 0;
 
@@ -309,6 +340,7 @@ struct curlFileTransfer : public FileTransfer
                 statusMsg = trim(match.str(1));
                 acceptRanges = false;
                 hasContentEncoding = false;
+                retryAfterMs = std::nullopt;
                 appendCurrentUrl();
             } else {
 
@@ -347,6 +379,20 @@ struct curlFileTransfer : public FileTransfer
                             result.immutableUrl = match.str(1);
                         else
                             debug("got invalid link header '%s'", value);
+                    }
+
+                    else if (name == "retry-after") {
+                        auto value = trim(line.substr(i + 1));
+                        // RFC 7231 §7.1.3: Retry-After = HTTP-date / delay-seconds.
+                        if (auto seconds = string2Int<uint32_t>(value)) {
+                            retryAfterMs = std::min(*seconds, UINT32_MAX / 1000) * 1000;
+                        } else if (time_t date = curl_getdate(value.c_str(), nullptr); date != -1) {
+                            time_t now = time(nullptr);
+                            time_t delta = date > now ? date - now : 0;
+                            retryAfterMs = (uint32_t) std::min<time_t>(delta, UINT32_MAX / 1000) * 1000;
+                        } else {
+                            debug("ignoring unparseable Retry-After header: '%s'", value);
+                        }
                     }
                 }
             }
@@ -641,8 +687,6 @@ struct curlFileTransfer : public FileTransfer
         {
             auto finishTime = std::chrono::steady_clock::now();
 
-            auto retryTimeMs = request.baseRetryTimeMs;
-
             auto httpStatus = getHTTPStatus();
 
             debug(
@@ -690,10 +734,7 @@ struct curlFileTransfer : public FileTransfer
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
-                } else if (httpStatus == 429) {
-                    // 429 means too many requests, so we retry (with a substantially longer delay)
-                    retryTimeMs = RETRY_TIME_MS_TOO_MANY_REQUESTS;
-                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408) {
+                } else if (httpStatus >= 400 && httpStatus < 500 && httpStatus != 408 && httpStatus != 429) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
                     err = Misc;
@@ -763,45 +804,63 @@ struct curlFileTransfer : public FileTransfer
                                      code,
                                      errbuf);
 
-                /* If this is a transient error, then maybe retry the
-                   download after a while. If we're writing to a
-                   sink, we can only retry if the server supports
-                   ranged requests. */
-                if (err == Transient && attempt < fileTransfer.settings.tries
-                    && (!this->request.dataCallback || writtenToSink == 0 || (acceptRanges && !hasContentEncoding))) {
-                    int ms = retryTimeMs
-                             * std::pow(
-                                 2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                maybeRetry(err, httpStatus, std::move(exc));
+            }
+        }
 
-                    if (writtenToSink) {
-                        warn(
-                            "%s; retrying from offset %d in %d ms (attempt %d/%d)",
-                            exc.message(),
-                            writtenToSink,
-                            ms,
-                            attempt,
-                            fileTransfer.settings.tries);
-                    } else {
-                        warn(
-                            "%s; retrying in %d ms (attempt %d/%d)",
-                            exc.message(),
-                            ms,
-                            attempt,
-                            fileTransfer.settings.tries);
-                    }
+        /* If this is a transient error, then maybe retry the download
+           after a while. If we're writing to a sink, we can only retry
+           if the server supports ranged requests. */
+        void maybeRetry(FileTransfer::Error err, long httpStatus, FileTransferError && exc)
+        {
+            // Resolve effective retry config (request overrides > global settings)
+            auto effAttempts = request.retryAttempts.value_or(fileTransfer.settings.tries);
+            auto effBaseMs = request.retryDelayMs.value_or(fileTransfer.settings.retryDelayMs);
+            auto effRateLimitMs =
+                request.retryDelayRateLimitedMs.value_or(fileTransfer.settings.retryDelayRateLimitedMs);
+            auto effMaxMs = request.retryMaxDelayMs.value_or(fileTransfer.settings.retryMaxDelayMs);
 
-                    errorSink.reset();
-                    embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
-                    try {
-                        fileTransfer.enqueueItem(ref{shared_from_this()});
-                    } catch (const nix::Error & e) {
-                        // If enqueue fails (e.g., during shutdown), fail the transfer properly
-                        // instead of letting the exception propagate, which would leave done=false
-                        // and cause the destructor to attempt a second callback invocation
-                        fail(std::move(exc));
-                    }
-                } else
-                    fail(std::move(exc));
+            // Pick base delay by error class: 429/503 indicate the server is
+            // rate-limiting or overloaded, so use the longer rate-limit delay.
+            uint32_t baseMs = (httpStatus == 429 || httpStatus == 503) ? effRateLimitMs : effBaseMs;
+
+            if (err != Transient || attempt >= effAttempts
+                || (request.dataCallback && writtenToSink != 0 && !(acceptRanges && !hasContentEncoding))) {
+                fail(std::move(exc));
+                return;
+            }
+
+            uint32_t ms = computeRetryDelayMs(
+                {
+                    .attempt = attempt,
+                    .baseMs = baseMs,
+                    .maxMs = effMaxMs,
+                    .retryAfterMs = retryAfterMs,
+                    .jitter = fileTransfer.settings.retryJitter,
+                },
+                fileTransfer.mt19937);
+
+            if (writtenToSink) {
+                warn(
+                    "%s; retrying from offset %d in %d ms (attempt %d/%d)",
+                    exc.message(),
+                    writtenToSink,
+                    ms,
+                    attempt,
+                    effAttempts);
+            } else {
+                warn("%s; retrying in %d ms (attempt %d/%d)", exc.message(), ms, attempt, effAttempts);
+            }
+
+            errorSink.reset();
+            embargo = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+            try {
+                fileTransfer.enqueueItem(ref{shared_from_this()});
+            } catch (const nix::Error & e) {
+                // If enqueue fails (e.g., during shutdown), fail the transfer properly
+                // instead of letting the exception propagate, which would leave done=false
+                // and cause the destructor to attempt a second callback invocation
+                fail(std::move(exc));
             }
         }
     };

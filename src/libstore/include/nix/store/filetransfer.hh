@@ -1,6 +1,9 @@
 #pragma once
 ///@file
 
+#include <optional>
+#include <cstdint>
+#include <random>
 #include <string>
 #include <future>
 
@@ -74,7 +77,57 @@ public:
         )"};
 
     Setting<unsigned int> tries{
-        this, 5, "download-attempts", "The number of times Nix attempts to download a file before giving up."};
+        this,
+        5,
+        "filetransfer-retry-attempts",
+        "The number of times Nix attempts a file transfer (download or upload) before giving up.",
+        {"download-attempts"}};
+
+    Setting<unsigned int> retryDelayMs{
+        this,
+        100,
+        "filetransfer-retry-delay",
+        R"(
+          Initial delay in milliseconds before retrying a failed file transfer
+          (download or upload). The delay doubles with each subsequent attempt
+          (exponential backoff) and is subject to random jitter (see
+          `filetransfer-retry-jitter`).
+        )"};
+
+    Setting<unsigned int> retryDelayRateLimitedMs{
+        this,
+        5000,
+        "filetransfer-retry-delay-rate-limited",
+        R"(
+          Initial delay in milliseconds before retrying a file transfer that
+          failed with a rate-limit response (HTTP 429 or 503). The delay doubles
+          with each subsequent attempt.
+
+          Servers may send a `Retry-After` header specifying a longer delay;
+          when present, Nix respects the larger of the two values.
+        )"};
+
+    Setting<unsigned int> retryMaxDelayMs{
+        this,
+        60000,
+        "filetransfer-retry-max-delay",
+        R"(
+          Cap on the exponential backoff delay in milliseconds. This does not
+          cap server-provided `Retry-After` values, which are honored as-is
+          (retrying before the server says it's ready just wastes an attempt).
+        )"};
+
+    Setting<bool> retryJitter{
+        this,
+        true,
+        "filetransfer-retry-jitter",
+        R"(
+          Whether to apply random jitter to retry delays. When enabled, each
+          retry waits for a random duration between 0 and the computed delay
+          ("full jitter"), which spreads out retry storms from many clients.
+
+          Disable for deterministic retry timing (primarily useful for tests).
+        )"};
 
     Setting<size_t> downloadBufferSize{
         this,
@@ -147,7 +200,36 @@ public:
 
 extern FileTransferSettings fileTransferSettings;
 
-extern const unsigned int RETRY_TIME_MS_DEFAULT;
+/**
+ * Parameters for computeRetryDelayMs.
+ */
+struct RetryDelayParams
+{
+    /** 1-based retry attempt number (1 = first retry). */
+    uint32_t attempt;
+    /** Base delay in ms for this error class. */
+    uint32_t baseMs;
+    /** Cap on the exponential backoff growth (does not cap retryAfterMs). */
+    uint32_t maxMs;
+    /** Server-provided minimum delay (from Retry-After header). */
+    std::optional<uint32_t> retryAfterMs = {};
+    /** Apply full jitter (false = deterministic). */
+    bool jitter = true;
+};
+
+/**
+ * Compute the delay before the next retry attempt.
+ *
+ * Uses exponential backoff with optional full jitter. When a server-provided
+ * Retry-After is present, jitter spreads *above* it so that concurrent
+ * clients don't all retry at the same instant:
+ *     sleep = random(floor, floor + backoff)
+ * where floor = retryAfter (or 0) and backoff = min(maxMs, base * 2^(attempt-1)).
+ * maxMs caps the backoff growth, not the server-provided floor.
+ *
+ * @param rng  random number generator (unused if p.jitter is false)
+ */
+uint32_t computeRetryDelayMs(const RetryDelayParams & p, std::mt19937 & rng);
 
 /**
  * HTTP methods supported by FileTransfer.
@@ -182,9 +264,18 @@ struct FileTransferRequest
     Headers headers;
     std::string expectedETag;
     HttpMethod method = HttpMethod::Get;
-    unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
+
+    /**
+     * Per-request retry overrides. When set, these take precedence over the
+     * global `FileTransferSettings`. Typically populated from a store's URL
+     * parameters (e.g. `s3://bucket?retry-attempts=8`).
+     */
+    std::optional<unsigned int> retryDelayMs;
+    std::optional<unsigned int> retryDelayRateLimitedMs;
+    std::optional<unsigned int> retryMaxDelayMs;
+    std::optional<unsigned int> retryAttempts;
 
     /**
      * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.

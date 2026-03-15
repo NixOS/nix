@@ -46,6 +46,24 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
     Setting<std::optional<AbsolutePath>> tlsKey{
         this, std::nullopt, "tls-private-key", "Path to an optional TLS client certificate private key in PEM format."};
 
+    Setting<unsigned int> retryDelayMs{
+        this, 0, "retry-delay", "Override `filetransfer-retry-delay` for requests to this store (milliseconds)."};
+
+    Setting<unsigned int> retryDelayRateLimitedMs{
+        this,
+        0,
+        "retry-delay-rate-limited",
+        "Override `filetransfer-retry-delay-rate-limited` for requests to this store (milliseconds)."};
+
+    Setting<unsigned int> retryMaxDelayMs{
+        this,
+        0,
+        "retry-max-delay",
+        "Override `filetransfer-retry-max-delay` for requests to this store (milliseconds)."};
+
+    Setting<unsigned int> retryAttempts{
+        this, 0, "retry-attempts", "Override `filetransfer-retry-attempts` for requests to this store."};
+
     static const std::string name()
     {
         return "HTTP Binary Cache Store";
