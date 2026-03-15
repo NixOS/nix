@@ -10,7 +10,9 @@
 
 #include <sqlite3.h>
 
+#include <algorithm>
 #include <atomic>
+#include <random>
 #include <thread>
 
 namespace nix {
@@ -254,6 +256,8 @@ bool SQLiteStmt::Use::isNull(int col)
 SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;
+    // TODO: use "begin immediate" when multiple SQLite connections are used,
+    // to acquire the write lock early and avoid deferred-to-write deadlocks.
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "starting transaction");
     active = true;
@@ -276,19 +280,56 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
+namespace {
+
+// Precondition: attempt >= 1
+constexpr unsigned int clampedExponential(unsigned int base, unsigned int attempt, unsigned int ceil)
+{
+    // Clamp shift to [0, 63] so base << shift is valid for unsigned long long.
+    auto shift = std::min(attempt - 1, 63u);
+    auto unclamped = static_cast<unsigned long long>(base) << shift;
+    return static_cast<unsigned int>(std::min(unclamped, static_cast<unsigned long long>(ceil)));
+}
+
+void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 {
     time_t now = time(nullptr);
-    if (now > nextWarning) {
-        nextWarning = now + 10;
+    if (now > state.nextWarning) {
+        state.nextWarning = now + 10;
         logWarning({.msg = e.info().msg});
     }
+}
 
-    /* Sleep for a while since retrying the transaction right away
-       is likely to fail again. */
+} // anonymous namespace
+
+SQLiteRetryState newSQLiteRetryState()
+{
+    thread_local std::mt19937 rng{std::random_device{}()};
+    return SQLiteRetryState{static_cast<unsigned int>(rng())};
+}
+
+std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config)
+{
+    auto ceiling = clampedExponential(config.baseUs, attempt, config.ceilUs);
+    auto jitterRange = (config.jitterShift >= 32u) ? 0u : (ceiling >> config.jitterShift);
+    auto jitterAmount = static_cast<unsigned int>((static_cast<unsigned long long>(jitterRange) * jitter) >> 32);
+    auto delay = ceiling + jitterAmount;
+    return std::chrono::microseconds{delay};
+}
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
+{
+    ++state.attempt;
+
+    throttledWarning(e, state);
     checkInterrupt();
-    /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 100});
+
+    BackoffConfig config{
+        .baseUs = settings.sqliteRetryBaseUs,
+        .ceilUs = settings.sqliteRetryCeilUs,
+        .jitterShift = settings.sqliteRetryJitterShift,
+    };
+    std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, state.jitter, config));
 }
 
 } // namespace nix
