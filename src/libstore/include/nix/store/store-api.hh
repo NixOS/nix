@@ -925,8 +925,9 @@ public:
     /**
      * Sort a set of paths topologically under the references
      * relation.  If p refers to q, then p precedes q in this list.
+     * Virtual to allow for more efficient implementations in derived classes.
      */
-    StorePaths topoSortPaths(const StorePathSet & paths);
+    virtual StorePaths topoSortPaths(const StorePathSet & paths);
 
     struct Stats
     {

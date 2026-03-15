@@ -86,6 +86,8 @@ public:
 
     void init() override;
 
+    StorePaths topoSortPaths(const StorePathSet & paths) override;
+
 protected:
 
     std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);

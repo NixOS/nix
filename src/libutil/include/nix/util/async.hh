@@ -5,9 +5,12 @@
 #include "nix/util/ref.hh"
 #include "nix/util/signals.hh"
 
+#include <boost/asio/bind_executor.hpp>
+#include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/awaitable.hpp>
+#include <boost/asio/strand.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/associated_cancellation_slot.hpp>
 
@@ -63,6 +66,34 @@ asio::awaitable<T> callbackToAwaitable(F && initiate)
 {
     auto fut = co_await callbackToAwaitable<T>(std::forward<F>(initiate), asio::use_awaitable);
     co_return fut.get();
+}
+
+template<typename Range, typename F>
+asio::awaitable<void> forEachAsync(Range && range, F && f)
+{
+    auto executor = co_await asio::this_coro::executor;
+    auto strand = asio::make_strand(executor); /* Serialise on a single strand. No synchronisation is needed. */
+    auto guard = asio::make_work_guard(executor);
+    std::size_t pending = 0;
+    std::exception_ptr err;
+
+    for (auto && elt : range) {
+        ++pending;
+        asio::co_spawn(strand, f(elt), asio::bind_executor(strand, [&](std::exception_ptr ex) {
+                           /* First exception wins. Other ones get swallowed. */
+                           if (ex && !err)
+                               err = ex;
+                           --pending;
+                       }));
+    }
+
+    while (pending > 0)
+        co_await asio::post(strand, asio::use_awaitable);
+
+    guard.reset();
+
+    if (err)
+        std::rethrow_exception(err);
 }
 
 } // namespace nix
