@@ -36,10 +36,14 @@ const unsigned int RETRY_TIME_MS_TOO_MANY_REQUESTS = 60000;
 
 std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile()
 {
+    /* Windows has no notion of a default location for the certificate bundles.
+       Instead we use CURLSSLOPT_NATIVE_CA by default. */
+#ifndef _WIN32
     for (auto & fn :
          {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
         if (pathAccessible(fn))
             return fn;
+#endif
     return std::nullopt;
 }
 
@@ -560,6 +564,11 @@ struct curlFileTransfer : public FileTransfer
                .string().c_str() are safe. See the comment near CURLOPT_SSLKEY below. */
             if (auto & caFile = fileTransfer.settings.caFile.get())
                 curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
+#ifdef _WIN32
+            /* Use native windows certificate store when the option is not specified explicitly. */
+            else
+                curl_easy_setopt(req, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
+#endif
 
 #if !defined(_WIN32)
             curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
