@@ -91,6 +91,9 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                                 .path = o.path,
                             };
                         },
+                        [&](const NixStringContextElem::SelfOutput &) -> DerivedPath {
+                            throw Error("self-output placeholder in app context is not supported");
+                        },
                     },
                     c.raw));
         }

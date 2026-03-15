@@ -27,6 +27,12 @@ struct Arbitrary<NixStringContextElem::DrvDeep>
 };
 
 template<>
+struct Arbitrary<NixStringContextElem::SelfOutput>
+{
+    static Gen<NixStringContextElem::SelfOutput> arbitrary();
+};
+
+template<>
 struct Arbitrary<NixStringContextElem>
 {
     static Gen<NixStringContextElem> arbitrary();
