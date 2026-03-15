@@ -67,3 +67,6 @@ subproject('nix-functional-tests')
 if get_option('json-schema-checks')
   subproject('json-schema-checks')
 endif
+
+# Static Analysis
+subdir('nix-meson-build-support/common/clang-tidy')
