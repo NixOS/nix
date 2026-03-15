@@ -1,0 +1,290 @@
+# Known static analysis anomalies for the Nix codebase.
+#
+# Each [[anomaly]] entry documents a finding that has been reviewed.
+# Matching uses: tool + check_id + file (exact) + code_anchor (literal
+# substring within ±anchor_window lines of the reported line).
+#
+# Status values:
+#   false-positive  — reviewed, not a real issue (suppressed from reports)
+#   needs-review    — potentially real issue, flagged for maintainer review
+#   confirmed-bug   — verified real bug, tracked until fixed
+#   wont-fix        — real issue but accepted risk (suppressed from reports)
+#
+# Per-anomaly analysis docs: packaging/analysis/anomalies/<id>.md
+
+# ─── False Positives ──────────────────────────────────────────────────
+
+[[anomaly]]
+id = "cppcheck-rethrow-util"
+tool = "cppcheck"
+check_id = "rethrowNoCurrentException"
+file = "src/libutil/util.cc"
+code_anchor = "try {\n        try {\n            throw;"
+status = "false-positive"
+reason = "Legitimate nested rethrow in ignoreExceptionInDestructor() — called from catch blocks"
+remediations = [
+    "Add // cppcheck-suppress rethrowNoCurrentException",
+    "Restructure to use std::current_exception + std::rethrow_exception",
+]
+
+[[anomaly]]
+id = "cppcheck-rethrow-nix-api-util"
+tool = "cppcheck"
+check_id = "rethrowNoCurrentException"
+file = "src/libutil-c/nix_api_util.cc"
+code_anchor = "try {\n        throw;\n    } catch (nix::Error & e)"
+anchor_window = 2
+status = "false-positive"
+reason = "try { throw; } catch pattern in nix_context_error() — called from NIXC_CATCH_ERRS macro"
+remediations = [
+    "Add // cppcheck-suppress rethrowNoCurrentException",
+    "Accept std::exception_ptr parameter instead of bare rethrow",
+]
+
+[[anomaly]]
+id = "cppcheck-accessMoved-finally-ctor"
+tool = "cppcheck"
+check_id = "accessMoved"
+file = "src/libutil/include/nix/util/finally.hh"
+code_anchor = "Finally(Finally && other) noexcept(std::is_nothrow_move_constructible_v<Fn>)"
+status = "false-positive"
+reason = "Correct move constructor — setting movedFrom on source object after move is the whole point"
+remediations = [
+    "Add // cppcheck-suppress accessMoved",
+    "Use std::optional<Fn> instead of movedFrom flag",
+]
+
+[[anomaly]]
+id = "cppcheck-accessMoved-finally-dtor"
+tool = "cppcheck"
+check_id = "accessMoved"
+file = "src/libutil/include/nix/util/finally.hh"
+code_anchor = "if (!movedFrom)\n                fun();"
+status = "false-positive"
+reason = "Destructor guards fun() call with movedFrom check — only called on non-moved objects"
+remediations = [
+    "Add // cppcheck-suppress accessMoved",
+    "Use std::optional<Fn> instead of movedFrom flag",
+]
+
+[[anomaly]]
+id = "cppcheck-preprocessorError-file-system"
+tool = "cppcheck"
+check_id = "preprocessorErrorDirective"
+file = "src/libutil/include/nix/util/file-system.hh"
+code_anchor = '#    error "S_IFLNK should be defined on non-Windows platforms"'
+status = "false-positive"
+reason = "Conditional #error for MinGW polyfill — only triggers on misconfigured non-Windows builds"
+remediations = [
+    "Add // cppcheck-suppress preprocessorErrorDirective",
+    "Wrap in cppcheck-specific #ifndef to hide from analyzer",
+]
+
+[[anomaly]]
+id = "cppcheck-syntaxError-base-nix-32"
+tool = "cppcheck"
+check_id = "syntaxError"
+file = "src/libutil/base-nix-32.cc"
+code_anchor = "constexpr const std::array<unsigned char, 256> BaseNix32::reverseMap = [] {"
+status = "false-positive"
+reason = "C++20 constexpr lambda — cppcheck parser does not support this syntax"
+remediations = [
+    "Add // cppcheck-suppress syntaxError",
+    "Move initialization to a constexpr function instead of inline lambda",
+]
+
+[[anomaly]]
+id = "semgrep-sqlite-exec"
+tool = "semgrep"
+check_id = "nix.store.sqlite-exec-non-literal"
+file = "src/libstore/sqlite.cc"
+code_anchor = "sqlite3_exec(db, stmt.c_str(), 0, 0, 0)"
+status = "false-positive"
+reason = "Internal utility SQLite::exec() — stmt comes from trusted internal callers, not user input"
+remediations = [
+    "Add a nosemgrep comment on the line",
+    "Use prepared statements instead of exec for parameterized queries",
+]
+
+[[anomaly]]
+id = "semgrep-delete-this-eval-error"
+tool = "semgrep"
+check_id = "nix.store.delete-this"
+file = "src/libexpr/eval-error.cc"
+code_anchor = "auto error = std::move(this->error);\n    delete this;"
+status = "false-positive"
+reason = "Intentional RAII cleanup in EvalErrorBuilder::debugThrow() — object is heap-allocated by EvalState"
+remediations = [
+    "Add a nosemgrep comment on the line",
+    "Return std::unique_ptr<EvalErrorBuilder> from factory instead of raw new",
+]
+
+[[anomaly]]
+id = "clang-tidy-forwarding-ref-overload-error"
+tool = "clang-tidy"
+check_id = "bugprone-forwarding-reference-overload"
+file = "src/libutil/include/nix/util/error.hh"
+code_anchor = "SysError(auto && mkHintFmt)\n        requires std::invocable<decltype(mkHintFmt)>"
+status = "false-positive"
+reason = "C++20 requires clause prevents overload hijacking — only matches callables returning HintFmt"
+remediations = [
+    "Add NOLINT comment for clang-tidy",
+    "Use a named factory function instead of a constrained constructor",
+]
+
+[[anomaly]]
+id = "clang-tidy-move-forwarding-ref-diagnose"
+tool = "clang-tidy"
+check_id = "bugprone-move-forwarding-reference"
+file = "src/libexpr/include/nix/expr/diagnose.hh"
+code_anchor = "throw std::move(error)"
+status = "false-positive"
+reason = "Handler always receives rvalue via std::move(*maybeError) — std::move on error is correct"
+remediations = [
+    "Replace std::move(error) with std::forward<decltype(error)>(error)",
+    "Add NOLINT comment for clang-tidy",
+]
+
+# ─── Confirmed Bugs / Needs Review ───────────────────────────────────
+
+[[anomaly]]
+id = "cppcheck-rethrow-nix-api-util-real"
+tool = "cppcheck"
+check_id = "rethrowNoCurrentException"
+file = "src/libutil-c/nix_api_util.cc"
+code_anchor = "if (context == nullptr) {\n        throw;"
+anchor_window = 2
+status = "confirmed-bug"
+reason = "Bare throw; outside any catch block — calls std::terminate() if no active exception"
+remediations = [
+    "Throw a specific exception: throw nix::Error(\"nix_context_error called with null context\")",
+    "Return an error code instead of throwing",
+    "Accept std::exception_ptr and use std::rethrow_exception",
+]
+
+[[anomaly]]
+id = "cppcheck-uninitMemberVar-DrvName"
+tool = "cppcheck"
+check_id = "uninitMemberVar"
+file = "src/libstore/names.cc"
+code_anchor = "DrvName::DrvName()\n{"
+status = "confirmed-bug"
+reason = "Default constructor leaves DrvName::hits uninitialized — reads return garbage"
+remediations = [
+    "Add in-class initializer: unsigned int hits = 0;",
+    "Initialize hits in the default constructor body",
+]
+
+[[anomaly]]
+id = "cppcheck-unsignedLessThanZero-serialise"
+tool = "cppcheck"
+check_id = "unsignedLessThanZero"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "if (this->remain <= 0)"
+status = "confirmed-bug"
+reason = "size_t is unsigned — '<= 0' is equivalent to '== 0', the '< 0' part is dead code"
+remediations = [
+    "Change to 'if (this->remain == 0)' to express intent clearly",
+    "Consider whether remain should be a signed type to detect underflow",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-Command"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/args.hh"
+code_anchor = "virtual ~Command() = default;"
+status = "needs-review"
+reason = "Destructor overrides base class virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~Command() override = default;",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-FdSink"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "~FdSink();"
+status = "needs-review"
+reason = "Destructor overrides BufferedSink virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~FdSink() override;",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-FdSource"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "~FdSource() = default;"
+status = "needs-review"
+reason = "Destructor overrides BufferedSource virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~FdSource() override = default;",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-LambdaSink"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "~LambdaSink()\n    {\n        cleanupFun();"
+status = "needs-review"
+reason = "Destructor overrides Sink virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~LambdaSink() override",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-FramedSource"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "~FramedSource()\n    {"
+status = "needs-review"
+reason = "Destructor overrides Source virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~FramedSource() override",
+]
+
+[[anomaly]]
+id = "cppcheck-missingOverride-FramedSink"
+tool = "cppcheck"
+check_id = "missingOverride"
+file = "src/libutil/include/nix/util/serialise.hh"
+code_anchor = "~FramedSink()\n    {"
+status = "needs-review"
+reason = "Destructor overrides BufferedSink virtual destructor but lacks 'override' specifier"
+remediations = [
+    "Change to: ~FramedSink() override",
+]
+
+[[anomaly]]
+id = "flawfinder-fopen-cgroup"
+tool = "flawfinder"
+check_id = "misc.fopen"
+file = "src/libutil/linux/cgroup.cc"
+code_anchor = 'auto fp = fopen("/proc/mounts", "r");'
+status = "wont-fix"
+reason = "Opening /proc/mounts with fopen — inherent procfs limitation, no TOCTOU mitigation possible"
+remediations = [
+    "Use std::ifstream with RAII for automatic cleanup",
+    "Consider using /proc/self/mounts for process-specific view",
+    "Accept as inherent procfs limitation and document",
+]
+
+# ─── Custom clang-tidy check anomalies ───────────────────────────────
+
+[[anomaly]]
+id = "nix-sqlite-non-literal-sqlite-cc"
+tool = "clang-tidy"
+check_id = "nix-sqlite-non-literal-sql"
+file = "src/libstore/sqlite.cc"
+code_anchor = "sqlite3_exec(db, stmt.c_str(), 0, 0, 0)"
+status = "false-positive"
+reason = "Internal SQLite::exec() wrapper — stmt comes from trusted internal callers, not user input"
+remediations = [
+    "Add NOLINT comment for nix-sqlite-non-literal-sql",
+    "Use prepared statements instead of exec for parameterized queries",
+]

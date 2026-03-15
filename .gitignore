@@ -54,5 +54,8 @@ result-*
 
 flake-regressions
 
+# Static analysis output directories
+analysis-reports/
+
 # direnv
 .direnv/

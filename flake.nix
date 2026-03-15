@@ -482,6 +482,20 @@
                 echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
               '';
         }
+        // (
+          let
+            analysisTargets = import ./packaging/analysis {
+              inherit lib;
+              pkgs = nixpkgsFor.${system}.native;
+              src = self;
+              nixComponents = nixpkgsFor.${system}.native.nixComponents2;
+            };
+          in
+          lib.mapAttrs' (name: value: {
+            name = "analysis-${name}";
+            inherit value;
+          }) analysisTargets
+        )
       );
 
       apps = forAllSystems (

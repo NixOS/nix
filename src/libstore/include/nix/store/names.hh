@@ -14,7 +14,7 @@ struct DrvName
     std::string fullName;
     std::string name;
     std::string version;
-    unsigned int hits;
+    unsigned int hits = 0;
 
     DrvName();
     DrvName(std::string_view s);

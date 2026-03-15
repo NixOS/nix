@@ -28,7 +28,7 @@ void nix_c_context_free(nix_c_context * context)
 nix_err nix_context_error(nix_c_context * context)
 {
     if (context == nullptr) {
-        throw;
+        throw nix::Error("nix_context_error called with null context");
     }
     try {
         throw;

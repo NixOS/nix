@@ -187,7 +187,7 @@ struct FdSink : BufferedSink
         return *this;
     }
 
-    ~FdSink();
+    ~FdSink() override;
 
     void writeUnbuffered(std::string_view data) override;
 
@@ -221,7 +221,7 @@ struct FdSource : BufferedSource, RestartableSource
     FdSource & operator=(FdSource && s) = default;
     FdSource(const FdSource &) = delete;
     FdSource & operator=(const FdSource & s) = delete;
-    ~FdSource() = default;
+    ~FdSource() override = default;
 
     bool good() override;
     void restart() override;
@@ -390,7 +390,7 @@ struct SizedSource : Source
 
     size_t read(char * data, size_t len) override
     {
-        if (this->remain <= 0) {
+        if (this->remain == 0) {
             throw EndOfFile("sized: unexpected end-of-file");
         }
         len = std::min(len, this->remain);
@@ -472,7 +472,7 @@ struct LambdaSink : Sink
     LambdaSink & operator=(LambdaSink &&) = delete;
     LambdaSink & operator=(const LambdaSink &) = delete;
 
-    ~LambdaSink()
+    ~LambdaSink() override
     {
         cleanupFun();
     }
@@ -674,7 +674,7 @@ struct FramedSource : Source
     FramedSource & operator=(FramedSource &&) = delete;
     FramedSource & operator=(const FramedSource &) = delete;
 
-    ~FramedSource()
+    ~FramedSource() override
     {
         try {
             if (!eof) {
@@ -736,7 +736,7 @@ struct FramedSink : nix::BufferedSink
     FramedSink & operator=(FramedSink &&) = delete;
     FramedSink & operator=(const FramedSink &) = delete;
 
-    ~FramedSink()
+    ~FramedSink() override
     {
         try {
             to << 0;
