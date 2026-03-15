@@ -5,6 +5,7 @@
 #include "nix_api_util.h"
 #include "nix_api_store.h"
 
+#include "nix/store/tests/libstore.hh"
 #include "nix/store/tests/nix_api_store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/tests/string_callback.hh"
@@ -293,6 +294,7 @@ struct LambdaAdapter
 class NixApiStoreTestWithRealisedPath : public nix_api_store_test_base
 {
 public:
+    std::optional<nix::EnableExperimentalFeature> enableCA;
     StorePath * drvPath = nullptr;
     nix_derivation * drv = nullptr;
     Store * store = nullptr;
@@ -305,7 +307,7 @@ public:
         GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
 #endif
 
-        nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+        enableCA.emplace("ca-derivations");
         nix::settings.getWorkerSettings().substituters = {};
 
         store = open_local_store();
@@ -363,7 +365,7 @@ TEST_F(nix_api_store_test_base, build_from_json)
     GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
 #endif
     // FIXME get rid of these
-    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
     nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
@@ -413,7 +415,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_invalid_system)
     GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
 #endif
     // Test that nix_store_realise properly reports errors when the system is invalid
-    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
     nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
@@ -461,7 +463,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_fails)
     GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
 #endif
     // Test that nix_store_realise properly reports errors when the builder fails
-    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
     nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
@@ -509,7 +511,7 @@ TEST_F(nix_api_store_test_base, nix_store_realise_builder_no_output)
     GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
 #endif
     // Test that nix_store_realise properly reports errors when builder succeeds but produces no output
-    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
     nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();
@@ -705,7 +707,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     // Test that nix_store_realise returns outputs in alphabetical order by output name.
     // This test uses a CA derivation with 10 outputs in randomized input order
     // to verify that the callback order is deterministic and alphabetical.
-    nix::experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
     nix::settings.getWorkerSettings().substituters = {};
 
     auto * store = open_local_store();

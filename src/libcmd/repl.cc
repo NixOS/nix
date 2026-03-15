@@ -17,6 +17,7 @@
 #include "nix/cmd/get-build-log.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/lockfile.hh"
@@ -535,7 +536,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             });
             auto drv = state->store->readDerivation(drvPath);
             logger->cout("\nThis derivation produced the following outputs:");
-            for (auto & [outputName, outputPath] : state->store->queryDerivationOutputMap(drvPath)) {
+            for (auto & [outputName, outputPath] : deepQueryDerivationOutputMap(*state->store, drvPath)) {
                 auto localStore = state->store.dynamic_pointer_cast<LocalFSStore>();
                 if (localStore && command == ":bl") {
                     std::string symlink = "repl-result-" + outputName;
