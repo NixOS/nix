@@ -345,6 +345,19 @@ void Worker::run(const Goals & _topGoals)
 
         checkInterrupt();
 
+        asyncPostBuildHooks.erase(
+            std::remove_if(
+                asyncPostBuildHooks.begin(),
+                asyncPostBuildHooks.end(),
+                [](auto & state) {
+                    if (state->ready) {
+                        state->complete();
+                        return true;
+                    }
+                    return false;
+                }),
+            asyncPostBuildHooks.end());
+
         // TODO GC interface?
         if (auto localStore = dynamic_cast<LocalStore *>(&store))
             localStore->autoGC(false);
@@ -387,6 +400,12 @@ void Worker::run(const Goals & _topGoals)
         } else
             assert(!awake.empty());
     }
+
+    /* Complete any remaining hooks */
+    for (auto & state : asyncPostBuildHooks) {
+        state->complete();
+    }
+    asyncPostBuildHooks.clear();
 
     /* If --keep-going is not set, it's possible that the main goal
        exited while some of its subgoals were still active.  But if

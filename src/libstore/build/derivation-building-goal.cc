@@ -15,6 +15,7 @@
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
 
 #include <algorithm>
 #include <fstream>
@@ -69,6 +70,13 @@ static void runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
+
+static Pid runAsyncPostBuildHook(
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Pipe & out,
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
 
@@ -761,6 +769,14 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     StorePathSet outputPaths;
     for (auto & [_, output] : builtOutputs)
         outputPaths.insert(output.outPath);
+
+    if (worker.settings.asyncPostBuildHook != "") {
+        auto info = std::make_unique<AsyncPostBuildHookState>(
+            *logger, worker.settings.asyncPostBuildHook.get(), worker.store.printStorePath(drvPath));
+        info->pid = runAsyncPostBuildHook(worker.settings, worker.store, *info->out, drvPath, outputPaths);
+        worker.asyncPostBuildHooks.push_back(std::move(info));
+    }
+
     runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
     /* It is now safe to delete the lock files, since all future
@@ -991,6 +1007,14 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
+
+        if (worker.settings.asyncPostBuildHook != "") {
+            auto info = std::make_unique<AsyncPostBuildHookState>(
+                *logger, worker.settings.asyncPostBuildHook.get(), worker.store.printStorePath(drvPath));
+            info->pid = runAsyncPostBuildHook(worker.settings, worker.store, *info->out, drvPath, outputPaths);
+            worker.asyncPostBuildHooks.push_back(std::move(info));
+        }
+
         runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
         /* It is now safe to delete the lock files, since all future
@@ -1029,42 +1053,6 @@ static void runPostBuildHook(
         OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
-    struct LogSink : Sink
-    {
-        Activity & act;
-        std::string currentLine;
-
-        LogSink(Activity & act)
-            : act(act)
-        {
-        }
-
-        void operator()(std::string_view data) override
-        {
-            for (auto c : data) {
-                if (c == '\n') {
-                    flushLine();
-                } else {
-                    currentLine += c;
-                }
-            }
-        }
-
-        void flushLine()
-        {
-            act.result(resPostBuildLogLine, currentLine);
-            currentLine.clear();
-        }
-
-        ~LogSink()
-        {
-            if (currentLine != "") {
-                currentLine += '\n';
-                flushLine();
-            }
-        }
-    };
-
     LogSink sink(act);
 
     runProgram2({
@@ -1073,6 +1061,51 @@ static void runPostBuildHook(
         .standardOut = &sink,
         .mergeStderrToStdout = true,
     });
+}
+
+static Pid runAsyncPostBuildHook(
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Pipe & out,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths)
+{
+    auto hook = workerSettings.asyncPostBuildHook.get();
+
+    OsStringMap hookEnvironment = getEnvOs();
+
+    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
+    hookEnvironment.emplace(
+        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
+    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
+
+    ProcessOptions processOptions;
+    processOptions.allowVfork = false;
+
+    auto pid = startProcess(
+        [&] {
+            replaceEnv(hookEnvironment);
+            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw SysError("cannot dup stdout into stderr");
+
+            Strings args_;
+            args_.push_front(hook);
+
+            unix::closeExtraFDs();
+
+            restoreProcessContext();
+
+            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
+
+            throw SysError("executing %s", PathFmt(hook));
+        },
+        processOptions);
+
+    out.writeSide.close();
+
+    return pid;
 }
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
