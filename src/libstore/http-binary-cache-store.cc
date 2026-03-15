@@ -4,8 +4,10 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/store/sqlite.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/closure.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/topo-sort.hh"
 
 namespace nix {
 
@@ -77,6 +79,42 @@ void HttpBinaryCacheStore::init()
         }
         diskCache->createCache(cacheKey, config->storeDir, config->wantMassQuery, config->priority);
     }
+}
+
+StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
+{
+    std::unordered_map<StorePath, ref<const ValidPathInfo>> pathInfos;
+    StorePathSet referencesClosureSet;
+
+    computeClosure<StorePath>(
+        paths, referencesClosureSet, [this, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
+            StorePathSet res;
+            auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+
+            for (auto & ref : info->references)
+                if (ref != path)
+                    res.insert(ref);
+
+            /* Fill the map. */
+            pathInfos.emplace(path, info);
+
+            co_return res;
+        });
+
+    auto result =
+        topoSort(referencesClosureSet, [&](const StorePath & path) { return pathInfos.at(path)->references; });
+
+    return std::visit(
+        overloaded{
+            [&](const Cycle<StorePath> & cycle) -> StorePaths {
+                throw Error(
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(cycle.path),
+                    printStorePath(cycle.parent));
+            },
+            [](const auto & sorted) { return sorted; }},
+        result);
 }
 
 std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
