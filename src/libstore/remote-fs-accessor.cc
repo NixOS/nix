@@ -110,6 +110,8 @@ std::pair<ref<SourceAccessor>, CanonPath> RemoteFSAccessor::fetch(const CanonPat
 
 std::optional<SourceAccessor::Stat> RemoteFSAccessor::maybeLstat(const CanonPath & path)
 {
+    if (path.isRoot())
+        return Stat{.type = tDirectory};
     auto res = fetch(path);
     return res.first->maybeLstat(res.second);
 }
