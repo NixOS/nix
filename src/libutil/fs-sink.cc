@@ -148,6 +148,16 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
 
     ~RestoreRegularFile()
     {
+        /* Flush the sink before FdSink destructor has a chance to run and we've
+           closed the file descriptor. */
+        if (fd) {
+            try {
+                FdSink::flush();
+            } catch (...) {
+                ignoreExceptionInDestructor();
+            }
+        }
+
         /* Initiate an fsync operation without waiting for the
            result. The real fsync should be run before registering a
            store path, but this is a performance optimization to allow
