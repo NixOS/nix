@@ -1,14 +1,17 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/compression.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
 #include "nix/util/util.hh"
+#include "util-config-private.hh"
 
 #include <cstring>
 #include <cerrno>
 #include <limits>
 #include <memory>
+#include <atomic>
 
 #include <boost/coroutine2/coroutine.hpp>
 
@@ -17,6 +20,8 @@
 #else
 #  include <poll.h>
 #endif
+
+#include <unistd.h>
 
 namespace nix {
 
@@ -46,7 +51,7 @@ void BufferedSink::operator()(std::string_view data)
 
 void BufferedSink::flush()
 {
-    if (bufPos == 0)
+    if (!hasData())
         return;
     size_t n = bufPos;
     bufPos = 0; // don't trigger the assert() in ~BufferedSink()
@@ -212,6 +217,67 @@ size_t FdSource::readUnbuffered(char * data, size_t len)
     }
     read += n;
     return n;
+}
+
+void FdSource::drainInto(Sink & sink, uint64_t left)
+{
+#if HAVE_COPY_FILE_RANGE
+    static std::atomic_flag copyFileRangeUnsupported{};
+
+    /* Don't bother with a non regular file, smaller than buffer size or cached ENOSYS. */
+    if (!isRegularFile || copyFileRangeUnsupported.test() || left <= bufSize || BufferedSource::hasData())
+        goto fallback;
+
+    /* Destination is a regular file and hasn't been written to: can do block cloning. */
+    if (auto * fdSink = dynamic_cast<FdSink *>(&sink);
+        fdSink && !fdSink->hasData() && fdSink->written == 0 && fdSink->isRegularFile) {
+        /* Sanity check that the size is correct and is not too large. Don't
+           want overflows if off_t is 32 bit somehow. */
+        if (left > std::numeric_limits<off_t>::max())
+            throw Error("can't copy %d bytes, amount larger than maximum file size", left);
+
+        /* Do zero-copy kernelspace copy_file_range for everything else. Has the
+           opportunity to do CoW block cloning under the right circumstances. */
+        while (left) {
+            checkInterrupt();
+            ssize_t n = ::copy_file_range(fd, nullptr, fdSink->fd, nullptr, left, /*flags=*/0);
+            /* Reached EOF too early. */
+            if (n == 0) {
+                _good = false;
+                throw EndOfFile(std::string(*endOfFileError));
+            }
+
+            if (n == -1) {
+                if (errno == EINTR)
+                    continue; /* Loop over to hit checkInterrupt. */
+
+                if (errno == EINVAL || errno == EOPNOTSUPP || errno == EXDEV || errno == EBADF) {
+                    /* Retry with fallback. */
+                } else if (errno == ENOSYS) {
+                    /* Cache ENOSYS. */
+                    copyFileRangeUnsupported.test_and_set();
+                } else {
+                    throw SysError(
+                        "copying contents of %1% to %2% via copy_file_range",
+                        PathFmt(descriptorToPath(fd)),
+                        PathFmt(descriptorToPath(fdSink->fd)));
+                }
+
+                goto fallback;
+            }
+
+            assert(static_cast<uint64_t>(n) <= left);
+            left -= n;
+            read += n;
+            fdSink->written += n;
+        }
+
+        return;
+    }
+
+fallback:
+#endif
+    Source::drainInto(sink, left);
 }
 
 bool FdSource::good()
