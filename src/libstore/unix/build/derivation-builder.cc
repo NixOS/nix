@@ -1455,6 +1455,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
          * `scratchOutputsInverse`.
          */
         StringSet otherOutputs;
+        /** NAR hash computed during scan pass. Valid only if tree not rewritten since. */
+        std::optional<HashResult> narHashFromScan;
     };
 
     /* inverse map of scratchOutputs for efficient lookup */
@@ -1526,14 +1528,15 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         }
 
         StorePathSet references;
+        std::optional<HashResult> narHashFromScan;
         if (discardReferences)
             debug("discarding references of output '%s'", outputName);
         else {
             debug("scanning for references for output '%s' in temp location %s", outputName, PathFmt(actualPath));
 
-            /* Pass blank Sink as we are not ready to hash data at this stage. */
-            NullSink blank;
-            references = scanForReferences(blank, actualPath, referenceablePaths);
+            HashSink narHashSink{HashAlgorithm::SHA256};
+            references = scanForReferences(narHashSink, actualPath, referenceablePaths);
+            narHashFromScan = narHashSink.finish();
         }
 
         StringSet referencedOutputs;
@@ -1546,6 +1549,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             PerhapsNeedToRegister{
                 .refs = references,
                 .otherOutputs = referencedOutputs,
+                .narHashFromScan = narHashFromScan,
             });
         outputStats.insert_or_assign(outputName, std::move(st));
     }
@@ -1608,23 +1612,44 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto orifu = get(outputReferencesIfUnregistered, outputName);
         assert(orifu);
 
-        std::optional<StorePathSet> referencesOpt = std::visit(
+        struct ScanResult
+        {
+            StorePathSet refs;
+            std::optional<HashResult> narHashFromScan;
+        };
+
+        std::optional<ScanResult> scanResultOpt = std::visit(
             overloaded{
-                [&](const AlreadyRegistered & skippedFinalPath) -> std::optional<StorePathSet> {
+                [&](const AlreadyRegistered & skippedFinalPath) -> std::optional<ScanResult> {
                     finish(skippedFinalPath.path);
                     return std::nullopt;
                 },
-                [&](const PerhapsNeedToRegister & r) -> std::optional<StorePathSet> { return r.refs; },
+                [&](const PerhapsNeedToRegister & r) -> std::optional<ScanResult> {
+                    return ScanResult{r.refs, r.narHashFromScan};
+                },
             },
             *orifu);
 
-        if (!referencesOpt)
+        if (!scanResultOpt)
             continue;
-        auto references = *referencesOpt;
+        auto references = std::move(scanResultOpt->refs);
+        auto narHashFromScan = std::move(scanResultOpt->narHashFromScan);
+
+        bool treeWasRewritten = false;
+
+        auto narHash = [&]() -> HashResult {
+            if (!treeWasRewritten && narHashFromScan)
+                return *narHashFromScan;
+            return hashPath(
+                {getFSSourceAccessor(), CanonPath(actualPath.native())},
+                FileSerialisationMethod::NixArchive,
+                HashAlgorithm::SHA256);
+        };
 
         auto rewriteOutput = [&](const StringMap & rewrites) {
             /* Apply hash rewriting if necessary. */
             if (!rewrites.empty()) {
+                treeWasRewritten = true;
                 debug("rewriting hashes in %1%; cross fingers", PathFmt(actualPath));
 
                 /* FIXME: Is this actually streaming? */
@@ -1730,10 +1755,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }
 
             {
-                HashResult narHashAndSize = hashPath(
-                    {getFSSourceAccessor(), CanonPath(actualPath.native())},
-                    FileSerialisationMethod::NixArchive,
-                    HashAlgorithm::SHA256);
+                auto narHashAndSize = narHash();
                 newInfo0.narHash = narHashAndSize.hash;
                 newInfo0.narSize = narHashAndSize.numBytesDigested;
             }
@@ -1754,10 +1776,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         outputRewrites.insert_or_assign(
                             std::string{scratchPath->hashPart()}, std::string{requiredFinalPath.hashPart()});
                     rewriteOutput(outputRewrites);
-                    HashResult narHashAndSize = hashPath(
-                        {getFSSourceAccessor(), CanonPath(actualPath.native())},
-                        FileSerialisationMethod::NixArchive,
-                        HashAlgorithm::SHA256);
+                    auto narHashAndSize = narHash();
                     ValidPathInfo newInfo0{requiredFinalPath, {store, narHashAndSize.hash}};
                     newInfo0.narSize = narHashAndSize.numBytesDigested;
                     auto refs = rewriteRefs();
