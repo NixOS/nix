@@ -1,13 +1,13 @@
 #pragma once
 ///@file
 
-#include <cassert>
 #include <filesystem>
 #include <map>
 #include <set>
 
 #include <nlohmann/json_fwd.hpp>
 
+#include "nix/util/error.hh"
 #include "nix/util/json-non-null.hh"
 #include "nix/util/types.hh"
 #include "nix/util/experimental-features.hh"
@@ -222,27 +222,30 @@ protected:
  * For `Setting<AbsolutePath>`. `parse()` calls `canonPath`,
  * rejecting empty and relative paths.
  *
- * Constructors assert that the path is absolute.
+ * Constructors throw `Error` if the path is not absolute.
  */
 struct AbsolutePath
 {
     AbsolutePath(std::filesystem::path p)
         : _path(std::move(p))
     {
-        assert(_path.is_absolute());
+        if (!_path.is_absolute())
+            throw Error("not an absolute path: %s", PathFmt(_path));
     }
 
     AbsolutePath(const char * s)
         : _path(s)
     {
-        assert(_path.is_absolute());
+        if (!_path.is_absolute())
+            throw Error("not an absolute path: %s", PathFmt(_path));
     }
 
 #ifdef _WIN32
     AbsolutePath(const wchar_t * s)
         : _path(s)
     {
-        assert(_path.is_absolute());
+        if (!_path.is_absolute())
+            throw Error("not an absolute path: %s", PathFmt(_path));
     }
 #endif
 
