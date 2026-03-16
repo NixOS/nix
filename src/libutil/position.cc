@@ -47,7 +47,7 @@ std::optional<std::string> Pos::getSource() const
             [](const SourcePath & path) -> std::optional<std::string> {
                 try {
                     return path.readFile();
-                } catch (Error &) {
+                } catch (...) { // FIXME: make readFile() not throw?
                     return std::nullopt;
                 }
             }},
