@@ -205,4 +205,21 @@ in
   fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
+
+  upgrade-nix = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    upgrade-nix.oldNix = nixComponents.nix-cli;
+  };
+
+  upgrade-nix_fromStable = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    name = lib.mkForce "upgrade-nix-from-stable";
+    upgrade-nix.oldNix = pkgs.nixVersions.stable;
+  };
+
+  upgrade-nix_fromLatest = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    name = lib.mkForce "upgrade-nix-from-latest";
+    upgrade-nix.oldNix = pkgs.nixVersions.latest;
+  };
 }
