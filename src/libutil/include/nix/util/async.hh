@@ -44,14 +44,35 @@ auto callbackToAwaitable(F && initiate, CompletionToken && token)
                 });
             }
 
-            initiate(Callback<T>([executor, done, h](std::future<T> fut) mutable {
-                if (done->exchange(true))
-                    /* Early return for cooperative cancellation. The callback has been called
-                       later than we've been cancelled. In practice we'll get an error, the handler
-                       has already been posted by the cancellation handler. */
-                    return;
-                asio::post(executor, [h, fut = std::move(fut)]() mutable { std::move (*h)(std::move(fut)); });
-            }));
+            initiate(
+                Callback<T>([executor,
+                             done,
+                             h,
+                             /* Ugly, but we need a work guard for the actual executor to ensure that the io_context
+                                stays alive until the callback has finished on possibly another thread. */
+                             guard = asio::make_work_guard(
+                                 static_cast<asio::io_context &>(asio::query(executor, asio::execution::context)))](
+                                std::future<T> fut) mutable {
+                    auto releaseOwnership = [&]() {
+                        /* Release our ownership. If the callback is owned by another thread, we don't want to be
+                           responsible for tearing down the last reference to any of the captured objects. */
+                        executor = {};
+                        h.reset();
+                        done.reset();
+                        guard.reset();
+                    };
+
+                    if (done->exchange(true)) {
+                        releaseOwnership();
+                        /* Early return for cooperative cancellation. The callback has been called
+                           later than we've been cancelled. In practice we'll get an error, the handler
+                           has already been posted by the cancellation handler. */
+                        return;
+                    }
+
+                    asio::post(executor, [h, fut = std::move(fut)]() mutable { std::move (*h)(std::move(fut)); });
+                    releaseOwnership();
+                }));
         },
         std::forward<CompletionToken>(token));
 }

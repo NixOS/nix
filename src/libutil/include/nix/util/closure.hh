@@ -47,10 +47,6 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
             asio::executor_work_guard<decltype(State::executor)> workGuard;
             std::size_t pending = 0;
             /**
-             * Whether the completion handler has been called.
-             */
-            bool done = false;
-            /**
              * Amount of coroutines currently in flight.
              */
             std::size_t inFlight = 0;
@@ -62,6 +58,11 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
              * Nodes to handle next.
              */
             std::queue<T> todo;
+            /**
+             * First error encountered from getEdges. Gets rethrown on `complete` when all coroutines have drained.
+             * It's only when all the coroutines have finished that we can release our work guard.
+             */
+            std::exception_ptr error;
 
             State(
                 decltype(executor) executor_, decltype(getEdges) getEdges, decltype(handler) handler, std::set<T> & res)
@@ -75,10 +76,14 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
 
             void complete(std::exception_ptr ex)
             {
-                if (std::exchange(done, true))
-                    return;
                 workGuard.reset(); /* We are done and we can release the lock. */
                 asio::post(executor, [state = this->shared_from_this(), ex] { state->handler(ex); });
+            }
+
+            void fail(std::exception_ptr ex)
+            {
+                if (!error)
+                    error = ex;
             }
 
             void enqueue(const std::set<T> & elts)
@@ -97,7 +102,7 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
                             try {
                                 state->enqueue(co_await state->getEdges(elt));
                             } catch (...) {
-                                state->complete(std::current_exception());
+                                state->fail(std::current_exception());
                             }
                             state->onWorkDone();
                         },
@@ -110,20 +115,27 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
                 --inFlight;
                 --pending;
 
-                if (!todo.empty()) {
+                if (!todo.empty() && !error) {
                     auto next = std::move(todo.front());
                     todo.pop();
                     asio::post(executor, [state = this->shared_from_this(), next = std::move(next)]() mutable {
                         state->spawnWorker(next);
                     });
-                } else if (pending == 0) {
-                    complete(std::exception_ptr{});
+                } else {
+                    if (error) {
+                        /* Discard all remaining work in case we failed. */
+                        pending -= todo.size();
+                        todo = {};
+                    }
+
+                    if (pending == 0)
+                        complete(error);
                 }
             }
 
             void enqueue(const T & elt)
             {
-                if (done)
+                if (error)
                     return;
 
                 if (!res.insert(elt).second)
