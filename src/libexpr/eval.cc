@@ -304,6 +304,7 @@ EvalState::EvalState(
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
+    , lookupPathResolved(make_ref<decltype(lookupPathResolved)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
     , baseEnvP(std::allocate_shared<Env *>(traceable_allocator<Env *>(), &mem.allocEnv(BASE_ENV_SIZE)))
@@ -3277,16 +3278,15 @@ SourcePath EvalState::findFile(const LookupPath & lookupPath, const std::string_
 std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAccessControl)
 {
     auto & value = value0.s;
-    auto i = lookupPathResolved.find(value);
-    if (i != lookupPathResolved.end())
-        return i->second;
+    if (auto cached = getConcurrent(*lookupPathResolved, value))
+        return *cached;
 
     auto finish = [&](std::optional<SourcePath> res) {
         if (res)
             debug("resolved search path element '%s' to '%s'", value, *res);
         else
             debug("failed to resolve search path element '%s'", value);
-        lookupPathResolved.emplace(value, res);
+        lookupPathResolved->emplace(std::string(value), res);
         return res;
     };
 
