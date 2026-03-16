@@ -5,12 +5,10 @@
 #include "nix/util/ref.hh"
 #include "nix/util/signals.hh"
 
-#include <boost/asio/bind_executor.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/awaitable.hpp>
-#include <boost/asio/strand.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/associated_cancellation_slot.hpp>
 
@@ -92,29 +90,29 @@ asio::awaitable<T> callbackToAwaitable(F && initiate)
 template<typename Range, typename F>
 asio::awaitable<void> forEachAsync(Range && range, F && f)
 {
+    /* This code only runs on a strand - we don't do multithreaded executors, so
+       no need for synchronisation. */
+    auto pending = std::ranges::size(range);
+    if (pending == 0)
+        co_return;
+
     auto executor = co_await asio::this_coro::executor;
-    auto strand = asio::make_strand(executor); /* Serialise on a single strand. No synchronisation is needed. */
-    auto guard = asio::make_work_guard(executor);
-    std::size_t pending = 0;
     std::exception_ptr err;
 
-    for (auto && elt : range) {
-        ++pending;
-        asio::co_spawn(strand, f(elt), asio::bind_executor(strand, [&](std::exception_ptr ex) {
-                           /* First exception wins. Other ones get swallowed. */
-                           if (ex && !err)
-                               err = ex;
-                           --pending;
-                       }));
-    }
-
-    while (pending > 0)
-        co_await asio::post(strand, asio::use_awaitable);
-
-    guard.reset();
-
-    if (err)
-        std::rethrow_exception(err);
+    co_await asio::async_initiate<decltype(asio::use_awaitable), void(std::exception_ptr)>(
+        [&](auto handler) {
+            auto h = std::make_shared<decltype(handler)>(std::move(handler));
+            for (auto && elt : range) {
+                asio::co_spawn(executor, f(elt), [executor, h, &err, &pending](std::exception_ptr ex) {
+                    if (ex && !err)
+                        err = ex;
+                    if (--pending == 0)
+                        /* Post the coroutine resumption to the executor. */
+                        asio::post(executor, [h = std::move(h), &err]() mutable { std::move (*h)(err); });
+                });
+            }
+        },
+        asio::use_awaitable);
 }
 
 } // namespace nix
