@@ -33,10 +33,18 @@ TEST(closure, properlyHandlesDirectExceptions)
     {};
 
     set<string> aClosure;
+    std::size_t callCount = 0;
     EXPECT_THROW(
         computeClosure<string>(
-            {"A"}, aClosure, [&](const std::string &) -> asio::awaitable<std::set<std::string>> { throw TestExn(); }),
+            {"A", "B"},
+            aClosure,
+            [&](const std::string &) -> asio::awaitable<std::set<std::string>> {
+                if (callCount++ == 0)
+                    throw TestExn();
+                co_return std::set<std::string>{};
+            }),
         TestExn);
+    ASSERT_EQ(callCount, 2);
 }
 
 } // namespace nix
