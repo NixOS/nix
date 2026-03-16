@@ -283,12 +283,16 @@ SQLiteTxn::~SQLiteTxn()
 
 namespace {
 
+constexpr uint32_t backoffBaseUs = 500;
+constexpr uint32_t backoffCeilUs = 100'000;
+constexpr uint32_t backoffJitterShift = 3; // ~12.5% jitter
+
 // Precondition: attempt >= 1
-constexpr uint32_t clampedExponential(BackoffConfig config, uint32_t attempt)
+constexpr uint32_t clampedExponential(uint32_t attempt)
 {
     auto shift = std::min(attempt - 1, uint32_t{63});
-    auto unclamped = static_cast<uint64_t>(config.baseUs) << shift;
-    return static_cast<uint32_t>(std::min(unclamped, static_cast<uint64_t>(config.ceilUs)));
+    auto unclamped = static_cast<uint64_t>(backoffBaseUs) << shift;
+    return static_cast<uint32_t>(std::min(unclamped, static_cast<uint64_t>(backoffCeilUs)));
 }
 
 void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
@@ -308,13 +312,11 @@ SQLiteRetryState newSQLiteRetryState()
     return SQLiteRetryState{static_cast<uint32_t>(rng())};
 }
 
-std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter, BackoffConfig config)
+std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
 {
-    auto ceiling = clampedExponential(config, attempt);
-    auto jitterRange = (config.jitterShift >= 32u) ? uint32_t{0} : (ceiling >> config.jitterShift);
-    auto jitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(jitterRange) * jitter) >> 32);
-    auto delay = ceiling + jitterAmount;
-    return std::chrono::microseconds{delay};
+    auto ceiling = clampedExponential(attempt);
+    auto jitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(ceiling >> backoffJitterShift) * jitter) >> 32);
+    return std::chrono::microseconds{ceiling + jitterAmount};
 }
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
@@ -324,7 +326,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
     throttledWarning(e, state);
     checkInterrupt();
 
-    std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, state.jitter, {}));
+    std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, state.jitter));
 }
 
 } // namespace nix

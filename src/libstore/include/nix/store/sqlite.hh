@@ -214,16 +214,7 @@ struct SQLiteRetryState
     }
 };
 
-struct BackoffConfig
-{
-    uint32_t baseUs = 500;
-    uint32_t ceilUs = 100'000; // AWS calls this "cap"
-    // Jitter adds [0, ceiling >> jitterShift) on top of the deterministic ceiling.
-    // The default of 3 gives ~12.5% jitter.
-    uint32_t jitterShift = 3;
-};
-
-std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter, BackoffConfig config);
+std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter);
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
 
