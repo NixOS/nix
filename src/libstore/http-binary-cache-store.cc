@@ -86,14 +86,19 @@ StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
     std::unordered_map<StorePath, ref<const ValidPathInfo>> pathInfos;
     StorePathSet referencesClosureSet;
 
+    /* Traverse the references closure that is also present in the starting set
+       in an asynchronous manner. */
     computeClosure<StorePath>(
-        paths, referencesClosureSet, [this, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
+        paths,
+        referencesClosureSet,
+        [this, &paths, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
                 [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
 
             for (auto & ref : info->references)
-                if (ref != path)
+                /* Don't traverse into items that don't exist in our starting set. */
+                if (ref != path && paths.count(ref))
                     res.insert(ref);
 
             /* Fill the map. */
@@ -102,8 +107,7 @@ StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
             co_return res;
         });
 
-    auto result =
-        topoSort(referencesClosureSet, [&](const StorePath & path) { return pathInfos.at(path)->references; });
+    auto result = topoSort(paths, [&](const StorePath & path) { return pathInfos.at(path)->references; });
 
     return std::visit(
         overloaded{

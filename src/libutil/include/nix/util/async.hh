@@ -5,12 +5,10 @@
 #include "nix/util/ref.hh"
 #include "nix/util/signals.hh"
 
-#include <boost/asio/bind_executor.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/awaitable.hpp>
-#include <boost/asio/strand.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <boost/asio/associated_cancellation_slot.hpp>
 
@@ -44,14 +42,35 @@ auto callbackToAwaitable(F && initiate, CompletionToken && token)
                 });
             }
 
-            initiate(Callback<T>([executor, done, h](std::future<T> fut) mutable {
-                if (done->exchange(true))
-                    /* Early return for cooperative cancellation. The callback has been called
-                       later than we've been cancelled. In practice we'll get an error, the handler
-                       has already been posted by the cancellation handler. */
-                    return;
-                asio::post(executor, [h, fut = std::move(fut)]() mutable { std::move (*h)(std::move(fut)); });
-            }));
+            initiate(
+                Callback<T>([executor,
+                             done,
+                             h,
+                             /* Ugly, but we need a work guard for the actual executor to ensure that the io_context
+                                stays alive until the callback has finished on possibly another thread. */
+                             guard = asio::make_work_guard(
+                                 static_cast<asio::io_context &>(asio::query(executor, asio::execution::context)))](
+                                std::future<T> fut) mutable {
+                    auto releaseOwnership = [&]() {
+                        /* Release our ownership. If the callback is owned by another thread, we don't want to be
+                           responsible for tearing down the last reference to any of the captured objects. */
+                        executor = {};
+                        h.reset();
+                        done.reset();
+                        guard.reset();
+                    };
+
+                    if (done->exchange(true)) {
+                        releaseOwnership();
+                        /* Early return for cooperative cancellation. The callback has been called
+                           later than we've been cancelled. In practice we'll get an error, the handler
+                           has already been posted by the cancellation handler. */
+                        return;
+                    }
+
+                    asio::post(executor, [h, fut = std::move(fut)]() mutable { std::move (*h)(std::move(fut)); });
+                    releaseOwnership();
+                }));
         },
         std::forward<CompletionToken>(token));
 }
@@ -71,29 +90,29 @@ asio::awaitable<T> callbackToAwaitable(F && initiate)
 template<typename Range, typename F>
 asio::awaitable<void> forEachAsync(Range && range, F && f)
 {
+    /* This code only runs on a strand - we don't do multithreaded executors, so
+       no need for synchronisation. */
+    auto pending = std::ranges::size(range);
+    if (pending == 0)
+        co_return;
+
     auto executor = co_await asio::this_coro::executor;
-    auto strand = asio::make_strand(executor); /* Serialise on a single strand. No synchronisation is needed. */
-    auto guard = asio::make_work_guard(executor);
-    std::size_t pending = 0;
     std::exception_ptr err;
 
-    for (auto && elt : range) {
-        ++pending;
-        asio::co_spawn(strand, f(elt), asio::bind_executor(strand, [&](std::exception_ptr ex) {
-                           /* First exception wins. Other ones get swallowed. */
-                           if (ex && !err)
-                               err = ex;
-                           --pending;
-                       }));
-    }
-
-    while (pending > 0)
-        co_await asio::post(strand, asio::use_awaitable);
-
-    guard.reset();
-
-    if (err)
-        std::rethrow_exception(err);
+    co_await asio::async_initiate<decltype(asio::use_awaitable), void(std::exception_ptr)>(
+        [&](auto handler) {
+            auto h = std::make_shared<decltype(handler)>(std::move(handler));
+            for (auto && elt : range) {
+                asio::co_spawn(executor, f(elt), [executor, h, &err, &pending](std::exception_ptr ex) {
+                    if (ex && !err)
+                        err = ex;
+                    if (--pending == 0)
+                        /* Post the coroutine resumption to the executor. */
+                        asio::post(executor, [h = std::move(h), &err]() mutable { std::move (*h)(err); });
+                });
+            }
+        },
+        asio::use_awaitable);
 }
 
 } // namespace nix
