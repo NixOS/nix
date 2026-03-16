@@ -9,11 +9,12 @@ namespace nix {
 namespace {
 
 // Mirror of clampedExponential for computing expected bounds in tests.
-constexpr unsigned int expectedCeiling(unsigned int baseUs, unsigned int attempt, unsigned int ceilUs)
+constexpr uint32_t expectedCeiling(uint32_t baseUs, uint32_t attempt, uint32_t ceilUs)
 {
-    auto shift = std::min(attempt - 1, 63u);
-    auto unclamped = static_cast<unsigned long long>(baseUs) << shift;
-    return static_cast<unsigned int>(std::min(unclamped, static_cast<unsigned long long>(ceilUs)));
+    constexpr uint32_t maxShift = 63;
+    auto shift = std::min(attempt - 1, maxShift);
+    auto unclamped = static_cast<uint64_t>(baseUs) << shift;
+    return static_cast<uint32_t>(std::min(unclamped, static_cast<uint64_t>(ceilUs)));
 }
 
 } // anonymous namespace
@@ -21,10 +22,10 @@ constexpr unsigned int expectedCeiling(unsigned int baseUs, unsigned int attempt
 TEST(sqliteRetryBackoff, ExponentialGrowth)
 {
     constexpr BackoffConfig config{.baseUs = 1000, .ceilUs = 100'000, .jitterShift = 3};
-    constexpr unsigned int jitter = UINT32_MAX;
+    constexpr uint32_t jitter = UINT32_MAX;
 
-    unsigned int ceiling = config.baseUs;
-    for (unsigned int attempt = 1; attempt <= 12; ++attempt) {
+    uint32_t ceiling = config.baseUs;
+    for (uint32_t attempt = 1; attempt <= 12; ++attempt) {
         auto delay = sqliteRetryBackoff(attempt, jitter, config);
         auto maxJitter = ceiling >> config.jitterShift;
         EXPECT_GE(delay.count(), static_cast<long>(ceiling)) << "attempt " << attempt;
@@ -42,8 +43,8 @@ TEST(sqliteRetryBackoff, JitterScalesLinearly)
     constexpr BackoffConfig config{.baseUs = 100'000, .ceilUs = 5'000'000, .jitterShift = 3};
 
     // Use attempt 1 so ceiling = baseUs
-    constexpr unsigned int attempt = 1;
-    auto halfJitter = static_cast<unsigned int>(UINT32_MAX / 2);
+    constexpr uint32_t attempt = 1;
+    auto halfJitter = static_cast<uint32_t>(UINT32_MAX / 2);
     auto delayHalf = sqliteRetryBackoff(attempt, halfJitter, config);
     auto delayMax = sqliteRetryBackoff(attempt, UINT32_MAX, config);
 
@@ -67,11 +68,11 @@ TEST(sqliteRetryBackoff, ZeroBase)
 TEST(sqliteRetryBackoff, SubMillisecondGrowth)
 {
     constexpr BackoffConfig config{.baseUs = 500, .ceilUs = 100'000, .jitterShift = 3};
-    constexpr unsigned int jitter = UINT32_MAX;
+    constexpr uint32_t jitter = UINT32_MAX;
 
     // All delays should be >= baseUs and grow with each attempt
     long prev = 0;
-    for (unsigned int attempt = 1; attempt <= 4; ++attempt) {
+    for (uint32_t attempt = 1; attempt <= 4; ++attempt) {
         auto delay = sqliteRetryBackoff(attempt, jitter, config);
         EXPECT_GE(delay.count(), static_cast<long>(config.baseUs)) << "attempt " << attempt;
         EXPECT_GT(delay.count(), prev) << "attempt " << attempt;
@@ -93,7 +94,7 @@ TEST(sqliteRetryBackoff, MinimumDelayGuarantee)
 {
     // Delay must always be >= ceiling >= baseUs, regardless of jitter value
     constexpr BackoffConfig config{.baseUs = 500, .ceilUs = 100'000, .jitterShift = 3};
-    for (unsigned int attempt = 1; attempt <= 10; ++attempt) {
+    for (uint32_t attempt = 1; attempt <= 10; ++attempt) {
         EXPECT_GE(sqliteRetryBackoff(attempt, 0, config).count(), static_cast<long>(config.baseUs))
             << "attempt " << attempt;
         EXPECT_GE(sqliteRetryBackoff(attempt, 1, config).count(), static_cast<long>(config.baseUs))
@@ -107,8 +108,8 @@ TEST(sqliteRetryBackoff, MinimumDelayGuarantee)
 
 struct BackoffBoundsCase
 {
-    unsigned int attempt;
-    unsigned int jitter;
+    uint32_t attempt;
+    uint32_t jitter;
     BackoffConfig config;
     std::string description;
 };
@@ -128,7 +129,7 @@ TEST_P(SqliteRetryBackoffBounds, DelayWithinBounds)
 
     auto ceiling = expectedCeiling(c.config.baseUs, c.attempt, c.config.ceilUs);
     auto jitterRange = ceiling >> c.config.jitterShift;
-    auto maxJitterAmount = static_cast<unsigned int>((static_cast<unsigned long long>(jitterRange) * c.jitter) >> 32);
+    auto maxJitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(jitterRange) * c.jitter) >> 32);
 
     EXPECT_GE(delay.count(), static_cast<long>(ceiling));
     EXPECT_LE(delay.count(), static_cast<long>(ceiling + maxJitterAmount));

@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -202,11 +203,11 @@ MakeError(SQLiteBusy, SQLiteError);
 
 struct SQLiteRetryState
 {
-    unsigned int attempt = 0;
+    uint32_t attempt = 0;
     time_t nextWarning;
-    unsigned int jitter; // random factor, computed once per retry sequence
+    uint32_t jitter; // random factor, computed once per retry sequence
 
-    explicit SQLiteRetryState(unsigned int jitter)
+    explicit SQLiteRetryState(uint32_t jitter)
         : nextWarning(time(nullptr) + 1)
         , jitter(jitter)
     {
@@ -215,22 +216,14 @@ struct SQLiteRetryState
 
 struct BackoffConfig
 {
-    unsigned int baseUs;
-    unsigned int ceilUs; // AWS calls this "cap"
+    uint32_t baseUs = 500;
+    uint32_t ceilUs = 100'000; // AWS calls this "cap"
     // Jitter adds [0, ceiling >> jitterShift) on top of the deterministic ceiling.
-    //
-    // Example configurations:
-    //   {500, 100'000, 3}  — 0.5ms base, 100ms ceil, 12.5% jitter
-    //     attempt 1: ceiling=500us,    delay ∈ [500, 561]us
-    //     attempt 8: ceiling=64'000us, delay ∈ [64'000, 71'999]us
-    //
-    //   {200'000, 5'000'000, 4} — 200ms base, 5s ceil, 6.25% jitter
-    //     attempt 1: ceiling=200'000us, delay ∈ [200'000, 212'499]us
-    //     attempt 5: ceiling=3'200'000us, delay ∈ [3'200'000, 3'399'999]us
-    unsigned int jitterShift;
+    // The default of 3 gives ~12.5% jitter.
+    uint32_t jitterShift = 3;
 };
 
-std::chrono::microseconds sqliteRetryBackoff(unsigned int attempt, unsigned int jitter, BackoffConfig config);
+std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter, BackoffConfig config);
 
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
 

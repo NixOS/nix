@@ -193,25 +193,6 @@ public:
 
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal", "Whether SQLite should use WAL mode."};
 
-    Setting<unsigned int> sqliteRetryBaseUs{
-        this,
-        500,
-        "sqlite-retry-base-us",
-        "Base delay in microseconds for SQLite busy retries. Doubles each attempt up to the ceiling."};
-
-    Setting<unsigned int> sqliteRetryCeilUs{
-        this, 100'000, "sqlite-retry-ceil-us", "Maximum delay in microseconds for SQLite busy retries."};
-
-    Setting<unsigned int> sqliteRetryJitterShift{
-        this,
-        3,
-        "sqlite-retry-jitter-shift",
-        R"(
-          Right bit-shift controlling jitter band for SQLite busy retries.
-          Jitter adds `[0, ceiling >> shift)` on top of the deterministic
-          exponential delay. The default of 3 gives ~12.5% jitter.
-        )"};
-
     Setting<bool> keepFailed{this, false, "keep-failed", "Whether to keep temporary directories of failed builds."};
 
     /**
