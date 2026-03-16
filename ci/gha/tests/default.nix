@@ -78,6 +78,7 @@ rec {
     installerScriptForGHA = hydraJobs.installerScriptForGHA.${system};
     installTests = hydraJobs.installTests.${system};
     nixpkgsLibTests = hydraJobs.tests.nixpkgsLibTests.${system};
+    filetransfer-retry-backoff = hydraJobs.tests.filetransfer-retry-backoff.${system};
     rl-next = pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
       LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${../../../doc/manual/rl-next} >$out
     '';

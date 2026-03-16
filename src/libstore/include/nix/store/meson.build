@@ -40,6 +40,7 @@ headers = [ config_pub_h ] + files(
   'dummy-store-impl.hh',
   'dummy-store.hh',
   'export-import.hh',
+  'filetransfer-impl.hh',
   'filetransfer.hh',
   'gc-store.hh',
   'global-paths.hh',
