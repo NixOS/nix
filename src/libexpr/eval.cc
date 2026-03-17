@@ -353,7 +353,7 @@ EvalState::EvalState(
     if (settings.traceFunctionCalls)
         profiler.addProfiler(make_ref<FunctionCallTrace>());
 
-    switch (settings.evalProfilerMode) {
+    switch (settings.evalProfilerMode.get()) {
     case EvalProfilerMode::flamegraph:
         profiler.addProfiler(
             makeSampleStackProfiler(*this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
