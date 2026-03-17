@@ -40,6 +40,7 @@ TEST(closure, properlyHandlesDirectExceptions)
             aClosure,
             [&](const std::string &) -> asio::awaitable<std::set<std::string>> {
                 if (callCount++ == 0)
+                    // NOLINTNEXTLINE(hicpp-exception-baseclass): test verifies any type propagates
                     throw TestExn();
                 co_return std::set<std::string>{};
             }),

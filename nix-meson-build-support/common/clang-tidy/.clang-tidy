@@ -20,9 +20,8 @@ Checks:
   - -bugprone-exception-escape
   # Non-bugprone checks (also disabled to pass on current codebase):
   #
-  # 4 warnings - exceptions not derived from std::exception
   # All thrown exceptions must derive from std::exception
-  # - hicpp-exception-baseclass
+  - hicpp-exception-baseclass
   # 88 warnings - C-style casts should be explicit about intent
   # - cppcoreguidelines-pro-type-cstyle-cast
   # 11 warnings - coroutine lambdas with captures (intentional pattern in async goal/store code)
