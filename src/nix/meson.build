@@ -70,6 +70,7 @@ nix_sources = [ config_priv_h ] + files(
   'crash-handler.cc',
   'derivation-add.cc',
   'derivation-show.cc',
+  'derivation-source-origins.cc',
   'derivation.cc',
   'develop.cc',
   'diff-closures.cc',
