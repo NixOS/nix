@@ -296,7 +296,7 @@ static int main_build_remote(int argc, char ** argv)
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
             if (!lockFile(uploadLock.get(), ltWrite, true))
-                printError("somebody is hogging the upload lock for '%s', continuing...");
+                printError("somebody is hogging the upload lock for '%s', continuing...", storeUri);
             alarm(0);
             signal(SIGALRM, old);
         }
