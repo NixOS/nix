@@ -216,7 +216,11 @@ public:
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override
     // TODO: Implement
     {
-        unsupported("queryRealisation");
+        try {
+            unsupported("queryRealisation");
+        } catch (...) {
+            callback.rethrow();
+        }
     }
 
     StorePathSet querySubstitutablePaths(const StorePathSet & paths) override

@@ -146,7 +146,7 @@ struct DummyStoreImpl : DummyStore
 
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override
-    {
+    try {
         if (path.isDerivation()) {
             if (auto accessor_ = getMemoryFSAccessor(path)) {
                 ref<MemorySourceAccessor> accessor = ref{std::move(accessor_)};
@@ -172,6 +172,8 @@ struct DummyStoreImpl : DummyStore
         }
 
         callback(nullptr);
+    } catch (...) {
+        callback.rethrow();
     }
 
     /**
