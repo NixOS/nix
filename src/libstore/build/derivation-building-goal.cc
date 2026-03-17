@@ -1146,7 +1146,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
             }();
             if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
                 ;
-            else if (s.substr(0, 2) == "# ") {
+            else if (s.starts_with("# ")) {
                 reply = s.substr(2);
                 break;
             } else {

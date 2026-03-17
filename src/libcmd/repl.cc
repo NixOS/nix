@@ -257,7 +257,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
-            if (i->substr(0, cur.size()) != cur)
+            if (!i->starts_with(cur))
                 break;
             completions.insert(prev + *i);
             i++;
@@ -284,7 +284,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
 
             for (auto & i : *v.attrs()) {
                 std::string_view name = state->symbols[i.name];
-                if (name.substr(0, cur2.size()) != cur2)
+                if (!name.starts_with(cur2))
                     continue;
                 completions.insert(concatStrings(prev, expr, ".", name));
             }

@@ -1045,9 +1045,9 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 throw;
             }
         }();
-        if (msg.substr(0, 1) == "\2")
+        if (msg.starts_with("\2"))
             break;
-        if (msg.substr(0, 1) == "\1") {
+        if (msg.starts_with("\1")) {
             FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");

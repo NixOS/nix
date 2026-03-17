@@ -186,7 +186,7 @@ matchUser(const std::optional<std::string> & user, const std::optional<std::stri
         return true;
 
     for (auto & i : users)
-        if (i.substr(0, 1) == "@") {
+        if (i.starts_with("@")) {
             if (group && *group == i.substr(1))
                 return true;
             struct group * gr = getgrnam(i.c_str() + 1);

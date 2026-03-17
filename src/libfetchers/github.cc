@@ -207,7 +207,7 @@ struct GitArchiveInputScheme : InputScheme
             for (auto & token : tokens) {
                 auto first = url.find(token.first);
                 if (first != std::string::npos && token.first.length() > answer_match_len && first == 0
-                    && url.substr(0, token.first.length()) == token.first
+                    && url.starts_with(token.first)
                     && (url.length() == token.first.length() || url[token.first.length()] == '/')) {
                     answer = token.second;
                     answer_match_len = token.first.length();

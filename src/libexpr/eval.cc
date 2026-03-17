@@ -466,7 +466,7 @@ Value * EvalState::addConstant(const std::string & name, Value & v, Constant inf
 
 void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 {
-    auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
+    auto name2 = name.starts_with("__") ? name.substr(2) : name;
 
     constantInfos.push_back({name2, info});
 

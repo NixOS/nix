@@ -98,7 +98,7 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
 template<class N>
 std::optional<N> string2Int(const std::string_view s)
 {
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+    if (s.starts_with("-") && !std::numeric_limits<N>::is_signed)
         return std::nullopt;
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
@@ -192,7 +192,7 @@ std::string renderSize(int64_t value, bool align)
 
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
-    return s.compare(0, prefix.size(), prefix) == 0;
+    return s.starts_with(prefix);
 }
 
 bool hasSuffix(std::string_view s, std::string_view suffix)
