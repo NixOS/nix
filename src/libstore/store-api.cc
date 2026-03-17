@@ -60,12 +60,14 @@ StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType
               switch (pathType) {
               case FilePathType::Unix:
                   return canonStoreDir(
-                      envOverrides.transform([](auto && s) { return os_string_to_string(std::move(s)); })
+                      envOverrides
+                          .transform([](auto && s) { return os_string_to_string(std::forward<decltype(s)>(s)); })
                           .value_or(NIX_STORE_DIR));
 
               case FilePathType::Native:
                   return canonStoreDir(
-                      envOverrides.transform([](auto && s) { return std::filesystem::path(std::move(s)); })
+                      envOverrides
+                          .transform([](auto && s) { return std::filesystem::path(std::forward<decltype(s)>(s)); })
                           .or_else([]() -> std::optional<std::filesystem::path> {
 #ifdef _WIN32
                               return windows::known_folders::getProgramData() / "nix" / "store";
