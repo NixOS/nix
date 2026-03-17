@@ -23,8 +23,6 @@ Checks:
   #
   # Checks disabled to pass on current codebase (can be progressively enabled):
   #
-  # 4 warnings - string_view::data() usage patterns
-  - -bugprone-suspicious-stringview-data-usage
   # 4 warnings - .cc files included in other files (intentional pattern)
   - -bugprone-suspicious-include
   # 2 warnings - returning const& from parameter
