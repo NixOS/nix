@@ -724,8 +724,10 @@ struct CompareValues
     {
         try {
             if (v1->type() == nFloat && v2->type() == nInt)
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 return v1->fpoint() < v2->integer().value;
             if (v1->type() == nInt && v2->type() == nFloat)
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 return v1->integer().value < v2->fpoint();
             if (v1->type() != v2->type())
                 state
@@ -1049,8 +1051,10 @@ static void prim_ceil(EvalState & state, const PosIdx pos, Value ** args, Value 
         *args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.ceil");
     auto ceilValue = ceil(value);
     bool isInt = args[0]->type() == nInt;
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
     constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
     if (ceilValue >= int_min && ceilValue < -int_min) {
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
         v.mkInt(ceilValue);
     } else if (isInt) {
         // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat
@@ -1104,8 +1108,10 @@ static void prim_floor(EvalState & state, const PosIdx pos, Value ** args, Value
         *args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.floor");
     auto floorValue = floor(value);
     bool isInt = args[0]->type() == nInt;
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
     constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
     if (floorValue >= int_min && floorValue < -int_min) {
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
         v.mkInt(floorValue);
     } else if (isInt) {
         // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat

@@ -4,8 +4,6 @@ Checks:
   - bugprone-*
   # Too many warnings
   - -bugprone-assignment-in-if-condition
-  # Too many warnings
-  - -bugprone-narrowing-conversions
   # Kind of nonsense
   - -bugprone-easily-swappable-parameters
   # Exception handling patterns in Nix
@@ -40,6 +38,10 @@ CheckOptions:
   bugprone-unused-return-value.AllowCastToVoid: true
   # vfork is deliberate (sandbox perf), stack-clobber-safe via __attribute__((noinline)). See processes.cc:210.
   bugprone-unsafe-functions.ReportMoreUnsafeFunctions: false
+  # Integer narrowing (int64->int32, unsigned->signed) is pervasive and harmless in practice;
+  # only flag float<->int conversions where precision loss is a real concern. All 29 current
+  # sites are intentional (Nix lang coercion, range-checked ceil/floor, display percentages).
+  bugprone-narrowing-conversions.WarnOnIntegerNarrowingConversion: false
 
 # clang 21+ only (older clang-tidy emits a suppressed -Wunknown-warning-option).
 # Flags new virtual methods in final classes, where virtual is dead weight.

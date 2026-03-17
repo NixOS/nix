@@ -849,6 +849,7 @@ void LocalStore::autoGC(bool sync)
         if (avail >= gcSettings.minFree || avail >= gcSettings.maxFree)
             return;
 
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): threshold ratio
         if (avail > state->availAfterGC * 0.97)
             return;
 

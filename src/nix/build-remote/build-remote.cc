@@ -184,9 +184,11 @@ static int main_build_remote(int argc, char ** argv)
                         // NOLINTNEXTLINE(bugprone-branch-clone): machine selection tiebreaker ladder
                         if (!bestSlotLock) {
                             best = true;
+                            // NOLINTBEGIN(bugprone-narrowing-conversions): load ratio: job count << 2^24
                         } else if (load / m.speedFactor < bestLoad / bestMachine->speedFactor) {
                             best = true;
                         } else if (load / m.speedFactor == bestLoad / bestMachine->speedFactor) {
+                            // NOLINTEND(bugprone-narrowing-conversions)
                             if (m.speedFactor > bestMachine->speedFactor) {
                                 best = true;
                             } else if (m.speedFactor == bestMachine->speedFactor) {

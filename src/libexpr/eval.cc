@@ -2110,6 +2110,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 nf = n.value;
                 nf += vTmp.fpoint();
             } else
@@ -2119,6 +2120,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                     .debugThrow();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 nf += vTmp.integer().value;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint();
@@ -2319,6 +2321,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
     try {
         forceValue(v, pos);
         if (v.type() == nInt)
+            // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
             return v.integer().value;
         else if (v.type() != nFloat)
             error<TypeError>(
@@ -2916,8 +2919,10 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         return v1.integer().value == v2.fpoint();
     if (v1.type() == nFloat && v2.type() == nInt)
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         return v1.fpoint() == v2.integer().value;
 
     // All other types are not compatible with each other.
@@ -3042,6 +3047,7 @@ void EvalState::printStatistics()
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
     double gcFullOnlyTime = ({
         auto ms = GC_get_full_gc_total_time();
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         ms * 0.001;
     });
     auto gcCycles = getGCCycles();
