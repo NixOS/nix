@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/args/root.hh"

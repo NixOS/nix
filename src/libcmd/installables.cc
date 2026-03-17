@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "nix/store/globals.hh"
 #include "nix/cmd/installables.hh"
 #include "nix/cmd/installable-derived-path.hh"

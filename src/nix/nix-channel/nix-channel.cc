@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "nix/store/profiles.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"

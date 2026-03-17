@@ -1,6 +1,7 @@
 #include "cmd-config-private.hh"
 
 #include <cstdio>
+#include <iostream>
 
 #include <signal.h>
 

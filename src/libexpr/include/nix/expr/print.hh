@@ -7,7 +7,7 @@
  * functions that are placed here.
  */
 
-#include <iostream>
+#include <ostream>
 
 #include "nix/util/fmt.hh"
 #include "nix/expr/print-options.hh"
