@@ -8,8 +8,6 @@ Checks:
   - -bugprone-narrowing-conversions
   # Kind of nonsense
   - -bugprone-easily-swappable-parameters
-  # Too many warnings for now
-  - -bugprone-implicit-widening-of-multiplication-result
   # Exception handling patterns in Nix
   - -bugprone-empty-catch
   # Many warnings
