@@ -2,6 +2,7 @@
 #include "nix/util/hash.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
 #include "nix/util/canon-path.hh"
 #include "nix/util/logging.hh"
 
@@ -54,6 +55,16 @@ StorePathSet scanForReferences(Sink & toTee, const std::filesystem::path & path,
 
     /* Look for the hashes in the NAR dump of the path. */
     dumpPath(path, sink);
+
+    return refsSink.getResultPaths();
+}
+
+StorePathSet scanForReferences(Sink & toTee, const SourcePath & path, const StorePathSet & refs)
+{
+    PathRefScanSink refsSink = PathRefScanSink::fromPaths(refs);
+    TeeSink sink{refsSink, toTee};
+
+    path.dumpPath(sink);
 
     return refsSink.getResultPaths();
 }

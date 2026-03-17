@@ -13,6 +13,7 @@
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/store/canonicalizing-source-accessor.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
@@ -1510,17 +1511,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 outputName);
 #endif
 
-        /* Canonicalise first.  This ensures that the path we're
-           rewriting doesn't contain a hard link to /etc/shadow or
-           something like that. */
-        canonicalisePathMetaData(
-            actualPath,
-            {
+        CanonicalizePathMetadataOptions canonOptions{
 #ifndef _WIN32
-                .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
+            .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
 #endif
-                NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)},
-            inodesSeen);
+            NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)};
 
         bool discardReferences = false;
         if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
@@ -1529,13 +1524,24 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
         StorePathSet references;
         std::optional<HashResult> narHashFromScan;
-        if (discardReferences)
+        if (discardReferences) {
             debug("discarding references of output '%s'", outputName);
-        else {
+            /* Rare path: still need to canonicalize even though we skip the scan. */
+            canonicalisePathMetaData(actualPath, canonOptions, inodesSeen);
+        } else {
             debug("scanning for references for output '%s' in temp location %s", outputName, PathFmt(actualPath));
 
+            /* Single fused traversal: canonicalize + scan + hash.
+               CanonicalizingSourceAccessor canonicalizes each file during
+               lstat(), before dumpPath() reads it — eliminating a separate
+               tree walk. */
+            auto canonSourcePath = PosixSourceAccessor::createAtRoot(actualPath);
+            auto canonAccessor =
+                make_ref<CanonicalizingSourceAccessor>(canonSourcePath.accessor, canonOptions, inodesSeen);
+
             HashSink narHashSink{HashAlgorithm::SHA256};
-            references = scanForReferences(narHashSink, actualPath, referenceablePaths);
+            references =
+                scanForReferences(narHashSink, SourcePath{canonAccessor, canonSourcePath.path}, referenceablePaths);
             narHashFromScan = narHashSink.finish();
         }
 

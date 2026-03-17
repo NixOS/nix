@@ -4,6 +4,7 @@
 #include "nix/store/references.hh"
 #include "nix/store/path.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/source-path.hh"
 
 #include <functional>
 #include <vector>
@@ -11,6 +12,12 @@
 namespace nix {
 
 StorePathSet scanForReferences(Sink & toTee, const std::filesystem::path & path, const StorePathSet & refs);
+
+/**
+ * Like the above, but takes a SourcePath so callers can provide a
+ * custom SourceAccessor (e.g. CanonicalizingSourceAccessor).
+ */
+StorePathSet scanForReferences(Sink & toTee, const SourcePath & path, const StorePathSet & refs);
 
 class PathRefScanSink : public RefScanSink
 {

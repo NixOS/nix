@@ -27,6 +27,7 @@ headers = [ config_pub_h ] + files(
   'build/worker.hh',
   'builtins.hh',
   'builtins/buildenv.hh',
+  'canonicalizing-source-accessor.hh',
   'common-protocol-impl.hh',
   'common-protocol.hh',
   'common-ssh-store-config.hh',

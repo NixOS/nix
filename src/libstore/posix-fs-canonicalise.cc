@@ -41,8 +41,11 @@ void canonicaliseTimestampAndPermissions(const std::filesystem::path & path)
     canonicaliseTimestampAndPermissions(path, lstat(path));
 }
 
-static void canonicalisePathMetaData_(
-    const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
+void canonicaliseOneFile(
+    const std::filesystem::path & path,
+    const PosixStat & st,
+    CanonicalizePathMetadataOptions options,
+    InodesSeen & inodesSeen)
 {
     checkInterrupt();
 
@@ -55,8 +58,6 @@ static void canonicalisePathMetaData_(
             throw SysError("clearing flags of path %1%", PathFmt(path));
     }
 #endif
-
-    auto st = lstat(path);
 
     /* Really make sure that the path is of a supported type. */
     if (!(S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode)))
@@ -113,6 +114,13 @@ static void canonicalisePathMetaData_(
             throw SysError("changing owner of %1% to %2%", PathFmt(path), geteuid());
     }
 #endif
+}
+
+static void canonicalisePathMetaData_(
+    const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
+{
+    auto st = lstat(path);
+    canonicaliseOneFile(path, st, options, inodesSeen);
 
     if (S_ISDIR(st.st_mode)) {
         for (auto & i : DirectoryIterator{path}) {

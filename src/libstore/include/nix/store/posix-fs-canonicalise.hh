@@ -8,6 +8,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/error.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/config.hh"
 
 namespace nix {
@@ -64,6 +65,20 @@ struct CanonicalizePathMetadataOptions
  */
 void canonicalisePathMetaData(
     const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen);
+
+/**
+ * Canonicalize a single file's metadata (permissions, ownership,
+ * timestamps, xattrs). This is the per-file logic extracted from
+ * canonicalisePathMetaData — it does NOT recurse into directories.
+ *
+ * Used by CanonicalizingSourceAccessor to fold canonicalize into
+ * the NAR dump traversal.
+ */
+void canonicaliseOneFile(
+    const std::filesystem::path & path,
+    const PosixStat & st,
+    CanonicalizePathMetadataOptions options,
+    InodesSeen & inodesSeen);
 
 void canonicalisePathMetaData(const std::filesystem::path & path, CanonicalizePathMetadataOptions options);
 

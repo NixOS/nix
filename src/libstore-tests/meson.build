@@ -55,6 +55,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'build-result.cc',
+  'canonicalizing-source-accessor.cc',
   'common-protocol.cc',
   'content-address.cc',
   'derivation-advanced-attrs.cc',
@@ -130,6 +131,7 @@ if get_option('benchmarks')
     'bench-main.cc',
     'canonicalize-bench.cc',
     'derivation-parser-bench.cc',
+    'fused-canonicalize-scan-bench.cc',
     'ref-scan-bench.cc',
     'register-valid-paths-bench.cc',
   )
