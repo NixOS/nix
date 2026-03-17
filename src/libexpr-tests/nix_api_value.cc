@@ -349,7 +349,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     // Clean up
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
-    free(out_name);
+    free(static_cast<void *>(out_name));
 }
 
 TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
@@ -381,7 +381,7 @@ TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
 
     // Clean up
     nix_gc_decref(ctx, intValue);
-    free(out_name);
+    free(static_cast<void *>(out_name));
 }
 
 TEST_F(nix_api_expr_test, nix_get_attr_byname_lazy)
