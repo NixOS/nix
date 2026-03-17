@@ -39,10 +39,13 @@ DrvName::~DrvName() {}
 bool DrvName::matches(const DrvName & n)
 {
     if (name != "*") {
-        if (!regex) {
-            regex = std::make_unique<Regex>();
-            regex->regex = std::regex(name, std::regex::extended);
-        }
+        if (!regex)
+            try {
+                regex = std::make_unique<Regex>();
+                regex->regex = std::regex(name, std::regex::extended);
+            } catch (std::regex_error & e) {
+                throw Error("invalid regular expression in derivation name '%s': %s", name, e.what());
+            }
         if (!std::regex_match(n.name, regex->regex))
             return false;
     }

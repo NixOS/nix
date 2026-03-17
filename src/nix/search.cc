@@ -76,11 +76,19 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         regexes.reserve(res.size());
         excludeRegexes.reserve(excludeRes.size());
 
+        auto compileRegex = [](const std::string & re) {
+            try {
+                return std::regex(re, std::regex::extended | std::regex::icase);
+            } catch (std::regex_error & e) {
+                throw UsageError("invalid regular expression '%s': %s", re, e.what());
+            }
+        };
+
         for (auto & re : res)
-            regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+            regexes.push_back(compileRegex(re));
 
         for (auto & re : excludeRes)
-            excludeRegexes.emplace_back(re, std::regex::extended | std::regex::icase);
+            excludeRegexes.push_back(compileRegex(re));
 
         auto state = getEvalState();
 

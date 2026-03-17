@@ -488,9 +488,11 @@ struct RegexMatcher final : public Matcher
     std::string pattern;
 
     RegexMatcher(const std::string & pattern)
+    try
         : regex(pattern, std::regex::extended | std::regex::icase)
-        , pattern(pattern)
-    {
+        , pattern(pattern) {
+    } catch (std::regex_error & e) {
+        throw UsageError("invalid regular expression '%s': %s", pattern, e.what());
     }
 
     std::string getTitle() override

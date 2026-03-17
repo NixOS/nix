@@ -53,7 +53,15 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
         std::smatch match;
         std::string mountInfo;
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
-        auto regex = std::regex(R"((^|\n)overlay )" + config->realStoreDir.get().string() + R"( .*(\n|$))");
+        auto compileRegex = [&](const std::string & pattern) {
+            try {
+                return std::regex(pattern);
+            } catch (std::regex_error & e) {
+                throw Error(
+                    "overlay store path '%s' contains regex metacharacters: %s", config->realStoreDir.get(), e.what());
+            }
+        };
+        auto regex = compileRegex(R"((^|\n)overlay )" + config->realStoreDir.get().string() + R"( .*(\n|$))");
 
         // Mount points can be stacked, so there might be multiple matching entries.
         // Loop until the last match, which will be the current state of the mount point.
@@ -63,7 +71,8 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
         }
 
         auto checkOption = [&](std::string_view option, const std::filesystem::path & value) {
-            return std::regex_search(mountInfo, std::regex("\\b" + option + "=" + value.string() + "( |,)"));
+            return std::regex_search(
+                mountInfo, compileRegex("\\b" + std::string{option} + "=" + value.string() + "( |,)"));
         };
 
         auto expectedLowerDir = lowerStore->config.realStoreDir.get();

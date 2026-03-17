@@ -600,7 +600,12 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         } else {
             refUri = fmt("refs/(heads|tags)/%s", ref);
         }
-        std::regex refRegex(refUri);
+        std::regex refRegex;
+        try {
+            refRegex = std::regex(refUri);
+        } catch (std::regex_error & e) {
+            throw BadURL("invalid reference '%s': %s", ref, e.what());
+        }
 
         auto downloadFileResult = downloadFile(store, settings, fmt("%s/info/refs", base_url), "source", headers);
         auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);

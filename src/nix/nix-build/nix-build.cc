@@ -511,13 +511,24 @@ static void main_nix_build(int argc, char ** argv)
                 self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
         };
 
+        // Pre-compile exclude patterns so we get a useful error for bad regexes
+        // instead of std::regex_error, and avoid recompiling per dependency.
+        std::vector<std::regex> envExcludeRegexes;
+        envExcludeRegexes.reserve(envExclude.size());
+        for (auto & exclude : envExclude)
+            try {
+                envExcludeRegexes.emplace_back(exclude);
+            } catch (std::regex_error & e) {
+                throw UsageError("invalid --exclude regular expression '%s': %s", exclude, e.what());
+            }
+
         // Build or fetch all dependencies of the derivation.
         for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
-                    return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
+            if (std::all_of(envExcludeRegexes.cbegin(), envExcludeRegexes.cend(), [&](const std::regex & exclude) {
+                    return !std::regex_search(store->printStorePath(inputDrv), exclude);
                 })) {
                 accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
                 pathsToCopy.insert(inputDrv);
