@@ -2043,11 +2043,14 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 } // namespace nix
 
 // FIXME: do this properly
+// NOLINTBEGIN(bugprone-suspicious-include)
 #include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
 #include "freebsd-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
 #include "external-derivation-builder.cc"
+
+// NOLINTEND(bugprone-suspicious-include)
 
 namespace nix {
 
