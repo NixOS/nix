@@ -40,3 +40,7 @@ CheckOptions:
   bugprone-unused-return-value.AllowCastToVoid: true
   # vfork is deliberate (sandbox perf), stack-clobber-safe via __attribute__((noinline)). See processes.cc:210.
   bugprone-unsafe-functions.ReportMoreUnsafeFunctions: false
+
+# clang 21+ only (older clang-tidy emits a suppressed -Wunknown-warning-option).
+# Flags new virtual methods in final classes, where virtual is dead weight.
+ExtraArgs: ['-Werror=unnecessary-virtual-specifier']
