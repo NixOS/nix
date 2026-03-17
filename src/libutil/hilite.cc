@@ -21,6 +21,7 @@ hiliteMatches(std::string_view s, std::vector<std::smatch> matches, std::string_
         out.append(s.substr(last_end, m.position() - last_end));
         // Merge continuous matches
         ssize_t end = start + m.length();
+        // NOLINTNEXTLINE(bugprone-inc-dec-in-conditions): idiomatic iterator advance, well-defined eval order
         while (++it != matches.end() && (*it).position() <= end) {
             auto n = *it;
             ssize_t nend = start + (n.position() - start + n.length());
