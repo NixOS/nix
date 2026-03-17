@@ -2860,9 +2860,15 @@ static void addPath(
                 state.error<EvalError>("store path mismatch in (possibly filtered) path added from '%s'", path)
                     .atPos(pos)
                     .debugThrow();
+            // Record the store→source mapping so that source-origins
+            // can trace filtered paths (cleanSourceWith / builtins.path)
+            // back to their original source location.
+            state.recordPathOrigin(dstPath, path);
             state.allowAndSetStorePathString(dstPath, v);
-        } else
+        } else {
+            state.recordPathOrigin(*expectedStorePath, path);
             state.allowAndSetStorePathString(*expectedStorePath, v);
+        }
     } catch (Error & e) {
         e.addTrace(state.positions[pos], "while adding path '%s'", path);
         throw;

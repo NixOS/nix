@@ -2604,6 +2604,90 @@ std::map<StorePath, SourcePath> EvalState::getSourceOrigins() const
     return result;
 }
 
+void EvalState::recordPathOrigin(const StorePath & storePath, const SourcePath & srcPath)
+{
+    storeToSrc->try_emplace(storePath, srcPath);
+
+    // Try to directly resolve the original filesystem path so that
+    // source-origins can map this store path back without needing to
+    // trace through accessor chains.
+
+    auto pathStr = srcPath.path.abs();
+    auto storeDirStr = store->storeDir;
+
+    // Strategy 1: the SourcePath's canonical path starts with /nix/store/.
+    // Parse the store path prefix and look it up in sourceStoreToOriginalPath.
+    if (hasPrefix(pathStr, storeDirStr + "/")) {
+        auto afterStore = pathStr.find('/', storeDirStr.size() + 1);
+        std::string storePathStr = (afterStore == std::string::npos)
+            ? pathStr : pathStr.substr(0, afterStore);
+        try {
+            auto sp = store->parseStorePath(storePathStr);
+            auto it = sourceStoreToOriginalPath.find(sp);
+            if (it != sourceStoreToOriginalPath.end()) {
+                auto relPath = (afterStore == std::string::npos)
+                    ? "" : pathStr.substr(afterStore + 1);
+                auto origPath = relPath.empty()
+                    ? it->second : (it->second / relPath);
+                sourceStoreToOriginalPath.try_emplace(storePath, origPath);
+                return;
+            }
+        } catch (...) {}
+    }
+
+    // Strategy 2: the accessor has originalRootPath set directly
+    // (per-input accessor from mountInput).
+    if (srcPath.accessor->originalRootPath) {
+        auto relPath = srcPath.path.rel();
+        auto origRoot = *srcPath.accessor->originalRootPath;
+        auto origPath = (relPath.empty() || relPath == ".")
+            ? origRoot : (origRoot / relPath);
+        sourceStoreToOriginalPath.try_emplace(storePath, origPath);
+        return;
+    }
+
+    // Strategy 3: the SourcePath is {rootFS, /} which means it accesses
+    // the root of a source tree mounted in storeFS. This happens with
+    // cleanSourceWith / builtins.path when the path expression resolves
+    // to the root of a per-input accessor. Use the storeFS to find which
+    // mount covers this path by checking each known source store path.
+    if (srcPath.path.isRoot()) {
+        // If there's exactly one source store path with an original path
+        // mapping, use it (common case: single flake with one source tree).
+        // If there are multiple, we can't disambiguate — skip.
+        if (sourceStoreToOriginalPath.size() == 1) {
+            auto & [srcStorePath, origPath] = *sourceStoreToOriginalPath.begin();
+            sourceStoreToOriginalPath.try_emplace(storePath, origPath);
+            return;
+        }
+
+        // Multiple source store paths — try to find the one that has a
+        // mount in storeFS by checking if the mount accessor matches
+        // srcPath's content fingerprint.
+        for (auto & [srcStorePath, origPath] : sourceStoreToOriginalPath) {
+            auto mountPath = CanonPath(store->printStorePath(srcStorePath));
+            auto mount = storeFS->getMount(mountPath);
+            if (mount) {
+                // Check if the srcPath's accessor delegates to this mount.
+                // We verify by checking if the mount's accessor has the
+                // same originalRootPath as the origPath we expect.
+                if (mount->originalRootPath && *mount->originalRootPath == origPath) {
+                    sourceStoreToOriginalPath.try_emplace(storePath, origPath);
+                    return;
+                }
+            }
+        }
+    }
+}
+
+std::optional<std::filesystem::path> EvalState::getOriginalPath(const StorePath & storePath) const
+{
+    auto it = sourceStoreToOriginalPath.find(storePath);
+    if (it != sourceStoreToOriginalPath.end())
+        return it->second;
+    return std::nullopt;
+}
+
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
     try {

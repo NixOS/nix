@@ -179,6 +179,14 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     CanonPath resolveSymlinks(const CanonPath & path, SymlinkResolution mode = SymlinkResolution::Full);
 
     /**
+     * For accessors backed by store paths that were copied from a
+     * local filesystem path (e.g. `path:` flake inputs), this records
+     * the original filesystem root so that we can map store paths back
+     * to their original locations.
+     */
+    std::optional<std::filesystem::path> originalRootPath;
+
+    /**
      * A string that uniquely represents the contents of this
      * accessor. This is used for caching lookups (see `fetchToStore()`).
      */

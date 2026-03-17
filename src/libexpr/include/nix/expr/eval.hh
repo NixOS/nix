@@ -467,6 +467,11 @@ private:
        Populated alongside srcToStore so we can recover provenance. */
     const ref<boost::concurrent_flat_map<StorePath, SourcePath>> storeToSrc;
 
+    /* Map from flake source store paths (e.g. /nix/store/xxx-source) to
+       their original filesystem paths (e.g. /home/user/project).
+       Populated by mountInput() for path: inputs. */
+    std::map<StorePath, std::filesystem::path> sourceStoreToOriginalPath;
+
     /**
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.
@@ -587,6 +592,19 @@ public:
      * Return the full store→source mapping built during this evaluation.
      */
     std::map<StorePath, SourcePath> getSourceOrigins() const;
+
+    /**
+     * Look up the original filesystem path for a flake source store path.
+     * Returns std::nullopt if the store path wasn't a path: input.
+     */
+    std::optional<std::filesystem::path> getOriginalPath(const StorePath & storePath) const;
+
+    /**
+     * Record a store path → source path mapping. Used by addPath
+     * (builtins.path / builtins.filterSource) so that filtered sources
+     * also appear in the storeToSrc provenance map.
+     */
+    void recordPathOrigin(const StorePath & storePath, const SourcePath & srcPath);
 
     void checkURI(const std::string & uri);
 

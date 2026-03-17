@@ -9,6 +9,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-settings.hh"
 #include <nlohmann/json.hpp>
 
 using namespace nix;
@@ -45,8 +46,74 @@ struct CmdDerivationSourceOrigins : InstallablesCommand, MixPrintJSON
         return catUtility;
     }
 
+    /**
+     * Given a SourcePath from the storeToSrc mapping, try to resolve
+     * it back to the original filesystem path.  Two strategies:
+     *
+     *  1. The SourcePath string starts with /nix/store/ (storeFS accessor).
+     *     Parse the store path prefix and look it up in
+     *     sourceStoreToOriginalPath.
+     *
+     *  2. The SourcePath's accessor has originalRootPath set (per-input
+     *     accessor, e.g. from path: flake inputs).  Combine
+     *     originalRootPath with the relative path component.
+     */
+    std::optional<std::string> resolveOriginalPath(
+        ref<Store> store, ref<EvalState> state, const SourcePath & srcPath)
+    {
+        // Use the canonical path, not to_string() which goes through
+        // showPath/resolve and may hide the actual store path.
+        auto pathStr = srcPath.path.abs();
+
+        // Strategy 1: store path in the string representation.
+        auto storeDir = store->storeDir;
+        if (hasPrefix(pathStr, storeDir + "/")) {
+            auto afterStore = pathStr.find('/', storeDir.size() + 1);
+            std::string storePathStr, relPath;
+            if (afterStore == std::string::npos) {
+                storePathStr = pathStr;
+                relPath = "";
+            } else {
+                storePathStr = pathStr.substr(0, afterStore);
+                relPath = pathStr.substr(afterStore + 1);
+            }
+
+            try {
+                auto sp = store->parseStorePath(storePathStr);
+                auto origPath = state->getOriginalPath(sp);
+                if (origPath) {
+                    if (relPath.empty())
+                        return origPath->string();
+                    else
+                        return (*origPath / relPath).string();
+                }
+            } catch (...) {
+                // Not a valid store path, fall through.
+            }
+        }
+
+        // Strategy 2: accessor tagged with originalRootPath by mountInput.
+        if (srcPath.accessor->originalRootPath) {
+            auto origRoot = *srcPath.accessor->originalRootPath;
+            auto relPath = srcPath.path.rel();
+            if (relPath.empty() || relPath == ".") {
+                return origRoot.string();
+            } else {
+                return (origRoot / relPath).string();
+            }
+        }
+
+        return std::nullopt;
+    }
+
     void run(ref<Store> store, Installables && installables) override
     {
+        // We need full evaluation (not cached) so that copyPathToStore
+        // fires and populates EvalState::storeToSrc. Without this, the
+        // eval cache returns cached derivation paths and storeToSrc
+        // stays empty.
+        evalSettings.useEvalCache = false;
+
         // Step 1: Evaluate installables to derivation paths.
         // This triggers copyPathToStore for every source reference in the
         // Nix expressions, populating EvalState::storeToSrc.
@@ -59,7 +126,7 @@ struct CmdDerivationSourceOrigins : InstallablesCommand, MixPrintJSON
         }
 
         // Step 2: Grab the full store→source mapping that was built during
-        // evaluation.
+        // evaluation, plus the sourceStoreToOriginalPath mapping from mountInput.
         auto state = getEvalState();
         auto origins = state->getSourceOrigins();
 
@@ -78,12 +145,31 @@ struct CmdDerivationSourceOrigins : InstallablesCommand, MixPrintJSON
                 json entry = json::object();
                 entry["storePath"] = store->printStorePath(inputSrc);
 
-                // Look up the original source path from our reverse mapping.
-                auto it = origins.find(inputSrc);
-                if (it != origins.end()) {
-                    entry["sourcePath"] = it->second.to_string();
+                // First, check if recordPathOrigin directly resolved this
+                // to an original filesystem path (handles cleanSourceWith,
+                // builtins.path, and all path: inputs).
+                auto origPath = state->getOriginalPath(inputSrc);
+                if (origPath) {
+                    entry["sourcePath"] = origPath->string();
                 } else {
-                    entry["sourcePath"] = nullptr;
+                    // Fall back to the storeToSrc reverse mapping.
+                    auto it = origins.find(inputSrc);
+                    if (it != origins.end()) {
+                        auto & srcPath = it->second;
+                        auto resolved = resolveOriginalPath(store, state, srcPath);
+                        if (resolved) {
+                            entry["sourcePath"] = *resolved;
+                        } else {
+                            auto physPath = srcPath.getPhysicalPath();
+                            if (physPath) {
+                                entry["sourcePath"] = physPath->string();
+                            } else {
+                                entry["sourcePath"] = srcPath.to_string();
+                            }
+                        }
+                    } else {
+                        entry["sourcePath"] = nullptr;
+                    }
                 }
 
                 inputSrcsJson[store->printStorePath(inputSrc)] = entry;

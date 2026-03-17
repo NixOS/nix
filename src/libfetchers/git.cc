@@ -989,6 +989,10 @@ struct GitInputScheme : InputScheme
         ref<SourceAccessor> accessor =
             repo->getAccessor(repoInfo.workdirInfo, {.exportIgnore = exportIgnore}, makeNotAllowedError(repoPath));
 
+        // Record the git repo root as the original filesystem path so that
+        // source-origins can map store paths back to their original locations.
+        accessor->originalRootPath = repoPath;
+
         /* If the repo has submodules, return a mounted input accessor
            consisting of the accessor for the top-level repo and the
            accessors for the submodule workdirs. */
