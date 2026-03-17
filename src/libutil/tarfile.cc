@@ -17,11 +17,11 @@ int callback_open(struct archive *, void * self)
 
 ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
 {
-    auto self = (TarArchive *) _self;
+    auto self = static_cast<TarArchive *>(_self);
     *buffer = self->buffer.data();
 
     try {
-        return self->source->read((char *) self->buffer.data(), self->buffer.size());
+        return self->source->read(reinterpret_cast<char *>(self->buffer.data()), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
     } catch (std::exception & err) {

@@ -162,8 +162,8 @@ private:
 
     static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length)
     {
-        auto self = (ArchiveCompressionSink *) _self;
-        self->nextSink({(const char *) buffer, length});
+        auto self = static_cast<ArchiveCompressionSink *>(_self);
+        self->nextSink({static_cast<const char *>(buffer), length});
         return length;
     }
 };
@@ -217,7 +217,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
 
     void writeInternal(std::string_view data) override
     {
-        auto next_in = (const uint8_t *) data.data();
+        auto next_in = reinterpret_cast<const uint8_t *>(data.data());
         size_t avail_in = data.size();
         uint8_t * next_out = outbuf;
         size_t avail_out = sizeof(outbuf);
@@ -229,7 +229,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
                 throw CompressionError("error while decompressing brotli file");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
-                nextSink({(char *) outbuf, sizeof(outbuf) - avail_out});
+                nextSink({reinterpret_cast<char *>(outbuf), sizeof(outbuf) - avail_out});
                 next_out = outbuf;
                 avail_out = sizeof(outbuf);
             }
@@ -289,7 +289,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
 
     void writeInternal(std::string_view data) override
     {
-        auto next_in = (const uint8_t *) data.data();
+        auto next_in = reinterpret_cast<const uint8_t *>(data.data());
         size_t avail_in = data.size();
         uint8_t * next_out = outbuf;
         size_t avail_out = sizeof(outbuf);
@@ -308,7 +308,7 @@ struct BrotliCompressionSink : ChunkedCompressionSink
                 throw CompressionError("error while compressing brotli compression");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
-                nextSink({(const char *) outbuf, sizeof(outbuf) - avail_out});
+                nextSink({reinterpret_cast<const char *>(outbuf), sizeof(outbuf) - avail_out});
                 next_out = outbuf;
                 avail_out = sizeof(outbuf);
             }
