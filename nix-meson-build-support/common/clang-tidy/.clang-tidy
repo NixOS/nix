@@ -30,6 +30,9 @@ Checks:
   - cppcoreguidelines-avoid-capturing-lambda-coroutines
   # Custom nix checks (when added)
   - nix-*
+  # Pending site-by-site triage: 159 sites (54 throw, 42 catch, 58 regex ctor, 5 type-dependent).
+  # Most regex ctors are compile-time literals (NOLINT); catch/throw need individual review.
+  - -nix-foreign-exceptions
 
 CheckOptions:
   # __asan_default_options: ASAN runtime configuration function (see nix-meson-build-support/common/asan-options/)

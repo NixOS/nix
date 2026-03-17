@@ -13,6 +13,8 @@
 #include <clang-tidy/ClangTidyModule.h>
 #include <clang-tidy/ClangTidyModuleRegistry.h>
 
+#include "forbidden-includes.hh"
+#include "foreign-exceptions.hh"
 #include "format-string-arity.hh"
 
 namespace nix::clang_tidy {
@@ -25,6 +27,8 @@ class NixClangTidyChecks : public ClangTidyModule
 public:
     void addCheckFactories(ClangTidyCheckFactories & CheckFactories) override
     {
+        CheckFactories.registerCheck<ForbiddenIncludesCheck>("nix-forbidden-includes");
+        CheckFactories.registerCheck<ForeignExceptionsCheck>("nix-foreign-exceptions");
         CheckFactories.registerCheck<FormatStringArityCheck>("nix-format-string-arity");
     }
 };
