@@ -127,7 +127,7 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
         res += "Sig: " + sig.to_string() + "\n";
 
     if (ca)
-        res += "CA: " + renderContentAddress(*ca) + "\n";
+        res += "CA: " + renderContentAddress(ca) + "\n";
 
     return res;
 }

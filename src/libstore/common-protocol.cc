@@ -69,7 +69,7 @@ CommonProto::Serialise<std::optional<ContentAddress>>::read(const StoreDirConfig
 void CommonProto::Serialise<std::optional<ContentAddress>>::write(
     const StoreDirConfig & store, CommonProto::WriteConn conn, const std::optional<ContentAddress> & caOpt)
 {
-    conn.to << (caOpt ? renderContentAddress(*caOpt) : "");
+    conn.to << (caOpt ? renderContentAddress(caOpt) : "");
 }
 
 Signature CommonProto::Serialise<Signature>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)

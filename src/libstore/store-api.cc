@@ -1197,7 +1197,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
             auto info = queryPathInfo(path);
             if (!info->deriver)
                 return std::nullopt;
-            return *info->deriver;
+            return info->deriver;
         } catch (InvalidPath &) {
             return std::nullopt;
         }

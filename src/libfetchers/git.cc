@@ -147,7 +147,7 @@ static std::optional<std::string> readHeadCached(const Settings & settings, cons
         // This function must behave the same way, so we return the expired
         // cached ref here.
         warn("could not get HEAD ref for repository '%s'; using expired cached ref '%s'", actualUrl, *cachedRef);
-        return *cachedRef;
+        return cachedRef;
     }
 
     return std::nullopt;
@@ -541,7 +541,7 @@ struct GitInputScheme : InputScheme
                         OS_STR("-F"),
                         OS_STR("-"),
                     },
-                    *commitMsg);
+                    commitMsg);
             }
         }
     }

@@ -225,7 +225,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     if (info->ultimate)
                         ss.push_back("ultimate");
                     if (info->ca)
-                        ss.push_back("ca:" + renderContentAddress(*info->ca));
+                        ss.push_back("ca:" + renderContentAddress(info->ca));
                     for (auto & sig : info->sigs)
                         ss.push_back(sig.to_string());
                     str << concatStringsSep(" ", ss);

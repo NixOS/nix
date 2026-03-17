@@ -3306,7 +3306,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
             auto res = (*hook)(*this, rest);
             if (res)
-                return finish(std::move(*res));
+                return finish(std::move(res));
         }
     }
 

@@ -108,7 +108,7 @@ FileTransferSettings::FileTransferSettings()
             })
             .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
     if (sslOverride)
-        caFile = *sslOverride;
+        caFile = sslOverride;
 }
 
 FileTransferSettings fileTransferSettings;

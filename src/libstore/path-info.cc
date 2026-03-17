@@ -198,7 +198,7 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
     }
 
     if (format == PathInfoJsonFormat::V1)
-        jsonObject["ca"] = ca ? static_cast<json>(renderContentAddress(*ca)) : static_cast<json>(nullptr);
+        jsonObject["ca"] = ca ? static_cast<json>(renderContentAddress(ca)) : static_cast<json>(nullptr);
     else
         jsonObject["ca"] = ca;
 

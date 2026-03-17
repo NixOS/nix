@@ -1308,7 +1308,7 @@ static void opSwitchGeneration(Globals & globals, Strings opFlags, Strings opArg
         throw UsageError("exactly one argument expected");
 
     if (auto dstGen = string2Int<GenerationNumber>(opArgs.front()))
-        switchGeneration(globals.profile, *dstGen, globals.dryRun);
+        switchGeneration(globals.profile, dstGen, globals.dryRun);
     else
         throw UsageError("expected a generation number");
 }
