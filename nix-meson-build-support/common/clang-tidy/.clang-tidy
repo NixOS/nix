@@ -31,8 +31,6 @@ Checks:
   - -bugprone-suspicious-stringview-data-usage
   # 4 warnings - .cc files included in other files (intentional pattern)
   - -bugprone-suspicious-include
-  # 2 warnings - unused return values (AllowCastToVoid helps but some remain)
-  - -bugprone-unused-return-value
   # 2 warnings - returning const& from parameter
   - -bugprone-return-const-ref-from-parameter
   # 2 warnings - std::move on forwarding reference (auto&&) in ranges lambdas
