@@ -14,18 +14,10 @@ Checks:
   - -bugprone-unchecked-optional-access
   # Many warnings, questionable lint
   - -bugprone-branch-clone
-  # Extremely noisy before clang 19: https://github.com/llvm/llvm-project/issues/93959
-  - -bugprone-multi-level-implicit-pointer-conversion
   # We don't compile out our asserts
   - -bugprone-assert-side-effect
   # TODO: figure out if this warning is useful
   - -bugprone-exception-escape
-  #
-  # Checks disabled to pass on current codebase (can be progressively enabled):
-  #
-  # 9 warnings - intentional std::bit_cast/memcpy on Value* arrays (evaluator hot path)
-  - -bugprone-bitwise-pointer-cast
-  #
   # Non-bugprone checks (also disabled to pass on current codebase):
   #
   # 4 warnings - exceptions not derived from std::exception

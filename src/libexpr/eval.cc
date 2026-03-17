@@ -2062,6 +2062,7 @@ void EvalState::concatLists(
         auto listView = lists[n]->listView();
         auto l = listView.size();
         if (l)
+            // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
             memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }

@@ -3287,6 +3287,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
         auto sym = state.symbols.create(name);
 
         // (ab)use Attr to store a Value * * instead of a Value *, so that we can stabilize the sort using the Value * *
+        // NOLINTBEGIN(bugprone-bitwise-pointer-cast): intentional type-punning for stable sort
         bindings[n] = Attr(sym, std::bit_cast<Value *>(&v2));
     }
 
@@ -3304,6 +3305,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
         }
         // Note that .value is actually a Value * *; see earlier comments
         Value * v2 = *std::bit_cast<ElemPtr>(attr.value);
+        // NOLINTEND(bugprone-bitwise-pointer-cast)
 
         auto j = state.getAttr(state.s.value, v2->attrs(), "in a {name=...; value=...;} pair");
         prev = attr.name;
@@ -4136,12 +4138,14 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value ** args, V
     auto rsize = right.size();
     auto rlist = state.buildList(rsize);
     if (rsize)
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(rlist.elems, right.data(), sizeof(Value *) * rsize);
     attrs.alloc(state.s.right).mkList(rlist);
 
     auto wsize = wrong.size();
     auto wlist = state.buildList(wsize);
     if (wsize)
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(wlist.elems, wrong.data(), sizeof(Value *) * wsize);
     attrs.alloc(state.s.wrong).mkList(wlist);
 
@@ -4193,6 +4197,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
     for (auto & i : attrs) {
         auto size = i.second.size();
         auto list = state.buildList(size);
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
         attrs2.alloc(i.first).mkList(list);
     }
@@ -4250,6 +4255,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value ** args, V
         auto listView = lists[n].listView();
         auto l = listView.size();
         if (l)
+            // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
             memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
