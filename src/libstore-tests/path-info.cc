@@ -89,6 +89,7 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
     return makeFullKeyed(store, includeImpureInfo);
 }
 
+// NOLINTBEGIN(bugprone-macro-parentheses): OBJ is always a simple call expression in tests
 #define JSON_READ_TEST_V1(STEM, OBJ)                                                     \
     TEST_F(PathInfoTestV1, PathInfo_##STEM##_from_json)                                  \
     {                                                                                    \
@@ -163,6 +164,7 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
 #define JSON_TEST_V3(STEM, OBJ, PURE) \
     JSON_READ_TEST_V3(STEM, OBJ)      \
     JSON_WRITE_TEST_V3(STEM, OBJ, PURE)
+// NOLINTEND(bugprone-macro-parentheses)
 
 JSON_TEST_V1(empty_pure, makeEmpty(), false)
 JSON_TEST_V1(empty_impure, makeEmpty(), true)

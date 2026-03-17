@@ -15,6 +15,7 @@ namespace nix {
 
 /* protocol-agnostic templates */
 
+// NOLINTBEGIN(bugprone-macro-parentheses): TEMPLATE/T are a template-head and a type
 #define SERVE_USE_LENGTH_PREFIX_SERIALISER(TEMPLATE, T)                                                \
     TEMPLATE T ServeProto::Serialise<T>::read(const StoreDirConfig & store, ServeProto::ReadConn conn) \
     {                                                                                                  \
@@ -25,6 +26,7 @@ namespace nix {
     {                                                                                                  \
         LengthPrefixedProtoHelper<ServeProto, T>::write(store, conn, t);                               \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 SERVE_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 #define COMMA_ ,

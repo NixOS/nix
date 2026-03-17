@@ -53,6 +53,7 @@ namespace nix {
    Nix daemon by setting the mode/ownership of the directory
    appropriately.  (This wouldn't work on the socket itself since it
    must be deleted and recreated on startup.) */
+// NOLINTNEXTLINE(bugprone-macro-parentheses): relies on expansion context (fs::path on left) for operator/
 #define DEFAULT_SOCKET_PATH "daemon-socket" / "socket"
 
 LogFileSettings::LogFileSettings()

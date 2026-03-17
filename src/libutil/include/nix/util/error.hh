@@ -265,12 +265,14 @@ public:
     }
 };
 
+// NOLINTBEGIN(bugprone-macro-parentheses): newClass/superClass are types, parens would change meaning
 #define MakeError(newClass, superClass)                             \
     class newClass : public CloneableError<newClass, superClass>    \
     {                                                               \
     public:                                                         \
         using CloneableError<newClass, superClass>::CloneableError; \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 MakeError(Error, BaseError);
 MakeError(UsageError, Error);

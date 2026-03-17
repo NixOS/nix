@@ -533,12 +533,14 @@ private:
     Payload payload;
 
 protected:
+// NOLINTBEGIN(bugprone-macro-parentheses): K is a type, parens would change meaning
 #define NIX_VALUE_STORAGE_GET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void getStorage(K & val) const noexcept                      \
     {                                                            \
         assert(internalType == DISCRIMINATOR);                   \
         val = payload.FIELD_NAME;                                \
     }
+    // NOLINTEND(bugprone-macro-parentheses)
 
 #define NIX_VALUE_STORAGE_SET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void setStorage(K val) noexcept                              \
@@ -819,6 +821,7 @@ protected:
         }
     }
 
+// NOLINTBEGIN(bugprone-macro-parentheses): TYPE is a type, parens would change meaning
 #define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, MEMBER_A, MEMBER_B)                                   \
                                                                                                        \
     void getStorage(TYPE & val) const noexcept                                                         \
@@ -830,6 +833,7 @@ protected:
     {                                                                                                  \
         setPairOfPointersPayload<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
     }
+    // NOLINTEND(bugprone-macro-parentheses)
 
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, [0], [1])
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, .left, .right)
