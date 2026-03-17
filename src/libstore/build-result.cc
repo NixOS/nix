@@ -57,8 +57,10 @@ unsigned int ExitStatusFlags::failingExitStatus() const
     return mask ? mask : 1;
 }
 
+// NOLINTBEGIN(bugprone-exception-escape): defaulted on variant/map members — only bad_alloc possible
 bool BuildResult::operator==(const BuildResult &) const noexcept = default;
 std::strong_ordering BuildResult::operator<=>(const BuildResult &) const noexcept = default;
+// NOLINTEND(bugprone-exception-escape)
 
 bool BuildResult::Success::operator==(const BuildResult::Success &) const noexcept = default;
 std::strong_ordering BuildResult::Success::operator<=>(const BuildResult::Success &) const noexcept = default;

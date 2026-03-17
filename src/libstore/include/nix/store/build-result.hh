@@ -116,6 +116,7 @@ public:
     std::strong_ordering operator<=>(const BuildError &) const noexcept;
 };
 
+// NOLINTNEXTLINE(bugprone-exception-escape): defaulted move-assign on variant member — never valueless
 struct BuildResult
 {
     struct Success

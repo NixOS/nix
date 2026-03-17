@@ -992,6 +992,7 @@ public:
     {
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape): variant never valueless-by-exception
     Value * const * data() const & noexcept
     {
         return std::visit(
@@ -1000,6 +1001,7 @@ public:
             raw);
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape): variant never valueless-by-exception
     std::size_t size() const noexcept
     {
         return std::visit(

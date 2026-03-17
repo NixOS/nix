@@ -172,6 +172,7 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape): map comparison — only bad_alloc possible
 bool Input::operator==(const Input & other) const noexcept
 {
     return attrs == other.attrs;

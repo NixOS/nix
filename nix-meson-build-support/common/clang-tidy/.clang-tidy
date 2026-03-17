@@ -14,8 +14,6 @@ Checks:
   - -bugprone-unchecked-optional-access
   # Many warnings, questionable lint
   - -bugprone-branch-clone
-  # TODO: figure out if this warning is useful
-  - -bugprone-exception-escape
   # Non-bugprone checks (also disabled to pass on current codebase):
   #
   # All thrown exceptions must derive from std::exception
