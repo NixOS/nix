@@ -142,8 +142,6 @@ struct PathInputScheme : InputScheme
     getAccessor(const Settings & settings, Store & store, const Input & _input) const override
     {
         Input input(_input);
-        auto path = getStrAttr(input.attrs, "path");
-
         auto absPath = getAbsPath(input);
 
         // FIXME: check whether access to 'path' is allowed.
