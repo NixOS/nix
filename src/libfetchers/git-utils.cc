@@ -873,7 +873,7 @@ struct GitSourceAccessor : SourceAccessor
             return Stat{.type = tDirectory};
 
         else
-            throw Error("file '%s' has an unsupported Git file type");
+            throw Error("file '%s' has an unsupported Git file type", showPath(path));
     }
 
     DirEntries readDirectory(const CanonPath & path) override
