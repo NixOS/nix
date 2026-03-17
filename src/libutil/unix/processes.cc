@@ -243,7 +243,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
                logger's destructor since that will crash (e.g. when
                ~ProgressBar() tries to join a thread that doesn't
                exist. */
-            logger.release();
+            (void) logger.release();
             logger = std::move(newLogger);
         }
         try {

@@ -1176,7 +1176,7 @@ StorePath LocalStore::addToStoreFromDump(
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, localSettings.narBufferSize - oldSize);
         if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
-            dumpBuffer.release();
+            (void) dumpBuffer.release();
             dumpBuffer.reset((char *) tmp);
         } else {
             throw std::bad_alloc();
