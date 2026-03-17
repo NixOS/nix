@@ -24,8 +24,10 @@ Checks:
   - hicpp-exception-baseclass
   # 88 warnings - C-style casts should be explicit about intent
   # - cppcoreguidelines-pro-type-cstyle-cast
-  # 11 warnings - coroutine lambdas with captures (intentional pattern in async goal/store code)
-  # - cppcoreguidelines-avoid-capturing-lambda-coroutines
+  # Coroutine lambdas with captures: all current sites are safe (co_await blocks until completion,
+  # or local Goal::Co sub-coroutines called in-scope). NOLINT per-site so the check stays active
+  # for future code where a ref-capturing coroutine might actually be stored/detached.
+  - cppcoreguidelines-avoid-capturing-lambda-coroutines
   # Custom nix checks (when added)
   - nix-*
 

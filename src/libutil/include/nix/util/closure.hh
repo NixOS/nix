@@ -98,6 +98,7 @@ auto computeClosure(std::set<T> startElts, std::set<T> & res, GetEdgesAsync<T> g
                 asio::post(executor, [state = this->shared_from_this(), elt] {
                     asio::co_spawn(
                         state->executor,
+                        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): by-value shared_ptr
                         [state, elt]() -> asio::awaitable<void> {
                             try {
                                 state->enqueue(co_await state->getEdges(elt));

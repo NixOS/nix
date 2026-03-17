@@ -364,6 +364,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         return LocalBuildCapability{*localStoreP, ext};
     }();
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): local sub-coroutine
     auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co {
         trace("trying to build");
 
@@ -444,6 +445,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         co_return Return{};
     };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): local sub-coroutine
     auto tryHookLoop = [&](bool & valid) -> Goal::Co {
         {
             PathLocks outputLocks;
@@ -511,6 +513,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         }
     };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): local sub-coroutine
     auto tryBuildLocally = [&](bool & valid) -> Goal::Co {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;

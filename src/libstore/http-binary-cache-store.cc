@@ -91,6 +91,7 @@ StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
     computeClosure<StorePath>(
         paths,
         referencesClosureSet,
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): consumed synchronously by computeClosure
         [this, &paths, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
