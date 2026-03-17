@@ -22,8 +22,6 @@ Checks:
   - -bugprone-assert-side-effect
   # TODO: figure out if this warning is useful
   - -bugprone-exception-escape
-  # We use pointers to aggregates intentionally; void * would look weird
-  - -bugprone-sizeof-expression
   #
   # Checks disabled to pass on current codebase (can be progressively enabled):
   #
