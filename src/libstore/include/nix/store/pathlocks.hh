@@ -66,11 +66,7 @@ struct FdLock
     FdLock(FdLock &&) = delete;
     FdLock & operator=(FdLock &&) = delete;
 
-    ~FdLock()
-    {
-        if (acquired)
-            lockFile(desc, ltNone, false);
-    }
+    ~FdLock();
 };
 
 } // namespace nix

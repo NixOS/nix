@@ -33,4 +33,14 @@ void PathLocks::setDeletion(bool deletePaths)
     this->deletePaths = deletePaths;
 }
 
+FdLock::~FdLock()
+{
+    try {
+        if (acquired)
+            lockFile(desc, ltNone, false);
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+}
+
 } // namespace nix
