@@ -1535,11 +1535,13 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast): ExprBlackHole:Expr only forward-declared here
     return isThunk() && thunk().expr == (Expr *) &eBlackHole;
 }
 
 void Value::mkBlackhole()
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast): ExprBlackHole:Expr only forward-declared here
     mkThunk(nullptr, (Expr *) &eBlackHole);
 }
 
