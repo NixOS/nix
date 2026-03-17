@@ -7,6 +7,7 @@ namespace nix::testing {
 
 void TestHttpBinaryCacheStore::init()
 {
+    // NOLINTNEXTLINE(bugprone-parent-virtual-call): skip HttpBinaryCacheStore::init in test setup
     BinaryCacheStore::init();
 }
 

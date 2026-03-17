@@ -41,8 +41,6 @@ Checks:
   - -bugprone-unused-local-non-trivial-variable
   # 2 warnings - returning const& from parameter
   - -bugprone-return-const-ref-from-parameter
-  # 1 warning - calling parent virtual instead of override
-  - -bugprone-parent-virtual-call
   # 1 warning - null termination issues
   - -bugprone-not-null-terminated-result
   # 1 warning - increment/decrement in conditions
