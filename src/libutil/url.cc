@@ -8,10 +8,87 @@
 
 #include <boost/url.hpp>
 
+#include <cctype>
+
 namespace nix {
 
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
+
+namespace {
+
+bool isHexDigit(unsigned char c)
+{
+    return std::isxdigit(c) != 0;
+}
+
+bool isRfc3986SubDelim(unsigned char c)
+{
+    switch (c) {
+    case '!':
+    case '$':
+    case '&':
+    case '\'':
+    case '(':
+    case ')':
+    case '*':
+    case '+':
+    case ',':
+    case ';':
+    case '=':
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool isRfc3986UserinfoChar(unsigned char c)
+{
+    return ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '.'
+            || c == '_' || c == '~')
+           || isRfc3986SubDelim(c) || c == ':';
+}
+
+void appendPctEncodedByte(std::string & out, unsigned char c)
+{
+    static constexpr std::string_view hex = "0123456789ABCDEF";
+    out += '%';
+    out += hex[c >> 4];
+    out += hex[c & 0x0f];
+}
+
+std::optional<std::string> normalizeLenientUserinfo(std::string_view userinfo)
+{
+    std::string normalized;
+    normalized.reserve(userinfo.size());
+
+    for (size_t i = 0; i < userinfo.size();) {
+        auto c = static_cast<unsigned char>(userinfo[i]);
+
+        if (c == '%' && i + 2 < userinfo.size() && isHexDigit(static_cast<unsigned char>(userinfo[i + 1]))
+            && isHexDigit(static_cast<unsigned char>(userinfo[i + 2]))) {
+            normalized += userinfo.substr(i, 3);
+            i += 3;
+            continue;
+        }
+
+        if (isRfc3986UserinfoChar(c)) {
+            normalized += static_cast<char>(c);
+            ++i;
+            continue;
+        }
+
+        if (std::isspace(c) || std::iscntrl(c))
+            return std::nullopt;
+
+        appendPctEncodedByte(normalized, c);
+        ++i;
+    }
+
+    return normalized;
+}
+
+} // namespace
 
 ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthority)
 {
@@ -50,6 +127,32 @@ ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthori
         .password = parsed->has_password() ? parsed->password() : std::optional<std::string>{},
         .port = port,
     };
+}
+
+std::optional<std::string> normalizeAuthorityLenientUserinfo(std::string_view encodedAuthority)
+{
+    auto lastAt = encodedAuthority.rfind('@');
+    if (lastAt == std::string_view::npos)
+        return std::nullopt;
+
+    auto userinfo = encodedAuthority.substr(0, lastAt);
+    auto hostAndPort = encodedAuthority.substr(lastAt + 1);
+
+    auto normalizedUserinfo = normalizeLenientUserinfo(userinfo);
+    if (!normalizedUserinfo)
+        return std::nullopt;
+
+    std::string fixedAuthority;
+    fixedAuthority.reserve(normalizedUserinfo->size() + 1 + hostAndPort.size());
+    fixedAuthority += *normalizedUserinfo;
+    fixedAuthority += '@';
+    fixedAuthority += hostAndPort;
+
+    try {
+        return ParsedURL::Authority::parse(fixedAuthority).to_string();
+    } catch (BadURL &) {
+        return std::nullopt;
+    }
 }
 
 std::ostream & operator<<(std::ostream & os, const ParsedURL::Authority & self)

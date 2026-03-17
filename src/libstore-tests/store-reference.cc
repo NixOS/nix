@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/util/file-system.hh"
+#include "nix/util/url.hh"
 #include "nix/store/store-reference.hh"
 
 #include "nix/util/tests/characterization.hh"
@@ -263,5 +264,45 @@ static const StoreReference sshIPv6AuthorityWithZoneId{
 };
 
 URI_TEST_READ(ssh_unbracketed_ipv6_9, sshIPv6AuthorityWithZoneId)
+
+TEST_F(StoreReferenceTest, parseStoreReferenceWithMultipleAtSignsInAuthority)
+{
+    auto parsed = StoreReference::parse("ssh-ng://deploy@device-2c-cf-67-db-54-61@gateway.example.org");
+    auto * specified = std::get_if<StoreReference::Specified>(&parsed.variant);
+
+    ASSERT_NE(specified, nullptr);
+    EXPECT_EQ(specified->scheme, "ssh-ng");
+    EXPECT_EQ(specified->authority, "deploy%40device-2c-cf-67-db-54-61@gateway.example.org");
+
+    auto authority = ParsedURL::Authority::parse(specified->authority);
+    ASSERT_TRUE(authority.user.has_value());
+    EXPECT_EQ(*authority.user, "deploy@device-2c-cf-67-db-54-61");
+    EXPECT_EQ(authority.host, "gateway.example.org");
+}
+
+TEST_F(StoreReferenceTest, parseStoreReferenceWithMultipleAtSignsInAuthorityAndPath)
+{
+    auto parsed = StoreReference::parse("https://user@service@example.org/cache");
+    auto * specified = std::get_if<StoreReference::Specified>(&parsed.variant);
+
+    ASSERT_NE(specified, nullptr);
+    EXPECT_EQ(specified->scheme, "https");
+    EXPECT_EQ(specified->authority, "user%40service@example.org/cache");
+
+    auto authorityAndPath = std::string_view(specified->authority);
+    auto slash = authorityAndPath.find('/');
+
+    ASSERT_NE(slash, std::string_view::npos);
+
+    auto authority = ParsedURL::Authority::parse(authorityAndPath.substr(0, slash));
+    ASSERT_TRUE(authority.user.has_value());
+    EXPECT_EQ(*authority.user, "user@service");
+    EXPECT_EQ(authority.host, "example.org");
+}
+
+TEST_F(StoreReferenceTest, parseStoreReferenceWithWhitespaceInUserinfoIsRejected)
+{
+    EXPECT_THROW((void) StoreReference::parse("ssh-ng://deploy user@gateway.example.org"), UsageError);
+}
 
 } // namespace nix

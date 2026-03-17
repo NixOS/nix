@@ -166,6 +166,24 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                     .params = std::move(params),
                 };
             }
+
+            auto authorityAndPath = schemeAndAuthority->authority;
+            auto slash = authorityAndPath.find('/');
+            auto authority = authorityAndPath.substr(0, slash);
+            auto path = slash == std::string_view::npos ? std::string_view{} : authorityAndPath.substr(slash);
+
+            if (auto fixedAuthority = normalizeAuthorityLenientUserinfo(authority)) {
+                std::string fixedAuthorityAndPath = std::move(*fixedAuthority);
+                fixedAuthorityAndPath += path;
+                return {
+                    .variant =
+                        Specified{
+                            .scheme = std::string(schemeAndAuthority->scheme),
+                            .authority = std::move(fixedAuthorityAndPath),
+                        },
+                    .params = std::move(params),
+                };
+            }
         }
     }
 
