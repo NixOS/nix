@@ -95,6 +95,8 @@ Here are some examples of flake references in their URL-like representation:
   branch of a Git repository.
 * `git+https://github.com/NixOS/patchelf?ref=master&rev=f34751b88bd07d7f44f5cd3200fb4122bf916c7e`:
   A specific branch *and* revision of a Git repository.
+* `git+https://github.com/NixOS/patchelf?ref=refs/tags/v1.0.0`: A specific
+  tag of a Git repository.
 * `https://github.com/NixOS/patchelf/archive/master.tar.gz`: A tarball
   flake.
 
