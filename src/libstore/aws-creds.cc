@@ -170,6 +170,31 @@ static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createSSOProvider(
     return createWrappedProvider(aws_credentials_provider_new_sso(allocator, &options), allocator);
 }
 
+/**
+ * Create an STS WebIdentity credentials provider using the C library directly.
+ * This reads AWS_WEB_IDENTITY_TOKEN_FILE, AWS_ROLE_ARN, AWS_ROLE_SESSION_NAME,
+ * and AWS_REGION from the environment (falling back to the profile config).
+ * Used by EKS IRSA, GitHub Actions OIDC, and other sts:AssumeRoleWithWebIdentity flows.
+ * Returns nullptr if the required parameters can't be resolved.
+ */
+static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createSTSWebIdentityProvider(
+    const std::string & profileName,
+    Aws::Crt::Io::ClientBootstrap * bootstrap,
+    Aws::Crt::Io::TlsContext * tlsContext,
+    Aws::Crt::Allocator * allocator = Aws::Crt::ApiAllocator())
+{
+    aws_credentials_provider_sts_web_identity_options options;
+    AWS_ZERO_STRUCT(options);
+
+    options.bootstrap = bootstrap->GetUnderlyingHandle();
+    options.tls_ctx = tlsContext ? tlsContext->GetUnderlyingHandle() : nullptr;
+    if (!profileName.empty()) {
+        options.profile_name_override = aws_byte_cursor_from_c_str(profileName.c_str());
+    }
+
+    return createWrappedProvider(aws_credentials_provider_new_sts_web_identity(allocator, &options), allocator);
+}
+
 static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider)
 {
     if (!provider || !provider->IsValid()) {
@@ -229,7 +254,8 @@ public:
         tlsContext =
             std::make_shared<Aws::Crt::Io::TlsContext>(tlsCtxOptions, Aws::Crt::Io::TlsMode::CLIENT, allocator);
         if (!tlsContext || !*tlsContext) {
-            warn("failed to create TLS context for AWS SSO; SSO authentication will be unavailable");
+            warn(
+                "failed to create TLS context for AWS credential providers; SSO and STS WebIdentity authentication will be unavailable");
             tlsContext = nullptr;
         }
 
@@ -273,7 +299,7 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
 
     debug("[pid=%d] creating new AWS credential provider for profile '%s'", getpid(), profileDisplayName);
 
-    // Build a custom credential chain: Environment → SSO → Profile → IMDS
+    // Build a custom credential chain: Environment → SSO → Profile → STS WebIdentity → IMDS
     // This works for both default and named profiles, ensuring consistent behavior
     // including SSO support and proper TLS context for STS-based role assumption.
     Aws::Crt::Auth::CredentialsProviderChainConfig chainConfig;
@@ -311,7 +337,18 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile)
         return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderProfile(profileConfig, allocator);
     });
 
-    // 4. IMDS provider (for EC2 instances, lowest priority)
+    // 4. STS WebIdentity (AWS_WEB_IDENTITY_TOKEN_FILE + AWS_ROLE_ARN — EKS IRSA, GitHub Actions OIDC)
+    if (tlsContext) {
+        addProviderToChain("STS WebIdentity", [&]() {
+            return createSTSWebIdentityProvider(profile, bootstrap, tlsContext.get(), allocator);
+        });
+    } else {
+        debug(
+            "Skipped AWS STS WebIdentity Credential Provider for profile '%s': TLS context unavailable",
+            profileDisplayName);
+    }
+
+    // 5. IMDS provider (for EC2 instances, lowest priority)
     addProviderToChain("IMDS", [&]() {
         Aws::Crt::Auth::CredentialsProviderImdsConfig imdsConfig;
         imdsConfig.Bootstrap = bootstrap;
