@@ -63,6 +63,7 @@ static std::vector<std::string> shellwords(std::string_view s)
                 cur.clear();
             }
         }
+        // NOLINTNEXTLINE(bugprone-switch-missing-default-case): char scanner, no meaningful default
         switch (*it) {
         case '\'':
             if (st != sDoubleQuote) {
