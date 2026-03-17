@@ -155,6 +155,7 @@ std::string optionalBracket(std::string_view prefix, std::string_view content, s
 
 const char * requireCString(const std::string & s)
 {
+    // NOLINTNEXTLINE(bugprone-not-null-terminated-result): memchr is bounded by size(), searching for embedded \0
     if (std::memchr(s.data(), '\0', s.size())) [[unlikely]] {
         using namespace std::string_view_literals;
         auto str = replaceStrings(s, "\0"sv, "␀"sv);
