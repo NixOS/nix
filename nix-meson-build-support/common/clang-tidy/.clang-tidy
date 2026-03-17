@@ -43,8 +43,6 @@ Checks:
   - -bugprone-return-const-ref-from-parameter
   # 1 warning - unsafe C functions (e.g., getenv)
   - -bugprone-unsafe-functions
-  # 1 warning - signed char misuse
-  - -bugprone-signed-char-misuse
   # 1 warning - calling parent virtual instead of override
   - -bugprone-parent-virtual-call
   # 1 warning - null termination issues
