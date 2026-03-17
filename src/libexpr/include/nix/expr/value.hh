@@ -445,6 +445,7 @@ struct ValueBase
             : ex(ex)
             , recoveryValue(recoveryValue)
         {
+            assert(this->ex);
         }
 
         [[noreturn]] void rethrow() const
@@ -459,6 +460,7 @@ struct ValueBase
             } catch (...) {
                 throw;
             }
+            unreachable();
         }
     };
 };

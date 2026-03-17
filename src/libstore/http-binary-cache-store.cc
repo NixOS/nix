@@ -7,6 +7,7 @@
 #include "nix/util/closure.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/topo-sort.hh"
 
 namespace nix {
@@ -202,11 +203,11 @@ void HttpBinaryCacheStore::upsertFile(
 {
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
-            CompressedSource compressed(source, *compressionMethod);
+            StringSource compressed(compress(*compressionMethod, source));
             /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
              */
             Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
-            upload(path, compressed, compressed.size(), mimeType, std::move(headers));
+            upload(path, compressed, compressed.s.size(), mimeType, std::move(headers));
         } else {
             upload(path, source, sizeHint, mimeType, std::nullopt);
         }

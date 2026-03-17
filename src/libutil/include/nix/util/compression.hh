@@ -23,6 +23,8 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
 
 std::string compress(CompressionAlgo method, std::string_view in, const bool parallel = false, int level = -1);
 
+std::string compress(CompressionAlgo method, Source & in, const bool parallel = false, int level = -1);
+
 ref<CompressionSink>
 makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel = false, int level = -1);
 
