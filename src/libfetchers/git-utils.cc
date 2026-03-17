@@ -368,7 +368,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // TODO: provide index callback for checkInterrupt() termination
         //       though this is about an order of magnitude faster than the packbuilder
         //       expect up to 1 sec latency due to uninterruptible git_indexer_append.
-        constexpr size_t chunkSize = 128 * 1024;
+        constexpr size_t chunkSize = 128UL * 1024;
         for (size_t offset = 0; offset < buf.size; offset += chunkSize) {
             if (git_indexer_append(indexer.get(), buf.ptr + offset, std::min(chunkSize, buf.size - offset), &stats))
                 throw GitError("appending to git packfile index");
@@ -1129,7 +1129,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     /** Total file contents in flight. */
     std::atomic<size_t> totalBufSize{0};
 
-    static constexpr std::size_t maxBufSize = 16 * 1024 * 1024;
+    static constexpr std::size_t maxBufSize = 16UL * 1024 * 1024;
 
     GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
         : repo(repo)

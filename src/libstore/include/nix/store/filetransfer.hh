@@ -135,7 +135,7 @@ public:
 
     Setting<size_t> downloadBufferSize{
         this,
-        1 * 1024 * 1024,
+        1UL * 1024 * 1024,
         "download-buffer-size",
         R"(
           The size of Nix's internal download buffer in bytes during `curl` transfers. If data is

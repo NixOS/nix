@@ -300,7 +300,7 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
 
-    std::array<char, 64 * 1024> buf;
+    std::array<char, 64UL * 1024> buf;
 
     try {
         while (true) {

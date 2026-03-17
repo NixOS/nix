@@ -53,7 +53,7 @@ struct BufferedSink : virtual Sink
     size_t bufSize, bufPos;
     std::unique_ptr<char[]> buffer;
 
-    BufferedSink(size_t bufSize = 32 * 1024)
+    BufferedSink(size_t bufSize = 32UL * 1024)
         : bufSize(bufSize)
         , bufPos(0)
         , buffer(nullptr)
@@ -124,7 +124,7 @@ struct BufferedSource : virtual Source
     size_t bufSize, bufPosIn, bufPosOut;
     std::unique_ptr<char[]> buffer;
 
-    BufferedSource(size_t bufSize = 32 * 1024)
+    BufferedSource(size_t bufSize = 32UL * 1024)
         : bufSize(bufSize)
         , bufPosIn(0)
         , bufPosOut(0)

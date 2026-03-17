@@ -159,8 +159,8 @@ TEST(getSizeUnit, misc)
     ASSERT_EQ(getSizeUnit(973), SizeUnit::Base); // FIXME: should round down
     ASSERT_EQ(getSizeUnit(1024), SizeUnit::Base);
     ASSERT_EQ(getSizeUnit(-1024), SizeUnit::Base);
-    ASSERT_EQ(getSizeUnit(1024 * 1024), SizeUnit::Kilo);
-    ASSERT_EQ(getSizeUnit(1100 * 1024), SizeUnit::Mega);
+    ASSERT_EQ(getSizeUnit(1024LL * 1024), SizeUnit::Kilo);
+    ASSERT_EQ(getSizeUnit(1100LL * 1024), SizeUnit::Mega);
     ASSERT_EQ(getSizeUnit(2ULL * 1024 * 1024 * 1024), SizeUnit::Giga);
     ASSERT_EQ(getSizeUnit(2100ULL * 1024 * 1024 * 1024), SizeUnit::Tera);
 }
@@ -174,9 +174,9 @@ TEST(getCommonSizeUnit, misc)
     ASSERT_EQ(getCommonSizeUnit({0}), SizeUnit::Base);
     ASSERT_EQ(getCommonSizeUnit({0, 100}), SizeUnit::Base);
     ASSERT_EQ(getCommonSizeUnit({100, 0}), SizeUnit::Base);
-    ASSERT_EQ(getCommonSizeUnit({100, 1024 * 1024}), std::nullopt);
-    ASSERT_EQ(getCommonSizeUnit({1024 * 1024, 100}), std::nullopt);
-    ASSERT_EQ(getCommonSizeUnit({1024 * 1024, 1024 * 1024}), SizeUnit::Kilo);
+    ASSERT_EQ(getCommonSizeUnit({100, 1024LL * 1024}), std::nullopt);
+    ASSERT_EQ(getCommonSizeUnit({1024LL * 1024, 100}), std::nullopt);
+    ASSERT_EQ(getCommonSizeUnit({1024LL * 1024, 1024LL * 1024}), SizeUnit::Kilo);
     ASSERT_EQ(getCommonSizeUnit({2100ULL * 1024 * 1024 * 1024, 2100ULL * 1024 * 1024 * 1024}), SizeUnit::Tera);
 }
 
@@ -193,8 +193,8 @@ TEST(renderSizeWithoutUnit, misc)
     ASSERT_EQ(renderSizeWithoutUnit(973, SizeUnit::Base, true), "   1.0"); // FIXME: should round down
     ASSERT_EQ(renderSizeWithoutUnit(1024, SizeUnit::Base, true), "   1.0");
     ASSERT_EQ(renderSizeWithoutUnit(-1024, SizeUnit::Base, true), "  -1.0");
-    ASSERT_EQ(renderSizeWithoutUnit(1024 * 1024, SizeUnit::Kilo, true), "1024.0");
-    ASSERT_EQ(renderSizeWithoutUnit(1100 * 1024, SizeUnit::Mega, true), "   1.1");
+    ASSERT_EQ(renderSizeWithoutUnit(1024LL * 1024, SizeUnit::Kilo, true), "1024.0");
+    ASSERT_EQ(renderSizeWithoutUnit(1100LL * 1024, SizeUnit::Mega, true), "   1.1");
     ASSERT_EQ(renderSizeWithoutUnit(2ULL * 1024 * 1024 * 1024, SizeUnit::Giga, true), "   2.0");
     ASSERT_EQ(renderSizeWithoutUnit(2100ULL * 1024 * 1024 * 1024, SizeUnit::Tera, true), "   2.1");
 }
@@ -212,8 +212,8 @@ TEST(renderSize, misc)
     ASSERT_EQ(renderSize(973, true), "   1.0 KiB"); // FIXME: should round down
     ASSERT_EQ(renderSize(1024, true), "   1.0 KiB");
     ASSERT_EQ(renderSize(-1024, true), "  -1.0 KiB");
-    ASSERT_EQ(renderSize(1024 * 1024, true), "1024.0 KiB");
-    ASSERT_EQ(renderSize(1100 * 1024, true), "   1.1 MiB");
+    ASSERT_EQ(renderSize(1024LL * 1024, true), "1024.0 KiB");
+    ASSERT_EQ(renderSize(1100LL * 1024, true), "   1.1 MiB");
     ASSERT_EQ(renderSize(2ULL * 1024 * 1024 * 1024, true), "   2.0 GiB");
     ASSERT_EQ(renderSize(2100ULL * 1024 * 1024 * 1024, true), "   2.1 TiB");
 }

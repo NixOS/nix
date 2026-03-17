@@ -172,7 +172,7 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
 
     /* Only allocate the buffer once. Use the heap because 131 KiB is a bit too
        much for the stack. */
-    std::vector<unsigned char> buf(128 * 1024);
+    std::vector<unsigned char> buf(128UL * 1024);
 
     for (;;) {
         // FIXME: merge with extract_archive

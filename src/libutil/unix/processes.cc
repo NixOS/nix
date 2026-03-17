@@ -272,7 +272,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
         // Not supported, since then we don't know when to free the stack.
         assert(!(options.cloneFlags & CLONE_VM));
 
-        size_t stackSize = 1 * 1024 * 1024;
+        size_t stackSize = 1UL * 1024 * 1024;
         auto stack = static_cast<char *>(
             mmap(0, stackSize, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
         if (stack == MAP_FAILED)
@@ -414,7 +414,7 @@ void runProgram2(const RunOptions & options)
         in.readSide.close();
         writerThread = std::thread([&] {
             try {
-                std::vector<char> buf(8 * 1024);
+                std::vector<char> buf(8UL * 1024);
                 while (true) {
                     size_t n;
                     try {

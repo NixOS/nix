@@ -41,7 +41,7 @@ struct GCSettings : public virtual Config
 {
     Setting<off_t> reservedSize{
         this,
-        8 * 1024 * 1024,
+        8UL * 1024 * 1024,
         "gc-reserved-space",
         "Amount of reserved disk space for the garbage collector.",
     };
@@ -248,7 +248,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
         )"};
 
     Setting<size_t> narBufferSize{
-        this, 32 * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};
+        this, 32ULL * 1024 * 1024, "nar-buffer-size", "Maximum size of NARs before spilling them to disk."};
 
     Setting<bool> allowSymlinkedStore{
         this,

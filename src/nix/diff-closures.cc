@@ -88,7 +88,7 @@ void printClosureDiff(
         auto beforeSize = totalSize(beforeVersions);
         auto afterSize = totalSize(afterVersions);
         auto sizeDelta = (int64_t) afterSize - (int64_t) beforeSize;
-        auto showDelta = std::abs(sizeDelta) >= 8 * 1024;
+        auto showDelta = std::abs(sizeDelta) >= 8LL * 1024;
 
         StringSet removed, unchanged;
         for (auto & [version, _] : beforeVersions)
