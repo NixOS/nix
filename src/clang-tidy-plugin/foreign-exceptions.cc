@@ -41,8 +41,10 @@ void ForeignExceptionsCheck::registerMatchers(MatchFinder * Finder)
     //   - `throw err;` where err is already typed as an allowed exception
     //   - `throw Error(...)` where the throw operand is a CXXConstructExpr
     //     whose constructor belongs to an allowed record
-    auto throwsAllowed = anyOf(
-        has(expr(hasType(allowedExceptions))), has(cxxConstructExpr(hasDeclaration(hasParent(allowedExceptions)))));
+    // hasCanonicalType looks through `using` aliases (e.g. NativeSysError =
+    // SysError) so alias throws match the underlying allowed type.
+    auto allowedType = hasCanonicalType(recordType(hasDeclaration(allowedExceptions)));
+    auto throwsAllowed = anyOf(has(expr(hasType(allowedType))), has(cxxConstructExpr(hasType(allowedType))));
 
     Finder->addMatcher(
         traverse(
