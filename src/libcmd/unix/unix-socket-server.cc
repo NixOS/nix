@@ -112,7 +112,7 @@ PeerInfo getPeerInfo(Descriptor remote)
                 struct sockaddr_un remoteAddr;
                 socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-                AutoCloseFD remote = accept(fd.fd, (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+                AutoCloseFD remote = accept(fd.fd, reinterpret_cast<struct sockaddr *>(&remoteAddr), &remoteAddrLen);
                 checkInterrupt();
                 if (!remote) {
                     if (errno == EINTR)

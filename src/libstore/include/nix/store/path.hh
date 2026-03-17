@@ -102,7 +102,7 @@ struct hash<nix::StorePath>
 {
     std::size_t operator()(const nix::StorePath & path) const noexcept
     {
-        return *(std::size_t *) path.to_string().data();
+        return *reinterpret_cast<const std::size_t *>(path.to_string().data());
     }
 };
 

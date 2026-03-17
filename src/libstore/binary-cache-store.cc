@@ -582,7 +582,7 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set
        when addSignatures() is called sequentially on a path, because
        S3 might return an outdated cached version. */
 
-    auto narInfo = make_ref<NarInfo>((NarInfo &) *queryPathInfo(storePath));
+    auto narInfo = make_ref<NarInfo>(static_cast<const NarInfo &>(*queryPathInfo(storePath)));
 
     narInfo->sigs.insert(sigs.begin(), sigs.end());
 

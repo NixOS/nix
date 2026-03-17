@@ -454,7 +454,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value
         state.error<EvalError>("could not open '%1%': %2%", path, dlerror()).debugThrow();
 
     dlerror();
-    ValueInitializer func = (ValueInitializer) dlsym(handle, sym.c_str());
+    ValueInitializer func = reinterpret_cast<ValueInitializer>(dlsym(handle, sym.c_str()));
     if (!func) {
         char * message = dlerror();
         if (message)
@@ -3064,16 +3064,17 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value ** args, 
     auto list = state.buildList(args[0]->attrs()->size());
 
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
-        list[n] = (Value *) &i;
+        list[n] = reinterpret_cast<Value *>(const_cast<Attr *>(&i));
 
     // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): comparator derefs, not pointer compare
     std::sort(list.begin(), list.end(), [&](Value * v1, Value * v2) {
-        std::string_view s1 = state.symbols[((Attr *) v1)->name], s2 = state.symbols[((Attr *) v2)->name];
+        std::string_view s1 = state.symbols[reinterpret_cast<Attr *>(v1)->name],
+                         s2 = state.symbols[reinterpret_cast<Attr *>(v2)->name];
         return s1 < s2;
     });
 
     for (auto & v : list)
-        v = ((Attr *) v)->value;
+        v = reinterpret_cast<Attr *>(v)->value;
 
     v.mkList(list);
 }

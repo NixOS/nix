@@ -8,7 +8,7 @@ namespace nix {
 
 static const std::span<const std::byte> stringToByteSpan(const std::string_view s)
 {
-    return {(const std::byte *) s.data(), s.size()};
+    return {reinterpret_cast<const std::byte *>(s.data()), s.size()};
 }
 
 /* ----------------------------------------------------------------------------

@@ -194,7 +194,7 @@ bool Fetch::shouldFetch(const CanonPath & path) const
     git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
     opts.attr_commit_id = this->rev;
     opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
-    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, path.rel_c_str(), "filter"))
+    if (git_attr_get_ext(&attr, const_cast<git_repository *>(this->repo), &opts, path.rel_c_str(), "filter"))
         throw Error("cannot get git-lfs attribute: %s", git_error_last()->message);
     debug("Git filter for '%s' is '%s'", path, attr ? attr : "null");
     return attr != nullptr && !std::string(attr).compare("lfs");

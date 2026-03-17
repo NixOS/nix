@@ -59,7 +59,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-    t = (char *) GC_MALLOC_ATOMIC(size);
+    t = static_cast<char *>(GC_MALLOC_ATOMIC(size));
     if (!t)
         throw std::bad_alloc();
     return t;
@@ -209,7 +209,8 @@ bool Value::isTrivial() const
 {
     return !isa<tApp, tPrimOpApp>()
            && (!isa<tThunk>()
-               || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs->empty())
+               || (dynamic_cast<ExprAttrs *>(thunk().expr)
+                   && static_cast<ExprAttrs *>(thunk().expr)->dynamicAttrs->empty())
                || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr));
 }
 
@@ -928,7 +929,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
 
 ListBuilder::ListBuilder(EvalMemory & mem, size_t size)
     : size(size)
-    , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes(size * sizeof(Value *)))
+    , elems(size <= 2 ? inlineElems : static_cast<Value **>(mem.allocBytes(size * sizeof(Value *))))
 {
 }
 

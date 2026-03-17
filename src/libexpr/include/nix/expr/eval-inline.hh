@@ -55,7 +55,7 @@ Value * EvalMemory::allocValue()
 #endif
 
     stats.nrValues++;
-    return (Value *) p;
+    return static_cast<Value *>(p);
 }
 
 [[gnu::always_inline]]
@@ -82,10 +82,10 @@ Env & EvalMemory::allocEnv(size_t size)
         void * p = *env1AllocCache;
         *env1AllocCache = GC_NEXT(p);
         GC_NEXT(p) = nullptr;
-        env = (Env *) p;
+        env = static_cast<Env *>(p);
     } else
 #endif
-        env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+        env = static_cast<Env *>(allocBytes(sizeof(Env) + size * sizeof(Value *)));
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 

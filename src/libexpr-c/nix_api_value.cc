@@ -165,7 +165,7 @@ PrimOp * nix_alloc_primop(
             for (size_t i = 0; args[i]; i++)
                 p->args.emplace_back(*args);
         nix_gc_incref(nullptr, p);
-        return (PrimOp *) p;
+        return reinterpret_cast<PrimOp *>(p);
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -175,7 +175,7 @@ nix_err nix_register_primop(nix_c_context * context, PrimOp * primOp)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        nix::RegisterPrimOp r(std::move(*((nix::PrimOp *) primOp)));
+        nix::RegisterPrimOp r(std::move(*reinterpret_cast<nix::PrimOp *>(primOp)));
     }
     NIXC_CATCH_ERRS
 }
@@ -340,7 +340,7 @@ ExternalValue * nix_get_external(nix_c_context * context, nix_value * value)
     try {
         auto & v = check_value_out(value);
         assert(v.type() == nix::nExternal);
-        return (ExternalValue *) v.external();
+        return reinterpret_cast<ExternalValue *>(v.external());
     }
     NIXC_CATCH_ERRS_NULL;
 }
@@ -592,7 +592,7 @@ nix_err nix_init_external(nix_c_context * context, nix_value * value, ExternalVa
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_out(value);
-        auto r = (nix::ExternalValueBase *) val;
+        auto r = reinterpret_cast<nix::ExternalValueBase *>(val);
         v.mkExternal(r);
     }
     NIXC_CATCH_ERRS
@@ -651,7 +651,7 @@ nix_err nix_init_primop(nix_c_context * context, nix_value * value, PrimOp * p)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_out(value);
-        v.mkPrimOp((nix::PrimOp *) p);
+        v.mkPrimOp(reinterpret_cast<nix::PrimOp *>(p));
     }
     NIXC_CATCH_ERRS
 }
@@ -709,9 +709,9 @@ nix_err nix_bindings_builder_insert(nix_c_context * context, BindingsBuilder * b
 void nix_bindings_builder_free(BindingsBuilder * bb)
 {
 #if NIX_USE_BOEHMGC
-    GC_FREE((nix::BindingsBuilder *) bb);
+    GC_FREE(reinterpret_cast<nix::BindingsBuilder *>(bb));
 #else
-    delete (nix::BindingsBuilder *) bb;
+    delete reinterpret_cast<nix::BindingsBuilder *>(bb);
 #endif
 }
 

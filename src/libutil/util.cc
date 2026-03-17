@@ -49,7 +49,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
     std::vector<char *> res;
     for (auto & s : ss)
-        res.push_back((char *) s.c_str());
+        res.push_back(const_cast<char *>(s.c_str()));
     res.push_back(0);
     return res;
 }
