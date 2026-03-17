@@ -38,6 +38,7 @@ protected:
         unsigned int n;
         const char * p = nix_err_msg(nullptr, ctx, &n);
         std::string msg(p, n);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test helper
         throw std::runtime_error(loc(file, line) + ": nix_err_code(ctx) != NIX_OK, message: " + msg);
     }
 
@@ -48,6 +49,7 @@ protected:
         if (nix_err_code(ctx) != NIX_OK) {
             return;
         }
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test helper
         throw std::runtime_error(loc(file, line) + ": Got NIX_OK, but expected an error!");
     }
 

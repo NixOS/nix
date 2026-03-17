@@ -119,6 +119,7 @@ void ThreadPool::doWork(bool mainThread)
                             // rethrown via the original state->exception.
                         } catch (const ThreadPoolShutDown &) {
                             // Similarly expected.
+                            // NOLINTNEXTLINE(nix-foreign-exceptions): thread boundary
                         } catch (std::exception & e) {
                             ignoreExceptionExceptInterrupt();
                         }

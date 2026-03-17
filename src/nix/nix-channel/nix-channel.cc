@@ -35,9 +35,11 @@ static void readChannels()
 
     for (const auto & line : tokenizeString<std::vector<std::string>>(channelsFile, "\n")) {
         chomp(line);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
         if (std::regex_search(line, std::regex("^\\s*\\#")))
             continue;
         auto split = tokenizeString<std::vector<std::string>>(line, " ");
+        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
         auto url = std::regex_replace(split[0], std::regex("/*$"), "");
         auto name = split.size() > 1 ? split[1] : std::string(baseNameOf(url));
         channels[name] = url;
@@ -63,8 +65,10 @@ static void writeChannels()
 // Adds a channel.
 static void addChannel(const std::string & url, const std::string & name)
 {
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     if (!regex_search(url, std::regex("^(file|http|https)://")))
         throw Error("invalid channel URL '%1%'", url);
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     if (!regex_search(name, std::regex("^[a-zA-Z0-9_][a-zA-Z0-9_\\.-]*$")))
         throw Error("invalid channel identifier '%1%'", name);
     readChannels();
@@ -121,6 +125,7 @@ static void update(const StringSet & channelNames)
         auto cname = name;
         std::smatch match;
         auto urlBase = std::string(baseNameOf(url));
+        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
         if (std::regex_search(urlBase, match, std::regex("(-\\d.*)$")))
             cname = cname + match.str(1);
 
@@ -142,6 +147,7 @@ static void update(const StringSet & channelNames)
             url = result.effectiveUrl;
 
             bool unpacked = false;
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (std::regex_search(std::string{result.storePath.to_string()}, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
                 runProgram(
                     getNixBin("nix-build"),
@@ -257,7 +263,9 @@ static int main_nix_channel(int argc, char ** argv)
                     name = args[1];
                 } else {
                     name = baseNameOf(url);
+                    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                     name = std::regex_replace(name, std::regex("-unstable$"), "");
+                    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                     name = std::regex_replace(name, std::regex("-stable$"), "");
                 }
                 addChannel(url, name);

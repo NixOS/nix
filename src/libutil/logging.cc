@@ -409,6 +409,7 @@ std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::str
         return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> nullopt
     } catch (nlohmann::json::exception & e) {
         printError("bad JSON log message from %s: %s", Uncolored(source), e.what());
     }
@@ -455,6 +456,7 @@ bool handleJSONLogMessage(
         }
 
         return true;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> warn
     } catch (const nlohmann::json::exception & e) {
         warn("Unable to handle a JSON message from %s: %s", Uncolored(source), e.what());
         return false;

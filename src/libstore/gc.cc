@@ -567,6 +567,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         if (results.bytesFreed > options.maxFreed) {
             printInfo("deleted more than %d bytes; stopping", options.maxFreed);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
             throw GCLimitReached();
         }
     };
@@ -736,6 +737,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 else
                     deleteFromStore(name, false);
             }
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
         } catch (GCLimitReached & e) {
         }
     }

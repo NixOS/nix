@@ -323,6 +323,7 @@ std::string S3BinaryCacheStore::createMultipartUpload(
 
     auto result = getFileTransfer()->enqueueFileTransfer(req).get();
 
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
     std::smatch match;
 

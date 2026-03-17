@@ -28,6 +28,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 static std::regex nameRegex{std::string{nameRegexStr}};
 
 #define TEST_DONT_PARSE(NAME, STR)                                           \

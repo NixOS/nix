@@ -41,7 +41,7 @@ TEST(closure, properlyHandlesDirectExceptions)
             // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): test lambda, consumed synchronously
             [&](const std::string &) -> asio::awaitable<std::set<std::string>> {
                 if (callCount++ == 0)
-                    // NOLINTNEXTLINE(hicpp-exception-baseclass): test verifies any type propagates
+                    // NOLINTNEXTLINE(hicpp-exception-baseclass,nix-foreign-exceptions): test: any type propagates
                     throw TestExn();
                 co_return std::set<std::string>{};
             }),

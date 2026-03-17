@@ -13,6 +13,7 @@ TEST(hiliteMatches, noHighlight)
 TEST(hiliteMatches, simpleHighlight)
 {
     std::string str = "Hello, world!";
+    // NOLINTNEXTLINE(nix-foreign-exceptions): test-only literal
     std::regex re = std::regex("world");
     auto matches = std::vector(std::sregex_iterator(str.begin(), str.end(), re), std::sregex_iterator());
     ASSERT_STREQ(hiliteMatches(str, matches, "(", ")").c_str(), "Hello, (world)!");
@@ -21,6 +22,7 @@ TEST(hiliteMatches, simpleHighlight)
 TEST(hiliteMatches, multipleMatches)
 {
     std::string str = "Hello, world, world, world, world, world, world, Hello!";
+    // NOLINTNEXTLINE(nix-foreign-exceptions): test-only literal
     std::regex re = std::regex("world");
     auto matches = std::vector(std::sregex_iterator(str.begin(), str.end(), re), std::sregex_iterator());
     ASSERT_STREQ(
@@ -31,7 +33,9 @@ TEST(hiliteMatches, multipleMatches)
 TEST(hiliteMatches, overlappingMatches)
 {
     std::string str = "world, Hello, world, Hello, world, Hello, world, Hello, world!";
+    // NOLINTNEXTLINE(nix-foreign-exceptions): test-only literal
     std::regex re = std::regex("Hello, world");
+    // NOLINTNEXTLINE(nix-foreign-exceptions): test-only literal
     std::regex re2 = std::regex("world, Hello");
     auto v = std::vector(std::sregex_iterator(str.begin(), str.end(), re), std::sregex_iterator());
     for (auto it = std::sregex_iterator(str.begin(), str.end(), re2); it != std::sregex_iterator(); ++it) {
@@ -45,10 +49,12 @@ TEST(hiliteMatches, complexOverlappingMatches)
 {
     std::string str = "legacyPackages.x86_64-linux.git-crypt";
     std::vector regexes = {
+        // NOLINTBEGIN(nix-foreign-exceptions): test-only literals
         std::regex("t-cry"),
         std::regex("ux\\.git-cry"),
         std::regex("git-c"),
         std::regex("pt"),
+        // NOLINTEND(nix-foreign-exceptions)
     };
     std::vector<std::smatch> matches;
     for (const auto & regex : regexes) {

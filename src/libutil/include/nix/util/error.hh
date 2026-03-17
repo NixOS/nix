@@ -261,6 +261,7 @@ public:
      */
     [[noreturn]] void throwClone() const override
     {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Derived always inherits BaseError
         throw Derived(static_cast<const Derived &>(*this));
     }
 };

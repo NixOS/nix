@@ -489,8 +489,10 @@ struct RegexMatcher final : public Matcher
 
     RegexMatcher(const std::string & pattern)
     try
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
         : regex(pattern, std::regex::extended | std::regex::icase)
         , pattern(pattern) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> UsageError
     } catch (std::regex_error & e) {
         throw UsageError("invalid regular expression '%s': %s", pattern, e.what());
     }

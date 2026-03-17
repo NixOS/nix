@@ -100,6 +100,7 @@ struct Checked
         T valueWrapping() const
         {
             if (overflowed_ == OverflowKind::DivByZero) {
+                // NOLINTNEXTLINE(nix-foreign-exceptions): stdlib contract: can't include error.hh here
                 throw DivideByZero{};
             }
             return value;

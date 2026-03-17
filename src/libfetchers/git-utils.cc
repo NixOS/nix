@@ -215,6 +215,7 @@ static int packBuilderProgressCheckInterrupt(int stage, uint32_t current, uint32
     try {
         checkInterrupt();
         return GIT_OK;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C callback boundary: libgit2
     } catch (const std::exception & e) {
         args.exception = std::current_exception();
         return GIT_EUSER;
@@ -726,10 +727,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             }
             auto fingerprint =
                 trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+");
             re += "(" + escaped_fingerprint + ")";
         }
         re += "]";
+        // NOLINTNEXTLINE(nix-foreign-exceptions): escaped hash fingerprint
         if (status == 0 && std::regex_search(output, std::regex(re)))
             printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
         else

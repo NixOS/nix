@@ -139,6 +139,7 @@ LockFile::LockFile(const fetchers::Settings & fetchSettings, std::string_view co
     auto json = [=] {
         try {
             return nlohmann::json::parse(contents);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
         } catch (const nlohmann::json::parse_error & e) {
             throw Error("Could not parse '%s': %s", path, e.what());
         }

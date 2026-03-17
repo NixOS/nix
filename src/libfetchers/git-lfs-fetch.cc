@@ -244,6 +244,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
             throw Error("response does not contain 'objects'");
 
         return objects;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (const nlohmann::json::parse_error & e) {
         printMsg(lvlTalkative, "Full response: '%1%'", responseString);
         throw Error("response did not parse as json: %s", e.what());
@@ -312,6 +313,7 @@ void Fetch::fetch(
         writeFile(cachePath, sink.s);
 
         debug("%s fetched with git-lfs", pointerFilePath);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (const nlohmann::json::out_of_range & e) {
         throw Error("bad json from /info/lfs/objects/batch: %s %s", obj, e.what());
     }

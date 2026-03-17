@@ -33,6 +33,7 @@ GroupedPaths getClosureInfo(ref<Store> store, const StorePath & toplevel)
         /* Strip the output name. Unfortunately this is ambiguous (we
            can't distinguish between output names like "bin" and
            version suffixes like "unstable"). */
+        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
         static std::regex regex("(.*)-([a-z]+|lib32|lib64)");
         std::cmatch match;
         std::string name{path.name()};

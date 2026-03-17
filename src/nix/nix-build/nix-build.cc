@@ -41,6 +41,7 @@ extern char ** environ __attribute__((weak));
  */
 static std::vector<std::string> shellwords(std::string_view s)
 {
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
     std::vector<std::string> res;
@@ -125,6 +126,7 @@ static SourcePath resolveShellExprPath(SourcePath path)
 static void main_nix_build(int argc, char ** argv)
 {
     auto dryRun = false;
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     auto isNixShell = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
     auto fromArgs = false;
@@ -180,6 +182,7 @@ static void main_nix_build(int argc, char ** argv)
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (!lines.empty() && std::regex_search(lines.front(), std::regex("^#!"))) {
                 lines.pop_front();
                 inShebang = true;
@@ -189,6 +192,7 @@ static void main_nix_build(int argc, char ** argv)
                 for (auto line : lines) {
                     line = chomp(line);
                     std::smatch match;
+                    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords({match[1].first, match[1].second}))
                             args.push_back(word);
@@ -270,6 +274,7 @@ static void main_nix_build(int argc, char ** argv)
             // executes it unless it contains the string "perl" or "indir",
             // or (undocumented) argv[0] does not contain "perl". Exploit
             // the latter by doing "exec -a".
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (std::regex_search(interpreter, std::regex("perl")))
                 execArgs = "-a PERL";
 
@@ -277,6 +282,7 @@ static void main_nix_build(int argc, char ** argv)
             for (const auto & i : savedArgs)
                 joined << escapeShellArgAlways(i) << ' ';
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (std::regex_search(interpreter, std::regex("ruby"))) {
                 // Hack for Ruby. Ruby also examines the shebang. It tries to
                 // read the shebang to understand which packages to read from. Since
@@ -518,6 +524,7 @@ static void main_nix_build(int argc, char ** argv)
         for (auto & exclude : envExclude)
             try {
                 envExcludeRegexes.emplace_back(exclude);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> UsageError
             } catch (std::regex_error & e) {
                 throw UsageError("invalid --exclude regular expression '%s': %s", exclude, e.what());
             }

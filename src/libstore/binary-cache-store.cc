@@ -239,7 +239,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 upsertFile(key, json.dump(), "application/json");
             };
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             std::regex regex1("^[0-9a-f]{2}$");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {

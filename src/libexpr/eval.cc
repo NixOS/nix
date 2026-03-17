@@ -823,6 +823,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         case ReplExitStatus::QuitAll:
             if (error)
                 throw *error;
+            // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
             throw Exit(0);
         case ReplExitStatus::Continue:
             break;

@@ -97,6 +97,7 @@ void EvalErrorBuilder<T>::debugThrow()
     auto error = std::move(this->error);
     delete this;
 
+    // NOLINTNEXTLINE(nix-foreign-exceptions): T always derives from BaseError
     throw error;
 }
 

@@ -14,6 +14,7 @@ StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
         return StructuredAttrs{
             .structuredAttrs = nlohmann::json::parse(encoded),
         };
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (nlohmann::json::exception & e) {
         throw Error("cannot process %s attribute: %s", envVarName, e.what());
     }
@@ -44,6 +45,7 @@ void StructuredAttrs::checkKeyNotInUse(const StringPairs & env)
             "Cannot have an environment variable named '__json'. This key is reserved for encoding structured attrs");
 }
 
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 static std::regex shVarName("[A-Za-z_][A-Za-z0-9_]*");
 
 /**

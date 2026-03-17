@@ -42,7 +42,9 @@ bool DrvName::matches(const DrvName & n)
         if (!regex)
             try {
                 regex = std::make_unique<Regex>();
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
                 regex->regex = std::regex(name, std::regex::extended);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> Error
             } catch (std::regex_error & e) {
                 throw Error("invalid regular expression in derivation name '%s': %s", name, e.what());
             }

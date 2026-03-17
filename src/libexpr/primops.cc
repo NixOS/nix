@@ -4789,6 +4789,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
                 v2 = mkString(state, match[i + 1]);
         v.mkList(list);
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> EvalError
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
@@ -4892,6 +4893,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 
         v.mkList(list);
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> EvalError
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++

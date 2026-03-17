@@ -55,7 +55,9 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
         auto mounts = readFile(std::filesystem::path{"/proc/self/mounts"});
         auto compileRegex = [&](const std::string & pattern) {
             try {
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
                 return std::regex(pattern);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> Error
             } catch (std::regex_error & e) {
                 throw Error(
                     "overlay store path '%s' contains regex metacharacters: %s", config->realStoreDir.get(), e.what());

@@ -25,6 +25,7 @@ struct DownloadUrl
 
 // A github, gitlab, or sourcehut host
 const static std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
@@ -602,7 +603,9 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex;
         try {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
             refRegex = std::regex(refUri);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> BadURL
         } catch (std::regex_error & e) {
             throw BadURL("invalid reference '%s': %s", ref, e.what());
         }

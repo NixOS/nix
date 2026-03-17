@@ -1107,6 +1107,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
         tunnelLogger->stopWork(&e);
         conn.to.flush();
         return;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): protocol boundary: daemon worker
     } catch (std::exception & e) {
         auto ex = Error(e.what());
         tunnelLogger->stopWork(&ex);

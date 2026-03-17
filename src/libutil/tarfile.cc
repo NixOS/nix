@@ -24,6 +24,7 @@ ssize_t callback_read(struct archive * archive, void * _self, const void ** buff
         return self->source->read(reinterpret_cast<char *>(self->buffer.data()), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C callback boundary: libarchive
     } catch (std::exception & err) {
         archive_set_error(archive, EIO, "Source threw exception: %s", err.what());
         return -1;

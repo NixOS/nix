@@ -252,6 +252,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
                 throw SysError("setting death signal");
 #endif
             processMain();
+            // NOLINTNEXTLINE(nix-foreign-exceptions): process boundary: child process
         } catch (std::exception & e) {
             try {
                 std::cerr << options.errorPrefix << e.what() << "\n";

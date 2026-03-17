@@ -19,6 +19,7 @@
 static const nix::Value & check_value_not_null(const nix_value * value)
 {
     if (!value) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw std::runtime_error("nix_value is null");
     }
     return *value->value;
@@ -27,6 +28,7 @@ static const nix::Value & check_value_not_null(const nix_value * value)
 static nix::Value & check_value_not_null(nix_value * value)
 {
     if (!value) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw std::runtime_error("nix_value is null");
     }
     return *value->value;
@@ -36,6 +38,7 @@ static const nix::Value & check_value_in(const nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (!v.isValid()) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw std::runtime_error("Uninitialized nix_value");
     }
     return v;
@@ -45,6 +48,7 @@ static nix::Value & check_value_in(nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (!v.isValid()) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw std::runtime_error("Uninitialized nix_value");
     }
     return v;
@@ -54,6 +58,7 @@ static nix::Value & check_value_out(nix_value * value)
 {
     auto & v = check_value_not_null(value);
     if (v.isValid()) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw std::runtime_error("nix_value already initialized. Variables are immutable");
     }
     return v;

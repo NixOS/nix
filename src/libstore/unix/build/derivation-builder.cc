@@ -692,9 +692,11 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
 static void rethrowExceptionAsError()
 {
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): rethrow-and-wrap dispatch
         throw;
     } catch (Error &) {
         throw;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): rethrow-and-wrap dispatch
     } catch (std::exception & e) {
         throw Error(e.what());
     } catch (...) {
@@ -1004,6 +1006,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
                     debug("Successfully pre-resolved AWS credentials in parent process");
                     return credentials;
                 }
+                // NOLINTNEXTLINE(nix-foreign-exceptions): AWS SDK boundary: log and swallow
             } catch (const std::exception & e) {
                 debug("Error pre-resolving S3 credentials: %s", e.what());
             }
@@ -1356,6 +1359,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
                 else
                     throw Error("unsupported builtin builder '%1%'", builtinName);
                 _exit(0);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): process boundary: builtin builder child
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
                 _exit(1);

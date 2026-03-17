@@ -18,6 +18,7 @@ struct StringData::Static
     {
         static_assert(N > 0);
         if (str[size] != '\0')
+            // NOLINTNEXTLINE(nix-foreign-exceptions): consteval: compile-time only, never runs
             throw;
         std::copy_n(str, N, data);
     }

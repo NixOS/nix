@@ -102,6 +102,7 @@ std::optional<N> string2Int(const std::string_view s)
         return std::nullopt;
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> nullopt
     } catch (const boost::bad_lexical_cast &) {
         return std::nullopt;
     }
@@ -124,6 +125,7 @@ std::optional<N> string2Float(const std::string_view s)
 {
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> nullopt
     } catch (const boost::bad_lexical_cast &) {
         return std::nullopt;
     }
@@ -228,9 +230,11 @@ void ignoreExceptionInDestructor(Verbosity lvl)
        printError() also throws when remote is closed. */
     try {
         try {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: rethrow by design
             throw;
         } catch (Error & e) {
             printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: catch by design
         } catch (std::exception & e) {
             printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
         }
@@ -241,11 +245,13 @@ void ignoreExceptionInDestructor(Verbosity lvl)
 void ignoreExceptionExceptInterrupt(Verbosity lvl)
 {
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: rethrow by design
         throw;
     } catch (const Interrupted & e) {
         throw;
     } catch (Error & e) {
         printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: catch by design
     } catch (std::exception & e) {
         printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
     }

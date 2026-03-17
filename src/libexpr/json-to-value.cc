@@ -22,6 +22,7 @@ class JSONSax : nlohmann::json_sax<json>
     public:
         virtual std::unique_ptr<JSONState> resolve(EvalState &)
         {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): unreachable: std::logic_error conventional
             throw std::logic_error("tried to close toplevel json parser state");
         }
 

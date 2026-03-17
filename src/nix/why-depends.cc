@@ -183,6 +183,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             }
 
             if (node.path == dependencyPath && !all && packagePath != dependencyPath)
+                // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
                 throw BailOut();
 
             if (node.visited)
@@ -289,6 +290,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
             }
             printNode(graph.at(packagePath), "", "");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
         } catch (BailOut &) {
         }
     }

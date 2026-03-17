@@ -40,6 +40,7 @@ void checkGTestWith(Testable && testable, MakeTestParams makeTestParams)
     } else {
         std::ostringstream ss;
         printResultMessage(result, ss);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test helper
         throw std::runtime_error(ss.str());
     }
 }

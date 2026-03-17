@@ -78,7 +78,9 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         auto compileRegex = [](const std::string & re) {
             try {
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
                 return std::regex(re, std::regex::extended | std::regex::icase);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> UsageError
             } catch (std::regex_error & e) {
                 throw UsageError("invalid regular expression '%s': %s", re, e.what());
             }

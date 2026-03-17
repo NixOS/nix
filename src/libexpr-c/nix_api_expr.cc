@@ -247,6 +247,7 @@ nix_err nix_gc_decref(nix_c_context * context, const void * p)
             return !--kv.second;
         });
         if (fail)
+            // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
             throw std::runtime_error("nix_gc_decref: object was not referenced");
     }
     NIXC_CATCH_ERRS

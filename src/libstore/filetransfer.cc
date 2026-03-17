@@ -365,6 +365,7 @@ struct curlFileTransfer : public FileTransfer
             std::string line(static_cast<char *>(contents), realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
                 result.etag = "";
@@ -406,6 +407,7 @@ struct curlFileTransfer : public FileTransfer
 
                     else if (name == "link" || name == "x-amz-meta-link") {
                         auto value = trim(line.substr(i + 1));
+                        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                         static std::regex linkRegex(
                             "<([^>]*)>; rel=\"immutable\"", std::regex::extended | std::regex::icase);
                         if (std::smatch match; std::regex_match(value, match, linkRegex))
@@ -1116,6 +1118,7 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
             normalExit = false;
+            // NOLINTNEXTLINE(nix-foreign-exceptions): thread boundary: worker exception sink
         } catch (std::exception & e) {
             printError("unexpected error in download thread: %s", e.what());
             normalExit = false;

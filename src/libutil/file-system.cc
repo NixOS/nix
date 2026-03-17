@@ -242,6 +242,7 @@ void readFile(const std::filesystem::path & path, Sink & sink, bool memory_map)
                 sink({mmap.data(), mmap.size()});
                 return;
             }
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost mmap fallback
         } catch (const boost::exception & e) {
         }
         debug("memory-mapping failed for path: %s", PathFmt(path));
