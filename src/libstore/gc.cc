@@ -347,7 +347,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 }
 
-struct GCLimitReached
+struct GCLimitReached : std::exception
 {};
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)

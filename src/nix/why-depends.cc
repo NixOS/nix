@@ -166,7 +166,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        struct BailOut
+        struct BailOut : std::exception
         {};
 
         fun<void(Node &, const std::string &, const std::string &)> printNode = [&](Node & node,
