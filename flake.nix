@@ -54,7 +54,6 @@
       systems = linuxSystems ++ darwinSystems;
 
       crossSystems = [
-        "aarch64-unknown-linux-gnu"
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
         "riscv64-unknown-linux-gnu"
