@@ -26,6 +26,8 @@ Checks:
   # or local Goal::Co sub-coroutines called in-scope). NOLINT per-site so the check stays active
   # for future code where a ref-capturing coroutine might actually be stored/detached.
   - cppcoreguidelines-avoid-capturing-lambda-coroutines
+  # Prefer C++20 starts_with/ends_with over substr/compare/find prefix checks
+  - modernize-use-starts-ends-with
   # Custom nix checks (when added)
   - nix-*
   # Pending site-by-site triage: 159 sites (54 throw, 42 catch, 58 regex ctor, 5 type-dependent).
