@@ -25,8 +25,6 @@ Checks:
   #
   # Checks disabled to pass on current codebase (can be progressively enabled):
   #
-  # 11 warnings - optional value conversions in various places
-  - -bugprone-optional-value-conversion
   # 4 warnings - switches without default cases
   - -bugprone-switch-missing-default-case
   # 4 warnings - string_view::data() usage patterns
