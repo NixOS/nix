@@ -11,6 +11,8 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include <nlohmann/json.hpp>
+#include <filesystem>
+#include <queue>
 
 using namespace nix;
 using json = nlohmann::json;
@@ -169,6 +171,47 @@ struct CmdDerivationSourceOrigins : InstallablesCommand, MixPrintJSON
                         }
                     } else {
                         entry["sourcePath"] = nullptr;
+                    }
+                }
+
+                // When the sourcePath is a directory (e.g. from cleanSourceWith
+                // with a broad src like ../../../.), enumerate the store path
+                // contents to get file-level precision.  The store path IS the
+                // filtered result, so its contents are exactly what passed the
+                // filter.  Map each file back to its original source location.
+                auto sourcePathStr = entry.value("sourcePath", "");
+                if (!sourcePathStr.empty() && sourcePathStr != "null") {
+                    auto storePathStr = store->printStorePath(inputSrc);
+                    try {
+                        namespace fs = std::filesystem;
+                        fs::path sp(storePathStr);
+                        if (fs::exists(sp) && fs::is_directory(sp)) {
+                            fs::path sourceRoot(sourcePathStr);
+                            json filesArr = json::array();
+                            // BFS to enumerate all files in the store path
+                            std::queue<fs::path> dirs;
+                            dirs.push(sp);
+                            while (!dirs.empty()) {
+                                auto dir = dirs.front();
+                                dirs.pop();
+                                for (auto & de : fs::directory_iterator(dir)) {
+                                    if (de.is_directory()) {
+                                        dirs.push(de.path());
+                                    } else {
+                                        // Get path relative to store root
+                                        auto relPath = fs::relative(de.path(), sp);
+                                        // Map back to original source location
+                                        auto origFile = sourceRoot / relPath;
+                                        filesArr.push_back(origFile.string());
+                                    }
+                                }
+                            }
+                            if (!filesArr.empty()) {
+                                entry["sourceFiles"] = filesArr;
+                            }
+                        }
+                    } catch (...) {
+                        // Store path not available (not built yet) — skip
                     }
                 }
 
