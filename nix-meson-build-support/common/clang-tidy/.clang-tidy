@@ -41,8 +41,6 @@ Checks:
   - -bugprone-unused-local-non-trivial-variable
   # 2 warnings - returning const& from parameter
   - -bugprone-return-const-ref-from-parameter
-  # 1 warning - unsafe C functions (e.g., getenv)
-  - -bugprone-unsafe-functions
   # 1 warning - calling parent virtual instead of override
   - -bugprone-parent-virtual-call
   # 1 warning - null termination issues
@@ -86,3 +84,5 @@ CheckOptions:
   bugprone-reserved-identifier.AllowedIdentifiers: '__asan_default_options;__wrap___assert_fail;_SingleDerivedPathRaw;_DerivedPathRaw;_SingleBuiltPathRaw;_BuiltPathRaw'
   # Allow explicitly discarding return values with (void) cast
   bugprone-unused-return-value.AllowCastToVoid: true
+  # vfork is deliberate (sandbox perf), stack-clobber-safe via __attribute__((noinline)). See processes.cc:210.
+  bugprone-unsafe-functions.ReportMoreUnsafeFunctions: false
