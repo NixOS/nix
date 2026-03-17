@@ -344,7 +344,13 @@
       };
 
       apps = import ./packaging/apps.nix {
-        inherit self nixpkgsFor forAllSystems;
+        inherit
+          lib
+          self
+          nixpkgsFor
+          devFlake
+          forAllSystems
+          ;
       };
 
       devShells =
