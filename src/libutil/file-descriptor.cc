@@ -237,9 +237,13 @@ AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept
     that.fd = INVALID_DESCRIPTOR;
 }
 
-AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that)
+AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that) noexcept
 {
-    close();
+    try {
+        close();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
     fd = that.fd;
     that.fd = INVALID_DESCRIPTOR;
     return *this;
