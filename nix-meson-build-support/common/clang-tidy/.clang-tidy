@@ -33,8 +33,6 @@ Checks:
   - -bugprone-suspicious-include
   # 2 warnings - returning const& from parameter
   - -bugprone-return-const-ref-from-parameter
-  # 2 warnings - std::move on forwarding reference (auto&&) in ranges lambdas
-  - -bugprone-move-forwarding-reference
   # 2 warnings - coroutine pattern: co_await await(std::move(waitees)) then reuse.
   # Relies on moved-from containers being empty (holds for libstdc++/libc++).
   - -bugprone-use-after-move
