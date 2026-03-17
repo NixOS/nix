@@ -235,7 +235,7 @@ bool SQLiteStmt::Use::next()
 
 std::string SQLiteStmt::Use::getStr(int col)
 {
-    auto s = (const char *) sqlite3_column_text(stmt, col);
+    auto s = reinterpret_cast<const char *>(sqlite3_column_text(stmt, col));
     assert(s);
     return s;
 }

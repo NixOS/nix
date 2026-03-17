@@ -540,7 +540,7 @@ void LocalStore::openDB(State & state, bool create)
         stmt.create(db, "pragma main.journal_mode;");
         if (sqlite3_step(stmt) != SQLITE_ROW)
             SQLiteError::throw_(db, "querying journal mode");
-        prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
+        prevMode = std::string(reinterpret_cast<const char *>(sqlite3_column_text(stmt, 0)));
     }
     if (prevMode != mode
         && sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
@@ -780,7 +780,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     info->registrationTime = useQueryPathInfo.getInt(2);
 
-    auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
+    auto s = reinterpret_cast<const char *>(sqlite3_column_text(state.stmts->QueryPathInfo, 3));
     if (s)
         info->deriver = parseStorePath(s);
 
@@ -789,11 +789,11 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     info->ultimate = useQueryPathInfo.getInt(5) == 1;
 
-    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 6);
+    s = reinterpret_cast<const char *>(sqlite3_column_text(state.stmts->QueryPathInfo, 6));
     if (s)
         info->sigs = Signature::parseMany(tokenizeString<StringSet>(s, " "));
 
-    s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 7);
+    s = reinterpret_cast<const char *>(sqlite3_column_text(state.stmts->QueryPathInfo, 7));
     if (s)
         info->ca = ContentAddress::parseOpt(s);
 
@@ -915,7 +915,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
         if (!useQueryPathFromHashPart.next())
             return {};
 
-        const char * s = (const char *) sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0);
+        const char * s = reinterpret_cast<const char *>(sqlite3_column_text(state->stmts->QueryPathFromHashPart, 0));
         if (s && prefix.compare(0, prefix.size(), s, prefix.size()) == 0)
             return parseStorePath(s);
         return {};
@@ -1177,7 +1177,7 @@ StorePath LocalStore::addToStoreFromDump(
         auto want = std::min(chunkSize, localSettings.narBufferSize - oldSize);
         if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
             (void) dumpBuffer.release();
-            dumpBuffer.reset((char *) tmp);
+            dumpBuffer.reset(static_cast<char *>(tmp));
         } else {
             throw std::bad_alloc();
         }

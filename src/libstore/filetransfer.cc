@@ -348,7 +348,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
+            return static_cast<TransferItem *>(userp)->writeCallback(contents, size, nmemb);
         }
 
         void appendCurrentUrl()
@@ -362,7 +362,7 @@ struct curlFileTransfer : public FileTransfer
         size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
         try {
             size_t realSize = size * nmemb;
-            std::string line((char *) contents, realSize);
+            std::string line(static_cast<char *>(contents), realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
 
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
@@ -438,7 +438,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
+            return static_cast<TransferItem *>(userp)->headerCallback(contents, size, nmemb);
         }
 
         /**
@@ -505,7 +505,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp) noexcept
         {
-            return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
+            return static_cast<TransferItem *>(userp)->readCallback(buffer, size, nitems);
         }
 
 #if !defined(_WIN32)
@@ -537,13 +537,13 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
-            return ((TransferItem *) clientp)->seekCallback(offset, origin);
+            return static_cast<TransferItem *>(clientp)->seekCallback(offset, origin);
         }
 
         static int resolverCallbackWrapper(void *, void *, void * clientp) noexcept
         try {
             // Create the `Activity` associated with this download.
-            ((TransferItem *) clientp)->act();
+            static_cast<TransferItem *>(clientp)->act();
             return 0;
         } catch (...) {
             return 1;
