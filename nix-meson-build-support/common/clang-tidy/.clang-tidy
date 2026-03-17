@@ -23,8 +23,6 @@ Checks:
   #
   # Checks disabled to pass on current codebase (can be progressively enabled):
   #
-  # 2 warnings - returning const& from parameter
-  - -bugprone-return-const-ref-from-parameter
   # 2 warnings - sorts Value* by ->string_view(), not by pointer value (false positive)
   - -bugprone-nondeterministic-pointer-iteration-order
   # 9 warnings - intentional std::bit_cast/memcpy on Value* arrays (evaluator hot path)

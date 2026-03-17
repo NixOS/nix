@@ -335,6 +335,7 @@ const typename T::mapped_type & getOr(T & map, const K & key, const typename T::
 {
     auto i = map.find(key);
     if (i == map.end())
+        // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter): rvalue overload deleted below
         return defaultValue;
     return i->second;
 }

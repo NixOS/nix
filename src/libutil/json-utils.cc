@@ -41,6 +41,7 @@ static const nlohmann::json & ensureType(const nlohmann::json & value, nlohmann:
             value.type_name(),
             value.dump());
 
+    // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter): static helper, callers pass lvalues
     return value;
 }
 

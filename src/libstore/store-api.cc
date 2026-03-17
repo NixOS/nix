@@ -885,6 +885,7 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
             overloaded{
                 [](const StoreReference::Auto &) -> const StoreReference::Specified & { unreachable(); },
                 [](const StoreReference::Specified & specified) -> const StoreReference::Specified & {
+                    // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter): visitor on lvalue variant
                     return specified;
                 }},
             ref.variant);
