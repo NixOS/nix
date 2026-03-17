@@ -2,6 +2,8 @@
 /build
 # Meson creates this file too
 src/.wraplock
+# Python bytecode (clang-tidy runner scripts)
+__pycache__/
 
 # /tests/functional/
 /tests/functional/common/subst-vars.sh

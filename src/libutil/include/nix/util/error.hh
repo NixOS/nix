@@ -250,8 +250,10 @@ public:
 template<typename Derived, typename Base>
 class CloneableError : public Base
 {
-public:
+    friend Derived;
+    CloneableError() = default;
     using Base::Base;
+public:
 
     /**
      * Rethrow a copy of this exception. Useful when the exception can get

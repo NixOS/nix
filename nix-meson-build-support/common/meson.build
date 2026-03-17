@@ -81,3 +81,6 @@ nix_soversion = meson.project_version().split('+')[0].split('pre')[0]
 
 subdir('assert-fail')
 subdir('asan-options')
+if not meson.is_subproject()
+  subdir('clang-tidy')
+endif
