@@ -460,7 +460,7 @@ LocalSettings::ExternalBuilders BaseSetting<LocalSettings::ExternalBuilders>::pa
 {
     try {
         return nlohmann::json::parse(str).template get<LocalSettings::ExternalBuilders>();
-    } catch (std::exception & e) {
+    } catch (nlohmann::json::exception & e) {
         throw UsageError("parsing setting '%s': %s", name, e.what());
     }
 }

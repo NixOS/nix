@@ -14,7 +14,7 @@ StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
         return StructuredAttrs{
             .structuredAttrs = nlohmann::json::parse(encoded),
         };
-    } catch (std::exception & e) {
+    } catch (nlohmann::json::exception & e) {
         throw Error("cannot process %s attribute: %s", envVarName, e.what());
     }
 }

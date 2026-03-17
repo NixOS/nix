@@ -408,7 +408,7 @@ std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::str
         return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));
-    } catch (std::exception & e) {
+    } catch (nlohmann::json::exception & e) {
         printError("bad JSON log message from %s: %s", Uncolored(source), e.what());
     }
     return std::nullopt;
