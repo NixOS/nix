@@ -128,6 +128,7 @@ if get_option('benchmarks')
 
   benchmark_sources = files(
     'bench-main.cc',
+    'canonicalize-bench.cc',
     'derivation-parser-bench.cc',
     'ref-scan-bench.cc',
     'register-valid-paths-bench.cc',

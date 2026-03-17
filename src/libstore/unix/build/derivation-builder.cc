@@ -1742,6 +1742,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             return newInfo0;
         };
 
+        bool needsFinalCanonicalize = false;
+
         ValidPathInfo newInfo = std::visit(
             overloaded{
 
@@ -1777,6 +1779,10 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
                     std::filesystem::rename(tmpOutput, actualPath);
 
+                    // copyFile creates directories with default permissions (not canonical 0555),
+                    // so we need to re-canonicalize after the copy.
+                    needsFinalCanonicalize = true;
+
                     return newInfoFromCA(
                         DerivationOutput::CAFloating{
                             .method = dof.ca.method,
@@ -1803,17 +1809,24 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             },
             output->raw);
 
-        /* FIXME: set proper permissions in restorePath() so
-            we don't have to do another traversal. */
-        canonicalisePathMetaData(
-            actualPath,
-            {
+        if (needsFinalCanonicalize) {
+            /* The CAFixed path copies the output tree via copyFile(), which
+               creates directories with default permissions rather than the
+               canonical 0555. Re-canonicalize to fix this.
+               For input-addressed outputs (the common case), Loop 1 already
+               set correct permissions and nothing modified the tree since.
+               For rewritten trees, rewriteOutput() already canonicalizes
+               internally after the dump/restore. */
+            canonicalisePathMetaData(
+                actualPath,
+                {
 #ifndef _WIN32
-                // builder UIDs are already dealt with
-                .uidRange = std::nullopt,
+                    // builder UIDs are already dealt with
+                    .uidRange = std::nullopt,
 #endif
-                NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)},
-            inodesSeen);
+                    NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)},
+                inodesSeen);
+        }
 
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
