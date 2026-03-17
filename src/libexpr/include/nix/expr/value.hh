@@ -1404,6 +1404,7 @@ public:
 
     inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
     {
+        // NOLINTNEXTLINE(bugprone-unhandled-exception-at-new): Boehm GC aborts on OOM, never throws
         setStorage(new Value::Failed(e, recovery));
     }
 
