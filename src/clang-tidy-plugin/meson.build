@@ -19,6 +19,7 @@ subdir('nix-meson-build-support/common')
 llvm_dep = dependency('LLVM', version : '>= 16', required : true)
 
 sources = files(
+  'format-string-arity.cc',
   'nix-clang-tidy-checks.cc',
 )
 

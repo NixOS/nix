@@ -13,6 +13,8 @@
 #include <clang-tidy/ClangTidyModule.h>
 #include <clang-tidy/ClangTidyModuleRegistry.h>
 
+#include "format-string-arity.hh"
+
 namespace nix::clang_tidy {
 
 using namespace clang;
@@ -21,11 +23,9 @@ using namespace clang::tidy;
 class NixClangTidyChecks : public ClangTidyModule
 {
 public:
-    void addCheckFactories([[maybe_unused]] ClangTidyCheckFactories & CheckFactories) override
+    void addCheckFactories(ClangTidyCheckFactories & CheckFactories) override
     {
-        // Custom checks will be registered here.
-        // Example:
-        // CheckFactories.registerCheck<MyCustomCheck>("nix-my-custom-check");
+        CheckFactories.registerCheck<FormatStringArityCheck>("nix-format-string-arity");
     }
 };
 
