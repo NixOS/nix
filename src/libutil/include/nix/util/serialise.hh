@@ -4,7 +4,6 @@
 #include <memory>
 #include <type_traits>
 
-#include "nix/util/compression-algo.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
@@ -264,16 +263,20 @@ struct StringSink : Sink
  */
 struct StringSource : RestartableSource
 {
+    std::optional<std::string> sOwned;
     std::string_view s;
     size_t pos;
 
-    // NOTE: Prevent unintentional dangling views when an implicit conversion
-    // from std::string -> std::string_view occurs when the string is passed
-    // by rvalue.
-    StringSource(std::string &&) = delete;
+    StringSource(std::string && s)
+        : sOwned(std::move(s))
+        , s(*sOwned)
+        , pos(0)
+    {
+    }
 
     StringSource(std::string_view s)
-        : s(s)
+        : sOwned(std::nullopt)
+        , s(s)
         , pos(0)
     {
     }
@@ -290,45 +293,6 @@ struct StringSource : RestartableSource
     void restart() override
     {
         pos = 0;
-    }
-};
-
-/**
- * Compresses a RestartableSource using the specified compression method.
- *
- * @note currently this buffers the entire compressed data stream in memory. In the future it may instead compress data
- * on demand, lazily pulling from the original `RestartableSource`. In that case, the `size()` method would go away
- * because we would not in fact know the compressed size in advance.
- */
-struct CompressedSource : RestartableSource
-{
-private:
-    std::string compressedData;
-    CompressionAlgo compressionMethod;
-    StringSource stringSource;
-
-public:
-    /**
-     * Compress a RestartableSource using the specified compression method.
-     *
-     * @param source The source data to compress
-     * @param compressionMethod The compression method to use
-     */
-    CompressedSource(RestartableSource & source, CompressionAlgo compressionMethod);
-
-    size_t read(char * data, size_t len) override
-    {
-        return stringSource.read(data, len);
-    }
-
-    void restart() override
-    {
-        stringSource.restart();
-    }
-
-    uint64_t size() const
-    {
-        return compressedData.size();
     }
 };
 

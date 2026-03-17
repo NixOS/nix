@@ -336,9 +336,15 @@ ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink
 
 std::string compress(CompressionAlgo method, std::string_view in, const bool parallel, int level)
 {
+    StringSource source(in);
+    return compress(method, source, parallel, level);
+}
+
+std::string compress(CompressionAlgo method, Source & in, const bool parallel, int level)
+{
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel, level);
-    (*sink)(in);
+    in.drainInto(*sink);
     sink->finish();
     return std::move(ssink.s);
 }

@@ -1,6 +1,7 @@
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
@@ -161,11 +162,11 @@ void S3BinaryCacheStore::upsertFile(
 
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
-            CompressedSource compressed(source, *compressionMethod);
+            StringSource compressed(compress(*compressionMethod, source));
             /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
              */
             Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
-            doUpload(compressed, compressed.size(), std::move(headers));
+            doUpload(compressed, compressed.s.size(), std::move(headers));
         } else {
             doUpload(source, sizeHint, std::nullopt);
         }
