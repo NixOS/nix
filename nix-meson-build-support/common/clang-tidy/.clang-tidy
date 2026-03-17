@@ -12,8 +12,6 @@ Checks:
   - -bugprone-empty-catch
   # Many warnings
   - -bugprone-unchecked-optional-access
-  # Many warnings, questionable lint
-  - -bugprone-branch-clone
   # Non-bugprone checks (also disabled to pass on current codebase):
   #
   # All thrown exceptions must derive from std::exception

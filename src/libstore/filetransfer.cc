@@ -770,7 +770,9 @@ struct curlFileTransfer : public FileTransfer
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
                 } else if (
-                    httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
+                    httpStatus >= 400 && httpStatus < 500
+                    && httpStatus != HttpStatus::RequestTimeout
+                    // NOLINTNEXTLINE(bugprone-branch-clone): HTTP status classifier: conditions document ranges
                     && httpStatus != HttpStatus::TooManyRequests) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again

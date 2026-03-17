@@ -102,6 +102,7 @@ public:
             case lvlChatty:
                 c = '6';
                 break;
+            // NOLINTNEXTLINE(bugprone-branch-clone): lvlDebug/lvlVomit both map to '7'
             case lvlDebug:
             case lvlVomit:
                 c = '7';

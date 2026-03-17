@@ -415,6 +415,7 @@ StorePath RemoteStore::addToStoreFromDump(
     case FileIngestionMethod::Flat:
         fsm = FileSerialisationMethod::Flat;
         break;
+    // NOLINTNEXTLINE(bugprone-branch-clone): Git uses NAR serialization (documented above)
     case FileIngestionMethod::NixArchive:
         fsm = FileSerialisationMethod::NixArchive;
         break;

@@ -177,6 +177,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                 else if (
                     attrPath.size() == 0 || (attrPathS[0] == "legacyPackages" && attrPath.size() <= 2)
                     || (attrPathS[0] == "packages" && attrPath.size() <= 2))
+                    // NOLINTNEXTLINE(bugprone-branch-clone): recurse: conditions document package tree shapes
                     recurse();
 
                 else if (initialRecurse)

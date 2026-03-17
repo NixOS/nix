@@ -85,10 +85,12 @@ static bool componentsLT(const std::string_view c1, const std::string_view c2)
     if (n1 && n2)
         return *n1 < *n2;
     else if (c1 == "" && n2)
+        // NOLINTNEXTLINE(bugprone-branch-clone): comparison ladder: conditions document cases
         return true;
     else if (c1 == "pre" && c2 != "pre")
         return true;
     else if (c2 == "pre")
+        // NOLINTNEXTLINE(bugprone-branch-clone): comparison ladder: conditions document cases
         return false;
     /* Assume that `2.3a' < `2.3.1'. */
     else if (n2)

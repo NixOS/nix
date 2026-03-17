@@ -181,6 +181,7 @@ static int main_build_remote(int argc, char ** argv)
                             continue;
                         }
                         bool best = false;
+                        // NOLINTNEXTLINE(bugprone-branch-clone): machine selection tiebreaker ladder
                         if (!bestSlotLock) {
                             best = true;
                         } else if (load / m.speedFactor < bestLoad / bestMachine->speedFactor) {

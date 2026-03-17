@@ -859,6 +859,7 @@ struct GitSourceAccessor : SourceAccessor
         auto mode = git_tree_entry_filemode(entry);
 
         if (mode == GIT_FILEMODE_TREE)
+            // NOLINTNEXTLINE(bugprone-branch-clone): file mode classifier: conditions document modes
             return Stat{.type = tDirectory};
 
         else if (mode == GIT_FILEMODE_BLOB)

@@ -177,6 +177,7 @@ char getSizeUnitSuffix(SizeUnit unit)
 #define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) \
     case SizeUnit::name:                        \
         return suffix;
+        // NOLINTNEXTLINE(bugprone-branch-clone): X-macro expansion
         NIX_UTIL_SIZE_UNITS
 #undef NIX_UTIL_DEFINE_SIZE_UNIT
     }
