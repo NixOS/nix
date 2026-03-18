@@ -263,19 +263,21 @@ struct StringSink : Sink
  */
 struct StringSource : RestartableSource
 {
-    std::optional<std::string> sOwned;
+    /* Put behind a shared_ptr to make sure that copies and moves don't invalidate pointers
+       into a small string buffer. */
+    std::shared_ptr<std::string> sOwned;
     std::string_view s;
     size_t pos;
 
     StringSource(std::string && s)
-        : sOwned(std::move(s))
+        : sOwned(std::make_shared<std::string>(std::move(s)))
         , s(*sOwned)
         , pos(0)
     {
     }
 
     StringSource(std::string_view s)
-        : sOwned(std::nullopt)
+        : sOwned(nullptr)
         , s(s)
         , pos(0)
     {
