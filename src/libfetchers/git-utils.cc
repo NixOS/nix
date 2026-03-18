@@ -630,6 +630,38 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         return toHash(*git_object_id(tree.get()));
     }
 
+    std::vector<Hash> getGitAttributesAlongPath(const Hash & commitSha, const std::string & path) override
+    {
+        std::vector<Hash> result;
+        auto oid = hashToOID(getCommitTree(commitSha));
+
+        typedef std::unique_ptr<git_tree, Deleter<git_tree_free>> Tree;
+        Tree tree;
+        if (git_tree_lookup(Setter(tree), *this, &oid))
+            throw Error("looking up tree: %s", git_error_last()->message);
+
+        auto checkAttrs = [&] {
+            auto e = git_tree_entry_byname(tree.get(), ".gitattributes");
+            if (e && git_tree_entry_type(e) == GIT_OBJECT_BLOB)
+                result.push_back(toHash(*git_tree_entry_id(e)));
+        };
+
+        checkAttrs();
+
+        for (auto & component : tokenizeString<std::vector<std::string>>(path, "/")) {
+            auto e = git_tree_entry_byname(tree.get(), component.c_str());
+            if (!e || git_tree_entry_type(e) != GIT_OBJECT_TREE)
+                break;
+            Tree next;
+            if (git_tree_lookup(Setter(next), *this, git_tree_entry_id(e)))
+                break;
+            tree = std::move(next);
+            checkAttrs();
+        }
+
+        return result;
+    }
+
     /**
      * A 'GitSourceAccessor' with no regard for export-ignore.
      */
@@ -800,8 +832,7 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Opti
 std::string GitAccessorOptions::makeFingerprint(const Hash & rev) const
 {
     return "git:" + rev.gitRev() + (exportIgnore ? ";e" : "") + (smudgeLfs ? ";l" : "")
-        + (attrCommitRev ? ";ac:" + attrCommitRev->gitRev() : "")
-        + (attrPathPrefix.empty() ? "" : ";ap:" + attrPathPrefix);
+        + (attrFingerprint.empty() ? "" : ";af:" + attrFingerprint);
 }
 
 /**

@@ -29,20 +29,23 @@ struct GitAccessorOptions
     bool submodules = false; // Currently implemented in GitInputScheme rather than GitAccessor
 
     /**
-     * When set, use this commit hash for attribute lookup (LFS and exportIgnore)
-     * instead of the tree hash passed to getAccessor(). Required when the
-     * accessor is created from a tree SHA rather than a commit SHA, since
-     * GIT_ATTR_CHECK_INCLUDE_COMMIT needs a commit OID to find .gitattributes.
+     * Commit OID for git_attr_get_ext with GIT_ATTR_CHECK_INCLUDE_COMMIT.
+     * Required when the accessor is created from a tree SHA rather than a
+     * commit SHA.
      */
     std::optional<Hash> attrCommitRev;
 
     /**
-     * Repo-relative path prefix for .gitattributes lookups. When the accessor
-     * is rooted at a subtree (e.g., a zone), paths passed to git_attr_get_ext
-     * must be qualified with the subtree's location in the repo so that
-     * libgit2 walks the correct .gitattributes files.
+     * Repo-relative path prefix prepended to paths before git_attr_get_ext
+     * so libgit2 walks .gitattributes at the correct tree locations.
      */
     std::string attrPathPrefix;
+
+    /**
+     * Fingerprint of .gitattributes blobs along attrPathPrefix.
+     * Pre-computed by the caller so makeFingerprint doesn't need repo access.
+     */
+    std::string attrFingerprint;
 
     std::string makeFingerprint(const Hash & rev) const;
 };
@@ -125,6 +128,9 @@ struct GitRepo
 
     /** Get the root tree SHA from a commit SHA */
     virtual Hash getCommitTree(const Hash & commitSha) = 0;
+
+    /** Blob OIDs of .gitattributes at each directory from root to `path`. */
+    virtual std::vector<Hash> getGitAttributesAlongPath(const Hash & commitSha, const std::string & path) = 0;
 
     virtual ref<SourceAccessor>
     getAccessor(const Hash & rev, const GitAccessorOptions & options, std::string displayPrefix) = 0;
