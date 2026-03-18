@@ -29,6 +29,7 @@ TEST(readLinkAt, works)
     std::string mediumTarget(maxPathLength / 2, 'x');
     std::string longTarget(maxPathLength - 1, 'y');
 
+    bool hasLongSymlinks = true;
     {
         RestoreSink sink(/*startFsync=*/false);
         sink.dstPath = tmpDir;
@@ -36,8 +37,16 @@ TEST(readLinkAt, works)
         sink.createSymlink(CanonPath("link"), "target");
         sink.createSymlink(CanonPath("relative"), "../relative/path");
         sink.createSymlink(CanonPath("absolute"), "/absolute/path");
-        sink.createSymlink(CanonPath("medium"), mediumTarget);
-        sink.createSymlink(CanonPath("long"), longTarget);
+        try {
+            sink.createSymlink(CanonPath("medium"), mediumTarget);
+            sink.createSymlink(CanonPath("long"), longTarget);
+        } catch (SystemError & e) {
+            if (e.is(std::errc::filename_too_long)) {
+                hasLongSymlinks = false;
+            } else {
+                throw;
+            }
+        }
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("a/b"));
         sink.createSymlink(CanonPath("a/b/link"), "nested_target");
@@ -50,8 +59,10 @@ TEST(readLinkAt, works)
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("link")), OS_STR("target"));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("relative")), OS_STR("../relative/path"));
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("absolute")), OS_STR("/absolute/path"));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("medium")), string_to_os_string(mediumTarget));
-    EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
+    if (hasLongSymlinks) {
+        EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("medium")), string_to_os_string(mediumTarget));
+        EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("long")), string_to_os_string(longTarget));
+    }
     EXPECT_EQ(readLinkAt(dirFd.get(), CanonPath("a/b/link")), OS_STR("nested_target"));
 
     auto subDirFd = openDirectory(tmpDir / "a", FinalSymlink::Follow);
