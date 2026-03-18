@@ -742,6 +742,11 @@ static void performOp(
         readInt(conn.from);
         readInt(conn.from);
 
+        if (!options.pathsToDelete.empty() && options.action == GCAction::gcDeleteDead
+            && !conn.protoVersion.features.contains(WorkerProto::featureGcClosure)) {
+            throw Error("Garbage collecting a closure requested but it is not supported by the negotiated protocol");
+        }
+
         GCResults results;
 
         logger->startWork();
