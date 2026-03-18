@@ -800,7 +800,8 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Opti
 std::string GitAccessorOptions::makeFingerprint(const Hash & rev) const
 {
     return "git:" + rev.gitRev() + (exportIgnore ? ";e" : "") + (smudgeLfs ? ";l" : "")
-        + (lfsCommitRev ? ";lc:" + lfsCommitRev->gitRev() : "");
+        + (attrCommitRev ? ";ac:" + attrCommitRev->gitRev() : "")
+        + (attrPathPrefix.empty() ? "" : ";ap:" + attrPathPrefix);
 }
 
 /**
@@ -823,7 +824,8 @@ struct GitSourceAccessor : SourceAccessor
               .repo = repo_,
               .root = peelToTreeOrBlob(lookupObject(*repo_, hashToOID(rev)).get()),
               .lfsFetch = options.smudgeLfs ? std::make_optional(lfs::Fetch(*repo_,
-                  options.lfsCommitRev ? hashToOID(*options.lfsCommitRev) : hashToOID(rev))) : std::nullopt,
+                  options.attrCommitRev ? hashToOID(*options.attrCommitRev) : hashToOID(rev),
+                  options.attrPathPrefix)) : std::nullopt,
               .options = options,
           }}
     {
@@ -1094,8 +1096,9 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
 {
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
+    std::string attrPathPrefix;
 
-    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev)
+    GitExportIgnoreSourceAccessor(ref<GitRepoImpl> repo, ref<SourceAccessor> next, std::optional<Hash> rev, std::string attrPathPrefix = "")
         : CachingFilteringSourceAccessor(
               next,
               [&](const CanonPath & path) {
@@ -1104,12 +1107,14 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
               })
         , repo(repo)
         , rev(rev)
+        , attrPathPrefix(std::move(attrPathPrefix))
     {
     }
 
     bool gitAttrGet(const CanonPath & path, const char * attrName, const char *& valueOut)
     {
-        const char * pathCStr = path.rel_c_str();
+        auto fullPath = attrPathPrefix.empty() ? path : CanonPath("/" + attrPathPrefix) / path;
+        const char * pathCStr = fullPath.rel_c_str();
 
         if (rev) {
             git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
@@ -1459,9 +1464,10 @@ GitRepoImpl::getAccessor(const Hash & rev, const GitAccessorOptions & options, s
     auto self = ref<GitRepoImpl>(shared_from_this());
     ref<GitSourceAccessor> rawGitAccessor = getRawAccessor(rev, options);
     rawGitAccessor->setPathDisplay(std::move(displayPrefix));
-    if (options.exportIgnore)
-        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, rev);
-    else
+    if (options.exportIgnore) {
+        auto commitRev = options.attrCommitRev ? options.attrCommitRev : std::optional(rev);
+        return make_ref<GitExportIgnoreSourceAccessor>(self, rawGitAccessor, commitRev, options.attrPathPrefix);
+    } else
         return rawGitAccessor;
 }
 
@@ -1477,7 +1483,7 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
-        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
+        fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt, options.attrPathPrefix);
     return fileAccessor;
 }
 

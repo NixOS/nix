@@ -29,12 +29,20 @@ struct GitAccessorOptions
     bool submodules = false; // Currently implemented in GitInputScheme rather than GitAccessor
 
     /**
-     * When set, use this commit hash for git-lfs attribute lookup instead of
-     * the tree hash passed to getAccessor(). Required when the accessor is
-     * created from a tree SHA rather than a commit SHA, since lfs::Fetch needs
-     * a commit OID for GIT_ATTR_CHECK_INCLUDE_COMMIT to find .gitattributes.
+     * When set, use this commit hash for attribute lookup (LFS and exportIgnore)
+     * instead of the tree hash passed to getAccessor(). Required when the
+     * accessor is created from a tree SHA rather than a commit SHA, since
+     * GIT_ATTR_CHECK_INCLUDE_COMMIT needs a commit OID to find .gitattributes.
      */
-    std::optional<Hash> lfsCommitRev;
+    std::optional<Hash> attrCommitRev;
+
+    /**
+     * Repo-relative path prefix for .gitattributes lookups. When the accessor
+     * is rooted at a subtree (e.g., a zone), paths passed to git_attr_get_ext
+     * must be qualified with the subtree's location in the repo so that
+     * libgit2 walks the correct .gitattributes files.
+     */
+    std::string attrPathPrefix;
 
     std::string makeFingerprint(const Hash & rev) const;
 };

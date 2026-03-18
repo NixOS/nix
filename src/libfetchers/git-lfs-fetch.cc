@@ -173,10 +173,11 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
     return std::make_optional(Pointer{oid, std::stoul(size)});
 }
 
-Fetch::Fetch(git_repository * repo, git_oid rev)
+Fetch::Fetch(git_repository * repo, git_oid rev, std::string attrPathPrefix)
 {
     this->repo = repo;
     this->rev = rev;
+    this->attrPathPrefix = std::move(attrPathPrefix);
 
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
@@ -189,9 +190,10 @@ bool Fetch::shouldFetch(const CanonPath & path) const
     git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
     opts.attr_commit_id = this->rev;
     opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
-    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, path.rel_c_str(), "filter"))
+    auto fullPath = attrPathPrefix.empty() ? path : CanonPath("/" + attrPathPrefix) / path;
+    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, fullPath.rel_c_str(), "filter"))
         throw Error("cannot get git-lfs attribute: %s", git_error_last()->message);
-    debug("Git filter for '%s' is '%s'", path, attr ? attr : "null");
+    debug("Git filter for '%s' is '%s'", fullPath, attr ? attr : "null");
     return attr != nullptr && !std::string(attr).compare("lfs");
 }
 
