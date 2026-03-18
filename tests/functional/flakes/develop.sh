@@ -161,3 +161,34 @@ EOF
 [[ -z "$(nix develop --no-write-lock-file .#hello-structured </dev/null)" ]]
 
 clearStore
+
+# Check that devShells has precedence over devShell and packages. Note that devShell is deprecated.
+cat <<EOF >"$TEST_HOME/flake.nix"
+{
+  inputs.nixpkgs.url = "$TEST_HOME/nixpkgs";
+  outputs = {self, nixpkgs}: {
+    devShells.$system.default = (import ./config.nix).mkDerivation {
+      name = "hello";
+      buildCommand = "set -x; mkdir \$out";
+      x = "foo";
+    };
+    devShell.$system = (import ./config.nix).mkDerivation {
+      name = "hello";
+      buildCommand = "set -x; mkdir \$out";
+      x = "bar";
+    };
+    packages.$system.default = (import ./config.nix).mkDerivation {
+      name = "hello";
+      buildCommand = "set -x; mkdir \$out";
+      x = "xyzzy";
+    };
+  };
+}
+EOF
+
+[[ $(nix develop . -L --command sh -c "echo \$x") == "foo" ]]
+[[ $(nix develop ".#devShell.$system" -L --command sh -c "echo \$x") == "bar" ]]
+sed -i "$TEST_HOME/flake.nix" -e 's/devShells/devShells2/' # remove devShells
+[[ $(nix develop . -L --command sh -c "echo \$x") == "bar" ]]
+sed -i "$TEST_HOME/flake.nix" -e 's/devShell/devShell2/' # remove devShell
+[[ $(nix develop . -L --command sh -c "echo \$x") == "xyzzy" ]]
