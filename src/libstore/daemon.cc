@@ -17,6 +17,7 @@
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
+#include <variant>
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
@@ -745,12 +746,26 @@ static void performOp(
     case WorkerProto::Op::CollectGarbage: {
         GCOptions options;
         options.action = WorkerProto::Serialise<GCOptions::GCAction>::read(*store, rconn);
-        options.pathsToDelete = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+        if (rconn.version.features.contains(WorkerProto::featureDeleteDeadSpecific)) {
+            options.pathsToDelete = WorkerProto::Serialise<GCOptions::GCPaths>::read(*store, rconn);
+        } else {
+            auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+            if (options.action != GCAction::gcDeleteSpecific && paths.empty())
+                options.pathsToDelete = GCOptions::WholeStore{};
+            else
+                options.pathsToDelete = paths;
+        }
         conn.from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(conn.from);
         readInt(conn.from);
         readInt(conn.from);
+
+        if (options.action == GCAction::gcDeleteDead && std::holds_alternative<StorePathSet>(options.pathsToDelete)
+            && !conn.protoVersion.features.contains(WorkerProto::featureDeleteDeadSpecific)) {
+            throw Error(
+                "Garbage collecting specific paths requested but it is not supported by the negotiated protocol");
+        }
 
         GCResults results;
 

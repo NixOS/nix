@@ -1,3 +1,4 @@
+#include "nix/store/gc-store.hh"
 #include "nix/store/local-gc.hh"
 #include "nix/store/local-settings.hh"
 #include "nix/store/local-store.hh"
@@ -22,6 +23,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <variant>
 #if HAVE_STATVFS
 #  include <sys/statvfs.h>
 #endif
@@ -360,6 +362,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
 
+    /* Return early if nothing to delete */
+    if (std::holds_alternative<StorePathSet>(options.pathsToDelete)
+        && std::get<StorePathSet>(options.pathsToDelete).empty())
+        return;
+
     struct Shared
     {
         // The temp roots only store the hash part to make it easier to
@@ -577,7 +584,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        via the referrers edges and optionally derivers and derivation
        output edges. If none of those paths are roots, then all
        visited paths are garbage and are deleted. */
-    auto deleteReferrersClosure = [&](const StorePath & start) {
+    auto maybeDeleteReferrersClosure = [&](const StorePath & start) {
         StorePathSet visited;
         std::queue<StorePath> todo;
 
@@ -634,7 +641,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            if (options.action == GCOptions::gcDeleteSpecific && !options.pathsToDelete.count(*path))
+            if (std::holds_alternative<StorePathSet>(options.pathsToDelete)
+                && !std::get<StorePathSet>(options.pathsToDelete).contains(*path))
                 return;
 
             {
@@ -694,50 +702,73 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         }
     };
 
-    /* Either delete all garbage paths, or just the specified
-       paths (for gcDeleteSpecific). */
-    if (options.action == GCOptions::gcDeleteSpecific) {
+    try {
+        /* Either delete all garbage paths, or just the specified paths. */
+        std::visit(
+            overloaded{
+                [&](const StorePathSet & paths) {
+                    for (auto & i : paths) {
+                        switch (options.action) {
+                        case GCOptions::gcDeleteDead:
+                            printInfo("deleting garbage within specified paths...");
+                            break;
+                        case GCOptions::gcDeleteSpecific:
+                            printInfo("deleting specified paths...");
+                            break;
+                        case GCOptions::gcReturnDead:
+                        case GCOptions::gcReturnLive:
+                            printInfo("determining live/dead paths...");
+                        }
 
-        for (auto & i : options.pathsToDelete) {
-            deleteReferrersClosure(i);
-            if (!dead.count(i))
-                throw Error(
-                    "Cannot delete path '%1%' since it is still alive. "
-                    "To find out why, use: "
-                    "nix-store --query --roots and nix-store --query --referrers",
-                    printStorePath(i));
-        }
+                        maybeDeleteReferrersClosure(i);
 
-    } else if (options.maxFreed > 0) {
+                        if (options.action == GCOptions::gcDeleteSpecific && !dead.count(i))
+                            throw Error(
+                                "Cannot delete path '%1%' since it is still alive. "
+                                "To find out why, use: "
+                                "nix-store --query --roots and nix-store --query --referrers",
+                                printStorePath(i));
+                    }
+                },
+                [&](const GCOptions::WholeStore & _) {
+                    if (options.maxFreed == 0)
+                        return;
 
-        if (shouldDelete)
-            printInfo("deleting garbage...");
-        else
-            printInfo("determining live/dead paths...");
+                    switch (options.action) {
+                    case GCOptions::gcDeleteDead:
+                        printInfo("deleting garbage...");
+                        break;
+                    case GCOptions::gcDeleteSpecific:
+                        throw Error("Cannot delete the entire store");
+                    case GCOptions::gcReturnDead:
+                    case GCOptions::gcReturnLive:
+                        printInfo("determining live/dead paths...");
+                    }
 
-        try {
-            AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
-            if (!dir)
-                throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
+                    AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
+                    if (!dir)
+                        throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
 
-            /* Read the store and delete all paths that are invalid or
-               unreachable. We don't use readDirectory() here so that
-               GCing can start faster. */
-            auto linksName = linksDir.filename();
-            struct dirent * dirent;
-            while (errno = 0, dirent = readdir(dir.get())) {
-                checkInterrupt();
-                std::string name = dirent->d_name;
-                if (name == "." || name == ".." || name == linksName)
-                    continue;
+                    /* Read the store and delete all paths that are invalid or
+                    unreachable. We don't use readDirectory() here so that
+                    GCing can start faster. */
+                    auto linksName = linksDir.filename();
+                    struct dirent * dirent;
+                    while (errno = 0, dirent = readdir(dir.get())) {
+                        checkInterrupt();
+                        std::string name = dirent->d_name;
+                        if (name == "." || name == ".." || name == linksName)
+                            continue;
 
-                if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
-                    deleteReferrersClosure(*storePath);
-                else
-                    deleteFromStore(name, false);
-            }
-        } catch (GCLimitReached & e) {
-        }
+                        if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
+                            maybeDeleteReferrersClosure(*storePath);
+                        else
+                            deleteFromStore(name, false);
+                    }
+                },
+            },
+            options.pathsToDelete);
+    } catch (GCLimitReached & e) {
     }
 
     if (options.action == GCOptions::gcReturnLive) {
