@@ -311,12 +311,7 @@ ref<SourceAccessor> getFSSourceAccessor()
 ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
 {
 #ifndef _WIN32
-    /* Die if the path ends in a / or /. That is a footgun that matters
-       for symlink resolution. TODO: Strip them or make this a proper error if
-       this becomes an issue. Defense-in-depth. */
-    assert(!root.native().ends_with(OS_STR("/.")));
-    assert(!root.native().ends_with(OS_STR("/")));
-
+    assert(root.is_absolute());
     AutoCloseFD fd = openFileReadonly(root, FinalSymlink::DontFollow);
 
     if (!fd) {
