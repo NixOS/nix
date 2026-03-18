@@ -57,8 +57,8 @@ void LocalStore::createTempRootsFile()
 
     while (1) {
         if (pathExists(fnTempRoots))
-            /* It *must* be stale, since there can be no two
-               processes with the same pid. */
+            /* The file is stale since each LocalStore instance
+               uses a unique filename (pid + counter). */
             tryUnlink(fnTempRoots);
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
@@ -170,8 +170,6 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         }
         auto path = i.path();
 
-        pid_t pid = std::stoi(name);
-
         debug("reading temporary root file %1%", PathFmt(path));
         AutoCloseFD fd(toDescriptor(open(
             path.string().c_str(),
@@ -206,7 +204,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             auto root = std::string_view(contents).substr(pos, end - pos);
             debug("got temporary root '%s'", root);
-            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
+            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%s}", name));
             pos = end + 1;
         }
     }
@@ -593,6 +591,33 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 todo.push(path);
         };
 
+        auto markAlive = [&](const StorePath & p) {
+            alive.insert(p);
+            try {
+                StorePathSet closure;
+                bool includeOutputs = false;
+                bool includeDerivers = false;
+                std::visit(
+                    overloaded{
+                        [&](const GCOptions::WholeStore &) {
+                            includeOutputs = gcSettings.keepOutputs;
+                            includeDerivers = gcSettings.keepDerivations;
+                        },
+                        [](const GCOptions::SpecificPaths &) {},
+                    },
+                    options.pathsToDelete);
+                computeFSClosure(
+                    p,
+                    closure,
+                    /* flipDirection */ false,
+                    includeOutputs,
+                    includeDerivers);
+                for (auto & c : closure)
+                    alive.insert(c);
+            } catch (InvalidPath &) {
+            }
+        };
+
         enqueue(start);
 
         while (auto path = pop(todo)) {
@@ -611,38 +636,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (dead.contains(*path))
                 continue;
 
-            auto markAlive = [&]() {
-                alive.insert(*path);
-                alive.insert(start);
-                try {
-                    StorePathSet closure;
-                    bool includeOutputs = false;
-                    bool includeDerivers = false;
-                    std::visit(
-                        overloaded{
-                            [&](const GCOptions::WholeStore &) {
-                                includeOutputs = gcSettings.keepOutputs;
-                                includeDerivers = gcSettings.keepDerivations;
-                            },
-                            [](const GCOptions::SpecificPaths &) {},
-                        },
-                        options.pathsToDelete);
-                    computeFSClosure(
-                        *path,
-                        closure,
-                        /* flipDirection */ false,
-                        includeOutputs,
-                        includeDerivers);
-                    for (auto & p : closure)
-                        alive.insert(p);
-                } catch (InvalidPath &) {
-                }
-            };
-
             /* If this is a root, bail out. */
             if (roots.contains(*path)) {
                 debug("cannot delete '%s' because it's a root", printStorePath(*path));
-                return markAlive();
+                alive.insert(start);
+                return markAlive(*path);
             }
 
             if (std::visit(
@@ -667,7 +665,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 auto shared(_shared.lock());
                 if (shared->tempRoots.contains(hashPart)) {
                     debug("cannot delete '%s' because it's a temporary root", printStorePath(*path));
-                    return markAlive();
+                    alive.insert(start);
+                    return markAlive(*path);
                 }
                 shared->pending = hashPart;
             }
@@ -725,11 +724,11 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 {
                     auto hashPart = std::string(path.hashPart());
                     auto shared(_shared.lock());
-                    if (shared->tempRoots.count(hashPart)) {
+                    if (shared->tempRoots.contains(hashPart)) {
                         debug(
                             "not deleting '%s' because it became a temporary root after initial scan",
                             printStorePath(path));
-                        alive.insert(path);
+                        markAlive(path);
                         continue;
                     }
                     shared->pending = hashPart;
