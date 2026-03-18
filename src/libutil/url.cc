@@ -296,13 +296,12 @@ try {
 }
 
 const static std::string allowedInQuery = ":@/?";
-const static std::string allowedInPath = ":@";
 
 std::string encodeUrlPath(std::span<const std::string> urlPath)
 {
     std::vector<std::string> encodedPath;
     for (auto & p : urlPath)
-        encodedPath.push_back(percentEncode(p, allowedInPath));
+        encodedPath.push_back(boost::urls::encode(p, boost::urls::pchars));
     return concatStringsSep("/", encodedPath);
 }
 
