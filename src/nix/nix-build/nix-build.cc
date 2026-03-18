@@ -15,6 +15,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/build-result.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
 #include "nix/main/shared.hh"
@@ -725,9 +726,34 @@ static void main_nix_build(int argc, char ** argv)
                 drvPrefix += fmt("-%d", counter + 1);
 
             auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath, &*evalStore);
-
             auto maybeOutputPath = builtOutputs.at(outputName);
-            assert(maybeOutputPath);
+
+            // For CA/impure derivations the output path is not known
+            // from the original derivation.  Re-build (a no-op since
+            // we just built) with buildPathsWithResults which returns
+            // the resolved output paths from the build results.
+            if (!maybeOutputPath) {
+                auto results = store->buildPathsWithResults(
+                    {DerivedPath::Built{
+                        .drvPath = makeConstantStorePathRef(drvPath),
+                        .outputs = OutputsSpec::Names{outputName},
+                    }},
+                    bmNormal,
+                    evalStore);
+                for (auto & result : results) {
+                    if (auto * success = std::get_if<BuildResult::Success>(&result.inner)) {
+                        auto ot = success->builtOutputs.find(outputName);
+                        if (ot != success->builtOutputs.end())
+                            maybeOutputPath = ot->second.outPath;
+                    }
+                }
+            }
+
+            if (!maybeOutputPath)
+                throw Error(
+                    "derivation '%s' does not have a known output path for '%s'",
+                    store->printStorePath(drvPath),
+                    outputName);
             auto outputPath = *maybeOutputPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
