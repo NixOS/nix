@@ -79,6 +79,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         try {
             outputInfo = promise->get_future().get();
+            // NOLINTNEXTLINE(nix-foreign-exceptions): future exception sink
         } catch (std::exception & e) {
             printError(e.what());
             substituterFailed = true;

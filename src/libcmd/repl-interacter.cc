@@ -1,6 +1,7 @@
 #include "cmd-config-private.hh"
 
 #include <cstdio>
+#include <iostream>
 
 #include <signal.h>
 
@@ -93,14 +94,14 @@ try {
             if (vp) {
                 while (--ac >= 0)
                     free(vp[ac]);
-                free(vp);
+                free(static_cast<void *>(vp));
             }
             throw Error("allocation failure");
         }
         return p;
     };
 
-    vp = check((char **) malloc(possible.size() * sizeof(char *)));
+    vp = check(static_cast<char **>(malloc(possible.size() * sizeof(char *))));
 
     for (auto & p : possible)
         vp[ac++] = check(strdup(p.c_str()));

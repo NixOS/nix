@@ -28,7 +28,9 @@ TEST_F(nix_api_util_context, nix_context_error)
     ASSERT_EQ(ctx->info->msg.str(), "testing error");
 
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test-only
         throw std::runtime_error("testing exception");
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test-only
     } catch (std::exception & e) {
         err_msg_ref = e.what();
         nix_context_error(ctx);

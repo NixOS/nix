@@ -8,13 +8,15 @@
 
 namespace nix {
 
-// Custom implementation to avoid `ref` ptr equality
+// Custom implementation to avoid `ref` ptr equality.
+// NOLINTNEXTLINE(bugprone-exception-escape): *me->drvPath deref — ref<> never null by invariant
 GENERATE_CMP_EXT(, std::strong_ordering, SingleDerivedPathBuilt, *me->drvPath, me->output);
 
 // Custom implementation to avoid `ref` ptr equality
 
 // TODO no `GENERATE_CMP_EXT` because no `std::set::operator<=>` on
 // Darwin, per header.
+// NOLINTNEXTLINE(bugprone-exception-escape): *me->drvPath deref — ref<> never null by invariant
 GENERATE_EQUAL(, DerivedPathBuilt ::, DerivedPathBuilt, *me->drvPath, me->outputs);
 GENERATE_ONE_CMP(, bool, DerivedPathBuilt ::, <, DerivedPathBuilt, *me->drvPath, me->outputs);
 

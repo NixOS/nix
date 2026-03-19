@@ -326,6 +326,7 @@ public:
             return *this;
         }
 
+        // NOLINTNEXTLINE(bugprone-exception-escape): iterator copy is trivial
         iterator operator++(int) noexcept
         {
             iterator tmp = *this;

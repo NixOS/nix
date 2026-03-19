@@ -493,6 +493,7 @@ public:
                 std::string s;
 
                 if (running || done || expected || failed) {
+                    // NOLINTBEGIN(bugprone-narrowing-conversions): display math: bytes << 2^53
                     if (running)
                         if (expected != 0)
                             s =
@@ -517,6 +518,7 @@ public:
 
                     if (failed)
                         s += fmt(" (" ANSI_RED "%d failed" ANSI_NORMAL ")", failed / unit);
+                    // NOLINTEND(bugprone-narrowing-conversions)
                 }
 
                 return s;

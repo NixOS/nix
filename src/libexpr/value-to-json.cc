@@ -116,6 +116,7 @@ void printValueAsJSON(
 {
     try {
         str << printValueAsJSON(state, strict, v, pos, context, copyToStore);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (nlohmann::json::exception & e) {
         throw JSONSerializationError("JSON serialization error: %s", e.what());
     }

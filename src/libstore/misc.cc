@@ -27,6 +27,7 @@ void Store::computeFSClosure(
 {
     std::function<asio::awaitable<StorePathSet>(const StorePath & path)> queryDeps;
     if (flipDirection)
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): consumed synchronously by computeClosure
         queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             StorePathSet referrers;
@@ -46,6 +47,7 @@ void Store::computeFSClosure(
             co_return res;
         };
     else
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): consumed synchronously by computeClosure
         queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
@@ -93,6 +95,7 @@ querySubstitutablePathInfosAsync(Store & store, const StorePathCAMap & paths, Su
     if (!settings.getWorkerSettings().useSubstitutes)
         co_return;
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): co_await blocks until completion
     co_await forEachAsync(paths, [&store, &infos](auto path) -> asio::awaitable<void> {
         std::optional<Error> lastStoresException = std::nullopt;
         for (auto & sub : getDefaultSubstituters()) {
@@ -189,11 +192,13 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
             collectDerivedPaths(edges, makeConstantStorePathRef(inputDrv), inputNode);
     };
 
+    // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): consumed synchronously by computeClosure
     GetEdgesAsync<DerivedPath> getEdges = [&](const DerivedPath & req) -> asio::awaitable<std::set<DerivedPath>> {
         std::set<DerivedPath> edges;
 
         co_await std::visit(
             overloaded{
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): co_await std::visit blocks
                 [&](const DerivedPath::Built & bfd) -> asio::awaitable<void> {
                     auto drvPathP = std::get_if<DerivedPath::Opaque>(&*bfd.drvPath);
                     if (!drvPathP) {
@@ -278,6 +283,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         /* Query all outputs concurrently (but not in parallel,
                            computeClosure runs on a strand). If any one is not
                            substitutable then discard all other outputs. */
+                        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): co_await blocks
                         co_await forEachAsync(invalid, [&](const StorePath & outPath) -> asio::awaitable<void> {
                             if (mustBuild)
                                 co_return;
@@ -301,6 +307,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         mustBuildDrv(drvPath, *drv, edges);
                     }
                 },
+                // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): co_await std::visit blocks
                 [&](const DerivedPath::Opaque & bo) -> asio::awaitable<void> {
                     if (isValidPath(bo.path))
                         co_return;

@@ -26,7 +26,7 @@ using namespace nix;
    mirrors defined in Nixpkgs. */
 std::string resolveMirrorUrl(EvalState & state, const std::string & url)
 {
-    if (url.substr(0, 9) != "mirror://")
+    if (!url.starts_with("mirror://"))
         return url;
 
     std::string s(url, 9);

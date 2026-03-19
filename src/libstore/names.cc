@@ -39,10 +39,15 @@ DrvName::~DrvName() {}
 bool DrvName::matches(const DrvName & n)
 {
     if (name != "*") {
-        if (!regex) {
-            regex = std::make_unique<Regex>();
-            regex->regex = std::regex(name, std::regex::extended);
-        }
+        if (!regex)
+            try {
+                regex = std::make_unique<Regex>();
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
+                regex->regex = std::regex(name, std::regex::extended);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> Error
+            } catch (std::regex_error & e) {
+                throw Error("invalid regular expression in derivation name '%s': %s", name, e.what());
+            }
         if (!std::regex_match(n.name, regex->regex))
             return false;
     }
@@ -82,10 +87,12 @@ static bool componentsLT(const std::string_view c1, const std::string_view c2)
     if (n1 && n2)
         return *n1 < *n2;
     else if (c1 == "" && n2)
+        // NOLINTNEXTLINE(bugprone-branch-clone): comparison ladder: conditions document cases
         return true;
     else if (c1 == "pre" && c2 != "pre")
         return true;
     else if (c2 == "pre")
+        // NOLINTNEXTLINE(bugprone-branch-clone): comparison ladder: conditions document cases
         return false;
     /* Assume that `2.3a' < `2.3.1'. */
     else if (n2)

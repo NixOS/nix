@@ -37,7 +37,7 @@ void MuxablePipePollState::iterate(
                 if (errno != EINTR)
                     throw SysError("read failed");
             } else {
-                std::string_view data((char *) buffer.data(), rd);
+                std::string_view data(reinterpret_cast<char *>(buffer.data()), rd);
                 handleRead(k, data);
             }
         }

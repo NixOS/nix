@@ -39,6 +39,7 @@ static nlohmann::json toJSON(Store & store, const SingleDerivedPath::Built & sdp
     res["output"] = sdpb.output;
     auto outputPathIter = outputMap.find(sdpb.output);
     if (outputPathIter == outputMap.end())
+        // NOLINTNEXTLINE(bugprone-branch-clone): outputPath=null: not-found vs found-but-empty
         res["outputPath"] = nullptr;
     else if (std::optional p = outputPathIter->second)
         res["outputPath"] = store.printStorePath(*p);

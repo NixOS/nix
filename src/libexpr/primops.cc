@@ -454,7 +454,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value
         state.error<EvalError>("could not open '%1%': %2%", path, dlerror()).debugThrow();
 
     dlerror();
-    ValueInitializer func = (ValueInitializer) dlsym(handle, sym.c_str());
+    ValueInitializer func = reinterpret_cast<ValueInitializer>(dlsym(handle, sym.c_str()));
     if (!func) {
         char * message = dlerror();
         if (message)
@@ -724,8 +724,10 @@ struct CompareValues
     {
         try {
             if (v1->type() == nFloat && v2->type() == nInt)
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 return v1->fpoint() < v2->integer().value;
             if (v1->type() == nInt && v2->type() == nFloat)
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 return v1->integer().value < v2->fpoint();
             if (v1->type() != v2->type())
                 state
@@ -1049,8 +1051,10 @@ static void prim_ceil(EvalState & state, const PosIdx pos, Value ** args, Value 
         *args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.ceil");
     auto ceilValue = ceil(value);
     bool isInt = args[0]->type() == nInt;
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
     constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
     if (ceilValue >= int_min && ceilValue < -int_min) {
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
         v.mkInt(ceilValue);
     } else if (isInt) {
         // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat
@@ -1104,8 +1108,10 @@ static void prim_floor(EvalState & state, const PosIdx pos, Value ** args, Value
         *args[0], args[0]->determinePos(pos), "while evaluating the first argument passed to builtins.floor");
     auto floorValue = floor(value);
     bool isInt = args[0]->type() == nInt;
+    // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
     constexpr NixFloat int_min = std::numeric_limits<NixInt::Inner>::min(); // power of 2, so that no rounding occurs
     if (floorValue >= int_min && floorValue < -int_min) {
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): range-checked above
         v.mkInt(floorValue);
     } else if (isInt) {
         // a NixInt, e.g. INT64_MAX, can be rounded to -int_min due to the cast to NixFloat
@@ -3038,6 +3044,7 @@ static void prim_attrNames(EvalState & state, const PosIdx pos, Value ** args, V
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
         list[n] = Value::toPtr(state.symbols[i.name]);
 
+    // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): comparator derefs, not pointer compare
     std::sort(list.begin(), list.end(), [](Value * v1, Value * v2) { return v1->string_view() < v2->string_view(); });
 
     v.mkList(list);
@@ -3063,15 +3070,17 @@ static void prim_attrValues(EvalState & state, const PosIdx pos, Value ** args, 
     auto list = state.buildList(args[0]->attrs()->size());
 
     for (const auto & [n, i] : enumerate(*args[0]->attrs()))
-        list[n] = (Value *) &i;
+        list[n] = reinterpret_cast<Value *>(const_cast<Attr *>(&i));
 
+    // NOLINTNEXTLINE(bugprone-nondeterministic-pointer-iteration-order): comparator derefs, not pointer compare
     std::sort(list.begin(), list.end(), [&](Value * v1, Value * v2) {
-        std::string_view s1 = state.symbols[((Attr *) v1)->name], s2 = state.symbols[((Attr *) v2)->name];
+        std::string_view s1 = state.symbols[reinterpret_cast<Attr *>(v1)->name],
+                         s2 = state.symbols[reinterpret_cast<Attr *>(v2)->name];
         return s1 < s2;
     });
 
     for (auto & v : list)
-        v = ((Attr *) v)->value;
+        v = reinterpret_cast<Attr *>(v)->value;
 
     v.mkList(list);
 }
@@ -3285,6 +3294,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
         auto sym = state.symbols.create(name);
 
         // (ab)use Attr to store a Value * * instead of a Value *, so that we can stabilize the sort using the Value * *
+        // NOLINTBEGIN(bugprone-bitwise-pointer-cast): intentional type-punning for stable sort
         bindings[n] = Attr(sym, std::bit_cast<Value *>(&v2));
     }
 
@@ -3302,6 +3312,7 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
         }
         // Note that .value is actually a Value * *; see earlier comments
         Value * v2 = *std::bit_cast<ElemPtr>(attr.value);
+        // NOLINTEND(bugprone-bitwise-pointer-cast)
 
         auto j = state.getAttr(state.s.value, v2->attrs(), "in a {name=...; value=...;} pair");
         prev = attr.name;
@@ -4134,12 +4145,14 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value ** args, V
     auto rsize = right.size();
     auto rlist = state.buildList(rsize);
     if (rsize)
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(rlist.elems, right.data(), sizeof(Value *) * rsize);
     attrs.alloc(state.s.right).mkList(rlist);
 
     auto wsize = wrong.size();
     auto wlist = state.buildList(wsize);
     if (wsize)
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(wlist.elems, wrong.data(), sizeof(Value *) * wsize);
     attrs.alloc(state.s.wrong).mkList(wlist);
 
@@ -4191,6 +4204,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
     for (auto & i : attrs) {
         auto size = i.second.size();
         auto list = state.buildList(size);
+        // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
         memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
         attrs2.alloc(i.first).mkList(list);
     }
@@ -4248,6 +4262,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value ** args, V
         auto listView = lists[n].listView();
         auto l = listView.size();
         if (l)
+            // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
             memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
@@ -4774,6 +4789,7 @@ void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v)
                 v2 = mkString(state, match[i + 1]);
         v.mkList(list);
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> EvalError
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++
@@ -4877,6 +4893,7 @@ void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 
         v.mkList(list);
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> EvalError
     } catch (std::regex_error & e) {
         if (e.code() == std::regex_constants::error_space) {
             // limit is _GLIBCXX_REGEX_STATE_LIMIT for libstdc++

@@ -32,6 +32,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
             [&](const StoreReference::Auto &) -> ref<StoreConfig> {
                 auto stateDir = getOr(params, "state", settings.nixStateDir.string());
                 if (access(stateDir.c_str(), R_OK | W_OK) == 0)
+                    // NOLINTNEXTLINE(bugprone-branch-clone): store type selection: conditions document cases
                     return make_ref<LocalStore::Config>(params);
                 else if (pathExists(settings.nixDaemonSocketFile))
                     return make_ref<UDSRemoteStore::Config>(params);

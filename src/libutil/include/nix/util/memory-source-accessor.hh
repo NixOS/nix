@@ -93,6 +93,7 @@ inline bool DirectoryT<Child>::operator==(const DirectoryT &) const noexcept = d
 template<typename Child>
 inline std::strong_ordering DirectoryT<Child>::operator<=>(const DirectoryT &) const noexcept = default;
 
+// NOLINTBEGIN(bugprone-exception-escape): defaulted on variant members — only bad_alloc possible
 template<typename RegularContents, bool recur>
 inline bool
 VariantT<RegularContents, recur>::operator==(const VariantT<RegularContents, recur> &) const noexcept = default;
@@ -100,6 +101,7 @@ VariantT<RegularContents, recur>::operator==(const VariantT<RegularContents, rec
 template<typename RegularContents, bool recur>
 inline std::strong_ordering
 VariantT<RegularContents, recur>::operator<=>(const VariantT<RegularContents, recur> &) const noexcept = default;
+// NOLINTEND(bugprone-exception-escape)
 
 } // namespace fso
 

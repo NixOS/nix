@@ -5,7 +5,7 @@
 #include <string>
 #include <optional>
 #include <cassert>
-#include <iostream>
+#include <iosfwd>
 #include <set>
 #include <vector>
 #include <ranges>

@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/args/root.hh"
@@ -67,12 +69,12 @@ static bool haveInternet()
         if (!i->ifa_addr)
             continue;
         if (i->ifa_addr->sa_family == AF_INET) {
-            if (ntohl(((sockaddr_in *) i->ifa_addr)->sin_addr.s_addr) != INADDR_LOOPBACK) {
+            if (ntohl(reinterpret_cast<sockaddr_in *>(i->ifa_addr)->sin_addr.s_addr) != INADDR_LOOPBACK) {
                 return true;
             }
         } else if (i->ifa_addr->sa_family == AF_INET6) {
-            if (!IN6_IS_ADDR_LOOPBACK(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr)
-                && !IN6_IS_ADDR_LINKLOCAL(&((sockaddr_in6 *) i->ifa_addr)->sin6_addr))
+            if (!IN6_IS_ADDR_LOOPBACK(&reinterpret_cast<sockaddr_in6 *>(i->ifa_addr)->sin6_addr)
+                && !IN6_IS_ADDR_LINKLOCAL(&reinterpret_cast<sockaddr_in6 *>(i->ifa_addr)->sin6_addr))
                 return true;
         }
     }
@@ -603,7 +605,7 @@ int main(int argc, char ** argv)
     // libstdc++'s std::regex.
     // This used to be 64 MiB, but macOS as deployed on GitHub Actions has a
     // hard limit slightly under that, so we round it down a bit.
-    nix::setStackSize(60 * 1024 * 1024);
+    nix::setStackSize(60UL * 1024 * 1024);
 #endif
 
     return nix::handleExceptions(argv[0], [&]() { nix::mainWrapped(argc, argv); });

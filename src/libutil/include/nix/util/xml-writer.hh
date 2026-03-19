@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include <iostream>
+#include <ostream>
 #include <string>
 #include <list>
 #include <map>

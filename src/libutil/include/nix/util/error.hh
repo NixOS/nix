@@ -261,16 +261,19 @@ public:
      */
     [[noreturn]] void throwClone() const override
     {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Derived always inherits BaseError
         throw Derived(static_cast<const Derived &>(*this));
     }
 };
 
+// NOLINTBEGIN(bugprone-macro-parentheses): newClass/superClass are types, parens would change meaning
 #define MakeError(newClass, superClass)                             \
     class newClass : public CloneableError<newClass, superClass>    \
     {                                                               \
     public:                                                         \
         using CloneableError<newClass, superClass>::CloneableError; \
     }
+// NOLINTEND(bugprone-macro-parentheses)
 
 MakeError(Error, BaseError);
 MakeError(UsageError, Error);

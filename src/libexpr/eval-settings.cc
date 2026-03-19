@@ -101,7 +101,7 @@ Strings EvalSettings::getDefaultNixPath()
 
 bool EvalSettings::isPseudoUrl(std::string_view s)
 {
-    if (s.compare(0, 8, "channel:") == 0)
+    if (s.starts_with("channel:"))
         return true;
     size_t pos = s.find("://");
     if (pos == std::string::npos)

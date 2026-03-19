@@ -21,7 +21,7 @@ namespace {
 inline std::pair<int, size_t> charWidthUTF8Helper(std::string_view s)
 {
     size_t bytes = 1;
-    uint32_t ch = s[0];
+    uint32_t ch = static_cast<unsigned char>(s[0]);
     uint32_t max = 1U << 7;
     if ((ch & 0x80U) == 0U) {
     } else if ((ch & 0xe0U) == 0xc0U) {

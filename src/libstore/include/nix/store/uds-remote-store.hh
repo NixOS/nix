@@ -60,6 +60,7 @@ struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
+        // NOLINTNEXTLINE(bugprone-parent-virtual-call): skip RemoteStore impl, use local FS
         Store::narFromPath(path, sink);
     }
 

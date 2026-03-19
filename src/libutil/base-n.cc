@@ -40,7 +40,7 @@ std::string base16::decode(std::string_view s)
     res.reserve(decodedSize);
 
     for (unsigned int i = 0; i < decodedSize; i++) {
-        res.push_back(parseHexDigit(s[i * 2]) << 4 | parseHexDigit(s[i * 2 + 1]));
+        res.push_back(parseHexDigit(s[i * 2UL]) << 4 | parseHexDigit(s[i * 2UL + 1]));
     }
 
     return res;

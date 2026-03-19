@@ -42,6 +42,7 @@ void onTerminate()
         } else {
             logFatal("std::terminate() called without exception");
         }
+        // NOLINTNEXTLINE(nix-foreign-exceptions): std::terminate handler: last resort
     } catch (const std::exception & ex) {
         logFatal(fmt("Exception: %s: %s", boost::core::demangle(typeid(ex).name()), ex.what()));
     } catch (...) {

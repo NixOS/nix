@@ -412,6 +412,7 @@ public:
          */
         void unhandled_exception()
         {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): coroutine contract: rethrow
             throw;
         };
 

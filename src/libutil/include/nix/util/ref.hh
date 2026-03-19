@@ -57,6 +57,7 @@ private:
     void assertNonNull()
     {
         if (!p)
+            // NOLINTNEXTLINE(nix-foreign-exceptions): stdlib contract: can't include error.hh here
             throw std::invalid_argument("null pointer cast to ref");
     }
 
@@ -115,6 +116,7 @@ public:
     {
         auto casted = std::dynamic_pointer_cast<T2>(p);
         if (!casted)
+            // NOLINTNEXTLINE(nix-foreign-exceptions): stdlib contract: can't include error.hh here
             throw bad_ref_cast(
                 "ref<" + demangle(typeid(T).name()) + "> cannot be cast to ref<" + demangle(typeid(T2).name()) + ">");
         return ref<T2>(std::move(casted));

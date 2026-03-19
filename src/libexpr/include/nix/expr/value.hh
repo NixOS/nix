@@ -535,12 +535,14 @@ private:
     Payload payload;
 
 protected:
+// NOLINTBEGIN(bugprone-macro-parentheses): K is a type, parens would change meaning
 #define NIX_VALUE_STORAGE_GET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void getStorage(K & val) const noexcept                      \
     {                                                            \
         assert(internalType == DISCRIMINATOR);                   \
         val = payload.FIELD_NAME;                                \
     }
+    // NOLINTEND(bugprone-macro-parentheses)
 
 #define NIX_VALUE_STORAGE_SET_IMPL(K, FIELD_NAME, DISCRIMINATOR) \
     void setStorage(K val) noexcept                              \
@@ -821,6 +823,7 @@ protected:
         }
     }
 
+// NOLINTBEGIN(bugprone-macro-parentheses): TYPE is a type, parens would change meaning
 #define NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(TYPE, MEMBER_A, MEMBER_B)                                   \
                                                                                                        \
     void getStorage(TYPE & val) const noexcept                                                         \
@@ -832,6 +835,7 @@ protected:
     {                                                                                                  \
         setPairOfPointersPayload<detail::payloadTypeToInternalType<TYPE>>(val MEMBER_A, val MEMBER_B); \
     }
+    // NOLINTEND(bugprone-macro-parentheses)
 
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(SmallList, [0], [1])
     NIX_VALUE_STORAGE_DEF_PAIR_OF_PTRS(PrimOpApplicationThunk, .left, .right)
@@ -990,6 +994,7 @@ public:
     {
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape): variant never valueless-by-exception
     Value * const * data() const & noexcept
     {
         return std::visit(
@@ -998,6 +1003,7 @@ public:
             raw);
     }
 
+    // NOLINTNEXTLINE(bugprone-exception-escape): variant never valueless-by-exception
     std::size_t size() const noexcept
     {
         return std::visit(
@@ -1402,6 +1408,7 @@ public:
 
     inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
     {
+        // NOLINTNEXTLINE(bugprone-unhandled-exception-at-new): Boehm GC aborts on OOM, never throws
         setStorage(new Value::Failed(e, recovery));
     }
 
@@ -1532,11 +1539,13 @@ extern ExprBlackHole eBlackHole;
 
 bool Value::isBlackhole() const
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast): ExprBlackHole:Expr only forward-declared here
     return isThunk() && thunk().expr == (Expr *) &eBlackHole;
 }
 
 void Value::mkBlackhole()
 {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-cstyle-cast): ExprBlackHole:Expr only forward-declared here
     mkThunk(nullptr, (Expr *) &eBlackHole);
 }
 

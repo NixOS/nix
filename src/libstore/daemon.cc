@@ -282,6 +282,7 @@ struct ClientSettings
 
             try {
                 if (name == "ssh-auth-sock") // obsolete
+                    // NOLINTNEXTLINE(bugprone-branch-clone): obsolete setting ignored (commented)
                     ;
                 else if (name == experimentalFeatureSettings.experimentalFeatures.name) {
                     // We don’t want to forward the experimental features to
@@ -437,6 +438,7 @@ static void performOp(
                 case FileIngestionMethod::Flat:
                     dumpMethod = FileSerialisationMethod::Flat;
                     break;
+                // NOLINTNEXTLINE(bugprone-branch-clone): Git uses NAR serialization (documented above)
                 case FileIngestionMethod::NixArchive:
                     dumpMethod = FileSerialisationMethod::NixArchive;
                     break;
@@ -1105,6 +1107,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
         tunnelLogger->stopWork(&e);
         conn.to.flush();
         return;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): protocol boundary: daemon worker
     } catch (std::exception & e) {
         auto ex = Error(e.what());
         tunnelLogger->stopWork(&ex);

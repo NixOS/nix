@@ -194,7 +194,7 @@ bool Fetch::shouldFetch(const CanonPath & path) const
     git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
     opts.attr_commit_id = this->rev;
     opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
-    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, path.rel_c_str(), "filter"))
+    if (git_attr_get_ext(&attr, const_cast<git_repository *>(this->repo), &opts, path.rel_c_str(), "filter"))
         throw Error("cannot get git-lfs attribute: %s", git_error_last()->message);
     debug("Git filter for '%s' is '%s'", path, attr ? attr : "null");
     return attr != nullptr && !std::string(attr).compare("lfs");
@@ -244,6 +244,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
             throw Error("response does not contain 'objects'");
 
         return objects;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (const nlohmann::json::parse_error & e) {
         printMsg(lvlTalkative, "Full response: '%1%'", responseString);
         throw Error("response did not parse as json: %s", e.what());
@@ -312,6 +313,7 @@ void Fetch::fetch(
         writeFile(cachePath, sink.s);
 
         debug("%s fetched with git-lfs", pointerFilePath);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> Error
     } catch (const nlohmann::json::out_of_range & e) {
         throw Error("bad json from /info/lfs/objects/batch: %s %s", obj, e.what());
     }

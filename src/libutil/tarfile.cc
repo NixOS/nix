@@ -17,13 +17,14 @@ int callback_open(struct archive *, void * self)
 
 ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
 {
-    auto self = (TarArchive *) _self;
+    auto self = static_cast<TarArchive *>(_self);
     *buffer = self->buffer.data();
 
     try {
-        return self->source->read((char *) self->buffer.data(), self->buffer.size());
+        return self->source->read(reinterpret_cast<char *>(self->buffer.data()), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C callback boundary: libarchive
     } catch (std::exception & err) {
         archive_set_error(archive, EIO, "Source threw exception: %s", err.what());
         return -1;
@@ -172,7 +173,7 @@ time_t unpackTarfileToSink(TarArchive & archive, ExtendedFileSystemObjectSink & 
 
     /* Only allocate the buffer once. Use the heap because 131 KiB is a bit too
        much for the stack. */
-    std::vector<unsigned char> buf(128 * 1024);
+    std::vector<unsigned char> buf(128UL * 1024);
 
     for (;;) {
         // FIXME: merge with extract_archive

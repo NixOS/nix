@@ -102,6 +102,7 @@ public:
             case lvlChatty:
                 c = '6';
                 break;
+            // NOLINTNEXTLINE(bugprone-branch-clone): lvlDebug/lvlVomit both map to '7'
             case lvlDebug:
             case lvlVomit:
                 c = '7';
@@ -408,7 +409,8 @@ std::optional<nlohmann::json> parseJSONMessage(const std::string & msg, std::str
         return std::nullopt;
     try {
         return nlohmann::json::parse(std::string(msg, 5));
-    } catch (std::exception & e) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> nullopt
+    } catch (nlohmann::json::exception & e) {
         printError("bad JSON log message from %s: %s", Uncolored(source), e.what());
     }
     return std::nullopt;
@@ -454,6 +456,7 @@ bool handleJSONLogMessage(
         }
 
         return true;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> warn
     } catch (const nlohmann::json::exception & e) {
         warn("Unable to handle a JSON message from %s: %s", Uncolored(source), e.what());
         return false;

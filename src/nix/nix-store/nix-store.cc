@@ -821,6 +821,7 @@ static void opVerify(Strings opFlags, Strings opArgs)
 
     if (store->verifyStore(checkContents, repair)) {
         warn("not all store errors were fixed");
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
         throw Exit(1);
     }
 }
@@ -850,6 +851,7 @@ static void opVerifyPath(Strings opFlags, Strings opArgs)
         }
     }
 
+    // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
     throw Exit(status);
 }
 

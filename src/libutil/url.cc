@@ -10,7 +10,9 @@
 
 namespace nix {
 
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 
 ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthority)
@@ -154,6 +156,7 @@ try {
     }
 
     return fromBoostUrlView(boost::urls::url_view(lenient ? fixedEncodedUrl : url), lenient);
+    // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> BadURL
 } catch (boost::system::system_error & e) {
     throw BadURL("'%s' is not a valid URL: %s", url, e.code().message());
 }
@@ -223,6 +226,7 @@ try {
         resolved.set_encoded_path(encodeUrlPath(base.path));
         resolved.set_encoded_query(encodeQuery(base.query));
         resolved.set_fragment(base.fragment);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> BadURL
     } catch (boost::system::system_error & e) {
         throw BadURL("'%s' is not a valid URL: %s", base.to_string(), e.code().message());
     }
@@ -231,6 +235,7 @@ try {
     try {
         url = urlS;
         resolved.resolve(url).value();
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> BadURL
     } catch (boost::system::system_error & e) {
         throw BadURL("'%s' is not a valid URL: %s", urlS, e.code().message());
     }
@@ -291,6 +296,7 @@ try {
     }
 
     return result;
+    // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> BadURL
 } catch (boost::system::system_error & e) {
     throw BadURL("invalid URI query '%s': %s", query, e.code().message());
 }
@@ -403,6 +409,7 @@ ParsedUrlScheme parseUrlScheme(std::string_view scheme)
 
 ParsedURL fixGitURL(std::string url)
 {
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     std::regex scpRegex("([^/]*)@(.*):(.*)");
     if (!hasPrefix(url, "/") && std::regex_match(url, scpRegex))
         url = std::regex_replace(url, scpRegex, "ssh://$1@$2/$3");
@@ -443,6 +450,7 @@ ParsedURL fixGitURL(std::string url)
 bool isValidSchemeName(std::string_view s)
 {
     const static std::string schemeNameRegex = "(?:[a-z][a-z0-9+.-]*)";
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     static std::regex regex(schemeNameRegex, std::regex::ECMAScript);
 
     return std::regex_match(s.begin(), s.end(), regex, std::regex_constants::match_default);

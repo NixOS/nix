@@ -49,7 +49,7 @@ std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
     std::vector<char *> res;
     for (auto & s : ss)
-        res.push_back((char *) s.c_str());
+        res.push_back(const_cast<char *>(s.c_str()));
     res.push_back(0);
     return res;
 }
@@ -98,10 +98,11 @@ std::string rewriteStrings(std::string s, const StringMap & rewrites)
 template<class N>
 std::optional<N> string2Int(const std::string_view s)
 {
-    if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)
+    if (s.starts_with("-") && !std::numeric_limits<N>::is_signed)
         return std::nullopt;
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> nullopt
     } catch (const boost::bad_lexical_cast &) {
         return std::nullopt;
     }
@@ -124,6 +125,7 @@ std::optional<N> string2Float(const std::string_view s)
 {
     try {
         return boost::lexical_cast<N>(s.data(), s.size());
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: boost -> nullopt
     } catch (const boost::bad_lexical_cast &) {
         return std::nullopt;
     }
@@ -177,6 +179,7 @@ char getSizeUnitSuffix(SizeUnit unit)
 #define NIX_UTIL_DEFINE_SIZE_UNIT(name, suffix) \
     case SizeUnit::name:                        \
         return suffix;
+        // NOLINTNEXTLINE(bugprone-branch-clone): X-macro expansion
         NIX_UTIL_SIZE_UNITS
 #undef NIX_UTIL_DEFINE_SIZE_UNIT
     }
@@ -192,7 +195,7 @@ std::string renderSize(int64_t value, bool align)
 
 bool hasPrefix(std::string_view s, std::string_view prefix)
 {
-    return s.compare(0, prefix.size(), prefix) == 0;
+    return s.starts_with(prefix);
 }
 
 bool hasSuffix(std::string_view s, std::string_view suffix)
@@ -227,9 +230,11 @@ void ignoreExceptionInDestructor(Verbosity lvl)
        printError() also throws when remote is closed. */
     try {
         try {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: rethrow by design
             throw;
         } catch (Error & e) {
             printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: catch by design
         } catch (std::exception & e) {
             printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
         }
@@ -240,11 +245,13 @@ void ignoreExceptionInDestructor(Verbosity lvl)
 void ignoreExceptionExceptInterrupt(Verbosity lvl)
 {
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: rethrow by design
         throw;
     } catch (const Interrupted & e) {
         throw;
     } catch (Error & e) {
         printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
+        // NOLINTNEXTLINE(nix-foreign-exceptions): ignoreException impl: catch by design
     } catch (std::exception & e) {
         printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.what());
     }

@@ -36,6 +36,7 @@ int main(int argc, char ** argv)
 
         return 0;
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test binary: top-level catch
     } catch (const std::exception & e) {
         std::cerr << "Error: " << e.what() << "\n";
         return 1;

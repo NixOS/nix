@@ -108,7 +108,7 @@ FileTransferSettings::FileTransferSettings()
             })
             .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
     if (sslOverride)
-        caFile = *sslOverride;
+        caFile = sslOverride;
 }
 
 FileTransferSettings fileTransferSettings;
@@ -227,7 +227,7 @@ struct curlFileTransfer : public FileTransfer
             curlSList tmpSList = curlSList(::curl_slist_append(requestHeaders.get(), requireCString(header)));
             if (!tmpSList)
                 throw std::bad_alloc();
-            requestHeaders.release();
+            (void) requestHeaders.release();
             requestHeaders = std::move(tmpSList);
         }
 
@@ -348,7 +348,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t writeCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((TransferItem *) userp)->writeCallback(contents, size, nmemb);
+            return static_cast<TransferItem *>(userp)->writeCallback(contents, size, nmemb);
         }
 
         void appendCurrentUrl()
@@ -362,9 +362,10 @@ struct curlFileTransfer : public FileTransfer
         size_t headerCallback(void * contents, size_t size, size_t nmemb) noexcept
         try {
             size_t realSize = size * nmemb;
-            std::string line((char *) contents, realSize);
+            std::string line(static_cast<char *>(contents), realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
                 result.etag = "";
@@ -406,6 +407,7 @@ struct curlFileTransfer : public FileTransfer
 
                     else if (name == "link" || name == "x-amz-meta-link") {
                         auto value = trim(line.substr(i + 1));
+                        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                         static std::regex linkRegex(
                             "<([^>]*)>; rel=\"immutable\"", std::regex::extended | std::regex::icase);
                         if (std::smatch match; std::regex_match(value, match, linkRegex))
@@ -438,7 +440,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t headerCallbackWrapper(void * contents, size_t size, size_t nmemb, void * userp)
         {
-            return ((TransferItem *) userp)->headerCallback(contents, size, nmemb);
+            return static_cast<TransferItem *>(userp)->headerCallback(contents, size, nmemb);
         }
 
         /**
@@ -505,7 +507,7 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t readCallbackWrapper(char * buffer, size_t size, size_t nitems, void * userp) noexcept
         {
-            return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
+            return static_cast<TransferItem *>(userp)->readCallback(buffer, size, nitems);
         }
 
 #if !defined(_WIN32)
@@ -537,13 +539,13 @@ struct curlFileTransfer : public FileTransfer
 
         static size_t seekCallbackWrapper(void * clientp, curl_off_t offset, int origin) noexcept
         {
-            return ((TransferItem *) clientp)->seekCallback(offset, origin);
+            return static_cast<TransferItem *>(clientp)->seekCallback(offset, origin);
         }
 
         static int resolverCallbackWrapper(void *, void *, void * clientp) noexcept
         try {
             // Create the `Activity` associated with this download.
-            ((TransferItem *) clientp)->act();
+            static_cast<TransferItem *>(clientp)->act();
             return 0;
         } catch (...) {
             return 1;
@@ -770,7 +772,9 @@ struct curlFileTransfer : public FileTransfer
                     // Don't retry on authentication/authorization failures
                     err = Forbidden;
                 } else if (
-                    httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
+                    httpStatus >= 400 && httpStatus < 500
+                    && httpStatus != HttpStatus::RequestTimeout
+                    // NOLINTNEXTLINE(bugprone-branch-clone): HTTP status classifier: conditions document ranges
                     && httpStatus != HttpStatus::TooManyRequests) {
                     // Most 4xx errors are client errors and are probably not worth retrying:
                     //   * 408 means the server timed out waiting for us, so we try again
@@ -1114,6 +1118,7 @@ struct curlFileTransfer : public FileTransfer
             workerThreadMain();
         } catch (nix::Interrupted & e) {
             normalExit = false;
+            // NOLINTNEXTLINE(nix-foreign-exceptions): thread boundary: worker exception sink
         } catch (std::exception & e) {
             printError("unexpected error in download thread: %s", e.what());
             normalExit = false;

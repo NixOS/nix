@@ -68,6 +68,7 @@ struct NixStringContextElem
 
     Raw raw;
 
+    // NOLINTNEXTLINE(bugprone-exception-escape): variant comparison — only bad_alloc possible
     GENERATE_CMP(NixStringContextElem, me->raw);
 
     MAKE_WRAPPER_CONSTRUCTOR(NixStringContextElem);

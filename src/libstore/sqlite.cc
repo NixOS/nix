@@ -178,7 +178,7 @@ SQLiteStmt::Use::~Use()
 SQLiteStmt::Use & SQLiteStmt::Use::operator()(std::string_view value, bool notNull)
 {
     if (notNull) {
-        if (sqlite3_bind_text(stmt, curArg++, value.data(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+        if (sqlite3_bind_text(stmt, curArg++, value.data(), value.size(), SQLITE_TRANSIENT) != SQLITE_OK)
             SQLiteError::throw_(stmt.db, "binding argument");
     } else
         bind();
@@ -235,7 +235,7 @@ bool SQLiteStmt::Use::next()
 
 std::string SQLiteStmt::Use::getStr(int col)
 {
-    auto s = (const char *) sqlite3_column_text(stmt, col);
+    auto s = reinterpret_cast<const char *>(sqlite3_column_text(stmt, col));
     assert(s);
     return s;
 }

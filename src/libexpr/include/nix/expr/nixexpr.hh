@@ -382,6 +382,7 @@ struct ExprAttrs : Expr
         AttrDef() {};
 
         template<typename T>
+        // NOLINTBEGIN(bugprone-return-const-ref-from-parameter): caller owns all three refs
         const T & chooseByKind(const T & plain, const T & inherited, const T & inheritedFrom) const
         {
             switch (kind) {
@@ -394,6 +395,8 @@ struct ExprAttrs : Expr
                 return inheritedFrom;
             }
         }
+
+        // NOLINTEND(bugprone-return-const-ref-from-parameter)
     };
 
     typedef std::pmr::map<Symbol, AttrDef> AttrDefs;

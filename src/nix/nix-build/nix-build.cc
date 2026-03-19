@@ -41,6 +41,7 @@ extern char ** environ __attribute__((weak));
  */
 static std::vector<std::string> shellwords(std::string_view s)
 {
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     std::regex whitespace("^\\s+");
     auto begin = s.cbegin();
     std::vector<std::string> res;
@@ -63,6 +64,7 @@ static std::vector<std::string> shellwords(std::string_view s)
                 cur.clear();
             }
         }
+        // NOLINTNEXTLINE(bugprone-switch-missing-default-case): char scanner, no meaningful default
         switch (*it) {
         case '\'':
             if (st != sDoubleQuote) {
@@ -124,6 +126,7 @@ static SourcePath resolveShellExprPath(SourcePath path)
 static void main_nix_build(int argc, char ** argv)
 {
     auto dryRun = false;
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     auto isNixShell = std::regex_search(argv[0], std::regex("nix-shell$"));
     auto pure = false;
     auto fromArgs = false;
@@ -179,6 +182,7 @@ static void main_nix_build(int argc, char ** argv)
         script = argv[1];
         try {
             auto lines = tokenizeString<Strings>(readFile(script), "\n");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (!lines.empty() && std::regex_search(lines.front(), std::regex("^#!"))) {
                 lines.pop_front();
                 inShebang = true;
@@ -188,6 +192,7 @@ static void main_nix_build(int argc, char ** argv)
                 for (auto line : lines) {
                     line = chomp(line);
                     std::smatch match;
+                    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix-shell\\s+(.*)$")))
                         for (const auto & word : shellwords({match[1].first, match[1].second}))
                             args.push_back(word);
@@ -269,6 +274,7 @@ static void main_nix_build(int argc, char ** argv)
             // executes it unless it contains the string "perl" or "indir",
             // or (undocumented) argv[0] does not contain "perl". Exploit
             // the latter by doing "exec -a".
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (std::regex_search(interpreter, std::regex("perl")))
                 execArgs = "-a PERL";
 
@@ -276,6 +282,7 @@ static void main_nix_build(int argc, char ** argv)
             for (const auto & i : savedArgs)
                 joined << escapeShellArgAlways(i) << ' ';
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             if (std::regex_search(interpreter, std::regex("ruby"))) {
                 // Hack for Ruby. Ruby also examines the shebang. It tries to
                 // read the shebang to understand which packages to read from. Since
@@ -510,13 +517,25 @@ static void main_nix_build(int argc, char ** argv)
                 self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
         };
 
+        // Pre-compile exclude patterns so we get a useful error for bad regexes
+        // instead of std::regex_error, and avoid recompiling per dependency.
+        std::vector<std::regex> envExcludeRegexes;
+        envExcludeRegexes.reserve(envExclude.size());
+        for (auto & exclude : envExclude)
+            try {
+                envExcludeRegexes.emplace_back(exclude);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> UsageError
+            } catch (std::regex_error & e) {
+                throw UsageError("invalid --exclude regular expression '%s': %s", exclude, e.what());
+            }
+
         // Build or fetch all dependencies of the derivation.
         for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
-            if (std::all_of(envExclude.cbegin(), envExclude.cend(), [&](const std::string & exclude) {
-                    return !std::regex_search(store->printStorePath(inputDrv), std::regex(exclude));
+            if (std::all_of(envExcludeRegexes.cbegin(), envExcludeRegexes.cend(), [&](const std::regex & exclude) {
+                    return !std::regex_search(store->printStorePath(inputDrv), exclude);
                 })) {
                 accumDerivedPath(makeConstantStorePathRef(inputDrv), inputNode);
                 pathsToCopy.insert(inputDrv);

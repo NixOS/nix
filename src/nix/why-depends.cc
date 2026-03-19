@@ -166,7 +166,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
            closure (i.e., that have a non-infinite distance to
            'dependency'). Print every edge on a path between `package`
            and `dependency`. */
-        struct BailOut
+        struct BailOut : std::exception
         {};
 
         fun<void(Node &, const std::string &, const std::string &)> printNode = [&](Node & node,
@@ -183,6 +183,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
             }
 
             if (node.path == dependencyPath && !all && packagePath != dependencyPath)
+                // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
                 throw BailOut();
 
             if (node.visited)
@@ -289,6 +290,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 logger->cout("%s", store->printStorePath(graph.at(packagePath).path));
             }
             printNode(graph.at(packagePath), "", "");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
         } catch (BailOut &) {
         }
     }

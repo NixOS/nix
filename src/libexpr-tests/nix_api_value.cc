@@ -298,7 +298,7 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr_invalid)
 TEST_F(nix_api_expr_test, nix_build_and_init_attr)
 {
     int size = 10;
-    const char ** out_name = (const char **) malloc(sizeof(char *));
+    const char ** out_name = static_cast<const char **>(malloc(sizeof(char *)));
 
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, size);
 
@@ -349,13 +349,13 @@ TEST_F(nix_api_expr_test, nix_build_and_init_attr)
     // Clean up
     nix_gc_decref(ctx, intValue);
     nix_gc_decref(ctx, stringValue);
-    free(out_name);
+    free(static_cast<void *>(out_name));
 }
 
 TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
 {
     // Create a small attribute set to test extremely large out-of-bounds access
-    const char ** out_name = (const char **) malloc(sizeof(char *));
+    const char ** out_name = static_cast<const char **>(malloc(sizeof(char *)));
     BindingsBuilder * builder = nix_make_bindings_builder(ctx, state, 2);
     nix_value * intValue = nix_alloc_value(ctx, state);
     nix_init_int(ctx, intValue, 42);
@@ -381,7 +381,7 @@ TEST_F(nix_api_expr_test, nix_get_attr_byidx_large_indices)
 
     // Clean up
     nix_gc_decref(ctx, intValue);
-    free(out_name);
+    free(static_cast<void *>(out_name));
 }
 
 TEST_F(nix_api_expr_test, nix_get_attr_byname_lazy)

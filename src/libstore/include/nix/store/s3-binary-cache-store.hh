@@ -90,7 +90,7 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
 
     Setting<uint64_t> multipartChunkSize{
         this,
-        5 * 1024 * 1024,
+        5ULL * 1024 * 1024,
         "multipart-chunk-size",
         R"(
           The size (in bytes) of each part in multipart uploads. Must be
@@ -101,7 +101,7 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
 
     Setting<uint64_t> multipartThreshold{
         this,
-        100 * 1024 * 1024,
+        100ULL * 1024 * 1024,
         "multipart-threshold",
         R"(
           The minimum file size (in bytes) for using multipart uploads.

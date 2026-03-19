@@ -76,8 +76,8 @@ TEST_F(nix_api_store_test, ReturnsValidStorePath)
 {
     StorePath * result = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_NE(result, nullptr);
-    ASSERT_STREQ("name", result->path.name().data());
-    ASSERT_STREQ(PATH_SUFFIX.substr(1).c_str(), result->path.to_string().data());
+    ASSERT_EQ(result->path.name(), "name");
+    ASSERT_EQ(result->path.to_string(), PATH_SUFFIX.substr(1));
     nix_store_path_free(result);
 }
 

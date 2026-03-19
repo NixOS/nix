@@ -241,7 +241,7 @@ time_t parseOlderThanTimeSpec(std::string_view timeSpec)
     if (!days || *days < 1)
         throw UsageError("invalid number of days specifier '%1%'", timeSpec);
 
-    return curTime - *days * 24 * 3600;
+    return curTime - *days * 24L * 3600;
 }
 
 void switchLink(std::filesystem::path link, std::filesystem::path target)

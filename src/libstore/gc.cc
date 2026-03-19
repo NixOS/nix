@@ -347,7 +347,7 @@ void LocalStore::findRuntimeRoots(Roots & roots, bool censor)
     }
 }
 
-struct GCLimitReached
+struct GCLimitReached : std::exception
 {};
 
 void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
@@ -547,7 +547,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         /* There may be temp directories in the store that are still in use
            by another process. We need to be sure that we can acquire an
            exclusive lock before deleting them. */
-        if (baseName.find("tmp-", 0) == 0) {
+        if (baseName.starts_with("tmp-")) {
             /* TODO Reconsider whether Follow is the right choice, here */
             auto tmpDirFd = openDirectory(realPath, FinalSymlink::Follow);
             if (!tmpDirFd || !lockFile(tmpDirFd.get(), ltWrite, false)) {
@@ -567,6 +567,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         if (results.bytesFreed > options.maxFreed) {
             printInfo("deleted more than %d bytes; stopping", options.maxFreed);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
             throw GCLimitReached();
         }
     };
@@ -736,6 +737,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 else
                     deleteFromStore(name, false);
             }
+            // NOLINTNEXTLINE(nix-foreign-exceptions): local control-flow exception
         } catch (GCLimitReached & e) {
         }
     }
@@ -849,6 +851,7 @@ void LocalStore::autoGC(bool sync)
         if (avail >= gcSettings.minFree || avail >= gcSettings.maxFree)
             return;
 
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): threshold ratio
         if (avail > state->availAfterGC * 0.97)
             return;
 

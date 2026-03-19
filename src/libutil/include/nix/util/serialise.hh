@@ -52,7 +52,7 @@ struct BufferedSink : virtual Sink
     size_t bufSize, bufPos;
     std::unique_ptr<char[]> buffer;
 
-    BufferedSink(size_t bufSize = 32 * 1024)
+    BufferedSink(size_t bufSize = 32UL * 1024)
         : bufSize(bufSize)
         , bufPos(0)
         , buffer(nullptr)
@@ -123,7 +123,7 @@ struct BufferedSource : virtual Source
     size_t bufSize, bufPosIn, bufPosOut;
     std::unique_ptr<char[]> buffer;
 
-    BufferedSource(size_t bufSize = 32 * 1024)
+    BufferedSource(size_t bufSize = 32UL * 1024)
         : bufSize(bufSize)
         , bufPosIn(0)
         , bufPosOut(0)
@@ -531,7 +531,7 @@ inline Sink & operator<<(Sink & sink, uint64_t n)
     buf[5] = (n >> 40) & 0xff;
     buf[6] = (n >> 48) & 0xff;
     buf[7] = (unsigned char) (n >> 56) & 0xff;
-    sink({(char *) buf, sizeof(buf)});
+    sink({reinterpret_cast<char *>(buf), sizeof(buf)});
     return sink;
 }
 
@@ -546,7 +546,7 @@ template<typename T>
 T readNum(Source & source)
 {
     unsigned char buf[8];
-    source((char *) buf, sizeof(buf));
+    source(reinterpret_cast<char *>(buf), sizeof(buf));
 
     auto n = readLittleEndian<uint64_t>(buf);
 

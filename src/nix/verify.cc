@@ -181,6 +181,7 @@ struct CmdVerify : StorePathsCommand
 
         pool.process();
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
         throw Exit((corrupted ? 1 : 0) | (untrusted ? 2 : 0) | (failed ? 4 : 0));
     }
 };

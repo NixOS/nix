@@ -17,7 +17,7 @@ namespace nix {
 
 MakeError(UploadToS3, Error);
 
-static constexpr uint64_t AWS_MIN_PART_SIZE = 5 * 1024 * 1024;           // 5MiB
+static constexpr uint64_t AWS_MIN_PART_SIZE = 5ULL * 1024 * 1024;        // 5MiB
 static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
 static constexpr uint64_t AWS_MAX_PART_COUNT = 10000;
 
@@ -324,6 +324,7 @@ std::string S3BinaryCacheStore::createMultipartUpload(
 
     auto result = getFileTransfer()->enqueueFileTransfer(req).get();
 
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
     std::smatch match;
 

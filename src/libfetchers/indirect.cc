@@ -5,6 +5,7 @@
 
 namespace nix::fetchers {
 
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex flakeRegex("[a-zA-Z][a-zA-Z0-9_-]*", std::regex::ECMAScript);
 
 struct IndirectInputScheme : InputScheme

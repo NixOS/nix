@@ -68,7 +68,8 @@ void diagnose(const Setting<Diagnose> & setting, F && mkError)
         withError(false, [](auto && error) { logWarning(error.info()); });
         return;
     case Diagnose::Fatal:
-        withError(true, [](auto && error) { throw std::move(error); });
+        // NOLINTNEXTLINE(nix-foreign-exceptions): error always derives from BaseError
+        withError(true, [](auto && error) { throw std::forward<decltype(error)>(error); });
         return;
     }
 }

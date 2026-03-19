@@ -144,6 +144,7 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
+        // NOLINTNEXTLINE(bugprone-parent-virtual-call): skip RemoteStore impl, use local FS
         return Store::narFromPath(path, sink);
     }
 

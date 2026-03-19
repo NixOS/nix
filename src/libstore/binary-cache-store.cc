@@ -239,7 +239,9 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
                 upsertFile(key, json.dump(), "application/json");
             };
 
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             std::regex regex1("^[0-9a-f]{2}$");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             std::regex regex2("^[0-9a-f]{38}\\.debug$");
 
             for (auto & [s1, _type] : narAccessor->readDirectory(buildIdDir)) {
@@ -582,7 +584,7 @@ void BinaryCacheStore::addSignatures(const StorePath & storePath, const std::set
        when addSignatures() is called sequentially on a path, because
        S3 might return an outdated cached version. */
 
-    auto narInfo = make_ref<NarInfo>((NarInfo &) *queryPathInfo(storePath));
+    auto narInfo = make_ref<NarInfo>(static_cast<const NarInfo &>(*queryPathInfo(storePath)));
 
     narInfo->sigs.insert(sigs.begin(), sigs.end());
 

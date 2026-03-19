@@ -111,6 +111,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthor
     for (auto & entry : DirectoryIterator{cacheDir})
         if (entry.path().extension() == ".narinfo") {
             auto content = readFile(entry.path());
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             content = std::regex_replace(content, std::regex("URL: nar/"), fmt("URL: https://127.0.0.1:%d/nar/", port));
             writeFile(entry.path(), content);
         }

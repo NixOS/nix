@@ -62,6 +62,7 @@ TEST(ref, invalid_cast_throws)
     try {
         base.cast<Derived>();
         FAIL() << "Expected bad_ref_cast";
+        // NOLINTNEXTLINE(nix-foreign-exceptions): test-only: exercising bad_ref_cast
     } catch (const bad_ref_cast & e) {
         std::string expected = "ref<" + demangle(typeid(Base).name()) + "> cannot be cast to ref<"
                                + demangle(typeid(Derived).name()) + ">";

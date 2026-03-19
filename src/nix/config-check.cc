@@ -77,6 +77,7 @@ struct CmdConfigCheck : StoreCommand
         checkTrustedUser(store);
 
         if (!success)
+            // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
             throw Exit(2);
     }
 

@@ -145,6 +145,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
                 attrs.alloc("value").mkString(str, state.mem);
                 v.mkAttrs(attrs);
             } else {
+                // NOLINTNEXTLINE(nix-foreign-exceptions): caught and wrapped below
                 throw std::runtime_error("Dates and times are not supported");
             }
         } break;
@@ -165,6 +166,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
                 toml::spec::v(1, 0, 0) // Be explicit that we are parsing TOML 1.0.0 without extensions
 #endif
                 ));
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: toml -> EvalError
     } catch (std::exception & e) { // TODO: toml::syntax_error
         state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(pos).debugThrow();
     }

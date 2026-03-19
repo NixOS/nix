@@ -60,12 +60,14 @@ StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType
               switch (pathType) {
               case FilePathType::Unix:
                   return canonStoreDir(
-                      envOverrides.transform([](auto && s) { return os_string_to_string(std::move(s)); })
+                      envOverrides
+                          .transform([](auto && s) { return os_string_to_string(std::forward<decltype(s)>(s)); })
                           .value_or(NIX_STORE_DIR));
 
               case FilePathType::Native:
                   return canonStoreDir(
-                      envOverrides.transform([](auto && s) { return std::filesystem::path(std::move(s)); })
+                      envOverrides
+                          .transform([](auto && s) { return std::filesystem::path(std::forward<decltype(s)>(s)); })
                           .or_else([]() -> std::optional<std::filesystem::path> {
 #ifdef _WIN32
                               return windows::known_folders::getProgramData() / "nix" / "store";
@@ -176,6 +178,7 @@ StorePath Store::addToStore(
     case FileIngestionMethod::Flat:
         fsm = FileSerialisationMethod::Flat;
         break;
+    // NOLINTNEXTLINE(bugprone-branch-clone): Git uses NAR serialization (documented above)
     case FileIngestionMethod::NixArchive:
         fsm = FileSerialisationMethod::NixArchive;
         break;
@@ -883,6 +886,7 @@ makeCopyPathMessage(const StoreConfig & srcCfg, const StoreConfig & dstCfg, std:
             overloaded{
                 [](const StoreReference::Auto &) -> const StoreReference::Specified & { unreachable(); },
                 [](const StoreReference::Specified & specified) -> const StoreReference::Specified & {
+                    // NOLINTNEXTLINE(bugprone-return-const-ref-from-parameter): visitor on lvalue variant
                     return specified;
                 }},
             ref.variant);
@@ -1197,7 +1201,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
             auto info = queryPathInfo(path);
             if (!info->deriver)
                 return std::nullopt;
-            return *info->deriver;
+            return info->deriver;
         } catch (InvalidPath &) {
             return std::nullopt;
         }

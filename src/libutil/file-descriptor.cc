@@ -149,7 +149,7 @@ void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts)
 #endif
 
     size_t bytesRead = 0;
-    std::array<std::byte, 64 * 1024> buf;
+    std::array<std::byte, 64UL * 1024> buf;
     while (1) {
         checkInterrupt();
 
@@ -203,7 +203,7 @@ std::string drainFD(Descriptor fd, DrainFdOpts opts)
 void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
 {
     auto left = nbytes;
-    std::array<std::byte, 64 * 1024> buf;
+    std::array<std::byte, 64UL * 1024> buf;
 
     while (left) {
         auto limit = std::min<size_t>(left, buf.size());
@@ -237,9 +237,13 @@ AutoCloseFD::AutoCloseFD(AutoCloseFD && that) noexcept
     that.fd = INVALID_DESCRIPTOR;
 }
 
-AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that)
+AutoCloseFD & AutoCloseFD::operator=(AutoCloseFD && that) noexcept
 {
-    close();
+    try {
+        close();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
     fd = that.fd;
     that.fd = INVALID_DESCRIPTOR;
     return *this;

@@ -64,6 +64,7 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 
         pool.process();
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
         throw Exit(nrFailed ? 1 : 0);
     }
 };

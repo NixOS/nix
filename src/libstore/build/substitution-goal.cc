@@ -263,12 +263,14 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
     try {
         promise.get_future().get();
+        // NOLINTNEXTLINE(nix-foreign-exceptions): future exception sink
     } catch (std::exception & e) {
         /* Cause the parent build to fail unless --fallback is given,
            or the substitute has disappeared. The latter case behaves
            the same as the substitute never having existed in the
            first place. */
         try {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): rethrow dispatch pattern
             throw;
         } catch (SubstituteGone & sg) {
             /* Missing NARs are expected when they've been garbage collected.

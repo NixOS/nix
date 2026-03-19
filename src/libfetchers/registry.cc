@@ -47,6 +47,7 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Source
         else
             throw Error("flake registry '%s' has unsupported version %d", path, version);
 
+        // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: nlohmann -> warn
     } catch (nlohmann::json::exception & e) {
         warn("cannot parse flake registry '%s': %s", path, e.what());
     } catch (Error & e) {

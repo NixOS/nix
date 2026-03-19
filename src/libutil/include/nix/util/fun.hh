@@ -29,6 +29,7 @@ private:
     void assertCallable()
     {
         if (!f)
+            // NOLINTNEXTLINE(nix-foreign-exceptions): stdlib contract: can't include error.hh here
             throw std::invalid_argument("null callable cast to fun");
     }
 

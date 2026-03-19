@@ -19,6 +19,9 @@ subdir('nix-meson-build-support/common')
 llvm_dep = dependency('LLVM', version : '>= 16', required : true)
 
 sources = files(
+  'forbidden-includes.cc',
+  'foreign-exceptions.cc',
+  'format-string-arity.cc',
   'nix-clang-tidy-checks.cc',
 )
 

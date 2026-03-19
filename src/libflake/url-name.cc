@@ -9,6 +9,7 @@
 namespace nix {
 
 static const std::string attributeNamePattern("[a-zA-Z0-9_-]+");
+// NOLINTBEGIN(nix-foreign-exceptions): compile-time regex literals
 static const std::regex
     lastAttributeRegex("^((?:" + attributeNamePattern + "\\.)*)(" + attributeNamePattern + ")(\\^.*)?$");
 static const std::string pathSegmentPattern("[a-zA-Z0-9_-]+");
@@ -16,6 +17,8 @@ static const std::regex lastPathSegmentRegex(".*/(" + pathSegmentPattern + ")");
 static const std::regex secondPathSegmentRegex("(?:" + pathSegmentPattern + ")/(" + pathSegmentPattern + ")(?:/.*)?");
 static const std::regex gitProviderRegex("github|gitlab|sourcehut");
 static const std::regex gitSchemeRegex("git($|\\+.*)");
+
+// NOLINTEND(nix-foreign-exceptions)
 
 std::optional<std::string> getNameFromURL(const ParsedURL & url)
 {

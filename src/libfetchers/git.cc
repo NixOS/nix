@@ -147,7 +147,7 @@ static std::optional<std::string> readHeadCached(const Settings & settings, cons
         // This function must behave the same way, so we return the expired
         // cached ref here.
         warn("could not get HEAD ref for repository '%s'; using expired cached ref '%s'", actualUrl, *cachedRef);
-        return *cachedRef;
+        return cachedRef;
     }
 
     return std::nullopt;
@@ -541,7 +541,7 @@ struct GitInputScheme : InputScheme
                         OS_STR("-F"),
                         OS_STR("-"),
                     },
-                    *commitMsg);
+                    commitMsg);
             }
         }
     }
@@ -829,7 +829,7 @@ struct GitInputScheme : InputScheme
             // We need to set the origin so resolving submodule URLs works
             repo->setRemote("origin", repoUrl.to_string());
 
-            auto localRefFile = ref.compare(0, 5, "refs/") == 0 ? cacheDir / ref : cacheDir / "refs/heads" / ref;
+            auto localRefFile = ref.starts_with("refs/") ? cacheDir / ref : cacheDir / "refs/heads" / ref;
 
             bool doFetch = false;
             time_t now = time(nullptr);
@@ -852,11 +852,11 @@ struct GitInputScheme : InputScheme
             if (doFetch) {
                 bool shallow = getShallowAttr(input);
                 try {
-                    auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
-                                    : input.getRev()                  ? input.getRev()->gitRev()
-                                    : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
-                                    : ref == "HEAD"                   ? "HEAD:HEAD"
-                                                                      : fmt("%1%:%1%", "refs/heads/" + ref);
+                    auto fetchRef = getAllRefsAttr(input)      ? "refs/*:refs/*"
+                                    : input.getRev()           ? input.getRev()->gitRev()
+                                    : ref.starts_with("refs/") ? fmt("%1%:%1%", ref)
+                                    : ref == "HEAD"            ? "HEAD:HEAD"
+                                                               : fmt("%1%:%1%", "refs/heads/" + ref);
 
                     repo->fetch(repoUrl.to_string(), fetchRef, shallow);
                 } catch (Error & e) {

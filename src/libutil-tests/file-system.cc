@@ -54,13 +54,13 @@ TEST(absPath, turnsEmptyPathIntoCWD)
     OsChar cwd[PATH_MAX + 1];
     auto p = absPath(std::filesystem::path{""});
 
-    ASSERT_EQ(p, GET_CWD((OsChar *) &cwd, PATH_MAX));
+    ASSERT_EQ(p, GET_CWD(cwd, PATH_MAX));
 }
 
 TEST(absPath, usesOptionalBasePathWhenGiven)
 {
     OsChar _cwd[PATH_MAX + 1];
-    OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
+    OsChar * cwd = GET_CWD(_cwd, PATH_MAX);
 
     auto cwdPath = std::filesystem::path{cwd};
     auto p = absPath("", &cwdPath);
@@ -71,7 +71,7 @@ TEST(absPath, usesOptionalBasePathWhenGiven)
 TEST(absPath, isIdempotent)
 {
     OsChar _cwd[PATH_MAX + 1];
-    OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
+    OsChar * cwd = GET_CWD(_cwd, PATH_MAX);
     auto p1 = absPath(std::filesystem::path{cwd});
     auto p2 = absPath(p1);
 

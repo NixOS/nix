@@ -59,7 +59,7 @@ namespace nix {
 static char * allocString(size_t size)
 {
     char * t;
-    t = (char *) GC_MALLOC_ATOMIC(size);
+    t = static_cast<char *>(GC_MALLOC_ATOMIC(size));
     if (!t)
         throw std::bad_alloc();
     return t;
@@ -209,7 +209,8 @@ bool Value::isTrivial() const
 {
     return !isa<tApp, tPrimOpApp>()
            && (!isa<tThunk>()
-               || (dynamic_cast<ExprAttrs *>(thunk().expr) && ((ExprAttrs *) thunk().expr)->dynamicAttrs->empty())
+               || (dynamic_cast<ExprAttrs *>(thunk().expr)
+                   && static_cast<ExprAttrs *>(thunk().expr)->dynamicAttrs->empty())
                || dynamic_cast<ExprLambda *>(thunk().expr) || dynamic_cast<ExprList *>(thunk().expr));
 }
 
@@ -353,7 +354,7 @@ EvalState::EvalState(
     if (settings.traceFunctionCalls)
         profiler.addProfiler(make_ref<FunctionCallTrace>());
 
-    switch (settings.evalProfilerMode) {
+    switch (settings.evalProfilerMode.get()) {
     case EvalProfilerMode::flamegraph:
         profiler.addProfiler(
             makeSampleStackProfiler(*this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
@@ -465,7 +466,7 @@ Value * EvalState::addConstant(const std::string & name, Value & v, Constant inf
 
 void EvalState::addConstant(const std::string & name, Value * v, Constant info)
 {
-    auto name2 = name.substr(0, 2) == "__" ? name.substr(2) : name;
+    auto name2 = name.starts_with("__") ? name.substr(2) : name;
 
     constantInfos.push_back({name2, info});
 
@@ -822,6 +823,7 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
         case ReplExitStatus::QuitAll:
             if (error)
                 throw *error;
+            // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
             throw Exit(0);
         case ReplExitStatus::Continue:
             break;
@@ -928,7 +930,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
 
 ListBuilder::ListBuilder(EvalMemory & mem, size_t size)
     : size(size)
-    , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes(size * sizeof(Value *)))
+    , elems(size <= 2 ? inlineElems : static_cast<Value **>(mem.allocBytes(size * sizeof(Value *))))
 {
 }
 
@@ -2062,6 +2064,7 @@ void EvalState::concatLists(
         auto listView = lists[n]->listView();
         auto l = listView.size();
         if (l)
+            // NOLINTNEXTLINE(bugprone-bitwise-pointer-cast,bugprone-multi-level-implicit-pointer-conversion)
             memcpy(out + pos, listView.data(), l * sizeof(Value *));
         pos += l;
     }
@@ -2108,6 +2111,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             } else if (vTmp.type() == nFloat) {
                 // Upgrade the type from int to float;
                 firstType = nFloat;
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 nf = n.value;
                 nf += vTmp.fpoint();
             } else
@@ -2117,6 +2121,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
                     .debugThrow();
         } else if (firstType == nFloat) {
             if (vTmp.type() == nInt) {
+                // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
                 nf += vTmp.integer().value;
             } else if (vTmp.type() == nFloat) {
                 nf += vTmp.fpoint();
@@ -2317,6 +2322,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
     try {
         forceValue(v, pos);
         if (v.type() == nInt)
+            // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
             return v.integer().value;
         else if (v.type() != nFloat)
             error<TypeError>(
@@ -2914,8 +2920,10 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         return v1.integer().value == v2.fpoint();
     if (v1.type() == nFloat && v2.type() == nInt)
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         return v1.fpoint() == v2.integer().value;
 
     // All other types are not compatible with each other.
@@ -3040,6 +3048,7 @@ void EvalState::printStatistics()
     GC_get_heap_usage_safe(&heapSize, 0, 0, 0, &totalBytes);
     double gcFullOnlyTime = ({
         auto ms = GC_get_full_gc_total_time();
+        // NOLINTNEXTLINE(bugprone-narrowing-conversions): Nix lang int->float coercion
         ms * 0.001;
     });
     auto gcCycles = getGCCycles();
@@ -3306,7 +3315,7 @@ std::optional<SourcePath> EvalState::resolveLookupPathPath(const LookupPath::Pat
         if (auto * hook = get(settings.lookupPathHooks, scheme)) {
             auto res = (*hook)(*this, rest);
             if (res)
-                return finish(std::move(*res));
+                return finish(std::move(res));
         }
     }
 

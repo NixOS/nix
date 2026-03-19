@@ -262,7 +262,7 @@ public:
     AutoCloseFD(AutoCloseFD && fd) noexcept;
     ~AutoCloseFD();
     AutoCloseFD & operator=(const AutoCloseFD & fd) = delete;
-    AutoCloseFD & operator=(AutoCloseFD && fd);
+    AutoCloseFD & operator=(AutoCloseFD && fd) noexcept;
     Descriptor get() const;
     explicit operator bool() const;
     Descriptor release();

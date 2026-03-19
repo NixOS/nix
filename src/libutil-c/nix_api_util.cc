@@ -28,9 +28,11 @@ void nix_c_context_free(nix_c_context * context)
 nix_err nix_context_error(nix_c_context * context)
 {
     if (context == nullptr) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
         throw;
     }
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary: rethrow dispatch
         throw;
     } catch (nix::Error & e) {
         /* Storing this exception is annoying, take what we need here */
@@ -46,6 +48,7 @@ nix_err nix_context_error(nix_c_context * context)
         }
         context->last_err_code = NIX_ERR_NIX_ERROR;
         return context->last_err_code;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C API boundary
     } catch (const std::exception & e) {
         context->last_err = e.what();
         context->last_err_code = NIX_ERR_UNKNOWN;

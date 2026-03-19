@@ -129,6 +129,7 @@ struct PathFmt
 template<class T>
 std::ostream & operator<<(std::ostream & out, const Magenta<T> & y)
 {
+    // NOLINTNEXTLINE(bugprone-unintended-char-ostream-output): generic colorizer, T=uchar is intended
     return out << ANSI_WARNING << y.value << ANSI_NORMAL;
 }
 

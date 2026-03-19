@@ -43,6 +43,7 @@ std::ostream & printLiteralString(std::ostream & str, const std::string_view str
         }
 
         if (*i == '\"' || *i == '\\')
+            // NOLINTNEXTLINE(bugprone-branch-clone): escape chars: each condition documents which char
             str << "\\" << *i;
         else if (*i == '\n')
             str << "\\n";

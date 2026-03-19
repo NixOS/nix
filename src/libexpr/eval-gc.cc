@@ -86,9 +86,9 @@ static inline void initGCReal()
        (resident) memory to be allocated.  This might be a problem on
        systems that don't overcommit. */
     if (!getEnv("GC_INITIAL_HEAP_SIZE")) {
-        size_t size = 32 * 1024 * 1024;
+        size_t size = 32UL * 1024 * 1024;
 #  if HAVE_SYSCONF && defined(_SC_PAGESIZE) && defined(_SC_PHYS_PAGES)
-        size_t maxSize = 384 * 1024 * 1024;
+        size_t maxSize = 384UL * 1024 * 1024;
         long pageSize = sysconf(_SC_PAGESIZE);
         long pages = sysconf(_SC_PHYS_PAGES);
         if (pageSize != -1)

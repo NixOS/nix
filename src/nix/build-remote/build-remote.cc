@@ -6,6 +6,7 @@
 #include <memory>
 #include <tuple>
 #include <iomanip>
+#include <iostream>
 #ifdef __APPLE__
 #  include <sys/time.h>
 #endif
@@ -180,11 +181,14 @@ static int main_build_remote(int argc, char ** argv)
                             continue;
                         }
                         bool best = false;
+                        // NOLINTNEXTLINE(bugprone-branch-clone): machine selection tiebreaker ladder
                         if (!bestSlotLock) {
                             best = true;
+                            // NOLINTBEGIN(bugprone-narrowing-conversions): load ratio: job count << 2^24
                         } else if (load / m.speedFactor < bestLoad / bestMachine->speedFactor) {
                             best = true;
                         } else if (load / m.speedFactor == bestLoad / bestMachine->speedFactor) {
+                            // NOLINTEND(bugprone-narrowing-conversions)
                             if (m.speedFactor > bestMachine->speedFactor) {
                                 best = true;
                             } else if (m.speedFactor == bestMachine->speedFactor) {
@@ -253,7 +257,7 @@ static int main_build_remote(int argc, char ** argv)
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
-                } catch (std::exception & e) {
+                } catch (Error & e) {
                     auto msg = chomp(drainFD(5, {.block = false}));
                     printError("cannot build on '%s': %s%s", storeUri, e.what(), msg.empty() ? "" : ": " + msg);
                     bestMachine->enabled = false;
@@ -296,7 +300,7 @@ static int main_build_remote(int argc, char ** argv)
             auto old = signal(SIGALRM, handleAlarm);
             alarm(15 * 60);
             if (!lockFile(uploadLock.get(), ltWrite, true))
-                printError("somebody is hogging the upload lock for '%s', continuing...");
+                printError("somebody is hogging the upload lock for '%s', continuing...", storeUri);
             alarm(0);
             signal(SIGALRM, old);
         }

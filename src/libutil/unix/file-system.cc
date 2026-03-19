@@ -181,6 +181,7 @@ static void _deletePath(
 
         switch (st.st_nlink) {
         /* Yes: last link. */
+        // NOLINTNEXTLINE(bugprone-branch-clone): nlink==1/2 both freed (commented above)
         case 1:
             bytesFreed += st.st_size;
             break;

@@ -323,6 +323,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
                         throw Error("odd number of tokens in 'exportReferencesGraph': '%1%'", s);
                     for (Strings::iterator i = ss.begin(); i != ss.end();) {
                         auto fileName = std::move(*i++);
+                        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                         static std::regex regex("[A-Za-z_][A-Za-z0-9_.-]*");
                         if (!std::regex_match(fileName, regex))
                             throw Error("invalid file name '%s' in 'exportReferencesGraph'", fileName);

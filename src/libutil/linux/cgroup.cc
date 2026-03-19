@@ -37,6 +37,7 @@ StringMap getCgroups(const std::filesystem::path & cgroupFile)
     StringMap cgroups;
 
     for (auto & line : tokenizeString<std::vector<std::string>>(readFile(cgroupFile), "\n")) {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
         static std::regex regex("([0-9]+):([^:]*):(.*)");
         std::smatch match;
         if (!std::regex_match(line, match, regex))

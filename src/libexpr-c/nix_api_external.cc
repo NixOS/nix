@@ -182,7 +182,7 @@ ExternalValue * nix_create_external_value(nix_c_context * context, NixCExternalV
 #endif
                 NixCExternalValue(*desc, v);
         nix_gc_incref(nullptr, ret);
-        return (ExternalValue *) ret;
+        return reinterpret_cast<ExternalValue *>(ret);
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -192,7 +192,7 @@ void * nix_get_external_value_content(nix_c_context * context, ExternalValue * b
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto r = dynamic_cast<NixCExternalValue *>((nix::ExternalValueBase *) b);
+        auto r = dynamic_cast<NixCExternalValue *>(reinterpret_cast<nix::ExternalValueBase *>(b));
         if (r)
             return r->get_ptr();
         return nullptr;

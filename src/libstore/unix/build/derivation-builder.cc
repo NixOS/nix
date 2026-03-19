@@ -692,9 +692,11 @@ bool DerivationBuilderImpl::decideWhetherDiskFull()
 static void rethrowExceptionAsError()
 {
     try {
+        // NOLINTNEXTLINE(nix-foreign-exceptions): rethrow-and-wrap dispatch
         throw;
     } catch (Error &) {
         throw;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): rethrow-and-wrap dispatch
     } catch (std::exception & e) {
         throw Error(e.what());
     } catch (...) {
@@ -1004,6 +1006,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
                     debug("Successfully pre-resolved AWS credentials in parent process");
                     return credentials;
                 }
+                // NOLINTNEXTLINE(nix-foreign-exceptions): AWS SDK boundary: log and swallow
             } catch (const std::exception & e) {
                 debug("Error pre-resolving S3 credentials: %s", e.what());
             }
@@ -1045,9 +1048,9 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
                 throw;
             }
         }();
-        if (msg.substr(0, 1) == "\2")
+        if (msg.starts_with("\2"))
             break;
-        if (msg.substr(0, 1) == "\1") {
+        if (msg.starts_with("\1")) {
             FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
@@ -1183,7 +1186,8 @@ void DerivationBuilderImpl::startDaemon()
             struct sockaddr_un remoteAddr;
             socklen_t remoteAddrLen = sizeof(remoteAddr);
 
-            AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            AutoCloseFD remote =
+                accept(daemonSocket.get(), reinterpret_cast<struct sockaddr *>(&remoteAddr), &remoteAddrLen);
             if (!remote) {
                 if (errno == EINTR || errno == EAGAIN)
                     continue;
@@ -1355,6 +1359,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
                 else
                     throw Error("unsupported builtin builder '%1%'", builtinName);
                 _exit(0);
+                // NOLINTNEXTLINE(nix-foreign-exceptions): process boundary: builtin builder child
             } catch (std::exception & e) {
                 writeFull(STDERR_FILENO, e.what() + std::string("\n"));
                 _exit(1);
@@ -2043,11 +2048,14 @@ StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 } // namespace nix
 
 // FIXME: do this properly
+// NOLINTBEGIN(bugprone-suspicious-include)
 #include "chroot-derivation-builder.cc"
 #include "linux-derivation-builder.cc"
 #include "freebsd-derivation-builder.cc"
 #include "darwin-derivation-builder.cc"
 #include "external-derivation-builder.cc"
+
+// NOLINTEND(bugprone-suspicious-include)
 
 namespace nix {
 

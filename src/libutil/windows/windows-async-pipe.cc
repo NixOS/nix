@@ -2,6 +2,7 @@
 
 #ifdef _WIN32
 #  include "nix/util/windows-async-pipe.hh"
+#  include <iostream>
 
 namespace nix::windows {
 

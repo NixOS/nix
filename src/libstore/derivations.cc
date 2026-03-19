@@ -103,7 +103,7 @@ bool DerivationType::isImpure() const
 
 bool BasicDerivation::isBuiltin() const
 {
-    return builder.substr(0, 8) == "builtin:";
+    return builder.starts_with("builtin:");
 }
 
 static auto infoForDerivation(const StoreDirConfig & store, const Derivation & drv)

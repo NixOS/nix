@@ -99,7 +99,7 @@ void initPlugins()
 
             /* Older plugins use a statically initialized object to run their code.
                Newer plugins can also export nix_plugin_entry() */
-            void (*nix_plugin_entry)() = (void (*)()) dlsym(handle, "nix_plugin_entry");
+            void (*nix_plugin_entry)() = reinterpret_cast<void (*)()>(dlsym(handle, "nix_plugin_entry"));
             if (nix_plugin_entry)
                 nix_plugin_entry();
 #else

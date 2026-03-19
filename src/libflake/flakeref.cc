@@ -106,6 +106,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     bool isFlake,
     bool preserveRelativePaths)
 {
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     static std::regex pathFlakeRegex(R"(([^?#]*)(\?([^#]*))?(#(.*))?)", std::regex::ECMAScript);
 
     std::smatch match;
@@ -224,6 +225,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
 {
     std::smatch match;
 
+    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
     static std::regex flakeRegex(
         "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)" + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
@@ -359,6 +361,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     return {std::move(flakeRef), fragment, std::move(extendedOutputsSpec)};
 }
 
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex flakeIdRegex(flakeIdRegexS, std::regex::ECMAScript);
 
 } // namespace nix

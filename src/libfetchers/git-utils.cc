@@ -54,7 +54,7 @@ struct hash<git_oid>
 {
     size_t operator()(const git_oid & oid) const
     {
-        return *(size_t *) oid.id;
+        return *reinterpret_cast<const size_t *>(oid.id);
     }
 };
 
@@ -211,10 +211,11 @@ extern "C" {
  */
 static int packBuilderProgressCheckInterrupt(int stage, uint32_t current, uint32_t total, void * payload)
 {
-    PackBuilderContext & args = *(PackBuilderContext *) payload;
+    PackBuilderContext & args = *static_cast<PackBuilderContext *>(payload);
     try {
         checkInterrupt();
         return GIT_OK;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): C callback boundary: libgit2
     } catch (const std::exception & e) {
         args.exception = std::current_exception();
         return GIT_EUSER;
@@ -368,7 +369,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // TODO: provide index callback for checkInterrupt() termination
         //       though this is about an order of magnitude faster than the packbuilder
         //       expect up to 1 sec latency due to uninterruptible git_indexer_append.
-        constexpr size_t chunkSize = 128 * 1024;
+        constexpr size_t chunkSize = 128UL * 1024;
         for (size_t offset = 0; offset < buf.size; offset += chunkSize) {
             if (git_indexer_append(indexer.get(), buf.ptr + offset, std::min(chunkSize, buf.size - offset), &stats))
                 throw GitError("appending to git packfile index");
@@ -431,7 +432,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             auto repo(repoPool.get());
 
             auto _commit = lookupObject(*repo, oid, GIT_OBJECT_COMMIT);
-            auto commit = (const git_commit *) &*_commit;
+            auto commit = reinterpret_cast<const git_commit *>(&*_commit);
 
             for (auto n : std::views::iota(0U, git_commit_parentcount(commit))) {
                 auto parentOid = git_commit_parent_id(commit, n);
@@ -533,7 +534,8 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     // Helper for statusCallback below.
     static int statusCallbackTrampoline(const char * path, unsigned int statusFlags, void * payload)
     {
-        return (*((std::function<int(const char * path, unsigned int statusFlags)> *) payload))(path, statusFlags);
+        return (*static_cast<std::function<int(const char * path, unsigned int statusFlags)> *>(payload))(
+            path, statusFlags);
     }
 
     WorkdirInfo getWorkdirInfo() override
@@ -725,10 +727,12 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             }
             auto fingerprint =
                 trim(hashString(HashAlgorithm::SHA256, keyDecoded).to_string(nix::HashFormat::Base64, false), "=");
+            // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
             auto escaped_fingerprint = std::regex_replace(fingerprint, std::regex("\\+"), "\\+");
             re += "(" + escaped_fingerprint + ")";
         }
         re += "]";
+        // NOLINTNEXTLINE(nix-foreign-exceptions): escaped hash fingerprint
         if (status == 0 && std::regex_search(output, std::regex(re)))
             printTalkative("Signature verification on commit %s succeeded.", rev.gitRev());
         else
@@ -756,7 +760,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto oid = hashToOID(oid_);
 
         auto _tree = lookupObject(*this, oid, GIT_OBJECT_TREE);
-        auto tree = (const git_tree *) &*_tree;
+        auto tree = reinterpret_cast<const git_tree *>(&*_tree);
 
         if (git_tree_entrycount(tree) == 1) {
             auto entry = git_tree_entry_byindex(tree, 0);
@@ -812,8 +816,8 @@ struct GitSourceAccessor : SourceAccessor
                 try {
                     // FIXME: do we need to hold the state lock while
                     // doing this?
-                    auto contents =
-                        std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+                    auto contents = std::string(
+                        static_cast<const char *>(git_blob_rawcontent(blob.get())), git_blob_rawsize(blob.get()));
                     state->lfsFetch->fetch(contents, path, s, [&s](uint64_t size) { s.s.reserve(size); });
                 } catch (Error & e) {
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
@@ -826,7 +830,8 @@ struct GitSourceAccessor : SourceAccessor
             }
         }
 
-        auto view = std::string_view((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
+        auto view =
+            std::string_view(static_cast<const char *>(git_blob_rawcontent(blob.get())), git_blob_rawsize(blob.get()));
         sizeCallback(view.size());
         StringSource source{view};
         source.drainInto(sink);
@@ -857,6 +862,7 @@ struct GitSourceAccessor : SourceAccessor
         auto mode = git_tree_entry_filemode(entry);
 
         if (mode == GIT_FILEMODE_TREE)
+            // NOLINTNEXTLINE(bugprone-branch-clone): file mode classifier: conditions document modes
             return Stat{.type = tDirectory};
 
         else if (mode == GIT_FILEMODE_BLOB)
@@ -873,7 +879,7 @@ struct GitSourceAccessor : SourceAccessor
             return Stat{.type = tDirectory};
 
         else
-            throw Error("file '%s' has an unsupported Git file type");
+            throw Error("file '%s' has an unsupported Git file type", showPath(path));
     }
 
     DirEntries readDirectory(const CanonPath & path) override
@@ -971,7 +977,7 @@ struct GitSourceAccessor : SourceAccessor
     {
         if (path.isRoot()) {
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
-                return dupObject<Tree>((git_tree *) &*state.root);
+                return dupObject<Tree>(reinterpret_cast<git_tree *>(&*state.root));
             else
                 return std::nullopt;
         }
@@ -981,7 +987,7 @@ struct GitSourceAccessor : SourceAccessor
             return std::nullopt;
 
         Tree tree;
-        if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
+        if (git_tree_entry_to_object(reinterpret_cast<git_object **>((git_tree **) Setter(tree)), *state.repo, entry))
             throw GitError("looking up directory '%s'", showPath(path));
 
         return tree;
@@ -1002,7 +1008,7 @@ struct GitSourceAccessor : SourceAccessor
     {
         if (path.isRoot()) {
             if (git_object_type(state.root.get()) == GIT_OBJECT_TREE)
-                return dupObject<Tree>((git_tree *) &*state.root);
+                return dupObject<Tree>(reinterpret_cast<git_tree *>(&*state.root));
             else
                 throw Error("Git root object '%s' is not a directory", *git_object_id(state.root.get()));
         }
@@ -1016,7 +1022,7 @@ struct GitSourceAccessor : SourceAccessor
             throw Error("'%s' is not a directory", showPath(path));
 
         Tree tree;
-        if (git_tree_entry_to_object((git_object **) (git_tree **) Setter(tree), *state.repo, entry))
+        if (git_tree_entry_to_object(reinterpret_cast<git_object **>((git_tree **) Setter(tree)), *state.repo, entry))
             throw GitError("looking up directory '%s'", showPath(path));
 
         return tree;
@@ -1025,7 +1031,7 @@ struct GitSourceAccessor : SourceAccessor
     Blob getBlob(State & state, const CanonPath & path, bool expectSymlink)
     {
         if (!expectSymlink && git_object_type(state.root.get()) == GIT_OBJECT_BLOB)
-            return dupObject<Blob>((git_blob *) &*state.root);
+            return dupObject<Blob>(reinterpret_cast<git_blob *>(&*state.root));
 
         auto notExpected = [&]() {
             throw Error(expectSymlink ? "'%s' is not a symlink" : "'%s' is not a regular file", showPath(path));
@@ -1049,7 +1055,7 @@ struct GitSourceAccessor : SourceAccessor
         }
 
         Blob blob;
-        if (git_tree_entry_to_object((git_object **) (git_blob **) Setter(blob), *state.repo, entry))
+        if (git_tree_entry_to_object(reinterpret_cast<git_object **>((git_blob **) Setter(blob)), *state.repo, entry))
             throw GitError("looking up file '%s'", showPath(path));
 
         return blob;
@@ -1129,7 +1135,7 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
     /** Total file contents in flight. */
     std::atomic<size_t> totalBufSize{0};
 
-    static constexpr std::size_t maxBufSize = 16 * 1024 * 1024;
+    static constexpr std::size_t maxBufSize = 16UL * 1024 * 1024;
 
     GitFileSystemObjectSinkImpl(ref<GitRepoImpl> repo)
         : repo(repo)

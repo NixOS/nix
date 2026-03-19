@@ -25,6 +25,7 @@ struct DownloadUrl
 
 // A github, gitlab, or sourcehut host
 const static std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
+// NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
 std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme
@@ -207,7 +208,7 @@ struct GitArchiveInputScheme : InputScheme
             for (auto & token : tokens) {
                 auto first = url.find(token.first);
                 if (first != std::string::npos && token.first.length() > answer_match_len && first == 0
-                    && url.substr(0, token.first.length()) == token.first
+                    && url.starts_with(token.first)
                     && (url.length() == token.first.length() || url[token.first.length()] == '/')) {
                     answer = token.second;
                     answer_match_len = token.first.length();
@@ -600,7 +601,14 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         } else {
             refUri = fmt("refs/(heads|tags)/%s", ref);
         }
-        std::regex refRegex(refUri);
+        std::regex refRegex;
+        try {
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrapped by catch below
+            refRegex = std::regex(refUri);
+            // NOLINTNEXTLINE(nix-foreign-exceptions): wrap boundary: regex_error -> BadURL
+        } catch (std::regex_error & e) {
+            throw BadURL("invalid reference '%s': %s", ref, e.what());
+        }
 
         auto downloadFileResult = downloadFile(store, settings, fmt("%s/info/refs", base_url), "source", headers);
         auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);

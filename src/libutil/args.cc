@@ -304,6 +304,7 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                     std::smatch match;
                     // We match one space after `nix` so that we preserve indentation.
                     // No space is necessary for an empty line. An empty line has basically no effect.
+                    // NOLINTNEXTLINE(nix-foreign-exceptions): compile-time literal
                     if (std::regex_match(line, match, std::regex("^#!\\s*nix(:? |$)(.*)$")))
                         shebangContent += std::string_view{match[2].first, match[2].second} + "\n";
                 }

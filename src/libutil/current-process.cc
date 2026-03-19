@@ -47,6 +47,7 @@ unsigned int getMaxCPU()
         auto quota = cpuMaxParts[0];
         auto period = cpuMaxParts[1];
         if (quota != "max")
+            // NOLINTNEXTLINE(bugprone-narrowing-conversions): quota ratio
             return std::ceil(std::stoi(quota) / std::stof(period));
     } catch (Error &) {
         ignoreExceptionInDestructor(lvlDebug);

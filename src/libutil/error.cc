@@ -487,6 +487,7 @@ int handleExceptions(const std::string & programName, fun<void()> body)
     std::string error = ANSI_RED "error:" ANSI_NORMAL " ";
     try {
         body();
+        // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
     } catch (Exit & e) {
         return e.status;
     } catch (UsageError & e) {
@@ -499,6 +500,7 @@ int handleExceptions(const std::string & programName, fun<void()> body)
     } catch (std::bad_alloc & e) {
         printError(error + "out of memory");
         return 1;
+        // NOLINTNEXTLINE(nix-foreign-exceptions): handleExceptions: top-level catch
     } catch (std::exception & e) {
         printError(error + e.what());
         return 1;

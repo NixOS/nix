@@ -172,6 +172,7 @@ Attrs Input::toAttrs() const
     return attrs;
 }
 
+// NOLINTNEXTLINE(bugprone-exception-escape): map comparison — only bad_alloc possible
 bool Input::operator==(const Input & other) const noexcept
 {
     return attrs == other.attrs;
@@ -429,7 +430,7 @@ std::optional<Hash> Input::getNarHash() const
 std::optional<std::string> Input::getRef() const
 {
     if (auto s = maybeGetStrAttr(attrs, "ref"))
-        return *s;
+        return s;
     return {};
 }
 
@@ -453,7 +454,7 @@ std::optional<Hash> Input::getRev() const
 std::optional<uint64_t> Input::getRevCount() const
 {
     if (auto n = maybeGetIntAttr(attrs, "revCount"))
-        return *n;
+        return n;
     return {};
 }
 

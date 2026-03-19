@@ -124,7 +124,6 @@ protected:
 // Regression test for https://github.com/NixOS/nix/issues/13215
 TEST_F(GitTest, submodulePeriodSupport)
 {
-    auto storePath = tmpDir / "store";
     auto repoPath = tmpDir / "repo";
     auto submodulePath = tmpDir / "submodule";
 

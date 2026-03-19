@@ -43,11 +43,13 @@ struct CanonicalizePathMetadataOptions
  * @todo Switch to a better way, as having a macro is not the nicest.
  * This will be easier to do after further settings refactors.
  */
+// NOLINTBEGIN(bugprone-macro-parentheses): ARG is in a designated-initializer, no precedence hazard
 #if NIX_SUPPORT_ACL
 #  define NIX_WHEN_SUPPORT_ACLS(ARG) .ignoredAcls = ARG,
 #else
 #  define NIX_WHEN_SUPPORT_ACLS(ARG)
 #endif
+// NOLINTEND(bugprone-macro-parentheses)
 
 /**
  * "Fix", or canonicalise, the meta-data of the files in a store path

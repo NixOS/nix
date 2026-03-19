@@ -8,6 +8,7 @@
  * Force the default versions of all constructors (copy, move, copy
  * assignment).
  */
+// NOLINTBEGIN(bugprone-macro-parentheses): CLASS_NAME is a type, parens would change meaning
 #define FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)            \
     CLASS_NAME(const CLASS_NAME &) = default;             \
     CLASS_NAME(CLASS_NAME &) = default;                   \
@@ -31,3 +32,4 @@
         : raw(std::forward<Args>(arg)...)                                                                   \
     {                                                                                                       \
     }
+// NOLINTEND(bugprone-macro-parentheses)

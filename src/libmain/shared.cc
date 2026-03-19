@@ -337,6 +337,7 @@ void printVersion(const std::string & programName)
                   << "\n";
         std::cout << "State directory: " << os_string_to_string(settings.nixStateDir.native()) << "\n";
     }
+    // NOLINTNEXTLINE(nix-foreign-exceptions): Exit is deliberate control flow
     throw Exit();
 }
 
