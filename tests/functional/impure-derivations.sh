@@ -68,6 +68,10 @@ path6=$(nix build -L --no-link --json --file ./impure-derivations.nix inputAddre
 [[ $(< "$path6") = X ]]
 [[ $(< "$TEST_ROOT"/counter) = 5 ]]
 
+# Test that nix-build works with impure derivations.
+out=$(nix-build --no-link ./impure-derivations.nix -A impure)
+[[ $(< "$out"/n) = $(( $(< "$TEST_ROOT"/counter) - 1 )) ]]
+
 # Test nix/fetchurl.nix.
 path7=$(nix build -L --no-link --print-out-paths --expr "import <nix/fetchurl.nix> { impure = true; url = \"file://$PWD/impure-derivations.sh\"; }")
 cmp "$path7" "$PWD"/impure-derivations.sh
