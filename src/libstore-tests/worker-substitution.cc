@@ -176,8 +176,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
 
 TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 {
-    // Enable CA derivations experimental feature
-    experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    EnableExperimentalFeature enableCA{"ca-derivations"};
 
     // Create a CA floating output derivation
     Derivation drv;
@@ -262,9 +261,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
-
-    // Disable CA derivations experimental feature
-    experimentalFeatureSettings.set("extra-experimental-features", "");
 }
 
 /**
@@ -274,8 +270,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
  */
 TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 {
-    // Enable CA derivations experimental feature
-    experimentalFeatureSettings.set("extra-experimental-features", "ca-derivations");
+    EnableExperimentalFeature enableCA{"ca-derivations"};
 
     // Create the dependency CA floating derivation
     Derivation depDrv;
@@ -426,9 +421,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
-
-    // Disable CA derivations experimental feature
-    experimentalFeatureSettings.set("extra-experimental-features", "");
 }
 
 } // namespace nix
