@@ -372,3 +372,29 @@ This release was made possible by the following 43 contributors:
 
 - Improve formatting of error messages and warnings [#15397](https://github.com/NixOS/nix/pull/15397)
 
+# Release 2.34.2 (2026-03-20)
+
+- S3: restore STS WebIdentity and ECS container credential providers [#15507](https://github.com/NixOS/nix/pull/15507)
+
+  Nix 2.33 replaced the S3 backend's `aws-sdk-cpp` credential chain with a
+  custom chain built on `aws-c-auth`. That chain omitted two providers,
+  breaking S3 binary cache access in container workloads:
+
+  - **STS WebIdentity** (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`,
+    `AWS_ROLE_SESSION_NAME`) — used by EKS IRSA, GitHub Actions OIDC, and
+    any `sts:AssumeRoleWithWebIdentity` federation.
+  - **ECS container metadata** (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`,
+    `AWS_CONTAINER_CREDENTIALS_FULL_URI`) — used by ECS tasks and EKS Pod
+    Identity.
+
+  The typical symptom was a misleading IMDS error
+  (`Valid credentials could not be sourced by the IMDS provider`), because
+  IMDS is the last provider tried after the correct one was skipped.
+
+  Both providers are now part of the chain, ordered to match the
+  pre-2.33 `DefaultAWSCredentialsProviderChain`:
+  `Environment → SSO → Profile → STS WebIdentity → (ECS | IMDS)`.
+  As in both the old and new AWS SDK default chains, ECS and IMDS are
+  mutually exclusive: when container credential environment variables are
+  set, IMDS is skipped.
+
