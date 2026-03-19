@@ -1,6 +1,7 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
@@ -87,6 +88,36 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
             throw Error("no Authorization in git-lfs-authenticate response");
 
         return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
+    }
+    else {
+        std::ostringstream inputCredDescr;
+        inputCredDescr << "protocol=" << url.scheme << "\n";
+        inputCredDescr << "host=" << url.authority->host << "\n";
+        inputCredDescr << "path=" << url.renderPath(true) << "\n";
+
+        auto [status, output] = runProgram({.program = "git", .args = {"credential", "fill"}, .input = std::move(inputCredDescr).str()});
+
+        if (output.empty())
+            throw Error("git-credential-fill: no output (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
+
+        std::string username;
+        std::string password;
+        for (auto & line : tokenizeString<Strings>(output, "\n")) {
+            auto eq = line.find('=');
+            if (eq == std::string::npos)
+                continue;
+            auto key = line.substr(0, eq);
+            auto val = line.substr(eq + 1);
+            if (key == "username")
+                username = val;
+            else if (key == "password")
+                password = val;
+        }
+
+        if (username.empty() || password.empty())
+            throw Error("git-credential-fill: no credentials returned (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
+
+        return {url.to_string() + "/info/lfs", "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
     }
 
     return {url.to_string() + "/info/lfs", std::nullopt};
