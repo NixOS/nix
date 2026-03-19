@@ -1,4 +1,5 @@
 #include "nix/store/sqlite.hh"
+#include "nix/store/backoff.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
@@ -10,7 +11,6 @@
 
 #include <sqlite3.h>
 
-#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <random>
@@ -290,15 +290,14 @@ namespace {
 
 constexpr uint32_t backoffBaseUs = 500;
 constexpr uint32_t backoffCeilUs = 100'000;
-constexpr uint32_t backoffJitterShift = 3; // ~12.5% jitter
 
-// Precondition: attempt >= 1
-constexpr uint32_t clampedExponential(uint32_t attempt)
-{
-    auto shift = std::min(attempt - 1, uint32_t{63});
-    auto unclamped = static_cast<uint64_t>(backoffBaseUs) << shift;
-    return static_cast<uint32_t>(std::min(unclamped, static_cast<uint64_t>(backoffCeilUs)));
-}
+// Additive jitter up to ceiling >> backoffJitterShift (~12.5%), sampled once
+// per sequence. Intentionally weak decorrelation, not AWS-style "full jitter".
+constexpr uint32_t backoffJitterShift = 3;
+
+// Give up after this much monotonic retry time. Checked between calls only;
+// sqlite3_busy_timeout (1 hour) can block a single call for longer.
+constexpr auto sqliteRetryTimeout = std::chrono::minutes{10};
 
 void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 {
@@ -319,7 +318,7 @@ SQLiteRetryState newSQLiteRetryState()
 
 std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
 {
-    auto ceiling = clampedExponential(attempt);
+    auto ceiling = clampedExponential(backoffBaseUs, attempt, backoffCeilUs);
     auto jitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(ceiling >> backoffJitterShift) * jitter) >> 32);
     return std::chrono::microseconds{ceiling + jitterAmount};
 }
@@ -327,6 +326,11 @@ std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
 {
     ++state.attempt;
+
+    // Only called from retrySQLite's catch block, so `throw;` re-raises the
+    // active SQLiteBusy; calling outside a handler would std::terminate().
+    if (std::chrono::steady_clock::now() - state.startTime > sqliteRetryTimeout)
+        throw;
 
     throttledWarning(e, state);
     checkInterrupt();
