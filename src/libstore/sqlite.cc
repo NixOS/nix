@@ -1,4 +1,5 @@
 #include "nix/store/sqlite.hh"
+#include "nix/store/backoff.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
@@ -10,7 +11,6 @@
 
 #include <sqlite3.h>
 
-#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <random>
@@ -287,13 +287,10 @@ constexpr uint32_t backoffBaseUs = 500;
 constexpr uint32_t backoffCeilUs = 100'000;
 constexpr uint32_t backoffJitterShift = 3; // ~12.5% jitter
 
-// Precondition: attempt >= 1
-constexpr uint32_t clampedExponential(uint32_t attempt)
-{
-    auto shift = std::min(attempt - 1, uint32_t{63});
-    auto unclamped = static_cast<uint64_t>(backoffBaseUs) << shift;
-    return static_cast<uint32_t>(std::min(unclamped, static_cast<uint64_t>(backoffCeilUs)));
-}
+// Give up after 10 minutes of total elapsed time (including time spent
+// in SQLite's internal busy-handler). If the database has been contended
+// for this long, something is seriously wrong.
+constexpr time_t sqliteRetryTimeoutSeconds = 600;
 
 void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 {
@@ -314,7 +311,7 @@ SQLiteRetryState newSQLiteRetryState()
 
 std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
 {
-    auto ceiling = clampedExponential(attempt);
+    auto ceiling = clampedExponential(backoffBaseUs, attempt, backoffCeilUs);
     auto jitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(ceiling >> backoffJitterShift) * jitter) >> 32);
     return std::chrono::microseconds{ceiling + jitterAmount};
 }
@@ -322,6 +319,9 @@ std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
 void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
 {
     ++state.attempt;
+
+    if (time(nullptr) - state.startTime > sqliteRetryTimeoutSeconds)
+        throw;
 
     throttledWarning(e, state);
     checkInterrupt();
