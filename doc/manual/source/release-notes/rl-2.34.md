@@ -374,6 +374,25 @@ This release was made possible by the following 43 contributors:
 
 # Release 2.34.2 (2026-03-20)
 
+## Changes
+
+- Fixed `nix upgrade-nix` without an explicitly specified `--profile` argument [#15437](https://github.com/NixOS/nix/issues/15437) [#15438](https://github.com/NixOS/nix/pull/15438)
+
+- Erroneous `error (ignored): write of ... bytes: Bad file descriptor` warnings on interrupted store copy operations are now fixed [#15486](https://github.com/NixOS/nix/pull/15486)
+
+- Reverted changes enabling keep-alive in the HTTP client [#15522](https://github.com/NixOS/nix/pull/15522)
+
+  Connection reuse for S3 stores has caused Hydra upload errors due to stale connections being closed by the remote servers. Nix currently lacks retry mechanisms for 400 `RequestTimeout` errors used by AWS S3.
+
+- Fixed evaluation that accesses the logical store directory using `ssh-ng://` `eval-store`s [#15417](https://github.com/NixOS/nix/pull/15417)
+
+  Accessing the logical store directory (typically `/nix/store`) during evaluation would fail previously:
+
+  ```
+  nix build nixpkgs#hello --store ssh-ng://host
+  error: path '/nix/store/' is not in the Nix store
+  ```
+
 - S3: restore STS WebIdentity and ECS container credential providers [#15507](https://github.com/NixOS/nix/pull/15507)
 
   Nix 2.33 replaced the S3 backend's `aws-sdk-cpp` credential chain with a
