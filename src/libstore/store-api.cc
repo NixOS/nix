@@ -80,9 +80,11 @@ StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType
           true,
           "store",
           R"(
-            Logical location of the Nix store, usually
-            `/nix/store`. Note that you can only copy store paths
-            between stores if they have the same `store` setting.
+            Logical location of the Nix store, usually `/nix/store`.
+
+            Defaults to [`NIX_STORE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STORE_DIR) if unset.
+
+            Note that you can only copy store paths between stores if they have the same `store` setting.
           )",
           {})
     , pathType(pathType)
@@ -1252,6 +1254,32 @@ void Store::signRealisation(Realisation & realisation)
         LocalSigner signer(std::move(secretKey));
         realisation.sign(realisation.id, signer);
     }
+}
+
+const std::filesystem::path & StoreConfig::getStateDir() const
+{
+    return settings.nixStateDir;
+}
+
+const std::filesystem::path & StoreConfig::getLogDir() const
+{
+    static std::filesystem::path logDir = [] {
+        return getEnvOsNonEmpty(OS_STR("NIX_LOG_DIR"))
+            .transform([](auto && s) { return std::filesystem::path(s); })
+            .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+#  ifdef NIX_LOG_DIR
+#    error "NIX_LOG_DIR should not be defined on Windows"
+#  endif
+                return windows::known_folders::getProgramData() / "nix" / "log";
+#else
+                return NIX_LOG_DIR;
+#endif
+            })
+            .transform([](auto && s) { return canonPath(s); })
+            .value();
+    }();
+    return logDir;
 }
 
 } // namespace nix

@@ -19,11 +19,18 @@
 
 namespace nix {
 
+std::filesystem::path getDaemonSocketPath(const Store::Config & config)
+{
+    return getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))
+        .transform([](auto && s) { return std::filesystem::path{s}; })
+        .value_or(config.getStateDir() / "daemon-socket" / "socket");
+}
+
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(const std::filesystem::path & path, const StoreReference::Params & params)
     : Store::Config{params, FilePathType::Native}
     , LocalFSStore::Config{params}
     , RemoteStore::Config{params, FilePathType::Native}
-    , path{path.empty() ? settings.nixDaemonSocketFile : path}
+    , path{path.empty() ? getDaemonSocketPath(*this) : path}
 {
 }
 
@@ -35,9 +42,10 @@ std::string UDSRemoteStoreConfig::doc()
 }
 
 // A bit gross that we now pass empty string but this is knowing that
-// empty string will later default to the same nixDaemonSocketFile. Why
-// don't we just wire it all through? I believe there are cases where it
-// will live reload so we want to continue to account for that.
+// empty string will later default to the per-store socket path based
+// on stateDir. Why don't we just wire it all through? I believe there
+// are cases where it will live reload so we want to continue to
+// account for that.
 UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
     : UDSRemoteStoreConfig("", params)
 {
@@ -56,7 +64,7 @@ StoreReference UDSRemoteStoreConfig::getReference() const
     /* We specifically return "daemon" here instead of "unix://" or "unix://${path}"
      * to be more compatible with older versions of nix. Some tooling out there
      * tries hard to parse store references and it might not be able to handle "unix://". */
-    if (path == settings.nixDaemonSocketFile)
+    if (path == getDaemonSocketPath(*this))
         return {
             .variant = StoreReference::Daemon{},
             .params = getQueryParams(),

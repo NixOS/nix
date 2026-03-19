@@ -48,31 +48,6 @@
 
 namespace nix {
 
-/* The default location of the daemon socket, relative to nixStateDir.
-   The socket is in a directory to allow you to control access to the
-   Nix daemon by setting the mode/ownership of the directory
-   appropriately.  (This wouldn't work on the socket itself since it
-   must be deleted and recreated on startup.) */
-#define DEFAULT_SOCKET_PATH "daemon-socket" / "socket"
-
-LogFileSettings::LogFileSettings()
-    : nixLogDir(getEnvOsNonEmpty(OS_STR("NIX_LOG_DIR"))
-                    .transform([](auto && s) { return std::filesystem::path(s); })
-                    .or_else([]() -> std::optional<std::filesystem::path> {
-#ifdef _WIN32
-#  ifdef NIX_LOG_DIR
-#    error "NIX_LOG_DIR should not be defined on Windows"
-#  endif
-                        return windows::known_folders::getProgramData() / "nix" / "log";
-#else
-                        return NIX_LOG_DIR;
-#endif
-                    })
-                    .transform([](auto && s) { return canonPath(s); })
-                    .value())
-{
-}
-
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
@@ -92,12 +67,6 @@ Settings::Settings()
                       })
                       .transform([](auto && s) { return canonPath(s); })
                       .value())
-    , nixDaemonSocketFile(
-          getEnvOsNonEmpty(OS_STR("NIX_DAEMON_SOCKET_PATH"))
-              .transform([](auto && s) { return std::filesystem::path(s); })
-              .or_else([this]() -> std::optional<std::filesystem::path> { return nixStateDir / DEFAULT_SOCKET_PATH; })
-              .transform([](auto && s) { return canonPath(s); })
-              .value())
 {
 #ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";
