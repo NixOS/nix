@@ -16,6 +16,13 @@ struct Machine
 {
 
     const StoreReference storeUri;
+    /**
+     * @TODO this information should eventually just exist to update an
+     * underlying setting on `Store::Config`, just as the feature information
+     * updates `Store::Config::systemType`. The only wrinkle is whether the
+     * makes sense for separate local stores to have distinct systems, when they
+     * are all the current OS, just different part of the file system.
+     */
     const StringSet systemTypes;
     const std::optional<std::filesystem::path> sshKey;
     const unsigned int maxJobs;

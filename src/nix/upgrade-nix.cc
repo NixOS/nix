@@ -3,6 +3,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
@@ -113,7 +114,7 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 
         {
             Activity act(*logger, lvlInfo, actUnknown, fmt("downloading '%s'...", store->printStorePath(storePath)));
-            store->ensurePath(storePath);
+            getDefaultBuilder(store)->ensurePath(storePath);
         }
 
         {
