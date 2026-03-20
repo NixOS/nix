@@ -2,6 +2,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 
 namespace nix {
@@ -272,7 +273,7 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
             state.error<EvalError>("context key '%s' is not a store path", name).atPos(i.pos).debugThrow();
         auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
-            state.store->ensurePath(namePath);
+            nix::getDefaultBuilder(state.store)->ensurePath(namePath);
         state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
 
         if (auto attr = i.value->attrs()->get(sPath)) {

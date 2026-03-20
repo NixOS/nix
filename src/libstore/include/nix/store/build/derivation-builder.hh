@@ -125,6 +125,13 @@ struct DerivationBuilderCallbacks
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
+
+    /**
+     * Process a recursive Nix daemon connection, using a builder
+     * that enforces the restrictions of the given context.
+     */
+    virtual void
+    processDaemonConnection(ref<Store> store, FdSource && from, FdSink && to, RestrictionContext & context) = 0;
 };
 
 /**

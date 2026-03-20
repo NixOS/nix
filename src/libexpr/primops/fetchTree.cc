@@ -3,6 +3,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/registry.hh"
@@ -464,7 +465,7 @@ static void fetch(
 
         // Try to get the path from the local store or substituters
         try {
-            state.store->ensurePath(expectedPath);
+            nix::getDefaultBuilder(state.store)->ensurePath(expectedPath);
             debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
             state.allowAndSetStorePathString(expectedPath, v);
             return;

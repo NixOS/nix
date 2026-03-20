@@ -12,6 +12,7 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/build.hh"
 #include "nix/store/local-fs-store.hh"
 #include "user-env.hh"
 #include "nix/expr/value-to-json.hh"
@@ -794,7 +795,7 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
     printMissing(globals.state->store, paths);
     if (globals.dryRun)
         return;
-    globals.state->store->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
+    getDefaultBuilder(globals.state->store)->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug("switching to new user environment");
     auto generation = createGeneration(*store2, globals.profile, drv.queryOutPath());
