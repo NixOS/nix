@@ -53,6 +53,14 @@ struct LfsApiInfo
 
 } // namespace
 
+static std::string lfsEndpointUrl(const ParsedURL & url)
+{
+    auto endpoint = url.to_string();
+    if (!endpoint.ends_with(".git"))
+        endpoint += ".git";
+    return endpoint + "/info/lfs";
+}
+
 static LfsApiInfo getLfsApi(const ParsedURL & url)
 {
     assert(url.authority.has_value());
@@ -117,10 +125,10 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         if (username.empty() || password.empty())
             throw Error("git-credential-fill: no credentials returned (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
 
-        return {url.to_string() + "/info/lfs", "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
+        return {lfsEndpointUrl(url), "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
     }
 
-    return {url.to_string() + "/info/lfs", std::nullopt};
+    return {lfsEndpointUrl(url), std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
