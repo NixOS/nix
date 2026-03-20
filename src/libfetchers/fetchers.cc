@@ -1,6 +1,7 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/store/build.hh"
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
@@ -321,7 +322,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
 
             store.addTempRoot(storePath);
 
-            store.ensurePath(storePath);
+            store.getBuilder()->ensurePath(storePath);
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store.printStorePath(storePath));
 

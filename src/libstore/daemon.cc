@@ -4,6 +4,7 @@
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/store/worker-protocol-impl.hh"
+#include "nix/store/build.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/filetransfer.hh"
@@ -308,7 +309,8 @@ static void performOp(
     TrustedFlag trusted,
     RecursiveFlag recursive,
     WorkerProto::BasicServerConnection & conn,
-    WorkerProto::Op op)
+    WorkerProto::Op op,
+    Builder & builder)
 {
     WorkerProto::ReadConn rconn(conn);
     WorkerProto::WriteConn wconn(conn);
@@ -555,7 +557,7 @@ static void performOp(
         if (mode == bmRepair && !trusted)
             throw Error("repairing is not allowed because you are not in 'trusted-users'");
         logger->startWork();
-        store->buildPaths(drvs, mode);
+        builder.buildPaths(drvs, mode);
         logger->stopWork();
         conn.to << 1;
         break;
@@ -574,7 +576,7 @@ static void performOp(
             throw Error("repairing is not allowed because you are not in 'trusted-users'");
 
         logger->startWork();
-        auto results = store->buildPathsWithResults(drvs, mode);
+        auto results = builder.buildPathsWithResults(drvs, mode);
         logger->stopWork();
 
         WorkerProto::write(*store, wconn, results);
@@ -653,7 +655,7 @@ static void performOp(
             drvPath = store->writeDerivation(Derivation{drv2});
         }
 
-        auto res = store->buildDerivation(drvPath, drv, buildMode);
+        auto res = builder.buildDerivation(drvPath, drv, buildMode);
         logger->stopWork();
         WorkerProto::write(*store, wconn, res);
         break;
@@ -662,7 +664,7 @@ static void performOp(
     case WorkerProto::Op::EnsurePath: {
         auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
         logger->startWork();
-        store->ensurePath(path);
+        builder.ensurePath(path);
         logger->stopWork();
         conn.to << 1;
         break;
@@ -1052,7 +1054,13 @@ static void performOp(
     }
 }
 
-void processConnection(ref<Store> store, FdSource && from, FdSink && to, TrustedFlag trusted, RecursiveFlag recursive)
+void processConnection(
+    ref<Store> store,
+    FdSource && from,
+    FdSink && to,
+    TrustedFlag trusted,
+    RecursiveFlag recursive,
+    std::shared_ptr<Builder> builder)
 {
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
     auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
@@ -1069,6 +1077,9 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
         }
     });
 #endif
+
+    if (!builder)
+        builder = store->getBuilder();
 
     /* Exchange the greeting. */
     auto localVersion = WorkerProto::latest;
@@ -1136,7 +1147,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
             debug("performing daemon worker op: %d", op);
 
             try {
-                performOp(tunnelLogger, store, trusted, recursive, conn, op);
+                performOp(tunnelLogger, store, trusted, recursive, conn, op, *builder);
             } catch (Error & e) {
                 /* If we're not in a state where we can send replies, then
                    something went wrong processing the input of the

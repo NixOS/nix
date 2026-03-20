@@ -22,6 +22,7 @@
 #include "nix/util/users.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 
 #include <filesystem>
@@ -823,9 +824,8 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-
             // once we get rid of the temporary hack above, this tenary operator will also go away
-            results = store->buildPathsWithResults((printOutputPaths || outLink) ? drvPaths : toBuild);
+            results = store->getBuilder()->buildPathsWithResults((printOutputPaths || outLink) ? drvPaths : toBuild);
 
             // Report build failures with attribute paths
             for (auto & result : results) {
