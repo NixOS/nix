@@ -496,6 +496,20 @@ static std::string normalizeZonePath(std::string_view zonePath)
     return path;
 }
 
+static GitAccessorOptions makeZoneAccessorOptions(ref<GitRepo> repo, const Hash & commitHash, const std::string & zonePath)
+{
+    std::string attrFp;
+    for (auto & h : repo->getGitAttributesAlongPath(commitHash, zonePath))
+        attrFp += h.gitRev();
+    return {
+        .exportIgnore = true,
+        .smudgeLfs = true,
+        .attrCommitRev = commitHash,
+        .attrPathPrefix = zonePath,
+        .attrFingerprint = std::move(attrFp),
+    };
+}
+
 // Helper to sanitize zone path for use in store path names.
 // Store paths only allow: a-zA-Z0-9 and +-._?=
 // Replaces / with - and any other invalid chars with _
@@ -792,10 +806,9 @@ StorePath EvalState::getZoneStorePath(std::string_view zonePath)
 
     if (!settings.lazyTrees) {
         debug("getZoneStorePath: %s clean, eager copy from git (tree %s)", zonePath, treeSha.gitRev());
-        // Eager mode: immediate copy from git ODB
         auto repo = getWorldRepo();
-        // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
-        GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+        auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
+        auto opts = makeZoneAccessorOptions(repo, commitHash, normalizeZonePath(zonePath));
         auto accessor = repo->getAccessor(treeSha, opts, "zone");
 
         std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
@@ -839,8 +852,8 @@ StorePath EvalState::mountZoneByTreeSha(const Hash & treeSha, std::string_view z
     // This allows concurrent mounts of different zones. Multiple threads may
     // race to mount the same zone, but we check again before inserting.
     auto repo = getWorldRepo();
-    // exportIgnore=true: honor .gitattributes for zone content (unlike world accessor)
-    GitAccessorOptions opts{.exportIgnore = true, .smudgeLfs = false};
+    auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
+    auto opts = makeZoneAccessorOptions(repo, commitHash, std::string(zonePath));
     auto accessor = repo->getAccessor(treeSha, opts, "zone");
 
     // Generate name from zone path (sanitized for store path requirements)
@@ -947,8 +960,9 @@ StorePath EvalState::getZoneFromCheckout(std::string_view zonePath, const boost:
 
     auto makeDirtyAccessor = [&]() -> ref<SourceAccessor> {
         auto repo = getWorldRepo();
-        auto baseAccessor = repo->getAccessor(
-            getWorldTreeSha(zone), {.exportIgnore = true, .smudgeLfs = false}, "zone");
+        auto commitHash = Hash::parseNonSRIUnprefixed(requireTectonixGitSha(), HashAlgorithm::SHA1);
+        auto zoneOpts = makeZoneAccessorOptions(repo, commitHash, zone);
+        auto baseAccessor = repo->getAccessor(getWorldTreeSha(zone), zoneOpts, "zone");
         boost::unordered_flat_set<std::string> zoneDirtyFiles;
         if (dirtyFiles) {
             auto zonePrefix = zone + "/";

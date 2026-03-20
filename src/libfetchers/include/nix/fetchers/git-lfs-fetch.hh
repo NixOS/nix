@@ -24,16 +24,12 @@ struct Pointer
 
 struct Fetch
 {
-    // Reference to the repository
     const git_repository * repo;
-
-    // Git commit being fetched
     git_oid rev;
-
-    // derived from git remote url
     nix::ParsedURL url;
+    std::string attrPathPrefix;
 
-    Fetch(git_repository * repo, git_oid rev);
+    Fetch(git_repository * repo, git_oid rev, std::string attrPathPrefix = "");
     bool shouldFetch(const CanonPath & path) const;
     void fetch(
         const std::string & content,

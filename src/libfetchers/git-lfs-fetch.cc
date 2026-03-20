@@ -1,6 +1,7 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/base-n.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
 #include "nix/util/users.hh"
@@ -52,6 +53,14 @@ struct LfsApiInfo
 
 } // namespace
 
+static std::string lfsEndpointUrl(const ParsedURL & url)
+{
+    auto endpoint = url.to_string();
+    if (!endpoint.ends_with(".git"))
+        endpoint += ".git";
+    return endpoint + "/info/lfs";
+}
+
 static LfsApiInfo getLfsApi(const ParsedURL & url)
 {
     assert(url.authority.has_value());
@@ -88,8 +97,38 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
 
         return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
     }
+    else {
+        std::ostringstream inputCredDescr;
+        inputCredDescr << "protocol=" << url.scheme << "\n";
+        inputCredDescr << "host=" << url.authority->host << "\n";
+        inputCredDescr << "path=" << url.renderPath(true) << "\n";
 
-    return {url.to_string() + "/info/lfs", std::nullopt};
+        auto [status, output] = runProgram({.program = "git", .args = {"credential", "fill"}, .input = std::move(inputCredDescr).str()});
+
+        if (output.empty())
+            throw Error("git-credential-fill: no output (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
+
+        std::string username;
+        std::string password;
+        for (auto & line : tokenizeString<Strings>(output, "\n")) {
+            auto eq = line.find('=');
+            if (eq == std::string::npos)
+                continue;
+            auto key = line.substr(0, eq);
+            auto val = line.substr(eq + 1);
+            if (key == "username")
+                username = val;
+            else if (key == "password")
+                password = val;
+        }
+
+        if (username.empty() || password.empty())
+            throw Error("git-credential-fill: no credentials returned (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
+
+        return {lfsEndpointUrl(url), "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
+    }
+
+    return {lfsEndpointUrl(url), std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
@@ -173,10 +212,11 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
     return std::make_optional(Pointer{oid, std::stoul(size)});
 }
 
-Fetch::Fetch(git_repository * repo, git_oid rev)
+Fetch::Fetch(git_repository * repo, git_oid rev, std::string attrPathPrefix)
 {
     this->repo = repo;
     this->rev = rev;
+    this->attrPathPrefix = std::move(attrPathPrefix);
 
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
@@ -189,9 +229,10 @@ bool Fetch::shouldFetch(const CanonPath & path) const
     git_attr_options opts = GIT_ATTR_OPTIONS_INIT;
     opts.attr_commit_id = this->rev;
     opts.flags = GIT_ATTR_CHECK_INCLUDE_COMMIT | GIT_ATTR_CHECK_NO_SYSTEM;
-    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, path.rel_c_str(), "filter"))
+    auto fullPath = attrPathPrefix.empty() ? path : CanonPath("/" + attrPathPrefix) / path;
+    if (git_attr_get_ext(&attr, (git_repository *) (this->repo), &opts, fullPath.rel_c_str(), "filter"))
         throw Error("cannot get git-lfs attribute: %s", git_error_last()->message);
-    debug("Git filter for '%s' is '%s'", path, attr ? attr : "null");
+    debug("Git filter for '%s' is '%s'", fullPath, attr ? attr : "null");
     return attr != nullptr && !std::string(attr).compare("lfs");
 }
 
@@ -268,13 +309,26 @@ void Fetch::fetch(
         return;
     }
 
+    // Check the local git LFS object store before hitting the network
+    auto gitDir = std::filesystem::path(git_repository_commondir(repo));
+    auto localLfsPath = gitDir / "lfs" / "objects" / pointer->oid.substr(0, 2) / pointer->oid.substr(2, 2) / pointer->oid;
+    if (pathExists(localLfsPath)) {
+        debug("using local git lfs object %s", localLfsPath);
+        auto localContent = readFile(localLfsPath);
+        sizeCallback(localContent.length());
+        sink(localContent);
+        return;
+    }
+
     std::filesystem::path cacheDir = getCacheDir() / "git-lfs";
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
     std::filesystem::path cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
-        sink(readFile(cachePath));
+        auto cacheContent = readFile(cachePath);
+        sizeCallback(cacheContent.length());
+        sink(cacheContent);
         return;
     }
     debug("did not find cache entry for %s", key);
