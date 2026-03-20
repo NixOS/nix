@@ -310,7 +310,7 @@ void Fetch::fetch(
     }
 
     // Check the local git LFS object store before hitting the network
-    auto gitDir = std::filesystem::path(git_repository_path(repo));
+    auto gitDir = std::filesystem::path(git_repository_commondir(repo));
     auto localLfsPath = gitDir / "lfs" / "objects" / pointer->oid.substr(0, 2) / pointer->oid.substr(2, 2) / pointer->oid;
     if (pathExists(localLfsPath)) {
         debug("using local git lfs object %s", localLfsPath);
@@ -326,7 +326,9 @@ void Fetch::fetch(
     std::filesystem::path cachePath = cacheDir / key;
     if (pathExists(cachePath)) {
         debug("using cache entry %s -> %s", key, cachePath);
-        sink(readFile(cachePath));
+        auto cacheContent = readFile(cachePath);
+        sizeCallback(cacheContent.length());
+        sink(cacheContent);
         return;
     }
     debug("did not find cache entry for %s", key);
