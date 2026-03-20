@@ -953,7 +953,12 @@ struct curlFileTransfer : public FileTransfer
     curlFileTransfer(const FileTransferSettings & settings)
         : settings(settings)
         , mt19937(rd())
-        , maxQueueSize(settings.httpConnections.get() * 5)
+        , maxQueueSize([&]() -> std::size_t {
+            if (settings.httpConnections.get())
+                return settings.httpConnections.get() * 5;
+            /* Zero means unlimited. See https://curl.se/libcurl/c/CURLMOPT_MAX_TOTAL_CONNECTIONS.html. */
+            return std::numeric_limits<std::size_t>::max();
+        }())
     {
         static std::once_flag globalInit;
         std::call_once(globalInit, curl_global_init, CURL_GLOBAL_ALL);
