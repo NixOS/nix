@@ -1,5 +1,6 @@
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/build.hh"
 #include "nix/store/build-result.hh"
 #include <iostream>
 
@@ -24,7 +25,7 @@ int main(int argc, char ** argv)
         std::vector<DerivedPath> paths{DerivedPath::Built{
             .drvPath = makeConstantStorePathRef(store->parseStorePath(drvPath)), .outputs = OutputsSpec::Names{"out"}}};
 
-        const auto results = store->buildPathsWithResults(paths, bmNormal, store);
+        const auto results = getDefaultBuilder(*store)->buildPathsWithResults(paths, bmNormal);
 
         for (const auto & result : results) {
             if (auto * successP = result.tryGetSuccess()) {

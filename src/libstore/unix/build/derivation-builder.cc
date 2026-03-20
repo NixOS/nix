@@ -8,7 +8,6 @@
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
-#include "nix/store/daemon.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
@@ -1195,10 +1194,9 @@ void DerivationBuilderImpl::startDaemon()
 
             debug("received daemon connection");
 
-            auto workerThread = std::thread([store, remote{std::move(remote)}]() {
+            auto workerThread = std::thread([this, store, remote{std::move(remote)}]() {
                 try {
-                    daemon::processConnection(
-                        store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
+                    miscMethods->processDaemonConnection(store, FdSource(remote.get()), FdSink(remote.get()), *this);
                     debug("terminated daemon connection");
                 } catch (const Interrupted &) {
                     debug("interrupted daemon connection");
