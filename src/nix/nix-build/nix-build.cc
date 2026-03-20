@@ -28,6 +28,7 @@
 #include "nix/util/users.hh"
 #include "nix/cmd/network-proxy.hh"
 #include "nix/cmd/compatibility-settings.hh"
+#include "nix/store/build.hh"
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
 
@@ -451,7 +452,7 @@ static void main_nix_build(int argc, char ** argv)
             printMissing(ref<Store>(store), paths);
 
         if (!dryRun)
-            store->buildPaths(paths, buildMode, evalStore);
+            nix::getDefaultBuilder(store, evalStore)->buildPaths(paths, buildMode);
     };
 
     if (isNixShell) {

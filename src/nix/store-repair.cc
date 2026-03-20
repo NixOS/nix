@@ -1,5 +1,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 
 namespace nix {
 
@@ -20,7 +21,7 @@ struct CmdStoreRepair : StorePathsCommand
     void run(ref<Store> store, StorePaths && storePaths) override
     {
         for (auto & path : storePaths)
-            store->repairPath(path);
+            getDefaultBuilder(store)->repairPath(path);
     }
 };
 

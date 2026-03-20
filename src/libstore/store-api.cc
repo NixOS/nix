@@ -6,6 +6,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/util/util.hh"
@@ -734,7 +735,7 @@ void Store::substitutePaths(const StorePathSet & paths)
             std::vector<DerivedPath> subs;
             for (auto & p : missing.willSubstitute)
                 subs.emplace_back(DerivedPath::Opaque{p});
-            buildPaths(subs);
+            nix::getDefaultBuilder(*this)->buildPaths(subs, bmNormal);
         } catch (Error & e) {
             logWarning(e.info());
         }
@@ -1176,7 +1177,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
-    ensurePath(drvPath);
+    nix::getDefaultBuilder(*this)->ensurePath(drvPath);
     return readDerivation(drvPath);
 }
 

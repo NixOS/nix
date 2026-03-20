@@ -2,6 +2,7 @@
 #include "nix/cmd/command-installable-value.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/globals.hh"
@@ -111,7 +112,7 @@ struct CmdBundle : InstallableValueCommand
 
         auto outPath = evalState->coerceToStorePath(attr2->pos, *attr2->value, context2, "");
 
-        store->buildPaths({
+        getDefaultBuilder(store)->buildPaths({
             DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(drvPath),
                 .outputs = OutputsSpec::All{},
