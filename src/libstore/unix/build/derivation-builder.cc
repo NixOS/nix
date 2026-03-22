@@ -2110,6 +2110,24 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
         useSandbox = false;
     }
 
+    const auto & binfmtMiscMap = localSettings.binfmtMisc.get();
+    auto binfmtMiscGot = binfmtMiscMap.find(params.drv.platform);
+
+    if (!useSandbox && binfmtMiscGot != binfmtMiscMap.end()) {
+        if (localSettings.sandboxMode == smRelaxed) {
+            assert(params.drvOptions.noChroot);
+            throw Error(
+                "Derivation '%s' has '__noChroot' set, but its platform '%s' has binfmt-misc configuration. This is not supported.",
+                store.printStorePath(params.drvPath),
+                params.drv.platform);
+        } else {
+            assert(localSettings.sandboxMode == smDisabled);
+            throw Error(
+                "Derivation '%s' is for platform '%s', which has binfmt-misc configuration, but 'sandbox' is set to 'false'. This is not supported.",
+                store.printStorePath(params.drvPath),
+                params.drv.platform);
+        }
+    }
 #endif
 
     if (!useSandbox && params.drvOptions.useUidRange(params.drv))

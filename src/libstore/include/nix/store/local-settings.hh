@@ -713,6 +713,63 @@ public:
      * derivation, or else returns a null pointer.
      */
     const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
+
+    Setting<StringMap> binfmtMisc{
+        this,
+        {},
+        "binfmt-misc",
+        R"(
+          *Linux only*
+
+          A list of items, each in the form `platform=file` or `platform=`,
+          where `platform` is the name of the platform this item applies to, and
+          `file` is the path to a file in the format documented in Systemd
+          [binfmt.d(5)]. Namely, it should be a file where each line is in the
+          format expected by `/proc/sys/fs/binfmt_misc/register`, except that
+          leading and trailing whitespace is removed, and empty lines and lines
+          starting with `;` or `#` are ignored. See [Linux documentation on binfmt\_misc]
+          for details.
+
+          [Linux documentation on binfmt\_misc]: https://docs.kernel.org/admin-guide/binfmt-misc.html
+          [binfmt.d(5)]: https://freedesktop.org/software/systemd/man/latest/binfmt.d.html
+
+          When building a derivation, if the platform of this derivation is
+          configured in the `binfmt-misc` setting, then the build runs with
+          binfmt\_misc configured with and only with the interpreters from the
+          configuration file. If the file is not specified, the build runs with
+          no binfmt\_misc interpreters.
+
+          This allows Nix to build derivations that are otherwise meant for
+          foreign platforms using emulators. Also, on systems with binfmt\_misc
+          interpreters configured globally, this also allows Nix to opt out of
+          them while building derivations of the native platform, which improves
+          purity of cross compilation. Note that in order for Nix to accept
+          building a derivation of a foreign platform, the platform must also be
+          added to the [`extra-platforms`](#conf-extra-platforms) setting. Also
+          note that it is not possible to deny running programs for the native
+          platform while building for an emulated foreign platform, although
+          this should rarely be an issue.
+
+          This setting only applies to sandboxed builds on Linux. On non-Linux
+          platforms, it is silently ignored. For non-sandboxed builds, If the
+          derivation's platform is configured in this setting, the build fails.
+          See also the [`sandbox`](#conf-sandbox) setting.
+
+          The binfmt\_misc interpreters are set up in such a way that if the `F`
+          flag is used, then the interpreter path is taken as the path outside
+          the build sandbox; otherwise, the path is resolved as executables are
+          run, inside the build sandbox. It is recommended that the interpreter
+          be statically linked and not otherwise depend on extra files, and the
+          flag `F` be set. If this is not possible, then paths of all required
+          files need to be added to [`sandbox-paths`](#conf-sandbox-paths). It
+          is also recommended that the flags `P`, `O` be set and supported by
+          the interpreter. (See the Linux kernel documentation for the meaning
+          and use of these flags.)
+
+          This feature requires Linux kernel version 6.7 or later. If your
+          system does not have the necessary features available, building a
+          derivation where the platform is configured in this setting fails.
+        )"};
 };
 
 } // namespace nix
