@@ -15,14 +15,16 @@ paths as valid in the local Nix store.
 The input consists of a sequence of records, one per store path. Each
 record has the following format:
 
-- path
-- nar-hash
-- nar-size
-- deriver
-- number-of-references
-- reference-1
-- ...
-- reference-n
+```
+path
+nar-hash
+nar-size
+deriver
+number-of-references
+reference-1
+...
+reference-n
+```
 
 Here, *path* is the store path to register. *nar-hash* is the SHA-256
 hash of the path’s NAR serialisation, and *nar-size* is the size of the
