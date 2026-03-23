@@ -25,7 +25,7 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
     auto p = s.find("-link");
     if (p == std::string::npos)
         return {};
-    if (auto n = string2Int<unsigned int>(s.substr(0, p)))
+    if (auto n = string2Int<GenerationNumber>(s.substr(0, p)))
         return *n;
     else
         return {};
