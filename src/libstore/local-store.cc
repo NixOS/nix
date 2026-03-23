@@ -40,6 +40,7 @@
 #  include <sched.h>
 #  include <sys/statvfs.h>
 #  include <sys/mount.h>
+#  include "nix/util/linux-namespaces.hh"
 #endif
 
 #ifdef __CYGWIN__
@@ -613,6 +614,12 @@ void LocalStore::makeStoreWritable()
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
+        if (!havePrivateMountNamespace())
+            warn(
+                "the Nix store is read-only and I couldn't set up a private mount namespace, "
+                "so remounting it writable will affect the host mount table too. "
+                "If you're running inside a container or user namespace, that's likely why.");
+
         /* In a user namespace, mount flags like `nodev` and `nosuid` are
            locked and dropping them causes `EPERM`, so here we translate each
            `statvfs` flag to the corresponding `mount` flag individually. */
