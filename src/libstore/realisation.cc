@@ -38,9 +38,14 @@ std::string UnkeyedRealisation::fingerprint(const DrvOutput & key) const
     return serialised.dump();
 }
 
+Signature UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer) const
+{
+    return signer.signDetached(fingerprint(key));
+}
+
 void UnkeyedRealisation::sign(const DrvOutput & key, const Signer & signer)
 {
-    signatures.insert(signer.signDetached(fingerprint(key)));
+    signatures.insert(std::as_const(*this).sign(key, signer));
 }
 
 bool UnkeyedRealisation::checkSignature(
