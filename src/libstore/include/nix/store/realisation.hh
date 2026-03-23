@@ -65,6 +65,14 @@ struct UnkeyedRealisation
 
     std::string fingerprint(const DrvOutput & key) const;
 
+    /**
+     * Returns a signature but does not modify the stored signatures
+     */
+    Signature sign(const DrvOutput & key, const Signer &) const;
+
+    /**
+     * Inserts the new signature into the set of stored ones
+     */
     void sign(const DrvOutput & key, const Signer &);
 
     bool checkSignature(const DrvOutput & key, const PublicKeys & publicKeys, const Signature & sig) const;
