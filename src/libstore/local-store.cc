@@ -37,9 +37,7 @@
 #endif
 
 #ifdef __linux__
-#  include <sched.h>
-#  include <sys/statvfs.h>
-#  include <sys/mount.h>
+#  include "nix/util/linux-namespaces.hh"
 #endif
 
 #ifdef __CYGWIN__
@@ -607,37 +605,7 @@ void LocalStore::makeStoreWritable()
 #ifdef __linux__
     if (!isRootUser())
         return;
-    /* Check if /nix/store is on a read-only mount. */
-    struct statvfs stat;
-    if (statvfs(config->realStoreDir.get().c_str(), &stat) != 0)
-        throw SysError("getting info about the Nix store mount point");
-
-    if (stat.f_flag & ST_RDONLY) {
-        /* In a user namespace, mount flags like `nodev` and `nosuid` are
-           locked and dropping them causes `EPERM`, so here we translate each
-           `statvfs` flag to the corresponding `mount` flag individually. */
-        unsigned long flags = MS_REMOUNT | MS_BIND;
-        if (stat.f_flag & ST_NODEV)
-            flags |= MS_NODEV;
-        if (stat.f_flag & ST_NOSUID)
-            flags |= MS_NOSUID;
-        if (stat.f_flag & ST_NOEXEC)
-            flags |= MS_NOEXEC;
-        if (stat.f_flag & ST_NOATIME)
-            flags |= MS_NOATIME;
-        if (stat.f_flag & ST_NODIRATIME)
-            flags |= MS_NODIRATIME;
-        if (stat.f_flag & ST_RELATIME)
-            flags |= MS_RELATIME;
-        if (stat.f_flag & ST_SYNCHRONOUS)
-            flags |= MS_SYNCHRONOUS;
-#  ifdef ST_NOSYMFOLLOW
-        if (stat.f_flag & ST_NOSYMFOLLOW)
-            flags |= MS_NOSYMFOLLOW;
-#  endif
-        if (mount(0, config->realStoreDir.get().c_str(), "none", flags, 0) == -1)
-            throw SysError("remounting %s writable", PathFmt(config->realStoreDir.get()));
-    }
+    remountReadOnlyWritable(config->realStoreDir.get());
 #endif
 }
 

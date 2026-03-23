@@ -11,6 +11,7 @@
 #include "nix/util/cgroup.hh"
 
 #include <sys/mount.h>
+#include <sys/statvfs.h>
 
 namespace nix {
 
@@ -94,6 +95,7 @@ bool mountAndPidNamespacesSupported()
 
 static AutoCloseFD fdSavedMountNamespace;
 static AutoCloseFD fdSavedRoot;
+static bool havePrivateMountNs = false;
 
 void saveMountNamespace()
 {
@@ -107,8 +109,65 @@ void saveMountNamespace()
     });
 }
 
+void tryEnterPrivateMountNamespace()
+{
+    try {
+        saveMountNamespace();
+        if (unshare(CLONE_NEWNS) == -1)
+            throw SysError("setting up a private mount namespace");
+        havePrivateMountNs = true;
+    } catch (Error & e) {
+        debug("failed to set up a private mount namespace: %s", e.message());
+    }
+}
+
+void remountReadOnlyWritable(const std::filesystem::path & path)
+{
+    struct statvfs stat;
+    if (statvfs(path.c_str(), &stat) != 0)
+        throw SysError("getting mount info for %s", PathFmt(path));
+
+    if (!(stat.f_flag & ST_RDONLY))
+        return;
+
+    if (!havePrivateMountNs)
+        throw Error(
+            "cannot remount %s writable: not in a private mount namespace, "
+            "so the remount would affect the host mount table. "
+            "This usually happens inside containers or user namespaces where unshare(CLONE_NEWNS) is not permitted",
+            PathFmt(path));
+
+    /* In a user namespace, mount flags like `nodev` and `nosuid` are
+       locked and dropping them causes `EPERM`, so here we translate each
+       `statvfs` flag to the corresponding `mount` flag individually. */
+    unsigned long flags = MS_REMOUNT | MS_BIND;
+    if (stat.f_flag & ST_NODEV)
+        flags |= MS_NODEV;
+    if (stat.f_flag & ST_NOSUID)
+        flags |= MS_NOSUID;
+    if (stat.f_flag & ST_NOEXEC)
+        flags |= MS_NOEXEC;
+    if (stat.f_flag & ST_NOATIME)
+        flags |= MS_NOATIME;
+    if (stat.f_flag & ST_NODIRATIME)
+        flags |= MS_NODIRATIME;
+    if (stat.f_flag & ST_RELATIME)
+        flags |= MS_RELATIME;
+    if (stat.f_flag & ST_SYNCHRONOUS)
+        flags |= MS_SYNCHRONOUS;
+#ifdef ST_NOSYMFOLLOW
+    if (stat.f_flag & ST_NOSYMFOLLOW)
+        flags |= MS_NOSYMFOLLOW;
+#endif
+    if (mount(0, path.c_str(), "none", flags, 0) == -1)
+        throw SysError("remounting %s writable", PathFmt(path));
+}
+
 void restoreMountNamespace()
 {
+    if (!havePrivateMountNs)
+        return;
+
     try {
         auto savedCwd = std::filesystem::current_path();
 
