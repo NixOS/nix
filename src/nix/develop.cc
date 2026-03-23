@@ -383,7 +383,8 @@ struct Common : InstallableCommand, MixProfile
 
         /* Substitute occurrences of output paths. */
         auto outputs = buildEnvironment.vars.find("outputs");
-        assert(outputs != buildEnvironment.vars.end());
+        if (outputs == buildEnvironment.vars.end())
+            throw Error("derivation does not have an 'outputs' attribute");
 
         StringMap rewrites;
         if (buildEnvironment.providesStructuredAttrs()) {
