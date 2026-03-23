@@ -425,8 +425,8 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                     "cannot perform a sandboxed build because user namespaces are not enabled; check /proc/sys/user/max_user_namespaces");
         }
 
-        /* Now that we now the sandbox uid, we can write
-           /etc/passwd. */
+        /* Now that we know the sandbox uid/gid, we can write
+           /etc/passwd and /etc/group. */
         writeFile(
             chrootRootDir / "etc" / "passwd",
             fmt("root:x:0:0:Nix build user:%3%:/noshell\n"
@@ -435,6 +435,13 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 sandboxUid(),
                 sandboxGid(),
                 store.config->getLocalSettings().sandboxBuildDir));
+
+        writeFile(
+            chrootRootDir / "etc" / "group",
+            fmt("root:x:0:\n"
+                "nixbld:!:%1%:\n"
+                "nogroup:x:65534:\n",
+                sandboxGid()));
 
         /* Save the mount- and user namespace of the child. We have to do this
          *before* the child does a chroot. */
