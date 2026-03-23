@@ -14,6 +14,7 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
 
 #include <algorithm>
@@ -143,7 +144,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
                 auto outMap = [&] {
                     for (auto * drvStore : {&worker.evalStore, &worker.store})
                         if (drvStore->isValidPath(depDrvPath))
-                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
                     assert(false);
                 }();
 
@@ -1275,7 +1276,7 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,
-                    .status = PathStatus::Valid,
+                    .status = worker.store.isValidPath(real->outPath) ? PathStatus::Valid : PathStatus::Absent,
                 };
             } else if (info.known && info.known->isValid()) {
                 // We know the output because it's a static output of the

@@ -23,10 +23,15 @@ copyAttr () {
     shift; shift
     local args=("-f" "./content-addressed.nix" "$derivationPath" --arg seed "$seedValue")
     args+=("$@")
-    # Note: to copy CA derivations, we need to copy the realisations, which
-    # currently requires naming the installables, not just the derivation output
-    # path.
 
+    # Build the outputs first so all NARs are in the store.
+    nix-build "./content-addressed.nix" -A "$derivationPath" --arg seed "$seedValue" --no-out-link
+
+    # TODO: we shouldn't need to copy the entire build closure like this.
+    # After #11928, it should be fine to use a realization referring to an
+    # output that is not uploaded. But until then, it isn't, so we need to
+    # make sure the intermediate shallow realizations have intermediate objects with them,
+    nix --extra-experimental-features nix-command copy --to "file://$cacheDir" --all --no-require-sigs
     nix copy --to "file://$cacheDir" "${args[@]}"
 }
 
@@ -36,7 +41,7 @@ testRemoteCacheFor () {
     copyAttr "$derivationPath" 1
     clearStore
     # Check nothing gets built.
-    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir" --no-require-sigs |& grepQuietInverse " will be built:"
+    buildAttr "$derivationPath" 1 --option substituters "file://$cacheDir?trusted=1" --no-require-sigs -j0
 }
 
 testRemoteCache () {

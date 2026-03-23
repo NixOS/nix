@@ -7,6 +7,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/util/util.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
@@ -441,6 +442,17 @@ std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivat
     return outputs;
 }
 
+std::optional<StorePath>
+Store::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
+{
+    auto drv = readInvalidDerivation(path);
+    auto outputs = drv.outputsAndOptPaths(*this);
+    auto it = outputs.find(outputName);
+    if (it == outputs.end())
+        throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
+    return it->second.second;
+}
+
 std::map<std::string, std::optional<StorePath>>
 Store::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore_)
 {
@@ -452,17 +464,7 @@ Store::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore
         return outputs;
 
     auto drv = evalStore.readInvalidDerivation(path);
-    for (auto & [outputName, _] : drv.outputs) {
-        auto realisation = queryRealisation(DrvOutput{path, outputName});
-        if (realisation) {
-            outputs.insert_or_assign(outputName, realisation->outPath);
-        } else {
-            // queryStaticPartialDerivationOutputMap is not guaranteed
-            // to return std::nullopt for outputs which are not
-            // statically known.
-            outputs.insert({outputName, std::nullopt});
-        }
-    }
+    queryPartialDerivationOutputMapCA(*this, path, drv, outputs);
 
     return outputs;
 }
@@ -481,7 +483,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * ev
 
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
-    auto outputMap = this->queryDerivationOutputMap(path);
+    auto outputMap = nix::deepQueryDerivationOutputMap(*this, path);
     StorePathSet outputPaths;
     for (auto & i : outputMap) {
         outputPaths.emplace(std::move(i.second));
@@ -977,11 +979,16 @@ std::map<StorePath, StorePath> copyPaths(
     StorePathSet storePaths;
     std::vector<const Realisation *> realisations;
     for (auto & path : paths) {
-        storePaths.insert(path.path());
-        if (auto * realisation = std::get_if<Realisation>(&path.raw)) {
-            experimentalFeatureSettings.require(Xp::CaDerivations);
-            realisations.push_back(realisation);
-        }
+        std::visit(
+            overloaded{
+                [&](const Realisation & realisation) {
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
+                    realisations.push_back(&realisation);
+                    storePaths.insert(realisation.outPath);
+                },
+                [&](const OpaquePath & op) { storePaths.insert(op.path); },
+            },
+            path.raw);
     }
 
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
@@ -1106,9 +1113,7 @@ void copyClosure(
 
     StorePathSet closure0;
     for (auto & path : paths) {
-        if (auto * opaquePath = std::get_if<OpaquePath>(&path.raw)) {
-            closure0.insert(opaquePath->path);
-        }
+        closure0.insert(path.path());
     }
 
     StorePathSet closure1;

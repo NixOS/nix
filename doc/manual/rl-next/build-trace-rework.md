@@ -8,6 +8,8 @@ The experimental content-addressed (CA) derivation feature has undergone a signi
 
 ### What changed
 
+#### Build trace format
+
 Previously, a build trace entry (realisation) was keyed by the **hash modulo** of the derivation.
 A SHA-256 hash computed via the complex "derivation hash modulo" algorithm.
 This required implementations to understand ATerm serialisation and the full derivation hashing scheme just to look up or store build results.
@@ -26,6 +28,13 @@ The key is now:
 
 This is simpler, more intuitive, and means that third-party tools implementing CA derivation support (e.g., Hydra)
 no longer need to implement the derivation hash modulo algorithm.
+
+#### Build trace usage
+
+Previously the build trace contained entries for both unresolved and [resolved](@docroot@/store/resolution.md) derivations.
+Now, it only contains entries for resolved derivations.
+For now, unresolved derivations will be resolved from these underlying build trace entries.
+This is slower, but avoids a bunch of correctness issues.
 
 ### Binary cache protocol
 
@@ -63,6 +72,12 @@ Non-CA builds are unaffected.
 
 Stable code paths do use the realization fields (`BuildResult::Success::builtOutputs`), but only the output name and outpath parts of that.
 For older protocols, we can fake enough of the realisation format to provide those two parts forthat map, which keeps operations like `--print-output-paths` working.
+
+### Local Store SQLite schema
+
+The build trace entries no longer have any foreign key store objects in the store.
+This is because we will need to remember the build trace entries for resolved derivations we may have deleted, otherwise we will effectively forget outputs resolved derivations we do have on disk.
+GC for build trace will be implemented later --- there is no single correct choice (there is no closure property) so it will be a question of what policies users want.
 
 ### Structured signatures
 

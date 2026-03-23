@@ -109,7 +109,6 @@ struct LocalStore::State::Stmts
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
-    SQLiteStmt QueryAllRealisedOutputs;
     SQLiteStmt QueryPathFromHashPart;
     SQLiteStmt QueryValidPaths;
 };
@@ -357,14 +356,14 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->RegisterRealisedOutput.create(
             state->db,
             R"(
-                insert into BuildTraceV2 (drvPath, outputName, outputPath, signatures)
-                values (?, ?, (select id from ValidPaths where path = ?), ?)
+                insert into BuildTraceV3 (drvPath, outputName, outputPath, signatures)
+                values (?, ?, ?, ?)
                 ;
             )");
         state->stmts->UpdateRealisedOutput.create(
             state->db,
             R"(
-                update BuildTraceV2
+                update BuildTraceV3
                     set signatures = ?
                 where
                     drvPath = ? and
@@ -374,17 +373,8 @@ LocalStore::LocalStore(ref<const Config> config)
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
-                select BuildTraceV2.id, Output.path, BuildTraceV2.signatures from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
+                select id, outputPath, signatures from BuildTraceV3
                     where drvPath = ? and outputName = ?
-                    ;
-            )");
-        state->stmts->QueryAllRealisedOutputs.create(
-            state->db,
-            R"(
-                select outputName, Output.path from BuildTraceV2
-                    inner join ValidPaths as Output on Output.id = BuildTraceV2.outputPath
-                    where drvPath = ?
                     ;
             )");
     }
@@ -603,7 +593,7 @@ void LocalStore::upgradeDBSchema(State & state)
 
     if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
         doUpgrade(
-            "20251016-ca-derivations",
+            "20251017-ca-derivations",
 #include "ca-specific-schema.sql.gen.hh"
         );
 
@@ -898,6 +888,27 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
 
         return outputs;
     });
+}
+
+std::optional<StorePath>
+LocalStore::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
+{
+    auto outputs = queryStaticPartialDerivationOutputMap(path);
+    auto it = outputs.find(outputName);
+    if (it == outputs.end()) {
+        /* Only throw if CA derivations is disabled, because then the
+           SQL table is complete.
+
+           With CA derivations enabled, derivations without static
+           outputs exist, this absence of a row in this table does not
+           mean the derivation doesn't have an output necessarily, just
+           that that it doesn't have an output with a known output path.
+          */
+        if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+            throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
+        return std::nullopt;
+    }
+    return it->second;
 }
 
 std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & hashPart)

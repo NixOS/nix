@@ -966,7 +966,10 @@ static void performOp(
     case WorkerProto::Op::QueryRealisation: {
         logger->startWork();
         auto outputId = WorkerProto::Serialise<DrvOutput>::read(*store, rconn);
-        std::optional<UnkeyedRealisation> info = *store->queryRealisation(outputId);
+        auto ptr = store->queryRealisation(outputId);
+        std::optional<UnkeyedRealisation> info;
+        if (ptr)
+            info = *ptr;
         logger->stopWork();
         /* Only return the new format because if we got past
            `DrvOutput` serialization, we know that is what we're using.
