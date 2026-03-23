@@ -469,6 +469,33 @@ TEST(parseURL, parsedUrlsWithUnescapedChars)
     EXPECT_EQ(url.query, query);
 }
 
+TEST(normalizeAuthorityLenientUserinfo, normalizesMultipleAtSigns)
+{
+    auto normalized = normalizeAuthorityLenientUserinfo("deploy@device-2c-cf-67-db-54-61@gateway.example.org");
+
+    ASSERT_TRUE(normalized.has_value());
+    EXPECT_EQ(*normalized, "deploy%40device-2c-cf-67-db-54-61@gateway.example.org");
+
+    auto authority = ParsedURL::Authority::parse(*normalized);
+    ASSERT_TRUE(authority.user.has_value());
+    EXPECT_EQ(*authority.user, "deploy@device-2c-cf-67-db-54-61");
+    EXPECT_EQ(authority.host, "gateway.example.org");
+}
+
+TEST(normalizeAuthorityLenientUserinfo, normalizesNonWhitespaceInvalidChars)
+{
+    auto normalized = normalizeAuthorityLenientUserinfo("user#name@example.org");
+
+    ASSERT_TRUE(normalized.has_value());
+    EXPECT_EQ(*normalized, "user%23name@example.org");
+}
+
+TEST(normalizeAuthorityLenientUserinfo, rejectsWhitespaceInUserinfo)
+{
+    auto normalized = normalizeAuthorityLenientUserinfo("deploy user@gateway.example.org");
+    EXPECT_EQ(normalized, std::nullopt);
+}
+
 TEST(parseURL, parseFTPUrl)
 {
     auto s = "ftp://ftp.nixos.org/downloads/nixos.iso";

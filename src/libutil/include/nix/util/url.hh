@@ -259,6 +259,17 @@ std::string percentDecode(std::string_view in);
 std::string percentEncode(std::string_view s, std::string_view keep = "");
 
 /**
+ * Back-compatibility normalization for URL authorities with non-standard
+ * userinfo.
+ *
+ * Attempts to split userinfo/host at the last `@`, normalize userinfo into
+ * RFC3986 form, and validate with strict authority parsing.
+ *
+ * Returns normalized encoded authority on success.
+ */
+std::optional<std::string> normalizeAuthorityLenientUserinfo(std::string_view encodedAuthority);
+
+/**
  * Render URL path segments to a string by joining with `/`.
  * Does not percent-encode the segments.
  */
