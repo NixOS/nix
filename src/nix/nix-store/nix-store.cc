@@ -20,6 +20,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/error.hh"
 #include "nix/store/gc-store.hh"
+#include "nix/store/build.hh"
 
 #include "man-pages.hh"
 
@@ -78,7 +79,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
 
     if (path.path.isDerivation()) {
         if (build)
-            store->buildPaths({path.toDerivedPath()});
+            getDefaultBuilder(ref<Store>(store))->buildPaths({path.toDerivedPath()});
         auto outputPaths = store->queryDerivationOutputMap(path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
@@ -115,7 +116,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
 
     else {
         if (build)
-            store->ensurePath(path.path);
+            getDefaultBuilder(ref<Store>(store))->ensurePath(path.path);
         else if (!store->isValidPath(path.path))
             throw Error("path '%s' does not exist and cannot be created", store->printStorePath(path.path));
         if (store2) {
@@ -175,7 +176,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
         return;
 
     /* Build all paths at the same time to exploit parallelism. */
-    store->buildPaths(toDerivedPaths(paths), buildMode);
+    getDefaultBuilder(ref<Store>(store))->buildPaths(toDerivedPaths(paths), buildMode);
 
     if (!ignoreUnknown)
         for (auto & i : paths) {
@@ -861,7 +862,7 @@ static void opRepairPath(Strings opFlags, Strings opArgs)
         throw UsageError("no flags expected");
 
     for (auto & i : opArgs)
-        store->repairPath(store->followLinksToStorePath(i));
+        getDefaultBuilder(ref<Store>(store))->repairPath(store->followLinksToStorePath(i));
 }
 
 /* Optimise the disk space usage of the Nix store by hard-linking
@@ -1008,7 +1009,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 #ifndef _WIN32 // TODO figure out if Windows needs something similar
                 MonitorFdHup monitor(in.fd);
 #endif
-                store->buildPaths(toDerivedPaths(paths));
+                getDefaultBuilder(ref<Store>(store))->buildPaths(toDerivedPaths(paths));
                 out << 0;
             } catch (Error & e) {
                 assert(e.info().status);
@@ -1031,7 +1032,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 #ifndef _WIN32 // TODO figure out if Windows needs something similar
             MonitorFdHup monitor(in.fd);
 #endif
-            auto status = store->buildDerivation(drvPath, drv);
+            auto status = getDefaultBuilder(ref<Store>(store))->buildDerivation(drvPath, drv);
 
             ServeProto::write(*store, wconn, status);
             break;

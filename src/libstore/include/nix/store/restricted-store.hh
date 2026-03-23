@@ -5,8 +5,10 @@
 
 namespace nix {
 
+struct Builder;
 class LocalStore;
 struct LocalStoreConfig;
+class Worker;
 
 /**
  * A restricted store has a pointer to one of these, which manages the
@@ -75,5 +77,11 @@ protected:
  * Create a shared pointer to a restricted store.
  */
 ref<Store> makeRestrictedStore(ref<LocalStoreConfig> config, ref<LocalStore> next, RestrictionContext & context);
+
+/**
+ * Create a builder that wraps an inner builder, adding restriction
+ * checks and dependency tracking for recursive Nix builds.
+ */
+ref<Builder> makeRestrictedBuilder(Worker & inner, RestrictionContext & context);
 
 } // namespace nix

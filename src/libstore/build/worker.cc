@@ -16,15 +16,15 @@
 
 namespace nix {
 
-Worker::Worker(Store & store, Store & evalStore)
+Worker::Worker(ref<Store> store, ref<Store> evalStore)
     : act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
 #ifdef _WIN32
     , ioport{CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)}
 #endif
-    , store(store)
-    , evalStore(evalStore)
+    , destStore(std::move(store))
+    , srcStore(std::move(evalStore))
     , settings(nix::settings.getWorkerSettings())
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
