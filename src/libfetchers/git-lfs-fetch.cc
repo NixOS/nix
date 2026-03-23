@@ -142,6 +142,9 @@ static std::string getLfsEndpointUrl(git_repository * repo)
         if (!git_config_get_entry(Setter(entry), config.get(), "lfs.url")) {
             auto value = std::string(entry->value);
             if (!value.empty()) {
+                const std::string suffix = "/info/lfs";
+                if (value.ends_with(suffix))
+                    value.resize(value.size() - suffix.size());
                 debug("Found explicit lfs.url value: %s", value);
                 return value;
             }
