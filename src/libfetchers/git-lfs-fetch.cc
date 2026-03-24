@@ -53,14 +53,6 @@ struct LfsApiInfo
 
 } // namespace
 
-static std::string lfsEndpointUrl(const ParsedURL & url)
-{
-    auto endpoint = url.to_string();
-    if (!endpoint.ends_with(".git"))
-        endpoint += ".git";
-    return endpoint + "/info/lfs";
-}
-
 static LfsApiInfo getLfsApi(const ParsedURL & url)
 {
     assert(url.authority.has_value());
@@ -95,7 +87,12 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         if (authIt == headerIt->end())
             throw Error("no Authorization in git-lfs-authenticate response");
 
-        return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
+        auto href = url.to_string();
+        auto hrefIt = queryResp.find("href");
+        if (hrefIt != queryResp.end())
+            href = hrefIt->get<std::string>();
+
+        return {href, authIt->get<std::string>()};
     }
     else {
         std::ostringstream inputCredDescr;
@@ -125,10 +122,10 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         if (username.empty() || password.empty())
             throw Error("git-credential-fill: no credentials returned (cmd: 'git credential fill' for protocol=%s, host=%s, path=%s)", url.scheme, url.authority->host, url.renderPath(true));
 
-        return {lfsEndpointUrl(url), "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
+        return {url.to_string(), "Basic " + base64::encode(std::as_bytes(std::span<const char>{username + ":" + password}))};
     }
 
-    return {lfsEndpointUrl(url), std::nullopt};
+    return {url.to_string(), std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
@@ -137,7 +134,7 @@ typedef std::unique_ptr<git_config_entry, Deleter<git_config_entry_free>> GitCon
 static std::string getLfsEndpointUrl(git_repository * repo)
 {
     GitConfig config;
-    if (git_repository_config(Setter(config), repo)) {
+    if (!git_repository_config(Setter(config), repo)) {
         GitConfigEntry entry;
         if (!git_config_get_entry(Setter(entry), config.get(), "lfs.url")) {
             auto value = std::string(entry->value);
@@ -149,14 +146,18 @@ static std::string getLfsEndpointUrl(git_repository * repo)
     }
 
     git_remote * remote = nullptr;
-    if (git_remote_lookup(&remote, repo, "origin"))
-        return "";
+    if (!git_remote_lookup(&remote, repo, "origin")) {
+        const char * url_c_str = git_remote_url(remote);
+        if (url_c_str) {
+            auto remote = std::string(url_c_str);
+            if (remote.ends_with(".git"))
+                return remote + "/info/lfs";
+            else
+                return remote + ".git/info/lfs";
+        }
+    }
 
-    const char * url_c_str = git_remote_url(remote);
-    if (!url_c_str)
-        return "";
-
-    return std::string(url_c_str);
+    return "";
 }
 
 static std::optional<Pointer> parseLfsPointer(std::string_view content, std::string_view filename)
