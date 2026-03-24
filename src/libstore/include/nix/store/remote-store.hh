@@ -122,6 +122,8 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void addTempRoot(const StorePath & path) override;
 
+    std::shared_ptr<const ValidPathInfo> addTempRootReturningPathInfo(const StorePath & path) override;
+
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
