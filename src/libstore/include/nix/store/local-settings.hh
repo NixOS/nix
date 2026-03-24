@@ -651,41 +651,47 @@ public:
         {},
         "external-builders",
         R"(
-          Helper programs that execute derivations.
+          Helper programs for building derivations, specified in JSON format, e.g.
 
-          The program is passed a JSON document that describes the build environment as the final argument.
+          ```json
+          [ {"systems": ["aarch64-linux"], "program": "/path/to/helper", "args": ["bla"]} ]
+          ```
+
+          Whenever Nix needs to build a derivation for a system contained in *systems*, it will invoke *program* with the command line arguments *args*, and an additional argument containing the path of a JSON document that describes the build environment.
           The JSON document looks like this:
 
-            {
-              "args": [
-                "-e",
-                "/nix/store/vj1c3wf9…-source-stdenv.sh",
-                "/nix/store/shkw4qm9…-default-builder.sh"
-              ],
+          ```json
+          {
+            "args": [
+              "-e",
+              "/nix/store/vj1c3wf9…-source-stdenv.sh",
+              "/nix/store/shkw4qm9…-default-builder.sh"
+            ],
+            "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
+            "env": {
+              "HOME": "/homeless-shelter",
               "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
-              "env": {
-                "HOME": "/homeless-shelter",
-                "builder": "/nix/store/s1qkj0ph…-bash-5.2p37/bin/bash",
-                "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
-                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
-                …
-              },
-              "inputPaths": [
-                "/nix/store/14dciax3…-glibc-2.32-54-dev",
-                "/nix/store/1azs5s8z…-gettext-0.21",
-                …
-              ],
-              "outputs": {
-                "out": "/nix/store/2yx2prgx…-hello-2.12.2"
-              },
-              "realStoreDir": "/nix/store",
-              "storeDir": "/nix/store",
-              "system": "aarch64-linux",
-              "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
-              "tmpDirInSandbox": "/build",
-              "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0",
-              "version": 1
-            }
+              "nativeBuildInputs": "/nix/store/l31j72f1…-version-check-hook",
+              "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+              …
+            },
+            "inputPaths": [
+              "/nix/store/14dciax3…-glibc-2.32-54-dev",
+              "/nix/store/1azs5s8z…-gettext-0.21",
+              …
+            ],
+            "outputs": {
+              "out": "/nix/store/2yx2prgx…-hello-2.12.2"
+            },
+            "realStoreDir": "/nix/store",
+            "storeDir": "/nix/store",
+            "system": "aarch64-linux",
+            "tmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0/build",
+            "tmpDirInSandbox": "/build",
+            "topTmpDir": "/private/tmp/nix-build-hello-2.12.2.drv-0",
+            "version": 1
+          }
+          ```
         )",
         {},   // aliases
         true, // document default
