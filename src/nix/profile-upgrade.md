@@ -21,6 +21,12 @@ R""(
   # nix profile upgrade --regex '.*vim.*'
   ```
 
+* Show what packages would be upgraded, without actually upgrading:
+
+  ```console
+  # nix profile upgrade --all --dry-run
+  ```
+
 # Description
 
 This command upgrades a previously installed package in a Nix profile,
