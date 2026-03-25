@@ -2817,6 +2817,9 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 .debugThrow();
         }
 
+        forceValueDeep(v1);
+        forceValueDeep(v2);
+
         /* This mirrors what EvalState::eqValues does. See the corresponding comment there. */
         for (auto i = attrs1.begin(), j = attrs2.begin(); i != attrs1.end(); ++i, ++j) {
             if (i->name != j->name) {
@@ -2977,6 +2980,9 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
 
         if (attrs1.size() != attrs2.size())
             return false;
+
+        forceValueDeep(v1);
+        forceValueDeep(v2);
 
         /* Compare in 2 passes: first make sure the attribute keys are equal
            without evaluating or recursing into values. Historically, attribute
