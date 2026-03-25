@@ -1013,7 +1013,7 @@ public:
     void concatValues(
         Value & v,
         const PosIdx pos,
-        std::span<Value> values,
+        std::span<std::pair<PosIdx, Value *>> values,
         bool forceString,
         std::string_view errorCtx,
         Env & env,

@@ -2070,22 +2070,23 @@ void EvalState::concatLists(Value & v, std::span<Value * const> lists, const Pos
 
 void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 {
-    // List of returned strings. References to these Values must NOT be persisted.
+    // List of returned values. References to these Values must NOT be persisted.
     SmallTemporaryValueVector<conservativeStackReservation> values(es.size());
-    Value * vTmpP = values.data();
+    SmallVector<std::pair<PosIdx, Value *>, conservativeStackReservation> valuePairs(es.size());
 
-    for (auto & [i_pos, i] : es) {
-        Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp);
+    for (size_t i = 0; i < es.size(); ++i) {
+        auto & [i_pos, expr] = es[i];
+        expr->eval(state, env, values[i]);
+        valuePairs[i] = {i_pos, &values[i]};
     }
 
-    state.concatValues(v, pos, std::span(values.data(), es.size()), forceString, "while evaluating a path segment", env, *this);
+    state.concatValues(v, pos, valuePairs, forceString, "while evaluating a path segment", env, *this);
 }
 
 void EvalState::concatValues(
     Value & v,
     const PosIdx pos,
-    std::span<Value> values,
+    std::span<std::pair<PosIdx, Value *>> values,
     bool forceString,
     std::string_view errorCtx,
     Env & env,
@@ -2100,7 +2101,8 @@ void EvalState::concatValues(
     bool first = !forceString;
     ValueType firstType = nString;
 
-    for (auto & vTmp : values) {
+    for (auto & [i_pos, vp] : values) {
+        auto & vTmp = *vp;
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -2117,7 +2119,7 @@ void EvalState::concatValues(
                     n = NixInt(*checked);
                 } else {
                     error<EvalError>("integer overflow in adding %1% + %2%", n, vTmp.integer())
-                        .atPos(pos)
+                        .atPos(i_pos)
                         .debugThrow();
                 }
             } else if (vTmp.type() == nFloat) {
@@ -2127,7 +2129,7 @@ void EvalState::concatValues(
                 nf += vTmp.fpoint();
             } else
                 error<EvalError>("cannot add %1% to an integer", showType(vTmp))
-                    .atPos(pos)
+                    .atPos(i_pos)
                     .withFrame(env, expr)
                     .debugThrow();
         } else if (firstType == nFloat) {
@@ -2137,17 +2139,17 @@ void EvalState::concatValues(
                 nf += vTmp.fpoint();
             } else
                 error<EvalError>("cannot add %1% to a float", showType(vTmp))
-                    .atPos(pos)
+                    .atPos(i_pos)
                     .withFrame(env, expr)
                     .debugThrow();
         } else {
             if (strings.empty())
                 strings.reserve(values.size());
             /* skip canonization of first path, which would only be not
-            canonized in the first place if it's coming from a ./${foo} type
-            path */
+               canonized in the first place if it's coming from a ./${foo} type
+               path */
             auto part = coerceToString(
-                pos, vTmp, context, errorCtx, false, firstType == nString, !first);
+                i_pos, vTmp, context, errorCtx, false, firstType == nString, !first);
             sSize += part->size();
             strings.emplace_back(std::move(part));
         }
