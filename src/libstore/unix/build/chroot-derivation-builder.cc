@@ -75,11 +75,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
             throw SysError("cannot create %1%", PathFmt(chrootRootDir));
 
-        if (buildUser
-            && chown(
-                   chrootRootDir.c_str(), buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID())
-                   == -1)
-            throw SysError("cannot change ownership of %1%", PathFmt(chrootRootDir));
+        if (buildUser)
+            chown(chrootRootDir, buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID());
 
         /* Create a writable /tmp in the chroot.  Many builders need
            this.  (Of course they should really respect $TMPDIR
@@ -115,8 +112,8 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
         createDirs(chrootStoreDir);
         chmod(chrootStoreDir, 01775);
 
-        if (buildUser && chown(chrootStoreDir.c_str(), 0, buildUser->getGID()) == -1)
-            throw SysError("cannot change ownership of %1%", PathFmt(chrootStoreDir));
+        if (buildUser)
+            chown(chrootStoreDir, 0, buildUser->getGID());
 
         pathsInChroot = getPathsInSandbox();
 

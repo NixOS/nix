@@ -516,6 +516,17 @@ bool chmodIfNeeded(const std::filesystem::path & path, mode_t mode, mode_t mask 
  */
 void chmod(const std::filesystem::path & path, mode_t mode);
 
+#ifndef _WIN32
+/**
+ * Change ownership of a file, throwing an exception on error.
+ *
+ * @param path Path to the file to change the ownership for.
+ * @param owner New owner user ID.
+ * @param group New owner group ID.
+ */
+void chown(const std::filesystem::path & path, uid_t owner, gid_t group);
+#endif
+
 /**
  * Remove a file, throwing an exception on error.
  *

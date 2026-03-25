@@ -293,4 +293,10 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
     _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
 }
 
+void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
+{
+    if (::chown(path.c_str(), owner, group) == -1)
+        throw SysError("changing ownership of %s", PathFmt(path));
+}
+
 } // namespace nix
