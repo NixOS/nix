@@ -10,6 +10,7 @@
 #include "nix/util/error.hh"
 #include "nix/util/json-non-null.hh"
 #include "nix/util/types.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/experimental-features.hh"
 
 namespace nix {
@@ -519,6 +520,20 @@ public:
         return this->value.path();
     }
 };
+
+/* Delete these overloads to avoid footguns with implicit quoting of Setting<AbsolutePath> in fmt(). */
+
+template<class F, typename... Args>
+inline void formatHelper(F & f, const AbsolutePath & x, const Args &... args) = delete;
+
+template<class F, typename... Args>
+inline void formatHelper(F & f, const AbsolutePath & x) = delete;
+
+template<class F, typename... Args>
+inline void formatHelper(F & f, const Setting<AbsolutePath> & x, const Args &... args) = delete;
+
+template<class F, typename... Args>
+inline void formatHelper(F & f, const Setting<AbsolutePath> & x) = delete;
 
 template<>
 void BaseSetting<std::set<std::filesystem::path>>::appendOrSet(std::set<std::filesystem::path> newValue, bool append);
