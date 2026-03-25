@@ -56,7 +56,14 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                         unreachable();
                     }
                 } localFSStoreConfig{params};
-                if (access(localFSStoreConfig.stateDir.get().c_str(), R_OK | W_OK) == 0)
+                if (
+#ifdef _WIN32
+                    _waccess
+#else
+                    access
+#endif
+                    (localFSStoreConfig.stateDir.get().c_str(), R_OK | W_OK)
+                    == 0)
                     return make_ref<LocalStore::Config>(params);
                 else if (pathExists(getDaemonSocketPath(localFSStoreConfig)))
                     return make_ref<UDSRemoteStore::Config>(params);
