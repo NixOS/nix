@@ -67,13 +67,11 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         printMsg(lvlChatty, "setting up chroot environment in %1%", PathFmt(chrootParentDir));
 
-        if (mkdir(chrootParentDir.c_str(), 0700) == -1)
-            throw SysError("cannot create %s", PathFmt(chrootRootDir));
+        createDir(chrootParentDir, 0700);
 
         chrootRootDir = chrootParentDir / "root";
 
-        if (mkdir(chrootRootDir.c_str(), buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750) == -1)
-            throw SysError("cannot create %1%", PathFmt(chrootRootDir));
+        createDir(chrootRootDir, buildUser && buildUser->getUIDCount() != 1 ? 0755 : 0750);
 
         if (buildUser)
             chown(chrootRootDir, buildUser->getUIDCount() != 1 ? buildUser->getUID() : 0, buildUser->getGID());
