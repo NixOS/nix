@@ -3833,8 +3833,7 @@ static void prim_concatLists(EvalState & state, const PosIdx pos, Value ** args,
     auto listView = args[0]->listView();
     state.concatLists(
         v,
-        args[0]->listSize(),
-        listView.data(),
+        std::span(listView.data(), args[0]->listSize()),
         pos,
         "while evaluating a value of the list passed to builtins.concatLists");
 }
