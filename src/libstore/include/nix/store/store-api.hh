@@ -653,6 +653,13 @@ public:
      */
     virtual void addMultipleToStore(Source & source, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
+    /**
+     * Import multiple paths into the store.
+     *
+     * @param pathsToCopy Paths to import, in topological order
+     *   (dependencies before dependents). Implementations may rely
+     *   on this ordering for correctness and performance.
+     */
     virtual void addMultipleToStore(
         PathsSource && pathsToCopy, Activity & act, RepairFlag repair = NoRepair, CheckSigsFlag checkSigs = CheckSigs);
 
