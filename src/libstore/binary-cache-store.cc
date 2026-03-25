@@ -150,8 +150,10 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
     {
         FdSink fileSink(fdTemp.get());
         TeeSink teeSinkCompressed{fileSink, fileHashSink};
-        auto compressionSink = makeCompressionSink(
-            config.compression, teeSinkCompressed, config.parallelCompression, config.compressionLevel);
+        bool parallel = config.parallelCompression.overridden ? config.parallelCompression.get()
+                                                              : config.compression.get() == CompressionAlgo::zstd;
+        auto compressionSink =
+            makeCompressionSink(config.compression, teeSinkCompressed, parallel, config.compressionLevel);
         TeeSink teeSinkUncompressed{*compressionSink, narHashSink};
         TeeSource teeSource{narSource, teeSinkUncompressed};
         narAccessor = makeNarAccessor(parseNarListing(teeSource));

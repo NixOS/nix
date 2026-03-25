@@ -10,6 +10,7 @@
 
   rapidcheck,
   gtest,
+  zstd,
   runCommand,
   util-linux,
 
@@ -45,6 +46,7 @@ mkMesonExecutable (finalAttrs: {
     nix-util-test-support
     rapidcheck
     gtest
+    zstd
   ]
   ++ lib.optionals stdenv.hostPlatform.isLinux [
     util-linux
