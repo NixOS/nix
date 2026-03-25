@@ -15,6 +15,7 @@ nix-instantiate --store "file://$cacheDir" dependencies.nix
 clearStore
 clearCache
 outPath=$(nix-build dependencies.nix --no-out-link)
+depPath=$(nix-build dependencies.nix -A input0_drv --no-out-link)
 
 nix copy --to "file://$cacheDir" "$outPath"
 
@@ -84,6 +85,19 @@ basicDownloadTests
 # Test HttpBinaryCacheStore.
 export _NIX_FORCE_HTTP=1
 basicDownloadTests
+
+
+# Test that multiple concurrent substitutions do only one download.
+clearStore
+nix-store --init # needed because concurrent creation of the store can give SQLite errors
+_NIX_TEST_CONCURRENT_SUBSTITUTION=1 nix-store -r "$depPath" --substituters "file://$cacheDir" --no-require-sigs -vvvv 2> "$TEST_ROOT/log1" &
+pid1="$!"
+_NIX_TEST_CONCURRENT_SUBSTITUTION=1 nix-store -r "$depPath" --substituters "file://$cacheDir" --no-require-sigs -vvvv 2> "$TEST_ROOT/log2" &
+pid2="$!"
+wait "$pid1"
+wait "$pid2"
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "copying path ") -eq 2 ]]
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "downloading.*nar.xz") -eq 1 ]]
 
 
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.

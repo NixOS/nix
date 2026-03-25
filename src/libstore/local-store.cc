@@ -1033,18 +1033,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
         throw Error("cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
 
     {
-        /* In case we are not interested in reading the NAR: discard it. */
-        bool narRead = false;
-        Finally cleanup = [&]() {
-            if (!narRead)
-                try {
-                    source.skip(info.narSize);
-                } catch (...) {
-                    // TODO: should Interrupted be handled here?
-                    ignoreExceptionInDestructor();
-                }
-        };
-
         addTempRoot(info.path);
 
         if (repair || !isValidPath(info.path)) {
@@ -1069,7 +1057,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 TeeSource wrapperSource{source, hashSink};
 
-                narRead = true;
                 restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
 
                 auto hashResult = hashSink.finish();

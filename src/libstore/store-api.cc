@@ -283,7 +283,9 @@ void Store::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag
                 .version = {.number = {.major = 1, .minor = 16}},
             });
         info.ultimate = false;
-        addToStore(info, source, repair, checkSigs);
+        EnsureRead wrapper{source, info.narSize};
+        addToStore(info, wrapper, repair, checkSigs);
+        wrapper.finish();
     }
 }
 
@@ -948,6 +950,9 @@ void copyStorePath(
         info2->ultimate = false;
         info = info2;
     }
+
+    if (getEnv("_NIX_TEST_CONCURRENT_SUBSTITUTION"))
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto source = sinkToSource(
         [&](Sink & sink) {

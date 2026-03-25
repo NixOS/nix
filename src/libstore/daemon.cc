@@ -934,8 +934,9 @@ static void performOp(
 
             logger->startWork();
 
-            // FIXME: race if addToStore doesn't read source?
-            store->addToStore(info, *source, (RepairFlag) repair, dontCheckSigs ? NoCheckSigs : CheckSigs);
+            EnsureRead wrapper{*source, info.narSize};
+            store->addToStore(info, wrapper, (RepairFlag) repair, dontCheckSigs ? NoCheckSigs : CheckSigs);
+            wrapper.finish();
 
             logger->stopWork();
         }

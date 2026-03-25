@@ -634,7 +634,8 @@ public:
     virtual void querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos);
 
     /**
-     * Import a path into the store.
+     * Import a path into the store. Note that the entire NAR may not be read from `narSource`, e.g. if the path is
+     * already valid.
      */
     virtual void addToStore(
         const ValidPathInfo & info,

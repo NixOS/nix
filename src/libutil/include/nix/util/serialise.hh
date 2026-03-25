@@ -722,4 +722,52 @@ struct FramedSink : nix::BufferedSink
     };
 };
 
+/**
+ * A wrapper source that ensures that at least a specified number of bytes are read from the underlying source.
+ */
+struct EnsureRead : Source
+{
+    Source & source;
+    uint64_t bytesRead = 0, bytesExpected;
+
+    EnsureRead(Source & source, uint64_t bytesExpected)
+        : source(source)
+        , bytesExpected(bytesExpected)
+    {
+    }
+
+    ~EnsureRead()
+    {
+        try {
+            finish();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+    }
+
+    void finish()
+    {
+        if (bytesRead < bytesExpected)
+            skip(bytesExpected - bytesRead);
+    }
+
+    size_t read(char * data, size_t len) override
+    {
+        auto n = source.read(data, len);
+        bytesRead += n;
+        return n;
+    }
+
+    bool good() override
+    {
+        return source.good();
+    }
+
+    void skip(size_t len) override
+    {
+        source.skip(len);
+        bytesRead += len;
+    }
+};
+
 } // namespace nix
