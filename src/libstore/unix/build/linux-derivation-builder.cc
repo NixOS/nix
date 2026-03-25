@@ -432,7 +432,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
                 "nobody:x:65534:65534:Nobody:/:/noshell\n",
                 sandboxUid(),
                 sandboxGid(),
-                store.config->getLocalSettings().sandboxBuildDir));
+                store.config->getLocalSettings().sandboxBuildDir.get().native()));
 
         writeFile(
             chrootRootDir / "etc" / "group",
