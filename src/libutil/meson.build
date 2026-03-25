@@ -101,6 +101,12 @@ brotli = [
 ]
 deps_private += brotli
 
+# Direct libzstd linkage for the multi-frame compression sink.
+# libarchive already pulls in libzstd transitively, but we need
+# the headers and an explicit link for ZSTD_compressStream2 etc.
+zstd = dependency('libzstd', version : '>= 1.4.0')
+deps_private += zstd
+
 cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
