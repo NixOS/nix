@@ -3831,12 +3831,7 @@ static void prim_concatLists(EvalState & state, const PosIdx pos, Value ** args,
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.concatLists");
     auto listView = args[0]->listView();
-    state.concatLists(
-        v,
-        args[0]->listSize(),
-        listView.data(),
-        pos,
-        "while evaluating a value of the list passed to builtins.concatLists");
+    state.concatLists(v, listView.span(), pos, "while evaluating a value of the list passed to builtins.concatLists");
 }
 
 static RegisterPrimOp primop_concatLists({

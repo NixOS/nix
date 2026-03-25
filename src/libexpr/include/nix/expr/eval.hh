@@ -27,6 +27,7 @@
 #include <map>
 #include <optional>
 #include <functional>
+#include <span>
 
 namespace nix {
 
@@ -997,7 +998,10 @@ public:
      */
     void mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
+    /**
+     * @brief Concatenate values with an n-ary version of the `++` operator.
+     */
+    void concatLists(Value & v, std::span<Value * const> lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.

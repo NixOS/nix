@@ -2033,22 +2033,21 @@ void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
     Value v2;
     e2->eval(state, env, v2);
     Value * lists[2] = {&v1, &v2};
-    state.concatLists(v, 2, lists, pos, "while evaluating one of the elements to concatenate");
+    state.concatLists(v, lists, pos, "while evaluating one of the elements to concatenate");
 }
 
-void EvalState::concatLists(
-    Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx)
+void EvalState::concatLists(Value & v, std::span<Value * const> lists, const PosIdx pos, std::string_view errorCtx)
 {
     nrListConcats++;
 
-    Value * nonEmpty = 0;
+    Value * nonEmpty = nullptr;
     size_t len = 0;
-    for (size_t n = 0; n < nrLists; ++n) {
-        forceList(*lists[n], pos, errorCtx);
-        auto l = lists[n]->listSize();
+    for (auto * list : lists) {
+        forceList(*list, pos, errorCtx);
+        auto l = list->listSize();
         len += l;
         if (l)
-            nonEmpty = lists[n];
+            nonEmpty = list;
     }
 
     if (nonEmpty && len == nonEmpty->listSize()) {
@@ -2058,12 +2057,13 @@ void EvalState::concatLists(
 
     auto list = buildList(len);
     auto out = list.elems;
-    for (size_t n = 0, pos = 0; n < nrLists; ++n) {
-        auto listView = lists[n]->listView();
-        auto l = listView.size();
-        if (l)
-            memcpy(out + pos, listView.data(), l * sizeof(Value *));
-        pos += l;
+    size_t pos2 = 0;
+    for (auto * l : lists) {
+        auto listView = l->listView();
+        auto n = listView.size();
+        if (n)
+            memcpy(out + pos2, listView.data(), n * sizeof(Value *));
+        pos2 += n;
     }
     v.mkList(list);
 }
