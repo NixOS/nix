@@ -977,4 +977,76 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
     nix_derivation_free(drv2);
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
+{
+    PathInfo * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    std::string narHash;
+    auto ret = nix_path_info_get_nar_hash(ctx, info, OBSERVE_STRING(narHash));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_FALSE(narHash.empty());
+    ASSERT_EQ(narHash.substr(0, 7), "sha256:");
+
+    auto narSize = nix_path_info_get_nar_size(ctx, info);
+    assert_ctx_ok();
+    ASSERT_GT(narSize, 0u);
+
+    // May be empty for this simple derivation
+    std::vector<std::string> refs;
+    auto refCb = LambdaAdapter{.fun = [&](const StorePath * refPath) {
+        std::string name;
+        nix_store_path_name(refPath, OBSERVE_STRING(name));
+        refs.push_back(name);
+    }};
+    ret = nix_path_info_get_references(
+        ctx, info, static_cast<void *>(&refCb), decltype(refCb)::call_void<const StorePath *>);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    std::vector<std::string> sigs;
+    auto sigCb = LambdaAdapter{.fun = [&](const char * sig, unsigned int sig_len) { sigs.emplace_back(sig, sig_len); }};
+    ret = nix_path_info_get_sigs(
+        ctx, info, static_cast<void *>(&sigCb), decltype(sigCb)::call_void<const char *, unsigned int>);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // This is a CA derivation, so ca should be present
+    std::string ca;
+    ret = nix_path_info_get_ca(ctx, info, OBSERVE_STRING(ca));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_deriver)
+{
+    PathInfo * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    // The output was built from a derivation, so deriver should be set
+    StorePath * deriver = nix_path_info_get_deriver(ctx, info);
+    assert_ctx_ok();
+    ASSERT_NE(deriver, nullptr);
+
+    nix_store_path_free(deriver);
+    nix_path_info_free(info);
+}
+
+TEST_F(nix_api_store_test, nix_store_query_path_info_invalid_path)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    ASSERT_NE(path, nullptr);
+
+    PathInfo * info = nix_store_query_path_info(ctx, store, path);
+    ASSERT_EQ(info, nullptr);
+    ASSERT_NE(nix_err_code(ctx), NIX_OK);
+
+    nix_store_path_free(path);
+}
+
 } // namespace nixC
