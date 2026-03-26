@@ -49,7 +49,7 @@ TEST(StoreOpen, resolveStoreConfig_auto_withParams)
 
     StoreReference ref{
         .variant = StoreReference::Auto{},
-        .params = {{"state", stateDir}},
+        .params = {{"state", stateDir.string()}},
     };
 
     auto config = resolveStoreConfig(std::move(ref));

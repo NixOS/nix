@@ -859,8 +859,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     if (buildUser) {
         chmod(slaveName, 0600);
 
-        if (chown(slaveName.c_str(), buildUser->getUID(), 0))
-            throw SysError("changing owner of pseudoterminal slave");
+        chown(slaveName, buildUser->getUID(), 0);
     }
 #ifdef __APPLE__
     else {
@@ -1256,8 +1255,7 @@ void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
     if (!buildUser)
         return;
-    if (chown(path.c_str(), buildUser->getUID(), buildUser->getGID()) == -1)
-        throw SysError("cannot change ownership of %1%", PathFmt(path));
+    chown(path, buildUser->getUID(), buildUser->getGID());
 }
 
 void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path & path)

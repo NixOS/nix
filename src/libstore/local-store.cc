@@ -170,8 +170,7 @@ LocalStore::LocalStore(ref<const Config> config)
             auto st = stat(config->realStoreDir.get());
 
             if (st.st_uid != 0 || st.st_gid != gr->gr_gid || (st.st_mode & ~S_IFMT) != perm) {
-                if (chown(config->realStoreDir.get().c_str(), 0, gr->gr_gid) == -1)
-                    throw SysError("changing ownership of path %s", PathFmt(config->realStoreDir.get()));
+                chown(config->realStoreDir.get(), 0, gr->gr_gid);
                 chmod(config->realStoreDir.get(), perm);
             }
         }
