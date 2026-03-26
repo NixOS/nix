@@ -182,7 +182,7 @@ TEST_P(AttrSetMergeTrvialExpressionTest, attrsetMergeLazy)
     ASSERT_NE(a, nullptr);
 
     ASSERT_THAT(*a->value, IsThunk());
-    state.forceValue(*a->value, noPos);
+    state.forceValue(*a->value, noRange);
 
     ASSERT_THAT(*a->value, IsAttrsOfSize(2));
 

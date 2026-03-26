@@ -439,7 +439,7 @@ static void main_nix_build(int argc, char ** argv)
             Value & v(
                 *findAlongAttrPath(*state, i, takesNixShellAttr(vRoot) ? *autoArgsWithInNixShell : *autoArgs, vRoot)
                      .first);
-            state->forceValue(v, v.determinePos(noPos));
+            state->forceValue(v, RangeIdxs{v.determinePos(noPos)});
             getDerivations(*state, v, "", takesNixShellAttr(v) ? *autoArgsWithInNixShell : *autoArgs, drvs, false);
         }
     }

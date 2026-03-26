@@ -10,14 +10,14 @@ error:
          at «nix-internal»/derivation-internal.nix:50:17:
            49|     value = commonAttrs // {
            50|       outPath = builtins.getAttr outputName strict;
-             |                 ^
+             |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            51|       drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin
          at «nix-internal»/derivation-internal.nix:37:12:
            36|
            37|   strict = derivationStrict drvAttrs;
-             |            ^
+             |            ^~~~~~~~~~~~~~~~~~~~~~~~~
            38|
 
        … while evaluating derivation 'test'

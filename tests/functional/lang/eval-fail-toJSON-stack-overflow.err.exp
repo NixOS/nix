@@ -3,7 +3,7 @@ error:
          at /pwd/lang/eval-fail-toJSON-stack-overflow.nix:8:1:
             7| in
             8| builtins.toJSON reverseLinkedList
-             | ^
+             | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             9|
 
        … while evaluating attribute 'tail'

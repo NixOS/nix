@@ -35,7 +35,7 @@ error:
        error: attribute 'undocument' missing
        at «string»:1:1:
             1| lib.attr.undocument
-             | ^
+             | ^~~~~~~~~~~~~~~~~~~
        Did you mean undocumented?
 
 nix-repl> :doc (import ./doc-comments.nix).constant
@@ -91,13 +91,13 @@ nix-repl> :doc lib.missing
 error: attribute 'missing' missing
        at «string»:1:1:
             1| lib.missing
-             | ^
+             | ^~~~~~~~~~~
 
 nix-repl> :doc lib.missing.attr
 error: attribute 'missing' missing
        at «string»:1:1:
             1| lib.missing.attr
-             | ^
+             | ^~~~~~~~~~~~~~~~
 
 nix-repl> :doc lib.attr.undocumental
 error:
@@ -111,5 +111,5 @@ error:
        error: attribute 'undocumental' missing
        at «string»:1:1:
             1| lib.attr.undocumental
-             | ^
+             | ^~~~~~~~~~~~~~~~~~~~~
        Did you mean undocumented?

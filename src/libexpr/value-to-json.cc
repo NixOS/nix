@@ -16,10 +16,10 @@ json printValueAsJSON(
 {
     checkInterrupt();
 
-    auto _level = state.addCallDepth(pos);
+    auto _level = state.addCallDepth(RangeIdxs{pos});
 
     if (strict)
-        state.forceValue(v, pos);
+        state.forceValue(v, RangeIdxs{pos});
 
     json out;
 
@@ -50,7 +50,7 @@ json printValueAsJSON(
         break;
 
     case nAttrs: {
-        auto maybeString = state.tryAttrsToString(pos, v, context, false, false);
+        auto maybeString = state.tryAttrsToString(RangeIdxs{pos}, v, context, false, false);
         if (maybeString) {
             out = *maybeString;
             break;

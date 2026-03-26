@@ -44,7 +44,7 @@ error:
          at /pwd/lang/eval-fail-toJSON.nix:7:13:
             6|     {
             7|       c.d = throw "hah no";
-             |             ^
+             |             ^~~~~~~~~~~~~~
             8|     }
 
        error: hah no

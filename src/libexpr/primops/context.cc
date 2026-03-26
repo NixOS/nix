@@ -10,7 +10,10 @@ static void prim_unsafeDiscardStringContext(EvalState & state, const PosIdx pos,
 {
     NixStringContext context;
     auto s = state.coerceToString(
-        pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
+        RangeIdxs{pos},
+        *args[0],
+        context,
+        "while evaluating the argument passed to builtins.unsafeDiscardStringContext");
     v.mkString(*s, state.mem);
 }
 
@@ -26,7 +29,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext({
 static void prim_hasContext(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     NixStringContext context;
-    state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.hasContext");
+    state.forceString(*args[0], context, RangeIdxs{pos}, "while evaluating the argument passed to builtins.hasContext");
     v.mkBool(!context.empty());
 }
 
@@ -57,7 +60,10 @@ static void prim_unsafeDiscardOutputDependency(EvalState & state, const PosIdx p
 {
     NixStringContext context;
     auto s = state.coerceToString(
-        pos, *args[0], context, "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
+        RangeIdxs{pos},
+        *args[0],
+        context,
+        "while evaluating the argument passed to builtins.unsafeDiscardOutputDependency");
 
     NixStringContext context2;
     for (auto && c : context) {
@@ -98,7 +104,7 @@ static void prim_addDrvOutputDependencies(EvalState & state, const PosIdx pos, V
 {
     NixStringContext context;
     auto s = state.coerceToString(
-        pos, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
+        RangeIdxs{pos}, *args[0], context, "while evaluating the argument passed to builtins.addDrvOutputDependencies");
 
     auto contextSize = context.size();
     if (contextSize != 1) {
@@ -188,7 +194,7 @@ static void prim_getContext(EvalState & state, const PosIdx pos, Value ** args, 
     };
 
     NixStringContext context;
-    state.forceString(*args[0], context, pos, "while evaluating the argument passed to builtins.getContext");
+    state.forceString(*args[0], context, RangeIdxs{pos}, "while evaluating the argument passed to builtins.getContext");
     auto contextInfos = std::map<StorePath, ContextInfo>();
     for (auto && i : context) {
         std::visit(
@@ -260,9 +266,9 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
 {
     NixStringContext context;
     auto orig = state.forceString(
-        *args[0], context, noPos, "while evaluating the first argument passed to builtins.appendContext");
+        *args[0], context, noRange, "while evaluating the first argument passed to builtins.appendContext");
 
-    state.forceAttrs(*args[1], pos, "while evaluating the second argument passed to builtins.appendContext");
+    state.forceAttrs(*args[1], RangeIdxs{pos}, "while evaluating the second argument passed to builtins.appendContext");
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
@@ -273,10 +279,11 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
         auto namePath = state.store->parseStorePath(name);
         if (!settings.readOnlyMode)
             state.store->ensurePath(namePath);
-        state.forceAttrs(*i.value, i.pos, "while evaluating the value of a string context");
+        state.forceAttrs(*i.value, RangeIdxs{i.pos}, "while evaluating the value of a string context");
 
         if (auto attr = i.value->attrs()->get(sPath)) {
-            if (state.forceBool(*attr->value, attr->pos, "while evaluating the `path` attribute of a string context"))
+            if (state.forceBool(
+                    *attr->value, RangeIdxs{attr->pos}, "while evaluating the `path` attribute of a string context"))
                 context.emplace(
                     NixStringContextElem::Opaque{
                         .path = namePath,
@@ -285,7 +292,9 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
 
         if (auto attr = i.value->attrs()->get(sAllOutputs)) {
             if (state.forceBool(
-                    *attr->value, attr->pos, "while evaluating the `allOutputs` attribute of a string context")) {
+                    *attr->value,
+                    RangeIdxs{attr->pos},
+                    "while evaluating the `allOutputs` attribute of a string context")) {
                 if (!isDerivation(name)) {
                     state
                         .error<EvalError>(
@@ -301,7 +310,8 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
         }
 
         if (auto attr = i.value->attrs()->get(state.s.outputs)) {
-            state.forceList(*attr->value, attr->pos, "while evaluating the `outputs` attribute of a string context");
+            state.forceList(
+                *attr->value, RangeIdxs{attr->pos}, "while evaluating the `outputs` attribute of a string context");
             if (attr->value->listSize() && !isDerivation(name)) {
                 state
                     .error<EvalError>(
@@ -310,8 +320,8 @@ static void prim_appendContext(EvalState & state, const PosIdx pos, Value ** arg
                     .debugThrow();
             }
             for (auto elem : attr->value->listView()) {
-                auto outputName =
-                    state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
+                auto outputName = state.forceStringNoCtx(
+                    *elem, RangeIdxs{attr->pos}, "while evaluating an output name within a string context");
                 context.emplace(
                     NixStringContextElem::Built{
                         .drvPath = makeConstantStorePathRef(namePath),

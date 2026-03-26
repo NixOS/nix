@@ -6,6 +6,10 @@ error:
             2| abort "unreachable"
 
        … while comparing attribute 'ding'
+         at /pwd/lang/eval-fail-assert-equal-type-nested.nix:1:8:
+            1| assert { ding = false; } == { ding = null; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2| abort "unreachable"
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-equal-type-nested.nix:1:10:

@@ -55,7 +55,7 @@ InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::
 
     else if (v.type() == nString) {
         return {{
-            .path = DerivedPath::fromSingle(state->coerceToSingleDerivedPath(pos, v, errorCtx)),
+            .path = DerivedPath::fromSingle(state->coerceToSingleDerivedPath(RangeIdxs{pos}, v, errorCtx)),
             .info = make_ref<ExtraPathInfo>(),
         }};
     }

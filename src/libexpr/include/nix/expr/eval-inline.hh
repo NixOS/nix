@@ -93,7 +93,7 @@ Env & EvalMemory::allocEnv(size_t size)
 }
 
 [[gnu::always_inline]]
-void EvalState::forceValue(Value & v, const PosIdx pos)
+void EvalState::forceValue(Value & v, RangeIdxs pos)
 {
     if (v.isThunk()) {
         Env * env = v.thunk().env;
@@ -123,16 +123,8 @@ void EvalState::forceValue(Value & v, const PosIdx pos)
 }
 
 [[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, const PosIdx pos, std::string_view errorCtx)
+inline void EvalState::forceAttrs(Value & v, RangeIdxs pos, std::string_view errorCtx)
 {
-    forceAttrs(v, [&]() { return pos; }, errorCtx);
-}
-
-template<typename Callable>
-[[gnu::always_inline]]
-inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
-{
-    PosIdx pos = getPos();
     forceValue(v, pos);
     if (v.type() != nAttrs) {
         error<TypeError>("expected a set but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
@@ -141,8 +133,20 @@ inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view e
     }
 }
 
+template<typename Callable>
 [[gnu::always_inline]]
-inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view errorCtx)
+inline void EvalState::forceAttrs(Value & v, Callable getPos, std::string_view errorCtx)
+{
+    forceValue(v, getPos());
+    if (v.type() != nAttrs) {
+        error<TypeError>("expected a set but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
+            .withTrace(getPos(), errorCtx)
+            .debugThrow();
+    }
+}
+
+[[gnu::always_inline]]
+inline void EvalState::forceList(Value & v, RangeIdxs pos, std::string_view errorCtx)
 {
     forceValue(v, pos);
     if (!v.isList()) {
@@ -153,7 +157,7 @@ inline void EvalState::forceList(Value & v, const PosIdx pos, std::string_view e
 }
 
 [[gnu::always_inline]]
-inline CallDepth EvalState::addCallDepth(const PosIdx pos)
+inline CallDepth EvalState::addCallDepth(RangeIdxs pos)
 {
     if (callDepth > settings.maxCallDepth)
         error<StackOverflowError>().atPos(pos).debugThrow();

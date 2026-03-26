@@ -189,10 +189,10 @@ FrameInfo SampleStack::getPrimOpFrameInfo(const PrimOp & primOp, std::span<Value
         if (primOp.name == "derivationStrict") {
             try {
                 /* Error context strings don't actually matter, since we ignore all eval errors. */
-                state.forceAttrs(*args[0], pos, "");
+                state.forceAttrs(*args[0], RangeIdxs{pos}, "");
                 auto attrs = args[0]->attrs();
                 auto nameAttr = state.getAttr(state.s.name, attrs, "");
-                auto drvName = std::string(state.forceStringNoCtx(*nameAttr->value, pos, ""));
+                auto drvName = std::string(state.forceStringNoCtx(*nameAttr->value, RangeIdxs{pos}, ""));
                 return DerivationStrictFrameInfo{.callPos = pos, .drvName = std::move(drvName)};
             } catch (...) {
                 /* Ignore all errors, since those will be diagnosed by the evaluator itself. */
@@ -257,7 +257,7 @@ std::ostream & LambdaFrameInfo::symbolize(const EvalState & state, std::ostream 
     if (auto pos = posCache.lookup(callPos); std::holds_alternative<std::monostate>(pos.origin))
         /* HACK: To avoid dubious «none»:0 in the generated profile if the origin can't be resolved
            resort to printing the lambda location instead of the callsite position. */
-        os << posCache.lookup(expr->getPos());
+        os << posCache.lookup(expr->pos.start);
     else
         os << pos;
     if (expr->name)

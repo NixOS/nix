@@ -22,7 +22,7 @@ static void printValueAsXML(
     XMLWriter & doc,
     NixStringContext & context,
     StringSet & drvsSeen,
-    const PosIdx pos);
+    RangeIdxs pos);
 
 static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
 {
@@ -50,7 +50,7 @@ static void showAttrs(
             posToXML(state, xmlAttrs, state.positions[a->pos]);
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
-        printValueAsXML(state, strict, location, *a->value, doc, context, drvsSeen, a->pos);
+        printValueAsXML(state, strict, location, *a->value, doc, context, drvsSeen, {a->pos});
     }
 }
 
@@ -62,7 +62,7 @@ static void printValueAsXML(
     XMLWriter & doc,
     NixStringContext & context,
     StringSet & drvsSeen,
-    const PosIdx pos)
+    RangeIdxs pos)
 {
     checkInterrupt();
 
@@ -102,14 +102,14 @@ static void printValueAsXML(
             std::string drvPath;
             if (auto a = v.attrs()->get(state.s.drvPath)) {
                 if (strict)
-                    state.forceValue(*a->value, a->pos);
+                    state.forceValue(*a->value, {a->pos});
                 if (a->value->type() == nString)
                     xmlAttrs["drvPath"] = drvPath = a->value->string_view();
             }
 
             if (auto a = v.attrs()->get(state.s.outPath)) {
                 if (strict)
-                    state.forceValue(*a->value, a->pos);
+                    state.forceValue(*a->value, {a->pos});
                 if (a->value->type() == nString)
                     xmlAttrs["outPath"] = a->value->string_view();
             }
@@ -144,7 +144,7 @@ static void printValueAsXML(
         }
         XMLAttrs xmlAttrs;
         if (location)
-            posToXML(state, xmlAttrs, state.positions[v.lambda().fun->pos]);
+            posToXML(state, xmlAttrs, state.positions[v.lambda().fun->pos.start]);
         XMLOpenElement _(doc, "function", xmlAttrs);
 
         if (auto formals = v.lambda().fun->getFormals()) {
@@ -186,7 +186,7 @@ void ExternalValueBase::printValueAsXML(
     XMLWriter & doc,
     NixStringContext & context,
     StringSet & drvsSeen,
-    const PosIdx pos) const
+    RangeIdxs pos) const
 {
     doc.writeEmptyElement("unevaluated");
 }
@@ -198,7 +198,7 @@ void printValueAsXML(
     Value & v,
     std::ostream & out,
     NixStringContext & context,
-    const PosIdx pos)
+    RangeIdxs pos)
 {
     XMLWriter doc(true, out);
     XMLOpenElement root(doc, "expr");

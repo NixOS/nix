@@ -8,6 +8,6 @@ error:
        error: function 'anonymous lambda' called with unexpected argument 'y'
        at /pwd/lang/eval-fail-undeclared-arg.nix:1:2:
             1| ({ x, z }: x + z) {
-             |  ^
+             |  ^~~~~~~~~~~~~~~
             2|   x = "foo";
        Did you mean one of x or z?

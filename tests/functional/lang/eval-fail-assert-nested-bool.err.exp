@@ -6,6 +6,10 @@ error:
             2|
 
        … while comparing attribute 'a'
+         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:8:
+            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2|
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-nested-bool.nix:1:10:
@@ -20,6 +24,10 @@ error:
             2|
 
        … while comparing attribute 'b'
+         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:8:
+            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2|
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-nested-bool.nix:1:10:
@@ -34,8 +42,16 @@ error:
             2|
 
        … while comparing list element 0
+         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:8:
+            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2|
 
        … while comparing attribute 'c'
+         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:8:
+            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2|
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-nested-bool.nix:1:20:
@@ -50,6 +66,10 @@ error:
             2|
 
        … while comparing attribute 'd'
+         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:8:
+            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
+             |        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            2|
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-nested-bool.nix:1:20:

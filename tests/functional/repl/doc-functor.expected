@@ -33,14 +33,14 @@ error:
          at /path/to/tests/functional/repl/doc-functor.nix:90:17:
            89|     */
            90|     __functor = self: self.__functor self;
-             |                 ^
+             |                 ^~~~~~~~~~~~~~~~~~~~~~~~~
            91|   };
 
        … from call site
          at /path/to/tests/functional/repl/doc-functor.nix:90:23:
            89|     */
            90|     __functor = self: self.__functor self;
-             |                       ^
+             |                       ^~~~~~~~~~~~~~~~~~~
            91|   };
 
        (199 duplicate frames omitted)
@@ -49,7 +49,7 @@ error:
        at /path/to/tests/functional/repl/doc-functor.nix:90:23:
            89|     */
            90|     __functor = self: self.__functor self;
-             |                       ^
+             |                       ^~~~~~~~~~~~~~~~~~~
            91|   };
 
 nix-repl> :doc diverging
@@ -62,14 +62,14 @@ error:
          at /path/to/tests/functional/repl/doc-functor.nix:103:21:
           102|       f = x: {
           103|         __functor = self: (f (x + 1));
-             |                     ^
+             |                     ^~~~~~~~~~~~~~~~~
           104|       };
 
        error: stack overflow; max-call-depth exceeded
        at /path/to/tests/functional/repl/doc-functor.nix:103:28:
           102|       f = x: {
           103|         __functor = self: (f (x + 1));
-             |                            ^
+             |                            ^~~~~~~~~
           104|       };
 
 nix-repl> :doc helper

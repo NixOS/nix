@@ -113,7 +113,7 @@ public:
     {
         return std::visit(
             overloaded{
-                [&](std::string_view str) -> Expr * { return exprs.add<ExprString>(exprs.alloc, str); },
+                [&](std::string_view str) -> Expr * { return exprs.add<ExprString>(noRange, exprs.alloc, str); },
                 [&](Expr * expr) { return expr; },
                 [](std::monostate) -> Expr * { unreachable(); }},
             raw);
@@ -147,7 +147,9 @@ struct LexerState
     PosTable & positions;
     PosTable::Origin origin;
 
-    PosIdx at(const ParserLocation & loc);
+    RangeIdxs at(const ParserLocation & loc) const;
+    PosIdx atStart(const ParserLocation & loc) const;
+    PosIdx atEnd(const ParserLocation & loc) const;
 };
 
 struct ParserState
@@ -174,7 +176,9 @@ struct ParserState
     void addAttr(ExprAttrs * attrs, AttrSelectionPath & attrPath, const Symbol & symbol, ExprAttrs::AttrDef && def);
     void validateFormals(FormalsBuilder & formals, PosIdx pos = noPos, Symbol arg = {});
     Expr * stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es);
-    PosIdx at(const ParserLocation & loc);
+    RangeIdxs at(const ParserLocation & loc) const;
+    PosIdx atStart(const ParserLocation & loc) const;
+    PosIdx atEnd(const ParserLocation & loc) const;
 };
 
 inline void ParserState::dupAttr(const AttrSelectionPath & attrPath, const PosIdx pos, const PosIdx prevPos)
@@ -202,7 +206,7 @@ inline void ParserState::addAttr(
     AttrSelectionPath::iterator i;
     // All attrpaths have at least one attr
     assert(!attrPath.empty());
-    auto pos = at(loc);
+    auto pos = atStart(loc);
     // Checking attrPath validity.
     // ===========================
     for (i = attrPath.begin(); i + 1 < attrPath.end(); i++) {
@@ -216,11 +220,11 @@ inline void ParserState::addAttr(
                     dupAttr(attrPath, pos, j->second.pos);
                 }
             } else {
-                nested = exprs.add<ExprAttrs>();
+                nested = exprs.add<ExprAttrs>(noRange);
                 (*attrs->attrs)[i->symbol] = ExprAttrs::AttrDef(nested, pos);
             }
         } else {
-            nested = exprs.add<ExprAttrs>();
+            nested = exprs.add<ExprAttrs>(noRange);
             attrs->dynamicAttrs->push_back(ExprAttrs::DynamicAttrDef(i->expr, nested, pos));
         }
         attrs = nested;
@@ -236,7 +240,7 @@ inline void ParserState::addAttr(
     auto it = lexerState.positionToDocComment.find(pos);
     if (it != lexerState.positionToDocComment.end()) {
         e->setDocComment(it->second);
-        lexerState.positionToDocComment.emplace(at(exprLoc), it->second);
+        lexerState.positionToDocComment.emplace(atStart(exprLoc), it->second);
     }
 }
 
@@ -324,7 +328,7 @@ inline Expr *
 ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std::variant<Expr *, StringToken>>> es)
 {
     if (es.empty())
-        return exprs.add<ExprString>(""_sds);
+        return exprs.add<ExprString>(noRange, ""_sds);
 
     /* Figure out the minimum indentation.  Note that by design
        whitespace-only final lines are not taken into account.  (So
@@ -364,7 +368,7 @@ ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std:
     }
 
     /* Strip spaces from each line. */
-    std::vector<std::pair<PosIdx, Expr *>> es2{};
+    std::vector<Expr *> es2{};
     atStartOfLine = true;
     size_t curDropped = 0;
     size_t n = es.size();
@@ -372,7 +376,7 @@ ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std:
     const auto trimExpr = [&](Expr * e) {
         atStartOfLine = false;
         curDropped = 0;
-        es2.emplace_back(i->first, e);
+        es2.push_back(e);
     };
     const auto trimString = [&](const StringToken & t) {
         std::string s2;
@@ -406,7 +410,7 @@ ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std:
 
         // Ignore empty strings for a minor optimisation and AST simplification
         if (s2 != "") {
-            es2.emplace_back(i->first, exprs.add<ExprString>(exprs.alloc, s2));
+            es2.push_back(exprs.add<ExprString>(noRange, exprs.alloc, s2));
         }
     };
     for (; i != es.end(); ++i, --n) {
@@ -416,26 +420,45 @@ ParserState::stripIndentation(const PosIdx pos, std::span<std::pair<PosIdx, std:
     // If there is nothing at all, return the empty string directly.
     // This also ensures that equivalent empty strings result in the same ast, which is helpful when testing formatters.
     if (es2.size() == 0) {
-        auto * const result = exprs.add<ExprString>(""_sds);
+        auto * const result = exprs.add<ExprString>(noRange, ""_sds);
         return result;
     }
 
     /* If this is a single string, then don't do a concatenation. */
-    if (es2.size() == 1 && dynamic_cast<ExprString *>((es2)[0].second)) {
-        auto * const result = (es2)[0].second;
-        return result;
+    if (es2.size() == 1 && dynamic_cast<ExprString *>(es2[0])) {
+        return es2[0];
     }
-    return exprs.add<ExprConcatStrings>(exprs.alloc, pos, true, es2);
+    return exprs.add<ExprConcatStrings>(exprs.alloc, RangeIdxs{pos, noPos}, true, es2);
 }
 
-inline PosIdx LexerState::at(const ParserLocation & loc)
+inline RangeIdxs LexerState::at(const ParserLocation & loc) const
+{
+    return {atStart(loc), atEnd(loc)};
+}
+
+inline PosIdx LexerState::atStart(const ParserLocation & loc) const
 {
     return positions.add(origin, loc.beginOffset);
 }
 
-inline PosIdx ParserState::at(const ParserLocation & loc)
+inline PosIdx LexerState::atEnd(const ParserLocation & loc) const
+{
+    return positions.add(origin, loc.endOffset);
+}
+
+inline RangeIdxs ParserState::at(const ParserLocation & loc) const
+{
+    return {atStart(loc), atEnd(loc)};
+}
+
+inline PosIdx ParserState::atStart(const ParserLocation & loc) const
 {
     return positions.add(origin, loc.beginOffset);
+}
+
+inline PosIdx ParserState::atEnd(const ParserLocation & loc) const
+{
+    return positions.add(origin, loc.endOffset);
 }
 
 } // namespace nix

@@ -48,7 +48,7 @@ std::string PackageInfo::queryName() const
         auto i = attrs->get(state->s.name);
         if (!i)
             state->error<TypeError>("derivation name missing").debugThrow();
-        name = state->forceStringNoCtx(*i->value, noPos, "while evaluating the 'name' attribute of a derivation");
+        name = state->forceStringNoCtx(*i->value, noRange, "while evaluating the 'name' attribute of a derivation");
     }
     return name;
 }
@@ -57,9 +57,9 @@ std::string PackageInfo::querySystem() const
 {
     if (system == "" && attrs) {
         auto i = attrs->get(state->s.system);
-        system =
-            !i ? "unknown"
-               : state->forceStringNoCtx(*i->value, i->pos, "while evaluating the 'system' attribute of a derivation");
+        system = !i ? "unknown"
+                    : state->forceStringNoCtx(
+                          *i->value, RangeIdxs{i->pos}, "while evaluating the 'system' attribute of a derivation");
     }
     return system;
 }
@@ -70,7 +70,7 @@ std::optional<StorePath> PackageInfo::queryDrvPath() const
         if (auto i = attrs->get(state->s.drvPath)) {
             NixStringContext context;
             auto found = state->coerceToStorePath(
-                i->pos, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
+                RangeIdxs{i->pos}, *i->value, context, "while evaluating the 'drvPath' attribute of a derivation");
             try {
                 found.requireDerivation();
             } catch (Error & e) {
@@ -98,7 +98,7 @@ StorePath PackageInfo::queryOutPath() const
         NixStringContext context;
         if (i)
             outPath = state->coerceToStorePath(
-                i->pos, *i->value, context, "while evaluating the output path of a derivation");
+                RangeIdxs{i->pos}, *i->value, context, "while evaluating the output path of a derivation");
     }
     if (!outPath)
         throw Error("derivation does not have attribute 'outPath'");
@@ -111,19 +111,19 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         /* Get the ‘outputs’ list. */
         const Attr * i;
         if (attrs && (i = attrs->get(state->s.outputs))) {
-            state->forceList(*i->value, i->pos, "while evaluating the 'outputs' attribute of a derivation");
+            state->forceList(*i->value, RangeIdxs{i->pos}, "while evaluating the 'outputs' attribute of a derivation");
 
             /* For each output... */
             for (auto elem : i->value->listView()) {
-                std::string output(
-                    state->forceStringNoCtx(*elem, i->pos, "while evaluating the name of an output of a derivation"));
+                std::string output(state->forceStringNoCtx(
+                    *elem, RangeIdxs{i->pos}, "while evaluating the name of an output of a derivation"));
 
                 if (withPaths) {
                     /* Evaluate the corresponding set. */
                     auto out = attrs->get(state->symbols.create(output));
                     if (!out)
                         continue; // FIXME: throw error?
-                    state->forceAttrs(*out->value, i->pos, "while evaluating an output of a derivation");
+                    state->forceAttrs(*out->value, RangeIdxs{i->pos}, "while evaluating an output of a derivation");
 
                     /* And evaluate its ‘outPath’ attribute. */
                     auto outPath = out->value->attrs()->get(state->s.outPath);
@@ -133,7 +133,10 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
                     outputs.emplace(
                         output,
                         state->coerceToStorePath(
-                            outPath->pos, *outPath->value, context, "while evaluating an output path of a derivation"));
+                            RangeIdxs{outPath->pos},
+                            *outPath->value,
+                            context,
+                            "while evaluating an output path of a derivation"));
                 } else
                     outputs.emplace(output, std::nullopt);
             }
@@ -146,7 +149,8 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
 
     const Attr * i;
     if (attrs && (i = attrs->get(state->s.outputSpecified))
-        && state->forceBool(*i->value, i->pos, "while evaluating the 'outputSpecified' attribute of a derivation")) {
+        && state->forceBool(
+            *i->value, RangeIdxs{i->pos}, "while evaluating the 'outputSpecified' attribute of a derivation")) {
         Outputs result;
         auto out = outputs.find(queryOutputName());
         if (out == outputs.end())
@@ -182,7 +186,7 @@ std::string PackageInfo::queryOutputName() const
     if (outputName == "" && attrs) {
         auto i = attrs->get(state->s.outputName);
         outputName =
-            i ? state->forceStringNoCtx(*i->value, noPos, "while evaluating the output name of a derivation") : "";
+            i ? state->forceStringNoCtx(*i->value, noRange, "while evaluating the output name of a derivation") : "";
     }
     return outputName;
 }
@@ -196,7 +200,7 @@ const Bindings * PackageInfo::getMeta()
     auto a = attrs->get(state->s.meta);
     if (!a)
         return 0;
-    state->forceAttrs(*a->value, a->pos, "while evaluating the 'meta' attribute of a derivation");
+    state->forceAttrs(*a->value, RangeIdxs{a->pos}, "while evaluating the 'meta' attribute of a derivation");
     meta = a->value->attrs();
     return meta;
 }
@@ -213,9 +217,9 @@ StringSet PackageInfo::queryMetaNames()
 
 bool PackageInfo::checkMeta(Value & v)
 {
-    auto _level = state->addCallDepth(v.determinePos(noPos));
+    auto _level = state->addCallDepth(RangeIdxs{v.determinePos(noPos)});
 
-    state->forceValue(v, v.determinePos(noPos));
+    state->forceValue(v, RangeIdxs{v.determinePos(noPos)});
     if (v.type() == nList) {
         for (auto elem : v.listView())
             if (!checkMeta(*elem))
@@ -330,7 +334,7 @@ static bool getDerivation(
     bool ignoreAssertionFailures)
 {
     try {
-        state.forceValue(v, v.determinePos(noPos));
+        state.forceValue(v, RangeIdxs{v.determinePos(noPos)});
         if (!state.isDerivation(v))
             return true;
 
@@ -399,7 +403,7 @@ static void getDerivations(
     Done & done,
     bool ignoreAssertionFailures)
 {
-    auto _level = state.addCallDepth(vIn.determinePos(noPos));
+    auto _level = state.addCallDepth(RangeIdxs{vIn.determinePos(noPos)});
 
     Value v;
     state.autoCallFunction(autoArgs, vIn, v);
@@ -436,7 +440,7 @@ static void getDerivations(
                         auto j = i->value->attrs()->get(state.s.recurseForDerivations);
                         if (j
                             && state.forceBool(
-                                *j->value, j->pos, "while evaluating the attribute `recurseForDerivations`"))
+                                *j->value, RangeIdxs{j->pos}, "while evaluating the attribute `recurseForDerivations`"))
                             getDerivations(
                                 state, *i->value, pathPrefix2, autoArgs, drvs, done, ignoreAssertionFailures);
                     }

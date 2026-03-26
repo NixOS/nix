@@ -16,6 +16,6 @@ void printValueAsXML(
     Value & v,
     std::ostream & out,
     NixStringContext & context,
-    const PosIdx pos);
+    RangeIdxs pos);
 
 }

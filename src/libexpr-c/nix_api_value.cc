@@ -359,7 +359,7 @@ nix_value * nix_get_list_byidx(nix_c_context * context, const nix_value * value,
         auto * p = v.listView()[ix];
         if (p == nullptr)
             return nullptr;
-        state->state.forceValue(*p, nix::noPos);
+        state->state.forceValue(*p, nix::noRange);
         return new_nix_value(p, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL
@@ -394,7 +394,7 @@ nix_value * nix_get_attr_byname(nix_c_context * context, const nix_value * value
         nix::Symbol s = state->state.symbols.create(name);
         auto attr = v.attrs()->get(s);
         if (attr) {
-            state->state.forceValue(*attr->value, nix::noPos);
+            state->state.forceValue(*attr->value, nix::noRange);
             return new_nix_value(attr->value, state->state.mem);
         }
         nix_set_err_msg(context, NIX_ERR_KEY, "missing attribute");
@@ -463,7 +463,7 @@ nix_get_attr_byidx(nix_c_context * context, nix_value * value, EvalState * state
         }
         const nix::Attr & a = (*v.attrs())[i];
         *name = state->state.symbols[a.name].c_str();
-        state->state.forceValue(*a.value, nix::noPos);
+        state->state.forceValue(*a.value, nix::noRange);
         return new_nix_value(a.value, state->state.mem);
     }
     NIXC_CATCH_ERRS_NULL

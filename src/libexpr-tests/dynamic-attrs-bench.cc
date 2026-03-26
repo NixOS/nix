@@ -46,7 +46,7 @@ static void BM_EvalDynamicAttrs(benchmark::State & state)
         state.ResumeTiming();
 
         st.eval(expr, v);
-        st.forceValue(v, noPos);
+        st.forceValue(v, noRange);
         benchmark::DoNotOptimize(v);
     }
 

@@ -90,10 +90,10 @@ static void fetchTree(
     if (params.isFetchGit)
         type = "git";
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], RangeIdxs{pos});
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos, fmt("while evaluating the argument passed to '%s'", fetcher));
+        state.forceAttrs(*args[0], RangeIdxs{pos}, fmt("while evaluating the argument passed to '%s'", fetcher));
 
         fetchers::Attrs attrs;
 
@@ -101,7 +101,9 @@ static void fetchTree(
             if (type)
                 state.error<EvalError>("unexpected argument 'type'").atPos(pos).debugThrow();
             type = state.forceStringNoCtx(
-                *aType->value, aType->pos, fmt("while evaluating the `type` argument passed to '%s'", fetcher));
+                *aType->value,
+                RangeIdxs{aType->pos},
+                fmt("while evaluating the `type` argument passed to '%s'", fetcher));
         } else if (!type)
             state.error<EvalError>("argument 'type' is missing in call to '%s'", fetcher).atPos(pos).debugThrow();
 
@@ -110,9 +112,9 @@ static void fetchTree(
         for (auto & attr : *args[0]->attrs()) {
             if (attr.name == state.s.type)
                 continue;
-            state.forceValue(*attr.value, attr.pos);
+            state.forceValue(*attr.value, RangeIdxs{attr.pos});
             if (attr.value->type() == nPath || attr.value->type() == nString) {
-                auto s = state.coerceToString(attr.pos, *attr.value, context, "", false, false).toOwned();
+                auto s = state.coerceToString(RangeIdxs{attr.pos}, *attr.value, context, "", false, false).toOwned();
                 attrs.emplace(
                     state.symbols[attr.name],
                     params.isFetchGit && state.symbols[attr.name] == "url" ? fixGitURL(s).to_string() : s);
@@ -166,7 +168,7 @@ static void fetchTree(
     } else {
         auto url = state
                        .coerceToString(
-                           pos,
+                           RangeIdxs{pos},
                            *args[0],
                            context,
                            fmt("while evaluating the first argument passed to '%s'", fetcher),
@@ -385,7 +387,7 @@ static void fetch(
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], RangeIdxs{pos});
 
     bool isArgAttrs = args[0]->type() == nAttrs;
     bool nameAttrPassed = false;
@@ -395,16 +397,17 @@ static void fetch(
         for (auto & attr : *args[0]->attrs()) {
             std::string_view n(state.symbols[attr.name]);
             if (n == "url")
-                url = state.forceStringNoCtx(*attr.value, attr.pos, "while evaluating the url we should fetch");
+                url = state.forceStringNoCtx(
+                    *attr.value, RangeIdxs{attr.pos}, "while evaluating the url we should fetch");
             else if (n == "sha256")
                 expectedHash = newHashAllowEmpty(
                     state.forceStringNoCtx(
-                        *attr.value, attr.pos, "while evaluating the sha256 of the content we should fetch"),
+                        *attr.value, RangeIdxs{attr.pos}, "while evaluating the sha256 of the content we should fetch"),
                     HashAlgorithm::SHA256);
             else if (n == "name") {
                 nameAttrPassed = true;
                 name = state.forceStringNoCtx(
-                    *attr.value, attr.pos, "while evaluating the name of the content we should fetch");
+                    *attr.value, RangeIdxs{attr.pos}, "while evaluating the name of the content we should fetch");
             } else
                 state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(pos).debugThrow();
         }
@@ -412,7 +415,7 @@ static void fetch(
         if (!url)
             state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
     } else
-        url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
+        url = state.forceStringNoCtx(*args[0], RangeIdxs{pos}, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
         url = state.settings.resolvePseudoUrl(*url);

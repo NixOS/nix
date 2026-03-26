@@ -167,7 +167,7 @@ TEST_F(EvalStateTest, getBuiltin_ok)
     // auto evaled = maybeThunk("builtins.toString");
     // ASSERT_EQ(evaled, &builtin);
     auto & builtin2 = state.getBuiltin("true");
-    ASSERT_EQ(state.forceBool(builtin2, noPos, "in unit test"), true);
+    ASSERT_EQ(state.forceBool(builtin2, noRange, "in unit test"), true);
 }
 
 TEST_F(EvalStateTest, getBuiltin_fail)

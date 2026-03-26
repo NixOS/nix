@@ -280,7 +280,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             e->eval(*state, *env, v);
             state->forceAttrs(
                 v,
-                noPos,
+                noRange,
                 "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
             for (auto & i : *v.attrs()) {
@@ -470,10 +470,10 @@ ProcessLineResult NixRepl::processLine(std::string line)
         const auto [path, line] = [&]() -> std::pair<SourcePath, uint32_t> {
             if (v.type() == nPath || v.type() == nString) {
                 NixStringContext context;
-                auto path = state->coerceToPath(noPos, v, context, "while evaluating the filename to edit");
+                auto path = state->coerceToPath(noRange, v, context, "while evaluating the filename to edit");
                 return {path, 0};
             } else if (v.isLambda()) {
-                auto pos = state->positions[v.lambda().fun->pos];
+                auto pos = state->positions[v.lambda().fun->pos.start];
                 if (auto path = std::get_if<SourcePath>(&pos.origin))
                     return {*path, pos.line};
                 else
@@ -513,7 +513,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         Value v, f, result;
         evalString(arg, v);
         evalString("drv: (import <nixpkgs> {}).runCommand \"shell\" { buildInputs = [ drv ]; } \"\"", f);
-        state->callFunction(f, v, result, PosIdx());
+        state->callFunction(f, v, result, noRange);
 
         StorePath drvPath = getDerivationPath(result);
         runNix("nix-shell", toOsStrings({state->store->printStorePath(drvPath)}));
@@ -588,7 +588,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
             auto name = select->evalExceptFinalSelect(*state, *env, vAttrs);
             fallbackName = state->symbols[name];
 
-            state->forceAttrs(vAttrs, noPos, "while evaluating an attribute set to look for documentation");
+            state->forceAttrs(vAttrs, noRange, "while evaluating an attribute set to look for documentation");
             auto attrs = vAttrs.attrs();
             assert(attrs);
             auto attr = attrs->get(name);
@@ -798,7 +798,7 @@ void NixRepl::addAttrsToScope(Value & attrs)
 {
     state->forceAttrs(
         attrs,
-        [&]() { return attrs.determinePos(noPos); },
+        [&]() { return RangeIdxs{attrs.determinePos(noPos)}; },
         "while evaluating an attribute set to be merged in the global scope");
     if (displ + attrs.attrs()->size() >= envSize)
         throw Error("environment full; cannot add more variables");
@@ -886,7 +886,7 @@ void NixRepl::evalString(std::string s, Value & v)
 {
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
-    state->forceValue(v, v.determinePos(noPos));
+    state->forceValue(v, RangeIdxs{v.determinePos(noPos)});
 }
 
 void NixRepl::runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input)

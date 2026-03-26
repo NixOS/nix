@@ -67,7 +67,7 @@ findAlongAttrPath(EvalState & state, const std::string & attrPath, Bindings & au
         Value * vNew = state.allocValue();
         state.autoCallFunction(autoArgs, *v, *vNew);
         v = vNew;
-        state.forceValue(*v, noPos);
+        state.forceValue(*v, noRange);
 
         /* It should evaluate to either a set or an expression,
            according to what is specified in the attrPath. */
@@ -132,7 +132,7 @@ std::pair<SourcePath, uint32_t> findPackageFilename(EvalState & state, Value & v
     //        toString + parsing?
     NixStringContext context;
     auto path =
-        state.coerceToPath(noPos, *v2, context, "while evaluating the 'meta.position' attribute of a derivation");
+        state.coerceToPath(noRange, *v2, context, "while evaluating the 'meta.position' attribute of a derivation");
 
     auto fn = path.path.abs();
 

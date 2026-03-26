@@ -10,6 +10,6 @@ error:
        at /pwd/lang/eval-fail-remove.nix:7:10:
             6|
             7|   body = (removeAttrs attrs [ "x" ]).x;
-             |          ^
+             |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             8| }
        Did you mean y?

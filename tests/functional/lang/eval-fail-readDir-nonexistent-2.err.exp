@@ -10,7 +10,7 @@ error:
          at /pwd/lang/eval-fail-readDir-nonexistent-2.nix:2:18:
             1| {
             2|   relativePath = builtins.readDir ./this/path/really/should/not/exist;
-             |                  ^
+             |                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             3| }
 
        error: path '/pwd/lang/this/path/really/should/not/exist' does not exist

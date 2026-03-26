@@ -105,7 +105,10 @@ struct Expr
 
     static Counter nrExprs;
 
-    Expr()
+    RangeIdxs pos;
+
+    Expr(RangeIdxs pos)
+        : pos(pos)
     {
         nrExprs++;
     }
@@ -135,11 +138,6 @@ struct Expr
     virtual void setName(Symbol name);
     virtual void setDocComment(DocComment docComment) {};
 
-    virtual PosIdx getPos() const
-    {
-        return noPos;
-    }
-
     // These are temporary methods to be used only in parser.y
     virtual void resetCursedOr() {};
     virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) {};
@@ -154,12 +152,14 @@ struct ExprInt : Expr
 {
     Value v;
 
-    ExprInt(NixInt n)
+    ExprInt(RangeIdxs pos, NixInt n)
+        : Expr(pos)
     {
         v.mkInt(n);
     };
 
-    ExprInt(NixInt::Inner n)
+    ExprInt(RangeIdxs pos, NixInt::Inner n)
+        : Expr(pos)
     {
         v.mkInt(n);
     };
@@ -172,7 +172,8 @@ struct ExprFloat : Expr
 {
     Value v;
 
-    ExprFloat(NixFloat nf)
+    ExprFloat(RangeIdxs pos, NixFloat nf)
+        : Expr(pos)
     {
         v.mkFloat(nf);
     };
@@ -189,12 +190,14 @@ struct ExprString : Expr
      * This is only for strings already allocated in our polymorphic allocator,
      * or that live at least that long (e.g. c++ string literals)
      */
-    ExprString(const StringData & s)
+    ExprString(RangeIdxs pos, const StringData & s)
+        : Expr(pos)
     {
         v.mkStringNoCopy(s);
     };
 
-    ExprString(std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
+    ExprString(RangeIdxs pos, std::pmr::polymorphic_allocator<char> & alloc, std::string_view sv)
+        : Expr(pos)
     {
         if (sv.size() == 0) {
             v.mkStringNoCopy(""_sds);
@@ -212,8 +215,10 @@ struct ExprPath : Expr
     ref<SourceAccessor> accessor;
     Value v;
 
-    ExprPath(std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
-        : accessor(accessor)
+    ExprPath(
+        RangeIdxs pos, std::pmr::polymorphic_allocator<char> & alloc, ref<SourceAccessor> accessor, std::string_view sv)
+        : Expr(pos)
+        , accessor(accessor)
     {
         v.mkPath(&*accessor, StringData::make(*alloc.resource(), sv));
     }
@@ -227,7 +232,6 @@ typedef uint32_t Displacement;
 
 struct ExprVar : Expr
 {
-    PosIdx pos;
     Symbol name;
 
     /* Whether the variable comes from an environment (e.g. a rec, let
@@ -246,17 +250,10 @@ struct ExprVar : Expr
     Level level = 0;
     Displacement displ = 0;
 
-    ExprVar(Symbol name)
-        : name(name) {};
-    ExprVar(const PosIdx & pos, Symbol name)
-        : pos(pos)
+    ExprVar(RangeIdxs pos, Symbol name)
+        : Expr(pos)
         , name(name) {};
     Value * maybeThunk(EvalState & state, Env & env) override;
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 };
@@ -268,7 +265,7 @@ struct ExprVar : Expr
  */
 struct ExprInheritFrom : ExprVar
 {
-    ExprInheritFrom(PosIdx pos, Displacement displ)
+    ExprInheritFrom(RangeIdxs pos, Displacement displ)
         : ExprVar(pos, {})
     {
         this->level = 0;
@@ -281,18 +278,17 @@ struct ExprInheritFrom : ExprVar
 
 struct ExprSelect : Expr
 {
-    PosIdx pos;
     uint32_t nAttrPath;
     Expr *e, *def;
     AttrName * attrPathStart;
 
     ExprSelect(
         std::pmr::polymorphic_allocator<char> & alloc,
-        const PosIdx & pos,
+        RangeIdxs pos,
         Expr * e,
         std::span<const AttrName> attrPath,
         Expr * def)
-        : pos(pos)
+        : Expr(pos)
         , nAttrPath(attrPath.size())
         , e(e)
         , def(def)
@@ -301,8 +297,8 @@ struct ExprSelect : Expr
         std::ranges::copy(attrPath, attrPathStart);
     };
 
-    ExprSelect(std::pmr::polymorphic_allocator<char> & alloc, const PosIdx & pos, Expr * e, Symbol name)
-        : pos(pos)
+    ExprSelect(std::pmr::polymorphic_allocator<char> & alloc, RangeIdxs pos, Expr * e, Symbol name)
+        : Expr(pos)
         , nAttrPath(1)
         , e(e)
         , def(0)
@@ -310,11 +306,6 @@ struct ExprSelect : Expr
     {
         *attrPathStart = AttrName(name);
     };
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     std::span<const AttrName> getAttrPath() const
     {
@@ -340,17 +331,13 @@ struct ExprOpHasAttr : Expr
     Expr * e;
     std::span<AttrName> attrPath;
 
-    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, Expr * e, std::span<AttrName> attrPath)
-        : e(e)
+    ExprOpHasAttr(std::pmr::polymorphic_allocator<char> & alloc, RangeIdxs pos, Expr * e, std::span<AttrName> attrPath)
+        : Expr(pos)
+        , e(e)
         , attrPath({alloc.allocate_object<AttrName>(attrPath.size()), attrPath.size()})
     {
         std::ranges::copy(attrPath, this->attrPath.begin());
     };
-
-    PosIdx getPos() const override
-    {
-        return e->getPos();
-    }
 
     COMMON_METHODS
 };
@@ -358,7 +345,6 @@ struct ExprOpHasAttr : Expr
 struct ExprAttrs : Expr
 {
     bool recursive;
-    PosIdx pos;
 
     struct AttrDef
     {
@@ -419,20 +405,11 @@ struct ExprAttrs : Expr
      * dynamicAttrs will never be null. See comment on AttrDefs above.
      */
     std::optional<DynamicAttrDefs> dynamicAttrs;
-    ExprAttrs(const PosIdx & pos)
-        : recursive(false)
-        , pos(pos)
+    ExprAttrs(RangeIdxs pos)
+        : Expr(pos)
+        , recursive(false)
         , attrs(AttrDefs{})
         , dynamicAttrs(DynamicAttrDefs{}) {};
-    ExprAttrs()
-        : recursive(false)
-        , attrs(AttrDefs{})
-        , dynamicAttrs(DynamicAttrDefs{}) {};
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 
@@ -446,19 +423,15 @@ struct ExprList : Expr
 {
     std::span<Expr *> elems;
 
-    ExprList(std::pmr::polymorphic_allocator<char> & alloc, std::span<Expr *> exprs)
-        : elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
+    ExprList(std::pmr::polymorphic_allocator<char> & alloc, RangeIdxs pos, std::span<Expr *> exprs)
+        : Expr(pos)
+        , elems({alloc.allocate_object<Expr *>(exprs.size()), exprs.size()})
     {
         std::ranges::copy(exprs, elems.begin());
     };
 
     COMMON_METHODS
     Value * maybeThunk(EvalState & state, Env & env) override;
-
-    PosIdx getPos() const override
-    {
-        return elems.empty() ? noPos : elems.front()->getPos();
-    }
 };
 
 struct Formal
@@ -514,7 +487,6 @@ struct Formals
 
 struct ExprLambda : Expr
 {
-    PosIdx pos;
     Symbol name;
     Symbol arg;
 
@@ -539,11 +511,11 @@ public:
     ExprLambda(
         const PosTable & positions,
         std::pmr::polymorphic_allocator<char> & alloc,
-        PosIdx pos,
+        RangeIdxs pos,
         Symbol arg,
         const FormalsBuilder & formals,
         Expr * body)
-        : pos(pos)
+        : Expr(pos)
         , arg(arg)
         , hasFormals(true)
         , ellipsis(formals.ellipsis)
@@ -555,15 +527,15 @@ public:
             auto err = Error(
                 "too many formal arguments, implementation supports at most %1%",
                 std::numeric_limits<decltype(nFormals)>::max());
-            if (pos)
-                err.atPos(positions[pos]);
+            if (pos.start)
+                err.atPos(positions[pos.start]);
             throw err;
         }
         std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
     };
 
-    ExprLambda(PosIdx pos, Symbol arg, Expr * body)
-        : pos(pos)
+    ExprLambda(RangeIdxs pos, Symbol arg, Expr * body)
+        : Expr(pos)
         , arg(arg)
         , hasFormals(false)
         , ellipsis(false)
@@ -574,18 +546,13 @@ public:
     ExprLambda(
         const PosTable & positions,
         std::pmr::polymorphic_allocator<char> & alloc,
-        PosIdx pos,
+        RangeIdxs pos,
         const FormalsBuilder & formals,
         Expr * body)
         : ExprLambda(positions, alloc, pos, Symbol(), formals, body) {};
 
     void setName(Symbol name) override;
     std::string showNamePos(const EvalState & state) const;
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     virtual void setDocComment(DocComment docComment) override;
     COMMON_METHODS
@@ -598,28 +565,22 @@ struct ExprCall : Expr
      * args will never be null. See comment on ExprAttrs::AttrDefs below.
      */
     std::optional<std::pmr::vector<Expr *>> args;
-    PosIdx pos;
     std::optional<PosIdx> cursedOrEndPos; // used during parsing to warn about https://github.com/NixOS/nix/issues/11118
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
-        : fun(fun)
+    ExprCall(RangeIdxs pos, Expr * fun, std::pmr::vector<Expr *> && args)
+        : Expr(pos)
+        , fun(fun)
         , args(args)
-        , pos(pos)
         , cursedOrEndPos({})
     {
     }
 
-    ExprCall(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
-        : fun(fun)
+    ExprCall(RangeIdxs pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+        : Expr(pos)
+        , fun(fun)
         , args(args)
-        , pos(pos)
         , cursedOrEndPos(cursedOrEndPos)
     {
-    }
-
-    PosIdx getPos() const override
-    {
-        return pos;
     }
 
     virtual void resetCursedOr() override;
@@ -632,62 +593,45 @@ struct ExprLet : Expr
 {
     ExprAttrs * attrs;
     Expr * body;
-    ExprLet(ExprAttrs * attrs, Expr * body)
-        : attrs(attrs)
+    ExprLet(RangeIdxs pos, ExprAttrs * attrs, Expr * body)
+        : Expr(pos)
+        , attrs(attrs)
         , body(body) {};
     COMMON_METHODS
 };
 
 struct ExprWith : Expr
 {
-    PosIdx pos;
     uint32_t prevWith;
     Expr *attrs, *body;
     ExprWith * parentWith;
-    ExprWith(const PosIdx & pos, Expr * attrs, Expr * body)
-        : pos(pos)
+    ExprWith(RangeIdxs pos, Expr * attrs, Expr * body)
+        : Expr(pos)
         , attrs(attrs)
         , body(body) {};
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 };
 
 struct ExprIf : Expr
 {
-    PosIdx pos;
     Expr *cond, *then, *else_;
-    ExprIf(const PosIdx & pos, Expr * cond, Expr * then, Expr * else_)
-        : pos(pos)
+    ExprIf(RangeIdxs pos, Expr * cond, Expr * then, Expr * else_)
+        : Expr(pos)
         , cond(cond)
         , then(then)
         , else_(else_) {};
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 };
 
 struct ExprAssert : Expr
 {
-    PosIdx pos;
     Expr *cond, *body;
-    ExprAssert(const PosIdx & pos, Expr * cond, Expr * body)
-        : pos(pos)
+    ExprAssert(RangeIdxs pos, Expr * cond, Expr * body)
+        : Expr(pos)
         , cond(cond)
         , body(body) {};
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 };
@@ -695,25 +639,17 @@ struct ExprAssert : Expr
 struct ExprOpNot : Expr
 {
     Expr * e;
-    ExprOpNot(Expr * e)
-        : e(e) {};
-
-    PosIdx getPos() const override
-    {
-        return e->getPos();
-    }
+    ExprOpNot(RangeIdxs pos, Expr * e)
+        : Expr(pos)
+        , e(e) {};
 
     COMMON_METHODS
 };
 
 #define MakeBinOpMembers(name, s)                                                        \
-    PosIdx pos;                                                                          \
     Expr *e1, *e2;                                                                       \
-    name(Expr * e1, Expr * e2)                                                           \
-        : e1(e1)                                                                         \
-        , e2(e2){};                                                                      \
-    name(const PosIdx & pos, Expr * e1, Expr * e2)                                       \
-        : pos(pos)                                                                       \
+    name(RangeIdxs pos, Expr * e1, Expr * e2)                                            \
+        : Expr(pos)                                                                      \
         , e1(e1)                                                                         \
         , e2(e2){};                                                                      \
     void show(const SymbolTable & symbols, std::ostream & str) const override            \
@@ -729,11 +665,7 @@ struct ExprOpNot : Expr
         e1->bindVars(es, env);                                                           \
         e2->bindVars(es, env);                                                           \
     }                                                                                    \
-    void eval(EvalState & state, Env & env, Value & v) override;                         \
-    PosIdx getPos() const override                                                       \
-    {                                                                                    \
-        return pos;                                                                      \
-    }
+    void eval(EvalState & state, Env & env, Value & v) override;
 
 #define MakeBinOp(name, s)        \
     struct name : Expr            \
@@ -762,52 +694,37 @@ public:
 
 struct ExprConcatStrings : Expr
 {
-    PosIdx pos;
     bool forceString;
-    std::span<std::pair<PosIdx, Expr *>> es;
+    std::span<Expr *> es;
 
     ExprConcatStrings(
-        std::pmr::polymorphic_allocator<char> & alloc,
-        const PosIdx & pos,
-        bool forceString,
-        std::span<std::pair<PosIdx, Expr *>> es)
-        : pos(pos)
+        std::pmr::polymorphic_allocator<char> & alloc, RangeIdxs pos, bool forceString, std::span<Expr *> es)
+        : Expr(pos)
         , forceString(forceString)
-        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+        , es({alloc.allocate_object<Expr *>(es.size()), es.size()})
     {
         std::ranges::copy(es, this->es.begin());
     };
 
     ExprConcatStrings(
         std::pmr::polymorphic_allocator<char> & alloc,
-        const PosIdx & pos,
+        RangeIdxs pos,
         bool forceString,
-        std::initializer_list<std::pair<PosIdx, Expr *>> es)
-        : pos(pos)
+        std::initializer_list<Expr *> es)
+        : Expr(pos)
         , forceString(forceString)
-        , es({alloc.allocate_object<std::pair<PosIdx, Expr *>>(es.size()), es.size()})
+        , es({alloc.allocate_object<Expr *>(es.size()), es.size()})
     {
         std::ranges::copy(es, this->es.begin());
     };
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
 
     COMMON_METHODS
 };
 
 struct ExprPos : Expr
 {
-    PosIdx pos;
-    ExprPos(const PosIdx & pos)
-        : pos(pos) {};
-
-    PosIdx getPos() const override
-    {
-        return pos;
-    }
+    ExprPos(RangeIdxs pos)
+        : Expr(pos) {};
 
     COMMON_METHODS
 };
@@ -815,6 +732,11 @@ struct ExprPos : Expr
 /* only used to mark thunks as black holes. */
 struct ExprBlackHole : Expr
 {
+    ExprBlackHole()
+        : Expr(noRange)
+    {
+    }
+
     void show(const SymbolTable & symbols, std::ostream & str) const override {}
 
     void eval(EvalState & state, Env & env, Value & v) override;
@@ -845,7 +767,7 @@ public:
     // we define some calls to add explicitly so that the argument can be passed in as initializer lists
     template<class C>
     [[gnu::always_inline]]
-    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args)
+    C * add(RangeIdxs pos, Expr * fun, std::pmr::vector<Expr *> && args)
         requires(std::same_as<C, ExprCall>)
     {
         return alloc.new_object<C>(pos, fun, std::move(args));
@@ -853,7 +775,7 @@ public:
 
     template<class C>
     [[gnu::always_inline]]
-    C * add(const PosIdx & pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
+    C * add(RangeIdxs pos, Expr * fun, std::pmr::vector<Expr *> && args, PosIdx && cursedOrEndPos)
         requires(std::same_as<C, ExprCall>)
     {
         return alloc.new_object<C>(pos, fun, std::move(args), std::move(cursedOrEndPos));
@@ -861,11 +783,7 @@ public:
 
     template<class C>
     [[gnu::always_inline]]
-    C *
-    add(std::pmr::polymorphic_allocator<char> & alloc,
-        const PosIdx & pos,
-        bool forceString,
-        std::span<std::pair<PosIdx, Expr *>> es)
+    C * add(std::pmr::polymorphic_allocator<char> & alloc, RangeIdxs pos, bool forceString, std::span<Expr *> es)
         requires(std::same_as<C, ExprConcatStrings>)
     {
         return alloc.new_object<C>(alloc, pos, forceString, es);
@@ -875,9 +793,9 @@ public:
     [[gnu::always_inline]]
     C *
     add(std::pmr::polymorphic_allocator<char> & alloc,
-        const PosIdx & pos,
+        RangeIdxs pos,
         bool forceString,
-        std::initializer_list<std::pair<PosIdx, Expr *>> es)
+        std::initializer_list<Expr *> es)
         requires(std::same_as<C, ExprConcatStrings>)
     {
         return alloc.new_object<C>(alloc, pos, forceString, es);

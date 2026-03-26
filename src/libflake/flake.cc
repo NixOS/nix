@@ -72,7 +72,7 @@ namespace flake {
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
 {
     if (value.isThunk() && value.isTrivial())
-        state.forceValue(value, pos);
+        state.forceValue(value, RangeIdxs{pos});
 }
 
 static void expectType(EvalState & state, ValueType type, Value & value, const PosIdx pos)
@@ -305,17 +305,19 @@ static Flake readFlake(
             forceTrivialValue(state, *setting.value, setting.pos);
             if (setting.value->type() == nString)
                 flake.config.settings.emplace(
-                    state.symbols[setting.name], std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
+                    state.symbols[setting.name],
+                    std::string(state.forceStringNoCtx(*setting.value, RangeIdxs{setting.pos}, "")));
             else if (setting.value->type() == nPath) {
                 auto storePath =
                     fetchToStore(state.fetchSettings, *state.store, setting.value->path(), FetchMode::Copy);
                 flake.config.settings.emplace(state.symbols[setting.name], state.store->printStorePath(storePath));
             } else if (setting.value->type() == nInt)
                 flake.config.settings.emplace(
-                    state.symbols[setting.name], state.forceInt(*setting.value, setting.pos, "").value);
+                    state.symbols[setting.name], state.forceInt(*setting.value, RangeIdxs{setting.pos}, "").value);
             else if (setting.value->type() == nBool)
                 flake.config.settings.emplace(
-                    state.symbols[setting.name], Explicit<bool>{state.forceBool(*setting.value, setting.pos, "")});
+                    state.symbols[setting.name],
+                    Explicit<bool>{state.forceBool(*setting.value, RangeIdxs{setting.pos}, "")});
             else if (setting.value->type() == nList) {
                 std::vector<std::string> ss;
                 for (auto elem : setting.value->listView()) {
@@ -326,7 +328,7 @@ static Flake readFlake(
                                 state.symbols[setting.name],
                                 showType(*setting.value))
                             .debugThrow();
-                    ss.emplace_back(state.forceStringNoCtx(*elem, setting.pos, ""));
+                    ss.emplace_back(state.forceStringNoCtx(*elem, RangeIdxs{setting.pos}, ""));
                 }
                 flake.config.settings.emplace(state.symbols[setting.name], ss);
             } else
@@ -973,7 +975,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     assert(vFetchFinalTree);
 
     Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
-    state.callFunction(*vCallFlake, args, vRes, noPos);
+    state.callFunction(*vCallFlake, args, vRes, noRange);
 }
 
 std::optional<Fingerprint> LockedFlake::getFingerprint(Store & store, const fetchers::Settings & fetchSettings) const
@@ -1017,7 +1019,7 @@ ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlak
         auto vFlake = state.allocValue();
         callFlake(state, *lockedFlake, *vFlake);
 
-        state.forceAttrs(*vFlake, noPos, "while parsing cached flake data");
+        state.forceAttrs(*vFlake, noRange, "while parsing cached flake data");
 
         auto aOutputs = vFlake->attrs()->get(state.symbols.create("outputs"));
         assert(aOutputs);

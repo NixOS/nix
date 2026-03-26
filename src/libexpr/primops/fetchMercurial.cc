@@ -1,5 +1,6 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/util/pos-idx.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
@@ -16,7 +17,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** ar
     std::string_view name = "source";
     NixStringContext context;
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], RangeIdxs{pos});
 
     if (args[0]->type() == nAttrs) {
 
@@ -25,7 +26,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** ar
             if (n == "url")
                 url = state
                           .coerceToString(
-                              attr.pos,
+                              RangeIdxs{attr.pos},
                               *attr.value,
                               context,
                               "while evaluating the `url` attribute passed to builtins.fetchMercurial",
@@ -36,14 +37,18 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** ar
                 // Ugly: unlike fetchGit, here the "rev" attribute can
                 // be both a revision or a branch/tag name.
                 auto value = state.forceStringNoCtx(
-                    *attr.value, attr.pos, "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
+                    *attr.value,
+                    RangeIdxs{attr.pos},
+                    "while evaluating the `rev` attribute passed to builtins.fetchMercurial");
                 if (std::regex_match(value.begin(), value.end(), revRegex))
                     rev = Hash::parseAny(value, HashAlgorithm::SHA1);
                 else
                     ref = value;
             } else if (n == "name")
                 name = state.forceStringNoCtx(
-                    *attr.value, attr.pos, "while evaluating the `name` attribute passed to builtins.fetchMercurial");
+                    *attr.value,
+                    RangeIdxs{attr.pos},
+                    "while evaluating the `name` attribute passed to builtins.fetchMercurial");
             else
                 state.error<EvalError>("unsupported argument '%s' to 'fetchMercurial'", state.symbols[attr.name])
                     .atPos(attr.pos)
@@ -56,7 +61,7 @@ static void prim_fetchMercurial(EvalState & state, const PosIdx pos, Value ** ar
     } else
         url = state
                   .coerceToString(
-                      pos,
+                      RangeIdxs{pos},
                       *args[0],
                       context,
                       "while evaluating the first argument passed to builtins.fetchMercurial",

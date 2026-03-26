@@ -20,6 +20,12 @@ void BaseError::addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePri
     err.traces.push_front(Trace{.pos = std::move(e), .hint = hint, .print = print});
 }
 
+void BaseError::addTrace(
+    std::shared_ptr<const Pos> && pos, std::shared_ptr<const Pos> && endPos, HintFmt hint, TracePrint print)
+{
+    err.traces.push_front(Trace{.pos = std::move(pos), .endPos = std::move(endPos), .hint = hint, .print = print});
+}
+
 void throwExceptionSelfCheck()
 {
     // This is meant to be caught in initLibUtil()
@@ -69,6 +75,14 @@ inline std::strong_ordering operator<=>(const Trace & lhs, const Trace & rhs)
         if (auto cmp = *lhs.pos <=> *rhs.pos; cmp != 0)
             return cmp;
     }
+    if (lhs.endPos != rhs.endPos) {
+        if (auto cmp = bool{lhs.endPos} <=> bool{rhs.endPos}; cmp != 0)
+            return cmp;
+        if (lhs.endPos && rhs.endPos) {
+            if (auto cmp = *lhs.endPos <=> *rhs.endPos; cmp != 0)
+                return cmp;
+        }
+    }
     // This formats a freshly formatted hint string and then throws it away, which
     // shouldn't be much of a problem because it only runs when pos is equal, and this function is
     // used for trace printing, which is infrequent.
@@ -76,7 +90,8 @@ inline std::strong_ordering operator<=>(const Trace & lhs, const Trace & rhs)
 }
 
 // print lines of code to the ostream, indicating the error column.
-void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc)
+void printCodeLines(
+    std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc, unsigned int endColumn)
 {
     // previous line of code.
     if (loc.prevLineOfCode.has_value()) {
@@ -95,6 +110,9 @@ void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & 
             }
 
             std::string arrows("^");
+            if (endColumn > errPos.column + 1) {
+                arrows += std::string(endColumn - errPos.column - 1, '~');
+            }
 
             out << std::endl << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL, prefix, spaces, arrows);
         }
@@ -139,14 +157,21 @@ static bool printUnknownLocations = getEnv("_NIX_EVAL_SHOW_UNKNOWN_LOCATIONS").h
  *
  * @return true if a position was printed.
  */
-static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std::shared_ptr<const Pos> & pos)
+static bool printPosMaybe(
+    std::ostream & oss,
+    std::string_view indent,
+    const std::shared_ptr<const Pos> & pos,
+    const std::shared_ptr<const Pos> & endPos = {})
 {
     bool hasPos = pos && *pos;
     if (hasPos) {
         oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
 
         if (auto loc = pos->getCodeLines()) {
-            printCodeLines(oss, "", *pos, *loc);
+            unsigned int endColumn = 0;
+            if (endPos && *endPos && endPos->line == pos->line)
+                endColumn = endPos->column;
+            printCodeLines(oss, "", *pos, *loc, endColumn);
             oss << "\n";
         }
     } else if (printUnknownLocations) {
@@ -159,7 +184,7 @@ static void printTrace(std::ostream & output, const std::string_view & indent, s
 {
     output << "\n" << "… " << trace.hint.str() << "\n";
 
-    if (printPosMaybe(output, indent, trace.pos))
+    if (printPosMaybe(output, indent, trace.pos, trace.endPos))
         count++;
 }
 
@@ -412,7 +437,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    printPosMaybe(oss, "", einfo.pos);
+    printPosMaybe(oss, "", einfo.pos, einfo.endPos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {

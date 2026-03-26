@@ -155,7 +155,7 @@ public:
         nix::XMLWriter & doc,
         nix::NixStringContext & context,
         nix::StringSet & drvsSeen,
-        const nix::PosIdx pos) const override
+        nix::RangeIdxs pos) const override
     {
         if (!desc.printValueAsXML) {
             return nix::ExternalValueBase::printValueAsXML(state, strict, location, doc, context, drvsSeen, pos);
@@ -163,7 +163,7 @@ public:
         nix_string_context ctx{context};
         EvalState wrapper{state};
         desc.printValueAsXML(
-            v, &wrapper, strict, location, &doc, &ctx, &drvsSeen, *reinterpret_cast<const uint32_t *>(&pos));
+            v, &wrapper, strict, location, &doc, &ctx, &drvsSeen, *reinterpret_cast<const uint32_t *>(&pos.start));
     }
 
     virtual ~NixCExternalValue() override {};

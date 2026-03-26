@@ -281,13 +281,13 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
 
     auto vRes = state.allocValue();
     Value * args[]{&state.getBuiltin("false"), vDump};
-    state.callFunction(*vGenerateManpage, args, *vRes, noPos);
+    state.callFunction(*vGenerateManpage, args, *vRes, noRange);
 
     auto attr = vRes->attrs()->get(state.symbols.create(mdName + ".md"));
     if (!attr)
         throw UsageError("Nix has no subcommand '%s'", concatStringsSep("", subcommand));
 
-    auto markdown = state.forceString(*attr->value, noPos, "while evaluating the lowdown help text");
+    auto markdown = state.forceString(*attr->value, noRange, "while evaluating the lowdown help text");
 
     RunPager pager;
     std::cout << renderMarkdownToTerminal(markdown) << "\n";

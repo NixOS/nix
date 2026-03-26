@@ -10,7 +10,7 @@ error:
          at /pwd/lang/eval-fail-scope-5.nix:13:10:
            12|
            13|   body = f { };
-             |          ^
+             |          ^~~~~
            14|
 
        … while calling 'f'

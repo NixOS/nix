@@ -203,12 +203,12 @@ TEST_F(PrimOpTest, unsafeGetAttrPos)
 
     auto line = v.attrs()->get(createSymbol("line"));
     ASSERT_NE(line, nullptr);
-    state.forceValue(*line->value, noPos);
+    state.forceValue(*line->value, noRange);
     ASSERT_THAT(*line->value, IsIntEq(4));
 
     auto column = v.attrs()->get(createSymbol("column"));
     ASSERT_NE(column, nullptr);
-    state.forceValue(*column->value, noPos);
+    state.forceValue(*column->value, noRange);
     ASSERT_THAT(*column->value, IsIntEq(3));
 }
 
@@ -310,13 +310,13 @@ TEST_F(PrimOpTest, mapAttrs)
     auto a = v.attrs()->get(createSymbol("a"));
     ASSERT_NE(a, nullptr);
     ASSERT_THAT(*a->value, IsThunk());
-    state.forceValue(*a->value, noPos);
+    state.forceValue(*a->value, noRange);
     ASSERT_THAT(*a->value, IsIntEq(10));
 
     auto b = v.attrs()->get(createSymbol("b"));
     ASSERT_NE(b, nullptr);
     ASSERT_THAT(*b->value, IsThunk());
-    state.forceValue(*b->value, noPos);
+    state.forceValue(*b->value, noRange);
     ASSERT_THAT(*b->value, IsIntEq(20));
 }
 
@@ -380,17 +380,17 @@ TEST_F(PrimOpTest, map)
     ASSERT_THAT(v, IsListOfSize(3));
     auto elem = v.listView()[0];
     ASSERT_THAT(*elem, IsThunk());
-    state.forceValue(*elem, noPos);
+    state.forceValue(*elem, noRange);
     ASSERT_THAT(*elem, IsStringEq("foobar"));
 
     elem = v.listView()[1];
     ASSERT_THAT(*elem, IsThunk());
-    state.forceValue(*elem, noPos);
+    state.forceValue(*elem, noRange);
     ASSERT_THAT(*elem, IsStringEq("foobla"));
 
     elem = v.listView()[2];
     ASSERT_THAT(*elem, IsThunk());
-    state.forceValue(*elem, noPos);
+    state.forceValue(*elem, noRange);
     ASSERT_THAT(*elem, IsStringEq("fooabc"));
 }
 
@@ -467,7 +467,7 @@ TEST_F(PrimOpTest, genList)
     auto listView = v.listView();
     for (const auto [i, elem] : enumerate(listView)) {
         ASSERT_THAT(*elem, IsThunk());
-        state.forceValue(*elem, noPos);
+        state.forceValue(*elem, noRange);
         ASSERT_THAT(*elem, IsIntEq(static_cast<int>(i) + 1));
     }
 }

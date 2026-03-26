@@ -251,7 +251,7 @@ void ExprConcatStrings::show(const SymbolTable & symbols, std::ostream & str) co
             first = false;
         else
             str << " + ";
-        i.second->show(symbols, str);
+        i->show(symbols, str);
     }
     str << ")";
 }
@@ -342,7 +342,7 @@ void ExprVar::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
        enclosing `with'.  If there is no `with', then we can issue an
        "undefined variable" error now. */
     if (withLevel == -1)
-        es.error<UndefinedVarError>("undefined variable '%1%'", es.symbols[name]).atPos(pos).debugThrow();
+        es.error<UndefinedVarError>("undefined variable '%1%'", es.symbols[name]).atPos(pos.start).debugThrow();
     for (auto * e = env.get(); e && !fromWith; e = e->up.get())
         fromWith = e->isWith;
     this->level = withLevel;
@@ -586,7 +586,7 @@ void ExprConcatStrings::bindVars(EvalState & es, const std::shared_ptr<const Sta
         es.exprEnvs.insert(std::make_pair(this, env));
 
     for (auto & i : this->es)
-        i.second->bindVars(es, env);
+        i->bindVars(es, env);
 }
 
 void ExprPos::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
@@ -608,7 +608,7 @@ void ExprLambda::setName(Symbol name)
 std::string ExprLambda::showNamePos(const EvalState & state) const
 {
     std::string id(name ? concatStrings("'", state.symbols[name], "'") : "anonymous function");
-    return fmt("%1% at %2%", id, state.positions[pos]);
+    return fmt("%1% at %2%", id, state.positions[pos.start]);
 }
 
 void ExprLambda::setDocComment(DocComment docComment)
@@ -673,12 +673,12 @@ void ExprCall::warnIfCursedOr(const SymbolTable & symbols, const PosTable & posi
 {
     if (cursedOrEndPos.has_value()) {
         std::ostringstream out;
-        out << "at " << positions[pos]
+        out << "at " << positions[pos.start]
             << ": "
                "This expression uses `or` as an identifier in a way that will change in a future Nix release.\n"
                "Wrap this entire expression in parentheses to preserve its current meaning:\n"
                "    ("
-            << positions[pos].getSnippetUpTo(positions[*cursedOrEndPos]).value_or("could not read expression")
+            << positions[pos.start].getSnippetUpTo(positions[*cursedOrEndPos]).value_or("could not read expression")
             << ")\n"
                "Give feedback at https://github.com/NixOS/nix/pull/11121";
         warn(out.str());

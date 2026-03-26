@@ -5,6 +5,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/value-to-json.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -71,7 +72,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             auto vApply = state->allocValue();
             state->eval(state->parseExprFromString(*apply, state->rootPath(".")), *vApply);
             auto vRes = state->allocValue();
-            state->callFunction(*vApply, *v, *vRes, noPos);
+            state->callFunction(*vApply, *v, *vRes, noRange);
             v = vRes;
         }
 
@@ -82,7 +83,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                 throw Error("path '%s' already exists", writeTo->string());
 
             [&](this const auto & recurse, Value & v, const PosIdx pos, const std::filesystem::path & path) -> void {
-                state->forceValue(v, pos);
+                state->forceValue(v, RangeIdxs{pos});
                 if (v.type() == nString)
                     // FIXME: disallow strings with contexts?
                     writeFile(path, v.string_view());
@@ -112,7 +113,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             logger->stop();
             writeFull(
                 getStandardOutput(),
-                *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+                *state->coerceToString(noRange, *v, context, "while generating the eval command output"));
         }
 
         else if (json) {

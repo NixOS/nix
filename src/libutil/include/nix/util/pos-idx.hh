@@ -6,6 +6,11 @@
 
 namespace nix {
 
+/**
+ * An index into a position table (probably `PosTable`).
+ *
+ * @see PosTable
+ */
 class PosIdx
 {
     friend struct LazyPosAccessors;
@@ -15,14 +20,14 @@ class PosIdx
 private:
     uint32_t id;
 
-    explicit PosIdx(uint32_t id)
+    constexpr explicit PosIdx(uint32_t id)
         : id(id)
     {
     }
 
 public:
-    PosIdx()
-        : id(0)
+    constexpr PosIdx()
+        : PosIdx(0)
     {
     }
 
@@ -47,7 +52,23 @@ public:
     }
 };
 
-inline PosIdx noPos = {};
+constexpr inline PosIdx noPos = {};
+
+/**
+ * A pair of position indices which together denote a range.
+ *
+ * The first one must be after the second one.
+ */
+struct RangeIdxs
+{
+    PosIdx start;
+    PosIdx end;
+
+    bool operator==(const RangeIdxs &) const = default;
+    auto operator<=>(const RangeIdxs &) const = default;
+};
+
+constexpr inline RangeIdxs noRange = {};
 
 } // namespace nix
 

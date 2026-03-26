@@ -119,7 +119,9 @@ YY_DECL;
 
 using namespace nix;
 
-#define CUR_POS state->at(yylhs.location)
+#define CUR_POS state->atStart(yylhs.location)
+#define CUR_END_POS state->atEnd(yylhs.location)
+#define CUR_RANGE state->at(yylhs.location)
 
 void parser::BisonParser::error(const location_type &loc_, const std::string &error)
 {
@@ -129,11 +131,11 @@ void parser::BisonParser::error(const location_type &loc_, const std::string &er
     }
     throw ParseError({
         .msg = HintFmt(error),
-        .pos = state->positions[state->at(loc)]
+        .pos = state->positions[state->atStart(loc)]
     });
 }
 
-#define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->at(pos))
+#define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->atStart(pos))
 static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, PosIdx start) {
     auto it = lexerState.positionToDocComment.find(start);
     if (it != lexerState.positionToDocComment.end()) {
@@ -141,9 +143,10 @@ static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, P
     }
 }
 
-static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
+static Expr * makeCall(Exprs & exprs, RangeIdxs pos, Expr * fn, Expr * arg) {
     if (auto e2 = dynamic_cast<ExprCall *>(fn)) {
         e2->args->push_back(arg);
+        e2->pos.end = pos.end;
         return fn;
     }
     return exprs.add<ExprCall>(pos, fn, {arg});
@@ -163,7 +166,7 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %type <Formal> formal
 %type <std::vector<AttrName>> attrpath
 %type <std::vector<std::pair<AttrName, PosIdx>>> attrs
-%type <std::vector<std::pair<PosIdx, Expr *>>> string_parts_interpolated
+%type <std::vector<Expr *>> string_parts_interpolated
 %type <std::vector<std::pair<PosIdx, std::variant<Expr *, StringToken>>>> ind_string_parts
 %type <Expr *> path_start
 %type <ToBeStringyExpr> string_parts string_attr
@@ -235,14 +238,14 @@ expr: expr_function;
 
 expr_function
   : ID ':' expr_function
-    { auto me = state->exprs.add<ExprLambda>(CUR_POS, state->symbols.create($1), $3);
+    { auto me = state->exprs.add<ExprLambda>(CUR_RANGE, state->symbols.create($1), $3);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
   | formal_set ':' expr_function[body]
     {
       state->validateFormals($formal_set);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, $formal_set, $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_RANGE, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -250,7 +253,7 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_RANGE, arg, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
@@ -258,67 +261,67 @@ expr_function
     {
       auto arg = state->symbols.create($ID);
       state->validateFormals($formal_set, CUR_POS, arg);
-      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_POS, arg, $formal_set, $body);
+      auto me = state->exprs.add<ExprLambda>(state->positions, state->exprs.alloc, CUR_RANGE, arg, $formal_set, $body);
       $$ = me;
       SET_DOC_POS(me, @1);
     }
   | ASSERT expr ';' expr_function
-    { $$ = state->exprs.add<ExprAssert>(CUR_POS, $2, $4); }
+    { $$ = state->exprs.add<ExprAssert>(CUR_RANGE, $2, $4); }
   | WITH expr ';' expr_function
-    { $$ = state->exprs.add<ExprWith>(CUR_POS, $2, $4); }
+    { $$ = state->exprs.add<ExprWith>(CUR_RANGE, $2, $4); }
   | LET binds IN_KW expr_function
     { if (!$2->dynamicAttrs->empty())
         throw ParseError({
             .msg = HintFmt("dynamic attributes not allowed in let"),
             .pos = state->positions[CUR_POS]
         });
-      $$ = state->exprs.add<ExprLet>($2, $4);
+      $$ = state->exprs.add<ExprLet>(CUR_RANGE, $2, $4);
     }
   | expr_if
   ;
 
 expr_if
-  : IF expr THEN expr ELSE expr { $$ = state->exprs.add<ExprIf>(CUR_POS, $2, $4, $6); }
+  : IF expr THEN expr ELSE expr { $$ = state->exprs.add<ExprIf>(CUR_RANGE, $2, $4, $6); }
   | expr_pipe_from
   | expr_pipe_into
   | expr_op
   ;
 
 expr_pipe_from
-  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
-  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->exprs, state->at(@2), $1, $3); }
+  : expr_op PIPE_FROM expr_pipe_from { $$ = makeCall(state->exprs, CUR_RANGE, $1, $3); }
+  | expr_op PIPE_FROM expr_op        { $$ = makeCall(state->exprs, CUR_RANGE, $1, $3); }
   ;
 
 expr_pipe_into
-  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
-  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->exprs, state->at(@2), $3, $1); }
+  : expr_pipe_into PIPE_INTO expr_op { $$ = makeCall(state->exprs, CUR_RANGE, $3, $1); }
+  | expr_op        PIPE_INTO expr_op { $$ = makeCall(state->exprs, CUR_RANGE, $3, $1); }
   ;
 
 expr_op
-  : '!' expr_op %prec NOT { $$ = state->exprs.add<ExprOpNot>($2); }
-  | '-' expr_op %prec NEGATE { $$ = state->exprs.add<ExprCall>(CUR_POS, state->exprs.add<ExprVar>(state->s.sub), {state->exprs.add<ExprInt>(0), $2}); }
-  | expr_op EQ expr_op { $$ = state->exprs.add<ExprOpEq>($1, $3); }
-  | expr_op NEQ expr_op { $$ = state->exprs.add<ExprOpNEq>($1, $3); }
-  | expr_op '<' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.lessThan), {$1, $3}); }
-  | expr_op LEQ expr_op { $$ = state->exprs.add<ExprOpNot>(state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.lessThan), {$3, $1})); }
-  | expr_op '>' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.lessThan), {$3, $1}); }
-  | expr_op GEQ expr_op { $$ = state->exprs.add<ExprOpNot>(state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.lessThan), {$1, $3})); }
-  | expr_op AND expr_op { $$ = state->exprs.add<ExprOpAnd>(state->at(@2), $1, $3); }
-  | expr_op OR expr_op { $$ = state->exprs.add<ExprOpOr>(state->at(@2), $1, $3); }
-  | expr_op IMPL expr_op { $$ = state->exprs.add<ExprOpImpl>(state->at(@2), $1, $3); }
-  | expr_op UPDATE expr_op { $$ = state->exprs.add<ExprOpUpdate>(state->at(@2), $1, $3); }
-  | expr_op '?' attrpath { $$ = state->exprs.add<ExprOpHasAttr>(state->exprs.alloc, $1, $3); }
+  : '!' expr_op %prec NOT { $$ = state->exprs.add<ExprOpNot>(CUR_RANGE, $2); }
+  | '-' expr_op %prec NEGATE { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@1), state->s.sub), {state->exprs.add<ExprInt>(state->at(@1), 0), $2}); }
+  | expr_op EQ expr_op { $$ = state->exprs.add<ExprOpEq>(CUR_RANGE, $1, $3); }
+  | expr_op NEQ expr_op { $$ = state->exprs.add<ExprOpNEq>(CUR_RANGE, $1, $3); }
+  | expr_op '<' expr_op { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.lessThan), {$1, $3}); }
+  | expr_op LEQ expr_op { $$ = state->exprs.add<ExprOpNot>(CUR_RANGE, state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.lessThan), {$3, $1})); }
+  | expr_op '>' expr_op { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.lessThan), {$3, $1}); }
+  | expr_op GEQ expr_op { $$ = state->exprs.add<ExprOpNot>(CUR_RANGE, state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.lessThan), {$1, $3})); }
+  | expr_op AND expr_op { $$ = state->exprs.add<ExprOpAnd>(CUR_RANGE, $1, $3); }
+  | expr_op OR expr_op { $$ = state->exprs.add<ExprOpOr>(CUR_RANGE, $1, $3); }
+  | expr_op IMPL expr_op { $$ = state->exprs.add<ExprOpImpl>(CUR_RANGE, $1, $3); }
+  | expr_op UPDATE expr_op { $$ = state->exprs.add<ExprOpUpdate>(CUR_RANGE, $1, $3); }
+  | expr_op '?' attrpath { $$ = state->exprs.add<ExprOpHasAttr>(state->exprs.alloc, CUR_RANGE, $1, $3); }
   | expr_op '+' expr_op
-    { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, state->at(@2), false, {{state->at(@1), $1}, {state->at(@3), $3}}); }
-  | expr_op '-' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.sub), {$1, $3}); }
-  | expr_op '*' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.mul), {$1, $3}); }
-  | expr_op '/' expr_op { $$ = state->exprs.add<ExprCall>(state->at(@2), state->exprs.add<ExprVar>(state->s.div), {$1, $3}); }
-  | expr_op CONCAT expr_op { $$ = state->exprs.add<ExprOpConcatLists>(state->at(@2), $1, $3); }
+    { $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_RANGE, false, {$1, $3}); }
+  | expr_op '-' expr_op { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.sub), {$1, $3}); }
+  | expr_op '*' expr_op { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.mul), {$1, $3}); }
+  | expr_op '/' expr_op { $$ = state->exprs.add<ExprCall>(CUR_RANGE, state->exprs.add<ExprVar>(state->at(@2), state->s.div), {$1, $3}); }
+  | expr_op CONCAT expr_op { $$ = state->exprs.add<ExprOpConcatLists>(CUR_RANGE, $1, $3); }
   | expr_app
   ;
 
 expr_app
-  : expr_app expr_select { $$ = makeCall(state->exprs, CUR_POS, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
+  : expr_app expr_select { $$ = makeCall(state->exprs, CUR_RANGE, $1, $2); $2->warnIfCursedOr(state->symbols, state->positions); }
   | /* Once a ‘cursed or’ reaches this nonterminal, it is no longer cursed,
        because the uncursed parse would also produce an expr_app. But we need
        to remove the cursed status in order to prevent valid things like
@@ -328,9 +331,9 @@ expr_app
 
 expr_select
   : expr_simple '.' attrpath
-    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, nullptr); }
+    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_RANGE, $1, $3, nullptr); }
   | expr_simple '.' attrpath OR_KW expr_select
-    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_POS, $1, $3, $5); $5->warnIfCursedOr(state->symbols, state->positions); }
+    { $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, CUR_RANGE, $1, $3, $5); $5->warnIfCursedOr(state->symbols, state->positions); }
   | /* Backwards compatibility: because Nixpkgs has a function named ‘or’,
        allow stuff like ‘map or [...]’. This production is problematic (see
        https://github.com/NixOS/nix/issues/11118) and will be refactored in the
@@ -339,7 +342,7 @@ expr_select
        the ExprCall with data (establishing that it is a ‘cursed or’) that can
        be used to emit a warning when an affected expression is parsed. */
     expr_simple OR_KW
-    { $$ = state->exprs.add<ExprCall>(CUR_POS, $1, {state->exprs.add<ExprVar>(CUR_POS, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
+    { $$ = state->exprs.add<ExprCall>(CUR_RANGE, $1, {state->exprs.add<ExprVar>(CUR_RANGE, state->s.or_)}, state->positions.add(state->origin, @$.endOffset)); }
   | expr_simple
   ;
 
@@ -347,27 +350,27 @@ expr_simple
   : ID {
       std::string_view s = "__curPos";
       if ($1.l == s.size() && strncmp($1.p, s.data(), s.size()) == 0)
-          $$ = state->exprs.add<ExprPos>(CUR_POS);
+          $$ = state->exprs.add<ExprPos>(CUR_RANGE);
       else
-          $$ = state->exprs.add<ExprVar>(CUR_POS, state->symbols.create($1));
+          $$ = state->exprs.add<ExprVar>(CUR_RANGE, state->symbols.create($1));
   }
-  | INT_LIT { $$ = state->exprs.add<ExprInt>($1); }
-  | FLOAT_LIT { $$ = state->exprs.add<ExprFloat>($1); }
+  | INT_LIT { $$ = state->exprs.add<ExprInt>(CUR_RANGE, $1); }
+  | FLOAT_LIT { $$ = state->exprs.add<ExprFloat>(CUR_RANGE, $1); }
   | '"' string_parts '"' { $$ = $2.toExpr(state->exprs); }
   | IND_STRING_OPEN ind_string_parts IND_STRING_CLOSE {
       $$ = state->stripIndentation(CUR_POS, $2);
   }
   | path_start PATH_END
   | path_start string_parts_interpolated PATH_END {
-      $2.insert($2.begin(), {state->at(@1), $1});
-      $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, false, $2);
+      $2.insert($2.begin(), $1);
+      $$ = state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_RANGE, false, $2);
   }
   | SPATH {
       std::string_view path($1.p + 1, $1.l - 2);
-      $$ = state->exprs.add<ExprCall>(CUR_POS,
-          state->exprs.add<ExprVar>(state->s.findFile),
-          {state->exprs.add<ExprVar>(state->s.nixPath),
-           state->exprs.add<ExprString>(state->exprs.alloc, path)});
+      $$ = state->exprs.add<ExprCall>(CUR_RANGE,
+          state->exprs.add<ExprVar>(CUR_RANGE, state->s.findFile),
+          {state->exprs.add<ExprVar>(CUR_RANGE, state->s.nixPath),
+           state->exprs.add<ExprString>(CUR_RANGE, state->exprs.alloc, path)});
   }
   | URI {
       diagnose(state->settings.lintUrlLiterals, [&](bool fatal) -> std::optional<ParseError> {
@@ -378,36 +381,36 @@ expr_simple
               .pos = state->positions[CUR_POS]
           });
       });
-      $$ = state->exprs.add<ExprString>(state->exprs.alloc, $1);
+      $$ = state->exprs.add<ExprString>(CUR_RANGE, state->exprs.alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
   /* Let expressions `let {..., body = ...}' are just desugared
      into `(rec {..., body = ...}).body'. */
   | LET '{' binds '}'
-    { $3->recursive = true; $3->pos = CUR_POS; $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, noPos, $3, state->s.body); }
+    { $3->recursive = true; $3->pos = CUR_RANGE; $$ = state->exprs.add<ExprSelect>(state->exprs.alloc, noRange, $3, state->s.body); }
   | REC '{' binds '}'
-    { $3->recursive = true; $3->pos = CUR_POS; $$ = $3; }
+    { $3->recursive = true; $3->pos = CUR_RANGE; $$ = $3; }
   | '{' binds1 '}'
-    { $2->pos = CUR_POS; $$ = $2; }
+    { $2->pos = CUR_RANGE; $$ = $2; }
   | '{' '}'
-    { $$ = state->exprs.add<ExprAttrs>(CUR_POS); }
-  | '[' list ']' { $$ = state->exprs.add<ExprList>(state->exprs.alloc, $2); }
+    { $$ = state->exprs.add<ExprAttrs>(CUR_RANGE); }
+  | '[' list ']' { $$ = state->exprs.add<ExprList>(state->exprs.alloc, CUR_RANGE, $2); }
   ;
 
 string_parts
   : STR { $$ = {$1}; }
-  | string_parts_interpolated { $$ = {state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_POS, true, $1)}; }
+  | string_parts_interpolated { $$ = {state->exprs.add<ExprConcatStrings>(state->exprs.alloc, CUR_RANGE, true, $1)}; }
   | { $$ = {std::string_view()}; }
   ;
 
 string_parts_interpolated
   : string_parts_interpolated STR
-  { $$ = std::move($1); $$.emplace_back(state->at(@2), state->exprs.add<ExprString>(state->exprs.alloc, $2)); }
-  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->at(@2), $3); }
-  | DOLLAR_CURLY expr '}' { $$.emplace_back(state->at(@1), $2); }
+  { $$ = std::move($1); $$.push_back(state->exprs.add<ExprString>(state->at(@2), state->exprs.alloc, $2)); }
+  | string_parts_interpolated DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.push_back($3); }
+  | DOLLAR_CURLY expr '}' { $$.push_back($2); }
   | STR DOLLAR_CURLY expr '}' {
-      $$.emplace_back(state->at(@1), state->exprs.add<ExprString>(state->exprs.alloc, $1));
-      $$.emplace_back(state->at(@2), $3);
+      $$.push_back(state->exprs.add<ExprString>(state->at(@1), state->exprs.alloc, $1));
+      $$.push_back($3);
     }
   ;
 
@@ -430,7 +433,7 @@ path_start
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
-        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
+        $$ = state->exprs.add<ExprPath>(CUR_RANGE, state->exprs.alloc, state->rootFS, path);
     } else {
         /* check for short path literals */
         diagnose(state->settings.lintShortPathLiterals, [&](bool) -> std::optional<ParseError> {
@@ -446,7 +449,7 @@ path_start
         /* add back in the trailing '/' to the first segment */
         if (literal.size() > 1 && literal.back() == '/')
           path += '/';
-        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->basePath.accessor, path);
+        $$ = state->exprs.add<ExprPath>(CUR_RANGE, state->exprs.alloc, state->basePath.accessor, path);
     }
   }
   | HPATH {
@@ -464,19 +467,19 @@ path_start
         });
     });
     auto path(getHome().string() + std::string($1.p + 1, $1.l - 1));
-    $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
+    $$ = state->exprs.add<ExprPath>(CUR_RANGE, state->exprs.alloc, state->rootFS, path);
   }
   ;
 
 ind_string_parts
-  : ind_string_parts IND_STR { $$ = std::move($1); $$.emplace_back(state->at(@2), $2); }
-  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->at(@2), $3); }
+  : ind_string_parts IND_STR { $$ = std::move($1); $$.emplace_back(state->atStart(@2), $2); }
+  | ind_string_parts DOLLAR_CURLY expr '}' { $$ = std::move($1); $$.emplace_back(state->atStart(@2), $3); }
   | { }
   ;
 
 binds
   : binds1
-  | { $$ = state->exprs.add<ExprAttrs>(); }
+  | { $$ = state->exprs.add<ExprAttrs>(noRange); }
   ;
 
 binds1
@@ -491,7 +494,7 @@ binds1
               state->dupAttr(i.symbol, iPos, (*$accum->attrs)[i.symbol].pos);
           $accum->attrs->emplace(
               i.symbol,
-              ExprAttrs::AttrDef(state->exprs.add<ExprVar>(iPos, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
+              ExprAttrs::AttrDef(state->exprs.add<ExprVar>(RangeIdxs{iPos, noPos}, i.symbol), iPos, ExprAttrs::AttrDef::Kind::Inherited));
       }
     }
   | binds[accum] INHERIT '(' expr ')' attrs ';'
@@ -506,27 +509,27 @@ binds1
           $accum->attrs->emplace(
               i.symbol,
               ExprAttrs::AttrDef(
-                  state->exprs.add<ExprSelect>(state->exprs.alloc, iPos, from, i.symbol),
+                  state->exprs.add<ExprSelect>(state->exprs.alloc, RangeIdxs{iPos, noPos}, from, i.symbol),
                   iPos,
                   ExprAttrs::AttrDef::Kind::InheritedFrom));
       }
     }
   | attrpath '=' expr ';'
-    { $$ = state->exprs.add<ExprAttrs>();
+    { $$ = state->exprs.add<ExprAttrs>(noRange);
       state->addAttr($$, std::move($attrpath), @attrpath, $expr, @expr);
     }
   ;
 
 attrs
-  : attrs attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($2), state->at(@2)); }
+  : attrs attr { $$ = std::move($1); $$.emplace_back(state->symbols.create($2), state->atStart(@2)); }
   | attrs string_attr
     { $$ = std::move($1);
       $2.visit(overloaded{
-          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str), state->at(@2)); },
+          [&](std::string_view str) { $$.emplace_back(state->symbols.create(str), state->atStart(@2)); },
           [&](Expr * expr) {
                 throw ParseError({
                     .msg = HintFmt("dynamic attributes not allowed in inherit"),
-                    .pos = state->positions[state->at(@2)]
+                    .pos = state->positions[state->atStart(@2)]
                 });
           }}
       );

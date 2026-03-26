@@ -96,6 +96,7 @@ struct PrimOp;
 class Symbol;
 class SymbolStr;
 class PosIdx;
+struct RangeIdxs;
 struct Pos;
 class StorePath;
 class EvalState;
@@ -160,7 +161,7 @@ public:
         XMLWriter & doc,
         NixStringContext & context,
         StringSet & drvsSeen,
-        const PosIdx pos) const;
+        RangeIdxs pos) const;
 
     virtual ~ExternalValueBase() {};
 };

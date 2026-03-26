@@ -38,7 +38,7 @@ using namespace nix::lexer::internal;
 
 namespace nix {
 
-#define CUR_POS state->at(*yylloc)
+#define CUR_POS state->atStart(*yylloc)
 
 // we make use of the fact that the parser receives a private copy of the input
 // string and can munge around in it.

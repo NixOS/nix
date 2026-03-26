@@ -46,7 +46,7 @@ void processExpr(
 
     for (auto & i : attrPaths) {
         Value & v(*findAlongAttrPath(state, i, autoArgs, vRoot).first);
-        state.forceValue(v, v.determinePos(noPos));
+        state.forceValue(v, RangeIdxs{v.determinePos(noPos)});
 
         NixStringContext context;
         if (evalOnly) {
@@ -56,11 +56,12 @@ void processExpr(
             else
                 state.autoCallFunction(autoArgs, v, vRes);
             if (output == okRaw)
-                std::cout << *state.coerceToString(noPos, vRes, context, "while generating the nix-instantiate output");
+                std::cout << *state.coerceToString(
+                    noRange, vRes, context, "while generating the nix-instantiate output");
             // We intentionally don't output a newline here. The default PS1 for Bash in NixOS starts with a newline
             // and other interactive shells like Zsh are smart enough to print a missing newline before the prompt.
             else if (output == okXML)
-                printValueAsXML(state, strict, location, vRes, std::cout, context, noPos);
+                printValueAsXML(state, strict, location, vRes, std::cout, context, noRange);
             else if (output == okJSON) {
                 printValueAsJSON(state, strict, vRes, v.determinePos(noPos), std::cout, context);
                 std::cout << std::endl;

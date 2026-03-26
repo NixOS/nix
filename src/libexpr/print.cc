@@ -275,8 +275,8 @@ private:
         std::optional<StorePath> storePath;
         if (auto i = v.attrs()->get(state.s.drvPath)) {
             NixStringContext context;
-            storePath =
-                state.coerceToStorePath(i->pos, *i->value, context, "while evaluating the drvPath of a derivation");
+            storePath = state.coerceToStorePath(
+                RangeIdxs{i->pos}, *i->value, context, "while evaluating the drvPath of a derivation");
         }
 
         /* This unfortunately breaks printing nested values because of
@@ -320,7 +320,7 @@ private:
         }
 
         // It is ok to force the item(s) here, because they will be printed anyway.
-        state.forceValue(*item, item->determinePos(noPos));
+        state.forceValue(*item, RangeIdxs{item->determinePos(noPos)});
 
         // Pretty-print single-item attrsets only if they contain nested
         // structures.
@@ -398,7 +398,7 @@ private:
         }
 
         // It is ok to force the item(s) here, because they will be printed anyway.
-        state.forceValue(*item, item->determinePos(noPos));
+        state.forceValue(*item, RangeIdxs{item->determinePos(noPos)});
 
         // Pretty-print single-item lists only if they contain nested
         // structures.
@@ -460,7 +460,7 @@ private:
                 }
 
                 std::ostringstream s;
-                s << state.positions[v.lambda().fun->pos];
+                s << state.positions[v.lambda().fun->pos.start];
                 output << " @ " << filterANSIEscapes(s.view());
             }
         } else if (v.isPrimOp()) {
@@ -560,7 +560,7 @@ private:
 
         try {
             if (options.force) {
-                state.forceValue(v, v.determinePos(noPos));
+                state.forceValue(v, RangeIdxs{v.determinePos(noPos)});
             }
 
             switch (v.type()) {

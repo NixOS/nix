@@ -89,7 +89,8 @@ static void normalizeDatetimeFormat(toml::value & t)
 
 static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Value & val)
 {
-    auto toml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromTOML");
+    auto toml =
+        state.forceStringNoCtx(*args[0], RangeIdxs{pos}, "while evaluating the argument passed to builtins.fromTOML");
 
     std::istringstream tomlStream(std::string{toml});
 

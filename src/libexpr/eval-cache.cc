@@ -24,7 +24,7 @@ void CachedEvalError::force()
     if (v.type() == nAttrs) {
         auto a = v.attrs()->get(this->attr);
 
-        state.forceValue(*a->value, a->pos);
+        state.forceValue(*a->value, RangeIdxs{a->pos});
     }
 
     // Shouldn't happen.
@@ -345,7 +345,7 @@ Value & AttrCursor::getValue()
     if (!_value) {
         if (parent) {
             auto & vParent = parent->first->getValue();
-            root->state.forceAttrs(vParent, noPos, "while searching for an attribute");
+            root->state.forceAttrs(vParent, noRange, "while searching for an attribute");
             auto attr = vParent.attrs()->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
@@ -398,7 +398,7 @@ Value & AttrCursor::forceValue()
     auto & v = getValue();
 
     try {
-        root->state.forceValue(v, noPos);
+        root->state.forceValue(v, noRange);
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
         if (root->db)
@@ -647,7 +647,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     debug("evaluating uncached attribute '%s'", getAttrPathStr());
 
     auto & v = getValue();
-    root->state.forceValue(v, noPos);
+    root->state.forceValue(v, noRange);
 
     if (v.type() != nList)
         root->state.error<TypeError>("'%s' is not a list", getAttrPathStr()).debugThrow();
@@ -656,7 +656,7 @@ std::vector<std::string> AttrCursor::getListOfStrings()
 
     for (auto elem : v.listView())
         res.push_back(
-            std::string(root->state.forceStringNoCtx(*elem, noPos, "while evaluating an attribute for caching")));
+            std::string(root->state.forceStringNoCtx(*elem, noRange, "while evaluating an attribute for caching")));
 
     if (root->db)
         cachedValue = {root->db->setListOfStrings(getKey(), res), res};

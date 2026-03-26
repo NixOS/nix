@@ -58,7 +58,12 @@ struct LinesOfCode
    4feb7d9f71? */
 struct Pos;
 
-void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & errPos, const LinesOfCode & loc);
+void printCodeLines(
+    std::ostream & out,
+    const std::string & prefix,
+    const Pos & errPos,
+    const LinesOfCode & loc,
+    unsigned int endColumn = 0);
 
 /**
  * When a stack frame is printed.
@@ -75,6 +80,7 @@ enum struct TracePrint {
 struct Trace
 {
     std::shared_ptr<const Pos> pos;
+    std::shared_ptr<const Pos> endPos;
     HintFmt hint;
     TracePrint print = TracePrint::Default;
 };
@@ -86,6 +92,7 @@ struct ErrorInfo
     Verbosity level;
     HintFmt msg;
     std::shared_ptr<const Pos> pos;
+    std::shared_ptr<const Pos> endPos;
     std::list<Trace> traces;
     /**
      * Some messages are generated directly by expressions; notably `builtins.warn`, `abort`, `throw`.
@@ -213,6 +220,13 @@ public:
         addTrace(std::move(pos), HintFmt(std::string(fs), std::forward<Args>(args)...));
     }
 
+    template<typename... Args>
+    void addTrace(
+        std::shared_ptr<const Pos> && pos, std::shared_ptr<const Pos> && endPos, std::string_view fs, Args &&... args)
+    {
+        addTrace(std::move(pos), std::move(endPos), HintFmt(std::string(fs), std::forward<Args>(args)...));
+    }
+
     /**
      * Prepends an item to the error trace, as is usual for extra context.
      *
@@ -221,6 +235,12 @@ public:
      * @param print Optional, whether to always print (used by `addErrorContext`)
      */
     void addTrace(std::shared_ptr<const Pos> && pos, HintFmt hint, TracePrint print = TracePrint::Default);
+
+    void addTrace(
+        std::shared_ptr<const Pos> && pos,
+        std::shared_ptr<const Pos> && endPos,
+        HintFmt hint,
+        TracePrint print = TracePrint::Default);
 
     bool hasTrace() const
     {

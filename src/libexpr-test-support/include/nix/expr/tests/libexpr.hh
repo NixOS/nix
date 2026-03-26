@@ -49,7 +49,7 @@ protected:
         assert(e);
         state.eval(e, v);
         if (forceValue)
-            state.forceValue(v, noPos);
+            state.forceValue(v, noRange);
         return v;
     }
 

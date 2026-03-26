@@ -109,10 +109,11 @@ TEST_F(ValuePrintingTests, vLambda)
 {
     Env env{.up = nullptr, .values = {}};
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
-    auto posIdx = state.positions.add(origin, 0);
-    auto body = ExprInt(0);
+    auto startPosIdx = state.positions.add(origin, 0);
+    auto endPosIdx = state.positions.add(origin, 0);
+    auto body = ExprInt(noRange, 0);
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
+    ExprLambda eLambda({startPosIdx, endPosIdx}, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);
@@ -478,11 +479,11 @@ TEST_F(ValuePrintingTests, ansiColorsDerivationError)
 
 TEST_F(ValuePrintingTests, ansiColorsAssert)
 {
-    ExprVar eFalse(state.symbols.create("false"));
+    ExprVar eFalse(noRange, state.symbols.create("false"));
     eFalse.bindVars(state, state.staticBaseEnv);
-    ExprInt eInt(1);
+    ExprInt eInt(noRange, 1);
 
-    ExprAssert expr(noPos, &eFalse, &eInt);
+    ExprAssert expr(noRange, &eFalse, &eInt);
 
     Value v;
     state.mkThunk_(v, &expr);
@@ -514,10 +515,11 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
 {
     Env env{.up = nullptr, .values = {}};
     PosTable::Origin origin = state.positions.addOrigin(std::monostate(), 1);
-    auto posIdx = state.positions.add(origin, 0);
-    auto body = ExprInt(0);
+    auto startPosIdx = state.positions.add(origin, 0);
+    auto endPosIdx = state.positions.add(origin, 0);
+    auto body = ExprInt(noRange, 0);
 
-    ExprLambda eLambda(posIdx, createSymbol("a"), &body);
+    ExprLambda eLambda({startPosIdx, endPosIdx}, createSymbol("a"), &body);
 
     Value vLambda;
     vLambda.mkLambda(&env, &eLambda);

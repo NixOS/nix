@@ -19,7 +19,7 @@ error:
          at /pwd/lang/eval-fail-deepseq-list-attr.nix:7:9:
             6|     a = 2;
             7|     b = throw "error in attr in list element";
-             |         ^
+             |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             8|   }
 
        error: error in attr in list element

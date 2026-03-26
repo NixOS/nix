@@ -10,7 +10,7 @@ error:
          at /pwd/lang/eval-fail-assert.nix:7:10:
             6|
             7|   body = x "x";
-             |          ^
+             |          ^~~~~
             8| }
 
        … while calling 'x'

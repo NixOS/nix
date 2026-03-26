@@ -35,8 +35,8 @@ namespace nix::flake::primops {
 PrimOp getFlake(const Settings & settings)
 {
     auto prim_getFlake = [&settings](EvalState & state, const PosIdx pos, Value ** args, Value & v) {
-        std::string flakeRefS(
-            state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
+        std::string flakeRefS(state.forceStringNoCtx(
+            *args[0], RangeIdxs{pos}, "while evaluating the argument passed to builtins.getFlake"));
         auto flakeRef = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
         if (state.settings.pureEval && !flakeRef.input.isLocked(state.fetchSettings))
             throw Error(
@@ -84,8 +84,8 @@ PrimOp getFlake(const Settings & settings)
 
 static void prim_parseFlakeRef(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    std::string flakeRefS(
-        state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.parseFlakeRef"));
+    std::string flakeRefS(state.forceStringNoCtx(
+        *args[0], RangeIdxs{pos}, "while evaluating the argument passed to builtins.parseFlakeRef"));
     auto attrs = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true).toAttrs();
     auto binds = state.buildBindings(attrs.size());
     for (const auto & [key, value] : attrs) {
@@ -125,10 +125,10 @@ nix::PrimOp parseFlakeRef({
 
 static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
+    state.forceAttrs(*args[0], noRange, "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;
     for (const auto & attr : *args[0]->attrs()) {
-        state.forceValue(*attr.value, attr.pos);
+        state.forceValue(*attr.value, RangeIdxs{attr.pos});
         auto t = attr.value->type();
         if (t == nInt) {
             auto intValue = attr.value->integer().value;

@@ -128,7 +128,7 @@ typedef std::optional<StorePath> StorePathOrGap;
 
 static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchClosure");
+    state.forceAttrs(*args[0], RangeIdxs{pos}, "while evaluating the argument passed to builtins.fetchClosure");
 
     std::optional<std::string> fromStoreUrl;
     std::optional<StorePath> fromPath;
@@ -143,25 +143,25 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
 
         if (attrName == "fromPath") {
             NixStringContext context;
-            fromPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
+            fromPath = state.coerceToStorePath(RangeIdxs{attr.pos}, *attr.value, context, attrHint());
         }
 
         else if (attrName == "toPath") {
-            state.forceValue(*attr.value, attr.pos);
+            state.forceValue(*attr.value, RangeIdxs{attr.pos});
             bool isEmptyString = attr.value->type() == nString && attr.value->string_view() == "";
             if (isEmptyString) {
                 toPath = StorePathOrGap{};
             } else {
                 NixStringContext context;
-                toPath = state.coerceToStorePath(attr.pos, *attr.value, context, attrHint());
+                toPath = state.coerceToStorePath(RangeIdxs{attr.pos}, *attr.value, context, attrHint());
             }
         }
 
         else if (attrName == "fromStore")
-            fromStoreUrl = state.forceStringNoCtx(*attr.value, attr.pos, attrHint());
+            fromStoreUrl = state.forceStringNoCtx(*attr.value, RangeIdxs{attr.pos}, attrHint());
 
         else if (attrName == "inputAddressed")
-            inputAddressedMaybe = state.forceBool(*attr.value, attr.pos, attrHint());
+            inputAddressedMaybe = state.forceBool(*attr.value, RangeIdxs{attr.pos}, attrHint());
 
         else
             throw Error(

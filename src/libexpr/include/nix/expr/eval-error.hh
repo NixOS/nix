@@ -110,9 +110,13 @@ public:
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & atPos(PosIdx pos);
 
+    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & atPos(RangeIdxs range);
+
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & atPos(Value & value, PosIdx fallback = noPos);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withTrace(PosIdx pos, const std::string_view text);
+
+    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withTrace(RangeIdxs range, const std::string_view text);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withFrameTrace(PosIdx pos, const std::string_view text);
 
@@ -121,6 +125,8 @@ public:
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & withFrame(const Env & e, const Expr & ex);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & addTrace(PosIdx pos, HintFmt hint);
+
+    [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & addTrace(RangeIdxs range, HintFmt hint);
 
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> & setIsFromExpr();
 

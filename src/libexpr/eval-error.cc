@@ -26,6 +26,15 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(PosIdx pos)
 }
 
 template<class T>
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(RangeIdxs range)
+{
+    error.err.pos = error.state.positions[range.start];
+    if (range.end)
+        error.err.endPos = error.state.positions[range.end];
+    return *this;
+}
+
+template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(Value & value, PosIdx fallback)
 {
     return atPos(value.determinePos(fallback));
@@ -35,6 +44,13 @@ template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
     error.addTrace(error.state.positions[pos], text);
+    return *this;
+}
+
+template<class T>
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(RangeIdxs range, const std::string_view text)
+{
+    error.addTrace(error.state.positions[range.start], error.state.positions[range.end], text);
     return *this;
 }
 
@@ -53,7 +69,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
     // TODO: What side-effects??
     error.state.debugTraces.push_front(
         DebugTrace{
-            .pos = expr.getPos(),
+            .pos = expr.pos,
             .expr = expr,
             .env = env,
             .hint = HintFmt("Fake frame for debugging purposes"),
@@ -65,6 +81,13 @@ template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint)
 {
     error.addTrace(error.state.positions[pos], hint);
+    return *this;
+}
+
+template<class T>
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(RangeIdxs range, HintFmt hint)
+{
+    error.addTrace(error.state.positions[range.start], error.state.positions[range.end], hint);
     return *this;
 }
 
