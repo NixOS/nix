@@ -49,7 +49,10 @@ std::string SourceAccessor::readFile(const CanonPath & path)
 {
     StringSink sink;
     std::optional<uint64_t> size;
-    readFile(path, sink, [&](uint64_t _size) { size = _size; });
+    readFile(path, sink, [&](uint64_t _size) {
+        size = _size;
+        sink.s.reserve(_size);
+    });
     assert(size && *size == sink.s.size());
     return std::move(sink.s);
 }
