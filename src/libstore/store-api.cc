@@ -270,25 +270,6 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
         });
 }
 
-void Store::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
-{
-    auto expected = readNum<uint64_t>(source);
-    for (uint64_t i = 0; i < expected; ++i) {
-        // FIXME we should not be using the worker protocol here, let
-        // alone the worker protocol with a hard-coded version!
-        auto info = WorkerProto::Serialise<ValidPathInfo>::read(
-            *this,
-            WorkerProto::ReadConn{
-                .from = source,
-                .version = {.number = {.major = 1, .minor = 16}},
-            });
-        info.ultimate = false;
-        EnsureRead wrapper{source, info.narSize};
-        addToStore(info, wrapper, repair, checkSigs);
-        wrapper.finish();
-    }
-}
-
 /*
 The aim of this function is to compute in one pass the correct ValidPathInfo for
 the files that we are trying to add to the store. To accomplish that in one

@@ -458,6 +458,13 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
 void RemoteStore::addMultipleToStore(
     PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
 {
+    if (getConnection()->protoVersion < WorkerProto::Version{.number = {1, 32}}) {
+        Store::addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
+        return;
+    }
+
+    auto conn(getConnection());
+
     // `addMultipleToStore` is single threaded
     size_t bytesExpected = 0;
     for (auto & [pathInfo, _] : pathsToCopy) {
@@ -486,17 +493,8 @@ void RemoteStore::addMultipleToStore(
         }
     });
 
-    addMultipleToStore(*source, repair, checkSigs);
-}
-
-void RemoteStore::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
-{
-    if (getConnection()->protoVersion >= WorkerProto::Version{.number = {1, 32}}) {
-        auto conn(getConnection());
-        conn->to << WorkerProto::Op::AddMultipleToStore << repair << !checkSigs;
-        conn.withFramedSink([&](Sink & sink) { source.drainInto(sink); });
-    } else
-        Store::addMultipleToStore(source, repair, checkSigs);
+    conn->to << WorkerProto::Op::AddMultipleToStore << repair << !checkSigs;
+    conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
 }
 
 void RemoteStore::registerDrvOutput(const Realisation & info)
