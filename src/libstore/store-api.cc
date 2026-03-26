@@ -15,9 +15,6 @@
 #include "nix/util/callback.hh"
 #include "nix/util/git.hh"
 #include "nix/util/posix-source-accessor.hh"
-// FIXME this should not be here, see TODO below on
-// `addMultipleToStore`.
-#include "nix/store/worker-protocol.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
@@ -268,25 +265,6 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
             nrDone++;
             showProgress();
         });
-}
-
-void Store::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
-{
-    auto expected = readNum<uint64_t>(source);
-    for (uint64_t i = 0; i < expected; ++i) {
-        // FIXME we should not be using the worker protocol here, let
-        // alone the worker protocol with a hard-coded version!
-        auto info = WorkerProto::Serialise<ValidPathInfo>::read(
-            *this,
-            WorkerProto::ReadConn{
-                .from = source,
-                .version = {.number = {.major = 1, .minor = 16}},
-            });
-        info.ultimate = false;
-        EnsureRead wrapper{source, info.narSize};
-        addToStore(info, wrapper, repair, checkSigs);
-        wrapper.finish();
-    }
 }
 
 /*
