@@ -748,7 +748,7 @@ std::string Derivation::unparse(
     s += ",["sv;
     first = true;
 
-    auto unparseEnv = [&](const StringPairs atermEnv) {
+    auto unparseEnv = [&](const StringPairs & atermEnv) {
         for (auto & i : atermEnv) {
             if (first)
                 first = false;
