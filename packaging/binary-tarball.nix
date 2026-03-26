@@ -69,7 +69,8 @@ runCommand "nix-binary-tarball-${version}" env ''
   fn=$out/$dir.tar.xz
   mkdir -p $out/nix-support
   echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
-  tar cfJ $fn \
+  tar cf - \
+    --sort=name \
     --owner=0 --group=0 --mode=u+rw,uga+r \
     --mtime='1970-01-01' \
     --absolute-names \
@@ -84,5 +85,5 @@ runCommand "nix-binary-tarball-${version}" env ''
     $TMPDIR/install-systemd-multi-user.sh \
     $TMPDIR/install-multi-user \
     $TMPDIR/reginfo \
-    $(cat ${installerClosureInfo}/store-paths)
+    $(cat ${installerClosureInfo}/store-paths) | xz --threads=1 > $fn
 ''
