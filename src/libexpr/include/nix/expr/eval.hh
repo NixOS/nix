@@ -489,7 +489,7 @@ private:
 
     LookupPath lookupPath;
 
-    boost::unordered_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>
+    const ref<boost::concurrent_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>>
         lookupPathResolved;
 
     /**
