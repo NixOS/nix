@@ -12,6 +12,7 @@
 #include <functional>
 #include <future>
 #include <thread>
+#include <queue>
 
 namespace nix {
 
@@ -131,6 +132,11 @@ private:
     WeakGoals waitingForAWhile;
 
     /**
+     * Goals awaiting completion callbacks.
+     */
+    WeakGoals waitingForCompletion;
+
+    /**
      * Last time the goals in `waitingForAWhile` were woken up.
      */
     steady_time_point lastWokenUp;
@@ -139,6 +145,49 @@ private:
      * Cache for pathContentsGood().
      */
     std::map<StorePath, bool> pathContentsGoodCache;
+
+    class Waker
+    {
+#ifndef _WIN32
+        /**
+         * Wakeup pipe polled alongside all other goal FDs. Gets written to by wakeUpCrossThread.
+         * Not needed on Windows.
+         */
+        unix::SelfPipe wakeupPipe;
+#else
+        Descriptor ioport;
+#endif
+        /**
+         * Queue of goals that need to be woken up.
+         */
+        Sync<std::queue<WeakGoalPtr>> wakeupQueue_;
+
+        friend class Worker;
+
+        void wakeAll(Worker & worker);
+
+        Waker()
+        {
+#ifndef _WIN32
+            wakeupPipe.create();
+#endif
+        }
+
+#ifdef _WIN32
+        Waker(Descriptor ioport)
+            : ioport(ioport)
+        {
+        }
+#endif
+
+    public:
+        void enqueue(WeakGoalPtr goal);
+    };
+
+    /**
+     * This is behind a ref, so that other threads can take a weak_ptr to it.
+     */
+    ref<Waker> wakerState;
 
 public:
 
@@ -257,6 +306,12 @@ public:
     void wakeUp(GoalPtr goal);
 
     /**
+     * Get a weak reference to the goal waker. It can be used to safely enqueue Goals
+     * for wakeup from other threads.
+     */
+    std::weak_ptr<Waker> getCrossThreadWaker();
+
+    /**
      * Return the number of local build processes currently running (but not
      * remote builds via the build hook).
      */
@@ -316,6 +371,11 @@ public:
      * to wait for multiple locks in the main select() loop.
      */
     void waitForAWhile(GoalPtr goal);
+
+    /**
+     * Wait until explicitly resumed by Waker::enqueue.
+     */
+    void waitForCompletion(GoalPtr goal);
 
     /**
      * Loop until the specified top-level goals have finished.

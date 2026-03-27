@@ -1,3 +1,5 @@
+#include "goal-impl.hh"
+
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/util/finally.hh"
 #include "nix/store/build/worker.hh"
@@ -30,49 +32,9 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     for (const auto & sub : subs) {
         trace("trying next substituter");
 
-        /* The callback of the curl download below can outlive `this` (if
-           some other error occurs), so it must not touch `this`. So put
-           the shared state in a separate refcounted object. */
-        auto outPipe = worker.makeMuxablePipe();
-        auto promise = std::make_shared<std::promise<std::shared_ptr<const UnkeyedRealisation>>>();
-
-        sub->queryRealisation(
-            id, {[outPipe(outPipe), promise(promise)](std::future<std::shared_ptr<const UnkeyedRealisation>> res) {
-                try {
-                    Finally updateStats([&]() { outPipe->writeSide.close(); });
-                    promise->set_value(res.get());
-                } catch (...) {
-                    promise->set_exception(std::current_exception());
-                }
-            }});
-
-        worker.childStarted(
-            shared_from_this(),
-            {
-#ifndef _WIN32
-                outPipe->readSide.get()
-#else
-                &*outPipe
-#endif
-            },
-            true,
-            false);
-
-        while (true) {
-            auto event = co_await WaitForChildEvent{};
-            if (std::get_if<ChildOutput>(&event)) {
-                // Doesn't process child output
-            } else if (std::get_if<ChildEOF>(&event)) {
-                break;
-            } else if (std::get_if<TimedOut>(&event)) {
-                unreachable();
-            }
-        }
-
-        worker.childTerminated(this);
-
         try {
-            outputInfo = promise->get_future().get();
+            outputInfo = co_await AsyncCallback<std::shared_ptr<const UnkeyedRealisation>>(
+                [sub, id = this->id](auto cb) { sub->queryRealisation(id, std::move(cb)); });
         } catch (std::exception & e) {
             printError(e.what());
             substituterFailed = true;
