@@ -156,4 +156,37 @@ void syncDescriptor(Descriptor fd)
         throw NativeSysError("fsync file descriptor %1%", fd);
 }
 
+void unix::SelfPipe::create()
+{
+    pipe.create(/*nonBlocking=*/true);
+}
+
+void unix::SelfPipe::notify()
+{
+    /* Write to the self-pipe. If we get EAGAIN that means the notify pipe is full
+       and we don't need to do anything. */
+    ssize_t res;
+    do {
+        res = ::write(pipe.writeSide.get(), "x", 1);
+    } while (res == -1 && errno == EINTR);
+    if (res == -1 && errno != EAGAIN)
+        throw SysError("writing to the self-pipe");
+}
+
+void unix::SelfPipe::drain()
+{
+    /* Drain the self-pipe. */
+    std::array<char, 128> buf;
+    while (true) {
+        if (::read(pipe.readSide.get(), buf.data(), buf.size()) == -1) {
+            if (errno == EAGAIN)
+                break;
+            else if (errno == EINTR)
+                continue;
+            else
+                throw SysError("reading from self-pipe");
+        }
+    }
+}
+
 } // namespace nix

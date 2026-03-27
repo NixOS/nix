@@ -123,7 +123,7 @@ static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size
 }
 #endif
 
-static Pipe sigChldPipe;
+static unix::SelfPipe sigChldPipe;
 
 static void sigChldHandler(int sigNo)
 {
@@ -131,7 +131,7 @@ static void sigChldHandler(int sigNo)
     auto saved_errno = errno;
     /* Write to the self-pipe that gets polled in the accept loop. Pipe
        is non-blocking. https://man7.org/tlpi/code/online/dist/altio/self_pipe.c.html */
-    auto res = ::write(sigChldPipe.writeSide.get(), "x", 1);
+    auto res = ::write(sigChldPipe.pipe.writeSide.get(), "x", 1);
     if (res == -1 && errno != EAGAIN) {
         /* Something is deeply wrong. Can't call std::terminate here because our terminate
            handler is not safe for that. */
@@ -256,7 +256,7 @@ static void daemonLoop(
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    sigChldPipe.create(/*nonBlocking=*/true);
+    sigChldPipe.create();
 
     // Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);
@@ -287,21 +287,10 @@ static void daemonLoop(
             {
                 .socketPath = std::move(socketPath),
                 .socketMode = 0666,
-                .auxiliaryFd = sigChldPipe.readSide.get(),
+                .auxiliaryFd = sigChldPipe.pipe.readSide.get(),
                 .onAuxiliaryFdPollin =
                     []() {
-                        std::array<char, 64> buf;
-
-                        /* Drain the self-pipe. */
-                        while (true) {
-                            if (::read(sigChldPipe.readSide.get(), buf.data(), buf.size()) == -1) {
-                                if (errno == EAGAIN)
-                                    break;
-                                else
-                                    throw SysError("reading from self-pipe for SIGCHLD");
-                            }
-                        }
-
+                        sigChldPipe.drain();
                         /* Reap all dead children. */
                         pid_t pid = -1;
                         int status;

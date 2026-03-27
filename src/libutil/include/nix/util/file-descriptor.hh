@@ -321,6 +321,27 @@ void closeExtraFDs();
  */
 void closeOnExec(Descriptor fd);
 
+/**
+ * A useful primitive for asynchronous poll() loops to notify about some work
+ * completing that gets polled alongside other file descriptors.
+ */
+struct SelfPipe
+{
+    Pipe pipe;
+
+    void create();
+
+    /**
+     * Write some data to the pipe in a non-blocking manner.
+     */
+    void notify();
+
+    /**
+     * Drain all data from the pipe.
+     */
+    void drain();
+};
+
 } // namespace unix
 #endif
 
