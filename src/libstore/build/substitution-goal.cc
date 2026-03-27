@@ -204,11 +204,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
-#ifndef _WIN32
-    outPipe.create();
-#else
-    outPipe.createAsyncPipe(worker.ioport.get());
-#endif
+    outPipe = worker.makeMuxablePipe();
 
     auto promise = std::promise<void>();
 

@@ -543,6 +543,17 @@ void Worker::markContentsGood(const StorePath & path)
     pathContentsGoodCache.insert_or_assign(path, true);
 }
 
+MuxablePipe Worker::makeMuxablePipe()
+{
+    MuxablePipe pipe;
+#ifndef _WIN32
+    pipe.create();
+#else
+    pipe.createAsyncPipe(ioport.get());
+#endif
+    return pipe;
+}
+
 GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal)
 {
     return subGoal;
