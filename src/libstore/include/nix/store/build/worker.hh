@@ -343,6 +343,12 @@ public:
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
+
+    /**
+     * Create a MuxablePipe that the worker can poll. Primary exists to
+     * deduplicate WIN32 ifdefs.
+     */
+    ref<MuxablePipe> makeMuxablePipe();
 };
 
 } // namespace nix
