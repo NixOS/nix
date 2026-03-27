@@ -723,6 +723,13 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                             auto inputFlake = getInputFlake(
                                 *input.ref, inputIsOverride ? fetchers::UseRegistries::All : useRegistriesInputs);
 
+                        
+                            for (auto & [name, value] : inputFlake.selfAttrs) {
+                                if (ref.input.attrs.count(name) == 0) {
+                                    ref.input.attrs.insert_or_assign(name, value);
+                                }
+                            }
+
                             auto childNode =
                                 make_ref<LockedNode>(inputFlake.lockedRef, ref, true, overriddenParentPath);
 
