@@ -17,7 +17,9 @@
 namespace nix {
 
 Worker::Worker(Store & store, Store & evalStore)
-    : act(*logger, actRealise)
+    /* Can't use make_ref, because the constructor is private. */
+    : wakerState(ref<Waker>(new Waker{}))
+    , act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
 #ifdef _WIN32
@@ -33,6 +35,7 @@ Worker::Worker(Store & store, Store & evalStore)
 #ifdef _WIN32
     if (!ioport)
         throw windows::WinError("CreateIoCompletionPort");
+    wakerState->ioport = ioport.get();
 #endif
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
@@ -319,6 +322,12 @@ void Worker::waitForAWhile(GoalPtr goal)
     addToWeakGoals(waitingForAWhile, goal);
 }
 
+void Worker::waitForCompletion(GoalPtr goal)
+{
+    debug("waiting for completion callback");
+    addToWeakGoals(waitingForCompletion, goal);
+}
+
 void Worker::run(const Goals & _topGoals)
 {
     std::vector<nix::DerivedPath> topPaths;
@@ -370,8 +379,8 @@ void Worker::run(const Goals & _topGoals)
         if (topGoals.empty())
             break;
 
-        /* Wait for input. */
-        if (!children.empty() || !waitingForAWhile.empty())
+        /* Wait for input or completion callbacks. */
+        if (!children.empty() || !waitingForAWhile.empty() || !waitingForCompletion.empty())
             waitForInput();
         else if (awake.empty() && 0U == settings.maxBuildJobs) {
             if (Machine::parseConfig({nix::settings.thisSystem}, nix::settings.getWorkerSettings().builders).empty())
@@ -463,6 +472,17 @@ void Worker::waitForInput()
             state.fdToPollStatus[j] = state.pollStatus.size() - 1;
         }
     }
+
+    {
+        auto wakeupPipeFd = wakerState->wakeupPipe.pipe.readSide.get();
+        state.pollStatus.push_back(
+            pollfd{
+                .fd = wakeupPipeFd,
+                .events = POLLIN,
+            });
+
+        state.fdToPollStatus[wakeupPipeFd] = state.pollStatus.size() - 1;
+    }
 #endif
 
     state.poll(
@@ -508,6 +528,17 @@ void Worker::waitForInput()
         }
     }
 
+#ifndef _WIN32
+    std::set<MuxablePipePollState::CommChannel> wakerChannels{wakerState->wakeupPipe.pipe.readSide.get()};
+    state.iterate(
+        wakerChannels,
+        [&](Descriptor k, std::string_view data) { wakerState->wakeAll(*this); },
+        [](Descriptor fd) { unreachable(); });
+#else
+    /* Slightly less optimal on windows. We don't use a wakeup pipe and signal the ioport directly. */
+    wakerState->wakeAll(*this);
+#endif
+
     if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(settings.pollInterval) <= after) {
         lastWokenUp = after;
         for (auto & i : waitingForAWhile) {
@@ -517,6 +548,39 @@ void Worker::waitForInput()
         }
         waitingForAWhile.clear();
     }
+}
+
+std::weak_ptr<Worker::Waker> Worker::getCrossThreadWaker()
+{
+    return wakerState.get_ptr();
+}
+
+void Worker::Waker::wakeAll(Worker & worker)
+{
+    /* Wake up all goals that have been enqueued by asynchronous completion callbacks. */
+    auto wakeupQueue(wakeupQueue_.lock());
+#ifndef _WIN32
+    wakeupPipe.drain();
+#endif
+    while (!wakeupQueue->empty()) {
+        auto ptr = wakeupQueue->front().lock();
+        wakeupQueue->pop();
+        if (ptr) {
+            worker.waitingForCompletion.erase(ptr);
+            worker.wakeUp(ptr);
+        }
+    }
+}
+
+void Worker::Waker::enqueue(WeakGoalPtr goal)
+{
+    wakeupQueue_.lock()->push(goal);
+#ifdef _WIN32
+    PostQueuedCompletionStatus(
+        ioport, /*dwNumberOfBytesTransferred=*/0, /*dwCompletionKey=*/0, /*lpOverlapped=*/nullptr);
+#else
+    wakeupPipe.notify();
+#endif
 }
 
 bool Worker::pathContentsGood(const StorePath & path)

@@ -253,6 +253,12 @@ public:
         void await_resume() {};
     };
 
+    template<typename T>
+    struct AsyncCallback
+    {
+        fun<void(Callback<T>)> fn;
+    };
+
     /**
      * Used on initial suspend, does the same as `std::suspend_always`,
      * but asserts that everything has been set correctly.
@@ -422,6 +428,9 @@ public:
         {
             return static_cast<Co &&>(co);
         }
+
+        template<typename T>
+        auto await_transform(AsyncCallback<T> && acb);
 
         /**
          * Awaiter for @ref Suspend. Always suspends, but asserts

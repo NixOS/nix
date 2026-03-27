@@ -1,3 +1,5 @@
+#include "goal-impl.hh"
+
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/nar-info.hh"
@@ -73,53 +75,10 @@ Goal::Co PathSubstitutionGoal::init()
         }
 
         try {
-            /* The callback of the curl download below can outlive `this` (if
-               some other error occurs), so it must not touch `this`. So put
-               the shared state in a separate refcounted object. */
-            auto outPipe = std::make_shared<MuxablePipe>(worker.makeMuxablePipe());
-            auto promise = std::make_shared<std::promise<std::shared_ptr<const ValidPathInfo>>>();
-
-            sub->queryPathInfo(
-                subPath ? *subPath : storePath,
-                Callback<ref<const ValidPathInfo>>{
-                    [outPipe(outPipe), promise(promise)](std::future<ref<const ValidPathInfo>> res) {
-                        try {
-                            Finally notify([&]() { outPipe->writeSide.close(); });
-                            promise->set_value(res.get());
-                        } catch (InvalidPath &) {
-                            promise->set_value(nullptr);
-                        } catch (...) {
-                            promise->set_exception(std::current_exception());
-                        }
-                    }});
-
-            worker.childStarted(
-                shared_from_this(),
-                {
-#ifndef _WIN32
-                    outPipe->readSide.get()
-#else
-                    &*outPipe
-#endif
-                },
-                true,
-                false);
-
-            while (true) {
-                auto event = co_await WaitForChildEvent{};
-                if (std::get_if<ChildOutput>(&event)) {
-                    // Doesn't process child output
-                } else if (std::get_if<ChildEOF>(&event)) {
-                    break;
-                } else if (std::get_if<TimedOut>(&event)) {
-                    unreachable();
-                }
-            }
-
-            worker.childTerminated(this);
-            info = promise->get_future().get();
-            if (!info)
-                continue;
+            info = co_await AsyncCallback<ref<const ValidPathInfo>>(
+                [sub, path = subPath.value_or(storePath)](auto cb) { sub->queryPathInfo(path, std::move(cb)); });
+        } catch (InvalidPath &) {
+            continue;
         } catch (SubstituterDisabled & e) {
             continue;
         } catch (Error & e) {
