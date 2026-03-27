@@ -40,7 +40,17 @@ static std::filesystem::path currentLoad;
 
 static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
 {
-    return openLockFile(currentLoad / fmt("%s-%d", escapeUri(m.storeUri.render()), slot), true);
+    auto storeUri = m.storeUri.render();
+    auto open = [&](auto && base) { return openLockFile(currentLoad / fmt("%s-%d", escapeUri(base), slot), true); };
+    try {
+        return open(storeUri);
+    } catch (SystemError & e) {
+        if (!e.is(std::errc::filename_too_long))
+            throw;
+        // Try again hashing the store URL so we have a shorter path
+        auto h = hashString(HashAlgorithm::MD5, storeUri);
+        return open(h.to_string(HashFormat::Base64, false));
+    }
 }
 
 static bool allSupportedLocally(Store & store, const StringSet & requiredFeatures)
