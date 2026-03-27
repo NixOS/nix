@@ -429,10 +429,21 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
     auto flake = getFlake(state, topRef, useRegistriesTop, {});
 
-    if (lockFlags.applyNixConfig) {
-        flake.config.apply(settings);
+    std::set<std::string> appliedNixConfigRefs;
+
+    auto applyConfigFromFlake = [&](Flake & configFlake) {
+        if (!lockFlags.applyNixConfig)
+            return;
+        if (lockFlags.recursiveNixConfig) {
+            auto refKey = configFlake.lockedRef.to_string();
+            if (!appliedNixConfigRefs.insert(refKey).second)
+                return;
+        }
+        configFlake.config.apply(settings);
         state.store->setOptions();
-    }
+    };
+
+    applyConfigFromFlake(flake);
 
     try {
         if (!state.fetchSettings.allowDirty && lockFlags.referenceLockFilePath) {
@@ -686,6 +697,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
 
                         if (mustRefetch) {
                             auto inputFlake = getInputFlake(oldLock->lockedRef, useRegistriesInputs);
+                            if (lockFlags.recursiveNixConfig && oldLock->isFlake)
+                                applyConfigFromFlake(inputFlake);
                             nodePaths.emplace(childNode, inputFlake.path.parent());
                             computeLocks(
                                 inputFlake.inputs,
@@ -696,6 +709,10 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                 inputFlake.path,
                                 false);
                         } else {
+                            if (lockFlags.recursiveNixConfig && oldLock->isFlake) {
+                                auto inputFlake = getInputFlake(oldLock->lockedRef, useRegistriesInputs);
+                                applyConfigFromFlake(inputFlake);
+                            }
                             computeLocks(
                                 fakeInputs, childNode, inputAttrPath, oldLock, followsPrefix, sourcePath, true);
                         }
@@ -722,6 +739,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                         if (input.isFlake) {
                             auto inputFlake = getInputFlake(
                                 *input.ref, inputIsOverride ? fetchers::UseRegistries::All : useRegistriesInputs);
+                            if (lockFlags.recursiveNixConfig)
+                                applyConfigFromFlake(inputFlake);
 
                             auto childNode =
                                 make_ref<LockedNode>(inputFlake.lockedRef, ref, true, overriddenParentPath);
