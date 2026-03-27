@@ -455,12 +455,17 @@ struct GitInputScheme : InputScheme
             args.push_back(string_to_os_string(*ref));
         }
 
-        if (input.getRev())
-            throw UnimplementedError("cloning a specific revision is not implemented");
-
         args.push_back(destDir.native());
 
         runProgram("git", true, args, {}, true);
+
+        if (auto rev = input.getRev())
+            runProgram(
+                "git",
+                true,
+                {OS_STR("-C"), destDir.native(), OS_STR("checkout"), string_to_os_string(rev->gitRev())},
+                {},
+                true);
     }
 
     std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
