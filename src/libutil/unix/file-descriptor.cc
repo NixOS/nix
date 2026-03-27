@@ -66,17 +66,20 @@ AutoCloseFD dupDescriptor(Descriptor fd)
 
 //////////////////////////////////////////////////////////////////////
 
-void Pipe::create()
+void Pipe::create(bool nonBlocking)
 {
     int fds[2];
 #if HAVE_PIPE2
-    if (pipe2(fds, O_CLOEXEC) != 0)
+    if (pipe2(fds, O_CLOEXEC | (nonBlocking ? O_NONBLOCK : 0)) != 0)
         throw SysError("creating pipe");
 #else
     if (pipe(fds) != 0)
         throw SysError("creating pipe");
-    unix::closeOnExec(fds[0]);
-    unix::closeOnExec(fds[1]);
+    for (auto fd : fds) {
+        unix::closeOnExec(fd);
+        if (nonBlocking && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+            throw SysError("making pipe non-blocking");
+    }
 #endif
     readSide = fds[0];
     writeSide = fds[1];
@@ -151,6 +154,39 @@ void syncDescriptor(Descriptor fd)
         ;
     if (result == -1)
         throw NativeSysError("fsync file descriptor %1%", fd);
+}
+
+void unix::SelfPipe::create()
+{
+    pipe.create(/*nonBlocking=*/true);
+}
+
+void unix::SelfPipe::notify()
+{
+    /* Write to the self-pipe. If we get EAGAIN that means the notify pipe is full
+       and we don't need to do anything. */
+    ssize_t res;
+    do {
+        res = ::write(pipe.writeSide.get(), "x", 1);
+    } while (res == -1 && errno == EINTR);
+    if (res == -1 && errno != EAGAIN)
+        throw SysError("writing to the self-pipe");
+}
+
+void unix::SelfPipe::drain()
+{
+    /* Drain the self-pipe. */
+    std::array<char, 128> buf;
+    while (true) {
+        if (::read(pipe.readSide.get(), buf.data(), buf.size()) == -1) {
+            if (errno == EAGAIN)
+                break;
+            else if (errno == EINTR)
+                continue;
+            else
+                throw SysError("reading from self-pipe");
+        }
+    }
 }
 
 } // namespace nix

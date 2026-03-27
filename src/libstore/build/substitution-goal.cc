@@ -1,8 +1,11 @@
+#include "goal-impl.hh"
+
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/callback.hh"
 #include "nix/store/globals.hh"
 
 #include <coroutine>
@@ -72,9 +75,9 @@ Goal::Co PathSubstitutionGoal::init()
         }
 
         try {
-            // FIXME: make async
-            info = sub->queryPathInfo(subPath ? *subPath : storePath);
-        } catch (InvalidPath & e) {
+            info = co_await AsyncCallback<ref<const ValidPathInfo>>(
+                [sub, path = subPath.value_or(storePath)](auto cb) { sub->queryPathInfo(path, std::move(cb)); });
+        } catch (InvalidPath &) {
             continue;
         } catch (SubstituterDisabled & e) {
             continue;
@@ -204,11 +207,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
-#ifndef _WIN32
-    outPipe.create();
-#else
-    outPipe.createAsyncPipe(worker.ioport.get());
-#endif
+    outPipe = worker.makeMuxablePipe();
 
     auto promise = std::promise<void>();
 
