@@ -36,7 +36,17 @@ public:
      */
     [[nodiscard]] constexpr static inline size_t encodedLength(size_t originalLength)
     {
+        if (originalLength == 0)
+            return 0;
         return (originalLength * 8 - 1) / 5 + 1;
+    }
+
+    /**
+     * Upper bound for the number of bytes produced by decoding a base-32 string.
+     */
+    [[nodiscard]] constexpr static inline size_t maxDecodedLength(size_t encodedLength)
+    {
+        return (encodedLength * 5 + 7) / 8; // ceiling(encodedLength * 5/8)
     }
 
     static std::string encode(std::span<const std::byte> originalData);
