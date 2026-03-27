@@ -15,6 +15,7 @@ doxygen_cfg = configure_file(
     'OUTPUT_DIRECTORY' : meson.current_build_dir(),
     'BUILD_ROOT' : meson.build_root(),
     'src' : fs.parent(fs.parent(meson.project_source_root())) / 'src',
+    'WARNINGS' : meson.is_subproject() ? 'NO' : 'YES',
   },
 )
 
