@@ -4,6 +4,13 @@
 
 namespace nix {
 
+unsigned int BuildError::exitCodeFromStatus(Status status)
+{
+    ExitStatusFlags flags{};
+    flags.updateFromStatus(status);
+    return flags.failingExitStatus();
+}
+
 void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
 {
 // Allow selecting a subset of enum values
@@ -19,8 +26,9 @@ void ExitStatusFlags::updateFromStatus(BuildResult::Failure::Status status)
     case BuildResult::Failure::NotDeterministic:
         checkMismatch = true;
         break;
+    case BuildResult::Failure::OutputRejected:
     case BuildResult::Failure::PermanentFailure:
-    // Also considered a permenant failure, it seems
+    // Also considered a permanent failure, it seems
     case BuildResult::Failure::InputRejected:
         permanentFailure = true;
         break;
@@ -90,7 +98,7 @@ static BuildResult::Success::Status successStatusFromString(std::string_view str
     throw Error("unknown built result success status '%s'", str);
 }
 
-static constexpr std::array<std::pair<BuildResult::Failure::Status, std::string_view>, 12> failureStatusStrings{{
+static constexpr std::array<std::pair<BuildResult::Failure::Status, std::string_view>, 13> failureStatusStrings{{
 #define ENUM_ENTRY(e) {BuildResult::Failure::e, #e}
     ENUM_ENTRY(PermanentFailure),
     ENUM_ENTRY(InputRejected),
@@ -104,6 +112,7 @@ static constexpr std::array<std::pair<BuildResult::Failure::Status, std::string_
     ENUM_ENTRY(NotDeterministic),
     ENUM_ENTRY(NoSubstituters),
     ENUM_ENTRY(HashMismatch),
+    ENUM_ENTRY(Cancelled),
 #undef ENUM_ENTRY
 }};
 
