@@ -8,7 +8,7 @@
 
 #include <fstream>
 #include <string>
-#include <regex>
+#include <boost/regex.hpp>
 #ifndef _WIN32
 #  include <glob.h>
 #endif
@@ -301,10 +301,13 @@ void RootArgs::parseCmdline(const Strings & _cmdline, bool allowShebang)
                 while (std::getline(stream, line) && !line.empty() && commentChars.find(line[0]) != std::string::npos) {
                     line = chomp(line);
 
-                    std::smatch match;
+                    static const auto nixLineRegex =
+                        boost::regex("^#!\\s*nix(:? |$)(.*)$", boost::regex_constants::optimize);
+
+                    boost::smatch match;
                     // We match one space after `nix` so that we preserve indentation.
                     // No space is necessary for an empty line. An empty line has basically no effect.
-                    if (std::regex_match(line, match, std::regex("^#!\\s*nix(:? |$)(.*)$")))
+                    if (boost::regex_match(line, match, nixLineRegex))
                         shebangContent += std::string_view{match[2].first, match[2].second} + "\n";
                 }
                 for (const auto & word : parseShebangContent(shebangContent)) {
