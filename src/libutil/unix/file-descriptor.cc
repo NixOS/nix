@@ -66,17 +66,20 @@ AutoCloseFD dupDescriptor(Descriptor fd)
 
 //////////////////////////////////////////////////////////////////////
 
-void Pipe::create()
+void Pipe::create(bool nonBlocking)
 {
     int fds[2];
 #if HAVE_PIPE2
-    if (pipe2(fds, O_CLOEXEC) != 0)
+    if (pipe2(fds, O_CLOEXEC | (nonBlocking ? O_NONBLOCK : 0)) != 0)
         throw SysError("creating pipe");
 #else
     if (pipe(fds) != 0)
         throw SysError("creating pipe");
-    unix::closeOnExec(fds[0]);
-    unix::closeOnExec(fds[1]);
+    for (auto fd : fds) {
+        unix::closeOnExec(fd);
+        if (nonBlocking && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
+            throw SysError("making pipe non-blocking");
+    }
 #endif
     readSide = fds[0];
     writeSide = fds[1];

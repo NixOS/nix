@@ -297,7 +297,13 @@ class Pipe
 {
 public:
     AutoCloseFD readSide, writeSide;
-    void create();
+
+    void create(
+#ifndef _WIN32
+        bool nonBlocking = false
+#endif
+    );
+
     void close();
 };
 
