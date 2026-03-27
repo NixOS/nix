@@ -859,7 +859,6 @@ StorePath EvalState::mountZoneByTreeSha(const Hash & treeSha, std::string_view z
     // Generate name from zone path (sanitized for store path requirements)
     std::string name = "zone-" + sanitizeZoneNameForStore(zonePath);
 
-    // Create virtual store path
     auto storePath = StorePath::random(name);
 
     // 4. Re-acquire write lock and check again before mounting
