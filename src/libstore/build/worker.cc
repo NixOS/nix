@@ -312,19 +312,19 @@ void Worker::waitForBuildSlot(GoalPtr goal)
 
 void Worker::waitForAnyGoal(GoalPtr goal)
 {
-    debug("wait for any goal");
+    goal->trace("wait for any goal");
     addToWeakGoals(waitingForAnyGoal, goal);
 }
 
 void Worker::waitForAWhile(GoalPtr goal)
 {
-    debug("wait for a while");
+    goal->trace("wait for a while");
     addToWeakGoals(waitingForAWhile, goal);
 }
 
 void Worker::waitForCompletion(GoalPtr goal)
 {
-    debug("waiting for completion callback");
+    goal->trace("waiting for completion callback");
     addToWeakGoals(waitingForCompletion, goal);
 }
 
