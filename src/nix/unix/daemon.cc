@@ -256,11 +256,7 @@ static void daemonLoop(
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
-    sigChldPipe.create();
-
-    for (auto fd : {sigChldPipe.readSide.get(), sigChldPipe.writeSide.get()})
-        if (::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
-            throw SysError("making self-pipe non-blocking");
+    sigChldPipe.create(/*nonBlocking=*/true);
 
     // Get rid of children automatically; don't let them become zombies.
     setSigChldAction(true);

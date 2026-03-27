@@ -79,7 +79,7 @@ AutoCloseFD dupDescriptor(Descriptor fd)
 
 //////////////////////////////////////////////////////////////////////
 
-void Pipe::create()
+void Pipe::create([[maybe_unused]] bool nonBlocking)
 {
     SECURITY_ATTRIBUTES saAttr = {0};
     saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
