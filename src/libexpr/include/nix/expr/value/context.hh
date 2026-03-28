@@ -64,7 +64,23 @@ struct NixStringContextElem
      */
     using Built = SingleDerivedPath::Built;
 
-    using Raw = std::variant<Opaque, DrvDeep, Built>;
+    /**
+     * Self-referential output placeholder.
+     *
+     * Created by `builtins.placeholder` to track which outputs a
+     * derivation references via placeholders. Validated against
+     * declared outputs in `derivationStrict`.
+     *
+     * Encoded in the form `^<outputName>`.
+     */
+    struct SelfOutput
+    {
+        std::string output;
+
+        GENERATE_CMP(SelfOutput, me->output);
+    };
+
+    using Raw = std::variant<Opaque, DrvDeep, Built, SelfOutput>;
 
     Raw raw;
 

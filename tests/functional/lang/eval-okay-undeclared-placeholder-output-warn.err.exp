@@ -1,0 +1,1 @@
+warning: derivation 'test-undeclared-placeholder-warn' references its own output 'bar' via placeholder, but this output is not declared (lint-undeclared-placeholder-outputs)
