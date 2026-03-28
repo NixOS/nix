@@ -1,0 +1,9 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-multiple-contexts.nix:15:1:
+           14| in
+           15| builtins.derivationOf multipleContexts
+             | ^
+           16|
+
+       error: '/nix/store/w190vpfkz3a127yhsd3z35rh02nra1l8-test1/nix/store/8xsds8xaq3yf169w0k54j23ir24gnmwi-test2' is not a valid store path
