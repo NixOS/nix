@@ -1,0 +1,87 @@
+# For the derivation builder inside to communicate with Nix
+interface org.nix.derivation-builder
+
+type DerivationOutput (
+  # Input-addressed output
+  path: ?string,
+  # Fixed content-addressed output
+  method: ?string,
+  hash: ?object,
+  # Floating content-addressed output
+  hashAlgo: ?string,
+  # Impure output
+  impure: ?bool
+)
+
+type DerivationInputs (
+  srcs: []string,
+  drvs: [string]object
+)
+
+type Derivation (
+  version: int,
+  name: string,
+  outputs: [string]DerivationOutput,
+  inputs: DerivationInputs,
+  system: string,
+  builder: string,
+  args: []string,
+  env: [string]string,
+  # Intentionally freeform, as the point of this is being extensible.
+  # Implementations should reject what they don't understand.
+  structuredAttrs: ?object
+)
+
+# Add a file to the store.
+#
+# Parameters:
+# - name: file name
+# - method: content addressing method ("sha256", etc.)
+# - fd: file descriptor number to read from
+#
+# Returns:
+# - path: resulting store path
+#
+# The references should be scanned based on the starting possible
+# reference set of all derivation inputs, and all previously-added store
+# objects. (Every successful add, this possible reference set grows one
+# bigger.)
+#
+# This also requires a file descriptor to be sent which refers to the
+# actual data to be added. I am not sure if it is possible to write this
+# in the IDL since it is an extension (in systemd's usage of Varlink),
+# and not Varlink proper. (Opened
+# https://github.com/systemd/systemd/issues/38595 for this question.)
+method AddToStore(
+  name: string,
+  method: string,
+  #descriptor: int
+) -> (path: string)
+
+# Add a derivation to the store.
+# Parameters:
+# - derivation: derivation in JSON format
+# Returns:
+# - path: store path of the derivation
+method AddDerivation(derivation: Derivation) -> (path: string)
+
+# Submit an output, associating an output with a store object.
+#
+# Parameters:
+# - name: name of the output
+# - path: path of the store object (must already exist in store)
+#
+# The idea is derivations should add and submit their outputs one at a
+# time. This allows a few things:
+#
+# 1. Interesting pipelining. If something downstream just needs e.g. a
+# "dev" or "headers" output, it need not block on waiting for the other
+# outputs of the upstream derivation.
+#
+# 2. Content addressing doesn't require Nix-side rewriting. Instead, it
+# is the responsibility of the builder to add outputs in reference order,
+# and arrange for the store paths that resulted from earlier adds being
+# used in later adds. This would be a very hard problem to solve
+# in "build system space", and punts it back to userspace, where
+# arbitrary strategies can be employed.
+method SubmitOutput(name: string, path: string) -> ()
