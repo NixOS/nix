@@ -56,6 +56,9 @@ struct AttrDb
         SQLiteStmt insertAttributeWithContext;
         SQLiteStmt queryAttribute;
         SQLiteStmt queryAttributes;
+        SQLiteStmt upsertAttribute;
+        SQLiteStmt insertAttributeIfNotExists;
+        SQLiteStmt deleteMissingChildren;
         std::unique_ptr<SQLiteTxn> txn;
     };
 
@@ -89,6 +92,17 @@ struct AttrDb
             state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
         state->queryAttributes.create(state->db, "select name from Attributes where parent = ?");
+
+        state->upsertAttribute.create(
+            state->db,
+            "insert into Attributes(parent, name, type, value) values (?, ?, ?, ?) "
+            "on conflict(parent, name) do update set type = excluded.type, value = excluded.value "
+            "returning rowid");
+
+        state->insertAttributeIfNotExists.create(
+            state->db, "insert or ignore into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
+
+        state->deleteMissingChildren.create(state->db, "delete from Attributes where parent = ? and type = 3");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -124,13 +138,17 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::FullAttrs) (0, false).exec();
-
-            AttrId rowId = state->db.getLastInsertedRowId();
+            // Seal the attribute names: we now know the complete set.
+            auto upsertAttribute(
+                state->upsertAttribute.use()(key.first)(symbols[key.second])(AttrType::FullAttrs) (0, false));
+            upsertAttribute.next();
+            auto rowId = (AttrId) upsertAttribute.getInt(0);
             assert(rowId);
+            state->deleteMissingChildren.use()(rowId).exec();
 
+            // Insert children as placeholders, but don't replace existing entries
             for (auto & attr : attrs)
-                state->insertAttribute.use()(rowId)(symbols[attr])(AttrType::Placeholder) (0, false).exec();
+                state->insertAttributeIfNotExists.use()(rowId)(symbols[attr])(AttrType::Placeholder) (0, false).exec();
 
             return rowId;
         });
@@ -407,9 +425,13 @@ Value & AttrCursor::forceValue()
     }
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
-        if (v.type() == nString)
-            cachedValue = {root->db->setString(getKey(), v.string_view(), v.context()), string_t{v.string_view(), {}}};
-        else if (v.type() == nPath) {
+        if (v.type() == nString) {
+            NixStringContext context;
+            copyContext(v, context);
+            cachedValue = {
+                root->db->setString(getKey(), v.string_view(), v.context()),
+                string_t{v.string_view(), std::move(context)}};
+        } else if (v.type() == nPath) {
             auto path = v.path().path;
             cachedValue = {root->db->setString(getKey(), path.abs()), string_t{path.abs(), {}}};
         } else if (v.type() == nBool)
