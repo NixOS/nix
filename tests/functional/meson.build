@@ -110,6 +110,7 @@ suites = [
       'build-remote-trustless-should-pass-3.sh',
       'build-remote-trustless-should-fail-0.sh',
       'build-remote-with-mounted-ssh-ng.sh',
+      'build-remote-logging.sh',
       'nar-access.sh',
       'impure-eval.sh',
       'pure-eval.sh',
