@@ -20,7 +20,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 {
     trace("init");
 
-    /* If the derivation already exists, we’re done */
+    /* If the derivation already exists, we're done */
     if ((outputInfo = worker.store.queryRealisation(id))) {
         co_return amDone(ecSuccess);
     }
@@ -42,6 +42,8 @@ Goal::Co DrvOutputSubstitutionGoal::init()
 
         if (!outputInfo)
             continue;
+
+        worker.store.registerDrvOutput({*outputInfo, id});
 
         trace("finished");
         co_return amDone(ecSuccess);
