@@ -443,6 +443,12 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
         state.store->setOptions();
     };
 
+    auto needsRecursiveNixConfigFor = [&](const FlakeRef & lockedRef) {
+        if (!lockFlags.recursiveNixConfig)
+            return false;
+        return !appliedNixConfigRefs.contains(lockedRef.to_string());
+    };
+
     applyConfigFromFlake(flake);
 
     try {
@@ -709,7 +715,8 @@ lockFlake(const Settings & settings, EvalState & state, const FlakeRef & topRef,
                                 inputFlake.path,
                                 false);
                         } else {
-                            if (lockFlags.recursiveNixConfig && oldLock->isFlake) {
+                            if (lockFlags.recursiveNixConfig && oldLock->isFlake
+                                && needsRecursiveNixConfigFor(oldLock->lockedRef)) {
                                 auto inputFlake = getInputFlake(oldLock->lockedRef, useRegistriesInputs);
                                 applyConfigFromFlake(inputFlake);
                             }
