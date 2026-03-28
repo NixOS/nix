@@ -443,7 +443,6 @@
                 {
                   # These attributes go right into `packages.<system>`.
                   "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
-                  "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
                   "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
                 }
                 // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (
@@ -453,6 +452,9 @@
                     # These attributes go right into `packages.<system>`.
                     "${pkgName}-${stdenvName}" =
                       nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
+
+                    "${pkgName}-${stdenvName}-static" =
+                      nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsStatic.nixComponents2.${pkgName};
                   }
                 )
               )
@@ -467,6 +469,9 @@
                       "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
                     }
                 )
+                // {
+                  "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
+                }
               )
             )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
