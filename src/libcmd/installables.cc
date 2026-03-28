@@ -67,6 +67,17 @@ MixFlakeOptions::MixFlakeOptions()
     });
 
     addFlag({
+        .longName = "recursive-nix-config",
+        .shortName = 'r',
+        .description = "Apply nixConfig recursively for transitive flake inputs.",
+        .category = category,
+        .handler = {[&]() {
+            lockFlags.recursiveNixConfig = true;
+            lockFlags.applyNixConfig = true;
+        }},
+    });
+
+    addFlag({
         .longName = "no-update-lock-file",
         .description = "Do not allow any updates to the flake's lock file.",
         .category = category,
