@@ -150,8 +150,8 @@ private:
     {
 #ifndef _WIN32
         /**
-         * Wakeup pipe polled alongside all other goal FDs. Gets written to by wakeUpCrossThread.
-         * Not needed on Windows.
+         * Wakeup pipe polled alongside all other goal FDs. Gets written to by
+         * enqueue(). Not needed on Windows.
          */
         unix::SelfPipe wakeupPipe;
 #else
@@ -172,13 +172,6 @@ private:
             wakeupPipe.create();
 #endif
         }
-
-#ifdef _WIN32
-        Waker(Descriptor ioport)
-            : ioport(ioport)
-        {
-        }
-#endif
 
     public:
         void enqueue(WeakGoalPtr goal);
@@ -403,12 +396,6 @@ public:
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
-
-    /**
-     * Create a MuxablePipe that the worker can poll. Primary exists to
-     * deduplicate WIN32 ifdefs.
-     */
-    MuxablePipe makeMuxablePipe();
 };
 
 } // namespace nix

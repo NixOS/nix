@@ -308,6 +308,13 @@ Goal::Co Goal::waitForAWhile()
     co_return Return{};
 }
 
+Goal::Co Goal::waitUntilWoken()
+{
+    worker.waitForCompletion(shared_from_this());
+    co_await Suspend{};
+    co_return Return{};
+}
+
 Goal::Co Goal::waitForBuildSlot()
 {
     worker.waitForBuildSlot(shared_from_this());

@@ -609,7 +609,19 @@ public:
 protected:
     Co await(Goals waitees);
 
+    /**
+     * Awaiting on the resulting coroutine yields the goal for several seconds.
+     * Used for retrying goals blocked on acquiring lockfiles.
+     */
     Co waitForAWhile();
+
+    /**
+     * Awaiting on the resulting coroutine yields the goal until it is
+     * explicitly woken up via Worker::wakeUp. Wakeup can be queued from another
+     * thread via Worker::Waker.
+     */
+    Co waitUntilWoken();
+
     Co waitForBuildSlot();
     Co yield();
 };
