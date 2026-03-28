@@ -4,6 +4,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
+#include "nix/store/build-result.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
@@ -435,6 +436,35 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
                 },
             },
             buildable.raw());
+    }
+}
+
+void createOutLinks(
+    const std::filesystem::path & outLink, const std::vector<KeyedBuildResult> & results, LocalFSStore & store)
+{
+    for (const auto & [_i, result] : enumerate(results)) {
+        auto i = _i;
+        auto & success = std::get<nix::BuildResult::Success>(result.inner);
+        std::visit(
+            overloaded{
+                [&](const DerivedPath::Opaque & bo) {
+                    auto symlink = outLink;
+                    if (i)
+                        symlink += fmt("-%d", i);
+                    store.addPermRoot(bo.path, absPath(symlink).string());
+                },
+                [&](const DerivedPath::Built & bfd) {
+                    for (auto & output : success.builtOutputs) {
+                        auto symlink = outLink;
+                        if (i)
+                            symlink += fmt("-%d", i);
+                        if (output.first != "out")
+                            symlink += fmt("-%s", output.first);
+                        store.addPermRoot(output.second.outPath, absPath(symlink).string());
+                    }
+                },
+            },
+            result.path.raw());
     }
 }
 
