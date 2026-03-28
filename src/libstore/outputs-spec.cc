@@ -139,18 +139,19 @@ using namespace nix;
 
 OutputsSpec adl_serializer<OutputsSpec>::from_json(const json & json)
 {
-    auto names = json.get<StringSet>();
-    if (names == StringSet({"*"}))
+    if (json.is_string() && json.get<std::string>() == "*")
         return OutputsSpec::All{};
-    else
+    else {
+        auto names = json.get<StringSet>();
         return OutputsSpec::Names{std::move(names)};
+    }
 }
 
 void adl_serializer<OutputsSpec>::to_json(json & json, const OutputsSpec & t)
 {
     std::visit(
         overloaded{
-            [&](const OutputsSpec::All &) { json = std::vector<std::string>({"*"}); },
+            [&](const OutputsSpec::All &) { json = "*"; },
             [&](const OutputsSpec::Names & names) { json = names; },
         },
         t.raw);
