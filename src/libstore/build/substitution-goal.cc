@@ -207,53 +207,54 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     auto maintainRunningSubstitutions = std::make_unique<MaintainCount<uint64_t>>(worker.runningSubstitutions);
     worker.updateProgress();
 
-    outPipe = worker.makeMuxablePipe();
-
     auto promise = std::promise<void>();
+    auto future = promise.get_future();
 
-    thr = std::thread([this, &promise, &subPath, &sub]() {
+    /* Be careful with ownership. cleanup() doesn't signal the worker thread
+       to cleanly shutdown, so the worker can die while the thread is still
+       running. That's why we use weak_ptr for everything that is owned by the
+       Worker. */
+    thr = std::thread([weakGoal = weak_from_this(),
+                       promise = std::move(promise),
+                       subPath,
+                       storePath = storePath,
+                       repair = repair,
+                       sub,
+                       maybeWaker = worker.getCrossThreadWaker(),
+                       maybeWorkerStore = worker.store.weak_from_this()]() mutable {
         try {
             ReceiveInterrupts receiveInterrupts;
 
-            /* Wake up the worker loop when we're done. */
-            Finally updateStats([this]() { outPipe.writeSide.close(); });
+            /* The Worker might have died while we were starting up. */
+            auto workerStore = maybeWorkerStore.lock();
+            if (!workerStore)
+                return;
 
             Activity act(
                 *logger,
                 actSubstitute,
-                Logger::Fields{worker.store.printStorePath(storePath), sub->config.getHumanReadableURI()});
+                Logger::Fields{workerStore->printStorePath(storePath), sub->config.getHumanReadableURI()});
             PushActivity pact(act.id);
 
-            copyStorePath(*sub, worker.store, subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);
+            copyStorePath(*sub, *workerStore, subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);
 
             promise.set_value();
         } catch (...) {
             promise.set_exception(std::current_exception());
         }
+
+        /* The Worker might have already died (and the waker with it) by the
+           time we finished. N.B. if enqueueing to the waker throws, we better
+           std::terminate, since something has gone very wrong. This intentionally
+           lets the thread crash on exceptions for that reason. */
+        if (auto waker = maybeWaker.lock())
+            waker->enqueue(weakGoal);
     });
 
-    worker.childStarted(
-        shared_from_this(),
-        {
-#ifndef _WIN32
-            outPipe.readSide.get()
-#else
-            &outPipe
-#endif
-        },
-        true,
-        false);
-
-    while (true) {
-        auto event = co_await WaitForChildEvent{};
-        if (std::get_if<ChildOutput>(&event)) {
-            // Substitution doesn't process child output
-        } else if (std::get_if<ChildEOF>(&event)) {
-            break;
-        } else if (std::get_if<TimedOut>(&event)) {
-            unreachable(); // Substitution doesn't use timeouts
-        }
-    }
+    /* Use up the substitution slot. */
+    worker.childStarted(shared_from_this(), /*channels=*/{}, /*inBuildSlot=*/true, /*respectTimeouts=*/false);
+    /* Suspend until the thread finishes. */
+    co_await waitUntilWoken();
 
     trace("substitute finished");
 
@@ -261,7 +262,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     worker.childTerminated(this);
 
     try {
-        promise.get_future().get();
+        future.get();
     } catch (std::exception & e) {
         /* Cause the parent build to fail unless --fallback is given,
            or the substitute has disappeared. The latter case behaves
@@ -313,8 +314,6 @@ void PathSubstitutionGoal::cleanup()
             thr.join();
             worker.childTerminated(this, JobCategory::Substitution);
         }
-
-        outPipe.close();
     } catch (...) {
         ignoreExceptionInDestructor();
     }

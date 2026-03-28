@@ -4,7 +4,6 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
-#include "nix/util/muxable-pipe.hh"
 #include <coroutine>
 #include <future>
 #include <source_location>
@@ -22,11 +21,6 @@ struct PathSubstitutionGoal : public Goal
      * Whether to try to repair a valid path.
      */
     RepairFlag repair;
-
-    /**
-     * Pipe for the substituter's standard output.
-     */
-    MuxablePipe outPipe;
 
     /**
      * The substituter thread.
