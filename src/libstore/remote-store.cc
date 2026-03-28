@@ -662,6 +662,24 @@ void RemoteStore::addTempRoot(const StorePath & path)
     conn->addTempRoot(*this, &conn.daemonException, path);
 }
 
+std::optional<std::shared_ptr<const ValidPathInfo>> RemoteStore::addTempRootReturningPathInfo(const StorePath & path)
+{
+    {
+        auto conn(getConnection());
+        if (conn->protoVersion.features.contains(WorkerProto::featureAddTempRootReturningPathInfo)) {
+            auto info = conn->addTempRootReturningPathInfo(*this, &conn.daemonException, path);
+            if (!info) {
+                return std::nullopt;
+            }
+
+            return std::make_shared<ValidPathInfo>(StorePath{path}, *info);
+        }
+    }
+    // Fallback for older daemons: use the default implementation
+    // which calls addTempRoot + queryPathInfo separately.
+    return Store::addTempRootReturningPathInfo(path);
+}
+
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
