@@ -1,5 +1,7 @@
 #include "nix/store/build-result.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/strings.hh"
 #include <array>
 
 namespace nix {
@@ -137,6 +139,33 @@ std::strong_ordering BuildError::operator<=>(const BuildError & other) const noe
     if (auto cmp = isNonDeterministic <=> other.isNonDeterministic; cmp != 0)
         return cmp;
     return message() <=> other.message();
+}
+
+void throwBuildResultErrors(const std::vector<KeyedBuildResult> & results, const Store & store)
+{
+    ExitStatusFlags exitStatusFlags;
+    StringSet failed;
+    const BuildResult::Failure * firstFailure = nullptr;
+    for (auto & result : results) {
+        if (auto * f = result.tryGetFailure()) {
+            exitStatusFlags.updateFromStatus(f->status);
+            if (firstFailure)
+                logError(f->info());
+            else
+                firstFailure = f;
+            failed.insert(result.path.to_string(store));
+        }
+    }
+    if (failed.size() == 1 && firstFailure) {
+        auto ex = *firstFailure;
+        ex.withExitStatus(exitStatusFlags.failingExitStatus());
+        throw ex;
+    } else if (!failed.empty()) {
+        if (firstFailure)
+            logError(firstFailure->info());
+        throw Error(
+            exitStatusFlags.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
+    }
 }
 
 } // namespace nix
