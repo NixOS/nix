@@ -48,6 +48,9 @@ struct ChrootPath
     bool optional = false;
 };
 
+void to_json(nlohmann::json & j, const ChrootPath & cp);
+void from_json(const nlohmann::json & j, ChrootPath & cp);
+
 typedef std::map<std::filesystem::path, ChrootPath> PathsInChroot; // maps target path to source path
 
 /**

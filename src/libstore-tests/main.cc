@@ -3,11 +3,9 @@
 #include "nix/store/tests/test-main.hh"
 #include "nix/store/tests/libstore-network.hh"
 
-using namespace nix;
-
 int main(int argc, char ** argv)
 {
-    auto res = testMainForBuidingPre(argc, argv);
+    auto res = nix::testMainForBuidingPre(argc, argv);
     if (res)
         return res;
 

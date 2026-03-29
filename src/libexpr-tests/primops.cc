@@ -637,7 +637,7 @@ TEST_F(PrimOpTest, toStringLambdaThrows)
 }
 
 class ToStringPrimOpTest : public PrimOpTest,
-                           public testing::WithParamInterface<std::tuple<std::string, std::string_view>>
+                           public ::testing::WithParamInterface<std::tuple<std::string, std::string_view>>
 {};
 
 TEST_P(ToStringPrimOpTest, toString)
@@ -651,7 +651,7 @@ TEST_P(ToStringPrimOpTest, toString)
 INSTANTIATE_TEST_SUITE_P(
     toString,
     ToStringPrimOpTest,
-    testing::Values(
+    ::testing::Values(
         CASE(R"("foo")", "foo"),
         CASE(R"(1)", "1"),
         CASE(R"([1 2 3])", "1 2 3"),
@@ -799,7 +799,7 @@ TEST_F(PrimOpTest, splitVersion)
 }
 
 class CompareVersionsPrimOpTest : public PrimOpTest,
-                                  public testing::WithParamInterface<std::tuple<std::string, const int>>
+                                  public ::testing::WithParamInterface<std::tuple<std::string, const int>>
 {};
 
 TEST_P(CompareVersionsPrimOpTest, compareVersions)
@@ -813,7 +813,7 @@ TEST_P(CompareVersionsPrimOpTest, compareVersions)
 INSTANTIATE_TEST_SUITE_P(
     compareVersions,
     CompareVersionsPrimOpTest,
-    testing::Values(
+    ::testing::Values(
         // The first two are weird cases. Intuition tells they should
         // be the same but they aren't.
         CASE(1.0, 1.0.0, -1),
@@ -835,7 +835,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 class ParseDrvNamePrimOpTest
     : public PrimOpTest,
-      public testing::WithParamInterface<std::tuple<std::string, std::string_view, std::string_view>>
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string_view, std::string_view>>
 {};
 
 TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
@@ -857,7 +857,7 @@ TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
 INSTANTIATE_TEST_SUITE_P(
     parseDrvName,
     ParseDrvNamePrimOpTest,
-    testing::Values(
+    ::testing::Values(
         std::make_tuple("nix-0.12pre12876", "nix", "0.12pre12876"),
         std::make_tuple("a-b-c-1234pre5+git", "a-b-c", "1234pre5+git")));
 

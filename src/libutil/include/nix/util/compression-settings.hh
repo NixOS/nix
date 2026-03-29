@@ -18,4 +18,9 @@ std::optional<CompressionAlgo> BaseSetting<std::optional<CompressionAlgo>>::pars
 template<>
 std::string BaseSetting<std::optional<CompressionAlgo>>::to_string() const;
 
+/* Same as with all settings - empty string means std::nullopt. */
+template<>
+struct json_avoids_null<CompressionAlgo> : std::true_type
+{};
+
 } // namespace nix
