@@ -177,44 +177,41 @@ struct DerivationJsonAtermTest : DerivationTest,
 
 MAKE_TEST_P(DerivationJsonAtermTest);
 
-Derivation makeSimpleDrv()
-{
-    Derivation drv;
-    drv.name = "simple-derivation";
-    drv.inputSrcs = {
-        StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
-    };
-    drv.inputDrvs = {
-        .map =
-            {
-                {
-                    StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
-                    {
-                        .value =
-                            {
-                                "cat",
-                                "dog",
-                            },
-                    },
-                },
-            },
-    };
-    drv.platform = "wasm-sel4";
-    drv.builder = "foo";
-    drv.args = {
-        "bar",
-        "baz",
-    };
-    drv.env = StringPairs{
-        {
-            "BIG_BAD",
-            "WOLF",
-        },
-    };
-    return drv;
-}
-
-INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values(makeSimpleDrv()));
+INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values([]() {
+                             Derivation drv;
+                             drv.name = "simple-derivation";
+                             drv.inputSrcs = {
+                                 StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+                             };
+                             drv.inputDrvs = {
+                                 .map =
+                                     {
+                                         {
+                                             StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                                             {
+                                                 .value =
+                                                     {
+                                                         "cat",
+                                                         "dog",
+                                                     },
+                                             },
+                                         },
+                                     },
+                             };
+                             drv.platform = "wasm-sel4";
+                             drv.builder = "foo";
+                             drv.args = {
+                                 "bar",
+                                 "baz",
+                             };
+                             drv.env = StringPairs{
+                                 {
+                                     "BIG_BAD",
+                                     "WOLF",
+                                 },
+                             };
+                             return drv;
+                         }()));
 
 struct DynDerivationJsonAtermTest : DynDerivationTest,
                                     JsonCharacterizationTest<Derivation>,

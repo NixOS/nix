@@ -721,4 +721,10 @@ public:
     const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
 };
 
+template<>
+LocalSettings::ExternalBuilders BaseSetting<LocalSettings::ExternalBuilders>::parse(const std::string & str) const;
+
+template<>
+std::string BaseSetting<LocalSettings::ExternalBuilders>::to_string() const;
+
 } // namespace nix

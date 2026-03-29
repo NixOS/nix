@@ -122,4 +122,10 @@ public:
     VERSIONED_READ_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, (VERSION), VALUE) \
     VERSIONED_WRITE_CHARACTERIZATION_TEST(FIXTURE, NAME, STEM, (VERSION), VALUE)
 
+/// Has to be a `BufferedSink` for handshake.
+struct NullBufferedSink : BufferedSink
+{
+    void writeUnbuffered(std::string_view data) override {}
+};
+
 } // namespace nix

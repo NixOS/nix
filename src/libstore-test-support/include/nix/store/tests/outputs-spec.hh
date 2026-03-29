@@ -9,12 +9,11 @@
 #include "nix/store/tests/path.hh"
 
 namespace rc {
-using namespace nix;
 
 template<>
-struct Arbitrary<OutputsSpec>
+struct Arbitrary<nix::OutputsSpec>
 {
-    static Gen<OutputsSpec> arbitrary();
+    static Gen<nix::OutputsSpec> arbitrary();
 };
 
 } // namespace rc
