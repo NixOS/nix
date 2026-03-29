@@ -153,6 +153,13 @@ let
       ninja
     ]
     ++ prevAttrs.nativeBuildInputs or [ ];
+    mesonFlags =
+      prevAttrs.mesonFlags or [ ]
+      ++ (lib.optionals scope.withUnityBuild [
+        "-Dunity=on"
+        "-Dunity_size=8192"
+        "-Db_pch=false"
+      ]);
     mesonCheckFlags = prevAttrs.mesonCheckFlags or [ ] ++ [
       "--print-errorlogs"
     ];
@@ -318,6 +325,11 @@ in
     Whether meson components are checked with [clang-tidy](https://clang.llvm.org/extra/clang-tidy/).
   */
   withClangTidy = false;
+
+  /**
+    Whether to use [unity builds](https://mesonbuild.com/Unity-builds.html#unity-builds).
+  */
+  withUnityBuild = true;
 
   /**
     A user-provided extension function to apply to each component derivation.
