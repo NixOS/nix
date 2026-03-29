@@ -30,11 +30,7 @@ MakeError(InvalidS3AddressingStyle, Error);
 S3AddressingStyle parseS3AddressingStyle(std::string_view style);
 std::string_view showS3AddressingStyle(S3AddressingStyle style);
 
-template<>
-S3AddressingStyle BaseSetting<S3AddressingStyle>::parse(const std::string & str) const;
-
-template<>
-std::string BaseSetting<S3AddressingStyle>::to_string() const;
+NIX_DECLARE_CONFIG_SERIALISER(S3AddressingStyle)
 
 /**
  * Parsed S3 URL.

@@ -6,17 +6,8 @@
 
 namespace nix {
 
-template<>
-CompressionAlgo BaseSetting<CompressionAlgo>::parse(const std::string & str) const;
-
-template<>
-std::string BaseSetting<CompressionAlgo>::to_string() const;
-
-template<>
-std::optional<CompressionAlgo> BaseSetting<std::optional<CompressionAlgo>>::parse(const std::string & str) const;
-
-template<>
-std::string BaseSetting<std::optional<CompressionAlgo>>::to_string() const;
+NIX_DECLARE_CONFIG_SERIALISER(CompressionAlgo)
+NIX_DECLARE_CONFIG_SERIALISER(std::optional<CompressionAlgo>)
 
 template<>
 struct json_avoids_null<CompressionAlgo> : std::true_type

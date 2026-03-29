@@ -122,23 +122,17 @@ void BaseSetting<T>::convertToArg(Args & args, const std::string & category)
         });
 }
 
-#define DECLARE_CONFIG_SERIALISER(TY)                         \
-    template<>                                                \
-    TY BaseSetting<TY>::parse(const std::string & str) const; \
-    template<>                                                \
-    std::string BaseSetting<TY>::to_string() const;
-
-DECLARE_CONFIG_SERIALISER(std::string)
-DECLARE_CONFIG_SERIALISER(std::optional<std::string>)
-DECLARE_CONFIG_SERIALISER(bool)
-DECLARE_CONFIG_SERIALISER(Strings)
-DECLARE_CONFIG_SERIALISER(StringSet)
-DECLARE_CONFIG_SERIALISER(StringMap)
-DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
-DECLARE_CONFIG_SERIALISER(std::filesystem::path)
-DECLARE_CONFIG_SERIALISER(AbsolutePath)
-DECLARE_CONFIG_SERIALISER(std::set<std::filesystem::path>)
-DECLARE_CONFIG_SERIALISER(std::optional<AbsolutePath>)
+NIX_DECLARE_CONFIG_SERIALISER(std::string)
+NIX_DECLARE_CONFIG_SERIALISER(std::optional<std::string>)
+NIX_DECLARE_CONFIG_SERIALISER(bool)
+NIX_DECLARE_CONFIG_SERIALISER(Strings)
+NIX_DECLARE_CONFIG_SERIALISER(StringSet)
+NIX_DECLARE_CONFIG_SERIALISER(StringMap)
+NIX_DECLARE_CONFIG_SERIALISER(std::set<ExperimentalFeature>)
+NIX_DECLARE_CONFIG_SERIALISER(std::filesystem::path)
+NIX_DECLARE_CONFIG_SERIALISER(AbsolutePath)
+NIX_DECLARE_CONFIG_SERIALISER(std::set<std::filesystem::path>)
+NIX_DECLARE_CONFIG_SERIALISER(std::optional<AbsolutePath>)
 
 template<typename T>
 T BaseSetting<T>::parse(const std::string & str) const

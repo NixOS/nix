@@ -28,11 +28,7 @@ enum struct Diagnose {
     Fatal,
 };
 
-template<>
-Diagnose BaseSetting<Diagnose>::parse(const std::string & str) const;
-
-template<>
-std::string BaseSetting<Diagnose>::to_string() const;
+NIX_DECLARE_CONFIG_SERIALISER(Diagnose)
 
 /**
  * Check a diagnostic setting and either do nothing, log a warning, or throw an error.
