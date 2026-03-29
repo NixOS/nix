@@ -12,6 +12,9 @@
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
+#include <zstd.h>
+#include <thread>
+
 namespace nix {
 
 static const int COMPRESSION_LEVEL_DEFAULT = -1;
@@ -69,7 +72,11 @@ struct ArchiveDecompressionSource : Source
     }
 };
 
-/* Happens to match enum names. */
+/* Algorithms handled by libarchive.  zstd is intentionally absent —
+   it is handled by ZstdMultiFrameCompressionSink for compression
+   (emitting independent frames that enable future parallel
+   decompression), while libarchive still handles zstd
+   *decompression* via ArchiveDecompressionSource. */
 #define NIX_FOR_EACH_LA_ALGO(MACRO) \
     MACRO(bzip2)                    \
     MACRO(compress)                 \
@@ -80,8 +87,7 @@ struct ArchiveDecompressionSource : Source
     MACRO(lzip)                     \
     MACRO(lzma)                     \
     MACRO(lzop)                     \
-    MACRO(xz)                       \
-    MACRO(zstd)
+    MACRO(xz)
 
 struct ArchiveCompressionSink : CompressionSink
 {
@@ -100,6 +106,7 @@ struct ArchiveCompressionSink : CompressionSink
             switch (method) {
             case CompressionAlgo::none:
             case CompressionAlgo::brotli:
+            case CompressionAlgo::zstd:
                 unreachable();
 #define NIX_DEF_LA_ALGO_CASE(algo) \
     case CompressionAlgo::algo:    \
@@ -318,6 +325,141 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
+/**
+ * Zstd compression that cuts a new frame every `bytesPerFrame` of
+ * uncompressed input.  The result is a concatenation of independent
+ * frames, which any conformant zstd decoder (RFC 8878 §3.1) handles
+ * transparently — including libarchive's, which is what the nix
+ * substituter path uses for decompression.
+ *
+ * Nix currently decompresses zstd serially, but emitting independent
+ * frames with known content sizes now means a future parallel decoder
+ * can exploit them without any change to the compressed data on disk.
+ *
+ * When `parallel` is set, `nbWorkers` is derived from
+ * `std::thread::hardware_concurrency()` so per-frame compression can
+ * use multiple cores.  `parallel=false` compresses each frame
+ * single-threaded but still emits independent frames.
+ *
+ * Each frame buffers its input and compresses in one shot with an exact
+ * `ZSTD_CCtx_setPledgedSrcSize`, so `Frame_Content_Size` is written to
+ * every frame header.  A future parallel decoder could compute each
+ * frame's output offset by walking headers with
+ * `ZSTD_findFrameCompressedSize` + `ZSTD_getFrameContentSize` — no
+ * coordination, no assumptions about `bytesPerFrame`.
+ *
+ * Frame size is fixed at 16 MiB of input.  zstd's window size is
+ * level-dependent (~2 MiB at the default level 3, up to 8 MiB at
+ * higher levels), so the ratio loss from not being able to reference
+ * across a frame boundary is small.  16 MiB gives ~700 frames for the
+ * biggest NARs, which is ample parallelism and lets a decoder start
+ * work before the whole blob is downloaded.
+ */
+struct ZstdMultiFrameCompressionSink : CompressionSink
+{
+    Sink & nextSink;
+    std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> cctx{nullptr, ZSTD_freeCCtx};
+    std::vector<char> outbuf;
+    /**
+     * Input buffer for the current frame.  We accumulate a full
+     * frame's worth before compressing so we can set an exact
+     * `ZSTD_CCtx_setPledgedSrcSize` — that writes `Frame_Content_Size`
+     * into the frame header, which a future parallel decoder could use
+     * to compute each frame's output offset without guessing or
+     * coordinating.
+     *
+     * 16 MiB of buffering is negligible next to the multi-GiB
+     * compressed output nix already keeps for the FileHash
+     * computation.
+     */
+    std::vector<char> inbuf;
+    bool emittedAnyFrame = false;
+    static constexpr uint64_t bytesPerFrame = 16 * 1024 * 1024;
+
+    ZstdMultiFrameCompressionSink(Sink & nextSink, bool parallel, int level)
+        : nextSink(nextSink)
+        , outbuf(ZSTD_CStreamOutSize())
+    {
+        inbuf.reserve(bytesPerFrame);
+        cctx.reset(ZSTD_createCCtx());
+        if (!cctx)
+            throw CompressionError("unable to initialise zstd encoder");
+        if (level != COMPRESSION_LEVEL_DEFAULT)
+            checkZstd(ZSTD_CCtx_setParameter(cctx.get(), ZSTD_c_compressionLevel, level));
+        if (parallel) {
+            unsigned ncpu = std::thread::hardware_concurrency();
+            /* Cap nbWorkers: zstd's MT engine splits each frame into
+               per-worker jobs.  With 16 MiB frames, more than ~4
+               workers yields diminishing returns (< 4 MiB per worker)
+               and the thread synchronisation overhead can make
+               compression slower than single-threaded. */
+            if (ncpu > 4)
+                ncpu = 4;
+            if (ncpu > 1)
+                /* Don't checkZstd(): if libzstd was built without
+                   ZSTD_MULTITHREAD this returns an error, but per the
+                   zstd docs the parameter is simply ignored and
+                   compression falls back to single-threaded. */
+                ZSTD_CCtx_setParameter(cctx.get(), ZSTD_c_nbWorkers, ncpu);
+        }
+    }
+
+    void checkZstd(size_t ret)
+    {
+        if (ZSTD_isError(ret))
+            throw CompressionError("zstd error: %s", ZSTD_getErrorName(ret));
+    }
+
+    /**
+     * Compress all of `inbuf` as one complete frame, pledged at its
+     * exact size so `Frame_Content_Size` lands in the header.
+     */
+    void emitFrame()
+    {
+        checkZstd(ZSTD_CCtx_reset(cctx.get(), ZSTD_reset_session_only));
+        checkZstd(ZSTD_CCtx_setPledgedSrcSize(cctx.get(), inbuf.size()));
+
+        ZSTD_inBuffer in = {inbuf.data(), inbuf.size(), 0};
+        for (;;) {
+            checkInterrupt();
+            ZSTD_outBuffer out = {outbuf.data(), outbuf.size(), 0};
+            size_t remaining = ZSTD_compressStream2(cctx.get(), &out, &in, ZSTD_e_end);
+            checkZstd(remaining);
+            if (out.pos > 0)
+                nextSink({outbuf.data(), out.pos});
+            if (remaining == 0)
+                break;
+        }
+        inbuf.clear();
+        emittedAnyFrame = true;
+    }
+
+    void writeUnbuffered(std::string_view data) override
+    {
+        while (!data.empty()) {
+            uint64_t room = bytesPerFrame - inbuf.size();
+            size_t n = (room < data.size()) ? room : data.size();
+
+            inbuf.insert(inbuf.end(), data.data(), data.data() + n);
+            data.remove_prefix(n);
+
+            if (inbuf.size() >= bytesPerFrame)
+                emitFrame();
+        }
+    }
+
+    void finish() override
+    {
+        flush();
+        /* Emit the trailing partial frame, or an empty frame if we
+           never wrote anything — the output must contain at least one
+           frame header to be valid zstd (otherwise the libarchive
+           decoder chokes on round-tripped empty input). */
+        if (!inbuf.empty() || !emittedAnyFrame)
+            emitFrame();
+    }
+};
+
 ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel, int level)
 {
     switch (method) {
@@ -325,6 +467,8 @@ ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink
         return make_ref<NoneSink>(nextSink);
     case CompressionAlgo::brotli:
         return make_ref<BrotliCompressionSink>(nextSink);
+    case CompressionAlgo::zstd:
+        return make_ref<ZstdMultiFrameCompressionSink>(nextSink, parallel, level);
         /* Everything else is supported via libarchive. */
 #define NIX_DEF_LA_ALGO_CASE(algo) case CompressionAlgo::algo:
         NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_CASE)

@@ -36,6 +36,9 @@ deps_private += gtest
 gmock = dependency('gmock')
 deps_private += gmock
 
+zstd = dependency('libzstd', version : '>= 1.4.0')
+deps_private += zstd
+
 if host_machine.system() == 'windows'
   # Boost.ASIO needs this unconditionally.
   socket = cxx.find_library('ws2_32')
