@@ -1,5 +1,6 @@
 {
   inputs,
+  darwinSystems,
   forAllCrossSystems,
   forAllSystems,
   lib,
@@ -209,13 +210,20 @@ rec {
     forAllPackages (pkgName: lib.genAttrs linux64BitSystems (system: (components system).${pkgName}));
 
   # Static analysis with clang-tidy
-  clangTidy = lib.genAttrs linux64BitSystems (
+  clangTidy = lib.genAttrs (linux64BitSystems ++ darwinSystems) (
     system:
     let
       pkgs = nixpkgsFor.${system}.nativeForStdenv.clangStdenv;
       tidyScope = pkgs.nixComponents2.overrideScope (
         self: super: {
           withClangTidy = true;
+          # Build without precompiled headers to catch missing #includes. With
+          # PCH enabled, builds may silently rely on transitive includes.
+          mesonComponentOverrides = finalAttrs: prevAttrs: {
+            mesonFlags = (prevAttrs.mesonFlags or [ ]) ++ [
+              (lib.mesonBool "b_pch" false)
+            ];
+          };
           # nix-everything is built via callPackage (not the layer system), so
           # enableClangTidyLayer's doCheck=false doesn't reach it. Set it here
           # so checkInputs (the *-tests.tests.run derivations) aren't pulled in.
