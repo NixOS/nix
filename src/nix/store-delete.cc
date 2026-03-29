@@ -18,6 +18,13 @@ struct CmdStoreDelete : StorePathsCommand
             .description = "Do not check whether the paths are reachable from a root.",
             .handler = {&options.ignoreLiveness, true},
         });
+
+        addFlag({
+            .longName = "ignore-alive",
+            .description =
+                "Do not emit errors when attempting to delete something that is still alive, useful with --recursive.",
+            .handler = {&options.action, GCOptions::gcDeleteDead},
+        });
     }
 
     std::string description() override

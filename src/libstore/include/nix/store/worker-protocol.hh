@@ -125,6 +125,11 @@ struct WorkerProto
     static constexpr std::string_view featureRealisationWithPath = "realisation-with-path-not-hash";
 
     /**
+     * Feature for garbage collecting within a closure.
+     */
+    static constexpr std::string_view featureGcClosure = "gc-closure";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
