@@ -14,6 +14,18 @@ namespace nix {
 void saveMountNamespace();
 
 /**
+ * Whether we successfully entered a private mount namespace via
+ * `unshare(CLONE_NEWNS)`. When false, remounting the store writable
+ * would affect the host mount table.
+ */
+bool havePrivateMountNamespace();
+
+/**
+ * Record that we have entered a private mount namespace.
+ */
+void setHavePrivateMountNamespace();
+
+/**
  * Restore the mount namespace saved by saveMountNamespace(). Ignored
  * if saveMountNamespace() was never called.
  */

@@ -94,6 +94,17 @@ bool mountAndPidNamespacesSupported()
 
 static AutoCloseFD fdSavedMountNamespace;
 static AutoCloseFD fdSavedRoot;
+static bool _havePrivateMountNamespace = false;
+
+bool havePrivateMountNamespace()
+{
+    return _havePrivateMountNamespace;
+}
+
+void setHavePrivateMountNamespace()
+{
+    _havePrivateMountNamespace = true;
+}
 
 void saveMountNamespace()
 {
