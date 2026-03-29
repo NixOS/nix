@@ -12,7 +12,7 @@
 #  include <filesystem>
 #  include <fstream>
 
-using namespace nix;
+namespace nix {
 
 static void BM_RegisterValidPathsDerivations(benchmark::State & state)
 {
@@ -75,5 +75,7 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
 }
 
 BENCHMARK(BM_RegisterValidPathsDerivations)->Arg(10);
+
+} // namespace nix
 
 #endif

@@ -100,7 +100,7 @@ struct AuthorizationSettings : Config
 
 AuthorizationSettings authorizationSettings;
 
-static GlobalConfig::Register rSettings(&authorizationSettings);
+static GlobalConfig::Register rAuthorizationSettings(&authorizationSettings);
 
 #ifndef __linux__
 #  define SPLICE_F_MOVE 0

@@ -7,13 +7,13 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>
 
-using testing::Contains;
-using testing::ElementsAre;
-using testing::Eq;
-using testing::Field;
-using testing::SizeIs;
+using ::testing::Contains;
+using ::testing::ElementsAre;
+using ::testing::Eq;
+using ::testing::Field;
+using ::testing::SizeIs;
 
-using namespace nix;
+namespace nix {
 
 TEST(machines, getMachinesWithEmptyBuilders)
 {
@@ -210,3 +210,5 @@ TEST(machines, getMachinesWithCorrectFileReferenceToIncorrectFile)
             {}, "@" + std::filesystem::weakly_canonical(getUnitTestData() / "machines" / "bad_format").string()),
         FormatError);
 }
+
+} // namespace nix

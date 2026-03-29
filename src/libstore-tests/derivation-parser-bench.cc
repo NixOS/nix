@@ -7,7 +7,7 @@
 #include <fstream>
 #include <sstream>
 
-using namespace nix;
+namespace nix {
 
 // Benchmark parsing real derivation files
 static void BM_ParseRealDerivationFile(benchmark::State & state, const std::string & filename)
@@ -54,3 +54,5 @@ BENCHMARK_CAPTURE(BM_ParseRealDerivationFile, hello, (getUnitTestData() / "deriv
 BENCHMARK_CAPTURE(BM_ParseRealDerivationFile, firefox, (getUnitTestData() / "derivation/firefox.drv").string());
 BENCHMARK_CAPTURE(BM_UnparseRealDerivationFile, hello, (getUnitTestData() / "derivation/hello.drv").string());
 BENCHMARK_CAPTURE(BM_UnparseRealDerivationFile, firefox, (getUnitTestData() / "derivation/firefox.drv").string());
+
+} // namespace nix

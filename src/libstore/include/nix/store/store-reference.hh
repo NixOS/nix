@@ -4,6 +4,7 @@
 #include <variant>
 
 #include "nix/util/types.hh"
+#include "nix/util/configuration.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/util/json-non-null.hh"
 
@@ -127,6 +128,10 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
 template<>
 struct json_avoids_null<StoreReference> : std::true_type
 {};
+
+NIX_DECLARE_CONFIG_SERIALISER(StoreReference)
+NIX_DECLARE_CONFIG_SERIALISER(std::vector<StoreReference>)
+NIX_DECLARE_CONFIG_SERIALISER(std::set<StoreReference>)
 
 } // namespace nix
 

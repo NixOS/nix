@@ -43,7 +43,7 @@ struct UpgradeSettings : Config
 
 UpgradeSettings upgradeSettings;
 
-static GlobalConfig::Register rSettings(&upgradeSettings);
+static GlobalConfig::Register rUpgradeSettings(&upgradeSettings);
 
 struct CmdUpgradeNix : MixDryRun, StoreCommand
 {

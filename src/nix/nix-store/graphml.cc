@@ -20,11 +20,6 @@ static std::string symbolicName(std::string_view p)
     return std::string(p.substr(0, p.find('-') + 1));
 }
 
-static std::string makeEdge(std::string_view src, std::string_view dst)
-{
-    return fmt("  <edge source=\"%1%\" target=\"%2%\"/>\n", xmlQuote(src), xmlQuote(dst));
-}
-
 static std::string makeNode(const ValidPathInfo & info)
 {
     return fmt(
@@ -67,6 +62,11 @@ void printGraphML(ref<Store> store, StorePathSet && roots)
         for (auto & p : info->references) {
             if (p != path) {
                 workList.insert(p);
+
+                auto makeEdge = [](std::string_view src, std::string_view dst) -> std::string {
+                    return fmt("  <edge source=\"%1%\" target=\"%2%\"/>\n", xmlQuote(src), xmlQuote(dst));
+                };
+
                 cout << makeEdge(path.to_string(), p.to_string());
             }
         }

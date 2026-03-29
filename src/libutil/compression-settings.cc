@@ -52,11 +52,6 @@ std::string BaseSetting<std::optional<CompressionAlgo>>::to_string() const
     return "";
 }
 
-/* Same as with all settings - empty string means std::nullopt. */
-template<>
-struct json_avoids_null<CompressionAlgo> : std::true_type
-{};
-
 #define NIX_COMPRESSION_JSON(name, value) {CompressionAlgo::value, name},
 NLOHMANN_JSON_SERIALIZE_ENUM(CompressionAlgo, {NIX_FOR_EACH_COMPRESSION_ALGO(NIX_COMPRESSION_JSON)});
 #undef NIX_COMPRESSION_JSON

@@ -91,8 +91,6 @@ TEST(WorkerProtoVersion, partialOrderingEmptyFeatures)
 
 const char workerProtoDir[] = "worker-protocol";
 
-static constexpr std::string_view defaultStoreDir = "/nix/store";
-
 struct WorkerProtoTest : VersionedProtoTest<WorkerProto, workerProtoDir>
 {
     /**
@@ -597,7 +595,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
-                std::string{defaultStoreDir},
+                "/nix/store",
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.registrationTime = 23423;
@@ -606,7 +604,7 @@ VERSIONED_CHARACTERIZATION_TEST(
         }),
         ({
             UnkeyedValidPathInfo info{
-                std::string{defaultStoreDir},
+                "/nix/store",
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.deriver = StorePath{
@@ -641,7 +639,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
-                    std::string{defaultStoreDir},
+                    "/nix/store",
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -655,7 +653,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
-                    std::string{defaultStoreDir},
+                    "/nix/store",
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -696,7 +694,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
-                    std::string{defaultStoreDir},
+                    "/nix/store",
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -711,7 +709,7 @@ VERSIONED_CHARACTERIZATION_TEST(
                     "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar",
                 },
                 UnkeyedValidPathInfo{
-                    std::string{defaultStoreDir},
+                    "/nix/store",
                     Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
                 },
             };
@@ -978,12 +976,6 @@ TEST_F(WorkerProtoTest, handshake_features)
             .features = {"bar", "xyzzy"},
         }));
 }
-
-/// Has to be a `BufferedSink` for handshake.
-struct NullBufferedSink : BufferedSink
-{
-    void writeUnbuffered(std::string_view data) override {}
-};
 
 TEST_F(WorkerProtoTest, handshake_client_replay)
 {

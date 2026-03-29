@@ -182,6 +182,18 @@ JSON_TEST_V3(empty_impure, makeEmpty(), true)
 JSON_TEST_V3(pure, makeFull(*store, false), false)
 JSON_TEST_V3(impure, makeFull(*store, true), true)
 
+#undef JSON_TEST_V1
+#undef JSON_READ_TEST_V1
+#undef JSON_WRITE_TEST_V1
+
+#undef JSON_TEST_V2
+#undef JSON_READ_TEST_V2
+#undef JSON_WRITE_TEST_V2
+
+#undef JSON_TEST_V3
+#undef JSON_READ_TEST_V3
+#undef JSON_WRITE_TEST_V3
+
 TEST_F(PathInfoTestV2, PathInfo_full_shortRefs)
 {
     ValidPathInfo it = makeFullKeyed(*store, true);

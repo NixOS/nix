@@ -169,4 +169,16 @@ JSON_TEST_V2(impure, true)
 JSON_TEST_V3(pure, false)
 JSON_TEST_V3(impure, true)
 
+#undef JSON_TEST_V1
+#undef JSON_READ_TEST_V1
+#undef JSON_WRITE_TEST_V1
+
+#undef JSON_TEST_V2
+#undef JSON_READ_TEST_V2
+#undef JSON_WRITE_TEST_V2
+
+#undef JSON_TEST_V3
+#undef JSON_READ_TEST_V3
+#undef JSON_WRITE_TEST_V3
+
 } // namespace nix

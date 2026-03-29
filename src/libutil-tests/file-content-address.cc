@@ -33,7 +33,7 @@ TEST(FileSerialisationMethod, testParseFileSerialisationMethodOptException)
 {
     EXPECT_THAT(
         []() { parseFileSerialisationMethod("narwhal"); },
-        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
+        ::testing::ThrowsMessage<UsageError>(::testing::HasSubstr("narwhal")));
 }
 
 /* ----------------------------------------------------------------------------
@@ -66,7 +66,7 @@ TEST(FileIngestionMethod, testParseFileIngestionMethodOptException)
 {
     EXPECT_THAT(
         []() { parseFileIngestionMethod("narwhal"); },
-        testing::ThrowsMessage<UsageError>(testing::HasSubstr("narwhal")));
+        ::testing::ThrowsMessage<UsageError>(::testing::HasSubstr("narwhal")));
 }
 
 } // namespace nix

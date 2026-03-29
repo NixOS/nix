@@ -173,6 +173,8 @@ rec {
             # Boost coroutines fail with ASAN on darwin.
             withASan = !pkgs.stdenv.buildPlatform.isDarwin;
             withUBSan = true;
+            # Build without unity to catch include issues.
+            withUnityBuild = false;
             nix-expr = super.nix-expr.override { enableGC = false; };
             # Unclear how to make Perl bindings work with a dynamically linked ASAN.
             nix-perl-bindings = null;

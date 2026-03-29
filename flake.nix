@@ -512,6 +512,16 @@
       devShells =
         let
           makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
+          makeShell' =
+            { pkgs }:
+            makeShell {
+              inherit pkgs;
+              nixComponents = pkgs.nixComponents2.overrideScope (
+                finalScope: prevScope: {
+                  withUnityBuild = false;
+                }
+              );
+            };
           prefixAttrs = prefix: lib.concatMapAttrs (k: v: { "${prefix}-${k}" = v; });
         in
         forAllSystems (
@@ -519,7 +529,7 @@
           prefixAttrs "native" (
             forAllStdenvs (
               stdenvName:
-              makeShell {
+              makeShell' {
                 pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName};
               }
             )
@@ -528,7 +538,7 @@
             prefixAttrs "static" (
               forAllStdenvs (
                 stdenvName:
-                makeShell {
+                makeShell' {
                   pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsStatic;
                 }
               )
@@ -536,7 +546,7 @@
             // prefixAttrs "llvm" (
               forAllStdenvs (
                 stdenvName:
-                makeShell {
+                makeShell' {
                   pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsLLVM;
                 }
               )
@@ -544,7 +554,7 @@
             // prefixAttrs "cross" (
               forAllCrossSystems (
                 crossSystem:
-                makeShell {
+                makeShell' {
                   pkgs = nixpkgsFor.${system}.cross.${crossSystem};
                 }
               )

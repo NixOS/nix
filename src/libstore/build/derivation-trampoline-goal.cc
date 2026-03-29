@@ -46,18 +46,17 @@ void DerivationTrampolineGoal::commonInit()
 
 DerivationTrampolineGoal::~DerivationTrampolineGoal() {}
 
-static StorePath pathPartOfReq(const SingleDerivedPath & req)
-{
-    return std::visit(
-        overloaded{
-            [&](const SingleDerivedPath::Opaque & bo) { return bo.path; },
-            [&](const SingleDerivedPath::Built & bfd) { return pathPartOfReq(*bfd.drvPath); },
-        },
-        req.raw());
-}
-
 std::string DerivationTrampolineGoal::key()
 {
+    auto pathPartOfReq = [](this const auto & self, const SingleDerivedPath & req) -> StorePath {
+        return std::visit(
+            overloaded{
+                [&](const SingleDerivedPath::Opaque & bo) { return bo.path; },
+                [&](const SingleDerivedPath::Built & bfd) { return self(*bfd.drvPath); },
+            },
+            req.raw());
+    };
+
     return "da$" + std::string(pathPartOfReq(*drvReq).name()) + "$" + DerivedPath::Built{
         .drvPath = drvReq,
         .outputs = wantedOutputs,

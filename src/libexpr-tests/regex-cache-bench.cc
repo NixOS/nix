@@ -5,7 +5,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/store-open.hh"
 
-using namespace nix;
+namespace nix {
 
 static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
 {
@@ -44,3 +44,5 @@ static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
 }
 
 BENCHMARK(BM_EvalManyBuiltinsMatchSameRegex);
+
+} // namespace nix

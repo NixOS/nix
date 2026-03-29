@@ -598,6 +598,12 @@ struct ExperimentalFeatureSettings : Config
     void require(const std::optional<ExperimentalFeature> &) const;
 };
 
+#define NIX_DECLARE_CONFIG_SERIALISER(TY)                     \
+    template<>                                                \
+    TY BaseSetting<TY>::parse(const std::string & str) const; \
+    template<>                                                \
+    std::string BaseSetting<TY>::to_string() const;
+
 // FIXME: don't use a global variable.
 extern ExperimentalFeatureSettings experimentalFeatureSettings;
 

@@ -5,7 +5,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/store-open.hh"
 
-using namespace nix;
+namespace nix {
 
 static std::string mkDynamicAttrsExpr(size_t attrCount)
 {
@@ -54,3 +54,5 @@ static void BM_EvalDynamicAttrs(benchmark::State & state)
 }
 
 BENCHMARK(BM_EvalDynamicAttrs)->Arg(100)->Arg(500)->Arg(2'000);
+
+} // namespace nix

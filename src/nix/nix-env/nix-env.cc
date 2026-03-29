@@ -67,7 +67,7 @@ struct EnvSettings : Config
 
 EnvSettings envSettings;
 
-static GlobalConfig::Register rSettings(&envSettings);
+static GlobalConfig::Register rEnvSettings(&envSettings);
 
 typedef enum { srcNixExprDrvs, srcNixExprs, srcStorePaths, srcProfile, srcAttrPath, srcUnknown } InstallSourceType;
 

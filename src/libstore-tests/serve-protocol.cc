@@ -17,8 +17,6 @@ namespace nix {
 
 const char serveProtoDir[] = "serve-protocol";
 
-static constexpr std::string_view defaultStoreDir = "/nix/store";
-
 struct ServeProtoTest : VersionedProtoTest<ServeProto, serveProtoDir>
 {
     /**
@@ -326,12 +324,12 @@ VERSIONED_CHARACTERIZATION_TEST(
     }),
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
-            UnkeyedValidPathInfo info{std::string{defaultStoreDir}, Hash::dummy};
+            UnkeyedValidPathInfo info{"/nix/store", Hash::dummy};
             info.narSize = 34878;
             info;
         }),
         ({
-            UnkeyedValidPathInfo info{std::string{defaultStoreDir}, Hash::dummy};
+            UnkeyedValidPathInfo info{"/nix/store", Hash::dummy};
             info.deriver = StorePath{
                 "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-bar.drv",
             };
@@ -356,7 +354,7 @@ VERSIONED_CHARACTERIZATION_TEST(
     (std::tuple<UnkeyedValidPathInfo, UnkeyedValidPathInfo>{
         ({
             UnkeyedValidPathInfo info{
-                std::string{defaultStoreDir},
+                "/nix/store",
                 Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc="),
             };
             info.deriver = StorePath{
@@ -546,12 +544,6 @@ TEST_F(ServeProtoTest, handshake_log)
         return std::move(toClientLog.s);
     });
 }
-
-/// Has to be a `BufferedSink` for handshake.
-struct NullBufferedSink : BufferedSink
-{
-    void writeUnbuffered(std::string_view data) override {}
-};
 
 TEST_F(ServeProtoTest, handshake_client_replay)
 {
