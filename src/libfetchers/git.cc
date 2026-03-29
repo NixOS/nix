@@ -1030,12 +1030,7 @@ struct GitInputScheme : InputScheme
 
             /* Return a rev of 000... if there are no commits yet. */
             auto rev = repoInfo.workdirInfo.headRev.value_or(nullRev);
-
             input.attrs.insert_or_assign("rev", rev.gitRev());
-            if (!getShallowAttr(input)) {
-                input.attrs.insert_or_assign(
-                    "revCount", rev == nullRev ? 0 : getRevCount(settings, repoInfo, repoPath, rev));
-            }
 
             verifyCommit(input, repo);
         } else {
@@ -1048,6 +1043,12 @@ struct GitInputScheme : InputScheme
 
             verifyCommit(input, nullptr);
         }
+
+        if (!getShallowAttr(input))
+            input.attrs.insert_or_assign(
+                "revCount",
+                repoInfo.workdirInfo.headRev ? getRevCount(settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev)
+                                             : 0);
 
         input.attrs.insert_or_assign(
             "lastModified",
