@@ -401,10 +401,10 @@ public:
      */
     struct ItemHandle
     {
-        std::reference_wrapper<Item> item;
+        std::weak_ptr<Item> item;
         friend struct FileTransfer;
 
-        ItemHandle(Item & item)
+        explicit ItemHandle(std::weak_ptr<Item> item)
             : item(item)
         {
         }
