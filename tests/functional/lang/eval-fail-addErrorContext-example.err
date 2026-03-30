@@ -1,0 +1,24 @@
+error:
+       … while counting down; n = 10
+
+       … while counting down; n = 9
+
+       … while counting down; n = 8
+
+       … while counting down; n = 7
+
+       … while counting down; n = 6
+
+       … while counting down; n = 5
+
+       … while counting down; n = 4
+
+       … while counting down; n = 3
+
+       … while counting down; n = 2
+
+       … while counting down; n = 1
+
+       (stack trace truncated; use '--show-trace' to show the full, detailed trace)
+
+       error: kaboom

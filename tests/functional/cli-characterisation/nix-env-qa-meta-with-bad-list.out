@@ -1,0 +1,15 @@
+{
+  "": {
+    "meta": {
+      "bad": null
+    },
+    "name": "meta-with-bad-list-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "meta-with-bad-list",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}

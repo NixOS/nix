@@ -1,0 +1,1 @@
+(let string = "str"; in [ (/some/path) ((/some/path)) ((/some/path)) ((/some/path + "\n    end")) (string) ((string)) ((string)) ((string + "\n    end")) ("") ("") ("end") ])

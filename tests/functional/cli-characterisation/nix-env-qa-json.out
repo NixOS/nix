@@ -1,0 +1,94 @@
+{
+  "bad-drvpath": {
+    "name": "bad-drvpath-1.0",
+    "outputName": "",
+    "outputs": {
+      "out": null
+    },
+    "pname": "bad-drvpath",
+    "system": "unknown",
+    "version": "1.0"
+  },
+  "bad-output-specified": {
+    "name": "bad-output-specified-1.0",
+    "outputName": "nonexistent",
+    "outputs": {
+      "out": null
+    },
+    "pname": "bad-output-specified",
+    "system": "unknown",
+    "version": "1.0"
+  },
+  "deep-meta": {
+    "name": "deep-meta-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "deep-meta",
+    "system": "SYSTEM",
+    "version": "1.0"
+  },
+  "ghost-outpath": {
+    "name": "ghost-outpath-1.0",
+    "outputName": "",
+    "outputs": {
+      "ghost": null,
+      "out": null
+    },
+    "pname": "ghost-outpath",
+    "system": "unknown",
+    "version": "1.0"
+  },
+  "ghost-output": {
+    "name": "ghost-output-1.0",
+    "outputName": "",
+    "outputs": {
+      "ghost": null,
+      "out": null
+    },
+    "pname": "ghost-output",
+    "system": "unknown",
+    "version": "1.0"
+  },
+  "infinite-meta": {
+    "name": "infinite-meta-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "infinite-meta",
+    "system": "SYSTEM",
+    "version": "1.0"
+  },
+  "no-system": {
+    "name": "no-system-1.0",
+    "outputName": "",
+    "outputs": {
+      "out": null
+    },
+    "pname": "no-system",
+    "system": "unknown",
+    "version": "1.0"
+  },
+  "normal": {
+    "name": "normal-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "normal",
+    "system": "SYSTEM",
+    "version": "1.0"
+  },
+  "simple": {
+    "name": "simple-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "simple",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}

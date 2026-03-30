@@ -1,0 +1,22 @@
+{
+  "": {
+    "meta": {
+      "description": "Has deeply nested meta",
+      "nested": {
+        "a": {
+          "b": {
+            "c": "deep value"
+          }
+        }
+      }
+    },
+    "name": "deep-meta-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "deep-meta",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}
