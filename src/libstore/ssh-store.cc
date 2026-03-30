@@ -209,6 +209,8 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
     conn->sshConn = master.startCommand(toOsStrings(std::move(command)));
+    if (config->connPipeSize > 0)
+        conn->sshConn->trySetBufferSize(config->connPipeSize);
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

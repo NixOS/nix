@@ -24,6 +24,14 @@ struct SSHStoreConfig : std::enable_shared_from_this<SSHStoreConfig>,
     Setting<Strings> remoteProgram{
         this, {"nix-daemon"}, "remote-program", "Path to the `nix-daemon` executable on the remote machine."};
 
+    Setting<size_t> connPipeSize{
+        this,
+        1024 * 1024,
+        "conn-pipe-size",
+        "Size in bytes of the pipe buffer to the SSH process, set via `F_SETPIPE_SZ`. "
+        "Larger values reduce `write()` blocking when streaming NARs to the remote. "
+        "Set to 0 to leave the pipe at the OS default."};
+
     static const std::string name()
     {
         return "Experimental SSH Store";
