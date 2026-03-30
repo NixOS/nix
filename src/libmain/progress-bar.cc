@@ -628,6 +628,8 @@ public:
         // FIXME: don't show "done" paths in green.
         showActivity(actVerifyPaths, "%s paths verified");
 
+        showActivity(actGarbageCollect, "%s paths scanned");
+
         if (state.corruptedPaths) {
             if (!res.empty())
                 res += ", ";

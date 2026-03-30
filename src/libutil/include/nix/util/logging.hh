@@ -28,6 +28,7 @@ typedef enum {
     actPostBuildHook = 110,
     actBuildWaiting = 111,
     actFetchTree = 112,
+    actGarbageCollect = 113,
 } ActivityType;
 
 typedef enum {
