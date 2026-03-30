@@ -2,7 +2,6 @@
 ///@file
 
 #include <cstdint>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <variant>
 
