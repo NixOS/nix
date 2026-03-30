@@ -1,0 +1,58 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-resolved-v4.json"
+title: Resolved Derivation
+description: |
+  Experimental JSON representation of a resolved Nix derivation (version 4).
+
+  This schema describes the JSON representation of Nix's `BasicDerivation` type,
+  which is a derivation with all input derivation dependencies resolved to store paths.
+  This is the result of `Derivation::tryResolve`.
+
+  This is called "version 4" because we wish to keep it in sync with the
+  [primary (not necessarily resolved) JSON schema](@docroot@/protocols/json/derivation/index.md),
+  but actually it is the first version for this format.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - name
+  - version
+  - outputs
+  - inputs
+  - system
+  - builder
+  - args
+  - env
+properties:
+  name: { "$ref": "derivation-v4.yaml#/$defs/common/properties/name" }
+  version: { "$ref": "derivation-v4.yaml#/$defs/common/properties/version" }
+  outputs: { "$ref": "derivation-v4.yaml#/$defs/common/properties/outputs" }
+  system: { "$ref": "derivation-v4.yaml#/$defs/common/properties/system" }
+  builder: { "$ref": "derivation-v4.yaml#/$defs/common/properties/builder" }
+  args: { "$ref": "derivation-v4.yaml#/$defs/common/properties/args" }
+  env: { "$ref": "derivation-v4.yaml#/$defs/common/properties/env" }
+  structuredAttrs: { "$ref": "derivation-v4.yaml#/$defs/common/properties/structuredAttrs" }
+
+  inputs:
+    type: array
+    title: Input source paths
+    description: |
+      List of store paths on which this resolved derivation depends.
+      Since all derivation inputs have been resolved, only source paths remain.
+
+      > **Example**
+      >
+      > ```json
+      > "inputs": [
+      >   "b8nwz167km1yciqpwzjj24f8jcy8pq1h-separate-debug-info.sh",
+      >   "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out"
+      > ]
+      > ```
+    items:
+      $ref: "store-path-v1.yaml"
+additionalProperties: false

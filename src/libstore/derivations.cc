@@ -1526,32 +1526,52 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
-void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
+static void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
+{
+    res = nlohmann::json::array();
+    for (auto & input : inputSrcs)
+        res.emplace_back(input);
+}
+
+static void basicDerivationToJson(json & res, const BasicDerivation & d)
 {
     res = nlohmann::json::object();
 
     res["name"] = d.name;
-
     res["version"] = expectedJsonVersionDerivation;
 
     {
         nlohmann::json & outputsObj = res["outputs"];
         outputsObj = nlohmann::json::object();
-        for (auto & [outputName, output] : d.outputs) {
+        for (auto & [outputName, output] : d.outputs)
             outputsObj[outputName] = output;
-        }
     }
+
+    res["system"] = d.platform;
+    res["builder"] = d.builder;
+    res["args"] = d.args;
+    res["env"] = d.env;
+
+    if (d.structuredAttrs)
+        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+}
+
+void adl_serializer<BasicDerivation>::to_json(json & res, const BasicDerivation & d)
+{
+    basicDerivationToJson(res, d);
+
+    inputSrcsToJson(res["inputs"], d.inputSrcs);
+}
+
+void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
+{
+    basicDerivationToJson(res, d);
 
     {
         auto & inputsObj = res["inputs"];
         inputsObj = nlohmann::json::object();
 
-        {
-            auto & inputsList = inputsObj["srcs"];
-            inputsList = nlohmann::json::array();
-            for (auto & input : d.inputSrcs)
-                inputsList.emplace_back(input);
-        }
+        inputSrcsToJson(inputsObj["srcs"], d.inputSrcs);
 
         auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
             auto value = nlohmann::json::object();
@@ -1567,28 +1587,21 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
 
         auto & inputDrvsObj = inputsObj["drvs"];
         inputDrvsObj = nlohmann::json::object();
-        for (auto & [inputDrv, inputNode] : d.inputDrvs.map) {
+        for (auto & [inputDrv, inputNode] : d.inputDrvs.map)
             inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
-        }
     }
-
-    res["system"] = d.platform;
-    res["builder"] = d.builder;
-    res["args"] = d.args;
-    res["env"] = d.env;
-
-    if (d.structuredAttrs)
-        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
 }
 
-Derivation adl_serializer<Derivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+static void inputSrcsFromJson(const json & inputSrcsJson, StorePathSet & inputSrcs)
 {
-    using nlohmann::detail::value_t;
+    auto arr = getArray(inputSrcsJson);
+    for (auto & input : arr)
+        inputSrcs.insert(input);
+}
 
-    Derivation res;
-
-    auto & json = getObject(_json);
-
+static void basicDerivationFromJson(
+    const json::object_t & json, BasicDerivation & res, const ExperimentalFeatureSettings & xpSettings)
+{
     res.name = getString(valueAt(json, "name"));
 
     {
@@ -1610,13 +1623,50 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
         throw;
     }
 
+    res.platform = getString(valueAt(json, "system"));
+    res.builder = getString(valueAt(json, "builder"));
+    res.args = getStringList(valueAt(json, "args"));
+
+    auto envJson = valueAt(json, "env");
+    try {
+        res.env = getStringMap(envJson);
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'env'");
+        throw;
+    }
+
+    if (auto structuredAttrs = get(json, "structuredAttrs"))
+        res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+}
+
+BasicDerivation
+adl_serializer<BasicDerivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+{
+    BasicDerivation res;
+    auto & json = getObject(_json);
+    basicDerivationFromJson(json, res, xpSettings);
+
+    try {
+        inputSrcsFromJson(valueAt(json, "inputs"), res.inputSrcs);
+    } catch (Error & e) {
+        e.addTrace({}, "while reading key 'inputs'");
+        throw;
+    }
+
+    return res;
+}
+
+Derivation adl_serializer<Derivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+{
+    Derivation res;
+    auto & json = getObject(_json);
+    basicDerivationFromJson(json, res, xpSettings);
+
     try {
         auto inputsObj = getObject(valueAt(json, "inputs"));
 
         try {
-            auto inputSrcs = getArray(valueAt(inputsObj, "srcs"));
-            for (auto & input : inputSrcs)
-                res.inputSrcs.insert(input);
+            inputSrcsFromJson(valueAt(inputsObj, "srcs"), res.inputSrcs);
         } catch (Error & e) {
             e.addTrace({}, "while reading key 'srcs'");
             throw;
@@ -1646,21 +1696,6 @@ Derivation adl_serializer<Derivation>::from_json(const json & _json, const Exper
         e.addTrace({}, "while reading key 'inputs'");
         throw;
     }
-
-    res.platform = getString(valueAt(json, "system"));
-    res.builder = getString(valueAt(json, "builder"));
-    res.args = getStringList(valueAt(json, "args"));
-
-    auto envJson = valueAt(json, "env");
-    try {
-        res.env = getStringMap(envJson);
-    } catch (Error & e) {
-        e.addTrace({}, "while reading key 'env'");
-        throw;
-    }
-
-    if (auto structuredAttrs = get(json, "structuredAttrs"))
-        res.structuredAttrs = StructuredAttrs{*structuredAttrs};
 
     return res;
 }

@@ -620,4 +620,5 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 } // namespace nix
 
 JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
+JSON_IMPL_WITH_XP_FEATURES(nix::BasicDerivation)
 JSON_IMPL_WITH_XP_FEATURES(nix::Derivation)

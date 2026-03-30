@@ -1,0 +1,23 @@
+[
+  [
+    {
+      "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1.drv",
+      "output": "dev"
+    },
+    "j1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-dev"
+  ],
+  [
+    {
+      "drvPath": "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1.drv",
+      "output": "out"
+    },
+    "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out"
+  ],
+  [
+    {
+      "drvPath": "h1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2.drv",
+      "output": "out"
+    },
+    "i1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2-out"
+  ]
+]

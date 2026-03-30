@@ -23,57 +23,14 @@ required:
   - args
   - env
 properties:
-  name:
-    type: string
-    title: Derivation name
-    description: |
-      The name of the derivation.
-      Used when calculating store paths for the derivation’s outputs.
-
-  version:
-    const: 4
-    title: Format version (must be 4)
-    description: |
-      Must be `4`.
-      This is a guard that allows us to continue evolving this format.
-      The choice of `3` is fairly arbitrary, but corresponds to this informal version:
-
-      - Version 0: ATerm format
-
-      - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from ATerm format.
-
-      - Version 2: Separate `method` and `hashAlgo` fields in output specs
-
-      - Version 3: Drop store dir from store paths, just include base name.
-
-      - Version 4: Two cleanups, batched together to lesson churn:
-
-        - Reorganize inputs into nested structure (`inputs.srcs` and `inputs.drvs`)
-
-        - Use canonical content address JSON format for floating content addressed derivation outputs.
-
-      Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
-
-  outputs:
-    type: object
-    title: Output specifications
-    description: |
-     Information about the output paths of the derivation.
-     This is a JSON object with one member per output, where the key is the output name and the value is a JSON object as described.
-
-      > **Example**
-      >
-      > ```json
-      > "outputs": {
-      >   "out": {
-      >     "method": "nar",
-      >     "hashAlgo": "sha256",
-      >     "hash": "6fc80dcc62179dbc12fc0b5881275898f93444833d21b89dfe5f7fbcbb1d0d62"
-      >   }
-      > }
-      > ```
-    additionalProperties:
-      "$ref": "#/$defs/output/overall"
+  name: { "$ref": "#/$defs/common/properties/name" }
+  version: { "$ref": "#/$defs/common/properties/version" }
+  outputs: { "$ref": "#/$defs/common/properties/outputs" }
+  system: { "$ref": "#/$defs/common/properties/system" }
+  builder: { "$ref": "#/$defs/common/properties/builder" }
+  args: { "$ref": "#/$defs/common/properties/args" }
+  env: { "$ref": "#/$defs/common/properties/env" }
+  structuredAttrs: { "$ref": "#/$defs/common/properties/structuredAttrs" }
 
   inputs:
     type: object
@@ -126,47 +83,105 @@ properties:
             - "$ref": "#/$defs/dynamicOutputs"
         additionalProperties: false
     additionalProperties: false
-
-  system:
-    type: string
-    title: Build system type
-    description: |
-      The system type on which this derivation is to be built
-      (e.g. `x86_64-linux`).
-
-  builder:
-    type: string
-    title: Build program path
-    description: |
-      Absolute path of the program used to perform the build.
-      Typically this is the `bash` shell
-      (e.g. `/nix/store/p4xlj4imjbnm4v0x5jf4qysvyjjlgq1d-bash-4.4-p23/bin/bash`).
-
-  args:
-    type: array
-    title: Builder arguments
-    description: |
-      Command-line arguments passed to the `builder`.
-    items:
-      type: string
-
-  env:
-    type: object
-    title: Environment variables
-    description: |
-      Environment variables passed to the `builder`.
-    additionalProperties:
-      type: string
-
-  structuredAttrs:
-    title: Structured attributes
-    description: |
-      [Structured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
-      Structured attributes are JSON, and thus embedded as-is.
-    type: object
-    additionalProperties: true
+additionalProperties: false
 
 "$defs":
+  common:
+    title: Common Derivation Fields
+    description: |
+      Fields shared between `Derivation` and `BasicDerivation`.
+    properties:
+      name:
+        type: string
+        title: Derivation name
+        description: |
+          The name of the derivation.
+          Used when calculating store paths for the derivation's outputs.
+
+      version:
+        const: 4
+        title: Format version (must be 4)
+        description: |
+          Must be `4`.
+          This is a guard that allows us to continue evolving this format.
+          The choice of `3` is fairly arbitrary, but corresponds to this informal version:
+
+          - Version 0: ATerm format
+
+          - Version 1: Original JSON format, with ugly `"r:sha256"` inherited from ATerm format.
+
+          - Version 2: Separate `method` and `hashAlgo` fields in output specs
+
+          - Version 3: Drop store dir from store paths, just include base name.
+
+          - Version 4: Two cleanups, batched together to lesson churn:
+
+            - Reorganize inputs into nested structure (`inputs.srcs` and `inputs.drvs`)
+
+            - Use canonical content address JSON format for floating content addressed derivation outputs.
+
+          Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
+
+      outputs:
+        type: object
+        title: Output specifications
+        description: |
+         Information about the output paths of the derivation.
+         This is a JSON object with one member per output, where the key is the output name and the value is a JSON object as described.
+
+          > **Example**
+          >
+          > ```json
+          > "outputs": {
+          >   "out": {
+          >     "method": "nar",
+          >     "hashAlgo": "sha256",
+          >     "hash": "6fc80dcc62179dbc12fc0b5881275898f93444833d21b89dfe5f7fbcbb1d0d62"
+          >   }
+          > }
+          > ```
+        additionalProperties:
+          "$ref": "#/$defs/output/overall"
+
+      system:
+        type: string
+        title: Build system type
+        description: |
+          The system type on which this derivation is to be built
+          (e.g. `x86_64-linux`).
+
+      builder:
+        type: string
+        title: Build program path
+        description: |
+          Absolute path of the program used to perform the build.
+          Typically this is the `bash` shell
+          (e.g. `/nix/store/p4xlj4imjbnm4v0x5jf4qysvyjjlgq1d-bash-4.4-p23/bin/bash`).
+
+      args:
+        type: array
+        title: Builder arguments
+        description: |
+          Command-line arguments passed to the `builder`.
+        items:
+          type: string
+
+      env:
+        type: object
+        title: Environment variables
+        description: |
+          Environment variables passed to the `builder`.
+        additionalProperties:
+          type: string
+
+      structuredAttrs:
+        title: Structured attributes
+        description: |
+          [Structured Attributes](@docroot@/store/derivation/index.md#structured-attrs), only defined if the derivation contains them.
+          Structured attributes are JSON, and thus embedded as-is.
+        type: object
+        additionalProperties: true
+
   output:
     overall:
       title: Derivation Output
