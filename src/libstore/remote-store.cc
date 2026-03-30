@@ -134,6 +134,13 @@ void RemoteStore::setOptions(Connection & conn)
     overrides.erase(loggerSettings.showTrace.name);
     overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
     overrides.erase("plugin-files");
+
+    auto asyncHookName = settings.getWorkerSettings().asyncPostBuildHook.name;
+    if (!conn.protoVersion.features.contains(WorkerProto::featureAsyncPostBuildHook)
+        && overrides.contains(asyncHookName)) {
+        throw Error("%s requested but remote does not support this", asyncHookName);
+    }
+
     conn.to << overrides.size();
     for (auto & i : overrides)
         conn.to << i.first << i.second.value;
