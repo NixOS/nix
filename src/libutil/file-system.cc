@@ -462,7 +462,7 @@ std::filesystem::path createTempDir(const std::filesystem::path & tmpRoot, const
                will be owned by "wheel"; but if the user is not in
                "wheel", then "tar" will fail to unpack archives that
                have the setgid bit set on directories. */
-            if (chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
+            if (::chown(tmpDir.c_str(), (uid_t) -1, getegid()) != 0)
                 throw SysError("setting group of directory %1%", PathFmt(tmpDir));
 #endif
             return tmpDir;
