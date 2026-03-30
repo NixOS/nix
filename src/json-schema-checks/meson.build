@@ -98,6 +98,17 @@ schemas += [
     'files' : [
       'dyn-dep-derivation.json',
       'simple-derivation.json',
+      'try-resolve' / 'no-inputs-before.json',
+      'try-resolve' / 'with-inputs-before.json',
+      'try-resolve' / 'resolution-failure-before.json',
+    ],
+  },
+  {
+    'stem' : 'derivation',
+    'schema' : schema_dir / 'derivation-resolved-v4.yaml',
+    'files' : [
+      'try-resolve' / 'no-inputs-after.json',
+      'try-resolve' / 'with-inputs-after.json',
     ],
   },
   {

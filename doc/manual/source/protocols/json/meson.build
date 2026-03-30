@@ -16,6 +16,7 @@ schemas = [
   'signature-v2',
   'store-object-info-v3',
   'derivation-v4',
+  'derivation-resolved-v4',
   'derivation-options-v1',
   'deriving-path-v1',
   'build-trace-entry-v3',

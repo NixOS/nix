@@ -16,3 +16,6 @@ s^\(./hash-v1.yaml\)\?#/$defs/algorithm^[JSON format for `Hash`](@docroot@/proto
 s^\(./hash-v1.yaml\)^[JSON format for `Hash`](@docroot@/protocols/json/hash.html)^g
 s^\(./content-address-v1.yaml\)\?#/$defs/method^[JSON format for `ContentAddress`](@docroot@/protocols/json/content-address.html#method)^g
 s^\(./content-address-v1.yaml\)^[JSON format for `ContentAddress`](@docroot@/protocols/json/content-address.html)^g
+s^\(./store-path-v1.yaml\)^[JSON format for `StorePath`](@docroot@/protocols/json/store-path.html)^g
+s^\(./derivation-v4.yaml\)\?#/\$defs/common/properties/[a-zA-Z]*^[JSON format for `Derivation`](@docroot@/protocols/json/derivation/index.html)^g
+s^\(./derivation-v4.yaml\)^[JSON format for `Derivation`](@docroot@/protocols/json/derivation/index.html)^g
