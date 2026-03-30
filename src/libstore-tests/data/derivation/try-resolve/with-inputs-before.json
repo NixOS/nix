@@ -1,0 +1,46 @@
+{
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "DEP1_DEV": "/1r6jj1sjvjx4d1jqlnak71d8vzysdl2gyz2m01spjf31nhr1g55f",
+    "DEP1_OUT": "prefix-/10qd59vslmmj9w7hx8lpr0yxazwvhf3gfrnvbbc2s9071rhl3l55-suffix",
+    "DEP2": "/1zwa38661ns8faagbp31qzc8vx94hxsxcncs7hvcxhjvbcfyv9wb"
+  },
+  "inputs": {
+    "drvs": {
+      "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "dev",
+          "out"
+        ]
+      },
+      "h1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "with-inputs",
+  "outputs": {
+    "dev": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    },
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "structuredAttrs": {
+    "dep1out": "/10qd59vslmmj9w7hx8lpr0yxazwvhf3gfrnvbbc2s9071rhl3l55",
+    "nested": {
+      "dep2": "before /1zwa38661ns8faagbp31qzc8vx94hxsxcncs7hvcxhjvbcfyv9wb after"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

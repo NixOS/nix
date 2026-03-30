@@ -60,6 +60,7 @@ sources = files(
   'derivation-advanced-attrs.cc',
   'derivation/external-formats.cc',
   'derivation/invariants.cc',
+  'derivations.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',
