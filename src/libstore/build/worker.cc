@@ -141,64 +141,31 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
         req.raw());
 }
 
-/**
- * This function is polymorphic (both via type parameters and
- * overloading) and recursive in order to work on a various types of
- * trees
- *
- * @return Whether the tree node we are processing is not empty / should
- * be kept alive. In the case of this overloading the node in question
- * is the leaf, the weak reference itself. If the weak reference points
- * to the goal we are looking for, our caller can delete it. In the
- * inductive case where the node is an interior node, we'll likewise
- * return whether the interior node is non-empty. If it is empty
- * (because we just deleted its last child), then our caller can
- * likewise delete it.
- */
-template<typename G>
-static bool removeGoal(std::shared_ptr<G> goal, std::weak_ptr<G> & gp)
-{
-    return gp.lock() != goal;
-}
-
-template<typename K, typename G, typename Inner>
-static bool removeGoal(std::shared_ptr<G> goal, std::map<K, Inner> & goalMap)
-{
-    /* !!! inefficient */
-    for (auto i = goalMap.begin(); i != goalMap.end();) {
-        if (!removeGoal(goal, i->second))
-            i = goalMap.erase(i);
-        else
-            ++i;
-    }
-    return !goalMap.empty();
-}
-
-template<typename G>
-static bool
-removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
-{
-    bool valueKeep = removeGoal(goal, node.value);
-    bool childMapKeep = removeGoal(goal, node.childMap);
-    return valueKeep || childMapKeep;
-}
-
 void Worker::removeGoal(GoalPtr goal)
 {
-    if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal))
-        nix::removeGoal(drvGoal, derivationTrampolineGoals.map);
-    else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
-        nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal))
-        nix::removeGoal(drvResolutionGoal, derivationResolutionGoals);
-    else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
-        nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
-        nix::removeGoal(subGoal, substitutionGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
-        nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
-    else
-        assert(false);
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal)) {
+        derivationTrampolineGoals.removeSlot(*drvGoal->drvReq, [&](auto & node) {
+            node.value.erase(drvGoal->wantedOutputs);
+            /* Return true if ancestors don't need to be pruned. */
+            return !node.value.empty();
+        });
+    } else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal)) {
+        if (auto it = derivationGoals.find(drvGoal->drvPath); it != derivationGoals.end()) {
+            it->second.erase(drvGoal->wantedOutput);
+            if (it->second.empty())
+                derivationGoals.erase(it);
+        }
+    } else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal)) {
+        derivationResolutionGoals.erase(drvResolutionGoal->drvPath);
+    } else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal)) {
+        derivationBuildingGoals.erase(drvBuildingGoal->drvPath);
+    } else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal)) {
+        substitutionGoals.erase(subGoal->storePath);
+    } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
+        drvOutputSubstitutionGoals.erase(subGoal->id);
+    } else {
+        unreachable();
+    }
 
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);

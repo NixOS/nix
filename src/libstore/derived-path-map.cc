@@ -48,6 +48,34 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
     return initIter(k);
 }
 
+template<typename V>
+void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNode &)> callback)
+{
+    auto removeIter = [&map =
+                           map](this auto & self, const SingleDerivedPath & k, fun<bool(ChildNode &)> onNode) -> void {
+        std::visit(
+            overloaded{
+                [&](const SingleDerivedPath::Opaque & bo) {
+                    if (auto it = map.find(bo.path); it != map.end() && !onNode(it->second))
+                        map.erase(it);
+                },
+                [&](const SingleDerivedPath::Built & bfd) {
+                    self(*bfd.drvPath, [&](ChildNode & parent) -> bool {
+                        auto it = parent.childMap.find(bfd.output);
+                        if (it == parent.childMap.end())
+                            return !parent.value.empty() || !parent.childMap.empty();
+                        if (!onNode(it->second))
+                            parent.childMap.erase(it);
+                        return !parent.value.empty() || !parent.childMap.empty();
+                    });
+                },
+            },
+            k.raw());
+    };
+
+    removeIter(k, [&](ChildNode & node) -> bool { return callback(node) || !node.childMap.empty(); });
+}
+
 } // namespace nix
 
 // instantiations

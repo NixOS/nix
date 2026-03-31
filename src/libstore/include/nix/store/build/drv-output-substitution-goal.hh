@@ -20,11 +20,12 @@ class Worker;
  * If the output store object itself should also be substituted, that is
  * the responsibility of the caller to do so.
  *
- * @todo rename this `BuidlTraceEntryGoal`, which will make sense
+ * @todo rename this `BuildTraceEntryGoal`, which will make sense
  * especially once `Realisation` is renamed to `BuildTraceEntry`.
  */
 class DrvOutputSubstitutionGoal : public Goal
 {
+    friend class Worker;
 
     /**
      * The drv output we're trying to substitute

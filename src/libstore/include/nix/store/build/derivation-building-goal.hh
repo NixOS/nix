@@ -31,6 +31,8 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
+    friend class Worker;
+
     /**
      * @param storeDerivation Whether to store the derivation in
      * `worker.store`. This is useful for newly-resolved derivations. In this
