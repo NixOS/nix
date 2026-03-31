@@ -254,21 +254,21 @@ void Worker::childStarted(
             nrLocalBuilds++;
             break;
         case JobCategory::Administration:
-            /* Intentionally not limited, see docs */
-            break;
         default:
+            /* Doesn't make sense, since there are only building and substitution slots. */
             unreachable();
         }
     }
 }
 
-void Worker::childTerminated(Goal * goal, bool wakeSleepers)
+void Worker::childTerminated(Goal * goal)
 {
-    childTerminated(goal, goal->jobCategory(), wakeSleepers);
+    childTerminated(goal, goal->jobCategory());
 }
 
-void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers)
+void Worker::childTerminated(Goal * goal, JobCategory jobCategory)
 {
+    // FIXME: Inefficient. Make children a map from Goal -> Child instead.
     auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
@@ -284,29 +284,25 @@ void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSlee
             nrLocalBuilds--;
             break;
         case JobCategory::Administration:
-            /* Intentionally not limited, see docs */
-            break;
         default:
+            /* Doesn't make sense, since there are only building and substitution slots. */
             unreachable();
         }
     }
 
     children.erase(i);
+    auto & waiting = jobCategory == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild;
 
-    if (wakeSleepers) {
-        auto & waiting = jobCategory == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild;
-
-        /* Wake up goals waiting for a build slot. Wake at most one waiter to avoid
-           starting unnecessary work (that is accompanied by coroutine frame allocation). */
-        auto it = waiting.begin();
-        while (it != waiting.end()) {
-            if (auto goal = it->lock()) {
-                waiting.erase(it);
-                wakeUp(goal);
-                break;
-            }
-            it = waiting.erase(it);
+    /* Wake up goals waiting for a build slot. Wake at most one waiter to avoid
+       starting unnecessary work (that is accompanied by coroutine frame allocation). */
+    auto it = waiting.begin();
+    while (it != waiting.end()) {
+        if (auto goal = it->lock()) {
+            waiting.erase(it);
+            wakeUp(goal);
+            break;
         }
+        it = waiting.erase(it);
     }
 }
 
