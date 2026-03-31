@@ -8,6 +8,7 @@
 #include "nix/util/sync.hh"
 #include "nix/store/remote-fs-accessor.hh"
 #include "nix/store/nar-info-disk-cache.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
@@ -381,6 +382,61 @@ StorePath BinaryCacheStore::addToStoreFromDump(
                    return info;
                })
         ->path;
+}
+
+StorePathSet BinaryCacheStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+{
+    struct State
+    {
+        size_t left;
+        StorePathSet valid;
+        std::exception_ptr exc;
+    };
+
+    Sync<State> state_(State{paths.size(), StorePathSet()});
+
+    std::condition_variable wakeup;
+    ThreadPool pool(fileTransferSettings.httpConnections);
+
+    auto doQuery = [&](const StorePath & path) {
+        checkInterrupt();
+
+        bool exists = false;
+        std::exception_ptr newExc{};
+
+        try {
+            exists = isValidPath(path);
+        } catch (...) {
+            newExc = std::current_exception();
+        }
+
+        auto state(state_.lock());
+
+        if (exists)
+            state->valid.insert(path);
+
+        if (newExc)
+            state->exc = newExc;
+
+        assert(state->left);
+        if (!--state->left)
+            wakeup.notify_one();
+    };
+
+    for (auto & path : paths)
+        pool.enqueue(std::bind(doQuery, path));
+
+    pool.process();
+
+    while (true) {
+        auto state(state_.lock());
+        if (!state->left) {
+            if (state->exc)
+                std::rethrow_exception(state->exc);
+            return std::move(state->valid);
+        }
+        state.wait(wakeup);
+    }
 }
 
 bool BinaryCacheStore::isValidPathUncached(const StorePath & storePath)
