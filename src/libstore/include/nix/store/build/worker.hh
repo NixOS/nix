@@ -127,11 +127,6 @@ private:
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
 
     /**
-     * Goals waiting for busy paths to be unlocked.
-     */
-    WeakGoals waitingForAnyGoal;
-
-    /**
      * Goals sleeping for a few seconds (polling a lock).
      */
     WeakGoals waitingForAWhile;
@@ -353,12 +348,6 @@ public:
      * might be right away).
      */
     void waitForBuildSlot(GoalPtr goal);
-
-    /**
-     * Wait for any goal to finish.  Pretty indiscriminate way to
-     * wait for some resource that some other goal is holding.
-     */
-    void waitForAnyGoal(GoalPtr goal);
 
     /**
      * Wait for a few seconds and then retry this goal.  Used when

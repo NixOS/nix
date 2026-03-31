@@ -207,15 +207,6 @@ void Worker::removeGoal(GoalPtr goal)
         if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
             topGoals.clear();
     }
-
-    /* Wake up goals waiting for any goal to finish. */
-    for (auto & i : waitingForAnyGoal) {
-        GoalPtr goal = i.lock();
-        if (goal)
-            wakeUp(goal);
-    }
-
-    waitingForAnyGoal.clear();
 }
 
 void Worker::wakeUp(GoalPtr goal)
@@ -321,12 +312,6 @@ void Worker::waitForBuildSlot(GoalPtr goal)
         wakeUp(goal); /* Can do it right away. */
     else
         addToWeakGoals(goal->jobCategory() == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild, goal);
-}
-
-void Worker::waitForAnyGoal(GoalPtr goal)
-{
-    goal->trace("wait for any goal");
-    addToWeakGoals(waitingForAnyGoal, goal);
 }
 
 void Worker::waitForAWhile(GoalPtr goal)
