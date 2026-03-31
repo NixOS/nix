@@ -171,6 +171,13 @@ rec {
         in
         pkgs.nixComponents2.overrideScope (
           self: super: {
+            # Build without precompiled headers to catch missing #includes. With
+            # PCH enabled, builds may silently rely on transitive includes.
+            mesonComponentOverrides = finalAttrs: prevAttrs: {
+              mesonFlags = (prevAttrs.mesonFlags or [ ]) ++ [
+                (lib.mesonBool "b_pch" false)
+              ];
+            };
             # Boost coroutines fail with ASAN on darwin.
             withASan = !pkgs.stdenv.buildPlatform.isDarwin;
             withUBSan = true;
@@ -217,13 +224,6 @@ rec {
       tidyScope = pkgs.nixComponents2.overrideScope (
         self: super: {
           withClangTidy = true;
-          # Build without precompiled headers to catch missing #includes. With
-          # PCH enabled, builds may silently rely on transitive includes.
-          mesonComponentOverrides = finalAttrs: prevAttrs: {
-            mesonFlags = (prevAttrs.mesonFlags or [ ]) ++ [
-              (lib.mesonBool "b_pch" false)
-            ];
-          };
           # nix-everything is built via callPackage (not the layer system), so
           # enableClangTidyLayer's doCheck=false doesn't reach it. Set it here
           # so checkInputs (the *-tests.tests.run derivations) aren't pulled in.
