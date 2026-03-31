@@ -88,13 +88,19 @@ std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
     const StorePath & drvPath,
-    const Derivation & drv,
+    ref<const Derivation> drv,
     const OutputName & wantedOutput,
     BuildMode buildMode,
     bool storeDerivation)
 {
     return initGoalIfNeeded(
-        derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode, storeDerivation);
+        derivationGoals[drvPath][wantedOutput],
+        drvPath,
+        std::move(drv),
+        wantedOutput,
+        *this,
+        buildMode,
+        storeDerivation);
 }
 
 std::shared_ptr<DerivationResolutionGoal>
@@ -104,9 +110,10 @@ Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation
 }
 
 std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation)
+    const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
+    return initGoalIfNeeded(
+        derivationBuildingGoals[drvPath], drvPath, std::move(drv), *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<PathSubstitutionGoal>
@@ -287,27 +294,37 @@ void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSlee
     children.erase(i);
 
     if (wakeSleepers) {
+        auto & waiting = jobCategory == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild;
 
-        /* Wake up goals waiting for a build slot. */
-        for (auto & j : wantingToBuild) {
-            GoalPtr goal = j.lock();
-            if (goal)
+        /* Wake up goals waiting for a build slot. Wake at most one waiter to avoid
+           starting unnecessary work (that is accompanied by coroutine frame allocation). */
+        auto it = waiting.begin();
+        while (it != waiting.end()) {
+            if (auto goal = it->lock()) {
+                waiting.erase(it);
                 wakeUp(goal);
+                break;
+            }
+            it = waiting.erase(it);
         }
-
-        wantingToBuild.clear();
     }
 }
 
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     goal->trace("wait for build slot");
-    bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
-    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs)
-        || (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
-        wakeUp(goal); /* we can do it right away */
+
+    bool slotAvailable = [&] {
+        if (goal->jobCategory() == JobCategory::Substitution)
+            return getNrSubstitutions() < settings.maxSubstitutionJobs;
+        else
+            return getNrLocalBuilds() < settings.maxBuildJobs;
+    }();
+
+    if (slotAvailable)
+        wakeUp(goal); /* Can do it right away. */
     else
-        addToWeakGoals(wantingToBuild, goal);
+        addToWeakGoals(goal->jobCategory() == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild, goal);
 }
 
 void Worker::waitForAnyGoal(GoalPtr goal)

@@ -93,6 +93,11 @@ private:
     WeakGoals wantingToBuild;
 
     /**
+     * Goals waiting for a substitution slot.
+     */
+    WeakGoals wantingToSubstitute;
+
+    /**
      * Child processes currently running.
      */
     std::list<Child> children;
@@ -256,7 +261,7 @@ public:
 
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
         const StorePath & drvPath,
-        const Derivation & drv,
+        ref<const Derivation> drv,
         const OutputName & wantedOutput,
         BuildMode buildMode,
         bool storeDerivation);
@@ -271,7 +276,7 @@ public:
      * @ref DerivationBuildingGoal "derivation building goal"
      */
     std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation);
+        const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"
