@@ -333,9 +333,24 @@ void Worker::run(const Goals & _topGoals)
                     awake2.insert(goal);
             }
             awake.clear();
+
             for (auto & goal : awake2) {
                 checkInterrupt();
+
+                std::chrono::time_point<std::chrono::steady_clock> startTime;
+                if (verbosity >= lvlVomit)
+                    startTime = std::chrono::steady_clock::now();
+
                 goal->work();
+
+                /* Useful for tracing which goals hod the event loop. */
+                vomit(
+                    "worker event loop worked goal '%1%' for %2$.3fms",
+                    goal->name,
+                    std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                        std::chrono::steady_clock::now() - startTime)
+                        .count());
+
                 if (topGoals.empty())
                     break; // stuff may have been cancelled
             }
