@@ -80,6 +80,11 @@ private:
      */
     Goals waitees;
 
+    /**
+     * Memoised result of key().
+     */
+    std::optional<std::string> cachedKey;
+
 public:
     typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
 
@@ -599,6 +604,17 @@ public:
      * "baboon".
      */
     virtual std::string key() = 0;
+
+    /**
+     * Memoising variant of key(). We really don't want to pay the overhead of
+     * allocating strings just to compare Goals.
+     */
+    std::string_view keyCached() &
+    {
+        if (cachedKey)
+            return *cachedKey;
+        return *(cachedKey = key());
+    }
 
     /**
      * @brief Hint for the scheduler, which concurrency limit applies.

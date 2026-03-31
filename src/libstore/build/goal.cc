@@ -157,9 +157,7 @@ std::coroutine_handle<> nix::Goal::Co::await_suspend(handle_type caller)
 
 bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
 {
-    std::string s1 = a->key();
-    std::string s2 = b->key();
-    return s1 < s2;
+    return a->keyCached() < b->keyCached();
 }
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p)
