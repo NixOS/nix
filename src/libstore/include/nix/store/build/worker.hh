@@ -93,6 +93,11 @@ private:
     WeakGoals wantingToBuild;
 
     /**
+     * Goals waiting for a substitution slot.
+     */
+    WeakGoals wantingToSubstitute;
+
+    /**
      * Child processes currently running.
      */
     std::list<Child> children;
@@ -120,11 +125,6 @@ private:
     std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
-
-    /**
-     * Goals waiting for busy paths to be unlocked.
-     */
-    WeakGoals waitingForAnyGoal;
 
     /**
      * Goals sleeping for a few seconds (polling a lock).
@@ -256,7 +256,7 @@ public:
 
     std::shared_ptr<DerivationGoal> makeDerivationGoal(
         const StorePath & drvPath,
-        const Derivation & drv,
+        ref<const Derivation> drv,
         const OutputName & wantedOutput,
         BuildMode buildMode,
         bool storeDerivation);
@@ -271,7 +271,7 @@ public:
      * @ref DerivationBuildingGoal "derivation building goal"
      */
     std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation);
+        const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"
@@ -326,15 +326,13 @@ public:
         bool respectTimeouts);
 
     /**
-     * Unregisters a running child process.  `wakeSleepers` should be
-     * false if there is no sense in waking up goals that are sleeping
-     * because they can't run yet (e.g., there is no free build slot,
-     * or the hook would still say `postpone`).
+     * Unregisters a running child process. Wakes at most a single goal that is
+     * awaiting on the corresponding build slot type (building or substitution).
      *
      * This overload requires `goal` to point to a fully constructed,
      * valid goal object, as it calls `goal->jobCategory()`.
      */
-    void childTerminated(Goal * goal, bool wakeSleepers = true);
+    void childTerminated(Goal * goal);
 
     /**
      * Unregisters a running child process, like the other overload.
@@ -343,19 +341,13 @@ public:
      * weak goal references, so it is safe to call from destructors
      * where the goal object may be partially destroyed.
      */
-    void childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers = true);
+    void childTerminated(Goal * goal, JobCategory jobCategory);
 
     /**
      * Put `goal` to sleep until a build slot becomes available (which
      * might be right away).
      */
     void waitForBuildSlot(GoalPtr goal);
-
-    /**
-     * Wait for any goal to finish.  Pretty indiscriminate way to
-     * wait for some resource that some other goal is holding.
-     */
-    void waitForAnyGoal(GoalPtr goal);
 
     /**
      * Wait for a few seconds and then retry this goal.  Used when

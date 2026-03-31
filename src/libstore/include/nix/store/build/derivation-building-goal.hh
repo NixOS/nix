@@ -31,6 +31,8 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
+    friend class Worker;
+
     /**
      * @param storeDerivation Whether to store the derivation in
      * `worker.store`. This is useful for newly-resolved derivations. In this
@@ -41,7 +43,11 @@ struct DerivationBuildingGoal : public Goal
      * faithfully reconstruct the build history.
      */
     DerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode, bool storeDerivation);
+        const StorePath & drvPath,
+        ref<const Derivation> drv,
+        Worker & worker,
+        BuildMode buildMode,
+        bool storeDerivation);
     ~DerivationBuildingGoal();
 
 private:
@@ -52,7 +58,7 @@ private:
     /**
      * The derivation stored at drvPath.
      */
-    const std::unique_ptr<Derivation> drv;
+    const ref<const Derivation> drv;
 
     /**
      * The remainder is state held during the build.

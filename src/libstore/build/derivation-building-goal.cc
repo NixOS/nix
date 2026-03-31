@@ -30,10 +30,10 @@
 namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode, bool storeDerivation)
+    const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode, bool storeDerivation)
     : Goal(worker, gaveUpOnSubstitution(storeDerivation))
     , drvPath(drvPath)
-    , drv{std::make_unique<Derivation>(drv)}
+    , drv{std::move(drv)}
     , buildMode(buildMode)
 {
     name = fmt("building derivation '%s'", worker.store.printStorePath(drvPath));

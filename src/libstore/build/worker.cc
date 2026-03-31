@@ -88,13 +88,19 @@ std::shared_ptr<DerivationTrampolineGoal> Worker::makeDerivationTrampolineGoal(
 
 std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
     const StorePath & drvPath,
-    const Derivation & drv,
+    ref<const Derivation> drv,
     const OutputName & wantedOutput,
     BuildMode buildMode,
     bool storeDerivation)
 {
     return initGoalIfNeeded(
-        derivationGoals[drvPath][wantedOutput], drvPath, drv, wantedOutput, *this, buildMode, storeDerivation);
+        derivationGoals[drvPath][wantedOutput],
+        drvPath,
+        std::move(drv),
+        wantedOutput,
+        *this,
+        buildMode,
+        storeDerivation);
 }
 
 std::shared_ptr<DerivationResolutionGoal>
@@ -104,9 +110,10 @@ Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation
 }
 
 std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv, BuildMode buildMode, bool storeDerivation)
+    const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation)
 {
-    return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
+    return initGoalIfNeeded(
+        derivationBuildingGoals[drvPath], drvPath, std::move(drv), *this, buildMode, storeDerivation);
 }
 
 std::shared_ptr<PathSubstitutionGoal>
@@ -134,64 +141,31 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
         req.raw());
 }
 
-/**
- * This function is polymorphic (both via type parameters and
- * overloading) and recursive in order to work on a various types of
- * trees
- *
- * @return Whether the tree node we are processing is not empty / should
- * be kept alive. In the case of this overloading the node in question
- * is the leaf, the weak reference itself. If the weak reference points
- * to the goal we are looking for, our caller can delete it. In the
- * inductive case where the node is an interior node, we'll likewise
- * return whether the interior node is non-empty. If it is empty
- * (because we just deleted its last child), then our caller can
- * likewise delete it.
- */
-template<typename G>
-static bool removeGoal(std::shared_ptr<G> goal, std::weak_ptr<G> & gp)
-{
-    return gp.lock() != goal;
-}
-
-template<typename K, typename G, typename Inner>
-static bool removeGoal(std::shared_ptr<G> goal, std::map<K, Inner> & goalMap)
-{
-    /* !!! inefficient */
-    for (auto i = goalMap.begin(); i != goalMap.end();) {
-        if (!removeGoal(goal, i->second))
-            i = goalMap.erase(i);
-        else
-            ++i;
-    }
-    return !goalMap.empty();
-}
-
-template<typename G>
-static bool
-removeGoal(std::shared_ptr<G> goal, typename DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<G>>>::ChildNode & node)
-{
-    bool valueKeep = removeGoal(goal, node.value);
-    bool childMapKeep = removeGoal(goal, node.childMap);
-    return valueKeep || childMapKeep;
-}
-
 void Worker::removeGoal(GoalPtr goal)
 {
-    if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal))
-        nix::removeGoal(drvGoal, derivationTrampolineGoals.map);
-    else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal))
-        nix::removeGoal(drvGoal, derivationGoals);
-    else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal))
-        nix::removeGoal(drvResolutionGoal, derivationResolutionGoals);
-    else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal))
-        nix::removeGoal(drvBuildingGoal, derivationBuildingGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal))
-        nix::removeGoal(subGoal, substitutionGoals);
-    else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal))
-        nix::removeGoal(subGoal, drvOutputSubstitutionGoals);
-    else
-        assert(false);
+    if (auto drvGoal = std::dynamic_pointer_cast<DerivationTrampolineGoal>(goal)) {
+        derivationTrampolineGoals.removeSlot(*drvGoal->drvReq, [&](auto & node) {
+            node.value.erase(drvGoal->wantedOutputs);
+            /* Return true if ancestors don't need to be pruned. */
+            return !node.value.empty();
+        });
+    } else if (auto drvGoal = std::dynamic_pointer_cast<DerivationGoal>(goal)) {
+        if (auto it = derivationGoals.find(drvGoal->drvPath); it != derivationGoals.end()) {
+            it->second.erase(drvGoal->wantedOutput);
+            if (it->second.empty())
+                derivationGoals.erase(it);
+        }
+    } else if (auto drvResolutionGoal = std::dynamic_pointer_cast<DerivationResolutionGoal>(goal)) {
+        derivationResolutionGoals.erase(drvResolutionGoal->drvPath);
+    } else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal)) {
+        derivationBuildingGoals.erase(drvBuildingGoal->drvPath);
+    } else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal)) {
+        substitutionGoals.erase(subGoal->storePath);
+    } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
+        drvOutputSubstitutionGoals.erase(subGoal->id);
+    } else {
+        unreachable();
+    }
 
     if (topGoals.find(goal) != topGoals.end()) {
         topGoals.erase(goal);
@@ -200,15 +174,6 @@ void Worker::removeGoal(GoalPtr goal)
         if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
             topGoals.clear();
     }
-
-    /* Wake up goals waiting for any goal to finish. */
-    for (auto & i : waitingForAnyGoal) {
-        GoalPtr goal = i.lock();
-        if (goal)
-            wakeUp(goal);
-    }
-
-    waitingForAnyGoal.clear();
 }
 
 void Worker::wakeUp(GoalPtr goal)
@@ -247,21 +212,21 @@ void Worker::childStarted(
             nrLocalBuilds++;
             break;
         case JobCategory::Administration:
-            /* Intentionally not limited, see docs */
-            break;
         default:
+            /* Doesn't make sense, since there are only building and substitution slots. */
             unreachable();
         }
     }
 }
 
-void Worker::childTerminated(Goal * goal, bool wakeSleepers)
+void Worker::childTerminated(Goal * goal)
 {
-    childTerminated(goal, goal->jobCategory(), wakeSleepers);
+    childTerminated(goal, goal->jobCategory());
 }
 
-void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSleepers)
+void Worker::childTerminated(Goal * goal, JobCategory jobCategory)
 {
+    // FIXME: Inefficient. Make children a map from Goal -> Child instead.
     auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
@@ -277,43 +242,43 @@ void Worker::childTerminated(Goal * goal, JobCategory jobCategory, bool wakeSlee
             nrLocalBuilds--;
             break;
         case JobCategory::Administration:
-            /* Intentionally not limited, see docs */
-            break;
         default:
+            /* Doesn't make sense, since there are only building and substitution slots. */
             unreachable();
         }
     }
 
     children.erase(i);
+    auto & waiting = jobCategory == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild;
 
-    if (wakeSleepers) {
-
-        /* Wake up goals waiting for a build slot. */
-        for (auto & j : wantingToBuild) {
-            GoalPtr goal = j.lock();
-            if (goal)
-                wakeUp(goal);
+    /* Wake up goals waiting for a build slot. Wake at most one waiter to avoid
+       starting unnecessary work (that is accompanied by coroutine frame allocation). */
+    auto it = waiting.begin();
+    while (it != waiting.end()) {
+        if (auto goal = it->lock()) {
+            waiting.erase(it);
+            wakeUp(goal);
+            break;
         }
-
-        wantingToBuild.clear();
+        it = waiting.erase(it);
     }
 }
 
 void Worker::waitForBuildSlot(GoalPtr goal)
 {
     goal->trace("wait for build slot");
-    bool isSubstitutionGoal = goal->jobCategory() == JobCategory::Substitution;
-    if ((!isSubstitutionGoal && getNrLocalBuilds() < settings.maxBuildJobs)
-        || (isSubstitutionGoal && getNrSubstitutions() < settings.maxSubstitutionJobs))
-        wakeUp(goal); /* we can do it right away */
-    else
-        addToWeakGoals(wantingToBuild, goal);
-}
 
-void Worker::waitForAnyGoal(GoalPtr goal)
-{
-    goal->trace("wait for any goal");
-    addToWeakGoals(waitingForAnyGoal, goal);
+    bool slotAvailable = [&] {
+        if (goal->jobCategory() == JobCategory::Substitution)
+            return getNrSubstitutions() < settings.maxSubstitutionJobs;
+        else
+            return getNrLocalBuilds() < settings.maxBuildJobs;
+    }();
+
+    if (slotAvailable)
+        wakeUp(goal); /* Can do it right away. */
+    else
+        addToWeakGoals(goal->jobCategory() == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild, goal);
 }
 
 void Worker::waitForAWhile(GoalPtr goal)
@@ -368,9 +333,24 @@ void Worker::run(const Goals & _topGoals)
                     awake2.insert(goal);
             }
             awake.clear();
+
             for (auto & goal : awake2) {
                 checkInterrupt();
+
+                std::chrono::time_point<std::chrono::steady_clock> startTime;
+                if (verbosity >= lvlVomit)
+                    startTime = std::chrono::steady_clock::now();
+
                 goal->work();
+
+                /* Useful for tracing which goals hod the event loop. */
+                vomit(
+                    "worker event loop worked goal '%1%' for %2$.3fms",
+                    goal->name,
+                    std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
+                        std::chrono::steady_clock::now() - startTime)
+                        .count());
+
                 if (topGoals.empty())
                     break; // stuff may have been cancelled
             }
