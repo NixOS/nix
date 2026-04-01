@@ -11,18 +11,18 @@ rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 echo foo > "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 mkdir -p "$TEST_ROOT/out2"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 # The same, but for a regular file.
 nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"
@@ -56,14 +56,14 @@ rm -rf "$TEST_ROOT/out"
 # must already exist, which conflicts with --restore creating
 # something new.
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.'.*not a valid filename"
 
 # Destination with trailing `/..` should fail.
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.\.'.*not a valid filename"
 
 # Empty destination should fail.
-expectStderr 1 nix-store --restore "" < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+expectStderr 1 nix-store --restore "" < "$TEST_ROOT/tmp.nar" | grepQuiet "destination path is empty"
 
 # The same, but for a symlink.
 ln -sfn foo "$TEST_ROOT/symlink"
@@ -93,7 +93,7 @@ rm -rf "$TEST_ROOT/out"
 
 # Trailing `/.` — same baseline as above (currently fails).
 rm -rf "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.'.*not a valid filename"
 
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
@@ -122,7 +122,7 @@ expectStderr 1 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null
 
 # Trailing `/.` — same baseline as above (currently fails).
 rm -rf "$TEST_ROOT/case"
-expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "No such file or directory"
+expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "ends in '\.'.*not a valid filename"
 
 # Detect NARs that have a directory entry that after case-hacking
 # collides with another entry (e.g. a directory containing 'Test',
@@ -156,7 +156,7 @@ if (( unicodeTestCode == 1 )); then
     # If the command failed (MacOS or ZFS + normalization), checks that it failed
     # with the expected "already exists" error, and that this is the same
     # behavior as `touch`
-    echo "$unicodeTestOut" | grepQuiet "creating directory \".*/out/â\": File exists"
+    echo "$unicodeTestOut" | grepQuiet 'creating directory ".*/out/â": File exists'
 
     (( touchFilesCount == 1 ))
 elif (( unicodeTestCode == 0 )); then
