@@ -116,3 +116,17 @@ path="$(nix flake prefetch --refresh --json "tarball+file://$TEST_ROOT/tar.tar" 
 # Test that unpacking an empty file does not segfault (see https://github.com/NixOS/nix/issues/15116).
 touch "$TEST_ROOT/empty"
 expectStderr 1 nix store prefetch-file --unpack "file://$TEST_ROOT/empty" | grepQuiet "archive.*is empty"
+
+# Test that concurrent invocations of Nix will fetch the tarball only once.
+rm -rf "$TEST_HOME/.cache"
+store="$TEST_ROOT/prefetch-store"
+nix-store --store "$store" --init # needed because concurrent creation of the store can give SQLite errors
+_NIX_TEST_CONCURRENT_FETCHES=1 _NIX_FORCE_HTTP=1 nix flake prefetch --store "$store" -v "tarball+file://$TEST_ROOT/tar.tar" 2> "$TEST_ROOT/log1" &
+pid1="$!"
+_NIX_TEST_CONCURRENT_FETCHES=1 _NIX_FORCE_HTTP=1 nix flake prefetch --store "$store" -v "tarball+file://$TEST_ROOT/tar.tar" 2> "$TEST_ROOT/log2" &
+pid2="$!"
+wait "$pid1"
+wait "$pid2"
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "Download.*to") -eq 2 ]]
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "downloading.*tar.tar") -eq 1 ]]
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "waiting for another Nix process to finish fetching input") -eq 1 ]]
