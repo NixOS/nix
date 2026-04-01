@@ -1,5 +1,6 @@
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/util/file-system-at.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
@@ -396,7 +397,7 @@ protected:
      * @param Name must not contain more than one path segment and none of them must be `..`, `.`
      * Otherwise this function throws an Error.
      */
-    void writeBuilderFile(const std::string & name, std::string_view contents);
+    void writeBuilderFile(const OsFilename & name, std::string_view contents);
 
     /**
      * Arguments passed to runChild().
@@ -1094,7 +1095,7 @@ void DerivationBuilderImpl::initEnv()
 
     /* Add extra files, similar to `finalEnv` */
     for (const auto & [fileName, value] : desugaredEnv.extraFiles) {
-        writeBuilderFile(fileName, rewriteStrings(value, inputRewrites));
+        writeBuilderFile(OsFilename{std::filesystem::path(fileName)}, rewriteStrings(value, inputRewrites));
     }
 
     /* For convenience, set an environment pointing to the top build
@@ -1266,16 +1267,11 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path &
         throw SysError("cannot change ownership of file %1%", PathFmt(path));
 }
 
-void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::string_view contents)
+void DerivationBuilderImpl::writeBuilderFile(const OsFilename & name, std::string_view contents)
 {
-    /* Path must be the same after normalisation. This is an additional sanity check in addition to
-       existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
-       a single path component without any `..`, `.` components. */
-    auto relPath = std::filesystem::path(name);
-    assert(relPath == relPath.filename());
-    AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
-        tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
-    auto path = tmpDir / relPath; /* This is used only for error messages. */
+    AutoCloseFD fd =
+        openFileEnsureBeneathNoSymlinks(tmpDirFd.get(), name, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
+    auto path = tmpDir / name.path(); /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
     writeFile(fd.get(), contents);

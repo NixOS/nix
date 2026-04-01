@@ -267,8 +267,25 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
 
 void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
 {
-    RestoreSink sink{startFsync};
-    sink.dstPath = path;
+    if (path.empty())
+        throw Error("restore destination path is empty");
+    auto filename = path.filename();
+    if (filename == "." || filename == "..")
+        throw Error(
+            "restore destination '%s' ends in '%s', which is not a valid filename", path.string(), filename.string());
+    /* For bare relative paths like "out", parent_path() returns "".
+       Fall back to "." to pin the current working directory. */
+    auto parentPath = path.parent_path();
+    if (parentPath.empty())
+        parentPath = ".";
+    auto dirFd = openDirectory(parentPath, FinalSymlink::Follow);
+    if (!dirFd)
+        throw SysError("opening parent directory of %s", PathFmt(path));
+    RestoreSink sink{
+        RestoreSink::DirFdParent{OsFilename{filename}},
+        std::move(dirFd),
+        startFsync,
+    };
     parseDump(sink, source);
 }
 

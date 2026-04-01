@@ -485,8 +485,14 @@ void InputScheme::clone(
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
-    RestoreSink sink(/*startFsync=*/false);
-    sink.dstPath = destDir;
+    auto dirFd = openDirectory(destDir.parent_path(), FinalSymlink::Follow);
+    if (!dirFd)
+        throw SysError("opening parent directory of %s", PathFmt(destDir));
+    RestoreSink sink{
+        RestoreSink::DirFdParent{OsFilename{destDir.filename()}},
+        std::move(dirFd),
+        /*startFsync=*/false,
+    };
     copyRecursive(*accessor, CanonPath::root, sink, CanonPath::root);
 }
 

@@ -92,11 +92,7 @@ TEST_F(FSSourceAccessorTest, works)
     GTEST_SKIP() << "Broken on Windows";
 #endif
     {
-        RestoreSink sink(false);
-        sink.dstPath = tmpDir;
-#ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
-#endif
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
         sink.createRegularFile(CanonPath("subdir/file2"), [](CreateRegularFileSink & crf) { crf("content2"); });
@@ -146,9 +142,11 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 {
     auto filePath = tmpDir / "rootfile";
     {
-        RestoreSink sink(false);
-        sink.dstPath = filePath;
-        // No dirFd set - this tests the !dirFd path
+        RestoreSink sink{
+            RestoreSink::DirFdParent{OsFilename{std::filesystem::path("rootfile")}},
+            openDirectory(tmpDir, FinalSymlink::Follow),
+            /*startFsync=*/false,
+        };
         sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
     }
 
@@ -162,9 +160,11 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
-        RestoreSink sink(false);
-        sink.dstPath = linkPath;
-        // No dirFd set - this tests the !dirFd path
+        RestoreSink sink{
+            RestoreSink::DirFdParent{OsFilename{std::filesystem::path("rootlink")}},
+            openDirectory(tmpDir, FinalSymlink::Follow),
+            /*startFsync=*/false,
+        };
         sink.createSymlink(CanonPath::root, "symlink_target");
     }
 

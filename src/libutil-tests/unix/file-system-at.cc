@@ -27,9 +27,7 @@ TEST(fchmodatTryNoFollow, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createDirectory(CanonPath("dir"));
         sink.createSymlink(CanonPath("filelink"), "file");
@@ -117,9 +115,7 @@ TEST(fchmodatTryNoFollow, fallbackWithoutProc)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
         sink.createSymlink(CanonPath("link"), "file");
     }

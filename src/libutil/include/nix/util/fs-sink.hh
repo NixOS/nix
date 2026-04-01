@@ -4,6 +4,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/os-filename.hh"
 
 namespace nix {
 
@@ -95,24 +96,58 @@ struct NullFileSystemObjectSink : FileSystemObjectSink
 
 /**
  * Write files at the given path
+ *
+ * This sink must *never* follow intermediate symlinks in case a file collision
+ * is encountered for various reasons like case-insensitivity or other types of
+ * normalization. Using appropriate *at system calls and traversing only one
+ * path component at a time ensures that writing is race-free and is not
+ * susceptible to symlink replacement.
  */
 struct RestoreSink : FileSystemObjectSink
 {
-    std::filesystem::path dstPath;
     /**
-     * File descriptor for the directory located at dstPath. Used for *at
-     * operations relative to this file descriptor. This sink must *never*
-     * follow intermediate symlinks (starting from dstPath) in case a file
-     * collision is encountered for various reasons like case-insensitivity or
-     * other types on normalization. using appropriate *at system calls and traversing
-     * only one path component at a time ensures that writing is race-free and is
-     * is not susceptible to symlink replacement.
+     * `dirFd` is the parent directory of the entry to create.
+     * `name` is the single-component name of the root entry
+     * within that parent.
+     */
+    struct DirFdParent
+    {
+        OsFilename name;
+    };
+
+    /**
+     * `dirFd` is the root directory of the restore tree itself.
+     * Paths are relative within it.
+     */
+    struct DirFdRoot
+    {};
+
+    using DirFdKind = std::variant<DirFdRoot, DirFdParent>;
+
+    /**
+     * What `dirFd` refers to.
+     */
+    DirFdKind dirFdKind;
+
+    /**
+     * File descriptor used for `*at` operations. Interpretation
+     * depends on `dirFdKind`.
+     *
+     * This sink must *never* follow intermediate symlinks in case a
+     * file collision is encountered for various reasons like
+     * case-insensitivity or other types of normalization. Using
+     * appropriate `*at` system calls and traversing only one path
+     * component at a time ensures that writing is race-free and is not
+     * susceptible to symlink replacement.
      */
     AutoCloseFD dirFd;
+
     bool startFsync = false;
 
-    explicit RestoreSink(bool startFsync)
-        : startFsync{startFsync}
+    RestoreSink(DirFdKind dirFdKind, AutoCloseFD dirFd, bool startFsync)
+        : dirFdKind{std::move(dirFdKind)}
+        , dirFd{std::move(dirFd)}
+        , startFsync{startFsync}
     {
     }
 

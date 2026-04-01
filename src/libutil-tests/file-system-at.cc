@@ -32,9 +32,7 @@ TEST(readLinkAt, works)
 
     bool hasLongSymlinks = true;
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         try {
             sink.createSymlink(CanonPath("link"), "target");
         } catch (SystemError &) {
@@ -94,9 +92,7 @@ TEST(openFileEnsureBeneathNoSymlinks, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createDirectory(CanonPath("a"));
         sink.createDirectory(CanonPath("c"));
         sink.createDirectory(CanonPath("c/d"));
@@ -305,9 +301,7 @@ TEST(openFileEnsureBeneathNoSymlinksDeathTest, rejectsONofollow)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
     {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
+        RestoreSink sink{RestoreSink::DirFdRoot{}, openDirectory(tmpDir, FinalSymlink::Follow), /*startFsync=*/false};
         sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink & crf) {});
     }
 
