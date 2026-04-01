@@ -144,7 +144,7 @@ TEST_F(MemorySourceAccessorTestErrors, addFileParentNotDirectory)
         [&] { accessor->addFile(CanonPath("file/child"), "contents"); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("cannot be created because some parent file is not a directory"))));
+            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, addFileNotARegularFile)
@@ -165,7 +165,7 @@ TEST_F(MemorySourceAccessorTestErrors, createDirectoryParentNotDirectory)
         [&] { sink.createDirectory(CanonPath("file/child")); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("cannot be created because some parent file is not a directory"))));
+            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, createDirectoryNotADirectory)
@@ -185,8 +185,8 @@ TEST_F(MemorySourceAccessorTestErrors, createRegularFileParentNotDirectory)
     EXPECT_THAT(
         [&] { sink.createRegularFile(CanonPath("file/child"), [](CreateRegularFileSink &) {}); },
         ThrowsMessage<Error>(AllOf(
-            HasSubstrIgnoreANSIMatcher("file/child"),
-            HasSubstrIgnoreANSIMatcher("cannot be created because some parent file is not a directory"))));
+            HasSubstrIgnoreANSIMatcher("somepath/file/child"),
+            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, createRegularFileNotARegularFile)
@@ -207,7 +207,7 @@ TEST_F(MemorySourceAccessorTestErrors, createSymlinkParentNotDirectory)
         [&] { sink.createSymlink(CanonPath("file/child"), "target"); },
         ThrowsMessage<Error>(AllOf(
             HasSubstrIgnoreANSIMatcher("somepath/file/child"),
-            HasSubstrIgnoreANSIMatcher("cannot be created because some parent file is not a directory"))));
+            HasSubstrIgnoreANSIMatcher("file 'somepath/file' is not a directory"))));
 }
 
 TEST_F(MemorySourceAccessorTestErrors, createSymlinkNotASymlink)
@@ -218,6 +218,36 @@ TEST_F(MemorySourceAccessorTestErrors, createSymlinkNotASymlink)
         [&] { sink.createSymlink(CanonPath("file"), "target"); },
         ThrowsMessage<NotASymlink>(
             AllOf(HasSubstrIgnoreANSIMatcher("somepath/file"), HasSubstrIgnoreANSIMatcher("is not a symbolic link"))));
+}
+
+TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughRegularFile)
+{
+    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    EXPECT_FALSE(accessor->pathExists(CanonPath("file/child")));
+}
+
+TEST_F(MemorySourceAccessorTestErrors, maybeLstatThroughRegularFile)
+{
+    sink.createRegularFile(CanonPath("file"), [](CreateRegularFileSink &) {});
+    EXPECT_FALSE(accessor->maybeLstat(CanonPath("file/child")));
+}
+
+TEST_F(MemorySourceAccessorTestErrors, pathExistsThroughSymlink)
+{
+    sink.createSymlink(CanonPath("link"), "target");
+    EXPECT_THAT(
+        [&] { accessor->pathExists(CanonPath("link/child")); },
+        ThrowsMessage<SymlinkNotAllowed>(
+            AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
+}
+
+TEST_F(MemorySourceAccessorTestErrors, createFileThroughSymlink)
+{
+    sink.createSymlink(CanonPath("link"), "target");
+    EXPECT_THAT(
+        [&] { sink.createRegularFile(CanonPath("link/child"), [](CreateRegularFileSink &) {}); },
+        ThrowsMessage<SymlinkNotAllowed>(
+            AllOf(HasSubstrIgnoreANSIMatcher("somepath/link"), HasSubstrIgnoreANSIMatcher("is a symlink"))));
 }
 
 /* ----------------------------------------------------------------------------

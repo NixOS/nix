@@ -315,20 +315,69 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
     AutoCloseFD fd = openFileReadonly(root, FinalSymlink::DontFollow);
 
     if (!fd) {
-        if (errno == ELOOP) {
-            /* This branch is taken either if the final component is a symlink
-               or we hit a symlink loop. If that's the latter this will also
-               throw. This can be done with O_PATH descriptor for the symlink
-               itself, but it's not portable. */
-            auto linkTarget = readLink(root);
-            auto res = make_ref<MemorySourceAccessor>();
-            /* Create an in-memory accessor with the symlink at the root. */
-            MemorySink sink{*res};
-            sink.createSymlink(CanonPath::root, os_string_to_string(linkTarget));
-            return res;
+        if (errno != ELOOP)
+            throw NativeSysError("opening file %1%", PathFmt(root));
+
+        /* A helper class that holds the symlink destination in memory. */
+        class SymlinkSourceAccessor : public MemorySourceAccessor
+        {
+            bool trackLastModified;
+            std::time_t mtime;
+            std::filesystem::path fsPath;
+
+        public:
+            SymlinkSourceAccessor(
+                std::string target, std::filesystem::path fsPath_, bool trackLastModified, std::time_t mtime)
+                : trackLastModified(trackLastModified)
+                , mtime(mtime)
+                , fsPath(std::move(fsPath_))
+            {
+                MemorySink sink{*this};
+                sink.createSymlink(CanonPath::root, target);
+                displayPrefix = fsPath.native();
+            }
+
+            std::optional<std::time_t> getLastModified() override
+            {
+                return trackLastModified ? std::optional{mtime} : std::nullopt;
+            }
+
+            std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+            {
+                if (path.isRoot())
+                    return fsPath;
+                return fsPath / path.rel(); /* RHS must be a relative path. */
+            }
+
+            std::string showPath(const CanonPath & path) override
+            {
+                /* When rendering the file itself omit the trailing slash. */
+                return path.isRoot() ? displayPrefix : SourceAccessor::showPath(path);
+            }
+        };
+
+        assert(root.has_parent_path());
+        assert(root.has_filename());
+
+        /* This branch is taken either if the final component is a symlink
+           or we hit a symlink loop. If that's the latter this will also
+           throw. This can be done with O_PATH descriptor for the symlink
+           itself, but it's not portable. Note that file must have a parent directory
+           (it's required to be absolute and root directories can't fail with ELOOP). */
+
+        auto parentFd = openDirectory(root.parent_path(), FinalSymlink::Follow);
+        std::time_t mtime = 0;
+        if (!parentFd)
+            throw SysError("opening %1%", PathFmt(root));
+
+        auto relPath = CanonPath::fromFilename(root.filename().native());
+        if (trackLastModified) {
+            auto st = fstatat(parentFd.get(), root.filename());
+            mtime = st.st_mtime;
         }
 
-        throw NativeSysError("opening file %1%", PathFmt(root));
+        auto linkTarget = readLinkAt(parentFd.get(), relPath);
+        return make_ref<SymlinkSourceAccessor>(std::move(linkTarget), std::move(root), trackLastModified, mtime);
     }
 
     auto st = nix::fstat(fd.get());

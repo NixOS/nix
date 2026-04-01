@@ -168,8 +168,7 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             });
 
             if (errno == ENOTDIR) /* Path component might be a symlink. */ {
-                struct ::stat st;
-                if (::fstatat(getParentFd(), component.c_str(), &st, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(st.st_mode))
+                if (auto st = maybeFstatat(getParentFd(), component); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
             } else if (errno == ELOOP) {
@@ -226,6 +225,30 @@ PosixStat fstat(Descriptor fd)
     PosixStat st;
     if (::fstat(fd, &st)) {
         throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(fd))); });
+    }
+    return st;
+}
+
+PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path)
+{
+    assert(path.is_relative());
+    assert(!path.empty());
+    PosixStat st;
+    if (::fstatat(dirFd, path.c_str(), &st, AT_SYMLINK_NOFOLLOW)) {
+        throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path)); });
+    }
+    return st;
+}
+
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const std::filesystem::path & path)
+{
+    assert(path.is_relative());
+    assert(!path.empty());
+    PosixStat st;
+    if (::fstatat(dirFd, path.c_str(), &st, AT_SYMLINK_NOFOLLOW)) {
+        if (errno == ENOENT || errno == ENOTDIR)
+            return std::nullopt;
+        throw SysError([&] { return HintFmt("getting status of %s", PathFmt(descriptorToPath(dirFd) / path)); });
     }
     return st;
 }
