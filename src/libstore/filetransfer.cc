@@ -42,6 +42,7 @@ enum struct HttpStatus : long {
     NoContent = 204,
     PartialContent = 206,
     NotModified = 304,
+    BadRequest = 400,
     Unauthorized = 401,
     Forbidden = 403,
     NotFound = 404,
@@ -192,6 +193,24 @@ struct curlFileTransfer : public FileTransfer
          */
         bool hasContentEncoding:1 = false;
 
+#if NIX_WITH_AWS_AUTH
+        /**
+         * Whether a refreshed AWS credential set has been applied since the
+         * last 2xx response. Once set, a subsequent 403 is classified
+         * Forbidden (not Transient) — the refresh didn't help. Cleared on 2xx
+         * so a long Range-resumable download that spans multiple token
+         * lifetimes can refresh more than once.
+         */
+        bool awsCredsRefreshed:1 = false;
+
+        /**
+         * Async credential fetch kicked off by maybeRetry(), consumed by init().
+         * The embargo delay between the two gives the fetch time to complete
+         * without blocking the curl worker thread.
+         */
+        std::optional<std::future<std::optional<AwsCredentials>>> pendingAwsCredRefresh;
+#endif
+
         /**
          * Server-provided minimum retry delay, parsed from the `Retry-After`
          * response header. Reset on each new HTTP status line, and consumed
@@ -231,6 +250,21 @@ struct curlFileTransfer : public FileTransfer
             requestHeaders = std::move(tmpSList);
         }
 
+        void buildRequestHeaders()
+        {
+            requestHeaders.reset();
+            if (!request.expectedETag.empty())
+                appendHeaders("If-None-Match: " + request.expectedETag);
+            if (!request.mimeType.empty())
+                appendHeaders("Content-Type: " + request.mimeType);
+            for (const auto & [name, value] : request.headers)
+                appendHeaders(fmt("%s: %s", name, value));
+#if NIX_WITH_AWS_AUTH
+            if (request.awsSessionToken)
+                appendHeaders("x-amz-security-token: " + *request.awsSessionToken);
+#endif
+        }
+
         TransferItem(
             curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
@@ -263,14 +297,7 @@ struct curlFileTransfer : public FileTransfer
             })
         {
             result.urls.push_back(request.uri.to_string());
-
-            if (!request.expectedETag.empty())
-                appendHeaders("If-None-Match: " + request.expectedETag);
-            if (!request.mimeType.empty())
-                appendHeaders("Content-Type: " + request.mimeType);
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                appendHeaders(fmt("%s: %s", it->first, it->second));
-            }
+            buildRequestHeaders();
         }
 
         ~TransferItem()
@@ -365,13 +392,31 @@ struct curlFileTransfer : public FileTransfer
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
 
-            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
+            static std::regex statusLine("HTTP/[^ ]+ +([0-9]+)(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
+                auto statusCode = string2Int<int>(match.str(1)).value_or(0);
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim(match.str(1));
-                acceptRanges = false;
+                statusMsg = trim(match.str(2));
+                // An error response doesn't carry Accept-Ranges, but it also
+                // doesn't revoke the server's range support established by a
+                // prior 2xx. Preserve across 3xx/4xx/5xx so a 403-on-resume
+                // can still retry after a credential refresh — a redirect hop
+                // (CURLOPT_FOLLOWLOCATION) doesn't carry Accept-Ranges either.
+                if (statusCode >= 200 && statusCode < 300)
+                    acceptRanges = false;
+#if NIX_WITH_AWS_AUTH
+                // A 2xx confirms the refreshed creds work — clear the
+                // loop-guard so a future expiry can refresh again. Exclude
+                // 1xx (100 Continue on PUT uploads isn't auth confirmation;
+                // some S3-compatibles send it before validating the header)
+                // and 3xx (a redirect mid-chain via CURLOPT_FOLLOWLOCATION
+                // doesn't validate auth either — same reasoning as the 1xx
+                // and CURLOPT_SUPPRESS_CONNECT_HEADERS exclusions).
+                if (statusCode >= 200 && statusCode < 300)
+                    awsCredsRefreshed = false;
+#endif
                 hasContentEncoding = false;
                 retryAfterMs = std::nullopt;
                 appendCurrentUrl();
@@ -565,6 +610,28 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
+#if NIX_WITH_AWS_AUTH
+            if (pendingAwsCredRefresh
+                && pendingAwsCredRefresh->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                auto creds = pendingAwsCredRefresh->get();
+                pendingAwsCredRefresh.reset();
+                awsCredsRefreshed = true;
+                if (creds) {
+                    request.usernameAuth = UsernameAuth{
+                        .username = std::move(creds->accessKeyId),
+                        .password = std::move(creds->secretAccessKey),
+                    };
+                    request.awsSessionToken = std::move(creds->sessionToken);
+                    buildRequestHeaders();
+                    debug("applied refreshed AWS credentials for retry attempt %d", attempt);
+                } else {
+                    debug("AWS credential refresh returned no credentials; retrying with previous ones");
+                }
+            } else if (pendingAwsCredRefresh) {
+                debug("AWS credential refresh still pending; retrying with previous credentials");
+            }
+#endif
+
             if (verbosity >= lvlVomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
@@ -583,6 +650,10 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
+            // Proxy CONNECT responses confuse headerCallback — a "200 Connection
+            // established" is not an origin 2xx and shouldn't reset per-response
+            // state (acceptRanges, awsCredsRefreshed).
+            curl_easy_setopt(req, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(
                 req,
@@ -758,10 +829,42 @@ struct curlFileTransfer : public FileTransfer
                     || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
-                } else if (
-                    httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::Forbidden
-                    || httpStatus == HttpStatus::ProxyAuthRequired) {
-                    // Don't retry on authentication/authorization failures
+                }
+#if NIX_WITH_AWS_AUTH
+                // S3 documents ExpiredToken/TokenRefreshRequired as HTTP 400
+                // (https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html),
+                // AccessDenied as 403. Check the body <Code> for both statuses —
+                // AWS SDKs check status-agnostic for this reason. A blind retry
+                // doubles S3 requests for every cache-miss probe, so the body
+                // check is load-bearing. HEAD has no body — with creds present,
+                // falls through (can't distinguish expiry without the <Code>).
+                else if ([&]() {
+                             if (!request.awsRetry || awsCredsRefreshed)
+                                 return false;
+                             // No creds yet (initial fetch failed, async pending) —
+                             // unauthenticated request → 403 AccessDenied, expected.
+                             // Bounded by awsCredsRefreshed: init() sets it
+                             // unconditionally when the future resolves (even
+                             // nullopt), and even a blackholed-IMDS chain
+                             // resolves within ~1s — well inside the retry
+                             // window. download-attempts is the backstop for a
+                             // genuinely-hung provider.
+                             if (!request.usernameAuth)
+                                 return httpStatus == HttpStatus::Forbidden;
+                             if (httpStatus != HttpStatus::Forbidden && httpStatus != HttpStatus::BadRequest)
+                                 return false;
+                             if (!errorSink)
+                                 return false;
+                             static const std::regex codeRe(
+                                 "<Code>(ExpiredToken|TokenRefreshRequired)</Code>", std::regex::optimize);
+                             return std::regex_search(errorSink->s, codeRe);
+                         }()) {
+                    err = Transient;
+                }
+#endif
+                else if (httpStatus == HttpStatus::Forbidden) {
+                    err = Forbidden;
+                } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
                     err = Forbidden;
                 } else if (
                     httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
@@ -875,9 +978,63 @@ struct curlFileTransfer : public FileTransfer
             }();
 
             if (!canRetry) {
+#if NIX_WITH_AWS_AUTH
+                // If retries exhausted while the credential refresh was still
+                // pending, the caller should see Forbidden (not Transient) so
+                // HttpBinaryCacheStore's 403→404 unlistable-bucket mapping works.
+                if ((httpStatus == HttpStatus::Forbidden || httpStatus == HttpStatus::BadRequest) && request.awsRetry) {
+                    // Surface the provider failure regardless of which path
+                    // brought us here — tryGetCredentials swallowed the error
+                    // message, so this is generic, but it at least tells the
+                    // user "provider" not "permissions". Once per process:
+                    // hundreds of cache-miss probes shouldn't spam.
+                    if (!request.usernameAuth) {
+                        static std::atomic<bool> haveWarned{false};
+                        warnOnce(
+                            haveWarned,
+                            "AWS credential provider returned no credentials; "
+                            "run with -vvvvv to see the provider chain's debug output");
+                    }
+                    // Downgrade: 403 → Forbidden (HttpBinaryCacheStore's 403→
+                    // 404 unlistable-bucket mapping), 400 → Misc. Only when no
+                    // bytes have streamed — a partial 200 OK proves the file
+                    // exists, so Forbidden→NoSuchBinaryCacheFile would lie.
+                    if (exc.error == Transient && writtenToSink == 0)
+                        exc.error = (httpStatus == HttpStatus::Forbidden) ? Forbidden : Misc;
+                }
+#endif
                 fail(std::move(exc));
                 return;
             }
+
+#if NIX_WITH_AWS_AUTH
+            // The cached provider honors credential expiration, so the common
+            // case (natural expiry → S3 403 → provider refetches) works. Clock
+            // skew or server-side revocation may return the same cached cred;
+            // we don't invalidate the cache entry because the <Code> gate
+            // upstream already filters to token-expiry cases where the
+            // provider's own TTL should align with S3's view.
+            //
+            // A future from std::promise does not block in its destructor
+            // (unlike std::async, whose future joins the launched thread).
+            // The detached thread holds the provider via its own refcount and
+            // uses tryGetCredentials (noexcept, no warn()). This avoids the
+            // direct logger deref from warn(), but the AWS CRT log hook
+            // (nixAwsLoggerLog) can still touch nix::logger at high verbosity
+            // during a slow fetch — residual risk at -vvvvv, not at default.
+            if ((httpStatus == HttpStatus::Forbidden || httpStatus == HttpStatus::BadRequest) && request.awsRetry
+                && !pendingAwsCredRefresh) {
+                try {
+                    auto promise = std::make_shared<std::promise<std::optional<AwsCredentials>>>();
+                    std::thread([url = request.awsRetry->s3Url, promise, provider = request.awsRetry->provider]() {
+                        promise->set_value(provider->tryGetCredentials(url));
+                    }).detach();
+                    pendingAwsCredRefresh = promise->get_future();
+                } catch (const std::system_error & e) {
+                    debug("failed to spawn AWS credential fetch thread: %s", e.what());
+                }
+            }
+#endif
 
             auto delay = computeRetryDelayMs(
                 {
@@ -1207,19 +1364,26 @@ void FileTransferRequest::setupForS3()
     awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
 
     // check if the request already has pre-resolved credentials
-    std::optional<std::string> sessionToken;
     if (usernameAuth) {
         debug("Using pre-resolved AWS credentials from parent process");
-        sessionToken = preResolvedAwsSessionToken;
-    } else if (auto creds = getAwsCredentialsProvider()->maybeGetCredentials(parsedS3)) {
-        usernameAuth = UsernameAuth{
-            .username = creds->accessKeyId,
-            .password = creds->secretAccessKey,
-        };
-        sessionToken = creds->sessionToken;
+        awsSessionToken = preResolvedAwsSessionToken;
+    } else {
+        auto provider = getAwsCredentialsProvider();
+        // One synchronous attempt — hot cache is instant. tryGetCredentials is
+        // noexcept and doesn't warn; a cold-start failure here falls through
+        // to the async retry path (maybeRetry() spawns on the first 403).
+        if (auto creds = provider->tryGetCredentials(parsedS3)) {
+            usernameAuth = UsernameAuth{
+                .username = std::move(creds->accessKeyId),
+                .password = std::move(creds->secretAccessKey),
+            };
+            awsSessionToken = std::move(creds->sessionToken);
+        } else {
+            debug("initial AWS credential fetch failed; will retry asynchronously");
+        }
+        // Always set — even on success, for later 403 refresh.
+        awsRetry = AwsRetryInfo{std::move(parsedS3), provider};
     }
-    if (sessionToken)
-        headers.emplace_back("x-amz-security-token", *sessionToken);
 #else
     // When built without AWS support, just try as public bucket
     debug("S3 request without authentication (built without AWS support)");

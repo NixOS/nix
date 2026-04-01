@@ -213,6 +213,8 @@ static std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> createSTSWebIdentit
 
     // aws-c-auth gives options.region precedence over env vars, so only set it
     // when env vars are absent — otherwise we'd mask a user-supplied AWS_REGION.
+    // The cursor is copied via aws_string_new_from_cursor in s_parameters_new,
+    // so fallbackRegion only needs to outlive this call.
     if (!fallbackRegion.empty() && !awsRegionSetInEnv()) {
         options.region = aws_byte_cursor_from_c_str(fallbackRegion.c_str());
     }
@@ -328,6 +330,15 @@ public:
         }
     }
 
+    std::optional<AwsCredentials> tryGetCredentials(const ParsedS3URL & url) noexcept override
+    {
+        try {
+            return getCredentialsRaw(url.profile.value_or(""), url.region.value_or(""));
+        } catch (...) {
+            return std::nullopt;
+        }
+    }
+
     std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider>
     createProviderForProfile(const std::string & profile, const std::string & region);
 
@@ -423,13 +434,24 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile,
             profileDisplayName);
     }
 
-    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
+    auto chain = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
+    if (!chain)
+        return nullptr;
+
+    // Wrap in a caching provider so each S3 request doesn't trigger a fresh STS
+    // / SSO / IMDS round-trip. aws-c-auth's default chain does this internally
+    // (DEFAULT_CREDENTIAL_PROVIDER_REFRESH_MS = 15min); the cached wrapper honors
+    // the credential's own expiration if shorter.
+    Aws::Crt::Auth::CredentialsProviderCachedConfig cachedConfig;
+    cachedConfig.Provider = chain;
+    cachedConfig.CachedCredentialTTL = std::chrono::minutes(15);
+    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderCached(cachedConfig, allocator);
 }
 
 AwsCredentials AwsCredentialProviderImpl::getCredentialsRaw(const std::string & profile, const std::string & region)
 {
     std::shared_ptr<Aws::Crt::Auth::ICredentialsProvider> provider;
-    auto key = std::make_pair(profile, region);
+    auto key = std::pair{profile, region};
 
     credentialProviderCache.try_emplace_and_cvisit(
         key,

@@ -84,7 +84,11 @@ public:
           or upload) before giving up. Retries apply to transient
           failures: connection-level errors, HTTP 408, 429, and most
           5xx responses. Authentication failures (401/403/407),
-          404/410, and other 4xx responses are not retried.
+          404/410, and other 4xx responses are not retried, except
+          that an S3 response with an `ExpiredToken` or
+          `TokenRefreshRequired` error code triggers an asynchronous
+          credential refresh; attempts may continue until the refresh
+          completes or the limit is reached.
         )",
         {"download-attempts"}};
 
@@ -299,6 +303,33 @@ struct FileTransferRequest
      * When provided along with usernameAuth, this will be used instead of fetching fresh credentials.
      */
     std::optional<std::string> preResolvedAwsSessionToken;
+
+    /**
+     * Current AWS session token, applied as the x-amz-security-token header.
+     * Populated by setupForS3() (either from preResolvedAwsSessionToken or the
+     * provider) and refreshed on retry when awsRetry is set.
+     */
+    std::optional<std::string> awsSessionToken;
+
+    /**
+     * State needed to (re-)fetch AWS credentials from the provider. The
+     * provider ref is stashed here (not read via getAwsCredentialsProvider()
+     * on the worker thread) because that function-local static is destroyed
+     * before ~curlFileTransfer joins the worker — LIFO static teardown.
+     *
+     * Always set by setupForS3() when credentials come from the provider,
+     * even if the initial synchronous fetch failed; in that case usernameAuth
+     * stays empty and the first 403 triggers an async fetch via maybeRetry().
+     * Not set in the pre-resolved branch (sandboxed builtin:fetchurl — the
+     * provider may be unreachable there).
+     */
+    struct AwsRetryInfo
+    {
+        ParsedS3URL s3Url;
+        ref<AwsCredentialProvider> provider;
+    };
+
+    std::optional<AwsRetryInfo> awsRetry;
 #endif
 
     FileTransferRequest(VerbatimURL uri)
