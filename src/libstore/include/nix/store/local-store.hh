@@ -212,6 +212,7 @@ private:
          */
         bool gcRunning = false;
         std::shared_future<void> gcFuture;
+        std::thread gcThread;
 
         /**
          * How much disk space was available after the previous
