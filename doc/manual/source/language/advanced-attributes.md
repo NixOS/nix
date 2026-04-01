@@ -84,7 +84,8 @@ Derivations can declare some infrequently used optional attributes.
     allows you to attach arbitrary metadata to a derivation without affecting its output paths
     or triggering rebuilds when the metadata changes.
 
-    This is useful for tooling that needs to associate information with derivations, such as:
+    This is useful for tooling that needs to associate information with derivations.
+    That information could be:
     - Package descriptions and maintainer information
     - License and homepage metadata
     - Documentation generation data
