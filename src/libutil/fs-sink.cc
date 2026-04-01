@@ -90,7 +90,7 @@ void RestoreSink::createDirectory(const CanonPath & path, DirectoryCreatedCallba
         FILE_READ_ATTRIBUTES | SYNCHRONIZE,
         FILE_DIRECTORY_FILE
 #else
-        O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC,
+        O_RDONLY | O_DIRECTORY | O_CLOEXEC,
         0
 #endif
     );

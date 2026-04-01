@@ -1273,7 +1273,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
        a single path component without any `..`, `.` components. */
     auto relPath = CanonPath::fromFilename(name);
     AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
-        tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666);
+        tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
     auto path = tmpDir / relPath.rel(); /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));

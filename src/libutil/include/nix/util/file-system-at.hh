@@ -72,25 +72,45 @@ PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path);
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
 
 /**
- * Safe(r) function to open a file relative to dirFd, while
- * disallowing escaping from a directory and any symlinks in the process.
+ * Open a file relative to @p dirFd, ensuring the path stays beneath
+ * @p dirFd and that no path component is a symlink (with the
+ * exception that `O_PATH` (without `O_DIRECTORY`) on Unix permits a
+ * trailing symlink).
  *
- * @note On Windows, implemented via NtCreateFile single path component traversal
- * with FILE_OPEN_REPARSE_POINT. On Unix, uses RESOLVE_BENEATH with openat2 when
- * available, or falls back to openat single path component traversal.
+ * Callers must not pass `O_NOFOLLOW` on Unix (enforced by assert);
+ * this function owns symlink policy and handles the flag internally.
  *
  * @param dirFd Directory handle to open relative to
- * @param path Relative path (no .. or . components)
- * @param desiredAccess (Windows) Windows ACCESS_MASK (e.g., GENERIC_READ, FILE_WRITE_DATA)
- * @param createOptions (Windows) Windows create options (e.g., FILE_NON_DIRECTORY_FILE)
- * @param createDisposition (Windows) FILE_OPEN, FILE_CREATE, etc.
- * @param flags (Unix) O_* flags
- * @param mode (Unix) Mode for O_{CREAT,TMPFILE}
+ * @param path Relative path (with no `..` or `.` components)
  *
- * @pre path.isRoot() is false
+ * @param desiredAccess (Windows) Windows `ACCESS_MASK`
+ * @param createOptions (Windows) Windows create options
+ * @param createDisposition (Windows) `FILE_OPEN`, `FILE_CREATE`, etc.
  *
- * @throws SymlinkNotAllowed if any path components are symlinks
- * @throws SystemError on other errors
+ * @param flags (Unix) `O_*` flags (must not include `O_NOFOLLOW`)
+ * @param mode (Unix) Mode for `O_{CREAT,TMPFILE}`
+ *
+ * @pre `path.isRoot()` is false
+ *
+ * @throws SymlinkNotAllowed if an interior path component is a
+ *     symlink, or if the final component is a symlink and `O_PATH`
+ *     (without `O_DIRECTORY`) was *not* passed. With `O_PATH`
+ *     (without `O_DIRECTORY`) on Unix, a trailing symlink is
+ *     permitted and the caller receives a "path fd" to the symlink
+ *     itself.
+ *
+ * @note With `O_CREAT | O_EXCL`, a pre-existing symlink at the
+ *     final component causes the OS to return `EEXIST` rather
+ *     than `ELOOP`, so `SymlinkNotAllowed` is *not* thrown — the
+ *     caller sees a failed descriptor with `errno == EEXIST`.
+ *
+ * @return A valid descriptor on success, or an invalid descriptor
+ *     on non-symlink errors (Unix: `errno` set, e.g. `ENOENT`,
+ *     `ENOTDIR`, `EACCES`; Windows: last error set). The caller is
+ *     responsible for checking the return value.
+ *
+ *     `errno` will never be `ELOOP` because that case is translated
+ *     to a `SymlinkNotAllowed` throw instead.
  */
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,

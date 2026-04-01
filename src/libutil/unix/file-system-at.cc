@@ -175,6 +175,9 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             });
 
             if (errno == ENOTDIR) /* Path component might be a symlink. */ {
+                /* Does not follow final symlink. We know `component` is a
+                   single component so we don't have to worry about intermediate
+                   symlinks either. */
                 if (auto st = maybeFstatat(getParentFd(), component); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
@@ -188,25 +191,78 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
         parentFd = std::move(parentFd2);
     }
 
-    AutoCloseFD res = ::openat(getParentFd(), std::string(path.baseName().value()).c_str(), flags | O_NOFOLLOW, mode);
-    if (!res && errno == ELOOP)
-        throw SymlinkNotAllowed(path);
+    auto lastComponent = std::string(path.baseName().value());
+    AutoCloseFD res = ::openat(getParentFd(), lastComponent.c_str(), flags | O_NOFOLLOW, mode);
+
+    if (!res) {
+        if (errno == ELOOP)
+            throw SymlinkNotAllowed(path);
+        /* `O_DIRECTORY | O_NOFOLLOW` on a trailing symlink returns
+           `ENOTDIR` rather than `ELOOP`. Post-check via `fstatat` to
+           disambiguate — only on the error path, so the common
+           successful-directory-open case pays no extra syscall. */
+        if (errno == ENOTDIR) {
+            if (auto st = maybeFstatat(getParentFd(), lastComponent); st && S_ISLNK(st->st_mode))
+                throw SymlinkNotAllowed(path);
+            /* Put back errno so the caller will get the original
+               error. */
+            errno = ENOTDIR;
+        }
+        return res;
+    }
+
+    /* For `O_PATH`, the defensive `| O_NOFOLLOW` we added above
+       means a trailing symlink silently succeeds with an fd to the
+       symlink itself (`O_PATH | O_NOFOLLOW` is the idiomatic way to
+       obtain a symlink fd). This is intentional — `O_PATH` callers
+       are asking for a path reference, and interior symlinks are
+       already guarded by the component-by-component walk above. */
+
     return res;
 }
 
 AutoCloseFD openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
 {
-    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    /* Just in case the invariant is somehow broken. */
+    assert(!path.rel().starts_with('/'));
     assert(!path.isRoot());
+
+    /* We don't want callers of this function to think about the presence or
+       absence of `O_NOFOLLOW`. "ensure beneath no symlinks" is in the name, so
+       we want them to trust us to handle it instead. */
+    assert(!(flags & O_NOFOLLOW));
+
+    /* See doxygen in `file-system-at.hh` for why we reject this. */
+
 #if HAVE_OPENAT2
-    auto maybeFd = linux::openat2(
-        dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
-    if (maybeFd) {
+    /* Two things are being fixed here:
+
+       1. For `O_PATH` (without `O_DIRECTORY`), add `O_NOFOLLOW` so
+          that a trailing symlink returns an fd to the symlink itself
+          rather than `ELOOP`. `O_PATH | O_NOFOLLOW` is the idiomatic
+          way to obtain a symlink fd, and `RESOLVE_NO_SYMLINKS` does
+          not refuse it.
+
+       2. We must not add `O_NOFOLLOW` when `O_DIRECTORY` is set,
+          because `O_DIRECTORY | O_NOFOLLOW` on a trailing symlink
+          returns `ENOTDIR` instead of `ELOOP`. Interior symlinks are
+          still caught by `RESOLVE_NO_SYMLINKS` regardless, but the
+          non-inclusion of `O_NOFOLLOW` is needed for
+          `RESOLVE_NO_SYMLINKS` to make the final symlink an `ELOOP`
+          rather than `O_DIRECTORY` making it an `ENOTDIR`.
+
+       For other cases, `O_NOFOLLOW` doesn't really matter, but we
+       default to not including it. */
+    auto flagsAdj = (flags & O_PATH) && !(flags & O_DIRECTORY) ? flags | O_NOFOLLOW : flags;
+
+    if (auto maybeFd = linux::openat2(
+            dirFd, path.rel_c_str(), flagsAdj, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)) {
         if (!*maybeFd && errno == ELOOP)
             throw SymlinkNotAllowed(path);
         return std::move(*maybeFd);
     }
 #endif
+
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
 }
 
