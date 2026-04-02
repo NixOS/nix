@@ -1271,7 +1271,7 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path &
 void DerivationBuilderImpl::writeBuilderFile(const OsFilename & name, std::string_view contents)
 {
     AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
-        tmpDirFd.get(), {name}, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
+        tmpDirFd.get(), OsCanonPath{name}, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
     auto path = tmpDir / name.path(); /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));

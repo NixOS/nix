@@ -169,7 +169,7 @@ static void _deletePath(
 
     auto name = OsFilename{path.filename()};
 
-    auto st_ = maybeFstatat(parentfd, name.path());
+    auto st_ = maybeFstatat(parentfd, OsCanonPath{name});
     if (!st_)
         return;
     auto & st = *st_;
@@ -203,7 +203,7 @@ static void _deletePath(
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK)
             try {
-                unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
+                unix::fchmodatTryNoFollow(parentfd, OsCanonPath{name}, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
@@ -251,7 +251,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     auto parentDirPath = path.parent_path();
     assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = openDirectory(parentDirPath);
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
     if (!dirfd) {
         if (errno == ENOENT)
             return;
