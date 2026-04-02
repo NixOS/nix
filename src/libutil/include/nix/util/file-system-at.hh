@@ -34,6 +34,35 @@ namespace nix {
  */
 PosixStat fstat(Descriptor fd);
 
+#ifndef _WIN32
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @return nullopt if the path does not exist.
+ * @throws SystemError on other I/O errors.
+ *
+ * @pre `path` must be relative (not absolute) and non-empty.
+ */
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const std::filesystem::path & path);
+
+/**
+ * Get status of a file relative to a directory file descriptor.
+ *
+ * @param dirFd Directory file descriptor
+ * @param path Relative path to stat
+ *
+ * @throws SystemError if the path does not exist or on other I/O errors.
+ *
+ * @pre `path` must be relative (not absolute) and non-empty.
+ */
+PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path);
+
+#endif
+
 /**
  * Read a symlink relative to a directory file descriptor.
  *

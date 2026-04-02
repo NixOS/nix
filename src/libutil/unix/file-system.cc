@@ -169,12 +169,10 @@ static void _deletePath(
 
     auto name = CanonPath::fromFilename(path.filename().native());
 
-    PosixStat st;
-    if (fstatat(parentfd, name.rel_c_str(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
-        if (errno == ENOENT)
-            return;
-        throw SysError("getting status of %1%", PathFmt(path));
-    }
+    auto st_ = maybeFstatat(parentfd, name.rel());
+    if (!st_)
+        return;
+    auto & st = *st_;
 
     if (!S_ISDIR(st.st_mode)) {
         /* We are about to delete a file. Will it likely free space? */
