@@ -1,4 +1,5 @@
 #include <cerrno>
+#include <fcntl.h>
 #include <map>
 
 #include <strings.h> // for strcasecmp

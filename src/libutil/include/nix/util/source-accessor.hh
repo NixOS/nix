@@ -226,12 +226,6 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
  */
 ref<SourceAccessor> makeEmptySourceAccessor();
 
-/**
- * Exception thrown when accessing a filtered path (see
- * `FilteringSourceAccessor`).
- */
-MakeError(RestrictedPathError, Error);
-
 struct SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
 {
     std::variant<CanonPath, std::filesystem::path> path;
@@ -265,6 +259,12 @@ struct SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
 private:
     static inline const std::string defaultMsg = "path '%s' is a symlink, which is not allowed";
 };
+
+/**
+ * Exception thrown when accessing a filtered path (see
+ * `FilteringSourceAccessor`).
+ */
+MakeError(RestrictedPathError, Error);
 
 /**
  * Return an accessor for the root filesystem.

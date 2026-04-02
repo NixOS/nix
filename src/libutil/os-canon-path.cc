@@ -7,14 +7,21 @@ namespace nix {
 OsCanonPath::OsCanonPath(const CanonPath & canonPath)
 {
     for (const auto & component : canonPath) {
+#ifdef _WIN32
+        assert(component.find('\\') == component.npos && "CanonPath component cannot contain backslash");
+#endif
         p /= std::filesystem::path{std::string{component}};
     }
-    // No need to validate — CanonPath guarantees no empty/dot/dotdot components
+    // No need to further validate — CanonPath guarantees no empty/dot/dotdot components,
+    // and operator/ produces preferred separators.
 }
 
 void OsCanonPath::validate() const
 {
     assert(!p.has_root_path() && "OsCanonPath cannot have a root path");
+#ifdef _WIN32
+    assert(p.native().find(L'/') == std::wstring::npos && "OsCanonPath must use preferred (backslash) separators on Windows");
+#endif
     for (const auto & component : p) {
         auto s = component.string();
         assert(!s.empty() && "OsCanonPath cannot have empty components");
