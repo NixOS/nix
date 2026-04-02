@@ -3,6 +3,11 @@
 #include "nix/util/processes.hh"
 #include "nix/util/tests/gmock-matchers.hh"
 
+#ifdef _WIN32
+#  include "nix/util/tests/wine.hh"
+#  include "nix/util/windows-environment.hh"
+#endif
+
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <rapidcheck/gtest.h>
@@ -166,7 +171,8 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
 TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
 {
 #ifdef _WIN32
-    GTEST_SKIP() << "symlinks have some problems under Wine";
+    if (windows::isWine() && !windows::wineSymlinksSupported(tmpDir))
+        GTEST_SKIP() << "Wine doesn't seem to be able to create symlinks here";
 #endif
     auto linkPath = tmpDir / "rootlink";
     {
