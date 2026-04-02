@@ -46,6 +46,10 @@ sources = files(
 
 subdir('include/nix/util/tests')
 
+if host_machine.system() == 'windows'
+  subdir('windows')
+endif
+
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 

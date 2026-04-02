@@ -51,67 +51,51 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 }
 
 /**
- * Throw a WinError, or if running under Wine, just warn and return true.
- * Wine has incomplete file locking support, so we degrade gracefully.
+ * Release whatever lock @p desc holds, if any.
+ *
+ * `LockFileEx` locks taken by the same handle on the same range stack,
+ * so keep going until there are none left.
  */
-template<typename... Args>
-static bool warnOrThrowWine(DWORD lastError, const std::string & fs, Args &&... args)
+static void unlockAll(Descriptor desc)
 {
     using namespace nix::windows;
-    if (isWine()) {
-        warn(fs + ": %s (ignored under Wine)", args..., lastError);
-        return true;
+    while (true) {
+        OVERLAPPED ov = {0};
+        if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
+            auto lastError = GetLastError();
+            /* Windows reports `ERROR_NOT_LOCKED` when there is nothing
+               (left) to unlock, but Wine reports `ERROR_LOCK_VIOLATION`
+               (`STATUS_FILE_LOCK_CONFLICT` from `unlock_fd` in its
+               `server/fd.c`). */
+            if (lastError == ERROR_NOT_LOCKED || (lastError == ERROR_LOCK_VIOLATION && isWine()))
+                return;
+            throw WinError(lastError, "unlocking %s", PathFmt(descriptorToPath(desc)));
+        }
     }
-    throw WinError(lastError, fs, std::forward<Args>(args)...);
 }
 
 bool lockFile(Descriptor desc, LockType lockType, bool wait)
 {
-    switch (lockType) {
-    case ltNone: {
-        OVERLAPPED ov = {0};
-        if (!UnlockFileEx(desc, 0, 2, 0, &ov))
-            return warnOrThrowWine(GetLastError(), "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
-        return true;
-    }
-    case ltRead: {
-        OVERLAPPED ov = {0};
-        if (!LockFileEx(desc, wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY, 0, 1, 0, &ov)) {
-            auto lastError = GetLastError();
-            if (lastError == ERROR_LOCK_VIOLATION)
-                return false;
-            return warnOrThrowWine(lastError, "Failed to lock file %s", PathFmt(descriptorToPath(desc)));
-        }
+    using namespace nix::windows;
 
-        ov.Offset = 1;
-        if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            auto lastError = GetLastError();
-            if (lastError != ERROR_NOT_LOCKED)
-                return warnOrThrowWine(lastError, "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
-        }
-        return true;
-    }
-    case ltWrite: {
-        OVERLAPPED ov = {0};
-        ov.Offset = 1;
-        if (!LockFileEx(desc, LOCKFILE_EXCLUSIVE_LOCK | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY), 0, 1, 0, &ov)) {
-            auto lastError = GetLastError();
-            if (lastError == ERROR_LOCK_VIOLATION)
-                return false;
-            return warnOrThrowWine(lastError, "Failed to lock file %s", PathFmt(descriptorToPath(desc)));
-        }
+    /* All locks are on the same single byte, so that shared and
+       exclusive locks from different handles conflict, as they do with
+       `flock` on Unix. Like `flock` (see flock(2)), changing the kind of
+       lock a handle holds isn't atomic: the old one is released first. */
+    unlockAll(desc);
 
-        ov.Offset = 0;
-        if (!UnlockFileEx(desc, 0, 1, 0, &ov)) {
-            auto lastError = GetLastError();
-            if (lastError != ERROR_NOT_LOCKED)
-                return warnOrThrowWine(lastError, "Failed to unlock file %s", PathFmt(descriptorToPath(desc)));
-        }
+    if (lockType == ltNone)
         return true;
+
+    OVERLAPPED ov = {0};
+    DWORD flags = (lockType == ltWrite ? LOCKFILE_EXCLUSIVE_LOCK : 0) | (wait ? 0 : LOCKFILE_FAIL_IMMEDIATELY);
+    if (!LockFileEx(desc, flags, 0, 1, 0, &ov)) {
+        auto lastError = GetLastError();
+        if (lastError == ERROR_LOCK_VIOLATION)
+            return false;
+        throw WinError(lastError, "locking %s", PathFmt(descriptorToPath(desc)));
     }
-    default:
-        assert(false);
-    }
+    return true;
 }
 
 bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const std::string & waitMsg, bool wait)
