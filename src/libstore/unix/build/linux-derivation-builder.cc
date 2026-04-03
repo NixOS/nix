@@ -178,6 +178,26 @@ struct LinuxDerivationBuilder : virtual DerivationBuilderImpl
     }
 };
 
+/* https://freedesktop.org/software/systemd/man/latest/binfmt.d.html */
+static StringSet parseBinfmtMiscConf(const std::string & conf)
+{
+    StringSet result;
+
+    for (auto line : tokenizeString<std::vector<std::string>>(conf, "\n")) {
+        /* Undocumented, but systemd-binfmt trims lines first as well:
+           https://github.com/systemd/systemd/blob/v259/src/binfmt/binfmt.c#L86 */
+        line = trim(line);
+
+        /* "Empty lines and lines beginning with ";" and "#" are ignored." */
+        if (line.empty() || line[0] == ';' || line[0] == '#')
+            continue;
+
+        result.emplace(line);
+    }
+
+    return result;
+}
+
 static const std::filesystem::path procPath = "/proc";
 
 struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBuilder
@@ -201,6 +221,13 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     bool usingUserNamespace = true;
 
     /**
+     * On Linux, whether we need a new binfmt_misc instance in the child user
+     * namespace, and if so what binfmt_misc registrations to set up in the new
+     * binfmt_misc instance.
+     */
+    std::optional<StringSet> binfmtMisc;
+
+    /**
      * The cgroup of the builder, if any.
      */
     std::optional<std::filesystem::path> cgroup;
@@ -211,6 +238,15 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         , ChrootDerivationBuilder{store, std::move(miscMethods), std::move(params)}
         , LinuxDerivationBuilder{store, std::move(miscMethods), std::move(params)}
     {
+        const auto & binfmtMiscMap = store.config->getLocalSettings().binfmtMisc.get();
+        auto binfmtMiscGot = binfmtMiscMap.find(drv.platform);
+
+        if (binfmtMiscGot != binfmtMiscMap.end()) {
+            if (binfmtMiscGot->second.empty())
+                binfmtMisc = StringSet{};
+            else
+                binfmtMisc = parseBinfmtMiscConf(readFile(binfmtMiscGot->second));
+        }
     }
 
     uid_t sandboxUid()
@@ -335,6 +371,17 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         usingUserNamespace = userNamespacesSupported();
 
+        if (binfmtMisc) {
+            if (!usingUserNamespace)
+                throw Error(
+                    "Platform '%s' has binfmt-misc configuration, but user namespaces are not available", drv.platform);
+
+            if (!binfmtMiscUserNamespacesSupported())
+                throw Error(
+                    "Platform '%s' has binfmt-misc configuration, but the kernel does not have binfmt_misc with support for user namespaces. Please update to Linux kernel 6.7 or later.",
+                    drv.platform);
+        }
+
         Pipe sendPid;
         sendPid.create();
 
@@ -414,12 +461,39 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
             uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
 
-            writeFile(thisProcPath / "uid_map", fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
-
             if (!buildUser || buildUser->getUIDCount() == 1)
                 writeFile(thisProcPath / "setgroups", "deny");
 
-            writeFile(thisProcPath / "gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            if (needDoubleUserns()) {
+                /* NOTE: This must match what setUserDoubleUserns() does. */
+
+                std::string uid_map, gid_map;
+
+                /* In order for the unshare(CLONE_NEWUSER) that we will call in
+                   setUserDoubleUserns() to work, we must map our current UID
+                   and GID into the intermediate userns. For binfmt_misc to
+                   work, in the intermediate userns UID 0 and GID 0 must be
+                   mapped (see comment on needDoubleUserns()). This satisfies
+                   both requirements. */
+
+                uid_map += fmt("%d %d %d\n", 0, getuid(), 1);
+                gid_map += fmt("%d %d %d\n", 0, getgid(), 1);
+
+                if (buildUser) {
+                    /* If using build users, we also need to map the allocated
+                       UIDs and GIDs into the intermediate userns. Map them
+                       starting at UID 1 and GID 1. In this case, our current
+                       UID and GID won't be mapped into the final userns. */
+                    uid_map += fmt("%d %d %d", 1, buildUser->getUID(), nrIds);
+                    gid_map += fmt("%d %d %d", 1, buildUser->getGID(), nrIds);
+                }
+
+                writeFile(thisProcPath / "uid_map", uid_map);
+                writeFile(thisProcPath / "gid_map", gid_map);
+            } else {
+                writeFile(thisProcPath / "uid_map", fmt("%d %d %d", sandboxUid(), hostUid, nrIds));
+                writeFile(thisProcPath / "gid_map", fmt("%d %d %d", sandboxGid(), hostGid, nrIds));
+            }
         } else {
             debug("note: not using a user namespace");
             if (!buildUser)
@@ -618,6 +692,16 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         if (mount("none", (chrootRootDir / "proc").c_str(), "proc", 0, 0) == -1)
             throw SysError("mounting /proc");
 
+        /* If requested, set up a new binfmt_misc instance */
+        if (binfmtMisc) {
+            if (mount("none", (procPath / "sys/fs/binfmt_misc").c_str(), "binfmt_misc", 0, 0) == -1)
+                throw SysError("mounting /proc/sys/fs/binfmt_misc");
+
+            /* See comment on needDoubleUserns() to see what it takes for this to work */
+            for (auto & registration : *binfmtMisc)
+                writeFile(procPath / "sys/fs/binfmt_misc/register", registration);
+        }
+
         /* Mount sysfs on /sys. */
         if (buildUser && buildUser->getUIDCount() != 1) {
             createDirs(chrootRootDir / "sys");
@@ -704,6 +788,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void setUser() override
     {
+        if (needDoubleUserns())
+            setUserDoubleUserns();
+
         preserveDeathSignal([this]() {
             /* Switch to the sandbox uid/gid in the user namespace,
                which corresponds to the build user or calling user in
@@ -760,6 +847,103 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         int status = child.wait();
         if (!statusOk(status))
             throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
+    }
+
+private:
+
+    /* Mounting binfmt_misc in a userns creates a new binfmt_misc instance and
+       associates the user namespace with it, if there is no such existing
+       instance. If an existing associated instance exists it is reused.
+
+       From this point onward, new programs executed in this userns only look up
+       binfmt_misc interpreters from the associate instance. User namespaces
+       without an associated binfmt_misc instance use the same instance as its
+       parent, if there is one, which may be recursively reusing the instance
+       from some further ancestor.
+
+       The files in the binfmt_misc filesystem associated with a userns are
+       owned by UID 0 and GID 0 in that userns. This means that for such files
+       to be writable, even to a process with CAP_DAC_OVERRIDE in that userns,
+       UID 0 and GID 0 must be mapped. In the unprivileged case, in particular,
+       since we can only map one UID and one GID, we can *only* map UID 0 and
+       GID 0.
+
+       With the uid-range feature, the build process running as UID 0 and GID 0
+       is intended, so we don't do anything special for that case. However,
+       normally running builds as root is probably not a good idea. Therefore,
+       in setUserDoubleUserns() we unshare(CLONE_NEWUSER) again, and map
+       sandboxUid() and sandboxGid(). This way the build sees the expected UID
+       and GID.
+
+       However, note that if we *only* need to mount binfmt_misc, and don't need
+       to write to /proc/sys/fs/binfmt_misc/register, we don't have a problem.
+       We can still mount /proc/sys/fs/binfmt_misc which creates an instance
+       associated with our sandbox userns, even though the files in it are
+       completely inaccessible. Therefore, we also don't need this trick if
+       binfmtMisc is supposed to be set up but it's empty. This is useful for
+       opting out of the global binfmt_misc in Nix builds.
+
+       See Linux commit "binfmt_misc: enable sandboxed mounts":
+       https://git.kernel.org/torvalds/c/21ca59b365c0 */
+
+    bool needDoubleUserns()
+    {
+        return binfmtMisc && !binfmtMisc->empty() && (sandboxUid() != 0 || sandboxGid() != 0);
+    }
+
+    void setUserDoubleUserns()
+    {
+        Pipe uidMapSync;
+        uidMapSync.create();
+
+        /* At this point, we still have the original UID and GID, we're in the
+           intermediate user namespace. We need to map UID 0 and GID 0 into
+           sandboxUid() and sandboxGid() after calling unshare(CLONE_NEWUSER) to
+           create the actual sandbox userns. But after unshare(CLONE_NEWUSER) we
+           lose the privileges to write uid_map and gid_map. It's also too late
+           to ask the parent process for help now. Instead, spawn a child
+           process as a helper to do that. */
+
+        Pid helper = startProcess([&]() {
+            uidMapSync.writeSide.close();
+
+            /* Wait for parent to unshare(CLONE_NEWUSER) */
+            if (FdSource(uidMapSync.readSide.get()).drain() != "1")
+                _exit(1);
+
+            uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
+
+            /* Parent process was spawned with CLONE_NEWPID, so it's PID 1. This
+               gets rid of any possible TOCTTOU problems as if the parent exits
+               early, the kernel will kill the child too. */
+            assert(getppid() == 1);
+
+            if (!buildUser || buildUser->getUIDCount() == 1)
+                writeFile("/proc/1/setgroups", "deny");
+
+            /* See comment back when the intermediate userns's uid_map and
+               gid_map were written.
+
+               NOTE: This must match how it was mapped back there. */
+            int intermediateId = buildUser ? 1 : 0;
+
+            writeFile("/proc/1/uid_map", fmt("%d %d %d", sandboxUid(), (uid_t) intermediateId, nrIds));
+            writeFile("/proc/1/gid_map", fmt("%d %d %d", sandboxGid(), (gid_t) intermediateId, nrIds));
+
+            _exit(0);
+        });
+
+        uidMapSync.readSide.close();
+
+        if (unshare(CLONE_NEWUSER) == -1)
+            throw SysError("unsharing user namespace");
+
+        /* Okay, time for helper to write uid_map and gid_map */
+        writeFull(uidMapSync.writeSide.get(), "1");
+        uidMapSync.writeSide.close();
+
+        if (helper.wait() != 0)
+            throw Error("unable to set uid_map and gid_map");
     }
 };
 
