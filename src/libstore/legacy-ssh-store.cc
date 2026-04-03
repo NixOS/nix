@@ -13,6 +13,7 @@
 #include "nix/store/ssh.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/util.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
 
@@ -165,8 +166,34 @@ void LegacySSHStore::addToStore(const ValidPathInfo & info, Source & source, Rep
     }
     conn->to.flush();
 
-    if (readInt(conn->from) != 1)
-        throw Error("failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
+    StringSink saved;
+    TeeSource tee(conn->from, saved);
+    try {
+        if (readInt(tee) != 1)
+            throw Error(
+                "failed to add path '%s' to remote host '%s'", printStorePath(info.path), config->authority.host);
+    } catch (SerialisationError & e) {
+        conn->good = false;
+        conn->sshConn->in.close();
+        {
+            NullSink nullSink;
+            tee.drainInto(nullSink);
+        }
+
+        auto remoteReply = chomp(saved.s);
+        if (!remoteReply.empty())
+            throw Error(
+                "failed to add path '%s' to remote host '%s': remote returned text where a binary reply was "
+                "expected: '%s'",
+                printStorePath(info.path),
+                config->authority.host,
+                remoteReply);
+
+        throw Error(
+            "failed to add path '%s' to remote host '%s': protocol mismatch",
+            printStorePath(info.path),
+            config->authority.host);
+    }
 }
 
 void LegacySSHStore::narFromPath(const StorePath & path, Sink & sink)
