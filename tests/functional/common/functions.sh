@@ -222,7 +222,7 @@ assertStderr() {
 }
 
 needLocalStore() {
-  if [[ "$NIX_REMOTE" == "daemon" ]]; then
+  if [[ "$NIX_REMOTE" == "daemon" ]] || isTestOnNixOS; then
     skipTest "Can't run through the daemon ($1)"
   fi
 }
