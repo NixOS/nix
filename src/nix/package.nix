@@ -8,9 +8,16 @@
   nix-main,
   nix-cmd,
 
+  mimalloc,
+
   # Configuration Options
 
   version,
+
+  # Whether to link against mimalloc for malloc override.
+  # Significantly improves evaluation performance on allocation-heavy
+  # workloads (~10-15% on large evaluations).
+  withMimalloc ? !stdenv.hostPlatform.isWindows,
 }:
 
 let
@@ -69,9 +76,11 @@ mkMesonExecutable (finalAttrs: {
     nix-expr
     nix-main
     nix-cmd
-  ];
+  ]
+  ++ lib.optional withMimalloc mimalloc;
 
   mesonFlags = [
+    (lib.mesonEnable "mimalloc" withMimalloc)
   ];
 
   postInstall = lib.optionalString stdenv.hostPlatform.isStatic ''
