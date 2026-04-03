@@ -86,9 +86,9 @@ public:
           5xx responses. Authentication failures (401/403/407),
           404/410, and other 4xx responses are not retried, except
           that an S3 response with an `ExpiredToken` or
-          `TokenRefreshRequired` error code triggers an asynchronous
-          credential refresh; attempts may continue until the refresh
-          completes or the limit is reached.
+          `TokenRefreshRequired` error code triggers a one-time
+          asynchronous credential refresh and retry, which does not
+          count against this limit.
         )",
         {"download-attempts"}};
 
@@ -307,30 +307,45 @@ struct FileTransferRequest
     /**
      * Current AWS session token, applied as the x-amz-security-token header.
      * Populated by setupForS3() (either from preResolvedAwsSessionToken or the
-     * provider) and refreshed on retry when awsRetry is set.
+     * provider) and refreshed by credentialHook->fetchAndApply().
      */
     std::optional<std::string> awsSessionToken;
+#endif
 
     /**
-     * State needed to (re-)fetch AWS credentials from the provider. The
-     * provider ref is stashed here (not read via getAwsCredentialsProvider()
-     * on the worker thread) because that function-local static is destroyed
-     * before ~curlFileTransfer joins the worker — LIFO static teardown.
+     * Optional hook for credential-based retry. When set, finish() consults
+     * shouldRefresh() on failure; if it returns true the transfer is parked
+     * (removed from the worker's queue) until one detached fetch per key
+     * completes, then re-enqueued. No doomed requests fire while waiting.
      *
-     * Always set by setupForS3() when credentials come from the provider,
-     * even if the initial synchronous fetch failed; in that case usernameAuth
-     * stays empty and the first 403 triggers an async fetch via maybeRetry().
-     * Not set in the pre-resolved branch (sandboxed builtin:fetchurl — the
-     * provider may be unreachable there).
+     * Items with the same key share one fetch — the broker calls
+     * fetchAndApply() per parked item, but the underlying provider is
+     * expected to cache so only the first call per key does real work.
      */
-    struct AwsRetryInfo
+    struct CredentialHook
     {
-        ParsedS3URL s3Url;
-        ref<AwsCredentialProvider> provider;
+        std::string key;
+
+        /**
+         * Decide if this failure warrants parking on a credential refresh.
+         * @param errorBody empty for HEAD or when no body was captured.
+         * @param refreshedSinceLast2xx true if the broker has already
+         *   released this item once since its last 2xx response.
+         */
+        std::function<bool(
+            const FileTransferRequest &, long httpStatus, std::string_view errorBody, bool refreshedSinceLast2xx)>
+            shouldRefresh;
+
+        /**
+         * Fetch fresh credentials and apply them to the request. Called by
+         * the broker on a detached thread. Must be noexcept and must not
+         * touch nix::logger (the thread isn't joined by any destructor).
+         * Return true if credentials were obtained.
+         */
+        std::function<bool(FileTransferRequest &)> fetchAndApply;
     };
 
-    std::optional<AwsRetryInfo> awsRetry;
-#endif
+    std::optional<CredentialHook> credentialHook;
 
     FileTransferRequest(VerbatimURL uri)
         : uri(std::move(uri))
