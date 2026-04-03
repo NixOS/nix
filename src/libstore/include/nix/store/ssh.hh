@@ -25,6 +25,8 @@ private:
     const std::string sshPublicHostKey;
     const bool useMaster;
     const bool compress;
+    const unsigned int serverAliveInterval;
+    const unsigned int serverAliveCountMax;
     const Descriptor logFD;
 
     const ref<const AutoDelete> tmpDir;
@@ -54,6 +56,8 @@ public:
         std::string_view sshPublicHostKey,
         bool useMaster,
         bool compress,
+        unsigned int serverAliveInterval,
+        unsigned int serverAliveCountMax,
         Descriptor logFD = INVALID_DESCRIPTOR);
 
     struct Connection
