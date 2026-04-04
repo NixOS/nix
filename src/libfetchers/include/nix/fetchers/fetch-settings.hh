@@ -14,8 +14,9 @@
 namespace nix {
 
 struct GitRepo;
+struct GitRepoPool;
 
-}
+} // namespace nix
 
 namespace nix::fetchers {
 
@@ -151,6 +152,8 @@ struct Settings : public Config
     ref<Cache> getCache() const;
 
     ref<GitRepo> getTarballCache() const;
+
+    ref<GitRepoPool> getTarballWriterPool() const;
 
 private:
     mutable Sync<std::shared_ptr<Cache>> _cache;
