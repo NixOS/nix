@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# docker.nix test script. Runs inside a built docker.nix container.
+# packaging/docker.nix test script. Runs inside a built docker.nix container.
 
 set -eEuo pipefail
 
