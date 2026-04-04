@@ -311,6 +311,7 @@
       hydraJobs = import ./packaging/hydra.nix {
         inherit
           inputs
+          darwinSystems
           forAllCrossSystems
           forAllSystems
           lib
