@@ -285,6 +285,18 @@ void WorkerProto::BasicClientConnection::addTempRoot(
     readInt(from);
 }
 
+std::optional<UnkeyedValidPathInfo> WorkerProto::BasicClientConnection::addTempRootReturningPathInfo(
+    const StoreDirConfig & store, bool * daemonException, const StorePath & path)
+{
+    to << WorkerProto::Op::AddTempRootReturningPathInfo << store.printStorePath(path);
+    processStderr(daemonException);
+    bool valid;
+    from >> valid;
+    if (!valid)
+        return std::nullopt;
+    return WorkerProto::Serialise<UnkeyedValidPathInfo>::read(store, *this);
+}
+
 void WorkerProto::BasicClientConnection::putBuildDerivationRequest(
     const StoreDirConfig & store,
     bool * daemonException,

@@ -688,6 +688,25 @@ static void performOp(
         break;
     }
 
+    case WorkerProto::Op::AddTempRootReturningPathInfo: {
+        auto path = WorkerProto::Serialise<StorePath>::read(*store, rconn);
+        std::shared_ptr<const ValidPathInfo> info;
+        logger->startWork();
+        store->addTempRoot(path);
+        try {
+            info = store->queryPathInfo(path);
+        } catch (InvalidPath &) {
+        }
+        logger->stopWork();
+        if (info) {
+            conn.to << 1;
+            WorkerProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
+        } else {
+            conn.to << 0;
+        }
+        break;
+    }
+
     case WorkerProto::Op::AddPermRoot: {
         if (!trusted)
             throw Error(
