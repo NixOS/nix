@@ -162,6 +162,31 @@ requireSandboxSupport () {
     canUseSandbox || skipTest "Sandboxing not supported"
 }
 
+requireBusybox() {
+    # Probe: build a trivial derivation with busybox as builder in a chroot
+    # store, mirroring how callers use it (--arg busybox + --store <chroot>,
+    # builder = busybox; args = ["sh" ...]). Catches the case where the host
+    # path is valid but a chroot-store build sandbox cannot exec it after the
+    # copy through --store (seen on some remote builders).
+    # shellcheck disable=SC2154 # busybox, TEST_ROOT set via common.sh
+    if [[ ! -x "$busybox" ]]; then
+        skipTest "no busybox"
+    fi
+    # shellcheck disable=SC2016 # $out is a Nix variable, not shell
+    local expr='{ busybox }: derivation {
+        name = "busybox-probe";
+        system = builtins.currentSystem;
+        builder = busybox;
+        args = ["sh" "-c" ": > $out"];
+    }'
+    if ! env -u NIX_STORE_DIR nix-build --no-out-link \
+        --store "$TEST_ROOT/requireBusybox-probe" \
+        --arg busybox "$busybox" -E "$expr" &>/dev/null
+    then
+        skipTest "busybox not reachable in chroot-store build sandbox"
+    fi
+}
+
 requireGit() {
     [[ $(type -p git) ]] || skipTest "Git not installed"
 }

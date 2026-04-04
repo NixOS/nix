@@ -3,7 +3,7 @@
 source common.sh
 
 requireSandboxSupport
-[[ $busybox =~ busybox ]] || skipTest "no busybox"
+requireBusybox
 
 enableFeatures mounted-ssh-store
 
