@@ -23,6 +23,32 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
     unsigned int parse(const std::string & str) const override;
 };
 
+template<typename T>
+class DeprecatedSetting : public Setting<T>
+{
+public:
+    DeprecatedSetting(
+        Config * options,
+        const T & def,
+        const std::string & name,
+        const std::string & description,
+        const StringSet & aliases = {})
+        : Setting<T>(options, def, name, description, aliases)
+    {
+    }
+
+    void operator=(const T & v)
+    {
+        this->assign(v);
+    }
+
+    void assign(const T & v) override
+    {
+        this->value = v;
+        warn("'%s' is deprecated and will be removed from a future version of Nix", this->name);
+    }
+};
+
 struct WorkerSettings : public virtual Config
 {
 protected:
@@ -114,7 +140,7 @@ public:
         )",
         {"build-timeout"}};
 
-    Setting<Strings> buildHook{
+    DeprecatedSetting<Strings> buildHook{
         this,
         {"nix", "__build-remote"},
         "build-hook",
@@ -127,6 +153,11 @@ public:
           > **Important**
           >
           > Change this setting only if you really know what you’re doing.
+
+          > **DEPRECATED**
+          >
+          > This setting is deprecated and will be removed in a future version of Nix.
+          > A migration guide will be published prior to its removal for converting build hooks to either a Store plugin or a program usable with built-in remote building.
         )"};
 
     Setting<std::string> builders{
