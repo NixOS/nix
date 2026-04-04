@@ -42,6 +42,8 @@ INPUT                  = \
   @src@/src/libexpr-c \
   @src@/src/libflake-c \
   @src@/src/libstore-c \
+  @src@/src/libfetchers-c \
+  @src@/src/libmain-c \
   @src@/src/external-api-docs/README.md
 
 FILE_PATTERNS = nix_api_*.h *.md
