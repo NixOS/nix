@@ -73,27 +73,37 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
         }
 
         else if (msg == STDERR_NEXT)
-            printError(chomp(readString(from)));
+            logger->log(lvlError, chomp(readString(from)), machineName);
 
         else if (msg == STDERR_START_ACTIVITY) {
-            auto act = readNum<ActivityId>(from);
+            auto remoteAct = readNum<ActivityId>(from);
             auto lvl = (Verbosity) readInt(from);
             auto type = (ActivityType) readInt(from);
             auto s = readString(from);
             auto fields = readFields(from);
-            auto parent = readNum<ActivityId>(from);
-            logger->startActivity(act, lvl, type, s, fields, parent);
+            auto remoteParent = readNum<ActivityId>(from);
+            auto act = nextActivityId();
+            activityIds[remoteAct] = act;
+            auto i = activityIds.find(remoteParent);
+            auto parent = i != activityIds.end() ? i->second : remoteParent;
+            logger->startActivity(act, lvl, type, s, fields, parent, machineName);
         }
 
         else if (msg == STDERR_STOP_ACTIVITY) {
-            auto act = readNum<ActivityId>(from);
+            auto remoteAct = readNum<ActivityId>(from);
+            auto i = activityIds.find(remoteAct);
+            auto act = i != activityIds.end() ? i->second : remoteAct;
+            if (i != activityIds.end())
+                activityIds.erase(i);
             logger->stopActivity(act);
         }
 
         else if (msg == STDERR_RESULT) {
-            auto act = readNum<ActivityId>(from);
+            auto remoteAct = readNum<ActivityId>(from);
             auto type = (ResultType) readInt(from);
             auto fields = readFields(from);
+            auto i = activityIds.find(remoteAct);
+            auto act = i != activityIds.end() ? i->second : remoteAct;
             logger->result(act, type, fields);
         }
 
