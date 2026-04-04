@@ -180,6 +180,11 @@ struct LockFlags
     bool applyNixConfig = false;
 
     /**
+     * Whether to apply nixConfig recursively to inputs of inputs.
+     */
+    bool recursiveNixConfig = false;
+
+    /**
      * Whether unlocked flake references (i.e. those without a Git
      * revision or similar) without a corresponding lock are
      * allowed. Unlocked flake references with a lock are always
