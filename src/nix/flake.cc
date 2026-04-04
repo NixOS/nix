@@ -2,6 +2,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-gc.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/get-drvs.hh"
@@ -722,9 +723,22 @@ struct CmdFlakeCheck : FlakeCommand
 
                     else if (name == "nixosConfigurations") {
                         state->forceAttrs(vOutput, pos, "");
-                        for (auto & attr : *vOutput.attrs())
+
+                        for (auto & attr : *vOutput.attrs()) {
+                            // Save thunk state before forcing
+                            Value savedValue = *attr.value;
+
                             checkNixOSConfiguration(
                                 fmt("%s.%s", name, state->symbols[attr.name]), *attr.value, attr.pos);
+
+                            // Restore thunk so evaluation tree becomes unreachable
+                            *attr.value = savedValue;
+
+                            // Trigger GC to free the evaluation tree before next config
+#if NIX_USE_BOEHMGC
+                            GC_gcollect();
+#endif
+                        }
                     }
 
                     else if (name == "hydraJobs")
