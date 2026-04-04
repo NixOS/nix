@@ -80,7 +80,7 @@ there is no risk of any build-system wildcards for the library accidentally pick
 ### Running tests
 
 You can run the whole testsuite with `meson test` from the Meson build directory, or the tests for a specific component with `meson test nix-store-tests`.
-A environment variables that Google Test accepts are also worth knowing:
+The environment variables that Google Test accepts are also worth knowing:
 
 1. [`GTEST_FILTER`](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests)
 
