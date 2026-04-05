@@ -77,6 +77,11 @@ foreach funcspec : check_funcs
   configdata_priv.set(define_name, define_value)
 endforeach
 
+if host_machine.system() == 'linux'
+  has_landlock = cxx.has_header('linux/landlock.h')
+  configdata_priv.set('HAVE_LANDLOCK', has_landlock.to_int())
+endif
+
 has_acl_support = cxx.has_header('sys/xattr.h') \
   and cxx.has_function('llistxattr') \
   and cxx.has_function('lremovexattr')
