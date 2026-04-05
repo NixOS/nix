@@ -15,6 +15,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/build-result.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-query.hh"
@@ -446,12 +447,16 @@ static void main_nix_build(int argc, char ** argv)
 
     state->maybePrintStats();
 
-    auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
+    auto buildPaths = [&](const std::vector<DerivedPath> & paths) -> std::vector<KeyedBuildResult> {
         if (settings.printMissing)
             printMissing(ref<Store>(store), paths);
 
-        if (!dryRun)
-            store->buildPaths(paths, buildMode, evalStore);
+        if (dryRun)
+            return {};
+
+        auto results = store->buildPathsWithResults(paths, buildMode, evalStore);
+        throwBuildResultErrors(results, *store);
+        return results;
     };
 
     if (isNixShell) {
@@ -712,10 +717,24 @@ static void main_nix_build(int argc, char ** argv)
                 drvMap[drvPath] = {drvMap.size(), {outputName}};
         }
 
-        buildPaths(pathsToBuild);
+        auto buildResults = buildPaths(pathsToBuild);
 
         if (dryRun)
             return;
+
+        // Index build results by derivation path for efficient lookup.
+        // buildPathsWithResults returns resolved output paths for all
+        // derivation types (input-addressed, CA, and impure).
+        std::map<StorePath, SingleDrvOutputs> resultsByDrv;
+        for (auto & result : buildResults) {
+            if (auto * built = std::get_if<DerivedPath::Built>(&result.path)) {
+                if (auto * success = std::get_if<BuildResult::Success>(&result.inner)) {
+                    auto drvPath = built->drvPath->getBaseStorePath();
+                    auto & outputs = resultsByDrv[drvPath];
+                    outputs.insert(success->builtOutputs.begin(), success->builtOutputs.end());
+                }
+            }
+        }
 
         std::vector<StorePath> outPaths;
 
@@ -725,9 +744,16 @@ static void main_nix_build(int argc, char ** argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto outPath = deepQueryPartialDerivationOutput(*store, drvPath, outputName, &*evalStore);
-            assert(outPath);
-            auto outputPath = *outPath;
+            auto ri = resultsByDrv.find(drvPath);
+            if (ri == resultsByDrv.end())
+                throw Error("derivation '%s' was not included in the build results", store->printStorePath(drvPath));
+            auto oi = ri->second.find(outputName);
+            if (oi == ri->second.end())
+                throw Error(
+                    "derivation '%s' does not have a known output path for '%s'",
+                    store->printStorePath(drvPath),
+                    outputName);
+            auto outputPath = oi->second.outPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                 std::string symlink = drvPrefix;
