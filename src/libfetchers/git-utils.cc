@@ -638,6 +638,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         //       then use code that was removed in this commit (see blame)
 
         auto dir = this->path;
+
+        // Remove shallow.lock left behind by a previously interrupted `git fetch`, as it would prevent `git fetch`
+        // from running. Note that we already have a repository-wide `PathLock` (see git.cc), so this is safe.
+        tryUnlink(dir / "shallow.lock");
+
         OsStrings gitArgs = {
             OS_STR("-C"),
             dir.native(),
