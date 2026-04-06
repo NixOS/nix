@@ -96,6 +96,12 @@ sources = files(
 
 include_dirs = [ include_directories('.') ]
 
+if host_machine.system() == 'darwin'
+  sources += files(
+    'spotlight-apps.cc',
+  )
+endif
+
 
 this_exe = executable(
   meson.project_name(),
