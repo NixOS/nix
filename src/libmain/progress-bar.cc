@@ -131,7 +131,7 @@ public:
             auto state(state_.lock());
             if (state->active) {
                 state->active = false;
-                writeToStderr("\r\e[K");
+                clearProgressDisplay();
                 updateCV.notify_one();
                 quitCV.notify_one();
             }
@@ -150,7 +150,7 @@ public:
         }
 
         if (state->active)
-            writeToStderr("\r\e[K");
+            clearProgressDisplay();
     }
 
     void resume() override
@@ -164,7 +164,7 @@ public:
         }
         if (state->suspensions == 0) {
             if (state->active)
-                writeToStderr("\r\e[K");
+                clearProgressDisplay();
             state->haveUpdate = true;
             updateCV.notify_one();
         }
@@ -196,6 +196,7 @@ public:
     void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
+            invalidateRedrawCache();
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
@@ -406,6 +407,17 @@ public:
             writeToStderr(newOutput);
             *lastOutput = std::move(newOutput);
         }
+    }
+
+    void invalidateRedrawCache()
+    {
+        *lastOutput_.lock() = "";
+    }
+
+    void clearProgressDisplay()
+    {
+        invalidateRedrawCache();
+        writeToStderr("\r\e[K");
     }
 
     std::chrono::milliseconds draw(State & state)
@@ -647,6 +659,7 @@ public:
     {
         auto state(state_.lock());
         if (state->active) {
+            invalidateRedrawCache();
             std::cerr << "\r\e[K";
             Logger::writeToStdout(s);
             draw(*state);
@@ -660,6 +673,7 @@ public:
         auto state(state_.lock());
         if (!state->active)
             return {};
+        invalidateRedrawCache();
         std::cerr << fmt("\r\e[K%s ", msg);
         auto s = trim(readLine(getStandardInput(), true));
         if (s.size() != 1)
