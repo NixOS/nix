@@ -61,6 +61,8 @@ mkMesonLibrary (finalAttrs: {
     ./linux/include/nix/store/meson.build
     ./unix/meson.build
     ./unix/include/nix/store/meson.build
+    ./darwin/meson.build
+    ./darwin/include/nix/store/meson.build
     ./windows/meson.build
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)

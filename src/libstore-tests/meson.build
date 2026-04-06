@@ -93,6 +93,12 @@ sources = files(
   'write-derivation.cc',
 )
 
+if host_machine.system() == 'darwin'
+  sources += files(
+    'spotlight-apps.cc',
+  )
+endif
+
 include_dirs = [ include_directories('.') ]
 
 
