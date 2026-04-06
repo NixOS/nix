@@ -690,6 +690,158 @@ struct CmdProfileRemove : virtual EvalCommand, MixProfileElementMatchers
     }
 };
 
+struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile
+{
+    std::string elementName;
+    std::string rawInstallable;
+    std::optional<int64_t> priority;
+
+    CmdProfileReplace()
+    {
+        addFlag({
+            .longName = "priority",
+            .description = "The priority of the replacement package.",
+            .labels = {"priority"},
+            .handler = {&priority},
+        });
+        expectArgs({
+            .label = "element",
+            .optional = false,
+            .handler = {&elementName},
+            .completer =
+                [this](AddCompletions & completions, size_t, std::string_view prefix) {
+                    auto * evalCmd = dynamic_cast<EvalCommand *>(this);
+                    if (!evalCmd)
+                        return;
+                    auto evalState = evalCmd->getEvalState();
+                    ProfileManifest manifest(*evalState, *profile);
+                    for (auto & [name, element] : manifest.elements)
+                        if (name.starts_with(prefix))
+                            completions.add(name, element.identifier());
+                },
+        });
+        expectArgs({
+            .label = "installable",
+            .optional = false,
+            .handler = {&rawInstallable},
+            .completer = getCompleteInstallable(),
+        });
+    }
+
+    std::string description() override
+    {
+        return "replace a package in a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "profile-replace.md"
+            ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        ProfileManifest manifest(*getEvalState(), *profile);
+
+        auto it = manifest.elements.find(elementName);
+        if (it == manifest.elements.end())
+            throw Error(
+                "package '%s' not found in the profile. Use 'nix profile list' to see installed packages.",
+                elementName);
+
+        notice("replacing '%s'", it->second.identifier());
+
+        // Build the new installable.
+        auto installable = parseInstallable(store, rawInstallable);
+
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal));
+
+        auto iter = builtPaths.find(&*installable);
+        if (iter == builtPaths.end())
+            throw Error("failed to build '%s'", rawInstallable);
+        auto & [res, info] = iter->second;
+
+        ProfileElement element;
+
+        if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
+            element.source = ProfileElementSource{
+                .originalRef = info2->flake.originalRef,
+                .lockedRef = info2->flake.lockedRef,
+                .attrPath = info2->value.attrPath,
+                .outputs = info2->value.extendedOutputsSpec,
+            };
+        }
+
+        element.priority = priority ? *priority : ({
+            auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
+            info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
+        });
+
+        element.updateStorePaths(getEvalStore(), store, res);
+
+        // Remove the old element and add the new one under the same name.
+        manifest.elements.erase(it);
+        manifest.elements.insert_or_assign(elementName, std::move(element));
+
+        try {
+            updateProfile(*store, manifest.build(store));
+        } catch (BuildEnvFileConflictError & conflictError) {
+            // FIXME use C++20 std::ranges once macOS has it
+            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
+                for (auto it = begin; it != end; it++) {
+                    auto & [name, profileElement] = *it;
+                    for (auto & storePath : profileElement.storePaths) {
+                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
+                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
+                        }
+                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
+                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
+                        }
+                    }
+                }
+                throw conflictError;
+            };
+            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
+                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
+                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+            throw Error(
+                "An existing package already provides the following file:\n"
+                "\n"
+                "  %1%\n"
+                "\n"
+                "This is the conflicting file from the new package:\n"
+                "\n"
+                "  %2%\n"
+                "\n"
+                "To remove the existing package:\n"
+                "\n"
+                "  nix profile remove %3%\n"
+                "\n"
+                "The new package can also be installed by assigning a different priority.\n"
+                "The conflicting packages have a priority of %5%.\n"
+                "To prioritise the new package:\n"
+                "\n"
+                "  nix profile replace %6% %4% --priority %7%\n"
+                "\n"
+                "To prioritise the existing package:\n"
+                "\n"
+                "  nix profile replace %6% %4% --priority %8%\n",
+                PathFmt(originalConflictingFilePath),
+                PathFmt(newConflictingFilePath),
+                originalEntryName,
+                concatStringsSep(" ", newConflictingRefs),
+                conflictError.priority,
+                elementName,
+                conflictError.priority - 1,
+                conflictError.priority + 1);
+        }
+    }
+};
+
 struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers, MixDryRun
 {
     std::string description() override
@@ -1002,6 +1154,7 @@ struct CmdProfile : NixMultiCommand
               {
                   {"add", []() { return make_ref<CmdProfileAdd>(); }},
                   {"remove", []() { return make_ref<CmdProfileRemove>(); }},
+                  {"replace", []() { return make_ref<CmdProfileReplace>(); }},
                   {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
                   {"list", []() { return make_ref<CmdProfileList>(); }},
                   {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
