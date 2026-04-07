@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -200,7 +202,26 @@ protected:
 
 MakeError(SQLiteBusy, SQLiteError);
 
-void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
+struct SQLiteRetryState
+{
+    uint32_t attempt = 0;
+    time_t startTime;
+    time_t nextWarning;
+    uint32_t jitter; // random factor, computed once per retry sequence
+
+    explicit SQLiteRetryState(uint32_t jitter)
+        : startTime(time(nullptr))
+        , nextWarning(startTime + 1)
+        , jitter(jitter)
+    {
+    }
+};
+
+std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter);
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state);
+
+SQLiteRetryState newSQLiteRetryState();
 
 /**
  * Convenience function for retrying a SQLite transaction when the
@@ -209,13 +230,13 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
 template<typename T, typename F>
 T retrySQLite(F && fun)
 {
-    time_t nextWarning = time(nullptr) + 1;
+    auto state = newSQLiteRetryState();
 
     while (true) {
         try {
             return fun();
         } catch (SQLiteBusy & e) {
-            handleSQLiteBusy(e, nextWarning);
+            handleSQLiteBusy(e, state);
         }
     }
 }
