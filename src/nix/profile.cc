@@ -401,6 +401,41 @@ static void rethrowProfileFileConflict(
         p + 1);
 }
 
+/**
+ * Build a `ProfileElement` from an installable's build result. `built` is the
+ * `(BuiltPaths, ExtraPathInfo)` entry produced by `builtPathsPerInstallable`.
+ * If `priorityOverride` is set, it takes precedence over any priority recorded
+ * on the installable.
+ */
+static ProfileElement makeProfileElement(
+    ref<Store> evalStore,
+    ref<Store> store,
+    const std::pair<BuiltPaths, ref<ExtraPathInfo>> & built,
+    std::optional<int64_t> priorityOverride)
+{
+    auto & [res, info] = built;
+
+    ProfileElement element;
+
+    if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
+        element.source = ProfileElementSource{
+            .originalRef = info2->flake.originalRef,
+            .lockedRef = info2->flake.lockedRef,
+            .attrPath = info2->value.attrPath,
+            .outputs = info2->value.extendedOutputsSpec,
+        };
+    }
+
+    element.priority = priorityOverride ? *priorityOverride : ({
+        auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
+        info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
+    });
+
+    element.updateStorePaths(evalStore, store, res);
+
+    return element;
+}
+
 struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 {
     std::optional<int64_t> priority;
@@ -435,30 +470,11 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
             Installable::build2(getEvalStore(), store, Realise::Outputs, installables, bmNormal));
 
         for (auto & installable : installables) {
-            ProfileElement element;
-
             auto iter = builtPaths.find(&*installable);
             if (iter == builtPaths.end())
                 continue;
-            auto & [res, info] = iter->second;
 
-            if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
-                element.source = ProfileElementSource{
-                    .originalRef = info2->flake.originalRef,
-                    .lockedRef = info2->flake.lockedRef,
-                    .attrPath = info2->value.attrPath,
-                    .outputs = info2->value.extendedOutputsSpec,
-                };
-            }
-
-            // If --priority was specified we want to override the
-            // priority of the installable.
-            element.priority = priority ? *priority : ({
-                auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
-                info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
-            });
-
-            element.updateStorePaths(getEvalStore(), store, res);
+            auto element = makeProfileElement(getEvalStore(), store, iter->second, priority);
 
             auto elementName = getNameFromElement(element);
 
@@ -774,25 +790,8 @@ struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile
         auto iter = builtPaths.find(&*installable);
         if (iter == builtPaths.end())
             throw Error("failed to build '%s'", rawInstallable);
-        auto & [res, info] = iter->second;
 
-        ProfileElement element;
-
-        if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
-            element.source = ProfileElementSource{
-                .originalRef = info2->flake.originalRef,
-                .lockedRef = info2->flake.lockedRef,
-                .attrPath = info2->value.attrPath,
-                .outputs = info2->value.extendedOutputsSpec,
-            };
-        }
-
-        element.priority = priority ? *priority : ({
-            auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
-            info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
-        });
-
-        element.updateStorePaths(getEvalStore(), store, res);
+        auto element = makeProfileElement(getEvalStore(), store, iter->second, priority);
 
         // Remove the old element and add the new one under the same name.
         manifest.elements.erase(it);
