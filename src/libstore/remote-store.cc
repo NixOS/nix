@@ -190,11 +190,8 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
 StorePathSet RemoteStore::queryValidPaths(
     const StorePathSet & paths, SubstituteFlag maybeSubstitute, AddTempRootsFlag maybeAddTempRoots)
 {
-    if (maybeAddTempRoots)
-        addTempRoots(paths);
-
     auto conn(getConnection());
-    return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute);
+    return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute, maybeAddTempRoots);
 }
 
 StorePathSet RemoteStore::queryAllValidPaths()
