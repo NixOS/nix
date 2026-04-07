@@ -126,7 +126,7 @@ public:
 
     void ensurePath(const StorePath & path) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
     Roots findRoots(bool censor) override;
 
