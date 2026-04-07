@@ -402,6 +402,22 @@ static void rethrowProfileFileConflict(
 }
 
 /**
+ * Build the manifest and update the profile, translating any
+ * `BuildEnvFileConflictError` into a user-facing error via
+ * `rethrowProfileFileConflict`. `prioritiseSubcommand` is forwarded to
+ * the conflict reporter (e.g. `"add"` or `"replace foo"`).
+ */
+static void buildAndUpdateProfileWithCatchConflict(
+    MixProfile & cmd, ref<Store> store, ProfileManifest & manifest, std::string_view prioritiseSubcommand)
+{
+    try {
+        cmd.updateProfile(*store, manifest.build(store));
+    } catch (BuildEnvFileConflictError & conflictError) {
+        rethrowProfileFileConflict(manifest, *store, conflictError, prioritiseSubcommand);
+    }
+}
+
+/**
  * Adds a `--priority` flag for commands that build a single
  * `ProfileElement` from an installable.
  */
@@ -507,11 +523,7 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile, MixProfilePriorit
             manifest.addElement(elementName, std::move(element));
         }
 
-        try {
-            updateProfile(*store, manifest.build(store));
-        } catch (BuildEnvFileConflictError & conflictError) {
-            rethrowProfileFileConflict(manifest, *store, conflictError, "add");
-        }
+        buildAndUpdateProfileWithCatchConflict(*this, store, manifest, "add");
     }
 };
 
@@ -803,11 +815,7 @@ struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile, MixProf
         manifest.elements.erase(it);
         manifest.elements.insert_or_assign(elementName, std::move(element));
 
-        try {
-            updateProfile(*store, manifest.build(store));
-        } catch (BuildEnvFileConflictError & conflictError) {
-            rethrowProfileFileConflict(manifest, *store, conflictError, fmt("replace %s", elementName));
-        }
+        buildAndUpdateProfileWithCatchConflict(*this, store, manifest, fmt("replace %s", elementName));
     }
 };
 
