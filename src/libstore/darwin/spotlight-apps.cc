@@ -7,24 +7,21 @@
 
 #include "nix/store/spotlight-apps.hh"
 
+#include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/processes.hh"
 #include "nix/util/users.hh"
+#include "nix/util/util.hh"
 
-#include <fcntl.h>
-#include <spawn.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include <sys/stat.h>
+
 #include <cstring>
-#include <fstream>
 #include <optional>
 #include <string>
-#include <system_error>
 #include <vector>
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreServices/CoreServices.h>
-
-extern char ** environ;
 
 namespace nix::darwin {
 
@@ -105,11 +102,12 @@ static CFRef<CFStringRef> cfStr(std::string_view s)
  */
 static CFRef<CFDictionaryRef> readInfoPlist(const fs::path & infoPlist)
 {
-    std::ifstream f(infoPlist, std::ios::binary);
-    if (!f)
+    std::string buf;
+    try {
+        buf = readFile(infoPlist);
+    } catch (SystemError &) {
         return {};
-
-    std::vector<char> buf((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    }
     if (buf.empty())
         return {};
 
@@ -166,82 +164,18 @@ static std::optional<fs::path> findIconFile(const fs::path & resourcesDir, const
         return std::nullopt;
 
     fs::path direct = resourcesDir / iconKey;
-    std::error_code ec;
-    if (fs::exists(direct, ec))
+    if (pathExists(direct))
         return direct;
 
     if (!fs::path(iconKey).has_extension()) {
         for (const char * ext : {".icns", ".png", ".tiff", ".jpg"}) {
             fs::path withExt = resourcesDir / (iconKey + ext);
-            if (fs::exists(withExt, ec))
+            if (pathExists(withExt))
                 return withExt;
         }
     }
 
     return std::nullopt;
-}
-
-/**
- * Run an external command, swallowing its output. Used for `mdimport -i`.
- * Returns the child's exit status, or -1 on spawn failure.
- */
-static int spawnQuiet(const std::vector<std::string> & argv)
-{
-    if (argv.empty())
-        return -1;
-
-    std::vector<char *> cargv;
-    cargv.reserve(argv.size() + 1);
-    for (auto & a : argv)
-        cargv.push_back(const_cast<char *>(a.c_str()));
-    cargv.push_back(nullptr);
-
-    posix_spawn_file_actions_t actions;
-    posix_spawn_file_actions_init(&actions);
-    /* Detach stdout/stderr so we don't pollute the user's terminal. */
-    posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
-    posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
-
-    pid_t pid = -1;
-    int rc = posix_spawn(&pid, cargv[0], &actions, nullptr, cargv.data(), environ);
-    posix_spawn_file_actions_destroy(&actions);
-    if (rc != 0)
-        return -1;
-
-    int status = 0;
-    if (waitpid(pid, &status, 0) < 0)
-        return -1;
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-}
-
-/**
- * (Re)create `dir` as an empty directory. If wiping fails, warn and
- * continue - stale entries may persist but the new generation's bundles
- * will still be materialized on top.
- */
-static void resetDir(const fs::path & dir)
-{
-    std::error_code removeEc;
-    fs::remove_all(dir, removeEc);
-    if (removeEc && fs::exists(dir))
-        warn(
-            "could not fully clear Spotlight app shadow directory %s: %s "
-            "(stale entries from a previous profile generation may remain)",
-            dir.string(),
-            removeEc.message());
-
-    std::error_code createEc;
-    fs::create_directories(dir, createEc);
-}
-
-/**
- * Symlink `link` -> `target`, replacing any existing entry at `link`.
- */
-static void replaceSymlink(const fs::path & target, const fs::path & link)
-{
-    std::error_code ec;
-    fs::remove(link, ec);
-    fs::create_symlink(target, link);
 }
 
 /**
@@ -261,21 +195,16 @@ static bool materializeHybridBundle(const fs::path & srcApp, const fs::path & de
     fs::path srcContents = srcApp / "Contents";
     fs::path srcInfoPlist = srcContents / "Info.plist";
 
-    {
-        std::error_code ec;
-        if (!fs::is_directory(srcContents, ec)) {
-            /* Not actually a bundle (e.g. a stray file with `.app` suffix). */
-            return false;
-        }
-    }
-    {
-        std::error_code ec;
-        if (!fs::is_regular_file(srcInfoPlist, ec)) {
-            /* No Info.plist -> can't be made into something Spotlight will
-               index as an Application. Skip silently. */
-            return false;
-        }
-    }
+    /* Not actually a bundle (e.g. a stray file with `.app` suffix). */
+    auto contentsSt = maybeLstat(srcContents);
+    if (!contentsSt || !S_ISDIR(contentsSt->st_mode))
+        return false;
+
+    /* No Info.plist -> can't be made into something Spotlight will index
+       as an Application. Skip silently. */
+    auto plistSt = maybeLstat(srcInfoPlist);
+    if (!plistSt || !S_ISREG(plistSt->st_mode))
+        return false;
 
     /* Read CFBundleIconFile so we know what icon to copy. */
     auto plist = readInfoPlist(srcInfoPlist);
@@ -287,17 +216,16 @@ static bool materializeHybridBundle(const fs::path & srcApp, const fs::path & de
 
     fs::path destContents = destApp / "Contents";
     fs::path destResources = destContents / "Resources";
-    fs::create_directories(destResources);
+    createDirs(destResources);
 
     /* Copy Info.plist (mandatory). */
-    fs::copy_file(srcInfoPlist, destContents / "Info.plist", fs::copy_options::overwrite_existing);
+    copyFile(srcInfoPlist, destContents / "Info.plist", /*andDelete=*/false, /*contents=*/true);
 
     /* Copy PkgInfo if present (optional, harmless if missing). */
     {
         fs::path pkgInfo = srcContents / "PkgInfo";
-        std::error_code ec;
-        if (fs::is_regular_file(pkgInfo, ec))
-            fs::copy_file(pkgInfo, destContents / "PkgInfo", fs::copy_options::overwrite_existing);
+        if (auto st = maybeLstat(pkgInfo); st && S_ISREG(st->st_mode))
+            copyFile(pkgInfo, destContents / "PkgInfo", /*andDelete=*/false, /*contents=*/true);
     }
 
     /* Copy the icon file (optional but strongly preferred - without it the
@@ -311,46 +239,46 @@ static bool materializeHybridBundle(const fs::path & srcApp, const fs::path & de
                that invariant. */
             assert(iconPath->parent_path() == srcResources);
             fs::path destIcon = destResources / iconPath->filename();
-            std::error_code ec;
-            fs::copy_file(*iconPath, destIcon, fs::copy_options::overwrite_existing, ec);
-            if (!ec)
+            try {
+                copyFile(*iconPath, destIcon, /*andDelete=*/false, /*contents=*/true);
                 copiedIconFile = iconPath->filename();
+            } catch (SystemError &) {
+                /* No icon -> blank icon in Spotlight, but bundle is still
+                   indexable. Continue. */
+            }
         }
     }
 
     /* Symlink everything else under Contents/ into the store. */
-    {
-        std::error_code ec;
-        for (auto & entry : fs::directory_iterator(srcContents, ec)) {
+    try {
+        for (auto & entry : DirectoryIterator{srcContents}) {
             const auto & name = entry.path().filename();
             if (name == "Info.plist" || name == "PkgInfo" || name == "Resources")
                 continue;
             replaceSymlink(entry.path(), destContents / name);
         }
-        if (ec)
-            return false;
+    } catch (SystemError &) {
+        return false;
     }
 
     /* Symlink everything else under Resources/ into the store, except the
        icon file we copied above. */
-    {
-        std::error_code ec;
-        if (fs::is_directory(srcResources, ec)) {
-            std::error_code iterEc;
-            for (auto & entry : fs::directory_iterator(srcResources, iterEc)) {
+    if (auto st = maybeLstat(srcResources); st && S_ISDIR(st->st_mode)) {
+        try {
+            for (auto & entry : DirectoryIterator{srcResources}) {
                 const auto & name = entry.path().filename();
                 if (copiedIconFile && name == *copiedIconFile)
                     continue;
                 replaceSymlink(entry.path(), destResources / name);
             }
-            if (iterEc)
-                warn(
-                    "could not fully enumerate %s while materializing %s: %s "
-                    "(some resource symlinks may be missing - Spotlight will "
-                    "still index the bundle but launching may be impaired)",
-                    srcResources.string(),
-                    destApp.string(),
-                    iterEc.message());
+        } catch (SystemError & e) {
+            warn(
+                "could not fully enumerate %s while materializing %s: %s "
+                "(some resource symlinks may be missing - Spotlight will "
+                "still index the bundle but launching may be impaired)",
+                PathFmt(srcResources),
+                PathFmt(destApp),
+                e.what());
         }
     }
 
@@ -394,23 +322,27 @@ static std::vector<fs::path> findAppBundles(const fs::path & profileTarget)
     std::vector<fs::path> out;
     fs::path appsDir = profileTarget / "Applications";
 
-    std::error_code ec;
-    if (!fs::is_directory(appsDir, ec))
+    auto st = maybeLstat(appsDir);
+    if (!st || !S_ISDIR(st->st_mode))
         return out;
 
-    for (auto & entry : fs::directory_iterator(appsDir, ec)) {
-        if (entry.path().extension() != ".app")
-            continue;
-        std::error_code rc;
-        /* Resolve through the buildenv symlink chain so that destApp's
-           symlinks point at the canonical store path, not at another
-           symlink farm. This keeps the materialized bundle valid even if
-           the intermediate generation directories are GC'd later (the
-           canonical store path is what the profile pins as a GC root). */
-        fs::path resolved = fs::canonical(entry.path(), rc);
-        if (rc)
-            continue;
-        out.push_back(std::move(resolved));
+    try {
+        for (auto & entry : DirectoryIterator{appsDir}) {
+            if (entry.path().extension() != ".app")
+                continue;
+            /* Resolve through the buildenv symlink chain so that destApp's
+               symlinks point at the canonical store path, not at another
+               symlink farm. This keeps the materialized bundle valid even if
+               the intermediate generation directories are GC'd later (the
+               canonical store path is what the profile pins as a GC root). */
+            try {
+                out.push_back(canonPath(entry.path(), /*resolveSymlinks=*/true));
+            } catch (SystemError &) {
+                /* Dangling or unresolvable - skip. */
+            }
+        }
+    } catch (SystemError & e) {
+        warn("could not enumerate %s for Spotlight indexing: %s", PathFmt(appsDir), e.what());
     }
 
     return out;
@@ -423,15 +355,18 @@ namespace detail {
 void syncProfileAppBundlesAt(const fs::path & profile, const fs::path & dest, bool notifySystem) noexcept
 {
     try {
-        std::error_code ec;
-
         /* Resolve the profile symlink (e.g. `~/.nix-profile`) to the actual
            generation directory it currently points at. If the profile does
            not exist or does not resolve, treat that as "no apps" and let
            the cleanup branch below remove our destination. */
         fs::path target;
-        if (fs::exists(profile, ec))
-            target = fs::canonical(profile, ec);
+        if (pathExists(profile)) {
+            try {
+                target = canonPath(profile, /*resolveSymlinks=*/true);
+            } catch (SystemError &) {
+                /* Treat as "no apps" - cleanup branch below removes dest. */
+            }
+        }
 
         std::vector<fs::path> bundles;
         if (!target.empty())
@@ -442,8 +377,7 @@ void syncProfileAppBundlesAt(const fs::path & profile, const fs::path & dest, bo
            which an *uninstall* propagates to Spotlight: the next profile
            switch sees fewer apps and rebuilds the destination accordingly. */
         if (bundles.empty()) {
-            if (fs::exists(dest, ec))
-                fs::remove_all(dest, ec);
+            deletePath(dest);
             return;
         }
 
@@ -451,7 +385,8 @@ void syncProfileAppBundlesAt(const fs::path & profile, const fs::path & dest, bo
            the system writes to "Nix Profile Apps". This is the simplest
            possible state model and avoids any need to track which bundles
            we created on a previous run. */
-        resetDir(dest);
+        deletePath(dest);
+        createDirs(dest);
 
         size_t ok = 0;
         for (const auto & srcApp : bundles) {
@@ -459,21 +394,32 @@ void syncProfileAppBundlesAt(const fs::path & profile, const fs::path & dest, bo
             try {
                 if (materializeHybridBundle(srcApp, destApp, notifySystem))
                     ok++;
-            } catch (const std::exception & e) {
-                warn("could not materialize hybrid app bundle for %s: %s", srcApp.string(), e.what());
+            } catch (std::exception & e) {
+                warn("could not materialize hybrid app bundle for %s: %s", PathFmt(srcApp), e.what());
             }
         }
 
         /* Nudge Spotlight to index the new bundles now instead of waiting
-           for its next periodic walk. Best-effort; ignore the exit status. */
-        if (notifySystem && ok > 0)
-            (void) spawnQuiet({"/usr/bin/mdimport", "-i", dest.string()});
+           for its next periodic walk. Best-effort: runProgram returns the
+           exit status (we discard it) and only throws on more fundamental
+           failures like spawn errors, which we swallow here. */
+        if (notifySystem && ok > 0) {
+            try {
+                (void) runProgram(
+                    RunOptions{
+                        .program = "/usr/bin/mdimport",
+                        .lookupPath = false,
+                        .args = {"-i", dest.string()},
+                        .mergeStderrToStdout = true,
+                    });
+            } catch (std::exception &) {
+                /* best-effort */
+            }
+        }
 
-        debug("syncProfileAppBundles: materialized %d/%d bundles into %s", ok, bundles.size(), dest.string());
-    } catch (const std::exception & e) {
-        warn("syncProfileAppBundles failed: %s", e.what());
+        debug("syncProfileAppBundles: materialized %d/%d bundles into %s", ok, bundles.size(), PathFmt(dest));
     } catch (...) {
-        warn("syncProfileAppBundles failed with an unknown exception");
+        ignoreExceptionInDestructor();
     }
 }
 

@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include <gtest/gtest.h>
 
 #include "nix/store/spotlight-apps.hh"
@@ -22,19 +20,20 @@ namespace {
  */
 void writeInfoPlist(const fs::path & path, const std::string & bundleName, const std::string & iconKey = "")
 {
-    std::ofstream plist(path);
-    plist << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-             "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
-             "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-             "<plist version=\"1.0\"><dict>\n"
-             "  <key>CFBundleIdentifier</key><string>org.nix.test."
-          << bundleName
-          << "</string>\n"
-             "  <key>CFBundleName</key><string>"
-          << bundleName << "</string>\n";
+    std::string contents =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" "
+        "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+        "<plist version=\"1.0\"><dict>\n"
+        "  <key>CFBundleIdentifier</key><string>org.nix.test."
+        + bundleName
+        + "</string>\n"
+          "  <key>CFBundleName</key><string>"
+        + bundleName + "</string>\n";
     if (!iconKey.empty())
-        plist << "  <key>CFBundleIconFile</key><string>" << iconKey << "</string>\n";
-    plist << "</dict></plist>\n";
+        contents += "  <key>CFBundleIconFile</key><string>" + iconKey + "</string>\n";
+    contents += "</dict></plist>\n";
+    writeFile(path, contents);
 }
 
 class SpotlightAppsTest : public ::testing::Test
@@ -53,8 +52,8 @@ protected:
         profile = tmpRoot / "profile";
         appsDir = profile / "Applications";
         destRoot = tmpRoot / "dest";
-        fs::create_directories(appsDir);
-        fs::create_directories(destRoot);
+        createDirs(appsDir);
+        createDirs(destRoot);
     }
 
     /**
@@ -74,10 +73,10 @@ protected:
         fs::path contents = app / "Contents";
         fs::path macos = contents / "MacOS";
         fs::path resources = contents / "Resources";
-        fs::create_directories(macos);
-        fs::create_directories(resources);
+        createDirs(macos);
+        createDirs(resources);
 
-        std::ofstream(macos / name) << "#!/bin/sh\n";
+        writeFile(macos / name, "#!/bin/sh\n");
 
         if (withInfoPlist)
             writeInfoPlist(contents / "Info.plist", name, iconKey);
@@ -88,11 +87,11 @@ protected:
             std::string iconName = iconKey;
             if (fs::path(iconName).extension().empty())
                 iconName += ".icns";
-            std::ofstream(resources / iconName) << "icns-stub";
+            writeFile(resources / iconName, "icns-stub");
         }
 
         if (!extraResource.empty())
-            std::ofstream(resources / extraResource) << "extra";
+            writeFile(resources / extraResource, "extra");
 
         return app;
     }
@@ -156,9 +155,9 @@ TEST_F(SpotlightAppsTest, removesDestWhenProfileHasNoApps)
 {
     // Pre-seed the destination with a stale bundle and prove it gets
     // cleaned up when the profile has no Applications/ directory.
-    fs::create_directories(destRoot / "Stale.app" / "Contents");
-    std::ofstream(destRoot / "Stale.app" / "Contents" / "Info.plist") << "stale";
-    fs::remove_all(appsDir);
+    createDirs(destRoot / "Stale.app" / "Contents");
+    writeFile(destRoot / "Stale.app" / "Contents" / "Info.plist", "stale");
+    deletePath(appsDir);
 
     sync();
 
@@ -172,12 +171,12 @@ TEST_F(SpotlightAppsTest, wipeAndRebuildClearsStaleEntries)
     EXPECT_TRUE(fs::is_directory(destRoot / "Foo.app"));
 
     // Inject garbage that should be cleaned by the next sync.
-    std::ofstream(destRoot / "garbage.txt") << "trash";
-    fs::create_directories(destRoot / "Stale.app" / "Contents");
-    std::ofstream(destRoot / "Stale.app" / "Contents" / "Info.plist") << "stale";
+    writeFile(destRoot / "garbage.txt", "trash");
+    createDirs(destRoot / "Stale.app" / "Contents");
+    writeFile(destRoot / "Stale.app" / "Contents" / "Info.plist", "stale");
 
     // Replace Foo with Bar in the profile and re-sync.
-    fs::remove_all(appsDir / "Foo.app");
+    deletePath(appsDir / "Foo.app");
     makeBundle("Bar", true, "AppIcon");
     sync();
 
@@ -225,8 +224,8 @@ TEST_F(SpotlightAppsTest, handlesBundleWithoutIcon)
 TEST_F(SpotlightAppsTest, ignoresNonAppEntriesInApplicationsDir)
 {
     makeBundle("Foo", true, "AppIcon");
-    std::ofstream(appsDir / "README.txt") << "ignored";
-    fs::create_directories(appsDir / "stuff");
+    writeFile(appsDir / "README.txt", "ignored");
+    createDirs(appsDir / "stuff");
 
     sync();
 
@@ -237,8 +236,8 @@ TEST_F(SpotlightAppsTest, ignoresNonAppEntriesInApplicationsDir)
 
 TEST_F(SpotlightAppsTest, missingProfileIsHarmless)
 {
-    fs::create_directories(destRoot / "Old.app" / "Contents");
-    std::ofstream(destRoot / "Old.app" / "Contents" / "Info.plist") << "old";
+    createDirs(destRoot / "Old.app" / "Contents");
+    writeFile(destRoot / "Old.app" / "Contents" / "Info.plist", "old");
 
     detail::syncProfileAppBundlesAt(tmpRoot / "no-such-profile", destRoot, /*notifySystem=*/false);
 
