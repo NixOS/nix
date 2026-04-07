@@ -270,16 +270,11 @@ void LegacySSHStore::computeFSClosure(
         out.insert(i);
 }
 
-StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet LegacySSHStore::queryValidPaths(
+    const StorePathSet & paths, SubstituteFlag maybeSubstitute, AddTempRootsFlag maybeAddTempRoots)
 {
     auto conn(connections->get());
-    return conn->queryValidPaths(*this, false, paths, maybeSubstitute);
-}
-
-StorePathSet LegacySSHStore::queryValidPaths(const StorePathSet & paths, bool lock, SubstituteFlag maybeSubstitute)
-{
-    auto conn(connections->get());
-    return conn->queryValidPaths(*this, lock, paths, maybeSubstitute);
+    return conn->queryValidPaths(*this, maybeAddTempRoots, paths, maybeSubstitute);
 }
 
 void LegacySSHStore::connect()

@@ -728,8 +728,12 @@ void Store::substitutePaths(const StorePathSet & paths)
         }
 }
 
-StorePathSet Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet
+Store::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute, AddTempRootsFlag maybeAddTempRoots)
 {
+    if (maybeAddTempRoots)
+        addTempRoots(paths);
+
     struct State
     {
         size_t left;

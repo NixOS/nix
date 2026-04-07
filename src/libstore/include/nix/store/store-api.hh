@@ -50,6 +50,8 @@ enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
+enum AddTempRootsFlag : bool { NoAddTempRoots = false, AddTempRoots = true };
+
 enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
@@ -475,9 +477,12 @@ public:
 
     /**
      * Query which of the given paths is valid. Optionally, try to
-     * substitute missing paths.
+     * substitute missing paths and/or add paths as temproots.
      */
-    virtual StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute);
+    virtual StorePathSet queryValidPaths(
+        const StorePathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        AddTempRootsFlag maybeAddTempRoots = NoAddTempRoots);
 
     /**
      * Query the set of all valid paths. Note that for some store
