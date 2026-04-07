@@ -658,10 +658,13 @@ void RemoteStore::ensurePath(const StorePath & path)
     readInt(conn->from);
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    conn->addTempRoot(*this, &conn.daemonException, path);
+
+    /* Unclear if adding a new operation would be worthwhile */
+    for (auto & path : paths)
+        conn->addTempRoot(*this, &conn.daemonException, path);
 }
 
 Roots RemoteStore::findRoots(bool censor)

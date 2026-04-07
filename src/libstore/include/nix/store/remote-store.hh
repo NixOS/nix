@@ -118,7 +118,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void ensurePath(const StorePath & path) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
     Roots findRoots(bool censor) override;
 
