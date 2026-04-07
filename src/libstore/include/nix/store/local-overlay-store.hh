@@ -149,6 +149,11 @@ private:
     bool isValidPathUncached(const StorePath & path) override;
 
     /**
+     * Copy path metadata from the lower store into the upper DB.
+     */
+    void syncPathInfoFromLower(const ValidPathInfo & info);
+
+    /**
      * Check the lower store and upper DB.
      */
     void queryReferrers(const StorePath & path, StorePathSet & referrers) override;

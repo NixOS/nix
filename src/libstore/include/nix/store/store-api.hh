@@ -813,6 +813,20 @@ public:
     }
 
     /**
+     * Combine addTempRoot and queryPathInfo into a single operation.
+     * For remote stores this saves one IPC round-trip per call.
+     */
+    virtual std::shared_ptr<const ValidPathInfo> addTempRootReturningPathInfo(const StorePath & path)
+    {
+        addTempRoot(path);
+        try {
+            return queryPathInfo(path);
+        } catch (InvalidPath &) {
+            return nullptr;
+        }
+    }
+
+    /**
      * @return a string representing information about the path that
      * can be loaded into the database using `nix-store --load-db` or
      * `nix-store --register-validity`.

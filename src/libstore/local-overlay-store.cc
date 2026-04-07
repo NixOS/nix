@@ -101,9 +101,11 @@ void LocalOverlayStore::queryPathInfoUncached(
                 return callbackPtr->rethrow();
             }
             // If we don't have it, check lower store
-            lowerStore->queryPathInfo(path, {[path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
+            lowerStore->queryPathInfo(path, {[this, path, callbackPtr](std::future<ref<const ValidPathInfo>> fut) {
                                           try {
-                                              (*callbackPtr)(fut.get().get_ptr());
+                                              auto info = fut.get();
+                                              syncPathInfoFromLower(*info);
+                                              (*callbackPtr)(info.get_ptr());
                                           } catch (...) {
                                               return callbackPtr->rethrow();
                                           }
@@ -146,13 +148,18 @@ bool LocalOverlayStore::isValidPathUncached(const StorePath & path)
     if (res) {
         // Get path info from lower store so upper DB genuinely has it.
         auto p = lowerStore->queryPathInfo(path);
-        // recur on references, syncing entire closure.
-        for (auto & r : p->references)
-            if (r != path)
-                isValidPath(r);
-        LocalStore::registerValidPath(*p);
+        syncPathInfoFromLower(*p);
     }
     return res;
+}
+
+void LocalOverlayStore::syncPathInfoFromLower(const ValidPathInfo & info)
+{
+    // Recur on references, syncing entire closure.
+    for (auto & r : info.references)
+        if (r != info.path)
+            queryPathInfo(r);
+    LocalStore::registerValidPath(info);
 }
 
 void LocalOverlayStore::queryReferrers(const StorePath & path, StorePathSet & referrers)

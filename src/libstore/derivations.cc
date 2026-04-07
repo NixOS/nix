@@ -139,10 +139,10 @@ StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
     /* In case the derivation is already valid, we bail out early since that's
        faster. But we need to make sure that the derivation has a corresponding
        temproot. It is added by the remote in addToStoreFromDump, but we'd like
-       to avoid sending a lot of drv contents to the daemon. */
-    addTempRoot(path);
-
-    if (isValidPath(path) && !repair)
+       to avoid sending a lot of drv contents to the daemon.
+       addTempRootReturningPathInfo combines both operations into a single IPC
+       round-trip for remote stores. */
+    if (addTempRootReturningPathInfo(path) && !repair)
         return path;
 
     StringSource s{contents};
