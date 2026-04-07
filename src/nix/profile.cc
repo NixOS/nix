@@ -402,6 +402,25 @@ static void rethrowProfileFileConflict(
 }
 
 /**
+ * Adds a `--priority` flag for commands that build a single
+ * `ProfileElement` from an installable.
+ */
+struct MixProfilePriority : virtual Args
+{
+    std::optional<int64_t> priority;
+
+    MixProfilePriority(std::string_view description)
+    {
+        addFlag({
+            .longName = "priority",
+            .description = std::string(description),
+            .labels = {"priority"},
+            .handler = {&priority},
+        });
+    }
+};
+
+/**
  * Build a `ProfileElement` from an installable's build result. `built` is the
  * `(BuiltPaths, ExtraPathInfo)` entry produced by `builtPathsPerInstallable`.
  * If `priorityOverride` is set, it takes precedence over any priority recorded
@@ -436,19 +455,12 @@ static ProfileElement makeProfileElement(
     return element;
 }
 
-struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
+struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile, MixProfilePriority
 {
-    std::optional<int64_t> priority;
-
     CmdProfileAdd()
+        : MixProfilePriority("The priority of the package to add.")
     {
-        addFlag({
-            .longName = "priority",
-            .description = "The priority of the package to add.",
-            .labels = {"priority"},
-            .handler = {&priority},
-        });
-    };
+    }
 
     std::string description() override
     {
@@ -719,20 +731,14 @@ struct CmdProfileRemove : virtual EvalCommand, MixProfileElementMatchers
     }
 };
 
-struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile
+struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile, MixProfilePriority
 {
     std::string elementName;
     std::string rawInstallable;
-    std::optional<int64_t> priority;
 
     CmdProfileReplace()
+        : MixProfilePriority("The priority of the replacement package.")
     {
-        addFlag({
-            .longName = "priority",
-            .description = "The priority of the replacement package.",
-            .labels = {"priority"},
-            .handler = {&priority},
-        });
         expectArgs({
             .label = "element",
             .optional = false,
