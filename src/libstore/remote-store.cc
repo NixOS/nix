@@ -745,13 +745,20 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    if (conn->tempRootsPinned.get(path))
-        return;
-    conn->addTempRoot(*this, &conn.daemonException, path);
-    conn->tempRootsPinned.upsert(path, true);
+
+    for (auto & path : paths) {
+        if (conn->tempRootsPinned.get(path))
+            continue;
+
+        /* Unclear if adding a new operation would be worthwhile */
+        for (auto & path : paths)
+            conn->addTempRoot(*this, &conn.daemonException, path);
+
+        conn->tempRootsPinned.upsert(path, true);
+    }
 }
 
 Roots RemoteStore::findRoots(bool censor)
