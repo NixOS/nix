@@ -11,6 +11,7 @@
 #include <chrono>
 #include <future>
 #include <string>
+#include <variant>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
@@ -317,6 +318,8 @@ private:
      * Connection to the garbage collector.
      */
     Sync<AutoCloseFD> _fdRootsSocket;
+
+    Sync<LRUCache<StorePath, std::monostate>> _tempRootsCache;
 
 public:
 

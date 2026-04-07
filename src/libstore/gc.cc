@@ -92,8 +92,18 @@ void LocalStore::addTempRoots(const StorePathSet & paths)
 
     std::string s;
 
-    for (auto & path : paths)
-        s += printStorePath(path) + '\0';
+    {
+        auto tempRootsCache(_tempRootsCache.lock());
+
+        for (auto & path : paths)
+            if (!tempRootsCache->get(path)) {
+                tempRootsCache->upsert(path, {});
+                s += printStorePath(path) + '\0';
+            }
+    }
+
+    if (s.empty())
+        return;
 
     {
         auto fdTempRoots(_fdTempRoots.lock());
