@@ -528,21 +528,22 @@ namespace nlohmann {
 
 using namespace nix;
 
-DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDerivedPath>>::from_json(const json & json_)
+template<typename Inputs>
+static DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
 {
     auto & json = getObject(json_);
 
     return {
-        .outputChecks = [&]() -> OutputChecksVariant<SingleDerivedPath> {
+        .outputChecks = [&]() -> OutputChecksVariant<Inputs> {
             auto outputChecks = getObject(valueAt(json, "outputChecks"));
 
             auto forAllOutputsOpt = get(outputChecks, "forAllOutputs");
             auto perOutputOpt = get(outputChecks, "perOutput");
 
             if (forAllOutputsOpt && !perOutputOpt) {
-                return static_cast<OutputChecks<SingleDerivedPath>>(*forAllOutputsOpt);
+                return static_cast<OutputChecks<Inputs>>(*forAllOutputsOpt);
             } else if (perOutputOpt && !forAllOutputsOpt) {
-                return static_cast<std::map<std::string, OutputChecks<SingleDerivedPath>, std::less<>>>(*perOutputOpt);
+                return static_cast<std::map<std::string, OutputChecks<Inputs>, std::less<>>>(*perOutputOpt);
             } else {
                 throw Error("Exactly one of 'perOutput' or 'forAllOutputs' is required");
             }
@@ -564,17 +565,17 @@ DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDeri
     };
 }
 
-void adl_serializer<DerivationOptions<SingleDerivedPath>>::to_json(
-    json & json, const DerivationOptions<SingleDerivedPath> & o)
+template<typename Inputs>
+static void derivationOptionsToJson(nlohmann::json & json, const DerivationOptions<Inputs> & o)
 {
     json["outputChecks"] = std::visit(
         overloaded{
-            [&](const OutputChecks<SingleDerivedPath> & checks) {
+            [&](const OutputChecks<Inputs> & checks) {
                 nlohmann::json outputChecks;
                 outputChecks["forAllOutputs"] = checks;
                 return outputChecks;
             },
-            [&](const std::map<std::string, OutputChecks<SingleDerivedPath>, std::less<>> & checksPerOutput) {
+            [&](const std::map<std::string, OutputChecks<Inputs>, std::less<>> & checksPerOutput) {
                 nlohmann::json outputChecks;
                 outputChecks["perOutput"] = checksPerOutput;
                 return outputChecks;
@@ -597,7 +598,8 @@ void adl_serializer<DerivationOptions<SingleDerivedPath>>::to_json(
     json["allowSubstitutes"] = o.allowSubstitutes;
 }
 
-OutputChecks<SingleDerivedPath> adl_serializer<OutputChecks<SingleDerivedPath>>::from_json(const json & json_)
+template<typename Inputs>
+static OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
 {
     auto & json = getObject(json_);
 
@@ -605,16 +607,15 @@ OutputChecks<SingleDerivedPath> adl_serializer<OutputChecks<SingleDerivedPath>>:
         .ignoreSelfRefs = getBoolean(valueAt(json, "ignoreSelfRefs")),
         .maxSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxSize"))),
         .maxClosureSize = ptrToOwned<uint64_t>(getNullable(valueAt(json, "maxClosureSize"))),
-        .allowedReferences =
-            ptrToOwned<std::set<DrvRef<SingleDerivedPath>>>(getNullable(valueAt(json, "allowedReferences"))),
+        .allowedReferences = ptrToOwned<std::set<DrvRef<Inputs>>>(getNullable(valueAt(json, "allowedReferences"))),
         .disallowedReferences = valueAt(json, "disallowedReferences"),
-        .allowedRequisites =
-            ptrToOwned<std::set<DrvRef<SingleDerivedPath>>>(getNullable(valueAt(json, "allowedRequisites"))),
+        .allowedRequisites = ptrToOwned<std::set<DrvRef<Inputs>>>(getNullable(valueAt(json, "allowedRequisites"))),
         .disallowedRequisites = valueAt(json, "disallowedRequisites"),
     };
 }
 
-void adl_serializer<OutputChecks<SingleDerivedPath>>::to_json(json & json, const OutputChecks<SingleDerivedPath> & c)
+template<typename Inputs>
+static void outputChecksToJson(nlohmann::json & json, const OutputChecks<Inputs> & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
     json["maxSize"] = c.maxSize;
@@ -623,6 +624,47 @@ void adl_serializer<OutputChecks<SingleDerivedPath>>::to_json(json & json, const
     json["disallowedReferences"] = c.disallowedReferences;
     json["allowedRequisites"] = c.allowedRequisites;
     json["disallowedRequisites"] = c.disallowedRequisites;
+}
+
+DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDerivedPath>>::from_json(const json & json_)
+{
+    return derivationOptionsFromJson<SingleDerivedPath>(json_);
+}
+
+void adl_serializer<DerivationOptions<SingleDerivedPath>>::to_json(
+    json & json, const DerivationOptions<SingleDerivedPath> & o)
+{
+    derivationOptionsToJson<SingleDerivedPath>(json, o);
+}
+
+DerivationOptions<StorePath> adl_serializer<DerivationOptions<StorePath>>::from_json(const json & json_)
+{
+    return derivationOptionsFromJson<StorePath>(json_);
+}
+
+void adl_serializer<DerivationOptions<StorePath>>::to_json(json & json, const DerivationOptions<StorePath> & o)
+{
+    derivationOptionsToJson<StorePath>(json, o);
+}
+
+OutputChecks<SingleDerivedPath> adl_serializer<OutputChecks<SingleDerivedPath>>::from_json(const json & json_)
+{
+    return outputChecksFromJson<SingleDerivedPath>(json_);
+}
+
+void adl_serializer<OutputChecks<SingleDerivedPath>>::to_json(json & json, const OutputChecks<SingleDerivedPath> & c)
+{
+    outputChecksToJson<SingleDerivedPath>(json, c);
+}
+
+OutputChecks<StorePath> adl_serializer<OutputChecks<StorePath>>::from_json(const json & json_)
+{
+    return outputChecksFromJson<StorePath>(json_);
+}
+
+void adl_serializer<OutputChecks<StorePath>>::to_json(json & json, const OutputChecks<StorePath> & c)
+{
+    outputChecksToJson<StorePath>(json, c);
 }
 
 } // namespace nlohmann

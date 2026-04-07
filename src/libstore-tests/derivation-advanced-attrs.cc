@@ -489,24 +489,137 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
         {"rainbow", "uid-range", "ca-derivations"});
 };
 
-#define TEST_JSON_OPTIONS(FIXUTURE, VAR, VAR2)                             \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_from_json)                  \
-    {                                                                      \
-        nix::readJsonTest<DerivationOptions<SingleDerivedPath>>(           \
-            *this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
-    }                                                                      \
-    TEST_F(FIXUTURE, DerivationOptions_##VAR##_to_json)                    \
-    {                                                                      \
-        nix::readJsonTest<DerivationOptions<SingleDerivedPath>>(           \
-            *this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+#define TEST_JSON_OPTIONS(FIXUTURE, INPUT, VAR, VAR2)                                                              \
+    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_from_json)                                                \
+    {                                                                                                              \
+        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
+    }                                                                                                              \
+    TEST_F(FIXUTURE, DerivationOptions_##INPUT##_##VAR##_to_json)                                                  \
+    {                                                                                                              \
+        nix::readJsonTest<DerivationOptions<INPUT>>(*this, "derivation-options/" #VAR, advancedAttributes_##VAR2); \
     }
 
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, defaults, defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, all_set, ia)
-TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, all_set, ca)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, structuredAttrs_defaults, structuredAttrs_defaults)
-TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, structuredAttrs_all_set, structuredAttrs_ia)
-TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, structuredAttrs_all_set, structuredAttrs_ca)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, defaults, defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, all_set, ca)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_defaults, structuredAttrs_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ia)
+TEST_JSON_OPTIONS(CaDerivationAdvancedAttrsTest, SingleDerivedPath, structuredAttrs_all_set, structuredAttrs_ca)
+
+/**
+ * `DerivationOptions<StorePath>` versions of the IA fixtures, used to
+ * exercise the `StorePath` JSON serializers. The IA test data files are
+ * reused as-is (see comment near the test invocations).
+ */
+static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
+    spFooDev{"z0rjzy29v9k5qa4nqpykrbzirj7sd43v-foo-dev"}, spBar{"r5cff30838majxk5mp3ip2diffi8vpaj-bar"},
+    spBarDev{"9b61w26b4avv870dw0ymb6rw4r1hzpws-bar-dev"}, spBarDrv{"vj2i49jm2868j2fmqvxm70vlzmzvgv14-bar.drv"};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
+    .outputChecks =
+        DerivationOptions<StorePath>::OutputChecks{
+            .ignoreSelfRefs = true,
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
+    .outputChecks =
+        DerivationOptions<StorePath>::OutputChecks{
+            .ignoreSelfRefs = true,
+            .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
+            .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
+            .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
+            .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph{
+        {"refs1", {spFoo}},
+        {"refs2", {spBarDrv}},
+    },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
+    .outputChecks = std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{},
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph = {},
+    .additionalSandboxProfile = "",
+    .noChroot = false,
+    .impureHostDeps = {},
+    .impureEnvVars = {},
+    .allowLocalNetworking = false,
+    .requiredSystemFeatures = {},
+    .preferLocalBuild = false,
+    .allowSubstitutes = true,
+};
+
+static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
+    .outputChecks =
+        std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{
+            {"out",
+             DerivationOptions<StorePath>::OutputChecks{
+                 .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
+                 .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
+             }},
+            {"bin",
+             DerivationOptions<StorePath>::OutputChecks{
+                 .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
+                 .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
+             }},
+            {"dev",
+             DerivationOptions<StorePath>::OutputChecks{
+                 .maxSize = 789,
+                 .maxClosureSize = 5909,
+             }},
+        },
+    .unsafeDiscardReferences = {},
+    .passAsFile = {},
+    .exportReferencesGraph =
+        {
+            {"refs1", {spFoo}},
+            {"refs2", {spBarDrv}},
+        },
+    .additionalSandboxProfile = "sandcastle",
+    .noChroot = true,
+    .impureHostDeps = {"/usr/bin/ditto"},
+    .impureEnvVars = {"UNICORN"},
+    .allowLocalNetworking = true,
+    .requiredSystemFeatures = {"rainbow", "uid-range"},
+    .preferLocalBuild = true,
+    .allowSubstitutes = false,
+};
+
+/**
+ * Same JSON characterization tests, but for `DerivationOptions<StorePath>`.
+ *
+ * Since `DrvRef<StorePath>` and `DrvRef<SingleDerivedPath>` (when only
+ * the `Opaque` case is used) JSON-encode identically, the IA test data
+ * files can be reused as-is.
+ */
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, defaults, sp_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, all_set, sp_all_set)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_defaults, sp_structuredAttrs_defaults)
+TEST_JSON_OPTIONS(DerivationAdvancedAttrsTest, StorePath, structuredAttrs_all_set, sp_structuredAttrs_all_set)
 
 #undef TEST_JSON_OPTIONS
 
