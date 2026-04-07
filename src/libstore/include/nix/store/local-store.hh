@@ -301,7 +301,7 @@ public:
         const StorePathSet & references,
         RepairFlag repair) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
 private:
 
