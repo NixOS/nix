@@ -299,7 +299,7 @@ public:
         RepairFlag repair,
         std::shared_ptr<const Provenance> provenance) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
 private:
 
