@@ -334,6 +334,73 @@ builtPathsPerInstallable(const std::vector<std::pair<ref<Installable>, BuiltPath
     return res;
 }
 
+/**
+ * Translate a `BuildEnvFileConflictError` raised by `updateProfile` into a
+ * user-facing `Error` explaining the conflict. `prioritiseSubcommand` is the
+ * `nix profile` subcommand (with any required arguments) used to suggest how
+ * to re-prioritise the new package, e.g. `"add"` or `"replace foo"`.
+ */
+static void rethrowProfileFileConflict(
+    ProfileManifest & manifest,
+    Store & store,
+    BuildEnvFileConflictError & conflictError,
+    std::string_view prioritiseSubcommand)
+{
+    // FIXME use C++20 std::ranges once macOS has it
+    //       See
+    //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
+    auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
+        for (auto it = begin; it != end; it++) {
+            auto & [name, profileElement] = *it;
+            for (auto & storePath : profileElement.storePaths) {
+                if (conflictError.fileA.string().starts_with(store.printStorePath(storePath)))
+                    return std::tuple(conflictError.fileA, name, profileElement.toInstallables(store));
+                if (conflictError.fileB.string().starts_with(store.printStorePath(storePath)))
+                    return std::tuple(conflictError.fileB, name, profileElement.toInstallables(store));
+            }
+        }
+        throw conflictError;
+    };
+    // The first matching package is the one already installed; the last is the new one.
+    auto [originalPath, originalName, _origRefs] =
+        findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+    auto [newPath, _newName, newRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+    auto newRefsStr = concatStringsSep(" ", newRefs);
+    auto p = conflictError.priority;
+
+    throw Error(
+        "An existing package already provides the following file:\n"
+        "\n"
+        "  %1%\n"
+        "\n"
+        "This is the conflicting file from the new package:\n"
+        "\n"
+        "  %2%\n"
+        "\n"
+        "To remove the existing package:\n"
+        "\n"
+        "  nix profile remove %3%\n"
+        "\n"
+        "The new package can also be installed by assigning a different priority.\n"
+        "The conflicting packages have a priority of %4%.\n"
+        "To prioritise the new package:\n"
+        "\n"
+        "  nix profile %5% %6% --priority %7%\n"
+        "\n"
+        "To prioritise the existing package:\n"
+        "\n"
+        "  nix profile %5% %6% --priority %8%\n",
+        PathFmt(originalPath),
+        PathFmt(newPath),
+        originalName,
+        p,
+        prioritiseSubcommand,
+        newRefsStr,
+        p - 1,
+        p + 1);
+}
+
 struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 {
     std::optional<int64_t> priority;
@@ -415,61 +482,7 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
         try {
             updateProfile(*store, manifest.build(store));
         } catch (BuildEnvFileConflictError & conflictError) {
-            // FIXME use C++20 std::ranges once macOS has it
-            //       See
-            //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
-            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
-                for (auto it = begin; it != end; it++) {
-                    auto & [name, profileElement] = *it;
-                    for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
-                        }
-                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
-                        }
-                    }
-                }
-                throw conflictError;
-            };
-            // There are 2 conflicting files. We need to find out which one is from the already installed package and
-            // which one is the package that is the new package that is being installed.
-            // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
-                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
-            // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
-                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
-
-            throw Error(
-                "An existing package already provides the following file:\n"
-                "\n"
-                "  %1%\n"
-                "\n"
-                "This is the conflicting file from the new package:\n"
-                "\n"
-                "  %2%\n"
-                "\n"
-                "To remove the existing package:\n"
-                "\n"
-                "  nix profile remove %3%\n"
-                "\n"
-                "The new package can also be added next to the existing one by assigning a different priority.\n"
-                "The conflicting packages have a priority of %5%.\n"
-                "To prioritise the new package:\n"
-                "\n"
-                "  nix profile add %4% --priority %6%\n"
-                "\n"
-                "To prioritise the existing package:\n"
-                "\n"
-                "  nix profile add %4% --priority %7%\n",
-                PathFmt(originalConflictingFilePath),
-                PathFmt(newConflictingFilePath),
-                originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
-                conflictError.priority,
-                conflictError.priority - 1,
-                conflictError.priority + 1);
+            rethrowProfileFileConflict(manifest, *store, conflictError, "add");
         }
     }
 };
@@ -788,56 +801,7 @@ struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile
         try {
             updateProfile(*store, manifest.build(store));
         } catch (BuildEnvFileConflictError & conflictError) {
-            // FIXME use C++20 std::ranges once macOS has it
-            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
-                for (auto it = begin; it != end; it++) {
-                    auto & [name, profileElement] = *it;
-                    for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
-                        }
-                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
-                        }
-                    }
-                }
-                throw conflictError;
-            };
-            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
-                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
-            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
-                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
-
-            throw Error(
-                "An existing package already provides the following file:\n"
-                "\n"
-                "  %1%\n"
-                "\n"
-                "This is the conflicting file from the new package:\n"
-                "\n"
-                "  %2%\n"
-                "\n"
-                "To remove the existing package:\n"
-                "\n"
-                "  nix profile remove %3%\n"
-                "\n"
-                "The new package can also be installed by assigning a different priority.\n"
-                "The conflicting packages have a priority of %5%.\n"
-                "To prioritise the new package:\n"
-                "\n"
-                "  nix profile replace %6% %4% --priority %7%\n"
-                "\n"
-                "To prioritise the existing package:\n"
-                "\n"
-                "  nix profile replace %6% %4% --priority %8%\n",
-                PathFmt(originalConflictingFilePath),
-                PathFmt(newConflictingFilePath),
-                originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
-                conflictError.priority,
-                elementName,
-                conflictError.priority - 1,
-                conflictError.priority + 1);
+            rethrowProfileFileConflict(manifest, *store, conflictError, fmt("replace %s", elementName));
         }
     }
 };
