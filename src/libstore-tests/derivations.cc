@@ -2,6 +2,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/tests/libstore.hh"
@@ -71,6 +72,11 @@ protected:
                 return std::nullopt;
             };
     }
+
+    /**
+     * Helper for the `exportReferencesGraph` + placeholder subpath tests.
+     */
+    void exportRefGraphSubpathTest(std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed);
 
     /**
      * Checkpoint before/buildTrace/after and assert the resolved derivation
@@ -246,6 +252,114 @@ TEST_F(TryResolveTest, resolutionFailure)
 
     auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
     EXPECT_FALSE(resolved);
+}
+
+/**
+ * Test that `derivationOptionsFromStructuredAttrs` can parse
+ * `exportReferencesGraph` entries that reference a CA derivation output
+ * with a subpath appended (e.g. `${dep}/foo`), and that the parsed
+ * options resolve correctly.
+ *
+ * Regression test for #15003: the placeholder + subpath was not found
+ * in the placeholder map (exact-match only), and the fallback to
+ * `toStorePath()` failed because placeholders don't start with
+ * `/nix/store/`.
+ */
+void TryResolveTest::exportRefGraphSubpathTest(
+    std::string_view stem, const Derivation & drv, const StructuredAttrs * parsed)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    StorePath depOutPath{"f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"};
+
+    nix::checkpointJson(*this, std::string{stem} + "-before", drv);
+
+    auto options = derivationOptionsFromStructuredAttrs(*store, drv.inputDrvs, drv.env, parsed, true);
+
+    nix::checkpointJson(*this, std::string{stem} + "-before-options", options);
+
+    SingleDerivedPath expectedPath = SingleDerivedPath::Built{
+        .drvPath = makeConstantStorePathRef(depDrvPath),
+        .output = "out",
+    };
+
+    ASSERT_EQ(options.exportReferencesGraph.size(), 1);
+    auto it = options.exportReferencesGraph.find("refs");
+    ASSERT_NE(it, options.exportReferencesGraph.end());
+    ASSERT_EQ(it->second.size(), 1);
+    EXPECT_EQ(*it->second.begin(), expectedPath);
+
+    // Also test that resolution works
+    BuildTrace buildTrace{.dict{
+        {
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+            depOutPath,
+        },
+    }};
+
+    nix::checkpointJson(*this, std::string{stem} + "-buildTrace", buildTrace);
+
+    auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
+    ASSERT_TRUE(resolved);
+
+    nix::checkpointJson(*this, std::string{stem} + "-resolved", *resolved);
+
+    // Re-parse options from the resolved derivation, where placeholders
+    // have been substituted with concrete store paths.
+    auto resolvedOptions = derivationOptionsFromStructuredAttrs(
+        *store,
+        /* inputDrvs */ {},
+        resolved->env,
+        resolved->structuredAttrs ? &*resolved->structuredAttrs : nullptr,
+        true);
+
+    nix::checkpointJson(*this, std::string{stem} + "-resolved-options", resolvedOptions);
+
+    EXPECT_EQ(
+        resolvedOptions.exportReferencesGraph,
+        (decltype(resolvedOptions.exportReferencesGraph){
+            {"refs", std::set<SingleDerivedPath>{SingleDerivedPath::Opaque{depOutPath}}}}));
+}
+
+TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    auto placeholder = DownstreamPlaceholder::unknownCaOutput(depDrvPath, "out").render();
+
+    Derivation drv;
+    drv.name = "export-ref-subpath";
+    drv.platform = "x86_64-linux";
+    drv.builder = "/bin/bash";
+    drv.outputs = {{"out", caFloatingOutput()}};
+    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.env = {
+        {"exportReferencesGraph", "refs " + placeholder + "/foo"},
+    };
+
+    exportRefGraphSubpathTest("export-ref-subpath", drv, nullptr);
+}
+
+TEST_F(TryResolveTest, exportReferencesGraphPlaceholderSubpath_structuredAttrs)
+{
+    StorePath depDrvPath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv"};
+    auto placeholder = DownstreamPlaceholder::unknownCaOutput(depDrvPath, "out").render();
+
+    Derivation drv;
+    drv.name = "export-ref-subpath-sa";
+    drv.platform = "x86_64-linux";
+    drv.builder = "/bin/bash";
+    drv.outputs = {{"out", caFloatingOutput()}};
+    drv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    drv.structuredAttrs = StructuredAttrs{{
+        {"exportReferencesGraph", nlohmann::json::object({{"refs", nlohmann::json::array({placeholder + "/foo"})}})},
+    }};
+    drv.env = {
+        {std::string{StructuredAttrs::envVarName}, nlohmann::json(drv.structuredAttrs->structuredAttrs).dump()},
+    };
+
+    exportRefGraphSubpathTest("export-ref-subpath-sa", drv, &*drv.structuredAttrs);
 }
 
 } // namespace nix

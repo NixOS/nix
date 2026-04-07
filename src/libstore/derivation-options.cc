@@ -157,16 +157,27 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
         }
     }
 
+    /* Extract the placeholder key from a path that may have a subpath
+       appended (e.g. `/HASH/foo` → `/HASH`), mirroring how
+       `StoreDirConfig::toStorePath` strips subpaths from store paths. */
+    auto findPlaceholder = [&](std::string_view pathS) -> const SingleDerivedPath::Built * {
+        auto slash = pathS.find('/', 1);
+        auto key = pathS.substr(0, slash);
+        if (auto it = placeholders.find(key); it != placeholders.end())
+            return &it->second;
+        return nullptr;
+    };
+
     auto parseSingleDerivedPath = [&](const std::string & pathS) -> SingleDerivedPath {
-        if (auto it = placeholders.find(pathS); it != placeholders.end())
-            return it->second;
+        if (auto * built = findPlaceholder(pathS))
+            return *built;
         else
             return SingleDerivedPath::Opaque{store.toStorePath(pathS).first};
     };
 
     auto parseRef = [&](const std::string & pathS) -> DrvRef<SingleDerivedPath> {
-        if (auto it = placeholders.find(pathS); it != placeholders.end())
-            return it->second;
+        if (auto * built = findPlaceholder(pathS))
+            return *built;
         if (store.isStorePath(pathS))
             return SingleDerivedPath::Opaque{store.toStorePath(pathS).first};
         else
