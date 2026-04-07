@@ -382,7 +382,7 @@ static void rethrowProfileFileConflict(
         "\n"
         "  nix profile remove %3%\n"
         "\n"
-        "The new package can also be installed by assigning a different priority.\n"
+        "The new package can also be added next to the existing one by assigning a different priority.\n"
         "The conflicting packages have a priority of %4%.\n"
         "To prioritise the new package:\n"
         "\n"
