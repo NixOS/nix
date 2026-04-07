@@ -338,11 +338,17 @@ static void performOp(
         auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
 
         SubstituteFlag substitute = NoSubstitute;
+        AddTempRootsFlag doAddTempRoots = NoAddTempRoots;
         if (conn.protoVersion >= WorkerProto::Version{.number = {1, 27}}) {
             substitute = readInt(conn.from) ? Substitute : NoSubstitute;
+
+            if (conn.protoVersion.features.contains(WorkerProto::featureQueryValidPathsAddTempRoots))
+                doAddTempRoots = readInt(conn.from) ? AddTempRoots : NoAddTempRoots;
         }
 
         logger->startWork();
+        if (doAddTempRoots)
+            store->addTempRoots(paths);
         if (substitute) {
             store->substitutePaths(paths);
         }
