@@ -1015,7 +1015,7 @@ std::map<StorePath, StorePath> copyPaths(
     CheckSigsFlag checkSigs,
     SubstituteFlag substitute)
 {
-    auto valid = dstStore.queryValidPaths(storePaths, substitute);
+    auto valid = dstStore.queryValidPaths(storePaths, substitute, AddTempRoots);
 
     StorePathSet missing;
     for (auto & path : storePaths)
