@@ -42,6 +42,11 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 mkdir -p "$TEST_ROOT/out2"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
+# Check that a bare relative destination (no directory component) works.
+rm -rf "$TEST_ROOT/out"
+(cd "$TEST_ROOT" && nix-store --restore out < tmp.nar)
+[[ -f "$TEST_ROOT/out" ]]
+
 # The same, but for a symlink.
 ln -sfn foo "$TEST_ROOT/symlink"
 nix-store --dump "$TEST_ROOT/symlink" > "$TEST_ROOT/tmp.nar"
@@ -62,6 +67,12 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 mkdir -p "$TEST_ROOT/out2"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
+# Likewise for a bare relative destination.
+rm -rf "$TEST_ROOT/out"
+(cd "$TEST_ROOT" && nix-store --restore out < tmp.nar)
+[[ -L "$TEST_ROOT/out" ]]
+[[ $(readlink "$TEST_ROOT/out") = foo ]]
+
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
 rm -rf "$TEST_ROOT/case"
@@ -76,6 +87,11 @@ nix-store "${opts[@]}" --restore "$TEST_ROOT/case" < case.nar
 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > "$TEST_ROOT/case.nar"
 cmp case.nar "$TEST_ROOT/case.nar"
 [ "$(nix-hash "${opts[@]}" --type sha256 "$TEST_ROOT/case")" = "$(nix-hash --flat --type sha256 case.nar)" ]
+
+# Likewise for a bare relative destination.
+rm -rf "$TEST_ROOT/case"
+(cd "$TEST_ROOT" && nix-store "${opts[@]}" --restore case) < case.nar
+[[ -e "$TEST_ROOT/case/xt_CONNMARK.h" ]]
 
 # Check whether we detect true collisions (e.g. those remaining after
 # removal of the suffix).
