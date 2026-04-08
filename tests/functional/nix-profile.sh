@@ -266,6 +266,30 @@ clearProfiles
 nix profile add $(nix build "$flake1Dir" --no-link --print-out-paths)
 expect 1 nix profile add --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
 
+# Test 'nix profile replace'.
+clearProfiles
+printf World > "$flake1Dir"/who
+printf World2 > "$flake2Dir"/who
+nix profile add "$flake1Dir"
+[[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
+
+# Replace flake1 with flake2; the element name is preserved.
+nix profile replace flake1 "$flake2Dir"
+[[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World2" ]]
+nix profile list | grep -q 'Name:.*flake1'
+
+# --priority is accepted.
+nix profile replace flake1 "$flake2Dir" --priority 42
+
+# Replacing a non-existent element fails with a clear error.
+expect 1 nix profile replace nonexistent "$flake1Dir" 2> "$TEST_ROOT/replace-err"
+grep -q "not found in the profile" "$TEST_ROOT/replace-err"
+
+# Tab completion of the element-name argument.
+completion_output=$(NIX_GET_COMPLETIONS=3 nix profile replace '' 2>&1)
+echo "$completion_output" | grep -q "^normal$"
+echo "$completion_output" | grep -q "^flake1"
+
 # Test upgrading from profile version 2.
 clearProfiles
 mkdir -p "$TEST_ROOT"/import-profile

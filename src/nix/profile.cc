@@ -767,9 +767,12 @@ struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile, MixProf
                             completions.add(name, element.identifier());
                 },
         });
+        // Marked optional so that completion of the first argument
+        // (`element`) succeeds even when no `installable` has been
+        // typed yet. Missing `installable` is validated in `run()`.
         expectArgs({
             .label = "installable",
-            .optional = false,
+            .optional = true,
             .handler = {&rawInstallable},
             .completer = getCompleteInstallable(),
         });
@@ -789,6 +792,9 @@ struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile, MixProf
 
     void run(ref<Store> store) override
     {
+        if (rawInstallable.empty())
+            throw UsageError("'nix profile replace' requires an installable as the second argument");
+
         ProfileManifest manifest(*getEvalState(), *profile);
 
         auto it = manifest.elements.find(elementName);
