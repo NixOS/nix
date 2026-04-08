@@ -276,7 +276,7 @@ nix profile add "$flake1Dir"
 # Replace flake1 with flake2; the element name is preserved.
 nix profile replace flake1 "$flake2Dir"
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World2" ]]
-nix profile list | grep -q 'Name:.*flake1'
+nix profile list | grep 'Name:.*flake1'
 
 # --priority is accepted.
 nix profile replace flake1 "$flake2Dir" --priority 42
