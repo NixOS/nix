@@ -7,4 +7,8 @@ sources += files(
   'user-lock.cc',
 )
 
+if host_machine.system() == 'darwin'
+  sources += files('build/darwin-mach-o-rewrite.cc')
+endif
+
 subdir('include/nix/store')

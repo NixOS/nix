@@ -175,6 +175,7 @@ suites = [
       'impure-env.sh',
       'debugger.sh',
       'extra-sandbox-profile.sh',
+      'macho-rewrite.sh',
       'help.sh',
       'symlinks.sh',
       'external-builders.sh',
