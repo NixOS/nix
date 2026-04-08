@@ -267,6 +267,18 @@ struct ExitStatusFlags
     unsigned int failingExitStatus() const;
 };
 
+/**
+ * Check a list of build results for failures and throw an appropriate
+ * error with proper exit status codes. This is used by callers of
+ * `buildPathsWithResults` that want to convert failures into
+ * exceptions (matching the behavior of `buildPaths`).
+ *
+ * If there is a single failure, throws that `BuildError` directly.
+ * If there are multiple failures, logs the first and throws a summary
+ * `Error`.
+ */
+void throwBuildResultErrors(const std::vector<KeyedBuildResult> & results, const Store & store);
+
 } // namespace nix
 
 JSON_IMPL(nix::BuildResult)

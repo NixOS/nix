@@ -3,46 +3,13 @@
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #include "nix/store/local-store.hh"
-#include "nix/util/strings.hh"
 
 namespace nix {
 
 void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode, std::shared_ptr<Store> evalStore)
 {
-    Worker worker(*this, evalStore ? *evalStore : *this);
-
-    Goals goals;
-    for (auto & br : reqs)
-        goals.insert(worker.makeGoal(br, buildMode));
-
-    worker.run(goals);
-
-    StringSet failed;
-    BuildResult::Failure * failure = nullptr;
-    for (auto & i : goals) {
-        if (auto * f = i->buildResult.tryGetFailure()) {
-            if (failure)
-                logError(f->info());
-            else
-                failure = f;
-        }
-        if (i->exitCode != Goal::ecSuccess) {
-            if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
-                failed.insert(i2->drvReq->to_string(*this));
-            else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(printStorePath(i2->storePath));
-        }
-    }
-
-    if (failed.size() == 1 && failure) {
-        failure->withExitStatus(worker.exitStatusFlags.failingExitStatus());
-        throw *failure;
-    } else if (!failed.empty()) {
-        auto exitStatus = worker.exitStatusFlags.failingExitStatus();
-        if (failure)
-            logError(failure->info());
-        throw Error(exitStatus, "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
-    }
+    auto results = buildPathsWithResults(reqs, buildMode, evalStore);
+    throwBuildResultErrors(results, *this);
 }
 
 std::vector<KeyedBuildResult> Store::buildPathsWithResults(
