@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/util/error.hh"
 #include "nix/util/terminal.hh"
 #include <gmock/gmock.h>
 
@@ -51,6 +52,18 @@ inline ::testing::PolymorphicMatcher<internal::HasSubstrIgnoreANSIMatcher>
 HasSubstrIgnoreANSIMatcher(const std::string & substring)
 {
     return ::testing::MakePolymorphicMatcher(internal::HasSubstrIgnoreANSIMatcher(substring));
+}
+
+/**
+ * Matches a callable that throws `SysError` whose `errNo` equals `expected`.
+ *
+ * Example:
+ *
+ *     EXPECT_THAT([&]{ openFile("nope"); }, ThrowsSysError(ENOENT));
+ */
+inline auto ThrowsSysError(int expected)
+{
+    return ::testing::Throws<SysError>(::testing::Field(&SysError::errNo, expected));
 }
 
 } // namespace nix::testing
