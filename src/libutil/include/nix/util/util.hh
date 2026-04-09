@@ -225,10 +225,16 @@ std::string toLower(std::string s);
 std::string escapeShellArgAlways(const std::string_view s);
 
 /**
- * Exception handling in destructors: print an error message, then
- * ignore the exception.
+ * Exception handling in destructors (and other contexts that must not let
+ * exceptions escape): print an error message, then ignore the exception.
+ * Unlike `ignoreExceptionExceptInterrupt()`, this also swallows
+ * `Interrupted`, so it is safe to call from a `noexcept` function, where
+ * a rethrown `Interrupted` would cross the noexcept boundary and trigger
+ * `std::terminate`.
  *
- * If you're not in a destructor, you usually want to use `ignoreExceptionExceptInterrupt()`.
+ * If you're not in a destructor or a `noexcept` function, you usually want
+ * `ignoreExceptionExceptInterrupt()` instead so that Ctrl-C still
+ * propagates.
  *
  * This function might also be used in callbacks whose caller may not handle exceptions,
  * but ideally we propagate the exception using an exception_ptr in such cases.
