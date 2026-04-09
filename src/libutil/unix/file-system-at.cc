@@ -129,7 +129,7 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
            try, and not falsely succeed by following.) However, if we reach
            this point, rather than the Linux-specific cases above, it means we
            will likely hit glibc compat paths that will make using
-           AT_SYMLINK_NOFOLLOW causes failures even if there is no symlink
+           AT_SYMLINK_NOFOLLOW cause failures even if there is no symlink
            being followed! */
         0
 #endif
