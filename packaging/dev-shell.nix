@@ -291,7 +291,8 @@ nixComponents.callPackage (
         map (transformFlag "perl") (ignoreCrossFile nixComponents.nix-perl-bindings.mesonFlags)
       )
       ++ map (transformFlag "libexpr") (ignoreCrossFile nixComponents.nix-expr.mesonFlags)
-      ++ map (transformFlag "libcmd") (ignoreCrossFile nixComponents.nix-cmd.mesonFlags);
+      ++ map (transformFlag "libcmd") (ignoreCrossFile nixComponents.nix-cmd.mesonFlags)
+      ++ map (transformFlag "nix") (ignoreCrossFile nixComponents.nix-cli.mesonFlags);
 
       nativeBuildInputs =
         let
