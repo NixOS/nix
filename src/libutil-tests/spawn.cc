@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
+#ifdef _WIN32
+#  include <gtest/gtest.h>
 
-#include "nix/util/os-string.hh"
-#include "nix/util/processes.hh"
+#  include "nix/util/os-string.hh"
+#  include "nix/util/processes.hh"
 
 namespace nix {
 
-#ifdef _WIN32
 TEST(SpawnTest, spawnEcho)
 {
     auto output =
@@ -34,5 +34,5 @@ TEST(SpawnTest, windowsEscape)
     auto space = windowsEscape(L"hello world", false);
     ASSERT_EQ(space, LR"("hello world")");
 }
-#endif
 } // namespace nix
+#endif
