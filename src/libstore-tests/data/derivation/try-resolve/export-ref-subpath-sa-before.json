@@ -1,0 +1,34 @@
+{
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "__json": "{\"exportReferencesGraph\":{\"refs\":[\"/19r5f6rm1xa6ii9sam7fqbmaj8skmasskfj0rixxb1zjpqcy470p/foo\"]}}"
+  },
+  "inputs": {
+    "drvs": {
+      "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "export-ref-subpath-sa",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "structuredAttrs": {
+    "exportReferencesGraph": {
+      "refs": [
+        "/19r5f6rm1xa6ii9sam7fqbmaj8skmasskfj0rixxb1zjpqcy470p/foo"
+      ]
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

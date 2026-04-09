@@ -1,0 +1,20 @@
+{
+  "additionalSandboxProfile": "",
+  "allowLocalNetworking": false,
+  "allowSubstitutes": true,
+  "exportReferencesGraph": {
+    "refs": [
+      "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"
+    ]
+  },
+  "impureEnvVars": [],
+  "impureHostDeps": [],
+  "noChroot": false,
+  "outputChecks": {
+    "perOutput": {}
+  },
+  "passAsFile": [],
+  "preferLocalBuild": false,
+  "requiredSystemFeatures": [],
+  "unsafeDiscardReferences": {}
+}

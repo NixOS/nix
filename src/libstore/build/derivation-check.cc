@@ -186,7 +186,8 @@ void checkOutputs(
         std::visit(
             overloaded{
                 [&](const DerivationOptions<StorePath>::OutputChecks & checks) { applyChecks(checks); },
-                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks> & checksPerOutput) {
+                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> &
+                        checksPerOutput) {
                     if (auto outputChecks = get(checksPerOutput, outputName))
 
                         applyChecks(*outputChecks);
