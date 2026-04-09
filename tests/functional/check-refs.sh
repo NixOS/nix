@@ -63,7 +63,13 @@ fi
 
 if isDaemonNewer "2.28pre20241225"; then
     # test12 should fail (syntactically invalid).
-    expectStderr 1 nix-build -vvv -o "$RESULT" check-refs.nix -A test12 >"$TEST_ROOT/test12.stderr"
+    # New daemons send the proper exit code (100 = build failure);
+    # old daemons lack the feature flag and default to exit code 1.
+    if isDaemonNewer "2.34pre"; then
+        expectStderr 100 nix-build -vvv -o "$RESULT" check-refs.nix -A test12 >"$TEST_ROOT/test12.stderr"
+    else
+        expectStderr 1 nix-build -vvv -o "$RESULT" check-refs.nix -A test12 >"$TEST_ROOT/test12.stderr"
+    fi
     if isDaemonNewer "2.33pre20251110"; then
         grepQuiet -F \
             "output check for 'lib' contains output name 'dev', but this is not a valid output of this derivation. (Valid outputs are [lib, out].)" \
