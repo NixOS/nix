@@ -121,9 +121,16 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
         dirFd,
         path.rel_c_str(),
         mode,
-#if defined(__APPLE__) || defined(__FreeBSD__)
+#if defined(AT_SYMLINK_NOFOLLOW) && !defined(__linux__)
         AT_SYMLINK_NOFOLLOW
 #else
+        /* We would like to avoid following symlinks on Linux too. (Even though
+           Linux doesn't support chmoding symlinks, we should still fail if we
+           try, and not falsely succeed by following.) However, if we reach
+           this point, rather than the Linux-specific cases above, it means we
+           will likely hit glibc compat paths that will make using
+           AT_SYMLINK_NOFOLLOW cause failures even if there is no symlink
+           being followed! */
         0
 #endif
     );
