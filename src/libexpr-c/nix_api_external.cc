@@ -1,7 +1,4 @@
-#include "nix/expr/attr-set.hh"
-#include "nix/util/configuration.hh"
 #include "nix/expr/eval.hh"
-#include "nix/store/globals.hh"
 #include "nix/expr/value.hh"
 
 #include "nix_api_expr.h"

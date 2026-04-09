@@ -2,8 +2,6 @@
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 
-#include <atomic>
-
 using namespace nix;
 
 struct CmdOptimiseStore : StoreCommand

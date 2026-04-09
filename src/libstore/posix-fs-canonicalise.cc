@@ -2,10 +2,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/util.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/globals.hh"
-#include "store-config-private.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>

@@ -2,7 +2,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/util.hh"
 
-#include "nix/util/tests/characterization.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock-matchers.h>

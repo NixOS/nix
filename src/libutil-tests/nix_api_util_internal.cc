@@ -1,5 +1,3 @@
-#include "nix/util/config-global.hh"
-#include "nix/util/args.hh"
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 #include "nix/util/tests/nix_api_util.hh"
@@ -8,8 +6,6 @@
 #include <gtest/gtest.h>
 
 #include <memory>
-
-#include "util-tests-config.hh"
 
 namespace nixC {
 

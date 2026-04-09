@@ -1,6 +1,5 @@
 #include "nix/util/base-n.hh"
 #include "nix/store/machines.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 
 #include <algorithm>

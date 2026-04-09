@@ -1,5 +1,4 @@
 #include "nix/store/ssh.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/os-string.hh"

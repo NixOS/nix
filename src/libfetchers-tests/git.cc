@@ -1,4 +1,3 @@
-#include "nix/store/store-open.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/dummy-store.hh"
 #include "nix/fetchers/fetch-settings.hh"

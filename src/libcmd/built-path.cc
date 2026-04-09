@@ -6,8 +6,6 @@
 
 #include <nlohmann/json.hpp>
 
-#include <optional>
-
 namespace nix {
 
 // Custom implementation to avoid `ref` ptr equality

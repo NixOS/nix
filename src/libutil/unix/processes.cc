@@ -13,7 +13,6 @@
 #include <cstring>
 #include <future>
 #include <iostream>
-#include <sstream>
 #include <atomic>
 using namespace std::chrono_literals;
 
@@ -31,7 +30,6 @@ using namespace std::chrono_literals;
 #  include <sys/mman.h>
 #endif
 
-#include "util-config-private.hh"
 #include "util-unix-config-private.hh"
 
 namespace nix {

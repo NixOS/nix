@@ -5,7 +5,6 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-impl.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
 #include "nix/util/json-utils.hh"
 

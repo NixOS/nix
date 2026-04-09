@@ -2,7 +2,6 @@
 #include "nix/util/args/root.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/environment-variables.hh"
-#include "nix/util/signals.hh"
 #include "nix/util/users.hh"
 #include "nix/util/json-utils.hh"
 

@@ -1,7 +1,6 @@
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/tarfile.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/logging.hh"
 
 #include <archive.h>

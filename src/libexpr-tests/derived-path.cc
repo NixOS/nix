@@ -1,6 +1,8 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
-#include <exception> // Needed by rapidcheck on Darwin
+#ifdef __APPLE__
+#  include <exception> // Needed by rapidcheck on Darwin
+#endif
 #include <rapidcheck/gtest.h>
 
 #include "nix/store/tests/derived-path.hh"

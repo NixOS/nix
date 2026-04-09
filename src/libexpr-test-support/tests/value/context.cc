@@ -1,7 +1,8 @@
-#include <exception> // Needed by rapidcheck on Darwin
+#ifdef __APPLE__
+#  include <exception> // Needed by rapidcheck on Darwin
+#endif
 #include <rapidcheck.h>
 
-#include "nix/store/tests/path.hh"
 #include "nix/expr/tests/value/context.hh"
 
 namespace rc {

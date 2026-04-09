@@ -13,7 +13,6 @@
 #endif
 #include <unistd.h>
 #include <widechar_width.h>
-#include <mutex>
 #include <cstdlib> // for ptsname and ptsname_r
 
 namespace {

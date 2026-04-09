@@ -1,8 +1,8 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/users.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 

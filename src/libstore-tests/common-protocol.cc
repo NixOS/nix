@@ -1,12 +1,9 @@
-#include <regex>
-
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
 #include "nix/util/json-utils.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
-#include "nix/store/build-result.hh"
 #include "nix/store/tests/protocol.hh"
 #include "nix/util/tests/characterization.hh"
 

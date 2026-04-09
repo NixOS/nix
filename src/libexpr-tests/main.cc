@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/tests/test-main.hh"
-#include "nix/util/config-global.hh"
+#include "nix/util/configuration.hh"
 
 int main(int argc, char ** argv)
 {

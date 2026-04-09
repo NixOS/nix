@@ -1,9 +1,7 @@
 #include "nix/expr/primops.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval-settings.hh"
-#include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/util/url.hh"
 #include "nix/util/url-parts.hh"
 
 namespace nix {

@@ -6,12 +6,10 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/main/loggers.hh"
-#include "nix/main/progress-bar.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
 #include <algorithm>
-#include <exception>
 #include <iostream>
 
 #include <cstdlib>

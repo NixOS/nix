@@ -1,4 +1,3 @@
-#include <regex>
 #include <thread>
 
 #include <nlohmann/json.hpp>

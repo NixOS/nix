@@ -5,7 +5,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/names.hh"
 
-#include <atomic>
 #include <map>
 #include <thread>
 #include <sstream>

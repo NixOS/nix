@@ -1,7 +1,6 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/file-system.hh"

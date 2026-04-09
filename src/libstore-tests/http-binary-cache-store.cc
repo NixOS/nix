@@ -3,7 +3,6 @@
 
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/tests/https-store.hh"
-#include "nix/util/fs-sink.hh"
 
 namespace nix {
 

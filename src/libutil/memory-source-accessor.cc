@@ -1,5 +1,4 @@
 #include "nix/util/memory-source-accessor.hh"
-#include "nix/util/json-utils.hh"
 
 #include <ranges>
 

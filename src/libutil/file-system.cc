@@ -1,4 +1,3 @@
-#include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/file-path-impl.hh"

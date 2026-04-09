@@ -1,6 +1,4 @@
 #include <cerrno>
-#include <algorithm>
-#include <vector>
 #include <map>
 
 #include <strings.h> // for strcasecmp

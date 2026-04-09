@@ -4,7 +4,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
 

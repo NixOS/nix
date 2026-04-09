@@ -1,14 +1,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/finally.hh"
-#include "nix/util/serialise.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <span>
 
-#include "util-config-private.hh"
 #include "util-unix-config-private.hh"
 
 namespace nix {

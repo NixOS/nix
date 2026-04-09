@@ -10,7 +10,6 @@
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 
-#include <iostream>
 #include <cerrno>
 
 using namespace nix;

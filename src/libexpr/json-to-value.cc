@@ -3,7 +3,6 @@
 #include "nix/expr/eval.hh"
 
 #include <limits>
-#include <variant>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;

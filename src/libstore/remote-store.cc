@@ -13,7 +13,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/util/pool.hh"
 #include "nix/util/finally.hh"
-#include "nix/util/git.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/filetransfer.hh"

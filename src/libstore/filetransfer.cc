@@ -2,13 +2,11 @@
 #include "nix/store/filetransfer-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
-#include "store-config-private.hh"
 #include "nix/store/s3-url.hh"
 #include <optional>
 #if NIX_WITH_AWS_AUTH

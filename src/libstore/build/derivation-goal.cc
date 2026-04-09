@@ -2,28 +2,17 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
-#ifndef _WIN32 // TODO enable build hook on Windows
-#  include "nix/store/build/hook-instance.hh"
-#  include "nix/store/build/derivation-builder.hh"
-#endif
-#include "nix/util/processes.hh"
-#include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
-#include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
 #include "nix/store/outputs-query.hh"
-#include "nix/store/globals.hh"
 
-#include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
-
-#include "nix/util/strings.hh"
 
 namespace nix {
 

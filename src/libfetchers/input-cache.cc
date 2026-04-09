@@ -1,7 +1,6 @@
 #include "nix/fetchers/input-cache.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
-#include "nix/util/source-path.hh"
 
 namespace nix::fetchers {
 

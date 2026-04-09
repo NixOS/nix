@@ -1,6 +1,5 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/fetchers/cache.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/url-parts.hh"
@@ -13,7 +12,6 @@
 
 #include <optional>
 #include <nlohmann/json.hpp>
-#include <fstream>
 
 namespace nix::fetchers {
 

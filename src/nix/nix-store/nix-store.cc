@@ -35,7 +35,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "nix/store/build-result.hh"
 #include "nix/util/exit.hh"
 #include "nix/store/serve-protocol-impl.hh"
 

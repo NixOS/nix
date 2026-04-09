@@ -1,7 +1,6 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/value.hh"
-#include "nix/store/store-api.hh"
 
 namespace nix {
 

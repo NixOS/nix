@@ -1,5 +1,5 @@
 #include "nix/store/local-store.hh"
-#include "nix/store/globals.hh"
+#include "nix/store/local-settings.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
@@ -11,8 +11,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
-#include <stdio.h>
-#include <regex>
 
 #include "store-config-private.hh"
 

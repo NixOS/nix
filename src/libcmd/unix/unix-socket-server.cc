@@ -5,7 +5,6 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/strings.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
 
