@@ -5,8 +5,6 @@
 
 #include "nix/util/os-string.hh"
 
-#ifdef _WIN32
-
 namespace nix {
 
 std::string os_string_to_string(OsStringView s)
@@ -32,5 +30,3 @@ OsString string_to_os_string(std::string s)
 }
 
 } // namespace nix
-
-#endif

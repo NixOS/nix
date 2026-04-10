@@ -5,10 +5,9 @@
 #include "nix/util/util.hh"
 #include "nix/util/windows-environment.hh"
 
-#ifdef _WIN32
-#  include <errhandlingapi.h>
-#  include <fileapi.h>
-#  include <windows.h>
+#include <errhandlingapi.h>
+#include <fileapi.h>
+#include <windows.h>
 
 namespace nix {
 
@@ -167,4 +166,3 @@ FdLock::FdLock(Descriptor desc, LockType lockType, bool wait, std::string_view w
 }
 
 } // namespace nix
-#endif

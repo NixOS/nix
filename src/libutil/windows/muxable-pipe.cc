@@ -1,9 +1,8 @@
-#ifdef _WIN32
-#  include <ioapiset.h>
+#include <ioapiset.h>
 
-#  include "nix/util/logging.hh"
-#  include "nix/util/util.hh"
-#  include "nix/util/muxable-pipe.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
+#include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 
@@ -70,4 +69,3 @@ void MuxablePipePollState::iterate(
 }
 
 } // namespace nix
-#endif
