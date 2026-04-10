@@ -141,6 +141,11 @@ stdenv.mkDerivation (finalAttrs: {
     nix-functional-tests
   ]
   ++
+    lib.optionals (stdenv.hostPlatform.isLinux && stdenv.buildPlatform.canExecute stdenv.hostPlatform)
+      [
+        nix-util-tests.tests.run-without-new-syscalls
+      ]
+  ++
     lib.optionals (!stdenv.hostPlatform.isStatic && stdenv.buildPlatform.canExecute stdenv.hostPlatform)
       [
         # Perl currently fails in static build

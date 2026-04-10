@@ -126,3 +126,27 @@ test(
   },
   protocol : 'gtest',
 )
+
+# Run the same tests again under `enosys -d openat2` to exercise the
+# iterative (non-openat2) fallback path on Linux.  `enosys` uses
+# seccomp to make `openat2` return `ENOSYS`, which the wrapper in
+# file-system-at.cc caches and falls back to the iterative impl.
+if host_machine.system() == 'linux'
+  enosys = find_program('enosys', required : false)
+  if enosys.found()
+    test(
+      meson.project_name() + '-without-new-syscalls',
+      enosys,
+      args : [
+        '--syscall', 'openat2',
+        '--syscall', 'fchmodat2',
+        '--',
+        this_exe,
+      ],
+      env : {
+        '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+      },
+      protocol : 'gtest',
+    )
+  endif
+endif
