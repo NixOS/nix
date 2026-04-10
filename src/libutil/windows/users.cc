@@ -3,9 +3,8 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
 
-#ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace nix {
 
@@ -50,4 +49,3 @@ bool isRootUser()
 }
 
 } // namespace nix
-#endif

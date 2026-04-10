@@ -29,7 +29,7 @@ namespace nix {
 
 namespace linux {
 
-std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve)
+std::optional<AutoCloseFD> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve)
 {
 #  if HAVE_OPENAT2
     /* Cache the result of whether openat2 is not supported. */
@@ -47,7 +47,7 @@ std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t 
             return std::nullopt;
         }
 
-        return res;
+        return AutoCloseFD{static_cast<Descriptor>(res)};
     }
 #  endif
     return std::nullopt;
@@ -202,9 +202,9 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & 
     auto maybeFd = linux::openat2(
         dirFd, path.rel_c_str(), flags, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS);
     if (maybeFd) {
-        if (*maybeFd < 0 && errno == ELOOP)
+        if (!*maybeFd && errno == ELOOP)
             throw SymlinkNotAllowed(path);
-        return AutoCloseFD{*maybeFd};
+        return std::move(*maybeFd);
     }
 #endif
     return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);

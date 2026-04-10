@@ -120,7 +120,8 @@ namespace linux {
  *
  * @return nullopt if openat2 is not supported by the kernel.
  */
-std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
+std::optional<AutoCloseFD>
+openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
 
 } // namespace linux
 #endif
