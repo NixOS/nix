@@ -352,6 +352,10 @@ struct DarwinDerivationBuilder : DerivationBuilder, DerivationBuilderParams, Bui
                     struct rlimit limit = {0, RLIM_INFINITY};
                     setrlimit(RLIMIT_CORE, &limit);
 
+                    /* Make sure the builder inherits a predictable umask. It must not be group-writable, since
+                     * registerOutputs rejects those as defense-in-depth. */
+                    umask(0022);
+
                     // FIXME: set other limits to deterministic values?
 
                     /* Drop privileges to the build user and apply Darwin sandbox profile */

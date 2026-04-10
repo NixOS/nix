@@ -180,6 +180,10 @@ struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams
                     struct rlimit limit = {0, RLIM_INFINITY};
                     setrlimit(RLIMIT_CORE, &limit);
 
+                    /* Make sure the builder inherits a predictable umask. It must not be group-writable, since
+                     * registerOutputs rejects those as defense-in-depth. */
+                    umask(0022);
+
                     if (buildUser)
                         nix::dropPrivileges(*buildUser);
 
