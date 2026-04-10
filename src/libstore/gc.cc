@@ -17,6 +17,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/unordered/unordered_flat_set.hpp>
 #include <boost/regex.hpp>
+#include <atomic>
 #include <queue>
 #include <thread>
 #include <errno.h>
@@ -515,7 +516,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* Find the roots.  Since we've grabbed the GC lock, the set of
        permanent roots cannot increase now. */
-    printInfo("finding garbage collector roots...");
+    Activity act(*logger, lvlInfo, actGarbageCollect, "finding garbage collector roots...");
     Roots rootMap;
     if (!options.ignoreLiveness)
         findRootsNoTemp(rootMap, true);
@@ -711,25 +712,52 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     } else if (options.maxFreed > 0) {
 
         if (shouldDelete)
-            printInfo("deleting garbage...");
+            act.result(resSetPhase, "deleting garbage");
         else
-            printInfo("determining live/dead paths...");
+            act.result(resSetPhase, "determining live/dead paths");
 
         try {
             AutoCloseDir dir(opendir(config->realStoreDir.get().string().c_str()));
             if (!dir)
                 throw SysError("opening directory %1%", PathFmt(config->realStoreDir.get()));
 
+            auto linksName = linksDir.filename();
+
+            /* Count store entries in a separate thread to provide a
+               progress denominator without blocking GC startup. The
+               counter gets a dup'd DIR handle and atomically publishes
+               the running total so the main loop can report progress
+               as it scans. */
+            std::atomic<uint64_t> storePathCount{0};
+            AutoCloseDir countDir(opendir(config->realStoreDir.get().string().c_str()));
+            std::thread counterThread([&]() {
+                if (!countDir)
+                    return;
+                struct dirent * de;
+                while (errno = 0, de = readdir(countDir.get())) {
+                    std::string_view name = de->d_name;
+                    if (name == "." || name == ".." || name == linksName)
+                        continue;
+                    storePathCount.fetch_add(1, std::memory_order_relaxed);
+                }
+            });
+            Finally joinCounter([&]() {
+                if (counterThread.joinable())
+                    counterThread.join();
+            });
+
             /* Read the store and delete all paths that are invalid or
                unreachable. We don't use readDirectory() here so that
                GCing can start faster. */
-            auto linksName = linksDir.filename();
+            uint64_t storePathsScanned = 0;
             struct dirent * dirent;
             while (errno = 0, dirent = readdir(dir.get())) {
                 checkInterrupt();
                 std::string name = dirent->d_name;
                 if (name == "." || name == ".." || name == linksName)
                     continue;
+
+                act.progress(++storePathsScanned, storePathCount.load(std::memory_order_relaxed));
 
                 if (auto storePath = maybeParseStorePath(storeDir + "/" + name))
                     deleteReferrersClosure(*storePath);
@@ -758,7 +786,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
        might see a link count of 1 just before optimisePath() increases
        the link count. */
     if (options.action == GCOptions::gcDeleteDead || options.action == GCOptions::gcDeleteSpecific) {
-        printInfo("deleting unused links...");
+        act.result(resSetPhase, "deleting unused links");
 
         AutoCloseDir dir(opendir(linksDir.string().c_str()));
         if (!dir)
@@ -806,6 +834,10 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
     /* While we're at it, vacuum the database. */
     // if (options.action == GCOptions::gcDeleteDead) vacuumDB();
+
+    /* Clear progress so stopActivity doesn't leave a stale count
+       in the progress bar after the summary prints. */
+    act.progress(0, 0);
 }
 
 void LocalStore::autoGC(bool sync)
