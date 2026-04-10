@@ -1,8 +1,6 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/util/config-global.hh"
-#include "nix/store/globals.hh"
-#include "nix/store/store-open.hh"
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-value.hh"
 #include "nix/cmd/repl.hh"

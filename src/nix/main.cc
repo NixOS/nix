@@ -22,7 +22,6 @@
 #include "nix/expr/eval-cache.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/settings.hh"
-#include "nix/util/json-utils.hh"
 
 #include "self-exe.hh"
 #include "crash-handler.hh"

@@ -24,8 +24,6 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-#include "nix/util/strings.hh"
-
 #ifdef _WIN32
 #  include "nix/util/windows-known-folders.hh"
 #endif

@@ -10,7 +10,6 @@
 #include <gtest/gtest.h>
 #include "nix/util/fs-sink.hh"
 #include "nix/util/serialise.hh"
-#include "nix/fetchers/git-lfs-fetch.hh"
 
 #include <git2/blob.h>
 #include <git2/tree.h>

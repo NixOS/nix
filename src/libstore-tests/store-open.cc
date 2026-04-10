@@ -3,7 +3,6 @@
 #include "nix/store/store-open.hh"
 #include "nix/store/store-reference.hh"
 #include "nix/store/local-store.hh"
-#include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"

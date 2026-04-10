@@ -3,7 +3,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/local-fs-store.hh"
-#include "nix/store/globals.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-inline.hh"
@@ -11,7 +10,6 @@
 #include "nix/expr/print-ambiguous.hh"
 #include "nix/expr/static-string-data.hh"
 
-#include <limits>
 #include <sstream>
 
 namespace nix {

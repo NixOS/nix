@@ -3,7 +3,6 @@
 #include "nix/util/memory-source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/sync.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 

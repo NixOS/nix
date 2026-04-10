@@ -5,7 +5,6 @@
 #include "nix/store/nar-info.hh"
 
 #include <algorithm>
-#include <array>
 
 #include <nlohmann/json.hpp>
 

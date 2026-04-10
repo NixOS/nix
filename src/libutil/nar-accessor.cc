@@ -1,7 +1,6 @@
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/error.hh"
-#include "nix/util/signals.hh"
 
 namespace nix {
 

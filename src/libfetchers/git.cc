@@ -1,25 +1,20 @@
+#include "nix/util/environment-variables.hh"
 #include "nix/util/error.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/url-parts.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/git.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/util/logging.hh"
-#include "nix/util/finally.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/mounted-source-accessor.hh"
 
-#include <regex>
-#include <string.h>
 #include <sys/time.h>
 
 #ifndef _WIN32

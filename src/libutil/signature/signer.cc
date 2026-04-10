@@ -1,5 +1,4 @@
 #include "nix/util/signature/signer.hh"
-#include "nix/util/error.hh"
 
 #include <sodium.h>
 

@@ -5,7 +5,6 @@
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/util/error.hh"
-#include "nix/util/logging.hh"
 
 using namespace nix;
 

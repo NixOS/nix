@@ -5,7 +5,6 @@
 #include "nix/util/os-string.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/processes.hh"
-#include "nix/util/url.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-registration.hh"
 

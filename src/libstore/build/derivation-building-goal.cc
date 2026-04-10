@@ -18,7 +18,6 @@
 #include "nix/store/globals.hh"
 
 #include <algorithm>
-#include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>

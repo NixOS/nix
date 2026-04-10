@@ -1,12 +1,9 @@
 #include "nix/util/util.hh"
 #include "nix/util/fmt.hh"
-#include "nix/util/file-path.hh"
 #include "nix/util/signals.hh"
 
 #include <array>
 #include <cctype>
-#include <iostream>
-#include <regex>
 
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>

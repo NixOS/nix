@@ -1,4 +1,3 @@
-#include "gmock/gmock.h"
 #include <gtest/gtest.h>
 
 #include "nix_api_fetchers.h"

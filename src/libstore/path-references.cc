@@ -1,5 +1,4 @@
 #include "nix/store/path-references.hh"
-#include "nix/util/hash.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/canon-path.hh"
@@ -7,9 +6,6 @@
 
 #include <map>
 #include <cstdlib>
-#include <mutex>
-#include <algorithm>
-#include <functional>
 
 namespace nix {
 

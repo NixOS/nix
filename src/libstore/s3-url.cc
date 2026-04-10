@@ -4,7 +4,6 @@
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/json-impls.hh"
-#include "nix/util/split.hh"
 #include "nix/util/strings-inline.hh"
 
 #include <atomic>

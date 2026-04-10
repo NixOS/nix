@@ -7,6 +7,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/nar-accessor.hh"
 
 #include "nix/util/tests/characterization.hh"
 

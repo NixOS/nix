@@ -1,7 +1,5 @@
 #include <cerrno>
 #include <algorithm>
-#include <vector>
-#include <map>
 #include <regex>
 #include <strings.h> // for strcasecmp
 

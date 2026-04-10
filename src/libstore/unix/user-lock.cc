@@ -3,8 +3,8 @@
 #include <grp.h>
 
 #include "nix/store/user-lock.hh"
+#include "nix/store/local-settings.hh"
 #include "nix/util/file-system.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"

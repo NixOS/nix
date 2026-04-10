@@ -1,6 +1,6 @@
-#include <regex>
-
-#include <exception> // Needed by rapidcheck on Darwin
+#ifdef __APPLE__
+#  include <exception> // Needed by rapidcheck on Darwin
+#endif
 #include <rapidcheck.h>
 
 #include "nix/util/hash.hh"

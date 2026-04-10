@@ -2,7 +2,6 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/local-fs-store.hh"
 
 #include <nlohmann/json.hpp>
 

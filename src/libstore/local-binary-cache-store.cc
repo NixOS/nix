@@ -1,6 +1,5 @@
 #include "nix/store/local-binary-cache-store.hh"
-#include "nix/store/globals.hh"
-#include "nix/store/nar-info-disk-cache.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-registration.hh"
 

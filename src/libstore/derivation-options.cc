@@ -6,7 +6,6 @@
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
-#include "nix/util/variant-wrapper.hh"
 
 #include <optional>
 #include <string>

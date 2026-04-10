@@ -1,10 +1,8 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-dir-config.hh"
 #include "nix/util/comparator.hh"
 #include "nix/util/json-utils.hh"
-
-#include <optional>
 
 namespace nix {
 

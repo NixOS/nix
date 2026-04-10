@@ -1,4 +1,4 @@
-#include "nix/util/util.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 

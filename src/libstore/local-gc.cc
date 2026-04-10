@@ -2,7 +2,6 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/types.hh"
 #include "nix/store/local-gc.hh"
 #include <filesystem>
 #include <boost/regex.hpp>

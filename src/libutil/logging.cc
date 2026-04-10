@@ -4,7 +4,6 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/util.hh"
 #include "nix/util/config-global.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/position.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/unix-domain-socket.hh"
@@ -12,7 +11,6 @@
 #include <atomic>
 #include <sstream>
 #include <nlohmann/json.hpp>
-#include <iostream>
 
 namespace nix {
 

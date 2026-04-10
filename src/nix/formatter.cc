@@ -2,8 +2,6 @@
 #include "nix/cmd/installable-flake.hh"
 #include "nix/cmd/installable-value.hh"
 #include "nix/expr/eval.hh"
-#include "nix/store/local-fs-store.hh"
-#include "nix/cmd/installable-derived-path.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/store/globals.hh"
 

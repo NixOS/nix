@@ -10,7 +10,6 @@
 #include <cinttypes>
 #include <iostream>
 #include <optional>
-#include "nix/util/serialise.hh"
 #include <sstream>
 
 namespace nix {

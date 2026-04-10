@@ -1,14 +1,11 @@
 #include <gtest/gtest.h>
-#include <optional>
 
-#include "nix/util/experimental-features.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/types.hh"
-#include "nix/util/json-utils.hh"
 
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"

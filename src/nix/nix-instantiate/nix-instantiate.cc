@@ -5,7 +5,6 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/expr/attr-path.hh"
-#include "nix/util/signals.hh"
 #include "nix/expr/value-to-xml.hh"
 #include "nix/expr/value-to-json.hh"
 #include "nix/store/store-open.hh"
@@ -14,7 +13,6 @@
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 
-#include <map>
 #include <iostream>
 
 using namespace nix;

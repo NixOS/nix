@@ -5,7 +5,6 @@
 #include "nix/store/path-with-outputs.hh"
 
 #include <cstring>
-#include <regex>
 
 namespace nix {
 

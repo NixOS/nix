@@ -1,12 +1,8 @@
 #include <stdint.h>
-#include <functional>
 #include <map>
 #include <optional>
-#include <set>
 #include <string>
-#include <utility>
 #include <variant>
-#include <vector>
 
 #include "nix/flake/flake-primops.hh"
 #include "nix/expr/eval.hh"
@@ -21,12 +17,10 @@
 #include "nix/expr/value.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
-#include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/util/pos-table.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 

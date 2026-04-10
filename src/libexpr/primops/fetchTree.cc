@@ -16,7 +16,6 @@
 
 #include <ctime>
 #include <iomanip>
-#include <regex>
 
 namespace nix {
 

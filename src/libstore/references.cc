@@ -3,9 +3,7 @@
 #include "nix/util/hash.hh"
 #include "nix/util/base-nix-32.hh"
 
-#include <map>
 #include <cstdlib>
-#include <mutex>
 #include <algorithm>
 
 namespace nix {

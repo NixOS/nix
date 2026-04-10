@@ -7,8 +7,6 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/cache.hh"
-#include "nix/store/globals.hh"
-#include "nix/util/tarfile.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/url-parts.hh"
 #include "nix/fetchers/fetch-settings.hh"

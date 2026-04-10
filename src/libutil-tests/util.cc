@@ -1,14 +1,8 @@
 #include "nix/util/util.hh"
 #include "nix/util/types.hh"
-#include "nix/util/file-system.hh"
-#include "nix/util/terminal.hh"
-#include "nix/util/strings.hh"
-#include "nix/util/base-n.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
-
-#include <numeric>
 
 namespace nix {
 

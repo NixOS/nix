@@ -1,4 +1,3 @@
-#include "nix/util/util.hh"
 #include "nix/util/environment-variables.hh"
 
 namespace nix {

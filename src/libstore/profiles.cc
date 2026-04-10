@@ -1,15 +1,12 @@
 #include "nix/store/profiles.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <errno.h>
-#include <stdio.h>
 
 namespace nix {
 

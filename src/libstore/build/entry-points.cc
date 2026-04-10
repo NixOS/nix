@@ -2,7 +2,6 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
-#include "nix/store/local-store.hh"
 #include "nix/util/strings.hh"
 
 namespace nix {

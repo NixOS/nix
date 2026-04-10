@@ -1,25 +1,22 @@
 ///@file
 
 #include "nix/util/signals.hh"
-#include "nix/util/unix-domain-socket.hh"
 #include "nix/cmd/command.hh"
 #include "nix/main/shared.hh"
-#include "nix/store/local-fs-store.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/serialise.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/derivations.hh"
-#include "nix/util/finally.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/unix-socket-server.hh"
 #include "nix/store/daemon.hh"
 #include "man-pages.hh"
+#include "nix/util/socket.hh"
 
 #include <algorithm>
 #include <climits>

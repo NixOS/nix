@@ -1,7 +1,7 @@
-#include "nix/util/util.hh"
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/logging.hh"
 
 #include <pwd.h>
 #include <sys/types.h>

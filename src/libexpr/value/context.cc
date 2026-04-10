@@ -2,8 +2,6 @@
 #include "nix/expr/value/context.hh"
 #include "nix/store/store-dir-config.hh"
 
-#include <optional>
-
 namespace nix {
 
 NixStringContextElem NixStringContextElem::parse(std::string_view s0, const ExperimentalFeatureSettings & xpSettings)

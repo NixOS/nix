@@ -1,14 +1,12 @@
 #include "nix/util/current-process.hh"
 #include "run.hh"
 #include "nix/cmd/command-installable-value.hh"
-#include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/finally.hh"
-#include "nix/util/source-accessor.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/util.hh"
 #include "nix/store/globals.hh"
@@ -19,8 +17,6 @@
 #  include <sys/mount.h>
 #  include "nix/store/personality.hh"
 #endif
-
-#include <queue>
 
 extern char ** environ __attribute__((weak));
 

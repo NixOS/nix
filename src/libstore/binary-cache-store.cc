@@ -3,11 +3,10 @@
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/source-accessor.hh"
-#include "nix/store/globals.hh"
+#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/util/sync.hh"
 #include "nix/store/remote-fs-accessor.hh"
-#include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/nar-accessor.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/callback.hh"
@@ -17,7 +16,6 @@
 #include <chrono>
 #include <future>
 #include <regex>
-#include <fstream>
 #include <sstream>
 
 #include <nlohmann/json.hpp>

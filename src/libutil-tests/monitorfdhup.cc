@@ -1,7 +1,6 @@
 // TODO: investigate why this is hanging on cygwin
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 
-#  include "nix/util/util.hh"
 #  include "nix/util/monitor-fd.hh"
 
 #  include <sys/file.h>

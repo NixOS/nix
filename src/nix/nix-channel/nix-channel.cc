@@ -9,7 +9,6 @@
 #include "nix/util/os-string.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
-#include "nix/fetchers/fetch-settings.hh"
 #include "self-exe.hh"
 #include "man-pages.hh"
 

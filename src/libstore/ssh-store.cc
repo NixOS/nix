@@ -2,7 +2,6 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/remote-store-connection.hh"
 #include "nix/util/source-accessor.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
