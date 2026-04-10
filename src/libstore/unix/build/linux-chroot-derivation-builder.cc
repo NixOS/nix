@@ -153,8 +153,8 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
         }));
 
         int status = child.wait();
-        if (status != 0)
-            throw Error("could not add path '%s' to sandbox", store.printStorePath(path));
+        if (!statusOk(status))
+            throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
     }
 
     void killSandbox(bool getStats)
@@ -691,10 +691,10 @@ struct LinuxChrootDerivationBuilder : DerivationBuilder, DerivationBuilderParams
 
             sendPid.writeSide.close();
 
-            if (helper.wait() != 0) {
+            if (auto status = helper.wait(); !statusOk(status)) {
                 nix::processSandboxSetupMessages(builderOut, pid, store, drvPath);
                 // Only reached if the child process didn't send an exception.
-                throw Error("unable to start build process");
+                throw Error("unable to start build process: %s", statusToString(status));
             }
 
             userNamespaceSync.readSide = -1;
