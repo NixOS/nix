@@ -31,7 +31,9 @@ mkMesonDerivation (finalAttrs: {
       # Source is not compiled, but still must be available for Doxygen
       # to gather comments.
       (cpp ../libexpr-c)
+      (cpp ../libfetchers-c)
       (cpp ../libflake-c)
+      (cpp ../libmain-c)
       (cpp ../libstore-c)
       (cpp ../libutil-c)
     ];
