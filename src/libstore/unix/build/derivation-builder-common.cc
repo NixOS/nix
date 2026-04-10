@@ -1,5 +1,7 @@
 #include "derivation-builder-common.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/canon-path.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/logging.hh"
@@ -661,9 +663,13 @@ void writeBuilderFile(
     const std::string & name,
     std::string_view contents)
 {
-    auto path = std::filesystem::path(tmpDir) / name;
-    AutoCloseFD fd{
-        openat(tmpDirFd, name.c_str(), O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL | O_NOFOLLOW, 0666)};
+    /* Path must be the same after normalisation. This is an additional sanity check in addition to
+       existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
+       a single path component without any `..`, `.` components. */
+    auto relPath = CanonPath::fromFilename(name);
+    AutoCloseFD fd =
+        openFileEnsureBeneathNoSymlinks(tmpDirFd, relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
+    auto path = tmpDir / relPath.rel(); /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
     writeFile(fd.get(), contents);
