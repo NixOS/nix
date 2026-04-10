@@ -11,10 +11,19 @@
 #include "nix/store/globals.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/personality.hh"
+#include "store-config-private.hh"
 
+#include <cstdint>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/resource.h>
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+#include <cstdint>
+
+#if HAVE_LANDLOCK
+#  include <linux/landlock.h>
+#endif
 
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
@@ -22,9 +31,9 @@
 
 namespace nix {
 
-#  if HAVE_LANDLOCK && defined(LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET)
+#if HAVE_LANDLOCK && defined(LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET)
 
-#    define DO_LANDLOCK 1
+#  define DO_LANDLOCK 1
 
 /* We are using LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET on best-effort basis. There are no glibc wrappers for now. */
 
@@ -87,11 +96,11 @@ static void setupLandlock()
     debug("applied landlock sandboxing");
 }
 
-#  else
+#else
 
-#    define DO_LANDLOCK 0
+#  define DO_LANDLOCK 0
 
-#  endif
+#endif
 
 struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
 {
@@ -254,7 +263,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams, Buil
 
                     setupSeccomp(localSettings);
 
-#  if DO_LANDLOCK
+#if DO_LANDLOCK
                     try {
                         setupLandlock();
                     } catch (SysError & e) {
@@ -264,7 +273,7 @@ struct LinuxDerivationBuilder : DerivationBuilder, DerivationBuilderParams, Buil
                            this code path might be hit. */
                         warn("setting up landlock: %s", e.message());
                     }
-#  endif
+#endif
 
                     linux::setPersonality({
                         .system = drv.platform,
@@ -329,6 +338,4 @@ DerivationBuilderUnique makeLinuxDerivationBuilder(
 
 } // namespace nix
 
-#  undef DO_LANDLOCK
-
-#endif
+#undef DO_LANDLOCK
