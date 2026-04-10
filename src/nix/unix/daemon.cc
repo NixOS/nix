@@ -38,8 +38,7 @@
 #  include "nix/util/cgroup.hh"
 #endif
 
-using namespace nix;
-using namespace nix::daemon;
+namespace nix {
 
 /**
  * Settings related to authenticating clients for the Nix daemon.
@@ -106,12 +105,12 @@ static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size
 {
     // We ignore most parameters, we just have them for conformance with the linux syscall
     std::vector<char> buf(8192);
-    auto read_count = read(fd_in, buf.data(), buf.size());
+    auto read_count = ::read(fd_in, buf.data(), buf.size());
     if (read_count == -1)
         return read_count;
     auto write_count = decltype(read_count)(0);
     while (write_count < read_count) {
-        auto res = write(fd_out, buf.data() + write_count, read_count - write_count);
+        auto res = ::write(fd_out, buf.data() + write_count, read_count - write_count);
         if (res == -1)
             return res;
         write_count += res;
@@ -250,6 +249,8 @@ static void daemonLoop(
     std::optional<TrustedFlag> forceTrustClientOpt,
     std::filesystem::path socketPath)
 {
+    using namespace nix::daemon;
+
     if (chdir("/") == -1)
         throw SysError("cannot change current directory");
 
@@ -404,7 +405,7 @@ static void forwardStdioConnection(RemoteStore & store)
  */
 static void processStdioConnection(ref<Store> store, TrustedFlag trustClient)
 {
-    processConnection(store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, NotRecursive);
+    processConnection(store, FdSource(STDIN_FILENO), FdSink(STDOUT_FILENO), trustClient, daemon::NotRecursive);
 }
 
 /**
@@ -622,3 +623,5 @@ struct CmdDaemon : StoreConfigCommand
 };
 
 static auto rCmdDaemon = registerCommand2<CmdDaemon>({"daemon"});
+
+} // namespace nix

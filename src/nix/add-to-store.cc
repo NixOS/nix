@@ -4,7 +4,7 @@
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdAddToStore : MixDryRun, StoreCommand
 {
@@ -84,3 +84,5 @@ struct CmdAddPath : CmdAddToStore
 static auto rCmdAddFile = registerCommand2<CmdAddFile>({"store", "add-file"});
 static auto rCmdAddPath = registerCommand2<CmdAddPath>({"store", "add-path"});
 static auto rCmdAdd = registerCommand2<CmdAdd>({"store", "add"});
+
+} // namespace nix

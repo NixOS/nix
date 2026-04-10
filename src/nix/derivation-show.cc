@@ -7,8 +7,9 @@
 #include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
 
-using namespace nix;
 using json = nlohmann::json;
+
+namespace nix {
 
 struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 {
@@ -68,3 +69,5 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 };
 
 static auto rCmdShowDerivation = registerCommand2<CmdShowDerivation>({"derivation", "show"});
+
+} // namespace nix

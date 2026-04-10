@@ -4,7 +4,7 @@
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdStoreDelete : StorePathsCommand
 {
@@ -45,3 +45,5 @@ struct CmdStoreDelete : StorePathsCommand
 };
 
 static auto rCmdStoreDelete = registerCommand2<CmdStoreDelete>({"store", "delete"});
+
+} // namespace nix

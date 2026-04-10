@@ -8,6 +8,7 @@
 #include "nix/util/tests/hash.hh"
 
 namespace rc {
+
 using namespace nix;
 
 Gen<Hash> Arbitrary<Hash>::arbitrary()

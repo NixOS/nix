@@ -4,7 +4,7 @@
 #include "nix/store/store-cast.hh"
 #include "nix/store/log-store.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 {
@@ -37,3 +37,5 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 };
 
 static auto rCmdCopyLog = registerCommand2<CmdCopyLog>({"store", "copy-log"});
+
+} // namespace nix

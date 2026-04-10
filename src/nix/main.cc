@@ -41,15 +41,15 @@
 #  include "nix/util/linux-namespaces.hh"
 #endif
 
+#include "nix/util/strings.hh"
+
+namespace nix {
+
 #ifndef _WIN32
 extern std::string chrootHelperName;
 
 void chrootHelper(int argc, char ** argv);
 #endif
-
-#include "nix/util/strings.hh"
-
-namespace nix {
 
 /* Check if we have a non-loopback/link-local network interface. */
 static bool haveInternet()

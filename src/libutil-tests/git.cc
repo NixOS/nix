@@ -7,8 +7,6 @@
 
 namespace nix {
 
-using namespace git;
-
 class GitTest : public CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "git";
@@ -36,6 +34,7 @@ private:
 
 TEST(GitMode, gitMode_directory)
 {
+    using namespace git;
     Mode m = Mode::Directory;
     RawMode r = 0040000;
     ASSERT_EQ(static_cast<RawMode>(m), r);
@@ -44,6 +43,7 @@ TEST(GitMode, gitMode_directory)
 
 TEST(GitMode, gitMode_executable)
 {
+    using namespace git;
     Mode m = Mode::Executable;
     RawMode r = 0100755;
     ASSERT_EQ(static_cast<RawMode>(m), r);
@@ -52,6 +52,7 @@ TEST(GitMode, gitMode_executable)
 
 TEST(GitMode, gitMode_regular)
 {
+    using namespace git;
     Mode m = Mode::Regular;
     RawMode r = 0100644;
     ASSERT_EQ(static_cast<RawMode>(m), r);
@@ -60,6 +61,7 @@ TEST(GitMode, gitMode_regular)
 
 TEST(GitMode, gitMode_symlink)
 {
+    using namespace git;
     Mode m = Mode::Symlink;
     RawMode r = 0120000;
     ASSERT_EQ(static_cast<RawMode>(m), r);
@@ -68,6 +70,7 @@ TEST(GitMode, gitMode_symlink)
 
 TEST_F(GitTest, blob_read)
 {
+    using namespace git;
     readTest("hello-world-blob.bin", [&](const auto & encoded) {
         StringSource in{encoded};
         StringSink out;
@@ -83,6 +86,7 @@ TEST_F(GitTest, blob_read)
 
 TEST_F(GitTest, blob_write)
 {
+    using namespace git;
     writeTest("hello-world-blob.bin", [&]() {
         auto decoded = readFile(goldenMaster("hello-world.bin"));
         StringSink s;
@@ -97,11 +101,11 @@ TEST_F(GitTest, blob_write)
  * so that we can check our test data in a small shell script test test
  * (`src/libutil-tests/data/git/check-data.sh`).
  */
-const static Tree treeSha1 = {
+const static git::Tree treeSha1 = {
     {
         "Foo",
         {
-            .mode = Mode::Regular,
+            .mode = git::Mode::Regular,
             // hello world with special chars from above
             .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
         },
@@ -109,7 +113,7 @@ const static Tree treeSha1 = {
     {
         "bAr",
         {
-            .mode = Mode::Executable,
+            .mode = git::Mode::Executable,
             // ditto
             .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
         },
@@ -117,7 +121,7 @@ const static Tree treeSha1 = {
     {
         "baZ/",
         {
-            .mode = Mode::Directory,
+            .mode = git::Mode::Directory,
             // Empty directory hash
             .hash = Hash::parseAny("4b825dc642cb6eb9a060e54bf8d69288fbee4904", HashAlgorithm::SHA1),
         },
@@ -125,7 +129,7 @@ const static Tree treeSha1 = {
     {
         "quuX",
         {
-            .mode = Mode::Symlink,
+            .mode = git::Mode::Symlink,
             // hello world with special chars from above (symlink target
             // can be anything)
             .hash = Hash::parseAny("63ddb340119baf8492d2da53af47e8c7cfcd5eb2", HashAlgorithm::SHA1),
@@ -137,11 +141,11 @@ const static Tree treeSha1 = {
  * Same conceptual object as `treeSha1`, just different hash algorithm.
  * See that one for details.
  */
-const static Tree treeSha256 = {
+const static git::Tree treeSha256 = {
     {
         "Foo",
         {
-            .mode = Mode::Regular,
+            .mode = git::Mode::Regular,
             .hash = Hash::parseAny(
                 "ce60f5ad78a08ac24872ef74d78b078f077be212e7a246893a1a5d957dfbc8b1", HashAlgorithm::SHA256),
         },
@@ -149,7 +153,7 @@ const static Tree treeSha256 = {
     {
         "bAr",
         {
-            .mode = Mode::Executable,
+            .mode = git::Mode::Executable,
             .hash = Hash::parseAny(
                 "ce60f5ad78a08ac24872ef74d78b078f077be212e7a246893a1a5d957dfbc8b1", HashAlgorithm::SHA256),
         },
@@ -157,7 +161,7 @@ const static Tree treeSha256 = {
     {
         "baZ/",
         {
-            .mode = Mode::Directory,
+            .mode = git::Mode::Directory,
             .hash = Hash::parseAny(
                 "6ef19b41225c5369f1c104d45d8d85efa9b057b53b14b4b9b939dd74decc5321", HashAlgorithm::SHA256),
         },
@@ -165,15 +169,16 @@ const static Tree treeSha256 = {
     {
         "quuX",
         {
-            .mode = Mode::Symlink,
+            .mode = git::Mode::Symlink,
             .hash = Hash::parseAny(
                 "ce60f5ad78a08ac24872ef74d78b078f077be212e7a246893a1a5d957dfbc8b1", HashAlgorithm::SHA256),
         },
     },
 };
 
-static auto mkTreeReadTest(HashAlgorithm hashAlgo, Tree tree, const ExperimentalFeatureSettings & mockXpSettings)
+static auto mkTreeReadTest(HashAlgorithm hashAlgo, git::Tree tree, const ExperimentalFeatureSettings & mockXpSettings)
 {
+    using namespace git;
     return [hashAlgo, tree, mockXpSettings](const auto & encoded) {
         StringSource in{encoded};
         NullFileSystemObjectSink out;
@@ -208,6 +213,7 @@ TEST_F(GitTest, tree_sha256_read)
 
 TEST_F(GitTest, tree_sha1_write)
 {
+    using namespace git;
     writeTest("tree-sha1.bin", [&]() {
         StringSink s;
         dumpTree(treeSha1, s, mockXpSettings);
@@ -217,6 +223,7 @@ TEST_F(GitTest, tree_sha1_write)
 
 TEST_F(GitTest, tree_sha256_write)
 {
+    using namespace git;
     writeTest("tree-sha256.bin", [&]() {
         StringSink s;
         dumpTree(treeSha256, s, mockXpSettings);
@@ -232,6 +239,7 @@ extern ref<MemorySourceAccessor> exampleComplex();
 
 TEST_F(GitTest, both_roundrip)
 {
+    using namespace git;
     auto files = memory_source_accessor::exampleComplex();
 
     for (const auto hashAlgo : {HashAlgorithm::SHA1, HashAlgorithm::SHA256}) {
@@ -285,6 +293,7 @@ TEST_F(GitTest, both_roundrip)
 
 TEST(GitLsRemote, parseSymrefLineWithReference)
 {
+    using namespace git;
     auto line = "ref: refs/head/main	HEAD";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());
@@ -295,6 +304,7 @@ TEST(GitLsRemote, parseSymrefLineWithReference)
 
 TEST(GitLsRemote, parseSymrefLineWithNoReference)
 {
+    using namespace git;
     auto line = "ref: refs/head/main";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());
@@ -305,6 +315,7 @@ TEST(GitLsRemote, parseSymrefLineWithNoReference)
 
 TEST(GitLsRemote, parseObjectRefLine)
 {
+    using namespace git;
     auto line = "abc123	refs/head/main";
     auto res = parseLsRemoteLine(line);
     ASSERT_TRUE(res.has_value());

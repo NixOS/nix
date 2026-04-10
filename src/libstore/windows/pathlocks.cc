@@ -11,8 +11,6 @@
 
 namespace nix {
 
-using namespace nix::windows;
-
 void deleteLockFile(const std::filesystem::path & path, Descriptor desc)
 {
 
@@ -59,6 +57,7 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 template<typename... Args>
 static bool warnOrThrowWine(DWORD lastError, const std::string & fs, const Args &... args)
 {
+    using namespace nix::windows;
     if (isWine()) {
         warn(fs + ": %s (ignored under Wine)", args..., lastError);
         return true;

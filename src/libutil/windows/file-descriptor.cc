@@ -14,13 +14,11 @@
 
 namespace nix {
 
-using namespace nix::windows;
-
 std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     LARGE_INTEGER li;
     if (!GetFileSizeEx(fd, &li)) {
-        throw WinError([&] { return HintFmt("getting size of file %s", PathFmt(descriptorToPath(fd))); });
+        throw windows::WinError([&] { return HintFmt("getting size of file %s", PathFmt(descriptorToPath(fd))); });
     }
     return li.QuadPart;
 }
@@ -34,7 +32,8 @@ size_t read(Descriptor fd, std::span<std::byte> buffer)
         if (lastError == ERROR_BROKEN_PIPE)
             n = 0; // Treat as EOF
         else
-            throw WinError(lastError, "reading %1% bytes from %2%", buffer.size(), PathFmt(descriptorToPath(fd)));
+            throw windows::WinError(
+                lastError, "reading %1% bytes from %2%", buffer.size(), PathFmt(descriptorToPath(fd)));
     }
     return static_cast<size_t>(n);
 }
@@ -48,7 +47,7 @@ size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
         ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
     DWORD n;
     if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov)) {
-        throw WinError([&] {
+        throw windows::WinError([&] {
             return HintFmt(
                 "reading %1% bytes at offset %2% from %3%", buffer.size(), offset, PathFmt(descriptorToPath(fd)));
         });
@@ -62,7 +61,7 @@ size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterru
         checkInterrupt(); // For consistency with unix
     DWORD n;
     if (!WriteFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL)) {
-        throw WinError(
+        throw windows::WinError(
             [&] { return HintFmt("writing %1% bytes to %2%", buffer.size(), PathFmt(descriptorToPath(fd))); });
     }
     return static_cast<size_t>(n);
@@ -72,7 +71,7 @@ AutoCloseFD dupDescriptor(Descriptor fd)
 {
     HANDLE newHandle;
     if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
-        throw WinError("duplicating handle");
+        throw windows::WinError("duplicating handle");
     }
     return AutoCloseFD{newHandle};
 }
@@ -88,7 +87,7 @@ void Pipe::create()
 
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0))
-        throw WinError("CreatePipe");
+        throw windows::WinError("CreatePipe");
 
     readSide = hReadPipe;
     writeSide = hWritePipe;
@@ -130,7 +129,7 @@ off_t lseek(HANDLE h, off_t offset, int whence)
 void syncDescriptor(Descriptor fd)
 {
     if (!::FlushFileBuffers(fd)) {
-        throw WinError([&] { return HintFmt("flushing file %s", PathFmt(descriptorToPath(fd))); });
+        throw windows::WinError([&] { return HintFmt("flushing file %s", PathFmt(descriptorToPath(fd))); });
     }
 }
 

@@ -18,7 +18,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 /* If ‘url’ starts with ‘mirror://’, then resolve it using the list of
    mirrors defined in Nixpkgs. */
@@ -349,3 +349,5 @@ struct CmdStorePrefetchFile : StoreCommand, MixJSON
 };
 
 static auto rCmdStorePrefetchFile = registerCommand2<CmdStorePrefetchFile>({"store", "prefetch-file"});
+
+} // namespace nix

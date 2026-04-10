@@ -41,8 +41,6 @@
 namespace nix_store {
 
 using namespace nix;
-using std::cin;
-using std::cout;
 
 typedef void (*Operation)(Strings opFlags, Strings opArgs);
 
@@ -182,7 +180,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
             auto paths2 = realisePath(i, false);
             if (!noOutput)
                 for (auto & j : paths2)
-                    cout << fmt("%s\n", j.string());
+                    std::cout << fmt("%s\n", j.string());
         }
 }
 
@@ -194,7 +192,7 @@ static void opAdd(Strings opFlags, Strings opArgs)
 
     for (auto & i : opArgs) {
         auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(i));
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), sourcePath)));
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), sourcePath)));
     }
 }
 
@@ -242,7 +240,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     std::string hash = *i++;
     std::string name = *i++;
 
-    cout << fmt(
+    std::cout << fmt(
         "%s\n",
         store->printStorePath(store->makeFixedOutputPath(
             name,
@@ -280,11 +278,11 @@ static void
 printTree(const StorePath & path, const std::string & firstPad, const std::string & tailPad, StorePathSet & done)
 {
     if (!done.insert(path).second) {
-        cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
+        std::cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
         return;
     }
 
-    cout << fmt("%s%s\n", firstPad, store->printStorePath(path));
+    std::cout << fmt("%s%s\n", firstPad, store->printStorePath(path));
 
     auto info = store->queryPathInfo(path);
 
@@ -387,7 +385,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         for (auto & i : opArgs) {
             auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
             for (auto & outputPath : outputs)
-                cout << fmt("%1%\n", store->printStorePath(outputPath));
+                std::cout << fmt("%1%\n", store->printStorePath(outputPath));
         }
         break;
     }
@@ -416,14 +414,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
         auto sorted = store->topoSortPaths(paths);
         for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+            std::cout << fmt("%s\n", store->printStorePath(*i));
         break;
     }
 
     case qDeriver:
         for (auto & i : opArgs) {
             auto info = store->queryPathInfo(store->followLinksToStorePath(i));
-            cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
+            std::cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
         }
         break;
 
@@ -437,7 +435,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
         auto sorted = store->topoSortPaths(result);
         for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+            std::cout << fmt("%s\n", store->printStorePath(*i));
         break;
     }
 
@@ -449,7 +447,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             if (j == drv.env.end())
                 throw Error(
                     "derivation '%s' has no environment binding named '%s'", store->printStorePath(path), bindingName);
-            cout << fmt("%s\n", j->second);
+            std::cout << fmt("%s\n", j->second);
         }
         break;
 
@@ -460,9 +458,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto info = store->queryPathInfo(j);
                 if (query == qHash) {
                     assert(info->narHash.algo == HashAlgorithm::SHA256);
-                    cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
+                    std::cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
                 } else if (query == qSize)
-                    cout << fmt("%d\n", info->narSize);
+                    std::cout << fmt("%d\n", info->narSize);
             }
         }
         break;
@@ -494,7 +492,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
     case qResolve: {
         for (auto & i : opArgs)
-            cout << fmt("%s\n", store->printStorePath(store->followLinksToStorePath(i)));
+            std::cout << fmt("%s\n", store->printStorePath(store->followLinksToStorePath(i)));
         break;
     }
 
@@ -513,7 +511,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         for (auto & [target, links] : roots)
             if (referrers.find(target) != referrers.end())
                 for (auto & link : links)
-                    cout << fmt("%1% -> %2%\n", link, gcStore.printStorePath(target));
+                    std::cout << fmt("%1% -> %2%\n", link, gcStore.printStorePath(target));
         break;
     }
 
@@ -539,7 +537,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
 
     /* Also output the arguments. */
     std::string argsStr = concatStringsSep(" ", drv.args);
-    cout << "export _args; _args=" << escapeShellArgAlways(argsStr) << "\n";
+    std::cout << "export _args; _args=" << escapeShellArgAlways(argsStr) << "\n";
 }
 
 static void opReadLog(Strings opFlags, Strings opArgs)
@@ -566,10 +564,10 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
         throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
-            cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
+            std::cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
         for (auto & i : store->queryAllValidPaths())
-            cout << store->makeValidityRegistration({i}, true, true);
+            std::cout << store->makeValidityRegistration({i}, true, true);
     }
 }
 
@@ -585,7 +583,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                                               std::numeric_limits<uint64_t>::max(),
                                           }}
                                         : std::nullopt;
-        auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
+        auto info = decodeValidPathInfo(*store, std::cin, hashResultOpt);
         if (!info)
             break;
         if (!store->isValidPath(info->path) || reregister) {
@@ -651,7 +649,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         if (!store->isValidPath(path)) {
             if (printInvalid)
-                cout << fmt("%s\n", store->printStorePath(path));
+                std::cout << fmt("%s\n", store->printStorePath(path));
             else
                 throw Error("path '%s' is not valid", store->printStorePath(path));
         }
@@ -703,7 +701,7 @@ static void opGC(Strings opFlags, Strings opArgs)
         Finally printer([&] {
             if (options.action != GCOptions::gcDeleteDead)
                 for (auto & i : results.paths)
-                    cout << i << std::endl;
+                    std::cout << i << std::endl;
             else
                 printFreed(false, results);
         });
@@ -788,7 +786,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     auto paths = importPaths(*store, source, NoCheckSigs);
 
     for (auto & i : paths)
-        cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
+        std::cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
 }
 
 /* Initialise the Nix databases. */

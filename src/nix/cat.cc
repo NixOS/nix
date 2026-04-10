@@ -6,7 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct MixCat : virtual Args
 {
@@ -120,3 +120,5 @@ struct CmdCatNar : StoreCommand, MixCat
 
 static auto rCmdCatStore = registerCommand2<CmdCatStore>({"store", "cat"});
 static auto rCmdCatNar = registerCommand2<CmdCatNar>({"nar", "cat"});
+
+} // namespace nix

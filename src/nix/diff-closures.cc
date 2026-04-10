@@ -112,10 +112,6 @@ void printClosureDiff(
     }
 }
 
-} // namespace nix
-
-using namespace nix;
-
 struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
 {
     std::string _before, _after;
@@ -149,3 +145,5 @@ struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
 };
 
 static auto rCmdDiffClosures = registerCommand2<CmdDiffClosures>({"store", "diff-closures"});
+
+} // namespace nix

@@ -6,7 +6,7 @@
 #include "nix/store/gc-store.hh"
 #include "nix/util/error.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdStoreGC : StoreCommand, MixDryRun
 {
@@ -49,3 +49,5 @@ struct CmdStoreGC : StoreCommand, MixDryRun
 };
 
 static auto rCmdStoreGC = registerCommand2<CmdStoreGC>({"store", "gc"});
+
+} // namespace nix

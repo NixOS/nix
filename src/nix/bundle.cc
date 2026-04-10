@@ -6,7 +6,7 @@
 #include "nix/expr/eval-inline.hh"
 #include "nix/store/globals.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdBundle : InstallableValueCommand
 {
@@ -131,3 +131,5 @@ struct CmdBundle : InstallableValueCommand
 };
 
 static auto r2 = registerCommand<CmdBundle>("bundle");
+
+} // namespace nix

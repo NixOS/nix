@@ -30,8 +30,6 @@
 
 namespace nix {
 
-using namespace nix::windows;
-
 Pid::Pid() {}
 
 Pid::Pid(Pid && other) noexcept
@@ -64,7 +62,7 @@ int Pid::kill(bool allowInterrupts)
     debug("killing process %1%", pid.get());
 
     if (!TerminateProcess(pid.get(), 1))
-        logError(WinError("terminating process %1%", pid.get()).info());
+        logError(windows::WinError("terminating process %1%", pid.get()).info());
 
     return wait(allowInterrupts);
 }
@@ -76,11 +74,11 @@ int Pid::wait(bool allowInterrupts)
     assert(pid.get() != INVALID_DESCRIPTOR);
     DWORD status = WaitForSingleObject(pid.get(), INFINITE);
     if (status != WAIT_OBJECT_0)
-        throw WinError("waiting for process %1%", pid.get());
+        throw windows::WinError("waiting for process %1%", pid.get());
 
     DWORD exitCode = 0;
     if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE)
-        throw WinError("getting exit code of process %1%", pid.get());
+        throw windows::WinError("getting exit code of process %1%", pid.get());
 
     pid.close();
     return exitCode;
@@ -126,7 +124,7 @@ void setFDInheritable(AutoCloseFD & fd, bool inherit)
 {
     if (fd.get() != INVALID_DESCRIPTOR) {
         if (!SetHandleInformation(fd.get(), HANDLE_FLAG_INHERIT, inherit ? HANDLE_FLAG_INHERIT : 0)) {
-            throw WinError("Couldn't disable inheriting of handle");
+            throw windows::WinError("Couldn't disable inheriting of handle");
         }
     }
 }
@@ -146,7 +144,7 @@ AutoCloseFD nullFD()
         0,
         NULL);
     if (!nul.get()) {
-        throw WinError("Couldn't open NUL device");
+        throw windows::WinError("Couldn't open NUL device");
     }
     // Let this handle be inheritable by child processes
     setFDInheritable(nul, true);
@@ -258,7 +256,7 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
             &startInfo,
             &procInfo)
         == 0) {
-        throw WinError("CreateProcessW failed (%1%)", os_string_to_string(cmdline));
+        throw windows::WinError("CreateProcessW failed (%1%)", os_string_to_string(cmdline));
     }
 
     // Convert these to use RAII
@@ -271,15 +269,15 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     Descriptor job = CreateJobObjectW(NULL, NULL);
     if (job == NULL) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw WinError("Couldn't create job object for child process");
+        throw windows::WinError("Couldn't create job object for child process");
     }
     if (AssignProcessToJobObject(job, procInfo.hProcess) == FALSE) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw WinError("Couldn't assign child process to job object");
+        throw windows::WinError("Couldn't assign child process to job object");
     }
     if (ResumeThread(procInfo.hThread) == (DWORD) -1) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw WinError("Couldn't resume child process thread");
+        throw windows::WinError("Couldn't resume child process thread");
     }
 
     return process;

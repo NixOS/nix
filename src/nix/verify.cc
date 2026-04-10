@@ -9,7 +9,7 @@
 
 #include "nix/util/exit.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdVerify : StorePathsCommand
 {
@@ -186,3 +186,5 @@ struct CmdVerify : StorePathsCommand
 };
 
 static auto rCmdVerify = registerCommand2<CmdVerify>({"store", "verify"});
+
+} // namespace nix

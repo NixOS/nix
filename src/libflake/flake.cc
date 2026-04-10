@@ -63,8 +63,6 @@
 namespace nix {
 struct SourceAccessor;
 
-using namespace flake;
-
 namespace flake {
 
 static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)

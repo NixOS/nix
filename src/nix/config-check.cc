@@ -11,7 +11,7 @@
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
 
-using namespace nix;
+namespace nix {
 
 namespace {
 
@@ -178,3 +178,5 @@ struct CmdConfigCheck : StoreCommand
 };
 
 static auto rCmdConfigCheck = registerCommand2<CmdConfigCheck>({"config", "check"});
+
+} // namespace nix

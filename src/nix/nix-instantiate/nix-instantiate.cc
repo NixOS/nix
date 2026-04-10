@@ -15,7 +15,7 @@
 
 #include <iostream>
 
-using namespace nix;
+namespace nix {
 
 std::filesystem::path gcRoot;
 static int rootNr = 0;
@@ -207,3 +207,5 @@ static int main_nix_instantiate(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_nix_instantiate("nix-instantiate", main_nix_instantiate);
+
+} // namespace nix

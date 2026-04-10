@@ -5,7 +5,7 @@
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 
-using namespace nix;
+namespace nix {
 
 static int main_nix_copy_closure(int argc, char ** argv)
 {
@@ -69,3 +69,5 @@ static int main_nix_copy_closure(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_nix_copy_closure("nix-copy-closure", main_nix_copy_closure);
+
+} // namespace nix

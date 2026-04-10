@@ -16,8 +16,9 @@
 
 #include "nix/util/strings.hh"
 
-using namespace nix;
 using json = nlohmann::json;
+
+namespace nix {
 
 std::string wrap(std::string prefix, std::string s)
 {
@@ -196,3 +197,5 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 };
 
 static auto rCmdSearch = registerCommand<CmdSearch>("search");
+
+} // namespace nix

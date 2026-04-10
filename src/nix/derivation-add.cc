@@ -7,8 +7,9 @@
 #include "nix/store/globals.hh"
 #include <nlohmann/json.hpp>
 
-using namespace nix;
 using json = nlohmann::json;
+
+namespace nix {
 
 struct CmdAddDerivation : MixDryRun, StoreCommand
 {
@@ -43,3 +44,5 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
 };
 
 static auto rCmdAddDerivation = registerCommand2<CmdAddDerivation>({"derivation", "add"});
+
+} // namespace nix

@@ -4,7 +4,7 @@
 #include "nix/main/common-args.hh"
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct MixLs : virtual Args, MixJSON
 {
@@ -160,3 +160,5 @@ struct CmdLsNar : Command, MixLs
 
 static auto rCmdLsStore = registerCommand2<CmdLsStore>({"store", "ls"});
 static auto rCmdLsNar = registerCommand2<CmdLsNar>({"nar", "ls"});
+
+} // namespace nix

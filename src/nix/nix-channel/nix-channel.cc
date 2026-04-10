@@ -16,7 +16,7 @@
 #include <regex>
 #include <pwd.h>
 
-using namespace nix;
+namespace nix {
 
 typedef StringMap Channels;
 
@@ -306,3 +306,5 @@ static int main_nix_channel(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_nix_channel("nix-channel", main_nix_channel);
+
+} // namespace nix

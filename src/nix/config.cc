@@ -4,7 +4,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct CmdConfig : NixMultiCommand
 {
@@ -79,3 +79,5 @@ struct CmdConfigShow : Command, MixJSON
 
 static auto rCmdConfig = registerCommand<CmdConfig>("config");
 static auto rShowConfig = registerCommand2<CmdConfigShow>({"config", "show"});
+
+} // namespace nix
