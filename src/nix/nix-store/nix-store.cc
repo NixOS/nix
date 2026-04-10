@@ -661,6 +661,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     bool printRoots = false;
     GCOptions options;
     options.action = GCOptions::gcDeleteDead;
+    options.pathsToDelete = GCOptions::WholeStore{};
 
     GCResults results;
 
@@ -723,8 +724,10 @@ static void opDelete(Strings opFlags, Strings opArgs)
         else
             throw UsageError("unknown flag '%1%'", i);
 
+    StorePathSet paths;
     for (auto & i : opArgs)
-        options.pathsToDelete.insert(store->followLinksToStorePath(i));
+        paths.insert(store->followLinksToStorePath(i));
+    options.pathsToDelete = std::move(paths);
 
     auto & gcStore = require<GcStore>(*store);
 

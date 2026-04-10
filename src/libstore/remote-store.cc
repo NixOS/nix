@@ -1,3 +1,5 @@
+#include "nix/store/path.hh"
+#include "nix/store/store-api.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -18,6 +20,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
+#include <variant>
 
 #ifndef _WIN32
 #  include <sys/socket.h>
@@ -679,9 +682,26 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(getConnection());
 
-    conn->to << WorkerProto::Op::CollectGarbage;
-    WorkerProto::write(*this, *conn, options.action);
-    WorkerProto::write(*this, *conn, options.pathsToDelete);
+    if (conn->protoVersion.features.contains(WorkerProto::featureDeleteDeadSpecific)) {
+        conn->to << WorkerProto::Op::CollectGarbage;
+        WorkerProto::write(*this, *conn, options.action);
+        WorkerProto::write(*this, *conn, options.pathsToDelete);
+    } else {
+        auto paths = std::visit(
+            overloaded{
+                [&](const StorePathSet & paths) {
+                    if (options.action != GCOptions::gcDeleteSpecific)
+                        throw Error(
+                            "Your daemon version is too old to support garbage collecting a specific set of paths");
+                    return paths;
+                },
+                [](const GCOptions::WholeStore & _) { return StorePathSet{}; },
+            },
+            options.pathsToDelete);
+        conn->to << WorkerProto::Op::CollectGarbage;
+        WorkerProto::write(*this, *conn, options.action);
+        WorkerProto::write(*this, *conn, paths);
+    }
     conn->to << options.ignoreLiveness
              << options.maxFreed
              /* removed options */

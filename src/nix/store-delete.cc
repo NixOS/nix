@@ -17,6 +17,13 @@ struct CmdStoreDelete : StorePathsCommand
             .description = "Do not check whether the paths are reachable from a root.",
             .handler = {&options.ignoreLiveness, true},
         });
+
+        addFlag({
+            .longName = "skip-alive",
+            .description =
+                "Do not emit errors when attempting to delete something that is still alive, useful with --recursive.",
+            .handler = {&options.action, GCOptions::gcDeleteDead},
+        });
     }
 
     std::string description() override
@@ -35,8 +42,10 @@ struct CmdStoreDelete : StorePathsCommand
     {
         auto & gcStore = require<GcStore>(*store);
 
+        StorePathSet paths;
         for (auto & path : storePaths)
-            options.pathsToDelete.insert(path);
+            paths.insert(path);
+        options.pathsToDelete = std::move(paths);
 
         GCResults results;
         Finally printer([&] { printFreed(false, results); });

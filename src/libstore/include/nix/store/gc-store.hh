@@ -39,6 +39,9 @@ struct GCOptions
     using GCAction = nix::GCAction;
     using enum GCAction;
 
+    struct WholeStore
+    {};
+
     GCAction action{gcDeleteDead};
 
     /**
@@ -50,9 +53,10 @@ struct GCOptions
     bool ignoreLiveness{false};
 
     /**
-     * For `gcDeleteSpecific`, the paths to delete.
+     * The paths from which to delete.
      */
-    StorePathSet pathsToDelete;
+    using GCPaths = std::variant<WholeStore, StorePathSet>;
+    GCPaths pathsToDelete;
 
     /**
      * Stop after at least `maxFreed` bytes have been freed.

@@ -6,6 +6,7 @@
 #include <compare>
 
 #include "nix/store/common-protocol.hh"
+#include "nix/store/gc-store.hh"
 
 namespace nix {
 
@@ -123,6 +124,11 @@ struct WorkerProto
      * using drvPath (store path) instead of the old hash-based JSON format.
      */
     static constexpr std::string_view featureRealisationWithPath = "realisation-with-path-not-hash";
+
+    /**
+     * Feature for garbage collecting a specific set of paths.
+     */
+    static constexpr std::string_view featureDeleteDeadSpecific = "delete-dead-specific";
 
     /**
      * A unidirectional read connection, to be used by the read half of the
@@ -339,6 +345,8 @@ template<>
 DECLARE_WORKER_SERIALISER(std::optional<std::chrono::microseconds>);
 template<>
 DECLARE_WORKER_SERIALISER(WorkerProto::ClientHandshakeInfo);
+template<>
+DECLARE_WORKER_SERIALISER(GCOptions::GCPaths);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);
