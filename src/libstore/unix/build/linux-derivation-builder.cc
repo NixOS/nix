@@ -37,8 +37,6 @@
 
 namespace nix {
 
-using namespace nix::linux;
-
 static void setupSeccomp(const LocalSettings & localSettings)
 {
     if (!localSettings.filterSyscalls)
@@ -337,10 +335,10 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
             /* If we're running from the daemon, then this will return the
                root cgroup of the service. Otherwise, it will return the
                current cgroup. */
-            auto cgroupFS = getCgroupFS();
+            auto cgroupFS = linux::getCgroupFS();
             if (!cgroupFS)
                 throw Error("cannot determine the cgroups file system");
-            auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
+            auto rootCgroupPath = *cgroupFS / linux::getRootCgroup().rel();
             if (!pathExists(rootCgroupPath))
                 throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
 
@@ -363,7 +361,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
                 if (pathExists(cgroupFile)) {
                     auto prevCgroup = readFile(cgroupFile);
-                    destroyCgroup(prevCgroup);
+                    linux::destroyCgroup(prevCgroup);
                 }
 
                 writeFile(cgroupFile, cgroup->native());
@@ -825,7 +823,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     void killSandbox(bool getStats) override
     {
         if (cgroup) {
-            auto stats = destroyCgroup(*cgroup);
+            auto stats = linux::destroyCgroup(*cgroup);
             if (getStats) {
                 buildResult.cpuUser = stats.cpuUser;
                 buildResult.cpuSystem = stats.cpuSystem;

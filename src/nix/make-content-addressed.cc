@@ -5,9 +5,9 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
-
 using nlohmann::json;
+
+namespace nix {
 
 struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand, MixJSON
 {
@@ -56,3 +56,5 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
 };
 
 static auto rCmdMakeContentAddressed = registerCommand2<CmdMakeContentAddressed>({"store", "make-content-addressed"});
+
+} // namespace nix

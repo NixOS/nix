@@ -2,7 +2,7 @@
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdOptimiseStore : StoreCommand
 {
@@ -25,3 +25,5 @@ struct CmdOptimiseStore : StoreCommand
 };
 
 static auto rCmdOptimiseStore = registerCommand2<CmdOptimiseStore>({"store", "optimise"});
+
+} // namespace nix

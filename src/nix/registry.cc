@@ -5,8 +5,7 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
 
-using namespace nix;
-using namespace nix::flake;
+namespace nix {
 
 class RegistryCommand : virtual Args
 {
@@ -268,3 +267,5 @@ struct CmdRegistry : NixMultiCommand
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");
+
+} // namespace nix

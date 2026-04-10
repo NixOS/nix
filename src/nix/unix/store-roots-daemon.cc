@@ -7,7 +7,7 @@
 
 #include <thread>
 
-using namespace nix;
+namespace nix {
 
 struct CmdRootsDaemon : StoreConfigCommand
 {
@@ -64,3 +64,5 @@ struct CmdRootsDaemon : StoreConfigCommand
 };
 
 static auto rCmdStoreRootsDaemon = registerCommand2<CmdRootsDaemon>({"store", "roots-daemon"});
+
+} // namespace nix

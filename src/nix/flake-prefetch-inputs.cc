@@ -6,8 +6,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
-using namespace nix::flake;
+namespace nix {
 
 struct CmdFlakePrefetchInputs : FlakeCommand
 {
@@ -25,6 +24,7 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 
     void run(nix::ref<nix::Store> store) override
     {
+        using namespace nix::flake;
         auto flake = lockFlake();
 
         ThreadPool pool{fileTransferSettings.httpConnections};
@@ -69,3 +69,5 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 };
 
 static auto rCmdFlakePrefetchInputs = registerCommand2<CmdFlakePrefetchInputs>({"flake", "prefetch-inputs"});
+
+} // namespace nix

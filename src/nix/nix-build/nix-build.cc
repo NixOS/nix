@@ -31,10 +31,11 @@
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
 
-using namespace nix;
 using namespace std::string_literals;
 
 extern char ** environ __attribute__((weak));
+
+namespace nix {
 
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
@@ -747,3 +748,5 @@ static void main_nix_build(int argc, char ** argv)
 
 static RegisterLegacyCommand r_nix_build("nix-build", main_nix_build);
 static RegisterLegacyCommand r_nix_shell("nix-shell", main_nix_build);
+
+} // namespace nix

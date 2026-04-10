@@ -13,7 +13,7 @@
 #include "nix/util/config-global.hh"
 #include "self-exe.hh"
 
-using namespace nix;
+namespace nix {
 
 /**
  * Check whether a path has a "profiles" component.
@@ -210,3 +210,5 @@ struct CmdUpgradeNix : MixDryRun, StoreCommand
 };
 
 static auto rCmdUpgradeNix = registerCommand<CmdUpgradeNix>("upgrade-nix");
+
+} // namespace nix

@@ -33,6 +33,8 @@ namespace nix {
   struct LexerState;
 }
 
+// OK because we keep this in a separate compilation unit even for unity
+// builds.
 using namespace nix;
 using namespace nix::lexer::internal;
 

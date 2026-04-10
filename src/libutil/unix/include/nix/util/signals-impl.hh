@@ -77,7 +77,7 @@ static inline bool getInterrupted()
 
 static inline bool isInterrupted()
 {
-    using namespace unix;
+    using namespace nix::unix;
     return _isInterrupted || (interruptCheck && interruptCheck());
 }
 

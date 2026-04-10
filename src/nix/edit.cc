@@ -7,7 +7,7 @@
 
 #include <unistd.h>
 
-using namespace nix;
+namespace nix {
 
 struct CmdEdit : InstallableValueCommand
 {
@@ -58,3 +58,5 @@ struct CmdEdit : InstallableValueCommand
 };
 
 static auto rCmdEdit = registerCommand<CmdEdit>("edit");
+
+} // namespace nix

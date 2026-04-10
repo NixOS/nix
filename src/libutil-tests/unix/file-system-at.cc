@@ -15,14 +15,14 @@
 
 namespace nix {
 
-using namespace nix::unix;
-
 /* ----------------------------------------------------------------------------
  * fchmodatTryNoFollow
  * --------------------------------------------------------------------------*/
 
 TEST(fchmodatTryNoFollow, works)
 {
+    using namespace nix::unix;
+
     std::filesystem::path tmpDir = nix::createTempDir();
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
 
@@ -106,6 +106,8 @@ TEST(fchmodatTryNoFollow, works)
 
 TEST(fchmodatTryNoFollow, fallbackWithoutProc)
 {
+    using namespace nix::unix;
+
     if (!userNamespacesSupported())
         GTEST_SKIP() << "User namespaces not supported";
 

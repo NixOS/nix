@@ -33,8 +33,7 @@
 #include <unistd.h>
 #include <nlohmann/json.hpp>
 
-using namespace nix;
-using std::cout;
+namespace nix {
 
 /**
  * Settings related to Nix user environments.
@@ -1073,7 +1072,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
     /* Print the desired columns, or XML output. */
     if (jsonOutput) {
         queryJSON(globals, elems, printOutPath, printDrvPath, printMeta);
-        cout << '\n';
+        std::cout << '\n';
         return;
     }
 
@@ -1082,7 +1081,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
 
     Table table;
     std::ostringstream dummy;
-    XMLWriter xml(true, *(xmlOutput ? &cout : &dummy));
+    XMLWriter xml(true, *(xmlOutput ? &std::cout : &dummy));
     XMLOpenElement xmlRoot(xml, "items");
 
     for (auto & i : elems) {
@@ -1274,7 +1273,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             } else
                 table.push_back(columns);
 
-            cout.flush();
+            std::cout.flush();
 
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
@@ -1536,3 +1535,5 @@ static int main_nix_env(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_nix_env("nix-env", main_nix_env);
+
+} // namespace nix

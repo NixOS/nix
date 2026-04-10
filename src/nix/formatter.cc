@@ -7,7 +7,7 @@
 
 #include "run.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdFormatter : NixMultiCommand
 {
@@ -158,3 +158,5 @@ struct CmdFmt : CmdFormatterRun
 };
 
 static auto rFmt = registerCommand<CmdFmt>("fmt");
+
+} // namespace nix

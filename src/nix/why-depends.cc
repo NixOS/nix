@@ -7,7 +7,7 @@
 
 #include <queue>
 
-using namespace nix;
+namespace nix {
 
 static std::string hilite(const std::string & s, size_t pos, size_t len, const std::string & colour = ANSI_RED)
 {
@@ -295,3 +295,5 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
 };
 
 static auto rCmdWhyDepends = registerCommand<CmdWhyDepends>("why-depends");
+
+} // namespace nix

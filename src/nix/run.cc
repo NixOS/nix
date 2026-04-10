@@ -20,11 +20,9 @@
 
 extern char ** environ __attribute__((weak));
 
-using namespace nix;
+namespace nix {
 
 std::string chrootHelperName = "__run_in_chroot";
-
-namespace nix {
 
 /* Convert `env` to a list of strings suitable for `execve`'s `envp` argument. */
 Strings toEnvp(StringMap env)
@@ -107,8 +105,6 @@ void execProgramInStore(
 
     throw SysError("unable to execute '%s'", program);
 }
-
-} // namespace nix
 
 struct CmdRun : InstallableValueCommand, MixEnvironment
 {
@@ -264,3 +260,5 @@ void chrootHelper(int argc, char ** argv)
     throw Error("mounting the Nix store on '%s' is not supported on this platform", storeDir);
 #endif
 }
+
+} // namespace nix

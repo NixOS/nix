@@ -20,7 +20,7 @@
 
 #include "nix/util/strings.hh"
 
-using namespace nix;
+namespace nix {
 
 struct ProfileElementSource
 {
@@ -1029,3 +1029,5 @@ struct CmdProfile : NixMultiCommand
 };
 
 static auto rCmdProfile = registerCommand<CmdProfile>("profile");
+
+} // namespace nix

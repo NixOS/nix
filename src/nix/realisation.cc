@@ -3,7 +3,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct CmdRealisation : NixMultiCommand
 {
@@ -78,3 +78,5 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 };
 
 static auto rCmdRealisationInfo = registerCommand2<CmdRealisationInfo>({"realisation", "info"});
+
+} // namespace nix

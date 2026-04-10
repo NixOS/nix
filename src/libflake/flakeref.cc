@@ -270,7 +270,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     bool isFlake,
     bool preserveRelativePaths)
 {
-    using namespace fetchers;
+    using namespace nix::fetchers;
 
     if (auto res = parseFlakeIdRef(fetchSettings, url, isFlake)) {
         return *res;

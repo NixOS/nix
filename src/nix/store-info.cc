@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct CmdInfoStore : StoreCommand, MixJSON
 {
@@ -45,3 +45,5 @@ struct CmdInfoStore : StoreCommand, MixJSON
 };
 
 static auto rCmdInfoStore = registerCommand2<CmdInfoStore>({"store", "info"});
+
+} // namespace nix

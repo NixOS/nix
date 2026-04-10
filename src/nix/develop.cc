@@ -21,7 +21,7 @@
 
 #include "nix/util/strings.hh"
 
-using namespace nix;
+namespace nix {
 
 struct DevelopSettings : Config
 {
@@ -752,3 +752,5 @@ struct CmdPrintDevEnv : Common, MixJSON
 
 static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
 static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");
+
+} // namespace nix

@@ -8,8 +8,6 @@
 
 namespace nix::windows::known_folders {
 
-using namespace nix::windows;
-
 static std::filesystem::path getKnownFolder(REFKNOWNFOLDERID rfid)
 {
     PWSTR str = nullptr;

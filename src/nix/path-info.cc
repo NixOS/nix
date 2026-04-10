@@ -10,7 +10,8 @@
 
 #include "nix/util/strings.hh"
 
-using namespace nix;
+namespace nix {
+
 using nlohmann::json;
 
 /**
@@ -237,3 +238,5 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 };
 
 static auto rCmdPathInfo = registerCommand<CmdPathInfo>("path-info");
+
+} // namespace nix

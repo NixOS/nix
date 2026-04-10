@@ -5,7 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 /* This serialization code is diferent from the canonical (single)
    derived path serialization because:
@@ -186,3 +186,5 @@ struct CmdBuild : InstallablesCommand, MixOutLinkByDefault, MixDryRun, MixJSON, 
 };
 
 static auto rCmdBuild = registerCommand<CmdBuild>("build");
+
+} // namespace nix

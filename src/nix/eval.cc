@@ -8,7 +8,7 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 {
@@ -126,3 +126,5 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 };
 
 static auto rCmdEval = registerCommand<CmdEval>("eval");
+
+} // namespace nix

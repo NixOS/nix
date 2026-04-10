@@ -5,6 +5,7 @@
 #include <set>
 #include <memory>
 #include <tuple>
+
 #ifdef __APPLE__
 #  include <sys/time.h>
 #endif
@@ -24,8 +25,7 @@
 #include "nix/util/experimental-features.hh"
 #include "nix/store/globals.hh"
 
-using namespace nix;
-using std::cin;
+namespace nix {
 
 static void handleAlarm(int sig) {}
 
@@ -410,3 +410,5 @@ static int main_build_remote(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_build_remote("build-remote", main_build_remote);
+
+} // namespace nix

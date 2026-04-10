@@ -10,7 +10,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/mounted-source-accessor.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdEnv : NixMultiCommand
 {
@@ -121,3 +121,5 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 };
 
 static auto rCmdShell = registerCommand2<CmdShell>({"env", "shell"});
+
+} // namespace nix

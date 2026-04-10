@@ -9,8 +9,6 @@
 
 namespace nix {
 
-using namespace unix;
-
 std::atomic<bool> unix::_isInterrupted = false;
 
 thread_local std::function<bool()> unix::interruptCheck;
@@ -56,6 +54,7 @@ static Sync<InterruptCallbacks> & getInterruptCallbacks()
 
 static void signalHandlerThread(sigset_t set)
 {
+    using namespace nix::unix;
     while (true) {
         int signal = 0;
         sigwait(&set, &signal);

@@ -9,7 +9,7 @@
 #include "man-pages.hh"
 #include "nix/util/fun.hh"
 
-using namespace nix;
+namespace nix {
 
 /**
  * Base for `nix hash path`, `nix hash file` (deprecated), and `nix-hash` (legacy).
@@ -366,3 +366,5 @@ static int compatNixHash(int argc, char ** argv)
 }
 
 static RegisterLegacyCommand r_nix_hash("nix-hash", compatNixHash);
+
+} // namespace nix
