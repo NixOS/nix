@@ -35,6 +35,11 @@ rm -rf "$TEST_ROOT/out"
 mkdir -p "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
+# Note that the target of the symlink doesn't exist, but the parent does.
+#
+# A more lenient implementation could allow this, but it would hard/impossible
+# to implement without TOCTOU (to the extent avoiding TOCTOU is even
+# well-defined with symlinks, though).
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
@@ -46,6 +51,19 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 rm -rf "$TEST_ROOT/out"
 (cd "$TEST_ROOT" && nix-store --restore out < tmp.nar)
 [[ -f "$TEST_ROOT/out" ]]
+
+# Trailing `/.` and `/..` refer to entries within a directory that
+# must already exist, which conflicts with --restore creating
+# something new.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+
+# Destination with trailing `/..` should fail.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+
+# Empty destination should fail.
+expectStderr 1 nix-store --restore "" < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
 
 # The same, but for a symlink.
 ln -sfn foo "$TEST_ROOT/symlink"
@@ -73,6 +91,10 @@ rm -rf "$TEST_ROOT/out"
 [[ -L "$TEST_ROOT/out" ]]
 [[ $(readlink "$TEST_ROOT/out") = foo ]]
 
+# Trailing `/.` — same baseline as above (currently fails).
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "No such file or directory"
+
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
 rm -rf "$TEST_ROOT/case"
@@ -96,7 +118,11 @@ rm -rf "$TEST_ROOT/case"
 # Check whether we detect true collisions (e.g. those remaining after
 # removal of the suffix).
 touch "$TEST_ROOT/case/xt_CONNMARK.h~nix~case~hack~3"
-(! nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null)
+expectStderr 1 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null
+
+# Trailing `/.` — same baseline as above (currently fails).
+rm -rf "$TEST_ROOT/case"
+expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "No such file or directory"
 
 # Detect NARs that have a directory entry that after case-hacking
 # collides with another entry (e.g. a directory containing 'Test',
