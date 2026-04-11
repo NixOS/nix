@@ -11,18 +11,18 @@ rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 echo foo > "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "File exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 mkdir -p "$TEST_ROOT/out2"
-expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "path '.*/out' already exists"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet 'creating directory ".*/out": File exists'
 
 # The same, but for a regular file.
 nix-store --dump ./nars.sh > "$TEST_ROOT/tmp.nar"
@@ -35,6 +35,11 @@ rm -rf "$TEST_ROOT/out"
 mkdir -p "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
 
+# Note that the target of the symlink doesn't exist, but the parent does.
+#
+# A more lenient implementation could allow this, but it would hard/impossible
+# to implement without TOCTOU (to the extent avoiding TOCTOU is even
+# well-defined with symlinks, though).
 rm -rf "$TEST_ROOT/out"
 ln -s "$TEST_ROOT/out2" "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | grepQuiet "File exists"
@@ -46,6 +51,19 @@ expectStderr 1 nix-store --restore "$TEST_ROOT/out" < "$TEST_ROOT/tmp.nar" | gre
 rm -rf "$TEST_ROOT/out"
 (cd "$TEST_ROOT" && nix-store --restore out < tmp.nar)
 [[ -f "$TEST_ROOT/out" ]]
+
+# Trailing `/.` and `/..` refer to entries within a directory that
+# must already exist, which conflicts with --restore creating
+# something new.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.'.*not a valid filename"
+
+# Destination with trailing `/..` should fail.
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/.." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.\.'.*not a valid filename"
+
+# Empty destination should fail.
+expectStderr 1 nix-store --restore "" < "$TEST_ROOT/tmp.nar" | grepQuiet "destination path is empty"
 
 # The same, but for a symlink.
 ln -sfn foo "$TEST_ROOT/symlink"
@@ -73,6 +91,10 @@ rm -rf "$TEST_ROOT/out"
 [[ -L "$TEST_ROOT/out" ]]
 [[ $(readlink "$TEST_ROOT/out") = foo ]]
 
+# Trailing `/.` — same baseline as above (currently fails).
+rm -rf "$TEST_ROOT/out"
+expectStderr 1 nix-store --restore "$TEST_ROOT/out/." < "$TEST_ROOT/tmp.nar" | grepQuiet "ends in '\.'.*not a valid filename"
+
 # Check whether restoring and dumping a NAR that contains case
 # collisions is round-tripping, even on a case-insensitive system.
 rm -rf "$TEST_ROOT/case"
@@ -96,7 +118,11 @@ rm -rf "$TEST_ROOT/case"
 # Check whether we detect true collisions (e.g. those remaining after
 # removal of the suffix).
 touch "$TEST_ROOT/case/xt_CONNMARK.h~nix~case~hack~3"
-(! nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null)
+expectStderr 1 nix-store "${opts[@]}" --dump "$TEST_ROOT/case" > /dev/null
+
+# Trailing `/.` — same baseline as above (currently fails).
+rm -rf "$TEST_ROOT/case"
+expectStderr 1 nix-store "${opts[@]}" --restore "$TEST_ROOT/case/." < case.nar | grepQuiet "ends in '\.'.*not a valid filename"
 
 # Detect NARs that have a directory entry that after case-hacking
 # collides with another entry (e.g. a directory containing 'Test',
@@ -130,7 +156,7 @@ if (( unicodeTestCode == 1 )); then
     # If the command failed (MacOS or ZFS + normalization), checks that it failed
     # with the expected "already exists" error, and that this is the same
     # behavior as `touch`
-    echo "$unicodeTestOut" | grepQuiet "creating directory \".*/out/â\": File exists"
+    echo "$unicodeTestOut" | grepQuiet 'creating directory ".*/out/â": File exists'
 
     (( touchFilesCount == 1 ))
 elif (( unicodeTestCode == 0 )); then
