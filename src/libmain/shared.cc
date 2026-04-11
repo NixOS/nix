@@ -133,7 +133,14 @@ void bumpFileLimit()
         return;
 
     if (limit.rlim_cur < limit.rlim_max) {
-        limit.rlim_cur = limit.rlim_max;
+        // Some software misbehaves really bad when we try to raise the
+        // limit to RLIM_INFINITY, so cap the limit at the 1048576 limit used
+        // by the daemon.
+        //
+        // GNU patch < 2.8 crashes with **** out of memory, which breaks in nixpkgs darwin bootstrap tools.
+        // This was fixed in:
+        // https://cgit.git.savannah.gnu.org/cgit/patch.git/commit/?id=61d7788b83b302207a67b82786f4fd79e3538f30
+        limit.rlim_cur = std::min(limit.rlim_max, rlim_t(1048576));
         // Ignore errors, this is best effort.
         setrlimit(RLIMIT_NOFILE, &limit);
     }
