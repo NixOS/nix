@@ -120,9 +120,8 @@ std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
 
 std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry = Registry::read(
+    return Registry::read(
         settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
-    return customRegistry;
 }
 
 std::shared_ptr<Registry> getFlagRegistry()
@@ -165,16 +164,27 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
 
 Registries getRegistries(const Settings & settings, Store & store)
 {
+    return getRegistries(settings, store, {});
+}
+
+Registries getRegistries(const Settings & settings, Store & store, const std::shared_ptr<Registry> & customRegistry)
+{
     Registries registries;
     registries.push_back(getFlagRegistry());
+    if (customRegistry)
+        registries.push_back(customRegistry);
     registries.push_back(getUserRegistry(settings));
     registries.push_back(getSystemRegistry(settings));
     registries.push_back(getGlobalRegistry(settings, store));
     return registries;
 }
 
-std::pair<Input, Attrs>
-lookupInRegistries(const Settings & settings, Store & store, const Input & _input, UseRegistries useRegistries)
+std::pair<Input, Attrs> lookupInRegistries(
+    const Settings & settings,
+    Store & store,
+    const Input & _input,
+    UseRegistries useRegistries,
+    const std::shared_ptr<Registry> & customRegistry)
 {
     Attrs extraAttrs;
     int n = 0;
@@ -189,7 +199,7 @@ restart:
     if (n > 100)
         throw Error("cycle detected in flake registry for '%s'", input.to_string());
 
-    for (auto & registry : getRegistries(settings, store)) {
+    for (auto & registry : getRegistries(settings, store, customRegistry)) {
         if (useRegistries == UseRegistries::Limited
             && !(registry->type == fetchers::Registry::Flag || registry->type == fetchers::Registry::Global))
             continue;

@@ -17,12 +17,46 @@ public:
 
     RegistryCommand()
     {
+        auto category = "Registry options";
+
+        addFlag({
+            .longName = "file",
+            .description =
+                "The registry file to operate on. This file will be composed with the default registries (global, system, user) in precedence order.",
+            .category = category,
+            .labels = {"file"},
+            .handler = {[this](std::string s) {
+                if (!registry_path.empty())
+                    throw UsageError("'--file' can only be specified once");
+                registry_path = std::move(s);
+            }},
+            .completer = completePath,
+        });
+
         addFlag({
             .longName = "registry",
-            .description = "The registry to operate on.",
-            .labels = {"registry"},
-            .handler = {&registry_path},
+            .description = R"(
+    Deprecated alias for `--file`.
+
+    > **DEPRECATED**
+    >
+    > Use `--file` instead.
+            )",
+            .category = category,
+            .labels = {"file"},
+            .handler = {[this](std::string s) {
+                if (!registry_path.empty())
+                    throw UsageError("'--registry' (or '--file') can only be specified once");
+                warn("'--registry' is deprecated; use '--file' instead");
+                registry_path = std::move(s);
+            }},
+            .completer = completePath,
         });
+    }
+
+    bool hasCustomRegistry() const
+    {
+        return !registry_path.empty();
     }
 
     std::shared_ptr<fetchers::Registry> getRegistry()
@@ -47,7 +81,7 @@ public:
     }
 };
 
-struct CmdRegistryList : StoreCommand
+struct CmdRegistryList : RegistryCommand, StoreCommand
 {
     std::string description() override
     {
@@ -65,7 +99,11 @@ struct CmdRegistryList : StoreCommand
     {
         using namespace fetchers;
 
-        auto registries = getRegistries(fetchSettings, *store);
+        Registries registries;
+        if (hasCustomRegistry())
+            registries.push_back(getRegistry());
+        else
+            registries = getRegistries(fetchSettings, *store);
 
         for (auto & registry : registries) {
             for (auto & entry : registry->entries) {
@@ -75,6 +113,7 @@ struct CmdRegistryList : StoreCommand
                     registry->type == Registry::Flag     ? "flags "
                     : registry->type == Registry::User   ? "user  "
                     : registry->type == Registry::System ? "system"
+                    : registry->type == Registry::Custom ? "custom"
                                                          : "global",
                     entry.from.toURLString(),
                     entry.to.toURLString(attrsToQuery(entry.extraAttrs)));
@@ -199,7 +238,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
     }
 };
 
-struct CmdRegistryResolve : StoreCommand
+struct CmdRegistryResolve : RegistryCommand, StoreCommand
 {
     std::vector<std::string> urls;
 
@@ -225,10 +264,14 @@ struct CmdRegistryResolve : StoreCommand
 
     void run(nix::ref<nix::Store> store) override
     {
+        auto customRegistry = hasCustomRegistry() ? getRegistry() : std::shared_ptr<fetchers::Registry>{};
+
         for (auto & url : urls) {
             auto ref = parseFlakeRef(fetchSettings, url);
-            auto resolved = ref.resolve(fetchSettings, *store);
-            logger->cout("%s", resolved.to_string());
+            auto [input, extraAttrs] = fetchers::lookupInRegistries(
+                fetchSettings, *store, ref.input, fetchers::UseRegistries::All, customRegistry);
+            auto subdir = fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(ref.subdir);
+            logger->cout("%s", FlakeRef(std::move(input), subdir).to_string());
         }
     }
 };
