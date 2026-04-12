@@ -4670,6 +4670,7 @@ struct SerializeContext
     BackRefMap backRefs;
     const PluginPrimOpPolicy & pluginPolicy;
     bool preserveStringContext = false;
+    std::set<std::string> externalBindings;
 
     void checkPluginPrimOp(const PrimOp & primOp)
     {
@@ -4964,6 +4965,9 @@ static bool tryEtaReduce(SerializeContext & ctx, Value & v)
     if (auto * calledVar = dynamic_cast<ExprVar *>(call->fun)) {
         if (calledVar->fromWith || calledVar->level < (Level) depth)
             return false;
+        // Don't eta-reduce if the variable is declared external.
+        if (ctx.externalBindings.count(std::string(ctx.state.symbols[calledVar->name])))
+            return false;
 
         Env * env = closureEnv;
         for (Level l = calledVar->level - depth; l > 0; --l)
@@ -5064,27 +5068,60 @@ static void serializeLambdaWithClosure(SerializeContext & ctx, Value & v)
             neededBindings.emplace(name, val);
     }
 
-    if (neededBindings.empty()) {
+    // Split bindings into external (emitted as wrapper function params)
+    // and inline (serialized as let bindings).
+    std::vector<std::string> externalNames;
+    std::map<std::string, Value *> inlineBindings;
+    for (auto & [name, val] : neededBindings) {
+        if (ctx.externalBindings.count(name))
+            externalNames.push_back(name);
+        else
+            inlineBindings.emplace(name, val);
+    }
+
+    if (externalNames.empty() && inlineBindings.empty()) {
         fun->show(ctx.state.symbols, ctx.out);
         return;
     }
 
+    // Register back-references for recursive values (Nix `let` is recursive).
     BackRefMap savedBackRefs = ctx.backRefs;
-    for (auto & [name, val] : neededBindings) {
+    for (auto & [name, val] : inlineBindings) {
         ctx.state.forceValue(*val, ctx.pos);
         ctx.backRefs.emplace(val, name);
     }
 
-    ctx.out << "(let ";
-    for (auto & [name, val] : neededBindings) {
-        printIdentifier(ctx.out, name);
-        ctx.out << " = ";
-        serializeValue(ctx, *val);
-        ctx.out << "; ";
+    // Emit external bindings as a wrapper function: `({ name1, name2 }: ...)`
+    if (!externalNames.empty()) {
+        ctx.out << "({ ";
+        bool first = true;
+        for (auto & name : externalNames) {
+            if (!first)
+                ctx.out << ", ";
+            printIdentifier(ctx.out, name);
+            first = false;
+        }
+        ctx.out << " }: ";
     }
-    ctx.out << "in ";
-    fun->show(ctx.state.symbols, ctx.out);
-    ctx.out << ")";
+
+    // Emit inline bindings as let block.
+    if (!inlineBindings.empty()) {
+        ctx.out << "(let ";
+        for (auto & [name, val] : inlineBindings) {
+            printIdentifier(ctx.out, name);
+            ctx.out << " = ";
+            serializeValue(ctx, *val);
+            ctx.out << "; ";
+        }
+        ctx.out << "in ";
+        fun->show(ctx.state.symbols, ctx.out);
+        ctx.out << ")";
+    } else {
+        fun->show(ctx.state.symbols, ctx.out);
+    }
+
+    if (!externalNames.empty())
+        ctx.out << ")";
 
     ctx.backRefs = std::move(savedBackRefs);
 }
@@ -5128,6 +5165,7 @@ static void prim_serializeFunction(EvalState & state, const PosIdx pos, Value **
             .debugThrow();
 
     bool preserveCtx = false;
+    std::set<std::string> externalBindings;
     if (args[0]->type() == nAttrs) {
         auto * ctxAttr = args[0]->attrs()->get(state.symbols.create("preserveStringContext"));
         if (ctxAttr)
@@ -5147,7 +5185,7 @@ static void prim_serializeFunction(EvalState & state, const PosIdx pos, Value **
     NixStringContext context;
     std::ostringstream out;
     std::set<const void *> visited;
-    SerializeContext ctx{state, pos, out, context, visited, {}, pluginPolicy, preserveCtx};
+    SerializeContext ctx{state, pos, out, context, visited, {}, pluginPolicy, preserveCtx, std::move(externalBindings)};
     serializeValue(ctx, *fn);
 
     v.mkString(out.str(), context, state.mem);
@@ -5187,6 +5225,22 @@ static RegisterPrimOp primop_serializeFunction({
         strings with store path contexts are wrapped in
         `builtins.appendContext` calls so that contexts survive
         round-trip through `builtins.deserializeFunction`.
+      - `externalBindings` (optional, default `[]`): a list of closure
+        variable names to emit as parameters of a wrapper function
+        instead of inlining their values.  The caller provides their
+        values at deserialization time.  This avoids serializing large
+        library functions (e.g. from nixpkgs `lib`):
+
+        ```nix
+        builtins.serializeFunction {
+          fn = items: concatMapStringsSep ", " toString items;
+          externalBindings = ["concatMapStringsSep"];
+        }
+        # => "({ concatMapStringsSep }: (items: ...))"
+        # Caller provides at deserialization:
+        # (builtins.deserializeFunction s) { inherit (lib) concatMapStringsSep; }
+        ```
+
       Lambdas, primops, and partially applied primops are all supported.
 
       > **Warning**

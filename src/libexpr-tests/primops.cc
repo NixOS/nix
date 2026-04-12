@@ -1228,7 +1228,112 @@ TEST_F(PrimOpTest, dynDrvImportPrimOpRoundTrip)
     ASSERT_THAT(v, IsStringEq("builtins.import"));
 }
 
+// externalBindings: named closure variables become wrapper function params.
+TEST_F(PrimOpTest, serializeFunctionExternalBindings)
+{
+    auto v = eval(R"(
+        let
+          greet = name: "hello ${name}";
+        in builtins.serializeFunction {
+          fn = x: greet x;
+          externalBindings = ["greet"];
+        }
+    )");
+    auto s = std::string(v.string_view());
+    // The output should be a wrapper function taking `greet` as a parameter.
+    EXPECT_THAT(s, ::testing::HasSubstr("{ greet }"));
+    // `greet` should NOT be inlined as a let binding.
+    ASSERT_EQ(s.find("let "), std::string::npos);
+}
+
+// externalBindings round-trip: caller provides bindings at deserialization.
+TEST_F(PrimOpTest, serializeFunctionExternalBindingsRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          double = x: x * 2;
+          serialized = builtins.serializeFunction {
+            fn = x: double x;
+            externalBindings = ["double"];
+          };
+          restored = builtins.deserializeFunction serialized;
+        in restored { double = x: x * 2; } 21
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+// externalBindings with mixed inline and external bindings.
+TEST_F(PrimOpTest, serializeFunctionMixedBindings)
+{
+    auto v = eval(R"(
+        let
+          prefix = "hello";
+          greet = name: "${prefix} ${name}";
+        in builtins.serializeFunction {
+          fn = x: greet x + prefix;
+          externalBindings = ["greet"];
+        }
+    )");
+    auto s = std::string(v.string_view());
+    // `greet` is external (wrapper param), `prefix` is inline (let binding).
+    EXPECT_THAT(s, ::testing::HasSubstr("{ greet }"));
+    EXPECT_THAT(s, ::testing::HasSubstr("prefix"));
+}
+
+// externalBindings in a dynamic derivation scenario: lib functions
 // provided at deserialization time, not inlined.
+TEST_F(PrimOpTest, dynDrvExternalLibBindings)
+{
+    auto v = eval(R"(
+        let
+          concatStrings = builtins.concatStringsSep "";
+          serialized = builtins.serializeFunction {
+            fn = items: concatStrings items;
+            externalBindings = ["concatStrings"];
+          };
+          restored = builtins.deserializeFunction serialized;
+          f = restored { concatStrings = builtins.concatStringsSep ""; };
+        in f ["a" "b" "c"]
+    )");
+    ASSERT_THAT(v, IsStringEq("abc"));
+}
+
+class ToStringPrimOpTest : public PrimOpTest,
+                           public ::testing::WithParamInterface<std::tuple<std::string, std::string_view>>
+{};
+
+TEST_P(ToStringPrimOpTest, toString)
+{
+    const auto & [input, output] = GetParam();
+    auto v = eval(input);
+    ASSERT_THAT(v, IsStringEq(output));
+}
+
+#define CASE(input, output) (std::make_tuple(std::string_view("builtins.toString " input), std::string_view(output)))
+INSTANTIATE_TEST_SUITE_P(
+    toString,
+    ToStringPrimOpTest,
+    ::testing::Values(
+        CASE(R"("foo")", "foo"),
+        CASE(R"(1)", "1"),
+        CASE(R"([1 2 3])", "1 2 3"),
+        CASE(R"(.123)", "0.123000"),
+        CASE(R"(true)", "1"),
+        CASE(R"(false)", ""),
+        CASE(R"(null)", ""),
+        CASE(R"({ v = "bar"; __toString = self: self.v; })", "bar"),
+        CASE(R"({ v = "bar"; __toString = self: self.v; outPath = "foo"; })", "bar"),
+        CASE(R"({ outPath = "foo"; })", "foo")
+// this is broken on cygwin because canonPath("//./test", false) returns //./test
+// FIXME: don't use canonPath
+#ifndef __CYGWIN__
+            ,
+        CASE(R"(./test)", "/test")
+#endif
+            ));
+#undef CASE
+
 TEST_F(PrimOpTest, substring)
 {
     auto v = eval("builtins.substring 0 3 \"nixos\"");
