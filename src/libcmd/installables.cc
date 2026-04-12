@@ -4,8 +4,12 @@
 #include "nix/cmd/installable-attr-path.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/store/outputs-spec.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/fmt.hh"
 #include "nix/util/users.hh"
 #include "nix/util/util.hh"
+
+#include <regex>
 #include "nix/cmd/command.hh"
 #include "nix/expr/attr-path.hh"
 #include "nix/cmd/common-eval-args.hh"
@@ -503,6 +507,99 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
                 }
             }
 
+            /* If the installable looks like `<path>[#<fragment>]` and
+               `<path>` resolves to a local directory, `<fragment>` can be
+               interpreted as an attribute path into that directory's
+               `default.nix` instead of treating `<path>` as a flake. This
+               lets e.g. `nix build .#foo` work in repositories that only
+               have a `default.nix`, and also in repositories that have both
+               files when the `flakes` experimental feature is disabled.
+
+               To match the existing flake walk-up behavior, both
+               `flake.nix` and `default.nix` are searched for in `<path>`
+               and its parent directories (up to a `.git` boundary or
+               filesystem root). The flake search runs first: if a
+               `flake.nix` is found anywhere in the ancestor chain and
+               flakes are enabled, flake resolution takes precedence --
+               even over a `default.nix` closer to `<path>`. This
+               preserves the invariant that a parent directory's
+               `flake.nix` is never silently shadowed.
+
+               When neither file is found anywhere in the ancestor chain
+               we still let flake parsing run (its own walk-up may apply
+               additional heuristics), but on failure we augment the error
+               to mention that a `default.nix` was not found either. */
+            std::optional<std::filesystem::path> localDir;
+            std::string localAttrPath;
+            {
+                static std::regex pathFragmentRegex(R"(([^?#]*)(#(.*))?)", std::regex::ECMAScript);
+                std::smatch match;
+                auto prefixStr = std::string{prefix};
+                if (std::regex_match(prefixStr, match, pathFragmentRegex) && !match[1].str().empty()) {
+                    auto pathPart = match[1].str();
+                    localAttrPath = match[3].str();
+                    try {
+                        auto baseDir = absPath(getCommandBaseDir());
+                        auto absPathPart = absPath(std::filesystem::path{pathPart}, &baseDir);
+                        if (pathExists(absPathPart) && std::filesystem::is_directory(absPathPart))
+                            localDir = absPathPart;
+                    } catch (...) {
+                    }
+                }
+            }
+
+            /* Search upward from `start` for a directory containing
+               `filename`, stopping at `.git` boundaries or the
+               filesystem root. Mirrors the walk-up in
+               `parsePathFlakeRefWithFragment`. */
+            auto searchUpFor = [](const std::filesystem::path & start,
+                                  const char * filename) -> std::optional<std::filesystem::path> {
+                auto path = start;
+                while (true) {
+                    if (pathExists(path / filename))
+                        return path;
+                    if (pathExists(path / ".git"))
+                        break;
+                    auto parent = path.parent_path();
+                    if (parent == path)
+                        break;
+                    path = parent;
+                }
+                return std::nullopt;
+            };
+
+            bool flakesEnabled = experimentalFeatureSettings.isEnabled(Xp::Flakes);
+            auto flakeNixDir = localDir ? searchUpFor(*localDir, "flake.nix") : std::nullopt;
+            auto defaultNixDir = localDir ? searchUpFor(*localDir, "default.nix") : std::nullopt;
+            bool hasFlakeNix = flakeNixDir.has_value();
+            bool hasDefaultNix = defaultNixDir.has_value();
+            bool useFlake = flakesEnabled && hasFlakeNix;
+
+            /* Fast path: the local directory has a usable `default.nix`.
+               Use it directly, before attempting flake parsing, to avoid the
+               misleading "searching up" notice and to keep the behavior
+               entirely local. Skip trying `default.nix` when `--pure-eval` was
+               explicitly set (see the note below about pure mode). */
+            if (localDir && !useFlake && hasDefaultNix
+                && !(evalSettings.pureEval && evalSettings.pureEval.overridden)) {
+                /* Reading `default.nix` requires the real filesystem to be
+                   reachable from the evaluator. In pure-eval mode the root
+                   accessor is restricted to the Nix store, so arbitrary
+                   local paths are not readable at all -- this is the same
+                   constraint that makes `-f` incompatible with pure-eval.
+                   Mirror the `-f` behavior: force pure-eval off for the
+                   duration of this command. */
+                evalSettings.pureEval = false;
+                auto state = getEvalState();
+                auto vFile = state->allocValue();
+                auto baseDir = absPath(getCommandBaseDir());
+                state->evalFile(lookupFileArg(*state, (*defaultNixDir / "default.nix").string(), &baseDir), *vFile);
+                result.push_back(
+                    make_ref<InstallableAttrPath>(InstallableAttrPath::parse(
+                        state, *this, vFile, localAttrPath, std::move(extendedOutputsSpec))));
+                continue;
+            }
+
             try {
                 auto [flakeRef, fragment] =
                     parseFlakeRefWithFragment(fetchSettings, std::string{prefix}, absPath(getCommandBaseDir()));
@@ -517,6 +614,18 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
                         getDefaultFlakeAttrPathPrefixes(),
                         lockFlags));
                 continue;
+            } catch (Error & e) {
+                /* If the target was a local directory that had neither a
+                   `flake.nix` nor a `default.nix`, make that visible in the
+                   error: the user probably expected one of the two. */
+                if (localDir && !hasFlakeNix && !hasDefaultNix) {
+                    e.addTrace(
+                        nullptr,
+                        "neither %s nor its parent directories contain a 'default.nix' to fall back to",
+                        PathFmt(*localDir));
+                    throw;
+                }
+                ex = std::current_exception();
             } catch (...) {
                 ex = std::current_exception();
             }

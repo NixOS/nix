@@ -21,6 +21,7 @@ suites += {
     'prefetch.sh',
     'eval-cache.sh',
     'search-root.sh',
+    'default-nix-fallback.sh',
     'config.sh',
     'show.sh',
     'dubious-query.sh',
