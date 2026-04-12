@@ -5133,6 +5133,68 @@ static RegisterPrimOp primop_serializeFunction({
     .experimentalFeature = Xp::FunctionSerialization,
 });
 
+static void prim_deserializeFunction(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    // Accept strings with context (serializeFunction attaches store path
+    // contexts from closure values).  The context is not restored in the
+    // deserialized result -- see the feature flag documentation.
+    NixStringContext context;
+    auto s = state.forceString(
+        *args[0], context, pos, "while evaluating the first argument passed to builtins.deserializeFunction");
+
+    Expr * e;
+    try {
+        e = state.parseExprFromString(std::string(s), state.rootPath("."), state.staticBaseEnv);
+    } catch (Error & err) {
+        err.addTrace(state.positions[pos], "while parsing the string passed to builtins.deserializeFunction");
+        throw;
+    }
+
+    e->eval(state, state.baseEnv, v);
+    state.forceValue(v, pos);
+
+    if (v.type() != nFunction)
+        state
+            .error<TypeError>(
+                "`builtins.deserializeFunction` expects the string to evaluate to a function, but got %1%", showType(v))
+            .atPos(pos)
+            .debugThrow();
+}
+
+static RegisterPrimOp primop_deserializeFunction({
+    .name = "deserializeFunction",
+    .args = {"s"},
+    .doc = R"doc(
+      Parse and evaluate the string *s* as a Nix expression, which must
+      produce a function value.  This is the inverse of
+      [`builtins.serializeFunction`](#builtins-serializeFunction).
+
+      > **Warning**
+      >
+      > This evaluates arbitrary Nix expressions (the result is only
+      > type-checked after evaluation).  Side effects such as
+      > `builtins.fetchurl` or import-from-derivation can be triggered
+      > during evaluation.  Only use this on trusted input.  This is
+      > inherent to the string-eval approach.
+
+      String contexts from the serialized form are **not** restored
+      by default, since the input is parsed as fresh Nix source.
+      However, if `preserveStringContext = true` was used during
+      serialization, the output contains `builtins.appendContext`
+      calls that reconstruct contexts on evaluation.
+
+      Paths are absolute (resolved at original parse time) but the
+      referenced files may not exist in the deserialization environment.
+
+      ```nix
+      let f = builtins.deserializeFunction "(x: x + 1)";
+      in f 41
+      ```
+      evaluates to `42`.
+    )doc",
+    .impl = prim_deserializeFunction,
+    .experimentalFeature = Xp::FunctionSerialization,
+});
 
 /* `substring start len str' returns the substring of `str' starting
    at byte position `min(start, stringLength str)' inclusive and
