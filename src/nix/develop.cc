@@ -718,6 +718,17 @@ struct CmdDevelop : Common, MixEnvironment
 
 struct CmdPrintDevEnv : Common, MixJSON
 {
+    bool printPath = false;
+
+    CmdPrintDevEnv()
+    {
+        addFlag({
+            .longName = "print-path",
+            .description = "Print the store path of the development environment rather than the contents.",
+            .handler = {&printPath, true},
+        });
+    }
+
     std::string description() override
     {
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
@@ -737,15 +748,17 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto buildEnvironment = getBuildEnvironment(store, installable).first;
+        auto buildEnvironment = getBuildEnvironment(store, installable);
 
         logger->stop();
 
         if (json) {
-            printJSON(buildEnvironment.toJSON());
+            printJSON(buildEnvironment.first.toJSON());
+        } else if (printPath) {
+            logger->writeToStdout(store->printStorePath(buildEnvironment.second));
         } else {
             AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
-            logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));
+            logger->writeToStdout(makeRcScript(store, buildEnvironment.first, tmpDir));
         }
     }
 };
