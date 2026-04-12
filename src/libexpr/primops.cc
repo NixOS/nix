@@ -4669,6 +4669,7 @@ struct SerializeContext
     std::set<const void *> & visited;
     BackRefMap backRefs;
     const PluginPrimOpPolicy & pluginPolicy;
+    bool preserveStringContext = false;
 
     void checkPluginPrimOp(const PrimOp & primOp)
     {
@@ -4758,10 +4759,69 @@ static void serializeValue(SerializeContext & ctx, Value & v)
     case nNull:
         ctx.out << "null";
         break;
-    case nString:
-        printLiteralString(ctx.out, v.string_view());
-        copyContext(v, ctx.context);
+    case nString: {
+        bool hasContext = v.context() && *v.context()->begin();
+        if (hasContext && ctx.preserveStringContext) {
+            // Emit `builtins.appendContext "..." { ... }` so that string
+            // contexts (store path dependencies) survive round-trip
+            // through deserializeFunction.
+            NixStringContext strCtx;
+            copyContext(v, strCtx);
+
+            ctx.out << "(builtins.appendContext ";
+            printLiteralString(ctx.out, v.string_view());
+            ctx.out << " { ";
+
+            // Group context elements by store path, matching the format
+            // expected by `builtins.appendContext`.
+            struct CtxInfo
+            {
+                bool path = false;
+                bool allOutputs = false;
+                std::vector<std::string> outputs;
+            };
+
+            std::map<std::string, CtxInfo> grouped;
+            for (auto & elem : strCtx) {
+                std::visit(
+                    overloaded{
+                        [&](const NixStringContextElem::Opaque & o) {
+                            grouped[ctx.state.store->printStorePath(o.path)].path = true;
+                        },
+                        [&](const NixStringContextElem::DrvDeep & d) {
+                            grouped[ctx.state.store->printStorePath(d.drvPath)].allOutputs = true;
+                        },
+                        [&](const NixStringContextElem::Built & b) {
+                            auto drvPath = resolveDerivedPath(*ctx.state.store, *b.drvPath);
+                            grouped[ctx.state.store->printStorePath(drvPath)].outputs.push_back(b.output);
+                        },
+                    },
+                    elem.raw);
+            }
+            for (auto & [path, info] : grouped) {
+                printLiteralString(ctx.out, path);
+                ctx.out << " = { ";
+                if (info.path)
+                    ctx.out << "path = true; ";
+                if (info.allOutputs)
+                    ctx.out << "allOutputs = true; ";
+                if (!info.outputs.empty()) {
+                    ctx.out << "outputs = [ ";
+                    for (auto & o : info.outputs) {
+                        printLiteralString(ctx.out, o);
+                        ctx.out << " ";
+                    }
+                    ctx.out << "]; ";
+                }
+                ctx.out << "}; ";
+            }
+            ctx.out << "})";
+        } else {
+            printLiteralString(ctx.out, v.string_view());
+            copyContext(v, ctx.context);
+        }
         break;
+    }
     case nPath:
         ctx.out << v.path().to_string();
         break;
@@ -5067,7 +5127,27 @@ static void prim_serializeFunction(EvalState & state, const PosIdx pos, Value **
             .atPos(pos)
             .debugThrow();
 
-    SerializeContext ctx{state, pos, out, context, visited, {}, pluginPolicy};
+    bool preserveCtx = false;
+    if (args[0]->type() == nAttrs) {
+        auto * ctxAttr = args[0]->attrs()->get(state.symbols.create("preserveStringContext"));
+        if (ctxAttr)
+            preserveCtx =
+                state.forceBool(*ctxAttr->value, pos, "while evaluating the `preserveStringContext` attribute");
+
+        auto * extAttr = args[0]->attrs()->get(state.symbols.create("externalBindings"));
+        if (extAttr) {
+            state.forceList(*extAttr->value, pos, "while evaluating the `externalBindings` attribute");
+            for (auto * elem : extAttr->value->listView()) {
+                auto name = state.forceStringNoCtx(*elem, pos, "while evaluating an element of `externalBindings`");
+                externalBindings.emplace(name);
+            }
+        }
+    }
+
+    NixStringContext context;
+    std::ostringstream out;
+    std::set<const void *> visited;
+    SerializeContext ctx{state, pos, out, context, visited, {}, pluginPolicy, preserveCtx};
     serializeValue(ctx, *fn);
 
     v.mkString(out.str(), context, state.mem);
@@ -5103,6 +5183,10 @@ static RegisterPrimOp primop_serializeFunction({
         plugin primop names to allow.  By default, user-provided primops
         (from plugins or the flake subsystem) are rejected since they
         may not be available in the deserialization environment.
+      - `preserveStringContext` (optional, default `false`): if true,
+        strings with store path contexts are wrapped in
+        `builtins.appendContext` calls so that contexts survive
+        round-trip through `builtins.deserializeFunction`.
       Lambdas, primops, and partially applied primops are all supported.
 
       > **Warning**
@@ -5127,6 +5211,7 @@ static RegisterPrimOp primop_serializeFunction({
       contexts (store path dependencies) are attached to the output string
       but lost if the result is passed through
       [`builtins.deserializeFunction`](#builtins-deserializeFunction)
+      unless `preserveStringContext` is enabled.
       Float values are serialized with limited precision (`std::to_string`).
     )doc",
     .impl = prim_serializeFunction,

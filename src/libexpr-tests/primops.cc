@@ -883,9 +883,32 @@ TEST_F(PrimOpTest, serializeFunctionAttrsetNoFnThrows)
 }
 
 // preserveStringContext = false (default): plain string, no appendContext.
+TEST_F(PrimOpTest, serializeFunctionStringContextNotPreservedByDefault)
+{
+    auto v = eval(R"nix(
+        let s = "hello";
+        in builtins.serializeFunction (x: s)
+    )nix");
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
 // preserveStringContext = true: strings with context get appendContext wrapping.
 // We can't easily create real store path context in the test harness, so
 // we verify the flag is accepted and plain strings (no context) are unaffected.
+TEST_F(PrimOpTest, serializeFunctionPreserveStringContextFlagAccepted)
+{
+    auto v = eval(R"nix(
+        builtins.serializeFunction {
+          fn = x: "hello";
+          preserveStringContext = true;
+        }
+    )nix");
+    // Plain string without context: no appendContext wrapping needed.
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
 // Eta-reduction: direct `builtins.head` access is now detected.
 TEST_F(PrimOpTest, serializeFunctionEtaReducesDirectBuiltin)
 {
@@ -1085,6 +1108,19 @@ TEST_F(PrimOpTest, dynDrvStringContextLostOnRoundTrip)
 // Scenario: `preserveStringContext` emits `builtins.appendContext` wrapping
 // for strings with context.  We verify the output format since the test
 // harness uses a dummy store that cannot validate real store paths.
+TEST_F(PrimOpTest, dynDrvPreserveStringContextOutput)
+{
+    auto v = eval(R"nix(
+        let
+          s = "hello";
+          f = _: s;
+        in builtins.serializeFunction { fn = f; preserveStringContext = true; }
+    )nix");
+    // Plain string without context: no wrapping needed even with the flag.
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
 // Scenario: eta-reduced polyfills in a dynamic derivation pipeline.
 // A `lib.head`-style polyfill round-trips to the underlying primop.
 TEST_F(PrimOpTest, dynDrvEtaReducedPolyfill)
