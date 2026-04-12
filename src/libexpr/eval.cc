@@ -2528,6 +2528,42 @@ BackedStringView EvalState::coerceToString(
         if (v.type() == nNull)
             return "";
 
+        if (v.type() == nFunction && experimentalFeatureSettings.isEnabled(Xp::FunctionSerialization)) {
+            if (v.isLambda() && v.lambda().fun) {
+                std::ostringstream s;
+                v.lambda().fun->show(symbols, s);
+                return s.str();
+            } else if (v.isPrimOp() && v.primOp()) {
+                return fmt("builtins.%s", v.primOp()->name);
+            } else if (v.isPrimOpApp()) {
+                // Walk the left-spine to collect the base primop and arguments.
+                std::vector<Value *> args;
+                Value * cur = const_cast<Value *>(&v);
+                while (cur->isPrimOpApp()) {
+                    auto thunk = cur->primOpApp();
+                    args.push_back(thunk.right);
+                    cur = thunk.left;
+                }
+                std::ostringstream s;
+                s << "(builtins." << (cur->isPrimOp() && cur->primOp() ? cur->primOp()->name : "?");
+                for (auto it = args.rbegin(); it != args.rend(); ++it) {
+                    s << " ";
+                    auto arg = coerceToString(
+                        pos,
+                        **it,
+                        context,
+                        "while coercing a partially applied primop argument to a string",
+                        coerceMore,
+                        copyToStore,
+                        canonicalizePath);
+                    s << *arg;
+                }
+                s << ")";
+                return s.str();
+            }
+            return "<<function>>";
+        }
+
         if (v.isList()) {
             std::string result;
             auto listView = v.listView();

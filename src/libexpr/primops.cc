@@ -2642,15 +2642,31 @@ static void prim_fromJSON(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_fromJSON({
     .name = "__fromJSON",
     .args = {"e"},
-    .doc = R"(
-      Convert a JSON string to a Nix value. For example,
+    .doc = R"doc(
+      Convert the expression *e* to a string. *e* can be:
 
-      ```nix
-      builtins.fromJSON ''{"x": [1, 2, 3], "y": null}''
-      ```
+        - A string (in which case the string is returned unmodified).
 
-      returns the value `{ x = [ 1 2 3 ]; y = null; }`.
-    )",
+        - A path (e.g., `toString /foo/bar` yields `"/foo/bar"`.
+
+        - A set containing `{ __toString = self: ...; }` or `{ outPath = ...; }`.
+
+        - An integer.
+
+        - A list, in which case the string representations of its elements
+          are joined with spaces.
+
+        - A Boolean (`false` yields `""`, `true` yields `"1"`).
+
+        - `null`, which yields the empty string.
+
+        - A function (requires the [`function-serialization`](@docroot@/development/experimental-features.md#xp-feature-function-serialization) experimental feature).
+          Lambdas produce their source representation (e.g. `toString (x: x)` yields `"(x: x)"`).
+          Primops produce their qualified `builtins.` name
+          (e.g. `toString builtins.head` yields `"builtins.head"`).
+          Partially applied primops include their arguments
+          (e.g. `toString (builtins.map builtins.head)` yields `"(builtins.map builtins.head)"`).
+    )doc",
     .impl = prim_fromJSON,
 });
 
@@ -4476,7 +4492,7 @@ static void prim_toString(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_toString({
     .name = "toString",
     .args = {"e"},
-    .doc = R"(
+    .doc = R"doc(
       Convert the expression *e* to a string. *e* can be:
 
         - A string (in which case the string is returned unmodified).
@@ -4493,7 +4509,14 @@ static RegisterPrimOp primop_toString({
         - A Boolean (`false` yields `""`, `true` yields `"1"`).
 
         - `null`, which yields the empty string.
-    )",
+
+        - A function (requires the [`function-serialization`](@docroot@/development/experimental-features.md#xp-feature-function-serialization) experimental feature).
+          Lambdas produce their source representation (e.g. `toString (x: x)` yields `"(x: x)"`).
+          Primops produce their qualified `builtins.` name
+          (e.g. `toString builtins.head` yields `"builtins.head"`).
+          Partially applied primops include their arguments
+          (e.g. `toString (builtins.map builtins.head)` yields `"(builtins.map builtins.head)"`).
+    )doc",
     .impl = prim_toString,
 });
 

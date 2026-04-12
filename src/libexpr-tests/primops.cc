@@ -631,9 +631,22 @@ TEST_F(PrimOpTest, toStringAttrsThrows)
     ASSERT_THROW(eval("builtins.toString {}"), EvalError);
 }
 
-TEST_F(PrimOpTest, toStringLambdaThrows)
+TEST_F(PrimOpTest, toStringLambda)
 {
-    ASSERT_THROW(eval("builtins.toString (x: x)"), EvalError);
+    auto v = eval("builtins.toString (x: x)");
+    ASSERT_THAT(v, IsStringEq("(x: x)"));
+}
+
+TEST_F(PrimOpTest, toStringLambdaWithFormals)
+{
+    auto v = eval("builtins.toString ({ a, b ? 1 }: a)");
+    ASSERT_THAT(v, IsStringEq("({ a, b ? 1 }: a)"));
+}
+
+TEST_F(PrimOpTest, toStringPrimOp)
+{
+    auto v = eval("builtins.toString builtins.head");
+    ASSERT_THAT(v, IsStringEq("builtins.head"));
 }
 
 class ToStringPrimOpTest : public PrimOpTest,
