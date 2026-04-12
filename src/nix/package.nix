@@ -56,7 +56,6 @@ mkMesonExecutable (finalAttrs: {
       # Other files to be included as string literals
       ./nix-channel/unpack-channel.nix
       ./nix-env/buildenv.nix
-      ./get-env.sh
       ./help-stores.md
       ../../doc/manual/source/store/types/index.md.in
       ./profiles.md

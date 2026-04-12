@@ -44,6 +44,7 @@ subproject('libfetchers-c')
 subproject('libexpr-c')
 subproject('libflake-c')
 subproject('libmain-c')
+subproject('libcmd-c')
 
 asan_enabled = 'address' in get_option('b_sanitize')
 

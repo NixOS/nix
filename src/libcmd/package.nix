@@ -47,6 +47,7 @@ mkMesonLibrary (finalAttrs: {
     ./meson.build
     ./meson.options
     ./include/nix/cmd/meson.build
+    ./get-env.sh
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];

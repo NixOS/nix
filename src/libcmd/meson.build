@@ -77,6 +77,7 @@ sources = files(
   'command-installable-value.cc',
   'command.cc',
   'common-eval-args.cc',
+  'develop.cc',
   'editor-for.cc',
   'get-build-log.cc',
   'installable-attr-path.cc',
@@ -90,6 +91,9 @@ sources = files(
   'repl-interacter.cc',
   'repl.cc',
 )
+
+subdir('nix-meson-build-support/generate-header')
+sources += gen_header.process('get-env.sh')
 
 if host_machine.system() != 'windows'
   sources += files(
