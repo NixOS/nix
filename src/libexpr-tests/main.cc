@@ -9,8 +9,8 @@ int main(int argc, char ** argv)
     if (res)
         return res;
 
-    // For pipe operator tests in trivial.cc
-    nix::experimentalFeatureSettings.set("experimental-features", "pipe-operators");
+    // For pipe operator tests in trivial.cc and function serialization tests in primops.cc
+    nix::experimentalFeatureSettings.set("experimental-features", "pipe-operators function-serialization");
 
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
