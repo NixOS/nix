@@ -42,6 +42,7 @@
 #include <fstream>
 #include <functional>
 #include <ranges>
+#include <mutex>
 
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
@@ -314,6 +315,17 @@ EvalState::EvalState(
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
 {
+#ifndef _WIN32
+    static std::once_flag stackSizeBumped;
+    std::call_once(stackSizeBumped, []() {
+        // Increase the default stack size for the evaluator and for
+        // libstdc++'s std::regex.
+        // This used to be 64 MiB, but macOS as deployed on GitHub Actions has a
+        // hard limit slightly under that, so we round it down a bit.
+        nix::ensureStackSizeAtLeast(60 * 1024 * 1024);
+    });
+#endif
+
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
 
