@@ -19,7 +19,7 @@ public:
         return oss.str();
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) override
     {
         oss << s << std::endl;
     }

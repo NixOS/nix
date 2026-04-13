@@ -130,7 +130,12 @@ public:
         return false;
     }
 
-    virtual void log(Verbosity lvl, std::string_view s) = 0;
+    /**
+     * @param machine The origin machine for messages forwarded from
+     * a remote store connection (e.g. "ssh-ng://host"). Absent
+     * (nullopt) for locally-generated messages.
+     */
+    virtual void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) = 0;
 
     void log(std::string_view s)
     {
@@ -147,13 +152,17 @@ public:
 
     virtual void warn(const std::string & msg);
 
+    /**
+     * @param machine Remote store origin, see `log()`.
+     */
     virtual void startActivity(
         ActivityId act,
         Verbosity lvl,
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) {};
+        ActivityId parent,
+        std::optional<std::string_view> machine = {}) {};
 
     virtual void stopActivity(ActivityId act) {};
 
@@ -191,6 +200,11 @@ struct nop
 ActivityId getCurActivity();
 void setCurActivity(const ActivityId activityId);
 
+/**
+ * Allocate a fresh activity ID, unique within this process.
+ */
+ActivityId nextActivityId();
+
 struct Activity
 {
     Logger & logger;
@@ -203,7 +217,8 @@ struct Activity
         ActivityType type,
         const std::string & s = "",
         const Logger::Fields & fields = {},
-        ActivityId parent = getCurActivity());
+        ActivityId parent = getCurActivity(),
+        std::optional<std::string_view> machine = {});
 
     Activity(
         Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
@@ -286,7 +301,8 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted);
+    bool trusted,
+    std::optional<std::string_view> machine = {});
 
 /**
  * @param source A noun phrase describing the source of the message, e.g. "the builder".
@@ -296,7 +312,8 @@ bool handleJSONLogMessage(
     const Activity & act,
     std::map<ActivityId, Activity> & activities,
     std::string_view source,
-    bool trusted);
+    bool trusted,
+    std::optional<std::string_view> machine = {});
 
 /**
  * suppress msgs > this
