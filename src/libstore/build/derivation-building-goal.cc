@@ -92,6 +92,17 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     }
 
     for (auto & i : drv->inputSrcs) {
+        /* Root the input before the validity check to close the race
+           against a concurrent GC. This matters most for remote builds
+           receiving a BasicDerivation: all inputs arrive flattened into
+           inputSrcs with no sub-goals to root them transitively, and the
+           builder's auto-GC has no visibility into the client's temp
+           roots. copyPaths() on the client side roots paths it copies,
+           but skips paths already present on the builder, leaving those
+           unprotected for the whole build. Substitution goals created
+           below also root their target, so the extra call in that path
+           is harmless. See #1970. */
+        worker.store.addTempRoot(i);
         if (worker.store.isValidPath(i))
             continue;
         if (!worker.settings.useSubstitutes)
