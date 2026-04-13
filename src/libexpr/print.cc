@@ -231,9 +231,15 @@ private:
 
     void printFloat(Value & v)
     {
+        const std::ios_base::fmtflags flags = output.flags();
+
         if (options.ansiColors)
             output << ANSI_CYAN;
+
+        output.setf(std::ios::showpoint);
         output << v.fpoint();
+        output.flags(flags);
+
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
