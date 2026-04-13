@@ -21,15 +21,15 @@ extern "C" {
 // cffi start
 
 /** @brief Opaque handle to store path metadata */
-typedef struct PathInfo PathInfo;
+typedef struct nix_path_info nix_path_info;
 
 /**
- * @brief Deallocate a PathInfo
+ * @brief Deallocate a nix_path_info
  *
  * Does not fail.
- * @param[in] path_info the PathInfo to free
+ * @param[in] path_info the nix_path_info to free
  */
-void nix_path_info_free(PathInfo * path_info);
+void nix_path_info_free(nix_path_info * path_info);
 
 /**
  * @brief Get the NAR hash of a store path
@@ -38,22 +38,22 @@ void nix_path_info_free(PathInfo * path_info);
  * e.g. "sha256:1b8m03r63zqhnjf7l5nh...". This is the format used in NARINFO files.
  *
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @param[in] callback called with the hash string
  * @param[in] user_data arbitrary data, passed to the callback when it's called
  * @return NIX_OK on success, error code on failure
  */
 nix_err nix_path_info_get_nar_hash(
-    nix_c_context * context, const PathInfo * path_info, nix_get_string_callback callback, void * user_data);
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data);
 
 /**
  * @brief Get the NAR size of a store path
  *
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @return NAR size in bytes, 0 if unknown
  */
-uint64_t nix_path_info_get_nar_size(nix_c_context * context, const PathInfo * path_info);
+uint64_t nix_path_info_get_nar_size(nix_c_context * context, const nix_path_info * path_info);
 
 /**
  * @brief Iterate over the references of a store path
@@ -62,14 +62,14 @@ uint64_t nix_path_info_get_nar_size(nix_c_context * context, const PathInfo * pa
  * callback is borrowed and only valid for the duration of the callback.
  *
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @param[in] user_data arbitrary data, passed to the callback
  * @param[in] callback called for each referenced store path
  * @return NIX_OK on success, error code on failure
  */
 nix_err nix_path_info_get_references(
     nix_c_context * context,
-    const PathInfo * path_info,
+    const nix_path_info * path_info,
     void * user_data,
     void (*callback)(void * user_data, const StorePath * store_path));
 
@@ -78,10 +78,10 @@ nix_err nix_path_info_get_references(
  *
  * @note Don't forget to free the result with nix_store_path_free()!
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @return owned StorePath of the deriver, or NULL if no deriver is known
  */
-StorePath * nix_path_info_get_deriver(nix_c_context * context, const PathInfo * path_info);
+StorePath * nix_path_info_get_deriver(nix_c_context * context, const nix_path_info * path_info);
 
 /**
  * @brief Iterate over the signatures of a store path
@@ -89,14 +89,14 @@ StorePath * nix_path_info_get_deriver(nix_c_context * context, const PathInfo * 
  * Calls the callback once for each signature string (format: "keyName:base64sig").
  *
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @param[in] user_data arbitrary data, passed to the callback
  * @param[in] callback called for each signature string
  * @return NIX_OK on success, error code on failure
  */
 nix_err nix_path_info_get_sigs(
     nix_c_context * context,
-    const PathInfo * path_info,
+    const nix_path_info * path_info,
     void * user_data,
     void (*callback)(void * user_data, const char * sig, unsigned int sig_len));
 
@@ -107,13 +107,13 @@ nix_err nix_path_info_get_sigs(
  * content address string. If not content-addressed, the callback is not called.
  *
  * @param[out] context Optional, stores error information
- * @param[in] path_info the PathInfo to read from
+ * @param[in] path_info the nix_path_info to read from
  * @param[in] callback called with the content address string, if present
  * @param[in] user_data arbitrary data, passed to the callback when it's called
  * @return NIX_OK on success, error code on failure
  */
 nix_err nix_path_info_get_ca(
-    nix_c_context * context, const PathInfo * path_info, nix_get_string_callback callback, void * user_data);
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data);
 
 // cffi end
 #ifdef __cplusplus

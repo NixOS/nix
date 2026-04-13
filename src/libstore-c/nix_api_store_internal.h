@@ -21,7 +21,7 @@ struct nix_derivation
     nix::Derivation drv;
 };
 
-struct PathInfo
+struct nix_path_info
 {
     nix::ref<const nix::ValidPathInfo> info;
 };

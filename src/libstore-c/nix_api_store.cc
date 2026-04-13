@@ -381,24 +381,24 @@ nix_err nix_store_copy_path(
     NIXC_CATCH_ERRS
 }
 
-PathInfo * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path)
+nix_path_info * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path)
 {
     if (context)
         context->last_err_code = NIX_OK;
     try {
         auto info = store->ptr->queryPathInfo(path->path);
-        return new PathInfo{info};
+        return new nix_path_info{info};
     }
     NIXC_CATCH_ERRS_NULL
 }
 
-void nix_path_info_free(PathInfo * path_info)
+void nix_path_info_free(nix_path_info * path_info)
 {
     delete path_info;
 }
 
 nix_err nix_path_info_get_nar_hash(
-    nix_c_context * context, const PathInfo * path_info, nix_get_string_callback callback, void * user_data)
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -409,7 +409,7 @@ nix_err nix_path_info_get_nar_hash(
     NIXC_CATCH_ERRS
 }
 
-uint64_t nix_path_info_get_nar_size(nix_c_context * context, const PathInfo * path_info)
+uint64_t nix_path_info_get_nar_size(nix_c_context * context, const nix_path_info * path_info)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -421,7 +421,7 @@ uint64_t nix_path_info_get_nar_size(nix_c_context * context, const PathInfo * pa
 
 nix_err nix_path_info_get_references(
     nix_c_context * context,
-    const PathInfo * path_info,
+    const nix_path_info * path_info,
     void * user_data,
     void (*callback)(void * user_data, const StorePath * store_path))
 {
@@ -438,7 +438,7 @@ nix_err nix_path_info_get_references(
     NIXC_CATCH_ERRS
 }
 
-StorePath * nix_path_info_get_deriver(nix_c_context * context, const PathInfo * path_info)
+StorePath * nix_path_info_get_deriver(nix_c_context * context, const nix_path_info * path_info)
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -452,7 +452,7 @@ StorePath * nix_path_info_get_deriver(nix_c_context * context, const PathInfo * 
 
 nix_err nix_path_info_get_sigs(
     nix_c_context * context,
-    const PathInfo * path_info,
+    const nix_path_info * path_info,
     void * user_data,
     void (*callback)(void * user_data, const char * sig, unsigned int sig_len))
 {
@@ -470,7 +470,7 @@ nix_err nix_path_info_get_sigs(
 }
 
 nix_err nix_path_info_get_ca(
-    nix_c_context * context, const PathInfo * path_info, nix_get_string_callback callback, void * user_data)
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data)
 {
     if (context)
         context->last_err_code = NIX_OK;

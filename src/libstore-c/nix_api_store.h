@@ -293,9 +293,9 @@ nix_err nix_store_copy_path(
  * @param[out] context Optional, stores error information
  * @param[in] store Nix store reference
  * @param[in] path The store path to query
- * @return owned PathInfo, NULL on error
+ * @return owned nix_path_info, NULL on error
  */
-PathInfo * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path);
+nix_path_info * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path);
 
 // cffi end
 #ifdef __cplusplus
