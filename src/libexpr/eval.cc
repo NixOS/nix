@@ -606,8 +606,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             s << "Function `" << name << "`";
             if (pos)
                 s << "\\\n  … ";
-            else
-                s << "\\\n";
         }
         if (pos) {
             s << "defined at " << pos;
