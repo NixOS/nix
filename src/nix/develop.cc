@@ -513,6 +513,7 @@ struct CmdDevelop : Common, MixEnvironment
 {
     std::vector<std::string> command;
     std::optional<std::string> phase;
+    bool preserveCwd = false;
 
     CmdDevelop()
     {
@@ -537,7 +538,8 @@ struct CmdDevelop : Common, MixEnvironment
 
         addFlag({
             .longName = "unpack",
-            .description = "Run the `unpack` phase.",
+            .description =
+                "Run the `unpack` phase. By default this will unpack in the flake root. See `--preserve-cwd`.",
             .handler = {&phase, {"unpack"}},
         });
 
@@ -569,6 +571,13 @@ struct CmdDevelop : Common, MixEnvironment
             .longName = "installcheck",
             .description = "Run the `installcheck` phase.",
             .handler = {&phase, {"installCheck"}},
+        });
+
+        addFlag({
+            .longName = "preserve-cwd",
+            .description =
+                "Don't cd to the flake root when using `--phase`. Useful when using `--unpack` with a flake in the Nix store / flake registry.",
+            .handler = {&preserveCwd, true},
         });
     }
 
@@ -694,7 +703,7 @@ struct CmdDevelop : Common, MixEnvironment
                                               : Strings{shell.filename().string(), "--rcfile", rcFilePath};
 
         // Need to chdir since phases assume in flake directory
-        if (phase) {
+        if (phase && !preserveCwd) {
             // chdir if installable is a flake of type git+file or path
             auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
             if (installableFlake) {
