@@ -29,10 +29,10 @@ struct TeeLogger : Logger
             logger->resume();
     };
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, const std::string & machine = "") override
     {
         for (auto & logger : loggers)
-            logger->log(lvl, s);
+            logger->log(lvl, s, machine);
     }
 
     void logEI(const ErrorInfo & ei) override
@@ -47,22 +47,23 @@ struct TeeLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        const std::string & machine = "") override
     {
         for (auto & logger : loggers)
-            logger->startActivity(act, lvl, type, s, fields, parent);
+            logger->startActivity(act, lvl, type, s, fields, parent, machine);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act, const std::string & machine = "") override
     {
         for (auto & logger : loggers)
-            logger->stopActivity(act);
+            logger->stopActivity(act, machine);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields, const std::string & machine = "") override
     {
         for (auto & logger : loggers)
-            logger->result(act, type, fields);
+            logger->result(act, type, fields, machine);
     }
 
     void writeToStdout(std::string_view s) override
