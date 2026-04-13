@@ -342,7 +342,7 @@ struct LocalSettings : public virtual Config, public GCSettings, public AutoAllo
 
     Setting<SandboxMode> sandboxMode{
         this,
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
         smEnabled
 #else
         smDisabled
