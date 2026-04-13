@@ -979,7 +979,7 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
 
 TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
 {
-    PathInfo * info = nix_store_query_path_info(ctx, store, outPath);
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
     assert_ctx_ok();
     ASSERT_NE(info, nullptr);
 
@@ -1024,7 +1024,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
 
 TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_deriver)
 {
-    PathInfo * info = nix_store_query_path_info(ctx, store, outPath);
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
     assert_ctx_ok();
     ASSERT_NE(info, nullptr);
 
@@ -1042,7 +1042,7 @@ TEST_F(nix_api_store_test, nix_store_query_path_info_invalid_path)
     StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
     ASSERT_NE(path, nullptr);
 
-    PathInfo * info = nix_store_query_path_info(ctx, store, path);
+    nix_path_info * info = nix_store_query_path_info(ctx, store, path);
     ASSERT_EQ(info, nullptr);
     ASSERT_NE(nix_err_code(ctx), NIX_OK);
 
