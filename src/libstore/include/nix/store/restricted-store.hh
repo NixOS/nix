@@ -2,6 +2,9 @@
 ///@file
 
 #include "nix/store/store-api.hh"
+#include "nix/util/sync.hh"
+
+#include <future>
 
 namespace nix {
 
@@ -28,15 +31,20 @@ struct RestrictionContext
      */
     virtual const StorePathSet & originalPaths() = 0;
 
-    /**
-     * Paths that were added via recursive Nix calls.
-     */
-    StorePathSet addedPaths;
+    struct State
+    {
+        /**
+         * Paths that were added via recursive Nix calls.
+         */
+        std::map<StorePath, std::shared_future<void>> addedPaths;
 
-    /**
-     * Realisations that were added via recursive Nix calls.
-     */
-    std::set<DrvOutput> addedDrvOutputs;
+        /**
+         * Realisations that were added via recursive Nix calls.
+         */
+        std::set<DrvOutput> addedDrvOutputs;
+    };
+
+    Sync<State> state_;
 
     /**
      * Recursive Nix calls are only allowed to build or realize paths
@@ -56,7 +64,33 @@ struct RestrictionContext
     {
         if (isAllowed(path))
             return;
-        addDependencyImpl(path);
+
+        std::promise<void> promise;
+
+        auto [future, shouldAdd] = [&]() -> std::pair<std::shared_future<void>, bool> {
+            auto state(state_.lock());
+            if (auto iter = state->addedPaths.find(path); iter != state->addedPaths.end()) {
+                return {iter->second, false};
+            }
+            auto [iter2, _] = state->addedPaths.emplace(path, promise.get_future().share());
+            return {iter2->second, true};
+        }();
+
+        /* Another daemon worker thread already started adding the dependency. Just wait for it
+           to complete. */
+        if (!shouldAdd) {
+            future.get();
+            return;
+        }
+
+        try {
+            addDependencyImpl(path);
+            promise.set_value();
+        } catch (...) {
+            /* Notify all other waiters that we are done. */
+            promise.set_exception(std::current_exception());
+            throw;
+        }
     }
 
     virtual ~RestrictionContext() = default;
