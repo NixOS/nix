@@ -58,7 +58,7 @@ unsigned int getMaxCPU()
 #ifndef _WIN32
 size_t savedStackSize = 0;
 
-void setStackSize(size_t stackSize)
+void ensureStackSizeAtLeast(size_t stackSize)
 {
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
