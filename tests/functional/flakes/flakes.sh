@@ -286,6 +286,12 @@ rm -rf "$TEST_ROOT"/flake1-v2
 nix flake clone flake1 --dest "$TEST_ROOT"/flake1-v2
 [ -e "$TEST_ROOT"/flake1-v2/flake.nix ]
 
+# Test 'nix flake clone' with a specific revision.
+rm -rf "$TEST_ROOT"/flake1-v2
+nix flake clone "git+file://$flake1Dir?ref=master&rev=$hash1" --dest "$TEST_ROOT"/flake1-v2
+[ -e "$TEST_ROOT"/flake1-v2/flake.nix ]
+[[ $(git -C "$TEST_ROOT"/flake1-v2 rev-parse HEAD) = "$hash1" ]]
+
 # Test 'follows' inputs.
 cat > "$flake3Dir/flake.nix" <<EOF
 {
