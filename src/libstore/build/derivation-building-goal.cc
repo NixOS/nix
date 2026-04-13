@@ -16,6 +16,7 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
 
 #include <algorithm>
 #include <sys/types.h>
@@ -65,7 +66,72 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     return msg;
 }
 
-static void runPostBuildHook(
+struct LogSink : Sink
+{
+    Activity & act;
+    std::string currentLine;
+
+    LogSink(Activity & act)
+        : act(act)
+    {
+    }
+
+    void operator()(std::string_view data) override
+    {
+        for (auto c : data) {
+            if (c == '\n') {
+                flushLine();
+            } else {
+                currentLine += c;
+            }
+        }
+    }
+
+    void flushLine()
+    {
+        act.result(resPostBuildLogLine, currentLine);
+        currentLine.clear();
+    }
+
+    ~LogSink()
+    {
+        if (currentLine != "") {
+            currentLine += '\n';
+            flushLine();
+        }
+    }
+};
+
+struct PostBuildHookState
+{
+    const std::string hook;
+    Activity act;
+    std::unique_ptr<LogSink> sink;
+    std::unique_ptr<Pipe> out;
+    Pid pid;
+
+    PostBuildHookState(Logger & logger, const std::string hook, const std::string drvPath)
+        : hook(hook)
+        , act(logger,
+              lvlTalkative,
+              actPostBuildHook,
+              fmt("running post-build-hook '%s'", hook),
+              Logger::Fields{drvPath})
+        , out(std::make_unique<Pipe>())
+    {
+        out->create();
+        sink = std::make_unique<LogSink>(act);
+    }
+
+    void complete()
+    {
+        if (int ret = pid.wait()) {
+            throw Error("program \"%s\" %s", hook, statusToString(ret));
+        }
+    }
+};
+
+static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
@@ -761,7 +827,21 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     StorePathSet outputPaths;
     for (auto & [_, output] : builtOutputs)
         outputPaths.insert(output.outPath);
-    runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+
+    if (worker.settings.postBuildHook.get() != "") {
+        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+        worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
+        while (true) {
+            auto event = co_await WaitForChildEvent{};
+            if (auto * output = std::get_if<ChildOutput>(&event)) {
+                (*hookState->sink)(output->data);
+            } else if (std::get_if<ChildEOF>(&event)) {
+                hookState->complete();
+                worker.childTerminated(this);
+                break;
+            }
+        }
+    }
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will
@@ -991,7 +1071,21 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
-        runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+
+        if (worker.settings.postBuildHook.get() != "") {
+            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+            worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
+            while (true) {
+                auto event = co_await WaitForChildEvent{};
+                if (auto * output = std::get_if<ChildOutput>(&event)) {
+                    (*hookState->sink)(output->data);
+                } else if (std::get_if<ChildEOF>(&event)) {
+                    hookState->complete();
+                    worker.childTerminated(this);
+                    break;
+                }
+            }
+        }
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -1004,24 +1098,21 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 #endif
 }
 
-static void runPostBuildHook(
+static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths)
 {
-    auto hook = workerSettings.postBuildHook;
-    if (hook == "")
-        return;
+#ifdef _WIN32
+    throw UnimplementedError("post-build-hook is not implemented on Windows");
+#else
+    auto state =
+        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
 
-    Activity act(
-        logger,
-        lvlTalkative,
-        actPostBuildHook,
-        fmt("running post-build-hook '%s'", workerSettings.postBuildHook),
-        Logger::Fields{store.printStorePath(drvPath)});
-    PushActivity pact(act.id);
+    auto hook = workerSettings.postBuildHook.get();
+
     OsStringMap hookEnvironment = getEnvOs();
 
     hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
@@ -1029,50 +1120,34 @@ static void runPostBuildHook(
         OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
-    struct LogSink : Sink
-    {
-        Activity & act;
-        std::string currentLine;
+    ProcessOptions processOptions;
+    processOptions.allowVfork = false;
 
-        LogSink(Activity & act)
-            : act(act)
-        {
-        }
+    state->pid = startProcess(
+        [&] {
+            replaceEnv(hookEnvironment);
+            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw SysError("cannot dup stdout into stderr");
 
-        void operator()(std::string_view data) override
-        {
-            for (auto c : data) {
-                if (c == '\n') {
-                    flushLine();
-                } else {
-                    currentLine += c;
-                }
-            }
-        }
+            Strings args_;
+            args_.push_front(hook);
 
-        void flushLine()
-        {
-            act.result(resPostBuildLogLine, currentLine);
-            currentLine.clear();
-        }
+            unix::closeExtraFDs();
 
-        ~LogSink()
-        {
-            if (currentLine != "") {
-                currentLine += '\n';
-                flushLine();
-            }
-        }
-    };
+            restoreProcessContext();
 
-    LogSink sink(act);
+            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
 
-    runProgram2({
-        .program = workerSettings.postBuildHook.get(),
-        .environment = hookEnvironment,
-        .standardOut = &sink,
-        .mergeStderrToStdout = true,
-    });
+            throw SysError("executing %s", PathFmt(hook));
+        },
+        processOptions);
+
+    state->out->writeSide.close();
+
+    return state;
+#endif
 }
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
