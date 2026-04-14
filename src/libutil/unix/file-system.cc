@@ -37,7 +37,7 @@ AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink fi
 
 AutoCloseFD openNewFileForWrite(const std::filesystem::path & path, mode_t mode, OpenNewFileForWriteParams params)
 {
-    auto flags = O_WRONLY | O_CREAT | O_CLOEXEC;
+    auto flags = (params.writeOnly ? O_WRONLY : O_RDWR) | O_CREAT | O_CLOEXEC;
     if (params.truncateExisting) {
         flags |= O_TRUNC;
         if (!params.followSymlinksOnTruncate)

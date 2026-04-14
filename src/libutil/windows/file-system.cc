@@ -57,7 +57,7 @@ openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t 
 {
     return AutoCloseFD{CreateFileW(
         path.c_str(),
-        GENERIC_WRITE,
+        GENERIC_WRITE | (params.writeOnly ? 0 : GENERIC_READ),
         FILE_SHARE_READ | FILE_SHARE_DELETE,
         /*lpSecurityAttributes=*/nullptr,
         params.truncateExisting ? CREATE_ALWAYS : CREATE_NEW, /* TODO: Reparse points. */

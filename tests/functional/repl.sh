@@ -381,6 +381,9 @@ import $testDir/lang/parse-fail-eof-pos.nix
 " \
 '.*error: syntax error, unexpected end of file.*'
 
+EDITOR='cat' nix repl <<< ':e derivation' 2>&1 | grepQuiet 'derivationStrict'
+EDITOR='cat' nix repl <<< ':e <nix/fetchurl.nix>' 2>&1 | grepQuiet 'builtin:fetchurl'
+
 # TODO: move init to characterisation/framework.sh
 badDiff=0
 badExitCode=0

@@ -484,8 +484,8 @@ ProcessLineResult NixRepl::processLine(std::string line)
             }
         }();
 
-        // Open in EDITOR
-        auto args = editorFor(path, line);
+        /* Open file in EDITOR, or edit a read-only copy if the file doesn't have a physical path. */
+        auto [args, fd, autoDel] = editorFor(path, line, /*readOnly=*/true);
         auto editor = args.front();
         args.pop_front();
 
@@ -494,13 +494,16 @@ ProcessLineResult NixRepl::processLine(std::string line)
         runProgram2({
             .program = editor,
             .lookupPath = true,
-            .args = toOsStrings(std::move(args)),
+            .args = std::move(args),
             .isInteractive = true,
         });
 
-        // Reload right after exiting the editor
-        state->resetFileCache();
-        reloadFilesAndFlakes();
+        /* If we had to open a temporary read-only file, there's no need to
+           reload (no files could have changed anyway). */
+        if (!fd) {
+            state->resetFileCache();
+            reloadFilesAndFlakes();
+        }
     }
 
     else if (command == ":t") {
