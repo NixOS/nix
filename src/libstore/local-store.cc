@@ -1064,8 +1064,8 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     throw Error(
                         "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
                         printStorePath(info.path),
-                        info.narHash.to_string(HashFormat::Nix32, true),
-                        hashResult.hash.to_string(HashFormat::Nix32, true));
+                        info.narHash.to_string(HashFormat::SRI, true),
+                        hashResult.hash.to_string(HashFormat::SRI, true));
 
                 if (hashResult.numBytesDigested != info.narSize)
                     throw Error(
