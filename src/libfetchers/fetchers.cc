@@ -239,6 +239,20 @@ void Input::checkLocks(Input specified, Input & result)
         if (auto narHash = result.getNarHash())
             result.attrs.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
 
+        /* Backwards compatibility hack: URL path encoding changed to stop
+           over-encoding sub-delims (RFC 3986 pchar), so lock files written
+           by older nix may have e.g. `%2B` where current nix writes `+`.
+           Canonicalize both sides through parseURL so they compare equal. */
+        auto normalizeUrl = [](Attrs & attrs) {
+            if (auto url = maybeGetStrAttr(attrs, "url"))
+                try {
+                    attrs.insert_or_assign("url", parseURL(*url).to_string());
+                } catch (BadURL &) {
+                }
+        };
+        normalizeUrl(specified.attrs);
+        normalizeUrl(result.attrs);
+
         for (auto & field : specified.attrs) {
             auto field2 = result.attrs.find(field.first);
             if (field2 != result.attrs.end() && field.second != field2->second)
