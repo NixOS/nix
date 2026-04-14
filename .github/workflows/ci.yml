@@ -9,7 +9,7 @@ on:
       dogfood:
         description: 'Use dogfood Nix build'
         required: false
-        default: true
+        default: false
         type: boolean
 
 permissions: read-all
@@ -23,7 +23,7 @@ jobs:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
       with:
-        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        dogfood: false
         extra_nix_config:
           experimental-features = nix-command flakes
         github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -37,7 +37,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+          dogfood: false
           extra_nix_config: experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - run: ./ci/gha/tests/pre-commit-checks
@@ -87,7 +87,7 @@ jobs:
     - uses: ./.github/actions/install-nix-action
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        dogfood: false
         # The sandbox would otherwise be disabled by default on Darwin
         extra_nix_config: "sandbox = true"
     # Since ubuntu 22.30, unprivileged usernamespaces are no longer allowed to map to the root user:
@@ -186,7 +186,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+          dogfood: false
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -217,7 +217,7 @@ jobs:
           path: flake-regressions/tests
       - uses: ./.github/actions/install-nix-action
         with:
-          dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+          dogfood: false
           extra_nix_config:
             experimental-features = nix-command flakes
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -237,7 +237,7 @@ jobs:
     - uses: ./.github/actions/install-nix-action
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        dogfood: false
         extra_nix_config: |
           experimental-features = flakes nix-command ca-derivations impure-derivations
           max-jobs = 1
