@@ -110,9 +110,12 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
     res += "URL: " + url + "\n";
     assert(compression != "");
     res += "Compression: " + compression + "\n";
-    assert(fileHash && fileHash->algo == HashAlgorithm::SHA256);
-    res += "FileHash: " + fileHash->to_string(HashFormat::Nix32, true) + "\n";
-    res += "FileSize: " + std::to_string(fileSize) + "\n";
+    if (fileHash) {
+        assert(fileHash->algo == HashAlgorithm::SHA256);
+        res += "FileHash: " + fileHash->to_string(HashFormat::Nix32, true) + "\n";
+    }
+    if (fileSize)
+        res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.algo == HashAlgorithm::SHA256);
     res += "NarHash: " + narHash.to_string(HashFormat::Nix32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
