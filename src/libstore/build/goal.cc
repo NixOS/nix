@@ -12,16 +12,15 @@ TimedOut::TimedOut(time_t maxDuration)
 
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
-using ChildEvents = decltype(promise_type::childEvents);
 
-void ChildEvents::pushChildEvent(ChildOutput event)
+void Goal::ChildEvents::pushChildEvent(ChildOutput event)
 {
     if (childTimeout)
         return; // Already timed out, ignore
     childOutputs.push(std::move(event));
 }
 
-void ChildEvents::pushChildEvent(ChildEOF event)
+void Goal::ChildEvents::pushChildEvent(ChildEOF event)
 {
     if (childTimeout)
         return; // Already timed out, ignore
@@ -29,20 +28,20 @@ void ChildEvents::pushChildEvent(ChildEOF event)
     childEOF = std::move(event);
 }
 
-void ChildEvents::pushChildEvent(TimedOut event)
+void Goal::ChildEvents::pushChildEvent(TimedOut event)
 {
     // Timeout is immediate - flush pending events
     childOutputs = {};
     childEOF.reset();
-    childTimeout = std::move(event);
+    childTimeout = std::make_unique<TimedOut>(std::move(event));
 }
 
-bool ChildEvents::hasChildEvent() const
+bool Goal::ChildEvents::hasChildEvent() const
 {
     return !childOutputs.empty() || childEOF || childTimeout;
 }
 
-Goal::ChildEvent ChildEvents::popChildEvent()
+Goal::ChildEvent Goal::ChildEvents::popChildEvent()
 {
     if (!childOutputs.empty()) {
         auto event = std::move(childOutputs.front());
@@ -52,7 +51,7 @@ Goal::ChildEvent ChildEvents::popChildEvent()
     if (childEOF)
         return *std::exchange(childEOF, std::nullopt);
     if (childTimeout)
-        return *std::exchange(childTimeout, std::nullopt);
+        return std::exchange(childTimeout, nullptr);
     unreachable();
 }
 
@@ -278,22 +277,19 @@ void Goal::work()
 
 void Goal::handleChildOutput(Descriptor fd, std::string_view data)
 {
-    assert(top_co);
-    top_co->handle.promise().childEvents.pushChildEvent(ChildOutput{fd, std::string{data}});
+    childEvents.pushChildEvent(ChildOutput{fd, std::string{data}});
     worker.wakeUp(shared_from_this());
 }
 
 void Goal::handleEOF(Descriptor fd)
 {
-    assert(top_co);
-    top_co->handle.promise().childEvents.pushChildEvent(ChildEOF{fd});
+    childEvents.pushChildEvent(ChildEOF{fd});
     worker.wakeUp(shared_from_this());
 }
 
 void Goal::timedOut(TimedOut && ex)
 {
-    assert(top_co);
-    top_co->handle.promise().childEvents.pushChildEvent(std::move(ex));
+    childEvents.pushChildEvent(std::move(ex));
     worker.wakeUp(shared_from_this());
 }
 
