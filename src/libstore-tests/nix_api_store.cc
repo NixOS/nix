@@ -1053,4 +1053,109 @@ TEST_F(nix_api_store_test, nix_store_query_path_info_invalid_path)
     nix_store_path_free(path);
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_references_early_exit)
+{
+    // Construct a path info with multiple references to test callback early exit
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->references.insert(outPath->path);
+    mutInfo->references.insert(drvPath->path);
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    int callCount = 0;
+    auto refCb = LambdaAdapter{.fun = [&](const StorePath *) -> nix_err {
+        callCount++;
+        return NIX_ERR_UNKNOWN;
+    }};
+    auto ret = nix_path_info_get_references(
+        ctx, info, static_cast<void *>(&refCb), decltype(refCb)::call_void<const StorePath *>);
+
+    ASSERT_EQ(callCount, 1);
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_sigs_early_exit)
+{
+    // Construct a path info with multiple signatures directly to avoid store cache issues
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->sigs.insert(nix::Signature::parse("key1:c2ln"));
+    mutInfo->sigs.insert(nix::Signature::parse("key2:c2ln"));
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    int callCount = 0;
+    auto sigCb = LambdaAdapter{.fun = [&](const char *, unsigned int) -> nix_err {
+        callCount++;
+        return NIX_ERR_UNKNOWN;
+    }};
+    auto ret = nix_path_info_get_sigs(
+        ctx, info, static_cast<void *>(&sigCb), decltype(sigCb)::call_void<const char *, unsigned int>);
+
+    ASSERT_EQ(callCount, 1);
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_deriver_absent)
+{
+    // The derivation itself was not built from another derivation, so deriver should be absent
+    nix_path_info * info = nix_store_query_path_info(ctx, store, drvPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    StorePath * deriver = nix_path_info_get_deriver(ctx, info);
+    assert_ctx_ok();
+    ASSERT_EQ(deriver, nullptr);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_ca_absent)
+{
+    // Construct a path info without a content address to test the absent-CA branch
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->ca = std::nullopt;
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    bool callbackCalled = false;
+    auto ret = nix_path_info_get_ca(
+        ctx,
+        info,
+        [](const char *, unsigned int, void * ud) { *static_cast<bool *>(ud) = true; },
+        &callbackCalled);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_FALSE(callbackCalled);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_null_callbacks)
+{
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    // NULL callback for references should succeed without invoking anything
+    auto ret = nix_path_info_get_references(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // NULL callback for sigs should succeed without invoking anything
+    ret = nix_path_info_get_sigs(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    // NULL callback for ca should succeed without invoking anything
+    ret = nix_path_info_get_ca(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    nix_path_info_free(info);
+}
+
 } // namespace nixC
