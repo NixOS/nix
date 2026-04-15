@@ -275,6 +275,8 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
         expectTag("target");
 
         auto target = getString(narMaxTarget);
+        if (target.empty() || target.find((char) 0) != std::string::npos)
+            throw badArchive("NAR contains invalid symlink target");
         sink.createSymlink(path, target);
 
         expectTag(")");
