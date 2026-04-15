@@ -18,6 +18,14 @@ subproject('libflake')
 subproject('libmain')
 subproject('libcmd')
 
+# External C wrapper libraries
+subproject('libutil-c')
+subproject('libstore-c')
+subproject('libfetchers-c')
+subproject('libexpr-c')
+subproject('libflake-c')
+subproject('libmain-c')
+
 # Executables
 subproject('nix')
 
@@ -33,14 +41,6 @@ if get_option('doc-gen')
     subproject('nix-manual')
   endif
 endif
-
-# External C wrapper libraries
-subproject('libutil-c')
-subproject('libstore-c')
-subproject('libfetchers-c')
-subproject('libexpr-c')
-subproject('libflake-c')
-subproject('libmain-c')
 
 # Testing
 if get_option('unit-tests')

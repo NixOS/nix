@@ -1,0 +1,6 @@
+option(
+  'plugin-c-api',
+  type : 'boolean',
+  value : false,
+  description : 'Build plugin tests that expect the nix executable to export the public C API',
+)

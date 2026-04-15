@@ -49,7 +49,7 @@ headers += files('nix_api_util_internal.h')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-this_library = library(
+this_libraries = both_libraries(
   'nixutilc',
   sources,
   config_priv_h,
@@ -57,9 +57,10 @@ this_library = library(
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,
-  prelink : true, # For C++ static initializers
+  override_options : [ 'b_lto=false' ],
   install : true,
 )
+plugin_c_api_enabled = true
 
 install_headers(headers, preserve_path : true)
 
