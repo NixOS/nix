@@ -1,0 +1,34 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/sh",
+  "env": {
+    "out": "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": [
+      "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"
+    ]
+  },
+  "meta": {
+    "description": "A test derivation",
+    "maintainer": "test@example.com",
+    "version": "1.0"
+  },
+  "name": "meta-derivation",
+  "outputs": {
+    "out": {
+      "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"
+    }
+  },
+  "structuredAttrs": {
+    "requiredSystemFeatures": [
+      "derivation-meta"
+    ]
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}
