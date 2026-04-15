@@ -31,6 +31,12 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
+/* Maximum directory nesting depth for dumpPath()/parseDump(). Bounds
+   stack usage so deep trees cannot overflow the (possibly coroutine)
+   stack these run on. Chosen to fit comfortably in the default 128 KiB
+   boost coroutine stack. */
+static constexpr size_t narMaxDepth = 64;
+
 PathFilter defaultPathFilter = [](const Path &) { return true; };
 
 void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
@@ -46,10 +52,13 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
         writePadding(*size, sink);
     };
 
-    std::function<void(const CanonPath & path)> dump;
+    std::function<void(const CanonPath & path, size_t depth)> dump;
 
-    dump = [&](const CanonPath & path) {
+    dump = [&](const CanonPath & path, size_t depth) {
         checkInterrupt();
+
+        if (depth >= narMaxDepth)
+            throw Error("path '%s' exceeds maximum NAR directory depth of %d", showPath(path), narMaxDepth);
 
         auto st = lstat(path);
 
@@ -85,7 +94,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             for (auto & i : unhacked)
                 if (filter((path / i.first).abs())) {
                     sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path / i.second);
+                    dump(path / i.second, depth + 1);
                     sink << ")";
                 }
         }
@@ -100,7 +109,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
     };
 
     sink << narVersionMagic1;
-    dump(path);
+    dump(path, 0);
 }
 
 time_t dumpPathAndGetMtime(const Path & path, Sink & sink, PathFilter & filter)
@@ -156,8 +165,11 @@ struct CaseInsensitiveCompare
     }
 };
 
-static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
+static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path, size_t depth)
 {
+    if (depth >= narMaxDepth)
+        throw badArchive("NAR directory nesting exceeds maximum depth of %d", narMaxDepth);
+
     auto getString = [&]() {
         checkInterrupt();
         return readString(source);
@@ -241,7 +253,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
             expectTag("node");
 
-            parse(sink, source, path / name);
+            parse(sink, source, path / name, depth + 1);
 
             expectTag(")");
         }
@@ -271,7 +283,7 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, CanonPath::root);
+    parse(sink, source, CanonPath::root, 0);
 }
 
 void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
