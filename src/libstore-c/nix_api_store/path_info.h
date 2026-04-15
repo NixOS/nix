@@ -35,7 +35,7 @@ void nix_path_info_free(nix_path_info * path_info);
  * @brief Get the NAR hash of a store path
  *
  * Returns the hash as a string with algorithm prefix in Nix base-32 encoding,
- * e.g. "sha256:1b8m03r63zqhnjf7l5nh...". This is the format used in NARINFO files.
+ * e.g. "sha256:1b8m03r63zqhnjf7l5nh...". This is the format used in narinfo files.
  *
  * @param[out] context Optional, stores error information
  * @param[in] path_info the nix_path_info to read from
