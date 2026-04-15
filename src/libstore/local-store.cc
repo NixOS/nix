@@ -584,7 +584,7 @@ void LocalStore::upgradeDBSchema(State & state)
         debug("executing Nix database schema migration '%s'...", migrationName);
 
         SQLiteTxn txn(state.db);
-        state.db.exec(stmt + fmt(";\ninsert into SchemaMigrations values('%s')", migrationName));
+        state.db.exec(stmt + fmt(";\ninsert or ignore into SchemaMigrations values('%s')", migrationName));
         txn.commit();
 
         schemaMigrations.insert(migrationName);
