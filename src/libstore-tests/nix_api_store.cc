@@ -996,10 +996,11 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
 
     // May be empty for this simple derivation
     std::vector<std::string> refs;
-    auto refCb = LambdaAdapter{.fun = [&](const StorePath * refPath) {
+    auto refCb = LambdaAdapter{.fun = [&](const StorePath * refPath) -> nix_err {
         std::string name;
         nix_store_path_name(refPath, OBSERVE_STRING(name));
         refs.push_back(name);
+        return NIX_OK;
     }};
     ret = nix_path_info_get_references(
         ctx, info, static_cast<void *>(&refCb), decltype(refCb)::call_void<const StorePath *>);
@@ -1007,7 +1008,10 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
     ASSERT_EQ(ret, NIX_OK);
 
     std::vector<std::string> sigs;
-    auto sigCb = LambdaAdapter{.fun = [&](const char * sig, unsigned int sig_len) { sigs.emplace_back(sig, sig_len); }};
+    auto sigCb = LambdaAdapter{.fun = [&](const char * sig, unsigned int sig_len) -> nix_err {
+        sigs.emplace_back(sig, sig_len);
+        return NIX_OK;
+    }};
     ret = nix_path_info_get_sigs(
         ctx, info, static_cast<void *>(&sigCb), decltype(sigCb)::call_void<const char *, unsigned int>);
     assert_ctx_ok();
