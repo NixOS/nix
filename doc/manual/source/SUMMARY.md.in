@@ -62,6 +62,7 @@
   - [Verifying Build Reproducibility](advanced-topics/diff-hook.md)
   - [Using the `post-build-hook`](advanced-topics/post-build-hook.md)
   - [Evaluation profiler](advanced-topics/eval-profiler.md)
+  - [Development Shells](advanced-topics/development-shells.md)
 - [Command Reference](command-ref/index.md)
   - [Common Options](command-ref/opt-common.md)
   - [Common Environment Variables](command-ref/env-common.md)
