@@ -10,6 +10,7 @@
 #include <memory>
 
 #include <boost/coroutine2/coroutine.hpp>
+#include <boost/coroutine2/protected_fixedsize_stack.hpp>
 
 #ifdef _WIN32
 #  include <fileapi.h>
@@ -327,7 +328,7 @@ std::unique_ptr<FinishSink> sourceToSink(fun<void(Source &)> reader)
             cur = in;
 
             if (!coro) {
-                coro = coro_t::push_type([&](coro_t::pull_type & yield) {
+                coro = coro_t::push_type(boost::coroutines2::protected_fixedsize_stack(), [&](coro_t::pull_type & yield) {
                     LambdaSource source([&](char * out, size_t out_len) {
                         if (cur.empty()) {
                             yield();
@@ -384,7 +385,7 @@ std::unique_ptr<Source> sinkToSource(fun<void(Sink &)> writer, fun<void()> eof)
         {
             bool hasCoro = coro.has_value();
             if (!hasCoro) {
-                coro = coro_t::pull_type([&](coro_t::push_type & yield) {
+                coro = coro_t::pull_type(boost::coroutines2::protected_fixedsize_stack(), [&](coro_t::push_type & yield) {
                     LambdaSink sink([&](std::string_view data) {
                         if (!data.empty()) {
                             yield(data);
