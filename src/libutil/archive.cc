@@ -173,33 +173,42 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     if (depth >= narMaxDepth)
         throw badArchive("NAR directory nesting exceeds maximum depth of %d", narMaxDepth);
 
-    auto getString = [&]() {
+    /* NAR keywords are all <= 10 bytes; a little slack keeps error
+       messages useful for short garbage without allowing large
+       allocations. */
+    constexpr size_t narMaxTag = 32;
+    /* Format-defined bounds, intentionally independent of host
+       NAME_MAX/PATH_MAX. */
+    constexpr size_t narMaxName = 255;
+    constexpr size_t narMaxTarget = 4095;
+
+    auto getString = [&](size_t max) {
         checkInterrupt();
-        return readString(source);
+        return readString(source, max);
     };
 
     auto expectTag = [&](std::string_view expected) {
-        auto tag = getString();
+        auto tag = getString(narMaxTag);
         if (tag != expected)
-            throw badArchive("expected tag '%s', got '%s'", expected, tag.substr(0, 1024));
+            throw badArchive("expected tag '%s', got '%s'", expected, tag);
     };
 
     expectTag("(");
 
     expectTag("type");
 
-    auto type = getString();
+    auto type = getString(narMaxTag);
 
     if (type == "regular") {
         sink.createRegularFile(path, [&](auto & crf) {
-            auto tag = getString();
+            auto tag = getString(narMaxTag);
 
             if (tag == "executable") {
-                auto s2 = getString();
+                auto s2 = getString(0);
                 if (s2 != "")
                     throw badArchive("executable marker has non-empty value");
                 crf.isExecutable();
-                tag = getString();
+                tag = getString(narMaxTag);
             }
 
             if (tag != "contents")
@@ -218,7 +227,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
             std::string prevName;
 
             while (1) {
-                auto tag = getString();
+                auto tag = getString(narMaxTag);
 
                 if (tag == ")")
                     break;
@@ -230,7 +239,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
                 expectTag("name");
 
-                auto name = getString();
+                auto name = getString(narMaxName);
                 if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
                     || name.find((char) 0) != std::string::npos)
                     throw badArchive("NAR contains invalid file name '%1%'", name);
@@ -265,7 +274,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     else if (type == "symlink") {
         expectTag("target");
 
-        auto target = getString();
+        auto target = getString(narMaxTarget);
         sink.createSymlink(path, target);
 
         expectTag(")");
