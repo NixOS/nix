@@ -22,23 +22,16 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-/**
- * Used for `inputGoals` local variable below
- */
-struct value_comparison
-{
-    template<typename T>
-    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const
-    {
-        return *lhs < *rhs;
-    }
-};
-
 Goal::Co DerivationResolutionGoal::resolveDerivation()
 {
     Goals waitees;
 
-    std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
+    using ValueComparison = decltype([]<typename T>(const ref<T> & lhs, const ref<T> & rhs) {
+        /* Compare the values, not the pointers themselves. */
+        return *lhs < *rhs;
+    });
+
+    std::map<ref<const SingleDerivedPath>, GoalPtr, ValueComparison> inputGoals;
 
     auto addWaiteeDerivedPath = [&worker = worker, buildMode = buildMode, &waitees, &inputGoals](
                                     this const auto & self,
