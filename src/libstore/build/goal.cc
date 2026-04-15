@@ -65,10 +65,15 @@ Co::Co(Co && rhs)
     rhs.handle = nullptr;
 }
 
-void Co::operator=(Co && rhs)
+Co & Co::operator=(Co && rhs)
 {
-    this->handle = rhs.handle;
+    if (handle) {
+        handle.promise().alive = false;
+        handle.destroy();
+    }
+    handle = rhs.handle;
     rhs.handle = nullptr;
+    return *this;
 }
 
 Co::~Co()

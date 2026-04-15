@@ -233,8 +233,10 @@ public:
 
         explicit Co(handle_type handle)
             : handle(handle) {};
-        void operator=(Co &&);
+        Co & operator=(Co &&);
         Co(Co && rhs);
+        Co & operator=(const Co &) = delete;
+        Co(const Co & rhs) = delete;
         ~Co();
 
         bool await_ready()

@@ -144,11 +144,9 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 worker.store.printStorePath(drvPath));
     }
 
-    auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, *drv, buildMode);
-    {
-        Goals waitees{resolutionGoal};
-        co_await await(std::move(waitees));
-    }
+    auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, drv, buildMode);
+    co_await await({resolutionGoal});
+
     if (nrFailed != 0) {
         co_return doneFailure({BuildResult::Failure::DependencyFailed, "Build failed due to failed dependency"});
     }
@@ -219,6 +217,9 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             assert(false);
     }
 
+    /* We don't need it any more and don't want to hold on to it while suspended. */
+    resolutionGoal.reset();
+
     /* Give up on substitution for the output we want, actually build this derivation */
 
     auto g = worker.makeDerivationBuildingGoal(drvPath, drv, buildMode, storeDerivation);
@@ -226,11 +227,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     /* We will finish with it ourselves, as if we were the derivational goal. */
     g->preserveFailure = true;
 
-    {
-        Goals waitees;
-        waitees.insert(g);
-        co_await await(std::move(waitees));
-    }
+    co_await await({g});
 
     trace("outer build done");
 

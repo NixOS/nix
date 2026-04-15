@@ -7,10 +7,10 @@
 namespace nix {
 
 DerivationResolutionGoal::DerivationResolutionGoal(
-    const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode)
+    const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode)
     : Goal(worker, resolveDerivation())
     , drvPath(drvPath)
-    , drv{std::make_unique<Derivation>(drv)}
+    , drv(std::move(drv))
     , buildMode{buildMode}
 {
     name = fmt("resolving derivation '%s'", worker.store.printStorePath(drvPath));
