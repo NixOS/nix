@@ -479,7 +479,10 @@ in
   /**
     The Nix command line interface. Note that this does not include its tests, whereas `nix-everything` does.
   */
-  nix-cli = callPackage ../src/nix/package.nix { version = fineVersion; };
+  nix-cli = callPackage ../src/nix/package.nix {
+    version = fineVersion;
+    withPluginCApi = officialRelease;
+  };
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
