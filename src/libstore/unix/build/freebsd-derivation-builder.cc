@@ -486,12 +486,6 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
             throw SysError("failed to attach to jail");
         }
     }
-
-    void addDependency(const StorePath & path)
-    {
-        throw UnimplementedError(
-            "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
-    }
 };
 
 } // namespace nix

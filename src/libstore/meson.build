@@ -342,7 +342,6 @@ sources = files(
   'references.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
-  'restricted-store.cc',
   's3-binary-cache-store.cc',
   's3-url.cc',
   'serve-protocol-connection.cc',

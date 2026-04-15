@@ -30,9 +30,6 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     void startChild() override
     {
-        if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-            throw Error("'recursive-nix' is not supported yet by external derivation builders");
-
         auto json = nlohmann::json::object();
 
         json.emplace("version", 1);
