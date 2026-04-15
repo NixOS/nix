@@ -423,7 +423,7 @@ nix_err nix_path_info_get_references(
     nix_c_context * context,
     const nix_path_info * path_info,
     void * user_data,
-    void (*callback)(void * user_data, const StorePath * store_path))
+    nix_err (*callback)(void * user_data, const StorePath * store_path))
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -431,7 +431,9 @@ nix_err nix_path_info_get_references(
         if (callback) {
             for (const auto & ref : path_info->info->references) {
                 const StorePath tmp{ref};
-                callback(user_data, &tmp);
+                auto err = callback(user_data, &tmp);
+                if (err != NIX_OK)
+                    return err;
             }
         }
     }
@@ -454,7 +456,7 @@ nix_err nix_path_info_get_sigs(
     nix_c_context * context,
     const nix_path_info * path_info,
     void * user_data,
-    void (*callback)(void * user_data, const char * sig, unsigned int sig_len))
+    nix_err (*callback)(void * user_data, const char * sig, unsigned int sig_len))
 {
     if (context)
         context->last_err_code = NIX_OK;
@@ -462,7 +464,9 @@ nix_err nix_path_info_get_sigs(
         if (callback) {
             for (const auto & sig : path_info->info->sigs) {
                 auto s = sig.to_string();
-                callback(user_data, s.data(), s.size());
+                auto err = callback(user_data, s.data(), s.size());
+                if (err != NIX_OK)
+                    return err;
             }
         }
     }
