@@ -515,6 +515,10 @@ struct GitInputScheme : InputScheme
                 });
 
             if (commitMsg) {
+                auto [tempFd, tempPath] = createTempFile("nix-msg");
+                AutoDelete delTemp(tempPath, /*recursive=*/false);
+                writeFull(tempFd.get(), *commitMsg);
+
                 // Pause the logger to allow for user input (such as a gpg passphrase) in `git commit`
                 auto suspension = logger->suspend();
                 runProgram(
@@ -528,9 +532,10 @@ struct GitInputScheme : InputScheme
                         OS_STR("commit"),
                         string_to_os_string(std::string(path.rel())),
                         OS_STR("-F"),
-                        OS_STR("-"),
-                    },
-                    *commitMsg);
+                        tempPath.native(),
+                    });
+
+                delTemp.deletePath();
             }
         }
     }
