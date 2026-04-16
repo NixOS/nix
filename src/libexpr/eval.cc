@@ -30,6 +30,7 @@
 #include "parser-tab.hh"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <exception>
@@ -2535,8 +2536,16 @@ BackedStringView EvalState::coerceToString(
             return "";
         if (v.type() == nInt)
             return std::to_string(v.integer().value);
-        if (v.type() == nFloat)
+        if (v.type() == nFloat) {
+            if (std::isinf(v.fpoint())) {
+                if (std::signbit(v.fpoint()))
+                    return "-inf";
+                return "inf";
+            }
+            if (std::isnan(v.fpoint()))
+                return "nan";
             return std::to_string(v.fpoint());
+        }
         if (v.type() == nNull)
             return "";
 
