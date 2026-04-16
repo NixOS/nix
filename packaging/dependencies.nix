@@ -16,15 +16,19 @@ in
 scope: {
   inherit stdenv;
 
-  mimalloc = pkgs.mimalloc.overrideAttrs rec {
-    version = "3.1.6";
-    src = pkgs.fetchFromGitHub {
-      owner = "microsoft";
-      repo = "mimalloc";
-      tag = "v${version}";
-      hash = "sha256-7zG0Sqloanz/b+fkJ4wzO86uBmtf9fdYNAT9ixLouyY=";
-    };
-  };
+  mimalloc =
+    if lib.versionAtLeast pkgs.mimalloc.version "3.3.0" then
+      pkgs.mimalloc
+    else
+      pkgs.mimalloc.overrideAttrs rec {
+        version = "3.3.0";
+        src = pkgs.fetchFromGitHub {
+          owner = "microsoft";
+          repo = "mimalloc";
+          tag = "v${version}";
+          hash = "sha256-xy9gPihw3xvhnd6BrCYfMnnRp5dPSodynKRToYwxuzg=";
+        };
+      };
 
   boehmgc =
     (pkgs.boehmgc.override {
