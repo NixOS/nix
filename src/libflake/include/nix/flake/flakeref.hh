@@ -91,6 +91,8 @@ struct FlakeRef
 
 std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef);
 
+const static std::string defaultFlakeEntryFile = "flake.nix";
+
 /**
  * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary.html#gloss-base-directory)
  */
@@ -99,7 +101,7 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    const std::optional<std::string> & entryFile = "flake.nix",
+    const std::optional<std::string> & entryFile = defaultFlakeEntryFile,
     bool preserveRelativePaths = false);
 
 /**
@@ -110,7 +112,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    const std::optional<std::string> & entryFile = "flake.nix",
+    const std::optional<std::string> & entryFile = defaultFlakeEntryFile,
     bool preserveRelativePaths = false);
 
 /**
@@ -121,7 +123,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    const std::optional<std::string> & entryFile = "flake.nix");
+    const std::optional<std::string> & entryFile = defaultFlakeEntryFile);
 
 const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
 extern std::regex flakeIdRegex;

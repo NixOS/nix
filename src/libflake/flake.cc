@@ -202,7 +202,7 @@ static FlakeInput parseFlakeInput(
                 *url,
                 {},
                 true,
-                input.isFlake ? std::optional<std::string>{"flake.nix"} : std::nullopt,
+                input.isFlake ? std::optional<std::string>{defaultFlakeEntryFile} : std::nullopt,
                 true);
     }
 
