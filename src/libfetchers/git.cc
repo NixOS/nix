@@ -455,7 +455,7 @@ struct GitInputScheme : InputScheme
 
         args.push_back(destDir.native());
 
-        runProgram("git", true, args, {}, true);
+        runProgram("git", true, args, true);
     }
 
     std::optional<std::filesystem::path> getSourcePath(const Input & input) const override
