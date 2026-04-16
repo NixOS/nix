@@ -28,10 +28,9 @@ static RunOptions hgOptions(OsStrings args)
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.
-static std::string runHg(OsStrings args, const std::optional<std::string> & input = {})
+static std::string runHg(OsStrings args)
 {
     RunOptions opts = hgOptions(std::move(args));
-    opts.input = input;
 
     auto res = runProgram(std::move(opts));
 
