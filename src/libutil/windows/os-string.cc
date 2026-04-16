@@ -4,6 +4,7 @@
 #include <locale>
 
 #include "nix/util/os-string.hh"
+#include "nix/util/strings-inline.hh"
 
 namespace nix {
 
@@ -28,5 +29,18 @@ OsString string_to_os_string(std::string s)
 {
     return string_to_os_string(std::string_view{s});
 }
+
+#ifdef _WIN32
+
+template<class C>
+C tokenizeString(OsStringView s, OsStringView separators)
+{
+    return basicTokenizeString<C, OsChar>(s, separators);
+}
+
+template std::list<OsString> tokenizeString(OsStringView s, OsStringView separators);
+template std::vector<OsString> tokenizeString(OsStringView s, OsStringView separators);
+
+#endif
 
 } // namespace nix

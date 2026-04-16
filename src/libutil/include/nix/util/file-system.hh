@@ -232,6 +232,10 @@ struct OpenNewFileForWriteParams
      * Whether to follow symlinks if @ref truncateExisting is true.
      */
     bool followSymlinksOnTruncate:1 = false;
+    /**
+     * Whether to open the newly created file as write-only.
+     */
+    bool writeOnly:1 = true;
 };
 
 /**
