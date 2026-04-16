@@ -274,24 +274,6 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     return process;
 }
 
-// TODO: Merge this with Unix's runProgram since it's identical logic.
-// Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(RunOptions && options)
-{
-    StringSink sink;
-    options.standardOut = &sink;
-
-    int status = 0;
-
-    try {
-        runProgram2(options);
-    } catch (ExecError & e) {
-        status = e.status;
-    }
-
-    return {status, std::move(sink.s)};
-}
-
 void runProgram2(const RunOptions & options)
 {
     checkInterrupt();

@@ -134,6 +134,7 @@ struct RunOptions
     bool isInteractive = false;
 };
 
+// Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
