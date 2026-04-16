@@ -99,7 +99,7 @@ FlakeRef parseFlakeRef(
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true,
+    const std::optional<std::string> & entryFile = "flake.nix",
     bool preserveRelativePaths = false);
 
 /**
@@ -110,7 +110,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true,
+    const std::optional<std::string> & entryFile = "flake.nix",
     bool preserveRelativePaths = false);
 
 /**
@@ -121,7 +121,7 @@ std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragment
     const std::string & url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
-    bool isFlake = true);
+    const std::optional<std::string> & entryFile = "flake.nix");
 
 const static std::string flakeIdRegexS = "[a-zA-Z][a-zA-Z0-9_-]*";
 extern std::regex flakeIdRegex;
