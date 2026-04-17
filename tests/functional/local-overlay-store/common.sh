@@ -29,7 +29,7 @@ export LIBMOUNT_FORCE_MOUNT2=always
 
 requireEnvironment () {
   requireSandboxSupport
-  [[ $busybox =~ busybox ]] || skipTest "no busybox"
+  requireBusybox
   if [[ $(uname) != Linux ]]; then skipTest "Need Linux for overlayfs"; fi
   needLocalStore "The test uses --store always so we would just be bypassing the daemon"
 }
