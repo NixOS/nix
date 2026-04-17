@@ -246,7 +246,7 @@ public:
 
     Setting<Strings> secretKeyFiles{
         this,
-        {},
+        {this->nixStateDir / "keys" / "secret-key"},
         "secret-key-files",
         R"(
           A whitespace-separated list of files containing secret (private)

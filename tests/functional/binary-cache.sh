@@ -14,7 +14,7 @@ nix-instantiate --store "file://$cacheDir" dependencies.nix
 # Create the binary cache.
 clearStore
 clearCache
-outPath=$(nix-build dependencies.nix --no-out-link)
+outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "")
 depPath=$(nix-build dependencies.nix -A input0_drv --no-out-link)
 
 nix copy --to "file://$cacheDir" "$outPath"
