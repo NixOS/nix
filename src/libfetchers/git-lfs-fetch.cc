@@ -8,6 +8,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/ssh.hh"
+#include "nix/util/deleter.hh"
 
 #include <git2/attr.h>
 #include <git2/config.h>
