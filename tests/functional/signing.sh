@@ -34,7 +34,7 @@ nix store verify -r "$outPath" --sigs-needed 2 --trusted-public-keys "$pk1 $pk2"
 nix store verify --all --sigs-needed 2 --trusted-public-keys "$pk1 $pk2"
 
 # Build something unsigned.
-outPath2=$(nix-build simple.nix --no-out-link)
+outPath2=$(nix-build simple.nix --no-out-link --secret-key-files "")
 
 nix store verify -r "$outPath"
 
@@ -54,6 +54,12 @@ expect 2 nix store verify -r "$outPath2" --sigs-needed 1 --trusted-public-keys "
 nix store sign --key-file "$TEST_ROOT"/sk1 "$outPath2"
 
 nix store verify -r "$outPath2" --sigs-needed 1 --trusted-public-keys "$pk1"
+
+# Test default signing
+if isDaemonNewer "2.35pre"; then
+    outPath3=$(nix-build simple2.nix --no-out-link)
+    nix store verify -r "$outPath3" --sigs-needed 1
+fi
 
 # Build something content-addressed.
 outPathCA=$(IMPURE_VAR1=foo IMPURE_VAR2=bar nix-build ./fixed.nix -A good.0 --no-out-link)

@@ -1,3 +1,4 @@
+#include "nix/store/global-paths.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/source-accessor.hh"
@@ -1222,6 +1223,22 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
     return readDerivationCommon(*this, drvPath, false);
 }
 
+static bool generateDefaultKeys()
+{
+    if (!pathAccessible(defaultSecretKeyFile().parent_path()))
+        return false;
+    if (pathExists(defaultPublicKeyFile())) {
+        printError(
+            "warning: cannot generate default keypair because a public key already exists at %s, skipping signing with default key",
+            defaultPublicKeyFile().string());
+        return false;
+    }
+    auto secretKey = SecretKey::generate(getHostName());
+    writeFile(defaultSecretKeyFile(), secretKey.to_string(), S_IRUSR | S_IWUSR);
+    writeFile(defaultPublicKeyFile(), secretKey.toPublicKey().to_string(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    return true;
+}
+
 void Store::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
@@ -1229,6 +1246,8 @@ void Store::signPathInfo(ValidPathInfo & info)
     auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
+        if (secretKeyFile == defaultSecretKeyFile() && !pathExists(secretKeyFile) && !generateDefaultKeys())
+            continue;
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         info.sign(*this, signer);
@@ -1242,6 +1261,8 @@ void Store::signRealisation(Realisation & realisation)
     auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
+        if (secretKeyFile == defaultSecretKeyFile() && !pathExists(secretKeyFile) && !generateDefaultKeys())
+            continue;
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         realisation.sign(realisation.id, signer);

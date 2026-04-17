@@ -7,6 +7,7 @@
 
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>
+#include <boost/asio/ip/host_name.hpp>
 #include <stdint.h>
 
 #ifdef NDEBUG
@@ -297,6 +298,11 @@ std::pair<std::string_view, std::string_view> getLine(std::string_view s)
             line = line.substr(0, line.size() - 1);
         return {line, s.substr(newline + 1)};
     }
+}
+
+std::string getHostName()
+{
+    return boost::asio::ip::host_name();
 }
 
 } // namespace nix
