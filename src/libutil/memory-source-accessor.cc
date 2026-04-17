@@ -179,23 +179,7 @@ SourcePath MemorySourceAccessor::addFile(CanonPath path, std::string && contents
 
 using File = MemorySourceAccessor::File;
 
-void MemorySink::createDirectory(const CanonPath & path)
-{
-    MemorySourceAccessor::File * f = nullptr;
-    try {
-        f = dst.open(path, File{File::Directory{}});
-        if (!f)
-            throw Error(
-                "directory '%s' cannot be created because some parent directories don't exist", dst.showPath(path));
-    } catch (SourceAccessorError & e) {
-        e.addTrace({}, "while creating directory '%s'", dst.showPath(path));
-        throw;
-    }
-    if (!std::holds_alternative<File::Directory>(f->raw))
-        throw NotADirectory("file '%s' is not a directory", dst.showPath(path));
-};
-
-struct CreateMemoryRegularFile : CreateRegularFileSink
+struct CreateMemoryRegularFile : FileSystemObjectSink::OnRegularFile
 {
     File::Regular & regularFile;
 
@@ -205,31 +189,32 @@ struct CreateMemoryRegularFile : CreateRegularFileSink
     }
 
     void operator()(std::string_view data) override;
-    void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
 
-void MemorySink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
+void MemorySink::MemoryDirectory::createChild(std::string_view name, ChildCreatedCallback callback)
 {
-    MemorySourceAccessor::File * f = nullptr;
-    try {
-        f = dst.open(path, File{File::Regular{}});
-        if (!f)
-            throw Error("file '%s' cannot be created because some parent directories don't exist", dst.showPath(path));
-    } catch (SourceAccessorError & e) {
-        e.addTrace({}, "while creating regular file '%s'", dst.showPath(path));
-        throw;
-    }
-    if (auto * rp = std::get_if<File::Regular>(&f->raw)) {
-        CreateMemoryRegularFile crf{*rp};
-        func(crf);
-    } else
-        throw NotARegularFile("file '%s' is not a regular file", dst.showPath(path));
+    MemorySink childSink{[&, name = std::string{name}](File file) -> File & {
+        auto [it, inserted] = dir.entries.insert_or_assign(name, std::move(file));
+        return it->second;
+    }};
+    callback(childSink);
 }
 
-void CreateMemoryRegularFile::isExecutable()
+void MemorySink::createDirectory(DirectoryCreatedCallback callback)
 {
-    regularFile.executable = true;
+    File & dst = createRoot(File{File::Directory{}});
+    MemoryDirectory dir{std::get<File::Directory>(dst.raw)};
+    callback(dir);
+}
+
+void MemorySink::createRegularFile(bool isExecutable, RegularFileCreatedCallback func)
+{
+    File & dst = createRoot(File{File::Regular{}});
+    auto & reg = std::get<File::Regular>(dst.raw);
+    reg.executable = isExecutable;
+    CreateMemoryRegularFile crf{reg};
+    func(crf);
 }
 
 void CreateMemoryRegularFile::preallocateContents(uint64_t len)
@@ -242,30 +227,16 @@ void CreateMemoryRegularFile::operator()(std::string_view data)
     regularFile.contents += data;
 }
 
-void MemorySink::createSymlink(const CanonPath & path, const std::string & target)
+void MemorySink::createSymlink(const std::string & target)
 {
-    MemorySourceAccessor::File * f = nullptr;
-    try {
-        f = dst.open(path, File{File::Symlink{}});
-        if (!f)
-            throw Error(
-                "symlink '%s' cannot be created because some parent directories don't exist", dst.showPath(path));
-    } catch (SourceAccessorError & e) {
-        e.addTrace({}, "while creating symlink '%s'", dst.showPath(path));
-        throw;
-    }
-    if (auto * s = std::get_if<File::Symlink>(&f->raw))
-        s->target = target;
-    else
-        throw NotASymlink("file '%s' is not a symbolic link", dst.showPath(path));
+    createRoot(File{File::Symlink{.target = target}});
 }
 
 ref<SourceAccessor> makeEmptySourceAccessor()
 {
     static auto empty = []() {
         auto empty = make_ref<MemorySourceAccessor>();
-        MemorySink sink{*empty};
-        sink.createDirectory(CanonPath::root);
+        empty->root = File{File::Directory{}};
         /* Don't forget to clear the display prefix, as the default constructed
            SourceAccessor has the «unknown» prefix. Since this accessor is supposed
            to mimic an empty root directory the prefix needs to be empty. */

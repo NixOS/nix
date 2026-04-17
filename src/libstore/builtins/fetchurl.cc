@@ -59,9 +59,10 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             decompressor->finish();
         });
 
-        if (unpack)
-            restorePath(storePath, *source);
-        else
+        if (unpack) {
+            std::filesystem::path p{storePath};
+            restorePath(p.parent_path(), p.filename(), *source);
+        } else
             writeFile(storePath, *source);
 
         auto executable = ctx.drv.env.find("executable");

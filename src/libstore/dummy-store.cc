@@ -71,8 +71,7 @@ class WholeStoreViewAccessor : public SourceAccessor
 public:
     WholeStoreViewAccessor()
     {
-        MemorySink sink{rootPathAccessor};
-        sink.createDirectory(CanonPath::root);
+        rootPathAccessor.root = MemorySourceAccessor::File{MemorySourceAccessor::File::Directory{}};
     }
 
     void addObject(std::string_view baseName, ref<MemorySourceAccessor> accessor)
@@ -208,7 +207,9 @@ struct DummyStoreImpl : DummyStore
             throw Error("checking signatures is not supported for '%s' store", config->getHumanReadableURI());
 
         auto accessor = make_ref<MemorySourceAccessor>();
-        MemorySink tempSink{*accessor};
+        MemorySink tempSink{[&](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+            return accessor->root.emplace(std::move(file));
+        }};
         parseDump(tempSink, source);
         auto path = info.path;
 
@@ -250,19 +251,18 @@ struct DummyStoreImpl : DummyStore
         auto temp = make_ref<MemorySourceAccessor>();
 
         {
-            MemorySink tempSink{*temp};
+            MemorySink tempSink{[&](MemorySourceAccessor::File file) -> MemorySourceAccessor::File & {
+                return temp->root.emplace(std::move(file));
+            }};
 
             // TODO factor this out into `restorePath`, same todo on it.
             switch (dumpMethod) {
             case FileSerialisationMethod::NixArchive:
                 parseDump(tempSink, source);
                 break;
-            case FileSerialisationMethod::Flat: {
-                // Replace root dir with file so next part succeeds.
-                temp->root = MemorySourceAccessor::File::Regular{};
-                tempSink.createRegularFile(CanonPath::root, [&](auto & sink) { source.drainInto(sink); });
+            case FileSerialisationMethod::Flat:
+                tempSink.createRegularFile(false, [&](auto & sink) { source.drainInto(sink); });
                 break;
-            }
             }
         }
 
