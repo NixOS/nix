@@ -116,7 +116,6 @@ std::string runProgram(
     std::filesystem::path program,
     bool lookupPath = false,
     const OsStrings & args = OsStrings(),
-    const std::optional<std::string> & input = {},
     bool isInteractive = false);
 
 struct RunOptions
@@ -130,13 +129,12 @@ struct RunOptions
 #endif
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
-    std::optional<std::string> input;
-    Source * standardIn = nullptr;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
     bool isInteractive = false;
 };
 
+// Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);

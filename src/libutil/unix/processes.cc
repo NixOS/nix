@@ -291,20 +291,15 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
     return pid;
 }
 
-std::string runProgram(
-    std::filesystem::path program,
-    bool lookupPath,
-    const OsStrings & args,
-    const std::optional<std::string> & input,
-    bool isInteractive)
+std::string runProgram(std::filesystem::path program, bool lookupPath, const OsStrings & args, bool isInteractive)
 {
     auto res = runProgram(
         RunOptions{
             .program = program,
             .lookupPath = lookupPath,
             .args = args,
-            .input = input,
-            .isInteractive = isInteractive});
+            .isInteractive = isInteractive,
+        });
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
@@ -312,43 +307,14 @@ std::string runProgram(
     return res.second;
 }
 
-// Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(RunOptions && options)
-{
-    StringSink sink;
-    options.standardOut = &sink;
-
-    int status = 0;
-
-    try {
-        runProgram2(options);
-    } catch (ExecError & e) {
-        status = e.status;
-    }
-
-    return {status, std::move(sink.s)};
-}
-
 void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
-    assert(!(options.standardIn && options.input));
-
-    std::unique_ptr<Source> source_;
-    Source * source = options.standardIn;
-
-    if (options.input) {
-        source_ = std::make_unique<StringSource>(*options.input);
-        source = source_.get();
-    }
-
     /* Create a pipe. */
-    Pipe out, in;
+    Pipe out;
     if (options.standardOut)
         out.create();
-    if (source)
-        in.create();
 
     ProcessOptions processOptions;
     // vfork implies that the environment of the main process and the fork will
@@ -368,8 +334,6 @@ void runProgram2(const RunOptions & options)
             if (options.mergeStderrToStdout)
                 if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
                     throw SysError("cannot dup stdout into stderr");
-            if (source && dup2(in.readSide.get(), STDIN_FILENO) == -1)
-                throw SysError("dupping stdin");
 
             if (options.chdir && chdir((*options.chdir).c_str()) == -1)
                 throw SysError("chdir failed");
@@ -399,47 +363,11 @@ void runProgram2(const RunOptions & options)
 
     out.writeSide.close();
 
-    std::thread writerThread;
-
-    std::promise<void> promise;
-
-    Finally doJoin([&] {
-        if (writerThread.joinable())
-            writerThread.join();
-    });
-
-    if (source) {
-        in.readSide.close();
-        writerThread = std::thread([&] {
-            try {
-                std::vector<char> buf(8 * 1024);
-                while (true) {
-                    size_t n;
-                    try {
-                        n = source->read(buf.data(), buf.size());
-                    } catch (EndOfFile &) {
-                        break;
-                    }
-                    writeFull(in.writeSide.get(), {buf.data(), n});
-                }
-                promise.set_value();
-            } catch (...) {
-                promise.set_exception(std::current_exception());
-            }
-            in.writeSide.close();
-        });
-    }
-
     if (options.standardOut)
         drainFD(out.readSide.get(), *options.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();
-
-    /* Wait for the writer thread to finish. */
-    if (source)
-        promise.get_future().get();
-
     if (status)
         throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }

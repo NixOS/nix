@@ -75,7 +75,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
 
     RunNix * runNixPtr;
 
-    void runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input = {});
+    void runNix(const std::string & program, OsStrings args);
 
     std::unique_ptr<ReplInteracter> interacter;
 
@@ -892,10 +892,10 @@ void NixRepl::evalString(std::string s, Value & v)
     state->forceValue(v, v.determinePos(noPos));
 }
 
-void NixRepl::runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input)
+void NixRepl::runNix(const std::string & program, OsStrings args)
 {
     if (runNixPtr)
-        (*runNixPtr)(program, std::move(args), input);
+        (*runNixPtr)(program, std::move(args));
     else
         throw Error(
             "Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes",

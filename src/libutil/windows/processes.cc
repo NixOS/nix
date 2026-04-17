@@ -85,20 +85,15 @@ int Pid::wait(bool allowInterrupts)
 }
 
 // TODO: Merge this with Unix's runProgram since it's identical logic.
-std::string runProgram(
-    std::filesystem::path program,
-    bool lookupPath,
-    const OsStrings & args,
-    const std::optional<std::string> & input,
-    bool isInteractive)
+std::string runProgram(std::filesystem::path program, bool lookupPath, const OsStrings & args, bool isInteractive)
 {
     auto res = runProgram(
         RunOptions{
             .program = program,
             .lookupPath = lookupPath,
             .args = args,
-            .input = input,
-            .isInteractive = isInteractive});
+            .isInteractive = isInteractive,
+        });
 
     if (!statusOk(res.first))
         throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
@@ -197,7 +192,7 @@ OsString windowsEscape(const OsString & str, bool cmd)
     return buffer + L'"';
 }
 
-Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & options, Pipe & out, Pipe & in)
+Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & options, Pipe & out)
 {
     // Setup pipes.
     if (options.standardOut) {
@@ -206,17 +201,13 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     } else {
         out.writeSide = nullFD();
     }
-    if (options.standardIn) {
-        // Don't inherit the write end of the input pipe
-        setFDInheritable(in.writeSide, false);
-    } else {
-        in.readSide = nullFD();
-    }
+
+    AutoCloseFD in = nullFD();
 
     STARTUPINFOW startInfo = {0};
     startInfo.cb = sizeof(startInfo);
     startInfo.dwFlags = STARTF_USESTDHANDLES;
-    startInfo.hStdInput = in.readSide.get();
+    startInfo.hStdInput = in.get();
     startInfo.hStdOutput = out.writeSide.get();
     startInfo.hStdError = out.writeSide.get();
 
@@ -283,46 +274,16 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     return process;
 }
 
-// TODO: Merge this with Unix's runProgram since it's identical logic.
-// Output = error code + "standard out" output stream
-std::pair<int, std::string> runProgram(RunOptions && options)
-{
-    StringSink sink;
-    options.standardOut = &sink;
-
-    int status = 0;
-
-    try {
-        runProgram2(options);
-    } catch (ExecError & e) {
-        status = e.status;
-    }
-
-    return {status, std::move(sink.s)};
-}
-
 void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
-    assert(!(options.standardIn && options.input));
-
-    std::unique_ptr<Source> source_;
-    Source * source = options.standardIn;
-
-    if (options.input) {
-        source_ = std::make_unique<StringSource>(*options.input);
-        source = source_.get();
-    }
-
     /* Create a pipe. */
-    Pipe out, in;
+    Pipe out;
     // TODO: I copied this from unix but this is handled again in spawnProcess, so might be weird to split it up like
     // this
     if (options.standardOut)
         out.create();
-    if (source)
-        in.create();
 
     std::filesystem::path realProgram = options.program;
     // TODO: Implement shebang / program interpreter lookup on Windows
@@ -330,52 +291,16 @@ void runProgram2(const RunOptions & options)
 
     auto suspension = logger->suspendIf(options.isInteractive);
 
-    Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, options, out, in);
+    Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, options, out);
 
     // TODO: This is identical to unix, deduplicate?
     out.writeSide.close();
-
-    std::thread writerThread;
-
-    std::promise<void> promise;
-
-    Finally doJoin([&] {
-        if (writerThread.joinable())
-            writerThread.join();
-    });
-
-    if (source) {
-        in.readSide.close();
-        writerThread = std::thread([&] {
-            try {
-                std::vector<char> buf(8 * 1024);
-                while (true) {
-                    size_t n;
-                    try {
-                        n = source->read(buf.data(), buf.size());
-                    } catch (EndOfFile &) {
-                        break;
-                    }
-                    writeFull(in.writeSide.get(), {buf.data(), n});
-                }
-                promise.set_value();
-            } catch (...) {
-                promise.set_exception(std::current_exception());
-            }
-            in.writeSide.close();
-        });
-    }
 
     if (options.standardOut)
         drainFD(out.readSide.get(), *options.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();
-
-    /* Wait for the writer thread to finish. */
-    if (source)
-        promise.get_future().get();
-
     if (status)
         throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }

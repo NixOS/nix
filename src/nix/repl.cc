@@ -11,7 +11,7 @@
 
 namespace nix {
 
-void runNix(const std::string & program, OsStrings args, const std::optional<std::string> & input = {})
+void runNix(const std::string & program, OsStrings args)
 {
     auto subprocessEnv = getEnvOs();
     subprocessEnv[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
@@ -21,7 +21,6 @@ void runNix(const std::string & program, OsStrings args, const std::optional<std
             .program = getNixBin(program).string(),
             .args = std::move(args),
             .environment = subprocessEnv,
-            .input = input,
             .isInteractive = true,
         });
 
