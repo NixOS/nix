@@ -391,14 +391,9 @@ static Flake getFlake(
         lockedRef = FlakeRef(std::move(cachedInput2.lockedInput), newLockedRef.subdir);
     }
 
+    auto rootDir = state.storePath(state.mountInput(lockedRef.input, originalRef.input, cachedInput.accessor));
     // Re-parse flake.nix from the store.
-    return readFlake(
-        state,
-        originalRef,
-        resolvedRef,
-        lockedRef,
-        state.storePath(state.mountInput(lockedRef.input, originalRef.input, cachedInput.accessor)),
-        lockRootAttrPath);
+    return readFlake(state, originalRef, resolvedRef, lockedRef, rootDir, lockRootAttrPath);
 }
 
 Flake getFlake(EvalState & state, const FlakeRef & originalRef, fetchers::UseRegistries useRegistries)
