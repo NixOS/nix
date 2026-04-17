@@ -268,6 +268,11 @@ std::string stripIndentation(std::string_view s);
 std::pair<std::string_view, std::string_view> getLine(std::string_view s);
 
 /**
+ * Gets our hostname in a cross-platform way.
+ */
+std::string getHostName();
+
+/**
  * Get a pointer to the contents of a `std::optional` if it is set, or a
  * null pointer otherise.
  *
