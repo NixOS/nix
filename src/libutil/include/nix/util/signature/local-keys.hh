@@ -41,8 +41,16 @@ struct Signature
     auto operator<=>(const Signature &) const = default;
 };
 
+enum KeyType {
+    Ed25519,
+    MLDSA65,
+};
+
+KeyType parseKeyType(std::string_view s);
+
 struct Key
 {
+    KeyType type;
     std::string name;
     std::string key;
 
@@ -59,8 +67,9 @@ protected:
      */
     Key(std::string_view s, bool sensitiveValue);
 
-    Key(std::string_view name, std::string && key)
-        : name(name)
+    Key(KeyType type, std::string_view name, std::string && key)
+        : type(type)
+        , name(name)
         , key(std::move(key))
     {
     }
@@ -79,11 +88,11 @@ struct SecretKey : Key
 
     PublicKey toPublicKey() const;
 
-    static SecretKey generate(std::string_view name);
+    static SecretKey generate(std::string_view name, KeyType type);
 
 private:
-    SecretKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
+    SecretKey(KeyType type, std::string_view name, std::string && key)
+        : Key(type, name, std::move(key))
     {
     }
 };
@@ -107,8 +116,8 @@ struct PublicKey : Key
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
 
 private:
-    PublicKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
+    PublicKey(KeyType type, std::string_view name, std::string && key)
+        : Key(type, name, std::move(key))
     {
     }
     friend struct SecretKey;

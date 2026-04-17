@@ -149,6 +149,7 @@ static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
 struct CmdKeyGenerateSecret : Command
 {
     std::string keyName;
+    std::string keyType = "ed25519";
 
     CmdKeyGenerateSecret()
     {
@@ -158,6 +159,13 @@ struct CmdKeyGenerateSecret : Command
             .labels = {"name"},
             .handler = {&keyName},
             .required = true,
+        });
+
+        addFlag({
+            .longName = "key-type",
+            .description = "Type of key: `ed25519` or `ml-dsa-65`.",
+            .labels = {"type"},
+            .handler = {&keyType},
         });
     }
 
@@ -176,7 +184,7 @@ struct CmdKeyGenerateSecret : Command
     void run() override
     {
         logger->stop();
-        writeFull(getStandardOutput(), SecretKey::generate(keyName).to_string());
+        writeFull(getStandardOutput(), SecretKey::generate(keyName, parseKeyType(keyType)).to_string());
     }
 };
 
