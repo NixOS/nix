@@ -446,6 +446,29 @@ nix store delete "$(nix store add-path "$badFlakeDir")"
 [[ $(nix-instantiate -I flake3=flake:flake3 --eval '<flake3>' -A x) = 123 ]]
 [[ $(NIX_PATH=flake3=flake:flake3 nix-instantiate --eval '<flake3>' -A x) = 123 ]]
 
+# Test the `--tree` flag: evaluate a `default.nix` from a tree reference
+# without requiring the `flakes` experimental feature.
+[[ $(nix eval --extra-experimental-features fetch-tree --tree "git+file://$percentEncodedFlake3Dir" x) = 123 ]]
+[[ $(nix eval --tree "git+file://$percentEncodedFlake3Dir" x) = 123 ]]
+# `--tree` and `--file` are mutually exclusive.
+expectStderr 1 nix eval --tree "git+file://$percentEncodedFlake3Dir" --file "$flake3Dir/default.nix" x \
+    | grepQuiet "mutually exclusive"
+# `--tree` requires the `fetch-tree` experimental feature when flakes are disabled.
+expectStderr 1 nix eval --experimental-features 'nix-command' --tree "git+file://$percentEncodedFlake3Dir" x \
+    | grepQuiet "experimental"
+
+# `--tree` also works with the legacy CLI (`nix-instantiate`, `nix-build`).
+[[ $(nix-instantiate --extra-experimental-features fetch-tree --eval --tree "git+file://$percentEncodedFlake3Dir" -A x) = 123 ]]
+[[ $(nix-instantiate --eval --tree "git+file://$percentEncodedFlake3Dir" -A x) = 123 ]]
+# `--tree` is mutually exclusive with `--expr` and positional file arguments in the legacy CLI.
+expectStderr 1 nix-instantiate --eval --tree "git+file://$percentEncodedFlake3Dir" --expr "1" \
+    | grepQuiet "mutually exclusive"
+expectStderr 1 nix-instantiate --eval --tree "git+file://$percentEncodedFlake3Dir" "$flake3Dir/default.nix" \
+    | grepQuiet "positional file arguments"
+# `--tree` in the legacy CLI is also gated on the `fetch-tree` experimental feature.
+expectStderr 1 nix-instantiate --experimental-features '' --eval --tree "git+file://$percentEncodedFlake3Dir" -A x \
+    | grepQuiet "experimental"
+
 # Test alternate lockfile paths.
 nix flake lock "$flake2Dir" --output-lock-file "$TEST_ROOT"/flake2.lock
 cmp "$flake2Dir/flake.lock" "$TEST_ROOT"/flake2.lock >/dev/null # lockfiles should be identical, since we're referencing flake2's original one

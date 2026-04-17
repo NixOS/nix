@@ -223,6 +223,22 @@ SourceExprCommand::SourceExprCommand()
         .labels = {"expr"},
         .handler = {&expr},
     });
+
+    addFlag({
+        .longName = "tree",
+        .description =
+            "Interpret [*installables*](@docroot@/command-ref/new-cli/nix.md#installables) as attribute paths relative to the Nix expression stored in the tree fetched from *tree-ref*. "
+            "*tree-ref* is any reference accepted by [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree), such as `github:NixOS/nixpkgs` or `git+https://example.com/repo`. "
+            "This flag is the non-flake equivalent of the flake-ref syntax used by the new CLI: it fetches a source tree and evaluates `default.nix` inside it. "
+            "Implies `--impure`.",
+        .category = installablesCategory,
+        .labels = {"tree-ref"},
+        .handler = {&tree},
+        .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
+            completeFlakeRef(completions, getEvalState()->store, prefix);
+        }},
+        .experimentalFeature = Xp::FetchTree,
+    });
 }
 
 MixReadOnlyOption::MixReadOnlyOption()
@@ -261,12 +277,14 @@ Args::CompleterClosure SourceExprCommand::getCompleteInstallable()
 void SourceExprCommand::completeInstallable(AddCompletions & completions, std::string_view prefix)
 {
     try {
-        if (file) {
+        if (file || tree) {
             completions.setType(AddCompletions::Type::Attrs);
 
             evalSettings.pureEval = false;
             auto state = getEvalState();
-            auto e = state->parseExprFromFile(resolveExprPath(lookupFileArg(*state, file->string())));
+            auto sourcePath = file ? lookupFileArg(*state, file->string())
+                                   : fetchTreeArg(*state, *tree, absPath(getCommandBaseDir()));
+            auto e = state->parseExprFromFile(resolveExprPath(sourcePath));
 
             Value root;
             state->eval(e, root);
@@ -447,14 +465,14 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 {
     Installables result;
 
-    if (file || expr) {
-        if (file && expr)
-            throw UsageError("'--file' and '--expr' are exclusive");
+    if (file || expr || tree) {
+        if ((file && expr) || (file && tree) || (expr && tree))
+            throw UsageError("'--file', '--expr' and '--tree' are mutually exclusive");
 
         // FIXME: backward compatibility hack
-        if (file) {
+        if (file || tree) {
             if (evalSettings.pureEval && evalSettings.pureEval.overridden)
-                throw UsageError("'--file' is not compatible with '--pure-eval'");
+                throw UsageError("'%s' is not compatible with '--pure-eval'", file ? "--file" : "--tree");
             evalSettings.pureEval = false;
         }
 
@@ -467,6 +485,9 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
         } else if (file) {
             auto dir = absPath(getCommandBaseDir());
             state->evalFile(lookupFileArg(*state, file->string(), &dir), *vFile);
+        } else if (tree) {
+            auto dir = absPath(getCommandBaseDir());
+            state->evalFile(fetchTreeArg(*state, *tree, dir), *vFile);
         } else {
             auto dir = absPath(getCommandBaseDir());
             auto e = state->parseExprFromString(*expr, state->rootPath(dir.string()));

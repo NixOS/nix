@@ -101,6 +101,7 @@ static int main_nix_instantiate(int argc, char ** argv)
 {
     {
         Strings files;
+        std::optional<std::string> treeRef;
         bool readStdin = false;
         bool fromArgs = false;
         bool findFile = false;
@@ -126,6 +127,8 @@ static int main_nix_instantiate(int argc, char ** argv)
                 readStdin = true;
             else if (*arg == "--expr" || *arg == "-E")
                 fromArgs = true;
+            else if (*arg == "--tree")
+                treeRef = getArg(*arg, arg, end);
             else if (*arg == "--eval" || *arg == "--eval-only")
                 evalOnly = true;
             else if (*arg == "--read-write-mode")
@@ -161,6 +164,17 @@ static int main_nix_instantiate(int argc, char ** argv)
 
         myArgs.parseCmdline(argvToStrings(argc, argv));
 
+        if (treeRef) {
+            if (fromArgs)
+                throw UsageError("'--tree' and '--expr' are mutually exclusive");
+            if (findFile)
+                throw UsageError("'--tree' and '--find-file' are mutually exclusive");
+            if (readStdin)
+                throw UsageError("'--tree' and '-' (read from stdin) are mutually exclusive");
+            if (!files.empty())
+                throw UsageError("'--tree' cannot be combined with positional file arguments");
+        }
+
         if (evalOnly && !wantsReadWrite)
             settings.readOnlyMode = true;
 
@@ -188,6 +202,11 @@ static int main_nix_instantiate(int argc, char ** argv)
 
         if (readStdin) {
             Expr * e = state->parseStdin();
+            processExpr(
+                *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
+        } else if (treeRef) {
+            auto sourcePath = fetchTreeArg(*state, *treeRef, absPath(myArgs.getCommandBaseDir()));
+            Expr * e = state->parseExprFromFile(resolveExprPath(sourcePath));
             processExpr(
                 *state, attrPaths, parseOnly, strict, autoArgs, evalOnly, outputKind, xmlOutputSourceLocation, e);
         } else if (files.empty() && !fromArgs)

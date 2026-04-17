@@ -204,4 +204,15 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
         return state.rootPath(absPath(std::filesystem::path{s}, baseDir).string());
 }
 
+SourcePath fetchTreeArg(EvalState & state, std::string_view treeRef, const std::filesystem::path & baseDir)
+{
+    experimentalFeatureSettings.require(Xp::FetchTree);
+    auto flakeRef = parseFlakeRef(fetchSettings, std::string{treeRef}, baseDir, true, false);
+    auto [accessor, lockedRef] = flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
+    auto storePath = nix::fetchToStore(
+        state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+    state.allowPath(storePath);
+    return state.storePath(storePath);
+}
+
 } // namespace nix
