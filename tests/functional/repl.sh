@@ -313,9 +313,9 @@ testReplResponseNoRegex '
 let x = { y = { a = 1; }; inherit x; }; in x
 ' \
 '{
-  x = «repeated»;
+  x = «repeated@0»;
   y = { ... };
-}
+} /* 0 */
 '
 
 # The :p command should recursively print sets, but prevent infinite recursion
@@ -329,9 +329,9 @@ testReplResponseNoRegex '
   x = {
     y = {
       z = {
-        y = «repeated»;
+        y = «repeated@0»;
       };
-    };
+    } /* 0 */;
   };
 }
 '
@@ -348,8 +348,8 @@ testReplResponseNoRegex '
     a = 1;
     b = {
       a = 1;
-      b = «repeated»;
-    };
+      b = «repeated@0»;
+    } /* 0 */;
   }
   [
     1
@@ -364,9 +364,9 @@ testReplResponseNoRegex '
 :p let x = { y = { a = 1; }; inherit x; }; in x
 ' \
 '{
-  x = «repeated»;
+  x = «repeated@0»;
   y = { a = 1; };
-}
+} /* 0 */
 '
 
 testReplResponseNoRegex '

@@ -34,7 +34,7 @@ nix-instantiate --eval -E 'let x = builtins.trace { x = x; } true; in x' \
   2>&1 | grepQuiet -E 'trace: { x = «potential infinite recursion»; }'
 
 nix-instantiate --eval -E 'let x = { repeating = x; tracing = builtins.trace x true; }; in x.tracing'\
-  2>&1 | grepQuiet -F 'trace: { repeating = «repeated»; tracing = «potential infinite recursion»; }'
+  2>&1 | grepQuiet -F 'trace: { repeating = «repeated@0»; tracing = «potential infinite recursion»; } /* 0 */'
 
 nix-instantiate --eval -E 'builtins.warn "Hello" 123' 2>&1 | grepQuiet 'warning: Hello'
 # shellcheck disable=SC2016 # The ${} in this is Nix, not shell
