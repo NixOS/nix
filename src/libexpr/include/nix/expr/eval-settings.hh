@@ -448,6 +448,29 @@ struct EvalSettings : Config
         )",
     };
 
+    Setting<Diagnose> lintFunctionComparison{
+        this,
+        Diagnose::Ignore,
+        "lint-function-comparison",
+        R"(
+          Controls handling of function comparisons using `==`.
+
+          - `ignore`: Ignore without warning (default)
+          - `warn`: Emit a warning when functions are compared
+          - `fatal`: Treat as an evaluation error
+
+          Comparing functions with `==`/`!=` produces unreliable results:
+          it returns `false` when comparison reaches function values, but the
+          [value identity optimization](@docroot@/language/operators.md#value-identity-optimization)
+          can short-circuit and return `true` for the same logical comparison.
+          This may depend on evaluation order, whether a shared binding is used, and whether equality is invoked on the function directly or on a structure containing it.
+          The result is effectively nondeterministic.
+
+          This lint only fires when comparison actually reaches function values.
+          Cases where equality short-circuits before that point are not detected.
+        )",
+    };
+
     Setting<unsigned> bindingsUpdateLayerRhsSizeThreshold{
         this,
         sizeof(void *) == 4 ? 8192 : 16,

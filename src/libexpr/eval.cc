@@ -1,4 +1,5 @@
 #include "nix/expr/eval.hh"
+#include "nix/expr/diagnose.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
@@ -2983,8 +2984,18 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         return true;
     }
 
-    /* Functions are incomparable. */
+    /* Function comparison is unreliable: returns false here, but the
+       value identity optimization (pointer equality) may have already
+       short-circuited and returned true for the same logical comparison. */
     case nFunction:
+        diagnose(settings.lintFunctionComparison, [&](bool) -> std::optional<EvalBaseError> {
+            return EvalBaseError(
+                *this,
+                ErrorInfo{
+                    .msg = HintFmt(
+                        "function comparison is unreliable; it may return true or false depending on structure and evaluation order"),
+                    .pos = positions[pos]});
+        });
         return false;
 
     case nExternal:
