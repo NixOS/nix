@@ -402,6 +402,8 @@ void printClosureDiff(
  * `buildables`.
  */
 void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & buildables, LocalFSStore & store);
+void createOutLinks(
+    const std::filesystem::path & outLink, const std::vector<KeyedBuildResult> & results, LocalFSStore & store);
 
 /** `outLink` parameter, `createOutLinksMaybe` method. See `MixOutLinkByDefault`. */
 struct MixOutLinkBase : virtual Args
