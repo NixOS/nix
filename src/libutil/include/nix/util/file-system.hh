@@ -12,6 +12,7 @@
 #include "nix/util/types.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-path.hh"
+#include "nix/util/deleter.hh"
 
 #include <filesystem>
 #include <sys/types.h>
@@ -436,15 +437,7 @@ public:
     }
 };
 
-struct DIRDeleter
-{
-    void operator()(DIR * dir) const
-    {
-        closedir(dir);
-    }
-};
-
-typedef std::unique_ptr<DIR, DIRDeleter> AutoCloseDir;
+typedef std::unique_ptr<DIR, Deleter<closedir>> AutoCloseDir;
 
 /**
  * Create a temporary directory.

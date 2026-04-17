@@ -33,6 +33,7 @@ headers = [ config_pub_h ] + files(
   'config-impl.hh',
   'configuration.hh',
   'current-process.hh',
+  'deleter.hh',
   'demangle.hh',
   'english.hh',
   'environment-variables.hh',
