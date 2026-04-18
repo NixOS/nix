@@ -486,6 +486,10 @@ in
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {
     version = fineVersion;
+    nix-cli = callPackage ../src/nix/package.nix {
+      version = fineVersion;
+      withPluginCApi = true;
+    };
   };
 
   /**
