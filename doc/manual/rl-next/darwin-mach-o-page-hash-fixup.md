@@ -15,9 +15,14 @@ nixpkgs as [#507531](https://github.com/NixOS/nixpkgs/issues/507531)
 (fish on `nixpkgs-darwin`).
 
 The daemon now recomputes only the affected page hash slots in place
-after `RewritingSink` runs. Every other byte of the Mach-O is
-unchanged — including the `linker-signed` flag, the original 4 KiB
-page size, and the identifier — so the fix-up is length-preserving
-and the result is bit-identical to a clean build. A single call site
-inside the shared `rewriteOutput` lambda covers both input-addressed
-and content-addressing multi-output derivations.
+after `RewritingSink` runs. The fix-up preserves every other byte,
+including the `linker-signed` flag and the original page size,
+so the rewritten binary is byte-identical to a clean build
+(`LC_UUID` non-determinism from Apple's `ld` aside). Both
+input-addressed and content-addressing
+multi-output derivations are covered. Thin Mach-O, fat32, and fat64
+containers are handled, including binaries with SHA-1 + SHA-256
+alternate CodeDirectories. Non-Mach-O files are silently skipped.
+Binaries carrying an embedded CMS signature (Developer ID / App
+Store chain) are skipped with a warning, since recomputing the
+CodeDirectory would invalidate the signer's cdhash commitment.

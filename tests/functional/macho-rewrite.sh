@@ -2,127 +2,107 @@
 
 # Regression test for nixpkgs#507531 / NixOS/nix#6065.
 #
-# `RewritingSink` mutates bytes inside `__TEXT,__cstring` pages that
-# Apple's `ld` had already covered with `linker-signed` SHA-256 page
-# hashes in `LC_CODE_SIGNATURE`. Without the page-hash fix-up in
-# `DerivationBuilderImpl::registerOutputs`, the rewritten binary
-# SIGKILLs at first page-in with `cs_invalid_page`.
+# `RewritingSink` mutates bytes inside pages that `ld` had already
+# covered with SHA-256 page hashes. Without the fix-up, the binary
+# SIGKILLs at first page-in.
 #
-# IA trigger condition (CA is simpler; see the inline IA/CA split
-# below): the bug only fires when at least one sibling output is
-# already in the store at the start of a multi-output build, so that
-# the sibling's scratch path becomes a `makeFallbackPath` placeholder
-# which `RewritingSink` then substitutes for the final hash inside the
-# already-signed `bin/hello`. A fresh cold build does not populate
-# `outputRewrites` for siblings, so the bug does not trigger and a
-# cold-build-only test would pass on an unpatched daemon. We therefore
-# build cold and then re-invoke under `--check`, which is Nix's own
-# determinism check: it rebuilds the derivation while the previous
-# outputs are still in the store, materialising the corrupted binary in
-# a `.check` directory. No `nix-store --delete` or other state mutation
-# is required.
-#
-# `--check` is *expected* to fail with `may not be deterministic` here,
-# because Apple's `ld_prime` generates a non-deterministic `LC_UUID`
-# even with identical inputs (and macOS does not let us turn `LC_UUID`
-# off — `dyld` rejects binaries that lack one). The test allows
-# `--check` to fail and inspects the resulting `.check` binary.
-#
-# Assertions on the post-rewrite binary (`$out.check` in IA mode,
-# `$out` in CA mode):
-#   1. it executes (no SIGKILL — the load-bearing regression assertion:
-#      any helper bug that produces stale page hashes manifests here as
-#      a kernel kill)
-#   2. its embedded `doc=` string contains the *final* doc hash, not the
-#      pre-rewrite placeholder (proves the substitution actually
-#      happened and the helper didn't accidentally restore pre-rewrite
-#      bytes)
-#   3. `codesign --verify` accepts the signature (catches any helper bug
-#      that corrupts the SuperBlob structure)
-#   4. `codesign -dvvv` reports `flags=0x20002(adhoc,linker-signed)`,
-#      proving the original `ld` signature was preserved rather than
-#      replaced by a `codesign(1)` re-sign (which would clear the
-#      `linker-signed` bit and switch to 16 KiB pages)
+# In IA mode the bug fires when an output the binary references is
+# already in the store at build start (self-reference or sibling);
+# its scratch path becomes a `makeFallbackPath` that `RewritingSink`
+# then substitutes. Cold build seeds the store; `nix-build --check`
+# rebuilds with the outputs still in place. `--check` exits 104
+# because Apple's `ld` emits a non-deterministic `LC_UUID` the
+# kernel requires, not because of our bug; we inspect the resulting
+# `.check` tree regardless.
 
 source common.sh
 
-if [[ $(uname) != Darwin ]]; then
-    skipTest "Mach-O page-hash rewriting is darwin-specific"
-fi
+[[ $(uname) == Darwin ]] || skipTest "Mach-O page-hash rewriting is darwin-specific"
+[[ -x /usr/bin/cc ]]       || skipTest "Need /usr/bin/cc to build the test fixture"
+[[ -x /usr/bin/codesign ]] || skipTest "Need /usr/bin/codesign to validate signatures"
+[[ -x /usr/bin/lipo ]]     || skipTest "Need /usr/bin/lipo to build fat Mach-O fixtures"
+[[ -x /usr/bin/python3 ]]  || skipTest "Need /usr/bin/python3 to synthesize the CMS-skip fixture"
 
-if ! [[ -x /usr/bin/cc ]]; then
-    skipTest "Need /usr/bin/cc to build the test fixture"
-fi
-
-if ! [[ -x /usr/bin/codesign ]]; then
-    skipTest "Need /usr/bin/codesign to validate signatures"
-fi
-
-# Build the multi-output derivation. The exact trigger condition
-# differs between IA and CA derivations:
-#
-#   - **InputAddressed**: the bug only fires when at least one sibling
-#     output is already in the store at the start of the build, so the
-#     sibling's scratch path becomes a `makeFallbackPath` placeholder.
-#     A fresh cold build does not populate `outputRewrites` for
-#     siblings and therefore does not trigger the bug. We seed the
-#     store with a cold build, then re-invoke under `nix-build --check`
-#     — Nix's own determinism check rebuilds the derivation while the
-#     previous outputs are still in the store, materialising the
-#     corrupted (or fixed-up, on a patched daemon) binary in a `.check`
-#     directory. No `nix-store --delete` or other state mutation is
-#     required.
-#
-#   - **ContentAddressed** (issue NixOS/nix#6065 was filed against this
-#     case): the cold build *itself* substitutes the scratch hash for
-#     the final content-addressed hash inside the rewriteOutput lambda,
-#     so the bug fires immediately. `--check` is unnecessary (and would
-#     succeed silently rather than producing a `.check`, since CA
-#     content-equality is verified per build).
-#
-# `NIX_TESTS_CA_BY_DEFAULT=1` is the framework convention used by the
-# tests under `tests/functional/ca/`; it makes `mkDerivation` in the
-# generated `config.nix` inject `__contentAddressed = true`,
-# `outputHashMode = "recursive"`, `outputHashAlgo = "sha256"`.
 out=$(nix-build --no-out-link ./macho-rewrite.nix)
 [[ -x "$out/bin/hello" ]]
 
-if [[ "${NIX_TESTS_CA_BY_DEFAULT:-}" == "1" ]]; then
-    # CA: the cold build already triggered the bug. Run assertions
-    # against `$out` directly.
+if [[ -n "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    # Confirm the fixture actually built as CA — `.info[].ca` is only
+    # present for CA paths. Catches any silent regression where
+    # `config.nix` stops honoring `NIX_TESTS_CA_BY_DEFAULT`.
+    nix path-info --json --json-format 2 "$out" | jq -e '.info.[].ca' >/dev/null
     target="$out"
 else
-    # IA: trigger the bug via Nix's determinism check. Expected to
-    # fail with `may not be deterministic` because Apple's `ld_prime`
-    # generates a non-deterministic `LC_UUID` even with identical
-    # inputs (and macOS does not let us turn `LC_UUID` off — `dyld`
-    # rejects binaries that lack one), so the rebuild always differs
-    # from the original. The `.check` directory contains the
-    # post-rewrite-and-fixup binary. Exit code 104 is Nix's dedicated
-    # status bit for `checkMismatch` — see `failingExitStatus` in
-    # `src/libstore/build-result.cc`.
     expect 104 nix-build --no-out-link --check --keep-failed ./macho-rewrite.nix
     target="${out}.check"
     [[ -x "$target/bin/hello" ]]
 fi
 
-# Step 1 — binary executes (no SIGKILL — the load-bearing regression
-# assertion: any helper bug that produces stale page hashes manifests
-# here as a kernel kill)
-output=$("$target/bin/hello")
-echo "$output"
+# dyld picks the host-matching slice for fat containers automatically.
+# `hello-codesigned` exercises the flags=0x2 / 16 KiB-page signer;
+# the rest are linker-signed.
+for binary in hello hello-fat32-1arch hello-fat32-multi hello-codesigned; do
+    path="$target/bin/$binary"
+    [[ -x "$path" ]]
 
-# Step 2 — embedded doc path is the final one (proves the substitution
-# actually happened and the helper didn't accidentally restore
-# pre-rewrite bytes). Match against `$NIX_STORE_DIR` rather than a
-# hardcoded `/nix/store` so the assertion holds under the functional
-# test harness, which points the store at a temporary directory.
-echo "$output" | grep -qE "^doc=${NIX_STORE_DIR:-/nix/store}/[a-z0-9]{32}-macho-rewrite-multi-doc/share/doc/hello$"
+    output=$("$path")
+    echo "$output" | grepQuiet -E "^doc=$NIX_STORE_DIR/[a-z0-9]{32}-macho-rewrite-multi-doc/share/doc/hello$"
 
-# Step 3 — codesign verifies the (rewritten + fixed-up) signature
-/usr/bin/codesign --verify "$target/bin/hello"
+    /usr/bin/codesign --verify "$path"
+done
 
-# Step 4 — `linker-signed` flag preserved (cleared by every
-# `codesign(1)` invocation, so this catches any future refactor that
-# swaps the in-process helper for a shellout)
-/usr/bin/codesign -dvvv "$target/bin/hello" 2>&1 | grep -qF 'flags=0x20002(adhoc,linker-signed)'
+# Self-reference variant: the binary embeds its own $out path, which
+# the daemon rewrites during the rebuild — same substitution
+# mechanism as sibling-reference, different byte location.
+[[ -x "$target/bin/hello-self" ]]
+output=$("$target/bin/hello-self")
+echo "$output" | grepQuiet -E "^self=$NIX_STORE_DIR/[a-z0-9]{32}-macho-rewrite-multi/bin/hello-self$"
+/usr/bin/codesign --verify "$target/bin/hello-self"
+
+# CMS-skip variant: the SuperBlob carries a synthetic non-empty
+# `CSMAGIC_BLOBWRAPPER` under `CSSLOT_SIGNATURESLOT`. The helper's
+# pre-scan must detect it and leave the slice untouched — recomputing
+# the CodeDirectory would invalidate the (would-be) PKCS#7 chain.
+#
+# Assert on the specific error: `codesign --verify` must report "code
+# or signature have been modified" (hash mismatch). A helper that
+# wrongly recomputed slots would pass the hash check and fail later
+# at the junk CMS blob with a different error, which a bare exit-code
+# check would silently mask.
+[[ -x "$target/bin/hello-cms" ]]
+cms_verify=$(/usr/bin/codesign --verify -vv "$target/bin/hello-cms" 2>&1 || true)
+echo "$cms_verify" | grepQuiet -F 'invalid signature (code or signature have been modified)'
+
+# `codesign --verify` on a fat64 file reports "code object is not
+# signed at all" even on a structurally-valid one on macOS 26; we
+# verify per-slice after `lipo -thin` instead.
+fat64="$target/lib/libgreet-fat64.dylib"
+[[ -f "$fat64" ]]
+# The fix-up never rewrites the fat header.
+printf '\xca\xfe\xba\xbf' > "$TEST_ROOT/expected-fat64-magic"
+cmp -n 4 "$TEST_ROOT/expected-fat64-magic" "$fat64"
+
+work_fat64="$TEST_ROOT/fat64-slices"
+mkdir -p "$work_fat64"
+for arch in arm64 x86_64; do
+    /usr/bin/lipo -thin "$arch" "$fat64" -output "$work_fat64/slice-$arch.dylib"
+    /usr/bin/codesign --verify "$work_fat64/slice-$arch.dylib"
+done
+
+# `linker-signed` is set only by `ld`'s adhoc-codesign path; a
+# refactor that re-signs via `codesign(1)` instead would clear it.
+/usr/bin/codesign -dvvv "$target/bin/hello" 2>&1 | grepQuiet -F 'flags=0x20002(adhoc,linker-signed)'
+
+# The helper must skip symlinks at both entry points.
+[[ -L "$target/bin/hello-symlink" ]]
+
+# Malformed fat-header fixtures — 32 bytes so they pass the helper's
+# minimum-file-size check (28 bytes) and reach the nfat bound that
+# we want to exercise. The helper must leave the bytes unchanged.
+expected_dir="$TEST_ROOT/fixture-expected"
+mkdir -p "$expected_dir"
+{ printf '\xca\xfe\xba\xbe\x00\x00\x00\x00'; head -c 24 /dev/zero; } > "$expected_dir/nfat-zero"
+{ printf '\xca\xfe\xba\xbe\x00\x00\x00\x41'; head -c 24 /dev/zero; } > "$expected_dir/java-class-shaped"
+for fixture in nfat-zero java-class-shaped; do
+    cmp "$expected_dir/$fixture" "$target/share/fixtures/$fixture"
+done

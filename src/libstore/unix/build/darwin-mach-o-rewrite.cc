@@ -3,6 +3,7 @@
 #  include "darwin-mach-o-rewrite.hh"
 
 #  include "nix/util/error.hh"
+#  include "nix/util/file-descriptor.hh"
 #  include "nix/util/file-system.hh"
 #  include "nix/util/hash.hh"
 #  include "nix/util/logging.hh"
@@ -11,10 +12,12 @@
 #  include <mach-o/loader.h>
 
 #  include <algorithm>
+#  include <array>
 #  include <cstdint>
 #  include <cstring>
 #  include <string>
 #  include <string_view>
+#  include <utility>
 
 namespace nix {
 
@@ -25,24 +28,77 @@ namespace {
    (`bsd/sys/codesign.h`). Big-endian on disk regardless of host. */
 constexpr uint32_t CSMAGIC_EMBEDDED_SIGNATURE = 0xfade0cc0;
 constexpr uint32_t CSMAGIC_CODEDIRECTORY = 0xfade0c02;
+constexpr uint32_t CSMAGIC_BLOBWRAPPER = 0xfade0b01;
 
+constexpr uint8_t CS_HASHTYPE_SHA1 = 1;
 constexpr uint8_t CS_HASHTYPE_SHA256 = 2;
+constexpr uint8_t CS_HASHSIZE_SHA1 = 20;
 constexpr uint8_t CS_HASHSIZE_SHA256 = 32;
 
-/* Cap the size of files we will load wholesale into memory. Anything
-   larger than this is implausibly a Mach-O binary in a nixpkgs build
-   output and is more likely a builder's runaway artefact (or a
-   resource-exhaustion attempt). */
+/* SuperBlob slot type for an embedded CMS signature. An empty 8-byte
+   `CSMAGIC_BLOBWRAPPER` placeholder is left in place by Apple's
+   `codesign(1)` on ad-hoc signing and is safe to process. A non-empty
+   payload is a PKCS#7 chain (Developer ID / App Store) that commits
+   to the CodeDirectory's hash: recomputing any page-hash slot would
+   invalidate the signer's cdhash commitment, and the re-signer's
+   identity is not recoverable from inside the daemon. */
+constexpr uint32_t CSSLOT_SIGNATURESLOT = 0x10000;
+
+/* Bound on the in-memory size of files we process. No darwin build
+   output carries a Mach-O binary this big in practice. */
 constexpr size_t maxFileSize = 512 * 1024 * 1024;
 
-/* Reasonable upper bound on the CodeDirectory page size exponent. Apple
-   ships 12 (4 KiB) for linker-signed binaries and 14 (16 KiB) for
-   `codesign(1)` output; 16 (64 KiB) is the practical maximum. */
+/* Upper bound on the CodeDirectory page size exponent. Apple emits 12
+   (4 KiB) for linker-signed binaries and 14 (16 KiB) for `codesign(1)`;
+   16 is the practical ceiling. */
 constexpr uint8_t maxPageSizeLog2 = 16;
+
+/* Bound on a fat container's `nfat_arch`. Java `.class` files share
+   the `0xcafebabe` magic and their major.minor version reads as a
+   large `nfat`, so without this check a class file reaches the per-
+   slice loop with 65+ garbage entries. */
+constexpr uint32_t maxNFatArch = 16;
+
+/* Bound on a SuperBlob's `count` field. An unbounded `count` with
+   matching `CSMAGIC_CODEDIRECTORY` entries inside a 512 MiB file
+   could drive the per-CodeDirectory loop to recompute the same
+   slot region many times over. */
+constexpr uint32_t maxSuperBlobCount = 16;
+
+/* On-disk width of fat_arch (20 bytes) and fat_arch_64 (32 bytes).
+   We read fields by offset rather than via Apple's host-ordered
+   structs; the static_asserts catch any future SDK padding change
+   at compile time. */
+constexpr size_t fatArchSize32 = 20;
+constexpr size_t fatArchSize64 = 32;
+static_assert(sizeof(fat_arch) == fatArchSize32);
+static_assert(sizeof(fat_arch_64) == fatArchSize64);
 
 uint32_t rdBE32(const uint8_t * p)
 {
     return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | uint32_t(p[3]);
+}
+
+uint64_t rdBE64(const uint8_t * p)
+{
+    return (uint64_t(rdBE32(p)) << 32) | uint64_t(rdBE32(p + 4));
+}
+
+/* A fat slice is valid if it fits strictly between the fat_arch
+   array and EOF, and has non-zero size. */
+bool validSliceBounds(size_t sliceOff, size_t sliceSize, size_t archArrayEnd, size_t fileSize)
+{
+    if (sliceSize == 0)
+        return false;
+    if (sliceOff < archArrayEnd)
+        return false;
+    if (sliceOff >= fileSize)
+        return false;
+    /* Subtraction form so the addition can't wrap on fat64's u64
+       offset/size fields. */
+    if (sliceSize > fileSize - sliceOff)
+        return false;
+    return true;
 }
 
 /**
@@ -52,19 +108,14 @@ uint32_t rdBE32(const uint8_t * p)
  */
 bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::path & path)
 {
-    /* `data` is owned by the caller and is not resized anywhere in this
-       function, so this pointer remains valid for the entire body. We
-       intentionally cast away `char` for the byte-level reads below;
-       writes through this pointer in the slot-update loop are safe for
-       the same reason. */
+    /* `data` is never resized past this point, so `bytes` stays valid. */
     auto * bytes = reinterpret_cast<uint8_t *>(data.data());
 
     if (sliceBase + sizeof(mach_header) > data.size())
         return false;
 
-    /* The mach_header / mach_header_64 fields are stored in native
-       byte order. We memcpy into a local to avoid undefined-behaviour
-       from a `reinterpret_cast` through a non-aliasing pointer. */
+    /* Mach-O header fields are host-ordered. memcpy-into-local avoids
+       UB from a reinterpret_cast through a non-aliasing pointer. */
     mach_header mhProbe;
     std::memcpy(&mhProbe, bytes + sliceBase, sizeof(mhProbe));
 
@@ -74,9 +125,6 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
     else if (mhProbe.magic == MH_MAGIC)
         is64 = false;
     else
-        /* Either not a Mach-O slice (e.g. random data inside a fat
-           container), or a byte-swapped header from an architecture
-           Apple has not shipped in 20 years. Either way, leave it. */
         return false;
 
     size_t headerSize = is64 ? sizeof(mach_header_64) : sizeof(mach_header);
@@ -125,9 +173,7 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
     if (!found)
         return false;
 
-    /* The signature SuperBlob lives at sliceBase + sigOff. For a thin
-       Mach-O sliceBase is zero; for a fat slice the file offset stored
-       in `LC_CODE_SIGNATURE` is relative to the slice, not the file. */
+    /* `LC_CODE_SIGNATURE.dataoff` is slice-relative (zero for thin). */
     constexpr size_t superBlobHeaderSize = 12; // magic + length + count
     constexpr size_t blobIndexSize = 8;        // type + offset
     size_t sbAbs = sliceBase + sigOff;
@@ -138,11 +184,38 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
         return false;
 
     uint32_t sbCount = rdBE32(bytes + sbAbs + 8);
+    if (sbCount > maxSuperBlobCount) {
+        warn("fixupMachoPageHashes: %s: implausible SuperBlob count %d, skipping", PathFmt(path), int(sbCount));
+        return false;
+    }
+
+    /* Pre-scan for a non-empty CMS signature blob and skip the slice if
+       present — see the comment on `CSSLOT_SIGNATURESLOT` above. */
+    for (uint32_t bi = 0; bi < sbCount; bi++) {
+        size_t entryOff = sbAbs + superBlobHeaderSize + size_t(bi) * blobIndexSize;
+        if (entryOff + blobIndexSize > sbAbs + sigSize)
+            break;
+        if (rdBE32(bytes + entryOff) != CSSLOT_SIGNATURESLOT)
+            continue;
+        uint32_t blobRel = rdBE32(bytes + entryOff + 4);
+        size_t blobAbs = sbAbs + blobRel;
+        if (blobAbs + 8 > sbAbs + sigSize)
+            continue;
+        if (rdBE32(bytes + blobAbs) != CSMAGIC_BLOBWRAPPER)
+            continue;
+        uint32_t blobLen = rdBE32(bytes + blobAbs + 4);
+        if (blobLen > 8) {
+            warn(
+                "fixupMachoPageHashes: %s: SuperBlob carries a non-empty CMS signature (%d bytes), skipping",
+                PathFmt(path),
+                int(blobLen));
+            return false;
+        }
+    }
 
     bool modified = false;
 
-    /* Binaries can carry multiple CodeDirectories (e.g. SHA-1 + SHA-256
-       alternates for older macOS); process each, skip non-SHA-256. */
+    /* Older binaries carry SHA-1 + SHA-256 alternate CodeDirectories. */
     for (uint32_t bi = 0; bi < sbCount; bi++) {
         size_t entryOff = sbAbs + superBlobHeaderSize + size_t(bi) * blobIndexSize;
         if (entryOff + blobIndexSize > sbAbs + sigSize)
@@ -165,11 +238,9 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
 
         uint32_t cdLength = rdBE32(bytes + blobAbs + 4);
 
-        /* Defense in depth: validate that the entire CodeDirectory blob
-           lies inside the SuperBlob. The slot bounds check below catches
-           the worst case (out-of-file write), but a malformed blob could
-           still claim a `cdLength` that overruns the SuperBlob structure
-           while leaving the slot region in-bounds. Reject early. */
+        /* Bound the CodeDirectory against the SuperBlob — the later
+           slot-region check would miss a malformed `cdLength` that
+           overruns sibling blob metadata while keeping slots in file. */
         if (cdLength < cdHeaderSize || blobAbs + cdLength > sbAbs + sigSize) {
             warn("fixupMachoPageHashes: %s: CodeDirectory length out of bounds, skipping", PathFmt(path));
             continue;
@@ -183,17 +254,30 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
         uint8_t hashType = bytes[blobAbs + 37];
         uint8_t pageSizeLog2 = bytes[blobAbs + 39];
 
-        if (hashType != CS_HASHTYPE_SHA256) {
+        /* Pre-2016 binaries carry SHA-1 + SHA-256 alternate CDs in one
+           SuperBlob. The kernel validates every CD at page-in, so
+           fixing just one leaves the other stale and the binary
+           SIGKILLs at load. */
+        HashAlgorithm hashAlgo;
+        uint8_t expectedHashSize;
+        if (hashType == CS_HASHTYPE_SHA256) {
+            hashAlgo = HashAlgorithm::SHA256;
+            expectedHashSize = CS_HASHSIZE_SHA256;
+        } else if (hashType == CS_HASHTYPE_SHA1) {
+            hashAlgo = HashAlgorithm::SHA1;
+            expectedHashSize = CS_HASHSIZE_SHA1;
+        } else {
             warn(
-                "fixupMachoPageHashes: %s: CodeDirectory hashType=%d (not SHA-256), skipping",
+                "fixupMachoPageHashes: %s: CodeDirectory hashType=%d not supported, skipping",
                 PathFmt(path),
                 int(hashType));
             continue;
         }
-        if (hashSize != CS_HASHSIZE_SHA256) {
+        if (hashSize != expectedHashSize) {
             warn(
-                "fixupMachoPageHashes: %s: SHA-256 CodeDirectory has hashSize=%d, skipping",
+                "fixupMachoPageHashes: %s: CodeDirectory hashType=%d has hashSize=%d, skipping",
                 PathFmt(path),
+                int(hashType),
                 int(hashSize));
             continue;
         }
@@ -202,9 +286,8 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
             continue;
         }
 
-        /* Validate that the special-slot region (negative indices,
-           hashing other blobs) lives entirely below the code-slot
-           region — otherwise the CodeDirectory is corrupt. */
+        /* Special slots hash other blobs at negative indices from
+           `hashOffset`, so they must fit below the code-slot region. */
         if (size_t(nSpecialSlots) * hashSize > hashOffset) {
             warn(
                 "fixupMachoPageHashes: %s: nSpecialSlots=%d overflows hashOffset=%d, skipping",
@@ -216,8 +299,6 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
 
         size_t pageSize = size_t(1) << pageSizeLog2;
 
-        /* Bounds-check the entire code-slot region against both the
-           CodeDirectory blob and the file. */
         size_t slotsAbs = blobAbs + hashOffset;
         size_t slotsEnd = slotsAbs + size_t(nCodeSlots) * hashSize;
         if (slotsEnd > blobAbs + cdLength || slotsEnd > data.size()) {
@@ -233,21 +314,20 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
             codeLimit);
 
         for (uint32_t i = 0; i < nCodeSlots; i++) {
-            /* Promote `i` to size_t BEFORE the +1 to prevent uint32
-               wraparound on hypothetical massive nCodeSlots. */
+            /* size_t-promoted before the `+1` to avoid uint32 wraparound. */
             size_t pageStart = sliceBase + size_t(i) * pageSize;
             size_t pageEndUnclamped = sliceBase + (size_t(i) + 1) * pageSize;
             size_t pageEndLimit = sliceBase + size_t(codeLimit);
             size_t pageEnd = std::min(pageEndUnclamped, pageEndLimit);
             if (pageEnd > data.size() || pageEnd < pageStart) {
-                warn("fixupMachoPageHashes: %s: page %d out of bounds, skipping", PathFmt(path), i);
+                warn("fixupMachoPageHashes: %s: page %d out of bounds, skipping", PathFmt(path), int(i));
                 continue;
             }
             std::string_view sv(data.data() + pageStart, pageEnd - pageStart);
-            Hash h = hashString(HashAlgorithm::SHA256, sv);
-            uint8_t * slot = bytes + slotsAbs + size_t(i) * CS_HASHSIZE_SHA256;
-            if (std::memcmp(slot, h.hash, CS_HASHSIZE_SHA256) != 0) {
-                std::memcpy(slot, h.hash, CS_HASHSIZE_SHA256);
+            Hash h = hashString(hashAlgo, sv);
+            uint8_t * slot = bytes + slotsAbs + size_t(i) * hashSize;
+            if (std::memcmp(slot, h.hash, hashSize) != 0) {
+                std::memcpy(slot, h.hash, hashSize);
                 modified = true;
             }
         }
@@ -261,8 +341,7 @@ bool fixupSlice(std::string & data, size_t sliceBase, const std::filesystem::pat
  * write it back. Returns 1 if the file was modified, 0 otherwise.
  *
  * Throws on read/write failure of a file we have committed to
- * rewriting, or on a Mach-O variant we cannot fix up (e.g. 64-bit
- * fat).
+ * rewriting.
  */
 size_t fixupFile(const std::filesystem::path & path)
 {
@@ -273,42 +352,72 @@ size_t fixupFile(const std::filesystem::path & path)
     if (sz > maxFileSize)
         return 0;
 
-    /* `readFile` returns the file as a `std::string`. Random access on
-       a flat byte buffer is the right primitive here — `Source` is
-       streaming-only and our parser needs to seek into the
-       `LC_CODE_SIGNATURE` blob and back. The `reinterpret_cast` to
-       `uint8_t *` below is well-defined as of C++17 (`std::string::data`
-       returns a pointer to the contiguous storage). */
-    std::string data = readFile(path);
+    /* Peek the 4-byte magic before loading the whole file. The helper
+       runs on every regular file in every darwin build output closure,
+       most of which are not Mach-O. `readOffset` uses `pread`, which
+       leaves the fd offset at 0 for the full `readFile(fd)` below. */
+    AutoCloseFD fd = openFileReadonly(path);
+    if (!fd)
+        return 0;
+    std::array<std::byte, 4> peek;
+    if (readOffset(fd.get(), 0, peek) != peek.size())
+        return 0;
+    const auto * peekBytes = reinterpret_cast<const uint8_t *>(peek.data());
+    uint32_t magicLE;
+    std::memcpy(&magicLE, peekBytes, sizeof(magicLE));
+    uint32_t magicBE = rdBE32(peekBytes);
+    if (magicLE != MH_MAGIC && magicLE != MH_MAGIC_64 && magicBE != FAT_MAGIC && magicBE != FAT_MAGIC_64)
+        return 0;
+
+    std::string data = readFile(fd.get());
 
     auto * bytes = reinterpret_cast<const uint8_t *>(data.data());
-    uint32_t magicLE;
-    std::memcpy(&magicLE, bytes, sizeof(magicLE));
-    uint32_t magicBE = rdBE32(bytes);
 
     bool modified = false;
 
     if (magicLE == MH_MAGIC || magicLE == MH_MAGIC_64) {
         modified = fixupSlice(data, 0, path);
-    } else if (magicBE == FAT_MAGIC) {
-        /* Apple's `fat_arch` struct is byte-swapped on little-endian
-           hosts, so we read the big-endian fields by hand. */
-        uint32_t nfat = rdBE32(bytes + 4);
+    } else if (magicBE == FAT_MAGIC || magicBE == FAT_MAGIC_64) {
+        /* fat32 and fat64 share the same fat_header (magic + nfat_arch,
+           u32 BE). The per-arch table differs: fat32 has u32 offset and
+           size; fat64 has u64. */
+        const bool is64 = (magicBE == FAT_MAGIC_64);
+        const size_t archSize = is64 ? fatArchSize64 : fatArchSize32;
+
+        const uint32_t nfat = rdBE32(bytes + 4);
+        if (nfat == 0 || nfat > maxNFatArch)
+            return 0;
+
+        const size_t archArrayEnd = sizeof(fat_header) + size_t(nfat) * archSize;
+        if (archArrayEnd > data.size())
+            return 0;
+
+        /* fat_arch entry fields (BE on disk):
+             fat_arch:    cputype@0 cpusubtype@4 offset@8  (u32) size@12 (u32) align@16
+             fat_arch_64: cputype@0 cpusubtype@4 offset@8  (u64) size@16 (u64) align@24 reserved@28 */
         for (uint32_t i = 0; i < nfat; i++) {
-            size_t archOff = sizeof(fat_header) + size_t(i) * sizeof(fat_arch);
-            if (archOff + sizeof(fat_arch) > data.size())
-                break;
-            uint32_t sliceOff = rdBE32(reinterpret_cast<const uint8_t *>(data.data()) + archOff + 8);
+            const size_t archOff = sizeof(fat_header) + size_t(i) * archSize;
+            const auto [sliceOff, sliceSize] = [&]() -> std::pair<size_t, size_t> {
+                if (is64)
+                    return {rdBE64(bytes + archOff + 8), rdBE64(bytes + archOff + 16)};
+                return {rdBE32(bytes + archOff + 8), rdBE32(bytes + archOff + 12)};
+            }();
+
+            if (!validSliceBounds(sliceOff, sliceSize, archArrayEnd, data.size())) {
+                warn(
+                    "fixupMachoPageHashes: %s: fat_arch[%d] slice bounds invalid "
+                    "(offset=%d size=%d file=%d), skipping",
+                    PathFmt(path),
+                    int(i),
+                    int(sliceOff),
+                    int(sliceSize),
+                    int(data.size()));
+                continue;
+            }
+
             if (fixupSlice(data, sliceOff, path))
                 modified = true;
         }
-    } else if (magicBE == FAT_MAGIC_64) {
-        /* 64-bit fat is rare in practice but real (Apple's own toolchain
-           emits it for very large slices). Refusing loudly is better
-           than silently leaving an unrunnable binary in the store. */
-        throw Error(
-            "fixupMachoPageHashes: %s: 64-bit fat Mach-O binaries are not yet supported (nixpkgs#507531 follow-up)",
-            PathFmt(path));
     } else {
         return 0;
     }
@@ -316,11 +425,8 @@ size_t fixupFile(const std::filesystem::path & path)
     if (!modified)
         return 0;
 
-    /* Write back. We don't bother preserving the original mode bits:
-       `canonicalisePathMetaData` runs immediately after this in the
-       same lambda and resets perms, uid, gid, and mtime to canonical
-       values. Use `0600` as a safe transient mode that excludes
-       setuid/setgid/sticky. */
+    /* `canonicalisePathMetaData` runs next and resets perms, so 0600
+       here is a safe transient. */
     writeFile(path, std::string_view{data}, 0600);
     return 1;
 }
@@ -343,9 +449,9 @@ size_t fixupMachoPageHashes(const std::filesystem::path & path)
     if (!std::filesystem::is_directory(st))
         return 0;
 
-    /* `recursive_directory_iterator` does not follow symlinks by
-       default, but it does still yield file symlinks inside real
-       directories — hence the explicit `is_symlink` skip below. */
+    /* The iterator doesn't recurse into directory symlinks but still
+       yields them (and file symlinks) as entries, so we skip
+       explicitly. */
     size_t count = 0;
     auto it = std::filesystem::recursive_directory_iterator(
         path, std::filesystem::directory_options::skip_permission_denied, ec);
