@@ -129,23 +129,20 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
-            return nix_eval_state_builder{
-                .store = nix::ref<nix::Store>(store->ptr),
-                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
-                .fetchSettings = nix::fetchers::Settings{},
-                .readOnlyMode = true,
-            };
-        });
+        auto readOnly = nix::make_ref<bool>(true);
+        return new nix_eval_state_builder{
+            .store = nix::ref<nix::Store>(store->ptr),
+            .settings = nix::EvalSettings{/* &bool */ *readOnly},
+            .fetchSettings = nix::fetchers::Settings{},
+            .readOnlyMode = readOnly,
+        };
     }
     NIXC_CATCH_ERRS_NULL
 }
 
 void nix_eval_state_builder_free(nix_eval_state_builder * builder)
 {
-    if (builder)
-        builder->~nix_eval_state_builder();
-    operator delete(builder, static_cast<std::align_val_t>(alignof(nix_eval_state_builder)));
+    delete builder;
 }
 
 nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder)
@@ -154,7 +151,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
         context->last_err_code = NIX_OK;
     try {
         // TODO: load in one go?
-        builder->settings.readOnlyMode = nix::settings.readOnlyMode;
+        builder->settings.readOnlyMode = &nix::settings.readOnlyMode;
         loadConfFile(builder->settings);
         loadConfFile(builder->fetchSettings);
     }

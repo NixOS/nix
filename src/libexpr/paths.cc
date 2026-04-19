@@ -24,7 +24,7 @@ SourcePath EvalState::storePath(const StorePath & path)
 
 void EvalState::ensureLazyPathCopied(const StorePath & path)
 {
-    if (settings.readOnlyMode)
+    if (settings.isReadOnly())
         return;
 
     auto mount = storeFS->getMount(CanonPath(store->printStorePath(path)));
