@@ -730,6 +730,21 @@ public:
         const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
     /**
+     * For efficiency reasons, some store paths (as seen by the evaluator) in
+     * the storeFS at their content-addressed locations don't get copied to the
+     * store eagerly. This saves on needless I/O and possibly IPC if all the
+     * evaluator does is just evaluate nix expressions from those locations.
+     * This function copies such store objects to the store if they aren't already valid.
+     */
+    void ensureLazyPathCopied(const StorePath & path);
+
+    /**
+     * Ensure that all NixStringContextElem::Opaque context elements get fetched
+     * to the store.
+     */
+    void ensureLazyPathsCopied(const NixStringContext & context);
+
+    /**
      * String coercion.
      *
      * Converts strings, paths and derivations to a

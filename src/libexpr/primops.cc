@@ -10,6 +10,7 @@
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/util/util.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
@@ -63,7 +64,7 @@ std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMayb
     nix::NixStringContext stringContext;
     auto rawStr = coerceToString(pos, s, stringContext, "while realising a string").toOwned();
     auto rewrites = realiseContext(stringContext, storePathsOutMaybe, isIFD);
-
+    ensureLazyPathsCopied(stringContext);
     return nix::rewriteStrings(rawStr, rewrites);
 }
 
@@ -88,7 +89,11 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                     ensureValid(b.drvPath->getBaseStorePath());
                 },
                 [&](const NixStringContextElem::Opaque & o) {
-                    ensureValid(o.path);
+                    /* If the path happens to be mounted on the storeFS, that means it's lazy path string and would get
+                       copied to the store on-demand (when referenced in a derivation). The string is equal to final
+                       store path where the store object would end up (the path is hashed before mounting). */
+                    if (!storeFS->getMount(CanonPath(store->printStorePath(o.path))))
+                        ensureValid(o.path);
                     if (maybePathsOut)
                         maybePathsOut->emplace(o.path);
                 },
@@ -445,11 +450,16 @@ extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     auto path = state.realisePath(pos, *args[0]);
+    auto physicalPath = path.getPhysicalPath();
+    /* TODO: Should we copy lazy paths to the store here? Probably not, it's
+       unlikely anybody cares about this builtin anyway. */
+    if (!physicalPath)
+        state.error<EvalError>("could not open '%1%' because it has no physical path", path).debugThrow();
 
     std::string sym(
         state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
 
-    void * handle = dlopen(path.path.c_str(), RTLD_LAZY | RTLD_LOCAL);
+    void * handle = dlopen(physicalPath->c_str(), RTLD_LAZY | RTLD_LOCAL);
     if (!handle)
         state.error<EvalError>("could not open '%1%': %2%", path, dlerror()).debugThrow();
 
@@ -471,7 +481,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value
     /* We don't dlclose because v may be a primop referencing a function in the shared object file */
 }
 
-/* Execute a program and parse its output */
+/* Execute a program and parse its output. FIXME: This doesn't work with chroot stores. */
 void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
@@ -509,6 +519,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             .debugThrow();
     }
 
+    state.ensureLazyPathsCopied(context);
     auto output = runProgram(program, true, toOsStrings(std::move(commandArgs)));
     Expr * parsed;
     try {
@@ -1726,7 +1737,10 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 [&](const NixStringContextElem::Built & b) {
                     drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
                 },
-                [&](const NixStringContextElem::Opaque & o) { drv.inputSrcs.insert(o.path); },
+                [&](const NixStringContextElem::Opaque & o) {
+                    state.ensureLazyPathCopied(o.path);
+                    drv.inputSrcs.insert(o.path);
+                },
             },
             c.raw);
     }
@@ -2666,9 +2680,10 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
     StorePathSet refs;
 
     for (auto c : context) {
-        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
+        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw)) {
+            state.ensureLazyPathCopied(p->path);
             refs.insert(p->path);
-        else
+        } else
             state
                 .error<EvalError>(
                     "files created by %1% may not reference derivations, but %2% references %3%",

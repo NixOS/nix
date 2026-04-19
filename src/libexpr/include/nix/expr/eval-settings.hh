@@ -71,7 +71,14 @@ struct EvalSettings : Config
 
     EvalSettings(bool & readOnlyMode, LookupPathHooks lookupPathHooks = {});
 
-    bool & readOnlyMode;
+    /* FIXME: This really shouldn't be public. The C API should have non-global settings instead. */
+    bool * readOnlyMode = nullptr;
+
+    bool isReadOnly() const
+    {
+        assert(readOnlyMode);
+        return *readOnlyMode;
+    }
 
     static Strings getDefaultNixPath();
 

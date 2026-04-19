@@ -7,6 +7,7 @@
 #include "nix/expr/get-drvs.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-spec.hh"
@@ -214,9 +215,12 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
     {
         auto lockedFlake = lockFlake();
         auto & flake = lockedFlake.flake;
+        auto evalState = getEvalState();
 
-        // Currently, all flakes are in the Nix store via the rootFS accessor.
-        auto storePath = store->printStorePath(store->toStorePath(flake.path.path.abs()).first);
+        /* Flakes do not get copied to the store, but are instead mounted at
+           their expected store paths in storeFS. Querying metadata does not
+           force copying to the store, as one would expect. */
+        auto storePath = store->toStorePath(flake.path.path.abs()).first;
 
         if (json) {
             nlohmann::json j;
@@ -238,7 +242,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 j["revCount"] = *revCount;
             if (auto lastModified = flake.lockedRef.input.getLastModified())
                 j["lastModified"] = *lastModified;
-            j["path"] = storePath;
+            j["path"] = store->printStorePath(storePath);
             j["locks"] = lockedFlake.lockFile.toJSON().first;
             if (auto fingerprint = lockedFlake.getFingerprint(*store, fetchSettings))
                 j["fingerprint"] = fingerprint->to_string(HashFormat::Base16, false);
@@ -249,7 +253,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
                 logger->cout(ANSI_BOLD "Locked URL:" ANSI_NORMAL "    %s", flake.lockedRef.to_string());
             if (flake.description)
                 logger->cout(ANSI_BOLD "Description:" ANSI_NORMAL "   %s", *flake.description);
-            logger->cout(ANSI_BOLD "Path:" ANSI_NORMAL "          %s", storePath);
+            logger->cout(ANSI_BOLD "Path:" ANSI_NORMAL "          %s", store->printStorePath(storePath));
             if (auto rev = flake.lockedRef.input.getRev())
                 logger->cout(ANSI_BOLD "Revision:" ANSI_NORMAL "      %s", rev->to_string(HashFormat::Base16, false));
             if (auto dirtyRev = fetchers::maybeGetStrAttr(flake.lockedRef.toAttrs(), "dirtyRev"))
@@ -1090,13 +1094,14 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 
         StorePathSet sources;
 
-        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+        auto storePath = dryRun ? flake.flake.lockedRef.input.computeStorePath(*store)
+                                : std::get<StorePath>(flake.flake.lockedRef.input.fetchToStore(fetchSettings, *store));
 
         sources.insert(storePath);
 
         // FIXME: use graph output, handle cycles.
-        std::function<nlohmann::json(const flake::Node & node)> traverse;
-        traverse = [&](const flake::Node & node) {
+        auto traverse = [&store, json = json, dryRun = dryRun, &sources](
+                            this const auto & self, const flake::Node & node) -> nlohmann::json {
             nlohmann::json jsonObj2 = json ? nlohmann::json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
@@ -1110,9 +1115,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
                         auto & jsonObj3 = jsonObj2[inputName];
                         if (storePath)
                             jsonObj3["path"] = store->printStorePath(*storePath);
-                        jsonObj3["inputs"] = traverse(**inputNode);
+                        jsonObj3["inputs"] = self(**inputNode);
                     } else
-                        traverse(**inputNode);
+                        self(**inputNode);
                 }
             }
             return jsonObj2;

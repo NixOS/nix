@@ -83,10 +83,10 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
             [&](this const auto & recurse, Value & v, const PosIdx pos, const std::filesystem::path & path) -> void {
                 state->forceValue(v, pos);
-                if (v.type() == nString)
-                    // FIXME: disallow strings with contexts?
+                if (v.type() == nString) {
+                    copyContext(v, context);
                     writeFile(path, v.string_view());
-                else if (v.type() == nAttrs) {
+                } else if (v.type() == nAttrs) {
                     [[maybe_unused]] bool directoryCreated = std::filesystem::create_directory(path);
                     // Directory should not already exist
                     assert(directoryCreated);
@@ -110,9 +110,8 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
         else if (raw) {
             logger->stop();
-            writeFull(
-                getStandardOutput(),
-                *state->coerceToString(noPos, *v, context, "while generating the eval command output"));
+            auto string = state->coerceToString(noPos, *v, context, "while generating the eval command output");
+            writeFull(getStandardOutput(), *string);
         }
 
         else if (json) {
@@ -120,8 +119,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
         }
 
         else {
-            logger->cout("%s", ValuePrinter(*state, *v, PrintOptions{.force = true, .derivationPaths = true}));
+            ValuePrinter printer(*state, *v, PrintOptions{.force = true, .derivationPaths = true}, &context);
+            logger->cout("%s", printer);
         }
+
+        state->ensureLazyPathsCopied(context);
     }
 };
 
