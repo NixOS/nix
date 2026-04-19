@@ -17,11 +17,18 @@ R""(
   github:NixOS/nixpkgs/25.05
   ```
 
+* Resolve flakerefs using a custom registry file:
+
+  ```console
+  # nix registry resolve --file ./flake-registry.json nixpkgs
+  github:NixOS/nixpkgs
+  ```
+
 # Description
 
 This command resolves indirect flakerefs (e.g. `nixpkgs`) to direct flakerefs (e.g. `github:NixOS/nixpkgs`) using the flake registries. It looks up each provided flakeref in all available registries (flag, user, system, and global) and returns the resolved direct flakeref on a separate line on standard output. It does not fetch any flakes.
 
-The resolution process may apply multiple redirections if necessary until a direct flakeref is found. If an indirect flakeref cannot be found in any registry, an error will be thrown.
+The resolution process may apply multiple redirections if necessary until a direct flakeref is found. If an indirect flakeref cannot be found in any registry, an error will be thrown. With `--file`, the specified registry file is added to the lookup chain with precedence between the user and flag registries.
 
 See the [`nix registry` manual page](./nix3-registry.md) for more details on the registry.
 
