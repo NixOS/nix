@@ -167,9 +167,9 @@ static void _deletePath(
     }
 #endif
 
-    auto name = CanonPath::fromFilename(path.filename().native());
+    auto name = OsFilename{path.filename()};
 
-    auto st_ = maybeFstatat(parentfd, name.rel());
+    auto st_ = maybeFstatat(parentfd, name.path());
     if (!st_)
         return;
     auto & st = *st_;
@@ -211,7 +211,7 @@ static void _deletePath(
                 throw;
             }
 
-        int fd = openat(parentfd, name.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
             throw SysError("opening directory %1%", PathFmt(path));
         AutoCloseDir dir(fdopendir(fd));
@@ -231,7 +231,7 @@ static void _deletePath(
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
-    if (unlinkat(parentfd, name.rel_c_str(), flags) == -1) {
+    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT)
             return;
         try {
