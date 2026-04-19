@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/build-result.hh"
@@ -70,7 +71,7 @@ struct HookInstance;
 /**
  * Coordinates one or more realisations and their interdependencies.
  */
-class Worker
+class Worker : public Builder
 {
 private:
 
@@ -197,8 +198,18 @@ public:
     AutoCloseFD ioport;
 #endif
 
-    Store & store;
-    Store & evalStore;
+    /**
+     * Owned references to the stores, keeping them alive for the
+     * lifetime of the Worker.
+     *
+     * @todo Per #5025, Worker should use these owned references
+     * directly instead of the aliased bare references below.
+     */
+    ref<Store> destStore;
+    ref<Store> srcStore;
+
+    Store & store = *destStore;
+    Store & evalStore = *srcStore;
     const WorkerSettings & settings;
 
     /**
@@ -233,7 +244,7 @@ public:
      */
     bool tryBuildHook = true;
 
-    Worker(Store & store, Store & evalStore);
+    Worker(ref<Store> store, ref<Store> evalStore);
     ~Worker();
 
     /**
@@ -388,6 +399,15 @@ public:
         act.setExpected(actFileTransfer, expectedDownloadSize + doneDownloadSize);
         act.setExpected(actCopyPath, expectedNarSize + doneNarSize);
     }
+
+    /* Builder interface — see `Builder` for documentation. */
+
+    void buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode) override;
+    std::vector<KeyedBuildResult>
+    buildPathsWithResults(const std::vector<DerivedPath> & reqs, BuildMode buildMode) override;
+    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
+    void ensurePath(const StorePath & path) override;
+    void repairPath(const StorePath & path) override;
 };
 
 } // namespace nix

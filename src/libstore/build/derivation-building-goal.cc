@@ -1,5 +1,8 @@
 #include "nix/store/build/derivation-building-goal.hh"
+#include "nix/store/build-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/restricted-store.hh"
+#include "nix/store/daemon.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
@@ -937,6 +940,22 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 void closeLogFile() override
                 {
                     closeLogFileFn();
+                }
+
+                void processDaemonConnection(
+                    ref<Store> store, FdSource && from, FdSink && to, RestrictionContext & context) override
+                {
+                    /**
+                     * TODO: We create a fresh Worker here because the
+                     * parent Worker is blocked waiting for the current
+                     * build to finish, so we can't reuse it from a
+                     * daemon thread. Ideally we should reuse the same
+                     * Worker to share scheduling state.
+                     */
+                    Worker freshWorker{goal.worker.destStore, goal.worker.srcStore};
+                    auto builder = makeRestrictedBuilder(freshWorker, context);
+                    daemon::processConnection(
+                        store, std::move(from), std::move(to), NotTrusted, daemon::Recursive, builder.get_ptr());
                 }
             };
 

@@ -19,6 +19,7 @@
 #include "nix/util/users.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 
 #include <filesystem>
@@ -809,7 +810,7 @@ struct CmdFlakeCheck : FlakeCommand
             }
 
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
-            auto results = store->buildPathsWithResults(toBuild);
+            auto results = getDefaultBuilder(store)->buildPathsWithResults(toBuild);
 
             // Report build failures with attribute paths
             for (auto & result : results) {
