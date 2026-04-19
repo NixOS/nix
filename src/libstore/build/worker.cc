@@ -104,7 +104,7 @@ std::shared_ptr<DerivationGoal> Worker::makeDerivationGoal(
 }
 
 std::shared_ptr<DerivationResolutionGoal>
-Worker::makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode)
+Worker::makeDerivationResolutionGoal(const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode)
 {
     return initGoalIfNeeded(derivationResolutionGoals[drvPath], drvPath, drv, *this, buildMode);
 }

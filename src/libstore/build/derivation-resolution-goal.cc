@@ -7,10 +7,10 @@
 namespace nix {
 
 DerivationResolutionGoal::DerivationResolutionGoal(
-    const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode)
+    const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode)
     : Goal(worker, resolveDerivation())
     , drvPath(drvPath)
-    , drv{std::make_unique<Derivation>(drv)}
+    , drv(std::move(drv))
     , buildMode{buildMode}
 {
     name = fmt("resolving derivation '%s'", worker.store.printStorePath(drvPath));
@@ -22,60 +22,49 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-/**
- * Used for `inputGoals` local variable below
- */
-struct value_comparison
-{
-    template<typename T>
-    bool operator()(const ref<T> & lhs, const ref<T> & rhs) const
-    {
-        return *lhs < *rhs;
-    }
-};
-
 Goal::Co DerivationResolutionGoal::resolveDerivation()
 {
     Goals waitees;
 
-    std::map<ref<const SingleDerivedPath>, GoalPtr, value_comparison> inputGoals;
+    using ValueComparison = decltype([]<typename T>(const ref<T> & lhs, const ref<T> & rhs) {
+        /* Compare the values, not the pointers themselves. */
+        return *lhs < *rhs;
+    });
 
-    {
-        std::function<void(ref<const SingleDerivedPath>, const DerivedPathMap<StringSet>::ChildNode &)>
-            addWaiteeDerivedPath;
+    std::map<ref<const SingleDerivedPath>, GoalPtr, ValueComparison> inputGoals;
 
-        addWaiteeDerivedPath = [&](ref<const SingleDerivedPath> inputDrv,
-                                   const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-            if (!inputNode.value.empty()) {
-                auto g = worker.makeGoal(
-                    DerivedPath::Built{
-                        .drvPath = inputDrv,
-                        .outputs = inputNode.value,
-                    },
-                    buildMode == bmRepair ? bmRepair : bmNormal);
-                inputGoals.insert_or_assign(inputDrv, g);
-                waitees.insert(std::move(g));
-            }
-            for (const auto & [outputName, childNode] : inputNode.childMap)
-                addWaiteeDerivedPath(
-                    make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
-        };
-
-        for (const auto & [inputDrvPath, inputNode] : drv->inputDrvs.map) {
-            /* Ensure that pure, non-fixed-output derivations don't
-               depend on impure derivations. */
-            if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
-                && !drv->type().isFixed()) {
-                auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
-                if (inputDrv.type().isImpure())
-                    throw Error(
-                        "pure derivation '%s' depends on impure derivation '%s'",
-                        worker.store.printStorePath(drvPath),
-                        worker.store.printStorePath(inputDrvPath));
-            }
-
-            addWaiteeDerivedPath(makeConstantStorePathRef(inputDrvPath), inputNode);
+    auto addWaiteeDerivedPath = [&worker = worker, buildMode = buildMode, &waitees, &inputGoals](
+                                    this const auto & self,
+                                    ref<const SingleDerivedPath> inputDrv,
+                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) -> void {
+        if (!inputNode.value.empty()) {
+            auto g = worker.makeGoal(
+                DerivedPath::Built{
+                    .drvPath = inputDrv,
+                    .outputs = inputNode.value,
+                },
+                buildMode == bmRepair ? bmRepair : bmNormal);
+            inputGoals.insert_or_assign(inputDrv, g);
+            waitees.insert(std::move(g));
         }
+        for (const auto & [outputName, childNode] : inputNode.childMap)
+            self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
+    };
+
+    for (const auto & [inputDrvPath, inputNode] : drv->inputDrvs.map) {
+        /* Ensure that pure, non-fixed-output derivations don't
+           depend on impure derivations. */
+        if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
+            && !drv->type().isFixed()) {
+            auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
+            if (inputDrv.type().isImpure())
+                throw Error(
+                    "pure derivation '%s' depends on impure derivation '%s'",
+                    worker.store.printStorePath(drvPath),
+                    worker.store.printStorePath(inputDrvPath));
+        }
+
+        addWaiteeDerivedPath(makeConstantStorePathRef(inputDrvPath), inputNode);
     }
 
     co_await await(std::move(waitees));

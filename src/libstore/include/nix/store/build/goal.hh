@@ -74,7 +74,43 @@ enum struct JobCategory {
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
+    /**
+     * Event types for child process communication, delivered via coroutines.
+     */
+    struct ChildOutput
+    {
+        Descriptor fd;
+        std::string data;
+    };
+
+    struct ChildEOF
+    {
+        Descriptor fd;
+    };
+
+    using ChildEvent = std::variant<ChildOutput, ChildEOF, std::unique_ptr<TimedOut>>;
+
 private:
+    class ChildEvents
+    {
+        /**
+         * Structured queue of child events:
+         * - outputs: stream of data from child
+         * - eof: optional end-of-stream marker
+         * - timeout: optional timeout that flushes/overrides other events
+         */
+        std::queue<ChildOutput> childOutputs;
+        std::optional<ChildEOF> childEOF;
+        std::unique_ptr<TimedOut> childTimeout;
+
+    public:
+        void pushChildEvent(ChildOutput event);
+        void pushChildEvent(ChildEOF event);
+        void pushChildEvent(TimedOut event);
+        bool hasChildEvent() const;
+        ChildEvent popChildEvent();
+    };
+
     /**
      * Goals that this goal is waiting for.
      */
@@ -84,6 +120,8 @@ private:
      * Memoised result of key().
      */
     std::optional<std::string> cachedKey;
+
+    ChildEvents childEvents;
 
 public:
     typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
@@ -153,22 +191,6 @@ public:
     };
 
     /**
-     * Event types for child process communication, delivered via coroutines.
-     */
-    struct ChildOutput
-    {
-        Descriptor fd;
-        std::string data;
-    };
-
-    struct ChildEOF
-    {
-        Descriptor fd;
-    };
-
-    using ChildEvent = std::variant<ChildOutput, ChildEOF, TimedOut>;
-
-    /**
      * Tag type for `co_await`-ing child events.
      * Returns a `ChildEvent` when resumed.
      */
@@ -233,8 +255,10 @@ public:
 
         explicit Co(handle_type handle)
             : handle(handle) {};
-        void operator=(Co &&);
+        Co & operator=(Co &&);
         Co(Co && rhs);
+        Co & operator=(const Co &) = delete;
+        Co(const Co & rhs) = delete;
         ~Co();
 
         bool await_ready()
@@ -318,28 +342,6 @@ public:
          * destructed coroutine by accident
          */
         bool alive = true;
-
-        class
-        {
-            /**
-             * Structured queue of child events:
-             * - outputs: stream of data from child
-             * - eof: optional end-of-stream marker
-             * - timeout: optional timeout that flushes/overrides other events
-             */
-            std::queue<ChildOutput> childOutputs;
-            std::optional<ChildEOF> childEOF;
-            std::optional<TimedOut> childTimeout;
-
-        public:
-
-            void pushChildEvent(ChildOutput event);
-            void pushChildEvent(ChildEOF event);
-            void pushChildEvent(TimedOut event);
-            bool hasChildEvent() const;
-            ChildEvent popChildEvent();
-
-        } childEvents;
 
         /**
          * The awaiter used by @ref final_suspend.
@@ -448,7 +450,7 @@ public:
 
             bool await_ready()
             {
-                assert(!promise.childEvents.hasChildEvent());
+                assert(!promise.goal->childEvents.hasChildEvent());
                 return false;
             }
 
@@ -476,7 +478,7 @@ public:
 
             bool await_ready()
             {
-                return handle && handle.promise().childEvents.hasChildEvent();
+                return handle && handle.promise().goal->childEvents.hasChildEvent();
             }
 
             void await_suspend(handle_type h)
@@ -487,7 +489,7 @@ public:
             ChildEvent await_resume()
             {
                 assert(handle);
-                return handle.promise().childEvents.popChildEvent();
+                return handle.promise().goal->childEvents.popChildEvent();
             }
         };
 
