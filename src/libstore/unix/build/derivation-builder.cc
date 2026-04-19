@@ -238,12 +238,18 @@ protected:
 
     bool isAllowed(const StorePath & path) override
     {
-        return inputPaths.count(path) || addedPaths.count(path);
+        if (inputPaths.count(path))
+            return true;
+        auto state(state_.lock());
+        auto iter = state->addedPaths.find(path);
+        if (iter == state->addedPaths.end())
+            return false;
+        return iter->second.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
     }
 
     bool isAllowed(const DrvOutput & id) override
     {
-        return addedDrvOutputs.count(id);
+        return state_.lock()->addedDrvOutputs.count(id);
     }
 
     bool isAllowed(const DerivedPath & req);
@@ -1165,7 +1171,7 @@ void DerivationBuilderImpl::startDaemon()
         ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
         *this);
 
-    addedPaths.clear();
+    state_.lock()->addedPaths.clear();
 
     auto socketName = ".nix-socket";
     std::filesystem::path socketPath = tmpDir / socketName;
@@ -1246,10 +1252,7 @@ void DerivationBuilderImpl::stopDaemon()
     daemonSocket.close();
 }
 
-void DerivationBuilderImpl::addDependencyImpl(const StorePath & path)
-{
-    addedPaths.insert(path);
-}
+void DerivationBuilderImpl::addDependencyImpl(const StorePath & path) {}
 
 void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
@@ -1434,7 +1437,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         referenceablePaths.insert(p);
     for (auto & i : scratchOutputs)
         referenceablePaths.insert(i.second);
-    for (auto & p : addedPaths)
+    for (auto & [p, _] : state_.lock()->addedPaths)
         referenceablePaths.insert(p);
 
     /* Check whether the output paths were created, and make all
