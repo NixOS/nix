@@ -10,7 +10,7 @@ cat > "$flake1Dir/subflake/flake.nix" <<EOF
   outputs = { self }:
     let
       # Bad, legacy way of getting a flake from an input.
-      parentFlake = builtins.getFlake (builtins.flakeRefToString { type = "path"; path = self.sourceInfo.outPath; narHash = self.narHash; });
+      parentFlake = builtins.getFlake (builtins.unsafeDiscardStringContext (builtins.flakeRefToString { type = "path"; path = self.sourceInfo.outPath; narHash = self.narHash; }));
       # Better way using a path value.
       parentFlake2 = builtins.getFlake ./..;
     in {

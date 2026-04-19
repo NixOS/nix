@@ -125,6 +125,7 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** 
 {
     state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;
+    NixStringContext context;
     for (const auto & attr : *args[0]->attrs()) {
         state.forceValue(*attr.value, attr.pos);
         auto t = attr.value->type();
@@ -143,7 +144,9 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** 
         } else if (t == nBool) {
             attrs.emplace(state.symbols[attr.name], Explicit<bool>{attr.value->boolean()});
         } else if (t == nString) {
-            attrs.emplace(state.symbols[attr.name], std::string(attr.value->string_view()));
+            auto s = state.forceString(
+                *attr.value, context, attr.pos, "while evaluating an attribute in 'builtins.flakeRefToString'");
+            attrs.emplace(state.symbols[attr.name], std::string(s));
         } else {
             state
                 .error<EvalError>(
@@ -155,7 +158,7 @@ static void prim_flakeRefToString(EvalState & state, const PosIdx pos, Value ** 
         }
     }
     auto flakeRef = FlakeRef::fromAttrs(state.fetchSettings, attrs);
-    v.mkString(flakeRef.to_string(), state.mem);
+    v.mkString(flakeRef.to_string(), context, state.mem);
 }
 
 nix::PrimOp flakeRefToString({

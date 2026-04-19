@@ -1,1 +1,1 @@
-"github:NixOS/nixpkgs/23.05?dir=lib"
+[ "github:NixOS/nixpkgs/23.05?dir=lib" "file:///nix/store/i4f75pn3bxkxdk2kld86k5qazq4cqj8i-hello" ]
