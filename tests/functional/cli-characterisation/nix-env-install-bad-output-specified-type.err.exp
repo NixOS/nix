@@ -8,8 +8,3 @@ error:
            10| }
 
        error: expected a Boolean but found a string: "yes"
-       at /pwd/cli-characterisation/bad-output-specified-type.nix:9:3:
-            8|   };
-            9|   outputSpecified = "yes";
-             |   ^
-           10| }

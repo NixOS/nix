@@ -2794,7 +2794,7 @@ bool EvalState::callPathFilter(Value * filterFun, const SourcePath & path, PosId
     // assert that type is not "unknown"
     Value * args[]{&arg1, const_cast<Value *>(&fileTypeToString(*this, st.type))};
     Value res;
-    callFunction(*filterFun, args, res, pos);
+    callFunction(*filterFun, args, res, noPos);
 
     return forceBool(res, pos, "while evaluating the return value of the path filter function");
 }
@@ -3977,7 +3977,7 @@ static void prim_foldlStrict(EvalState & state, const PosIdx pos, Value ** args,
         for (auto [n, elem] : enumerate(listView)) {
             Value * vs[]{vCur, elem};
             vCur = n == args[2]->listSize() - 1 ? &v : state.allocValue();
-            state.callFunction(*args[0], vs, *vCur, pos);
+            state.callFunction(*args[0], vs, *vCur, noPos);
         }
         state.forceValue(v, pos);
     } else {
@@ -4025,7 +4025,7 @@ static void anyOrAll(bool any, EvalState & state, const PosIdx pos, Value ** arg
 
     Value vTmp;
     for (auto elem : args[1]->listView()) {
-        state.callFunction(*args[0], *elem, vTmp, pos);
+        state.callFunction(*args[0], *elem, vTmp, noPos);
         bool res = state.forceBool(vTmp, pos, errorCtx);
         if (res == any) {
             v.mkBool(any);
@@ -4266,7 +4266,7 @@ static void prim_partition(EvalState & state, const PosIdx pos, Value ** args, V
         auto vElem = args[1]->listView()[n];
         state.forceValue(*vElem, pos);
         Value res;
-        state.callFunction(*args[0], *vElem, res, pos);
+        state.callFunction(*args[0], *vElem, res, noPos);
         if (state.forceBool(
                 res, pos, "while evaluating the return value of the partition function passed to builtins.partition"))
             right.push_back(vElem);
@@ -4330,7 +4330,7 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
 
     for (auto vElem : args[1]->listView()) {
         Value res;
-        state.callFunction(*args[0], *vElem, res, pos);
+        state.callFunction(*args[0], *vElem, res, noPos);
         auto name = state.forceStringNoCtx(
             res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
         auto sym = state.symbols.create(name);
@@ -4394,7 +4394,7 @@ static void prim_concatMap(EvalState & state, const PosIdx pos, Value ** args, V
 
     for (size_t n = 0; n < nrLists; ++n) {
         Value * vElem = args[1]->listView()[n];
-        state.callFunction(*args[0], *vElem, lists[n], pos);
+        state.callFunction(*args[0], *vElem, lists[n], noPos);
         state.forceList(
             lists[n],
             lists[n].determinePos(args[0]->determinePos(pos)),
