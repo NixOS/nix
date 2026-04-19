@@ -128,25 +128,6 @@ struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 
         autoDelChroot.reset(); /* this runs the destructor */
     }
-
-    std::pair<std::filesystem::path, std::filesystem::path> addDependencyPrep(const StorePath & path)
-    {
-        DerivationBuilderImpl::addDependencyImpl(path);
-
-        debug("materialising '%s' in the sandbox", store.printStorePath(path));
-
-        std::filesystem::path source = store.toRealPath(path);
-        std::filesystem::path target =
-            chrootRootDir / std::filesystem::path(store.printStorePath(path)).relative_path();
-
-        if (pathExists(target)) {
-            // There is a similar debug message in doBind, so only run it in this block to not have double messages.
-            debug("bind-mounting %s -> %s", PathFmt(target), PathFmt(source));
-            throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
-        }
-
-        return {source, target};
-    }
 };
 
 } // namespace nix

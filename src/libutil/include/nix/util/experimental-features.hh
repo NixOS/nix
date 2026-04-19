@@ -23,7 +23,6 @@ enum struct ExperimentalFeature {
     FetchTree,
     NixCommand,
     GitHashing,
-    RecursiveNix,
     FetchClosure,
     AutoAllocateUids,
     Cgroups,

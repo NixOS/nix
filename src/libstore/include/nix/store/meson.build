@@ -78,7 +78,6 @@ headers = [ config_pub_h ] + files(
   'remote-fs-accessor.hh',
   'remote-store-connection.hh',
   'remote-store.hh',
-  'restricted-store.hh',
   's3-binary-cache-store.hh',
   's3-url.hh',
   'serve-protocol-connection.hh',

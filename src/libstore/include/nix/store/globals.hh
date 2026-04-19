@@ -329,10 +329,6 @@ public:
 
             This system feature is implicitly required by derivations with the [`__contentAddressed` attribute](@docroot@/language/advanced-attributes.md#adv-attr-__contentAddressed).
 
-          - `recursive-nix`
-
-            Included by default if the [`recursive-nix` experimental feature](@docroot@/development/experimental-features.md#xp-feature-recursive-nix) is enabled.
-
           - `uid-range`
 
             On Linux, Nix can run builds in a user namespace where they run as root (UID 0) and have 65,536 UIDs available.
