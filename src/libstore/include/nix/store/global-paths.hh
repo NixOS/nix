@@ -30,4 +30,20 @@ static inline std::filesystem::path nixConfFile()
  */
 const std::vector<std::filesystem::path> & nixUserConfFiles();
 
+/**
+ * The path to the default secret key file.
+ */
+static inline std::filesystem::path defaultSecretKeyFile()
+{
+    return nixConfDir() / "secret-key";
+}
+
+/**
+ * The path to the default secret key file's public key.
+ */
+static inline std::filesystem::path defaultPublicKeyFile()
+{
+    return nixConfDir() / "public-key";
+}
+
 } // namespace nix
