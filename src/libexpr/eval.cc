@@ -2929,7 +2929,7 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
             // that pointer equality is silently masking. Track visited
             // pointers to handle cyclic structures.
             std::set<const void *> seen;
-            std::function<bool(Value &)> hasFunction = [&](Value & v) -> bool {
+            auto hasFunction = [&](this const auto &self, Value & v) -> bool {
                 if (!seen.insert(&v).second)
                     return false;
                 switch (v.type()) {
@@ -2937,12 +2937,12 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
                     return true;
                 case nAttrs:
                     for (auto & attr : *v.attrs())
-                        if (hasFunction(*attr.value))
+                        if (self(*attr.value))
                             return true;
                     return false;
                 case nList:
                     for (auto elem : v.listView())
-                        if (hasFunction(*elem))
+                        if (self(*elem))
                             return true;
                     return false;
                 default:
