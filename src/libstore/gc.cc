@@ -57,8 +57,8 @@ void LocalStore::createTempRootsFile()
 
     while (1) {
         if (pathExists(fnTempRoots))
-            /* It *must* be stale, since there can be no two
-               processes with the same pid. */
+            /* The file is stale since each LocalStore instance
+               uses a unique filename (pid + counter). */
             tryUnlink(fnTempRoots);
 
         *fdTempRoots = openLockFile(fnTempRoots, true);
@@ -170,8 +170,6 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         }
         auto path = i.path();
 
-        pid_t pid = std::stoi(name);
-
         debug("reading temporary root file %1%", PathFmt(path));
         AutoCloseFD fd(toDescriptor(open(
             path.string().c_str(),
@@ -206,7 +204,7 @@ void LocalStore::findTempRoots(Roots & tempRoots, bool censor)
         while ((end = contents.find((char) 0, pos)) != std::string::npos) {
             auto root = std::string_view(contents).substr(pos, end - pos);
             debug("got temporary root '%s'", root);
-            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%d}", pid));
+            tempRoots[parseStorePath(root)].emplace(censor ? censored : fmt("{temp:%s}", name));
             pos = end + 1;
         }
     }
@@ -689,6 +687,32 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             if (!dead.insert(path).second)
                 continue;
             if (shouldDelete) {
+                /* Re-check tempRoots before deleting and set pending
+                   to synchronise with addTempRoot. Between the BFS
+                   and this deletion loop, new temproots may have been
+                   added via the GC socket by a concurrent process
+                   (e.g. an evaluator calling addTempRoot). The BFS
+                   only checks tempRoots when it first visits a path,
+                   but the "pending" mechanism only blocks the socket
+                   handler for the single path currently being visited,
+                   not for paths already queued for deletion. */
+                {
+                    auto hashPart = std::string(path.hashPart());
+                    auto shared(_shared.lock());
+                    if (shared->tempRoots.count(hashPart)) {
+                        debug(
+                            "not deleting '%s' because it became a temporary root after initial scan",
+                            printStorePath(path));
+                        alive.insert(path);
+                        continue;
+                    }
+                    shared->pending = hashPart;
+                }
+                Finally resetPending([&]() {
+                    auto shared(_shared.lock());
+                    shared->pending.reset();
+                    wakeup.notify_all();
+                });
                 try {
                     invalidatePathChecked(path);
                     deleteFromStore(path.to_string(), true);
