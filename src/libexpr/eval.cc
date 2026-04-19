@@ -1095,11 +1095,9 @@ struct ExprParseFile : Expr, gc
 {
     // FIXME: make this a reference (see below).
     SourcePath path;
-    bool mustBeTrivial;
 
-    ExprParseFile(SourcePath & path, bool mustBeTrivial)
+    ExprParseFile(SourcePath & path)
         : path(path)
-        , mustBeTrivial(mustBeTrivial)
     {
     }
 
@@ -1116,11 +1114,6 @@ struct ExprParseFile : Expr, gc
                           state, *e, state.baseEnv, e->getPos(), "while evaluating the file '%s':", path.to_string())
                     : nullptr;
 
-            // Enforce that 'flake.nix' is a direct attrset, not a
-            // computation.
-            if (mustBeTrivial && !(dynamic_cast<ExprAttrs *>(e)))
-                state.error<EvalError>("file '%s' must be an attribute set", path).debugThrow();
-
             state.eval(e, v);
         } catch (Error & e) {
             state.addErrorTrace(e, "while evaluating the file '%s':", path.to_string());
@@ -1129,7 +1122,7 @@ struct ExprParseFile : Expr, gc
     }
 };
 
-void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
+void EvalState::evalFile(const SourcePath & path, Value & v)
 {
     auto resolvedPath = getConcurrent(*importResolutionCache, path);
 
@@ -1149,7 +1142,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
     // https://github.com/NixOS/nix/pull/13930 is merged. That will ensure
     // the post-condition that `expr` is unreachable after
     // `forceValue()` returns.
-    auto expr = new ExprParseFile{*resolvedPath, mustBeTrivial};
+    auto expr = new ExprParseFile{*resolvedPath};
 
     fileEvalCache->try_emplace_and_cvisit(
         *resolvedPath,
