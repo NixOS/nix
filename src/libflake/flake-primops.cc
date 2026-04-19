@@ -42,7 +42,6 @@ PrimOp getFlake(const Settings & settings)
             auto path = state.realisePath(pos, *args[0]);
             callFlake(state, lockFlake(settings, state, path, lockFlags), v);
         } else {
-            NixStringContext context;
             std::string flakeRefS(
                 state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.getFlake"));
 
