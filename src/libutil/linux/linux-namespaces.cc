@@ -86,6 +86,78 @@ bool mountAndPidNamespacesSupported()
     return res;
 }
 
+bool binfmtMiscUserNamespacesSupported()
+{
+    static auto res = [&]() -> bool {
+        if (!userNamespacesSupported())
+            return false;
+
+        try {
+            auto uid = getuid();
+            auto gid = getgid();
+
+            Pid pid = startProcess(
+                [&]() {
+                    /* We can't unshare(CLONE_NEWUSER) again if our UID and GID
+                       are not mapped, so set up a proper mapping. */
+                    writeFile("/proc/self/uid_map", fmt("%d %d %d", 0, uid, 1));
+                    writeFile("/proc/self/setgroups", "deny");
+                    writeFile("/proc/self/gid_map", fmt("%d %d %d", 0, gid, 1));
+
+                    /* Make sure we don't remount the parent's /proc. */
+                    if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
+                        _exit(1);
+
+                    /* Mount binfmt_misc, which should create the instance
+                       associated with the current userns.
+
+                       Older kernels shouldn't even get past this, but we keep
+                       going to complete a sanity check. */
+                    if (mount("none", "/proc/sys/fs/binfmt_misc", "binfmt_misc", 0, 0) == -1)
+                        throw SysError("mounting /proc/sys/fs/binfmt_misc");
+
+                    auto dev1 = stat("/proc/sys/fs/binfmt_misc/register").st_dev;
+
+                    /* New user namespace for new binfmt_misc, and new mount
+                       namespace so that we can mount stuff while in the new
+                       userns. */
+                    if (unshare(CLONE_NEWUSER | CLONE_NEWNS) == -1)
+                        throw SysError("unsharing user and mount namespaces");
+
+                    /* Mount binfmt_misc again, which should be the instance
+                       associated with the new userns and different from the
+                       previous one */
+                    if (mount("none", "/proc/sys/fs/binfmt_misc", "binfmt_misc", 0, 0) == -1)
+                        throw SysError("mounting /proc/sys/fs/binfmt_misc again");
+
+                    auto dev2 = stat("/proc/sys/fs/binfmt_misc/register").st_dev;
+
+                    /* Two different binfmt_misc instances should have two
+                       different st_dev, since they're different filesystems. */
+                    if (dev1 == dev2)
+                        _exit(1);
+
+                    /* Creating multiple instances of binfmt_misc works. Yay! */
+                    _exit(0);
+                },
+                {.cloneFlags = CLONE_NEWNS | CLONE_NEWUSER});
+
+            if (pid.wait()) {
+                debug("binfmt_misc user namespace sandboxing does not work");
+                return false;
+            }
+
+        } catch (SysError & e) {
+            debug("binfmt_misc user namespace sandboxing does not work: %s", e.msg());
+            return false;
+        }
+
+        return true;
+    }();
+
+    return res;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 static AutoCloseFD fdSavedMountNamespace;
