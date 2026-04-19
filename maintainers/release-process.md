@@ -81,27 +81,30 @@ release:
   $ git push --set-upstream origin $VERSION-maintenance
   ```
 
-* Create a jobset for the release branch on Hydra as follows:
+* Create two jobsets for the release branch on Hydra:
 
-  * Go to the jobset of the previous release
-  (e.g. https://hydra.nixos.org/jobset/nix/maintenance-2.11).
+  `maintenance-$VERSION` runs the full `hydraJobs` CI matrix.
+  `release-$VERSION` builds only the artifacts consumed by
+  `upload-release`, so a release can be cut without waiting on the full
+  matrix.
 
-  * Select `Actions -> Clone this jobset`.
+  * Clone the previous `maintenance-*` jobset, set identifier
+    `maintenance-$VERSION`, description `$VERSION release branch`, flake
+    URL `github:NixOS/nix/$VERSION-maintenance`.
 
-  * Set identifier to `maintenance-$VERSION`.
+  * Clone the previous `release-*` jobset (or create a new **legacy**
+    jobset), set identifier `release-$VERSION`, description `$VERSION
+    release artifacts`, Nix expression `packaging/release-jobs.nix` in
+    input `src`, and add input `src` of type *Git checkout* pointing at
+    `https://github.com/NixOS/nix $VERSION-maintenance`.
 
-  * Set description to `$VERSION release branch`.
+* Wait for the `release-$VERSION` jobset to evaluate and build. If
+  impatient, go to the evaluation and select `Actions -> Bump builds to
+  front of queue`. The aggregate job `release` turns green once every
+  required artifact is available.
 
-  * Set flake URL to `github:NixOS/nix/$VERSION-maintenance`.
-
-  * Hit `Create jobset`.
-
-* Wait for the new jobset to evaluate and build. If impatient, go to
-  the evaluation and select `Actions -> Bump builds to front of
-  queue`.
-
-* When the jobset evaluation has succeeded building, take note of the
-  evaluation ID (e.g. `1780832` in
+* When the release jobset evaluation has succeeded building, take note of
+  the evaluation ID (e.g. `1780832` in
   `https://hydra.nixos.org/eval/1780832`).
 
 * Tag the release:
@@ -174,8 +177,8 @@ release:
   $ git push
   ```
 
-* Wait for the desired evaluation of the maintenance jobset to finish
-  building.
+* Wait for the desired evaluation of the `release-$VERSION` jobset to
+  finish building (the `release` aggregate job is the gating signal).
 
 * Tag the release
 
