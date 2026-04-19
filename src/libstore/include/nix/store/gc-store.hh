@@ -121,6 +121,14 @@ struct GcStore : public virtual Store
      * Perform a garbage collection.
      */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
+
+    /**
+     * Delete a build trace entry (realisation) from the store's database.
+     */
+    virtual void deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs)
+    {
+        unsupported("deleteBuildTrace");
+    };
 };
 
 } // namespace nix
