@@ -1095,8 +1095,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
         sources.insert(storePath);
 
         // FIXME: use graph output, handle cycles.
-        std::function<nlohmann::json(const flake::Node & node)> traverse;
-        traverse = [&](const flake::Node & node) {
+        auto traverse = [&store, json = json, dryRun = dryRun, &sources](
+                            this const auto & self, const flake::Node & node) -> nlohmann::json {
             nlohmann::json jsonObj2 = json ? nlohmann::json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
@@ -1110,9 +1110,9 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
                         auto & jsonObj3 = jsonObj2[inputName];
                         if (storePath)
                             jsonObj3["path"] = store->printStorePath(*storePath);
-                        jsonObj3["inputs"] = traverse(**inputNode);
+                        jsonObj3["inputs"] = self(**inputNode);
                     } else
-                        traverse(**inputNode);
+                        self(**inputNode);
                 }
             }
             return jsonObj2;
