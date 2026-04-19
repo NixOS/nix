@@ -47,8 +47,3 @@ error:
            13|     in
 
        error: stack overflow; max-call-depth exceeded
-       at /pwd/lang/eval-fail-derivation-structuredAttrs-stack-overflow.nix:12:66:
-           11|       long = builtins.genList (x: x) 100000;
-           12|       reverseLinkedList = builtins.foldl' (tail: head: { inherit head tail; }) null long;
-             |                                                                  ^
-           13|     in

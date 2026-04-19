@@ -7,8 +7,3 @@ error:
             3| in
 
        error: infinite recursion encountered
-       at /pwd/lang/eval-fail-recursion.nix:2:14:
-            1| let
-            2|   a = { } // a;
-             |              ^
-            3| in

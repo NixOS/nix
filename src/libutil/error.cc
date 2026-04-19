@@ -154,12 +154,22 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
     return hasPos;
 }
 
-static void printTrace(std::ostream & output, const std::string_view & indent, size_t & count, const Trace & trace)
+static void printTrace(
+    std::ostream & output,
+    const std::string_view & indent,
+    size_t & count,
+    const Trace & trace,
+    std::shared_ptr<const Pos> & lastPrintedPos)
 {
     output << "\n" << "… " << trace.hint.str() << "\n";
 
-    if (printPosMaybe(output, indent, trace.pos))
+    // Skip the position if it's identical to the last one printed,
+    // to avoid redundant source snippets in consecutive related traces.
+    bool samePos = lastPrintedPos && trace.pos && *lastPrintedPos && *trace.pos && *lastPrintedPos == *trace.pos;
+    if (!samePos && printPosMaybe(output, indent, trace.pos)) {
+        lastPrintedPos = trace.pos;
         count++;
+    }
 }
 
 void printSkippedTracesMaybe(
@@ -167,14 +177,15 @@ void printSkippedTracesMaybe(
     const std::string_view & indent,
     size_t & count,
     std::vector<Trace> & skippedTraces,
-    std::set<Trace> tracesSeen)
+    std::set<Trace> tracesSeen,
+    std::shared_ptr<const Pos> & lastPrintedPos)
 {
     if (skippedTraces.size() > 0) {
         // If we only skipped a few frames, print them out normally;
         // messages like "1 duplicate frames omitted" aren't helpful.
         if (skippedTraces.size() <= 5) {
             for (auto & trace : skippedTraces) {
-                printTrace(output, indent, count, trace);
+                printTrace(output, indent, count, trace, lastPrintedPos);
             }
         } else {
             output << "\n"
@@ -363,6 +374,10 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     // prepended to each element of the trace
     auto ellipsisIndent = "  ";
 
+    // Track last printed position to deduplicate consecutive identical
+    // positions across traces and the final error position.
+    std::shared_ptr<const Pos> lastPrintedPos;
+
     if (!einfo.traces.empty()) {
         // Stack traces seen since we last printed a chunk of `duplicate frames
         // omitted`.
@@ -389,15 +404,15 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
                 tracesSeen.insert(trace);
 
-                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen, lastPrintedPos);
 
                 count++;
 
-                printTrace(oss, ellipsisIndent, count, trace);
+                printTrace(oss, ellipsisIndent, count, trace, lastPrintedPos);
             }
         }
 
-        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
+        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen, lastPrintedPos);
 
         if (truncate) {
             oss << "\n"
@@ -411,7 +426,11 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
 
     oss << einfo.msg << "\n";
 
-    printPosMaybe(oss, "", einfo.pos);
+    // Skip the error's own position if it matches the last trace position.
+    bool sameAsLastTrace =
+        lastPrintedPos && einfo.pos && *lastPrintedPos && *einfo.pos && *lastPrintedPos == *einfo.pos;
+    if (!sameAsLastTrace)
+        printPosMaybe(oss, "", einfo.pos);
 
     auto suggestions = einfo.suggestions.trim();
     if (!suggestions.suggestions.empty()) {
