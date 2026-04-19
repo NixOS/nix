@@ -2,6 +2,7 @@
 #if !defined(_WIN32) && !defined(__CYGWIN__)
 
 #  include "nix/util/monitor-fd.hh"
+#  include "nix/util/signals.hh"
 
 #  include <sys/file.h>
 #  include <sys/socket.h>
@@ -9,7 +10,19 @@
 #  include <gtest/gtest.h>
 
 namespace nix {
-TEST(MonitorFdHup, shouldNotBlock)
+
+// MonitorFdHup calls triggerInterrupt() when it detects a hangup,
+// which sets a process-global flag.  We must clear it after each
+// test so subsequent tests that call checkInterrupt() are not
+// poisoned.
+class MonitorFdHupTest : public ::testing::Test {
+protected:
+    void TearDown() override {
+        setInterrupted(false);
+    }
+};
+
+TEST_F(MonitorFdHupTest, shouldNotBlock)
 {
     Pipe p;
     p.create();
@@ -20,7 +33,7 @@ TEST(MonitorFdHup, shouldNotBlock)
     }
 }
 
-TEST(MonitorFdHup, shouldExitOnPeerClose)
+TEST_F(MonitorFdHupTest, shouldExitOnPeerClose)
 {
     // When the peer end of a socket is closed, MonitorFdHup should
     // detect the hangup and exit its poll loop promptly.
@@ -52,7 +65,7 @@ TEST(MonitorFdHup, shouldExitOnPeerClose)
 // MonitorFdHup must handle this without spinning.
 // On macOS, kqueue is used instead of poll, and registering a
 // closed fd with kevent fails differently.
-TEST(MonitorFdHup, shouldExitOnInvalidFd)
+TEST_F(MonitorFdHupTest, shouldExitOnInvalidFd)
 {
     // Close the fd before creating MonitorFdHup.
     // The poll loop should see POLLNVAL on the first poll() call
@@ -82,7 +95,7 @@ TEST(MonitorFdHup, shouldExitOnInvalidFd)
 }
 #  endif
 
-TEST(MonitorFdHup, shouldExitOnShutdown)
+TEST_F(MonitorFdHupTest, shouldExitOnShutdown)
 {
     // When the peer calls shutdown(SHUT_RDWR), MonitorFdHup should
     // detect the condition and exit.
