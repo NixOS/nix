@@ -29,7 +29,7 @@ EvalSettings evalSettings{
             [](EvalState & state, std::string_view rest) {
                 experimentalFeatureSettings.require(Xp::Flakes);
                 // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
+                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, std::nullopt);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] =
                     flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
@@ -185,7 +185,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
+        auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, std::nullopt);
         auto [accessor, lockedRef] =
             flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
         auto storePath = nix::fetchToStore(

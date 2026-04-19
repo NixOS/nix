@@ -197,7 +197,13 @@ static FlakeInput parseFlakeInput(
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
-            input.ref = parseFlakeRef(state.fetchSettings, *url, {}, true, input.isFlake, true);
+            input.ref = parseFlakeRef(
+                state.fetchSettings,
+                *url,
+                {},
+                true,
+                input.isFlake ? std::optional<std::string>{defaultFlakeEntryFile} : std::nullopt,
+                true);
     }
 
     if (input.ref && input.follows)
