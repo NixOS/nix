@@ -42,6 +42,10 @@
 #include <grp.h>
 #include <iostream>
 
+#ifdef __APPLE__
+#  include "darwin-mach-o-rewrite.hh"
+#endif
+
 #include "nix/util/strings.hh"
 #include "nix/util/signals.hh"
 
@@ -1646,6 +1650,18 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 restorePath(tmpPath, *source);
                 deletePath(actualPath);
                 movePath(tmpPath, actualPath);
+
+#ifdef __APPLE__
+                /* nixpkgs#507531 / NixOS/nix#6065: `RewritingSink` above
+                   mutates bytes inside `__TEXT,__cstring` pages that the
+                   linker had already covered with ad-hoc page hashes
+                   (`linker-signed` in `LC_CODE_SIGNATURE`), so the
+                   resulting binary SIGKILLs at first page-in. Recompute
+                   the affected slots in place; preserves every other
+                   byte and is therefore bit-reproducible. */
+                if (size_t fixed = fixupMachoPageHashes(actualPath); fixed > 0)
+                    debug("fixupMachoPageHashes: rewrote %1% Mach-O file(s) under %2%", fixed, PathFmt(actualPath));
+#endif
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
