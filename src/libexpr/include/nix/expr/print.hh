@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "nix/util/fmt.hh"
+#include "nix/expr/value/context.hh"
 #include "nix/expr/print-options.hh"
 
 namespace nix {
@@ -64,7 +65,12 @@ bool isReservedKeyword(const std::string_view str);
  */
 std::ostream & printIdentifier(std::ostream & o, std::string_view s);
 
-void printValue(EvalState & state, std::ostream & str, Value & v, PrintOptions options = PrintOptions{});
+void printValue(
+    EvalState & state,
+    std::ostream & str,
+    Value & v,
+    PrintOptions options = PrintOptions{},
+    NixStringContext * context = nullptr);
 
 /**
  * A partially-applied form of `printValue` which can be formatted using `<<`
@@ -77,12 +83,15 @@ private:
     EvalState & state;
     Value & value;
     PrintOptions options;
+    NixStringContext * context;
 
 public:
-    ValuePrinter(EvalState & state, Value & value, PrintOptions options = PrintOptions{})
+    ValuePrinter(
+        EvalState & state, Value & value, PrintOptions options = PrintOptions{}, NixStringContext * context = nullptr)
         : state(state)
         , value(value)
         , options(options)
+        , context(context)
     {
     }
 };
