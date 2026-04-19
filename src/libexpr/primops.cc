@@ -30,6 +30,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <set>
 #include <sstream>
 #include <regex>
 
@@ -4649,7 +4650,7 @@ static void prim_toString(EvalState & state, const PosIdx pos, Value ** args, Va
 static RegisterPrimOp primop_toString({
     .name = "toString",
     .args = {"e"},
-    .doc = R"(
+    .doc = R"doc(
       Convert the expression *e* to a string. *e* can be:
 
         - A string (in which case the string is returned unmodified).
@@ -4666,8 +4667,845 @@ static RegisterPrimOp primop_toString({
         - A Boolean (`false` yields `""`, `true` yields `"1"`).
 
         - `null`, which yields the empty string.
-    )",
+
+        - A function (requires the [`function-serialization`](@docroot@/development/experimental-features.md#xp-feature-function-serialization) experimental feature).
+          Lambdas produce their source representation (e.g. `toString (x: x)` yields `"(x: x)"`).
+          Primops produce their qualified `builtins.` name
+          (e.g. `toString builtins.head` yields `"builtins.head"`).
+          Partially applied primops include their arguments
+          (e.g. `toString (builtins.map builtins.head)` yields `"(builtins.map builtins.head)"`).
+    )doc",
     .impl = prim_toString,
+});
+
+/**
+ * Collect free variable names from an expression tree that reference bindings
+ * from outside the lambda (i.e., closure captures).
+ *
+ * `depth` is the number of scope levels between the current position and the
+ * lambda's parameter scope.  An `ExprVar` with `level > depth` refers to a
+ * binding captured from the enclosing environment.
+ */
+static void collectFreeVars(Expr * e, int depth, std::set<Symbol> & freeVars)
+{
+    if (!e)
+        return;
+
+    // Leaves / literals -- no free variables.
+    if (dynamic_cast<ExprInt *>(e) || dynamic_cast<ExprFloat *>(e) || dynamic_cast<ExprString *>(e)
+        || dynamic_cast<ExprPath *>(e) || dynamic_cast<ExprPos *>(e) || dynamic_cast<ExprBlackHole *>(e))
+        return;
+
+    if (auto var = dynamic_cast<ExprVar *>(e)) {
+        // Captures both lexically-bound and `with`-bound variables
+        // from enclosing scopes.  `mapStaticEnvBindings` includes
+        // `with` bindings when the attrset has been forced.
+        if (var->level > (Level) depth)
+            freeVars.insert(var->name);
+        return;
+    }
+
+    if (auto sel = dynamic_cast<ExprSelect *>(e)) {
+        collectFreeVars(sel->e, depth, freeVars);
+        collectFreeVars(sel->def, depth, freeVars);
+        for (auto & an : sel->getAttrPath())
+            if (an.expr)
+                collectFreeVars(an.expr, depth, freeVars);
+        return;
+    }
+
+    if (auto hasAttr = dynamic_cast<ExprOpHasAttr *>(e)) {
+        collectFreeVars(hasAttr->e, depth, freeVars);
+        for (auto & an : hasAttr->attrPath)
+            if (an.expr)
+                collectFreeVars(an.expr, depth, freeVars);
+        return;
+    }
+
+    if (auto attrs = dynamic_cast<ExprAttrs *>(e)) {
+        int innerDepth = attrs->recursive ? depth + 1 : depth;
+        for (auto & [name, def] : *attrs->attrs)
+            collectFreeVars(def.e, innerDepth, freeVars);
+        if (attrs->inheritFromExprs)
+            for (auto * expr : *attrs->inheritFromExprs)
+                collectFreeVars(expr, depth, freeVars);
+        for (auto & dyn : *attrs->dynamicAttrs) {
+            collectFreeVars(dyn.nameExpr, depth, freeVars);
+            collectFreeVars(dyn.valueExpr, innerDepth, freeVars);
+        }
+        return;
+    }
+
+    if (auto list = dynamic_cast<ExprList *>(e)) {
+        for (auto * elem : list->elems)
+            collectFreeVars(elem, depth, freeVars);
+        return;
+    }
+
+    if (auto lambda = dynamic_cast<ExprLambda *>(e)) {
+        // Nested lambda: adds one scope level for its parameters.
+        if (auto formals = lambda->getFormals())
+            for (auto & f : formals->formals)
+                if (f.def)
+                    collectFreeVars(f.def, depth + 1, freeVars);
+        collectFreeVars(lambda->body, depth + 1, freeVars);
+        return;
+    }
+
+    if (auto call = dynamic_cast<ExprCall *>(e)) {
+        collectFreeVars(call->fun, depth, freeVars);
+        for (auto * arg : *call->args)
+            collectFreeVars(arg, depth, freeVars);
+        return;
+    }
+
+    if (auto let = dynamic_cast<ExprLet *>(e)) {
+        for (auto & [name, def] : *let->attrs->attrs)
+            collectFreeVars(def.e, depth + 1, freeVars);
+        if (let->attrs->inheritFromExprs)
+            for (auto * expr : *let->attrs->inheritFromExprs)
+                collectFreeVars(expr, depth, freeVars);
+        collectFreeVars(let->body, depth + 1, freeVars);
+        return;
+    }
+
+    if (auto with = dynamic_cast<ExprWith *>(e)) {
+        collectFreeVars(with->attrs, depth, freeVars);
+        collectFreeVars(with->body, depth + 1, freeVars);
+        return;
+    }
+
+    if (auto if_ = dynamic_cast<ExprIf *>(e)) {
+        collectFreeVars(if_->cond, depth, freeVars);
+        collectFreeVars(if_->then, depth, freeVars);
+        collectFreeVars(if_->else_, depth, freeVars);
+        return;
+    }
+
+    if (auto assert_ = dynamic_cast<ExprAssert *>(e)) {
+        collectFreeVars(assert_->cond, depth, freeVars);
+        collectFreeVars(assert_->body, depth, freeVars);
+        return;
+    }
+
+    if (auto not_ = dynamic_cast<ExprOpNot *>(e)) {
+        collectFreeVars(not_->e, depth, freeVars);
+        return;
+    }
+
+    if (auto concat = dynamic_cast<ExprConcatStrings *>(e)) {
+        for (auto & [pos, expr] : concat->es)
+            collectFreeVars(expr, depth, freeVars);
+        return;
+    }
+
+    // Binary operators all have e1/e2 members.
+#define HANDLE_BINOP(Type)                         \
+    if (auto * bin = dynamic_cast<Type *>(e)) {    \
+        collectFreeVars(bin->e1, depth, freeVars); \
+        collectFreeVars(bin->e2, depth, freeVars); \
+        return;                                    \
+    }
+    HANDLE_BINOP(ExprOpEq)
+    HANDLE_BINOP(ExprOpNEq)
+    HANDLE_BINOP(ExprOpAnd)
+    HANDLE_BINOP(ExprOpOr)
+    HANDLE_BINOP(ExprOpImpl)
+    HANDLE_BINOP(ExprOpConcatLists)
+    HANDLE_BINOP(ExprOpUpdate)
+#undef HANDLE_BINOP
+
+    // ExprInheritFrom is a subclass of ExprVar -- handled by the ExprVar case above.
+    // Unknown expression type -- skip conservatively.
+}
+
+using BackRefMap = std::map<const void *, std::string>;
+
+/**
+ * Policy for serializing plugin primops (those registered via `extraPrimOps`).
+ * - `nullopt`: allow all plugin primops unconditionally
+ * - empty set: reject all plugin primops (default for `builtins.serializeFunction`)
+ * - non-empty set: allow only the listed primop names
+ */
+using PluginPrimOpPolicy = std::optional<std::set<std::string>>;
+
+/**
+ * Mutable context threaded through the serialization functions,
+ * avoiding 8-parameter signatures on every call.
+ */
+struct SerializeContext
+{
+    EvalState & state;
+    PosIdx pos;
+    std::ostream & out;
+    NixStringContext & context;
+    std::set<const void *> & visited;
+    BackRefMap backRefs;
+    const PluginPrimOpPolicy & pluginPolicy;
+    bool preserveStringContext = false;
+    std::set<std::string> externalBindings;
+
+    void checkPluginPrimOp(const PrimOp & primOp)
+    {
+        if (!primOp.isPluginPrimOp)
+            return;
+        if (!pluginPolicy.has_value())
+            return;
+        if (pluginPolicy->count(primOp.name))
+            return;
+        state
+            .error<EvalError>(
+                "cannot serialize plugin primop `builtins.%s`: "
+                "it may not be available in the deserialization environment "
+                "(add it to the allowed plugin primops list to override)",
+                primOp.name)
+            .atPos(pos)
+            .debugThrow();
+    }
+
+    /**
+     * Check for cycles via the visited set.  If a cycle is detected and
+     * the value has a back-reference name, emit it and return true.
+     * Otherwise throw on cycle, or return false (no cycle -- caller
+     * should serialize the value and call `leaveVisited` when done).
+     */
+    bool enterVisited(Value & v)
+    {
+        auto ptr = &v;
+        if (visited.insert(ptr).second)
+            return false;
+        auto it = backRefs.find(ptr);
+        if (it != backRefs.end()) {
+            out << it->second;
+            return true;
+        }
+        state.error<EvalError>("infinite recursion encountered while serializing a function closure")
+            .atPos(pos)
+            .debugThrow();
+    }
+
+    void leaveVisited(Value & v)
+    {
+        visited.erase(&v);
+    }
+};
+
+static void serializeValue(SerializeContext & ctx, Value & v);
+static void serializeLambdaWithClosure(SerializeContext & ctx, Value & v);
+
+/**
+ * Collect the base primop and accumulated arguments from a
+ * `tPrimOpApp` value by walking the left-spine.  Arguments are
+ * returned in application order (innermost first).
+ */
+static std::pair<const PrimOp *, std::vector<Value *>>
+collectPrimOpAppArgs(EvalState & state, const PosIdx pos, Value & v)
+{
+    std::vector<Value *> args;
+    Value * cur = &v;
+    while (cur->isPrimOpApp()) {
+        auto thunk = cur->primOpApp();
+        args.push_back(thunk.right);
+        cur = thunk.left;
+    }
+    if (!cur->isPrimOp() || !cur->primOp())
+        state.error<EvalError>("cannot serialize a partially applied primop without a known base")
+            .atPos(pos)
+            .debugThrow();
+    std::reverse(args.begin(), args.end());
+    return {cur->primOp(), std::move(args)};
+}
+
+static void serializeValue(SerializeContext & ctx, Value & v)
+{
+    ctx.state.forceValue(v, ctx.pos);
+
+    switch (v.type()) {
+    case nInt:
+        ctx.out << v.integer().value;
+        break;
+    case nFloat:
+        ctx.out << std::to_string(v.fpoint());
+        break;
+    case nBool:
+        ctx.out << (v.boolean() ? "true" : "false");
+        break;
+    case nNull:
+        ctx.out << "null";
+        break;
+    case nString: {
+        bool hasContext = v.context() && *v.context()->begin();
+        if (hasContext && ctx.preserveStringContext) {
+            // Emit `builtins.appendContext "..." { ... }` so that string
+            // contexts (store path dependencies) survive round-trip
+            // through deserializeFunction.
+            NixStringContext strCtx;
+            copyContext(v, strCtx);
+
+            ctx.out << "(builtins.appendContext ";
+            printLiteralString(ctx.out, v.string_view());
+            ctx.out << " { ";
+
+            // Group context elements by store path, matching the format
+            // expected by `builtins.appendContext`.
+            struct CtxInfo
+            {
+                bool path = false;
+                bool allOutputs = false;
+                std::vector<std::string> outputs;
+            };
+
+            std::map<std::string, CtxInfo> grouped;
+            for (auto & elem : strCtx) {
+                std::visit(
+                    overloaded{
+                        [&](const NixStringContextElem::Opaque & o) {
+                            grouped[ctx.state.store->printStorePath(o.path)].path = true;
+                        },
+                        [&](const NixStringContextElem::DrvDeep & d) {
+                            grouped[ctx.state.store->printStorePath(d.drvPath)].allOutputs = true;
+                        },
+                        [&](const NixStringContextElem::Built & b) {
+                            auto drvPath = resolveDerivedPath(*ctx.state.store, *b.drvPath);
+                            grouped[ctx.state.store->printStorePath(drvPath)].outputs.push_back(b.output);
+                        },
+                    },
+                    elem.raw);
+            }
+            for (auto & [path, info] : grouped) {
+                printLiteralString(ctx.out, path);
+                ctx.out << " = { ";
+                if (info.path)
+                    ctx.out << "path = true; ";
+                if (info.allOutputs)
+                    ctx.out << "allOutputs = true; ";
+                if (!info.outputs.empty()) {
+                    ctx.out << "outputs = [ ";
+                    for (auto & o : info.outputs) {
+                        printLiteralString(ctx.out, o);
+                        ctx.out << " ";
+                    }
+                    ctx.out << "]; ";
+                }
+                ctx.out << "}; ";
+            }
+            ctx.out << "})";
+        } else {
+            printLiteralString(ctx.out, v.string_view());
+            copyContext(v, ctx.context);
+        }
+        break;
+    }
+    case nPath:
+        ctx.out << v.path().to_string();
+        break;
+    case nList: {
+        if (ctx.enterVisited(v))
+            break;
+        ctx.out << "[ ";
+        for (auto * elem : v.listView()) {
+            serializeValue(ctx, *elem);
+            ctx.out << " ";
+        }
+        ctx.out << "]";
+        ctx.leaveVisited(v);
+        break;
+    }
+    case nAttrs: {
+        if (ctx.enterVisited(v))
+            break;
+        ctx.out << "{ ";
+        for (auto & attr : *v.attrs()) {
+            printAttributeName(ctx.out, ctx.state.symbols[attr.name]);
+            ctx.out << " = ";
+            serializeValue(ctx, *attr.value);
+            ctx.out << "; ";
+        }
+        ctx.out << "}";
+        ctx.leaveVisited(v);
+        break;
+    }
+    case nFunction: {
+        if (v.isLambda() && v.lambda().fun) {
+            serializeLambdaWithClosure(ctx, v);
+        } else if (v.isPrimOp() && v.primOp()) {
+            ctx.checkPluginPrimOp(*v.primOp());
+            ctx.out << "builtins." << v.primOp()->name;
+        } else if (v.isPrimOpApp()) {
+            auto [primOp, args] = collectPrimOpAppArgs(ctx.state, ctx.pos, v);
+            ctx.checkPluginPrimOp(*primOp);
+            ctx.out << "(builtins." << primOp->name;
+            for (auto * arg : args) {
+                ctx.out << " ";
+                serializeValue(ctx, *arg);
+            }
+            ctx.out << ")";
+        } else {
+            ctx.state.error<EvalError>("cannot serialize %1%", showType(v)).atPos(ctx.pos).debugThrow();
+        }
+        break;
+    }
+    default:
+        ctx.state.error<EvalError>("cannot serialize %1%", showType(v)).atPos(ctx.pos).debugThrow();
+    }
+}
+
+/**
+ * Collect all parameter names from a chain of nested lambdas, and
+ * return the innermost body.  For `x: y: z: body`, this returns
+ * `body` and fills `params` with `[x, y, z]`.  Each lambda must be
+ * a simple positional-arg lambda (not formals) for multi-level
+ * unwinding; the outermost lambda may use formals.
+ */
+static Expr * collectNestedLambdaParams(ExprLambda * outerFun, std::vector<Symbol> & params, int & depth)
+{
+    // Collect params from the outermost lambda.
+    if (outerFun->arg)
+        params.push_back(outerFun->arg);
+    if (auto formals = outerFun->getFormals())
+        for (auto & f : formals->formals)
+            params.push_back(f.name);
+    depth = 1;
+
+    // Unwrap nested simple lambdas (`x: y: ... : body`).
+    Expr * body = outerFun->body;
+    while (auto * inner = dynamic_cast<ExprLambda *>(body)) {
+        // Only unwrap simple positional-arg lambdas, not formals.
+        if (!inner->arg || inner->getFormals())
+            break;
+        params.push_back(inner->arg);
+        depth++;
+        body = inner->body;
+    }
+    return body;
+}
+
+/**
+ * Check whether `call->args` are exactly `params` forwarded in order
+ * as simple variable references at the given `depth` levels.
+ */
+static bool argsMatchParams(ExprCall * call, const std::vector<Symbol> & params, int depth)
+{
+    if (!call->args || call->args->size() != params.size())
+        return false;
+    for (size_t i = 0; i < params.size(); ++i) {
+        auto * argVar = dynamic_cast<ExprVar *>((*call->args)[i]);
+        if (!argVar || argVar->fromWith || argVar->name != params[i])
+            return false;
+        // Each arg must reference its own lambda scope level.
+        // The innermost params are at level 0, outermost at depth-1,
+        // but they're all within the nested lambda stack.  In practice,
+        // each param is at level (depth - 1 - its_lambda_index), but
+        // since params are collected from outer to inner and variables
+        // are resolved relative to the point of use (innermost body),
+        // we just need level < depth (referencing a lambda param, not
+        // the closure).
+        if (argVar->level >= (Level) depth)
+            return false;
+    }
+    return true;
+}
+
+/**
+ * Attempt eta-reduction to normalize `lib` polyfills.  Detects:
+ *
+ * - `x: f x` where `f` is a closure variable (handles `let head = builtins.head;`)
+ * - `x: builtins.head x` where the called function is a direct builtin select
+ * - `x: y: f x y` (multi-arg) through nested lambda unwinding
+ *
+ * Returns true if eta-reduction was applied (and output was written).
+ */
+static bool tryEtaReduce(SerializeContext & ctx, Value & v)
+{
+    auto * fun = v.lambda().fun;
+    auto * closureEnv = v.lambda().env;
+    if (!fun || !closureEnv)
+        return false;
+
+    // Collect params from potentially nested lambdas.
+    std::vector<Symbol> params;
+    int depth;
+    Expr * body = collectNestedLambdaParams(fun, params, depth);
+
+    auto * call = dynamic_cast<ExprCall *>(body);
+    if (!call)
+        return false;
+
+    if (!argsMatchParams(call, params, depth))
+        return false;
+
+    // Case 1: called function is a closure variable (`x: f x`).
+    if (auto * calledVar = dynamic_cast<ExprVar *>(call->fun)) {
+        if (calledVar->fromWith || calledVar->level < (Level) depth)
+            return false;
+        // Don't eta-reduce if the variable is declared external.
+        if (ctx.externalBindings.count(std::string(ctx.state.symbols[calledVar->name])))
+            return false;
+
+        Env * env = closureEnv;
+        for (Level l = calledVar->level - depth; l > 0; --l)
+            env = env->up;
+        Value * calledValue = env->values[calledVar->displ];
+        ctx.state.forceValue(*calledValue, ctx.pos);
+
+        if (calledValue->type() != nFunction)
+            return false;
+
+        serializeValue(ctx, *calledValue);
+        return true;
+    }
+
+    // Case 2: called function is `<var>.<name>` (e.g. `builtins.head`).
+    if (auto * sel = dynamic_cast<ExprSelect *>(call->fun)) {
+        if (sel->def || sel->getAttrPath().size() != 1)
+            return false;
+        auto & attrName = sel->getAttrPath()[0];
+        if (attrName.expr)
+            return false;
+
+        auto * baseVar = dynamic_cast<ExprVar *>(sel->e);
+        if (!baseVar || baseVar->fromWith || baseVar->level < (Level) depth)
+            return false;
+
+        // Look up the base variable in the closure env (same as case 1).
+        Env * env = closureEnv;
+        for (Level l = baseVar->level - depth; l > 0; --l)
+            env = env->up;
+        Value * baseValue = env->values[baseVar->displ];
+        ctx.state.forceAttrs(*baseValue, ctx.pos, "while eta-reducing a builtin select");
+
+        auto * attr = baseValue->attrs()->get(attrName.symbol);
+        if (!attr)
+            return false;
+
+        ctx.state.forceValue(*attr->value, ctx.pos);
+        if (attr->value->type() != nFunction)
+            return false;
+
+        serializeValue(ctx, *attr->value);
+        return true;
+    }
+
+    return false;
+}
+
+static void serializeLambdaWithClosure(SerializeContext & ctx, Value & v)
+{
+    if (tryEtaReduce(ctx, v))
+        return;
+
+    auto * fun = v.lambda().fun;
+    auto * closureEnv = v.lambda().env;
+
+    if (!fun) {
+        ctx.out << "<<lambda>>";
+        return;
+    }
+
+    auto staticEnv = ctx.state.getStaticEnv(*fun);
+    if (!staticEnv) {
+        fun->show(ctx.state.symbols, ctx.out);
+        return;
+    }
+
+    std::set<Symbol> freeVarNames;
+    if (auto formals = fun->getFormals())
+        for (auto & f : formals->formals)
+            if (f.def)
+                collectFreeVars(f.def, 1, freeVarNames);
+    collectFreeVars(fun->body, 0, freeVarNames);
+
+    if (freeVarNames.empty()) {
+        fun->show(ctx.state.symbols, ctx.out);
+        return;
+    }
+
+    // Force `with` attrset thunks so `mapStaticEnvBindings` can enumerate them.
+    {
+        const StaticEnv * se = staticEnv.get();
+        Env * env = closureEnv;
+        while (se && env && se->up && env->up) {
+            if (se->isWith && env->values[0]->isThunk())
+                ctx.state.forceValue(*env->values[0], ctx.pos);
+            se = se->up.get();
+            env = env->up;
+        }
+    }
+
+    auto allBindings = mapStaticEnvBindings(ctx.state.symbols, *staticEnv, *closureEnv);
+
+    std::map<std::string, Value *> neededBindings;
+    for (auto & [name, val] : *allBindings) {
+        auto sym = ctx.state.symbols.create(name);
+        if (freeVarNames.count(sym))
+            neededBindings.emplace(name, val);
+    }
+
+    // Split bindings into external (emitted as wrapper function params)
+    // and inline (serialized as let bindings).
+    std::vector<std::string> externalNames;
+    std::map<std::string, Value *> inlineBindings;
+    for (auto & [name, val] : neededBindings) {
+        if (ctx.externalBindings.count(name))
+            externalNames.push_back(name);
+        else
+            inlineBindings.emplace(name, val);
+    }
+
+    if (externalNames.empty() && inlineBindings.empty()) {
+        fun->show(ctx.state.symbols, ctx.out);
+        return;
+    }
+
+    // Register back-references for recursive values (Nix `let` is recursive).
+    BackRefMap savedBackRefs = ctx.backRefs;
+    for (auto & [name, val] : inlineBindings) {
+        ctx.state.forceValue(*val, ctx.pos);
+        ctx.backRefs.emplace(val, name);
+    }
+
+    // Emit external bindings as a wrapper function: `({ name1, name2 }: ...)`
+    if (!externalNames.empty()) {
+        ctx.out << "({ ";
+        bool first = true;
+        for (auto & name : externalNames) {
+            if (!first)
+                ctx.out << ", ";
+            printIdentifier(ctx.out, name);
+            first = false;
+        }
+        ctx.out << " }: ";
+    }
+
+    // Emit inline bindings as let block.
+    if (!inlineBindings.empty()) {
+        ctx.out << "(let ";
+        for (auto & [name, val] : inlineBindings) {
+            printIdentifier(ctx.out, name);
+            ctx.out << " = ";
+            serializeValue(ctx, *val);
+            ctx.out << "; ";
+        }
+        ctx.out << "in ";
+        fun->show(ctx.state.symbols, ctx.out);
+        ctx.out << ")";
+    } else {
+        fun->show(ctx.state.symbols, ctx.out);
+    }
+
+    if (!externalNames.empty())
+        ctx.out << ")";
+
+    ctx.backRefs = std::move(savedBackRefs);
+}
+
+static void prim_serializeFunction(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceValue(*args[0], pos);
+
+    PluginPrimOpPolicy pluginPolicy = std::set<std::string>{}; // reject all by default
+    Value * fn;
+
+    if (args[0]->type() == nAttrs) {
+        // Called as: serializeFunction { fn = <function>; allowedPluginPrimOps = [...]; }
+        auto * fnAttr = args[0]->attrs()->get(state.symbols.create("fn"));
+        if (!fnAttr)
+            state.error<TypeError>("`builtins.serializeFunction` attrset argument must contain a `fn` attribute")
+                .atPos(pos)
+                .debugThrow();
+        state.forceValue(*fnAttr->value, pos);
+        fn = fnAttr->value;
+
+        auto * allowedAttr = args[0]->attrs()->get(state.symbols.create("allowedPluginPrimOps"));
+        if (allowedAttr) {
+            state.forceList(*allowedAttr->value, pos, "while evaluating the `allowedPluginPrimOps` attribute");
+            std::set<std::string> allowed;
+            for (auto * elem : allowedAttr->value->listView()) {
+                auto name = state.forceStringNoCtx(*elem, pos, "while evaluating an element of `allowedPluginPrimOps`");
+                allowed.emplace(name);
+            }
+            pluginPolicy = std::move(allowed);
+        }
+    } else {
+        fn = args[0];
+    }
+
+    if (fn->type() != nFunction)
+        state
+            .error<TypeError>(
+                "`builtins.serializeFunction` expects a function or an attrset with `fn`, but got %1%", showType(*fn))
+            .atPos(pos)
+            .debugThrow();
+
+    bool preserveCtx = false;
+    std::set<std::string> externalBindings;
+    if (args[0]->type() == nAttrs) {
+        auto * ctxAttr = args[0]->attrs()->get(state.symbols.create("preserveStringContext"));
+        if (ctxAttr)
+            preserveCtx =
+                state.forceBool(*ctxAttr->value, pos, "while evaluating the `preserveStringContext` attribute");
+
+        auto * extAttr = args[0]->attrs()->get(state.symbols.create("externalBindings"));
+        if (extAttr) {
+            state.forceList(*extAttr->value, pos, "while evaluating the `externalBindings` attribute");
+            for (auto * elem : extAttr->value->listView()) {
+                auto name = state.forceStringNoCtx(*elem, pos, "while evaluating an element of `externalBindings`");
+                externalBindings.emplace(name);
+            }
+        }
+    }
+
+    NixStringContext context;
+    std::ostringstream out;
+    std::set<const void *> visited;
+    SerializeContext ctx{state, pos, out, context, visited, {}, pluginPolicy, preserveCtx, std::move(externalBindings)};
+    serializeValue(ctx, *fn);
+
+    v.mkString(out.str(), context, state.mem);
+}
+
+static RegisterPrimOp primop_serializeFunction({
+    .name = "serializeFunction",
+    .args = {"f"},
+    .doc = R"doc(
+      Serialize a function to a string containing a self-contained Nix
+      expression.  The resulting string includes `let` bindings for all
+      variables captured from the function's closure, so that the expression
+      can be evaluated independently of its original context.
+
+      The argument *f* can be a function directly:
+
+      ```nix
+      builtins.serializeFunction (x: x + 1)
+      ```
+
+      Or an attrset with options:
+
+      ```nix
+      builtins.serializeFunction {
+        fn = myFunction;
+        allowedPluginPrimOps = [ "getFlake" ];
+      }
+      ```
+
+      Attributes:
+      - `fn` (required): the function to serialize.
+      - `allowedPluginPrimOps` (optional, default `[]`): a list of
+        plugin primop names to allow.  By default, user-provided primops
+        (from plugins or the flake subsystem) are rejected since they
+        may not be available in the deserialization environment.
+      - `preserveStringContext` (optional, default `false`): if true,
+        strings with store path contexts are wrapped in
+        `builtins.appendContext` calls so that contexts survive
+        round-trip through `builtins.deserializeFunction`.
+      - `externalBindings` (optional, default `[]`): a list of closure
+        variable names to emit as parameters of a wrapper function
+        instead of inlining their values.  The caller provides their
+        values at deserialization time.  This avoids serializing large
+        library functions (e.g. from nixpkgs `lib`):
+
+        ```nix
+        builtins.serializeFunction {
+          fn = items: concatMapStringsSep ", " toString items;
+          externalBindings = ["concatMapStringsSep"];
+        }
+        # => "({ concatMapStringsSep }: (items: ...))"
+        # Caller provides at deserialization:
+        # (builtins.deserializeFunction s) { inherit (lib) concatMapStringsSep; }
+        ```
+
+      Lambdas, primops, and partially applied primops are all supported.
+
+      > **Warning**
+      >
+      > The serialized form is **not stable** across Nix versions.
+      > Primops are referenced by name (`builtins.<name>`), which can
+      > change between versions; `lib` polyfills may also change whether
+      > an operation is a primop or a lambda.  Intended for same-version
+      > use cases: debugging, code generation, and evaluation
+      > continuations (e.g. dynamic derivations).
+
+      ```nix
+      let x = 1; in builtins.serializeFunction (y: x + y)
+      ```
+      evaluates to
+      ```nix
+      "(let x = 1; in (y: (x + y)))"
+      ```
+
+      Serialization forces all captured thunks.  Recursive values in
+      closures are handled via self-referencing `let` bindings.  String
+      contexts (store path dependencies) are attached to the output string
+      but lost if the result is passed through
+      [`builtins.deserializeFunction`](#builtins-deserializeFunction)
+      unless `preserveStringContext` is enabled.
+      Float values are serialized with limited precision (`std::to_string`).
+    )doc",
+    .impl = prim_serializeFunction,
+    .experimentalFeature = Xp::FunctionSerialization,
+});
+
+static void prim_deserializeFunction(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    // Accept strings with context (serializeFunction attaches store path
+    // contexts from closure values).  The context is not restored in the
+    // deserialized result -- see the feature flag documentation.
+    NixStringContext context;
+    auto s = state.forceString(
+        *args[0], context, pos, "while evaluating the first argument passed to builtins.deserializeFunction");
+
+    Expr * e;
+    try {
+        e = state.parseExprFromString(std::string(s), state.rootPath("."), state.staticBaseEnv);
+    } catch (Error & err) {
+        err.addTrace(state.positions[pos], "while parsing the string passed to builtins.deserializeFunction");
+        throw;
+    }
+
+    e->eval(state, state.baseEnv, v);
+    state.forceValue(v, pos);
+
+    if (v.type() != nFunction)
+        state
+            .error<TypeError>(
+                "`builtins.deserializeFunction` expects the string to evaluate to a function, but got %1%", showType(v))
+            .atPos(pos)
+            .debugThrow();
+}
+
+static RegisterPrimOp primop_deserializeFunction({
+    .name = "deserializeFunction",
+    .args = {"s"},
+    .doc = R"doc(
+      Parse and evaluate the string *s* as a Nix expression, which must
+      produce a function value.  This is the inverse of
+      [`builtins.serializeFunction`](#builtins-serializeFunction).
+
+      > **Warning**
+      >
+      > This evaluates arbitrary Nix expressions (the result is only
+      > type-checked after evaluation).  Side effects such as
+      > `builtins.fetchurl` or import-from-derivation can be triggered
+      > during evaluation.  Only use this on trusted input.  This is
+      > inherent to the string-eval approach.
+
+      String contexts from the serialized form are **not** restored
+      by default, since the input is parsed as fresh Nix source.
+      However, if `preserveStringContext = true` was used during
+      serialization, the output contains `builtins.appendContext`
+      calls that reconstruct contexts on evaluation.
+
+      Paths are absolute (resolved at original parse time) but the
+      referenced files may not exist in the deserialization environment.
+
+      ```nix
+      let f = builtins.deserializeFunction "(x: x + 1)";
+      in f 41
+      ```
+      evaluates to `42`.
+    )doc",
+    .impl = prim_deserializeFunction,
+    .experimentalFeature = Xp::FunctionSerialization,
 });
 
 /* `substring start len str' returns the substring of `str' starting
@@ -5614,6 +6452,7 @@ void EvalState::createBaseEnv(const EvalSettings & evalSettings)
     for (auto & primOp : evalSettings.extraPrimOps) {
         auto primOpAdjusted = primOp;
         primOpAdjusted.arity = std::max(primOp.args.size(), primOp.arity);
+        primOpAdjusted.isPluginPrimOp = true;
         addPrimOp(std::move(primOpAdjusted));
     }
 
