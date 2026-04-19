@@ -1,10 +1,7 @@
-# Value identity optimization masks function comparison: no warning expected.
-# The pointer equality check short-circuits before we reach the function case.
+# Pointer equality on a value with no functions: no warning expected.
 let
-  f = x: x;
+  a = {
+    x = 1;
+  };
 in
-{
-  a = f;
-} == {
-  a = f;
-}
+a == a

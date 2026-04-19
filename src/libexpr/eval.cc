@@ -2923,8 +2923,43 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls
        uniqList on a list of sets.)  Will remove this eventually. */
-    if (&v1 == &v2)
+    if (&v1 == &v2) {
+        diagnose(settings.lintFunctionComparison, [&](bool) -> std::optional<EvalBaseError> {
+            // Walk the value tree without forcing, looking for functions
+            // that pointer equality is silently masking. Track visited
+            // pointers to handle cyclic structures.
+            std::set<const void *> seen;
+            std::function<bool(Value &)> hasFunction = [&](Value & v) -> bool {
+                if (!seen.insert(&v).second)
+                    return false;
+                switch (v.type()) {
+                case nFunction:
+                    return true;
+                case nAttrs:
+                    for (auto & attr : *v.attrs())
+                        if (hasFunction(*attr.value))
+                            return true;
+                    return false;
+                case nList:
+                    for (auto elem : v.listView())
+                        if (hasFunction(*elem))
+                            return true;
+                    return false;
+                default:
+                    return false;
+                }
+            };
+            if (!hasFunction(v1))
+                return std::nullopt;
+            return EvalBaseError(
+                *this,
+                ErrorInfo{
+                    .msg = HintFmt(
+                        "function comparison is unreliable; it may return true or false depending on structure and evaluation order"),
+                    .pos = positions[pos]});
+        });
         return true;
+    }
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
