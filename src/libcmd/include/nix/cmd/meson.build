@@ -8,6 +8,7 @@ headers = files(
   'command.hh',
   'common-eval-args.hh',
   'compatibility-settings.hh',
+  'develop.hh',
   'editor-for.hh',
   'get-build-log.hh',
   'installable-attr-path.hh',

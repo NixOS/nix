@@ -1,6 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/util/config-global.hh"
 #include "nix/expr/eval.hh"
+#include "nix/cmd/develop.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
@@ -218,97 +219,6 @@ struct BuildEnvironment
             return settings.thisSystem;
     }
 };
-
-const static std::string getEnvSh =
-#include "get-env.sh.gen.hh"
-    ;
-
-/**
- * Given an existing derivation, return the shell environment as
- * initialised by stdenv's setup script. We do this by building a
- * modified derivation with the same dependencies and nearly the same
- * initial environment variables, that just writes the resulting
- * environment to a file and exits.
- */
-static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore, const StorePath & drvPath)
-{
-    auto drv = evalStore->derivationFromPath(drvPath);
-
-    auto builder = baseNameOf(drv.builder);
-    if (builder != "bash")
-        throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
-
-    auto getEnvShPath = ({
-        StringSource source{getEnvSh};
-        evalStore->addToStoreFromDump(
-            source,
-            "get-env.sh",
-            FileSerialisationMethod::Flat,
-            ContentAddressMethod::Raw::Text,
-            HashAlgorithm::SHA256,
-            {});
-    });
-
-    drv.args = {store->printStorePath(getEnvShPath)};
-
-    /* Remove derivation checks. */
-    if (drv.structuredAttrs) {
-        drv.structuredAttrs->structuredAttrs.erase("outputChecks");
-    } else {
-        drv.env.erase("allowedReferences");
-        drv.env.erase("allowedRequisites");
-        drv.env.erase("disallowedReferences");
-        drv.env.erase("disallowedRequisites");
-    }
-
-    drv.env.erase("name");
-
-    /* Rehash and write the derivation. FIXME: would be nice to use
-       'buildDerivation', but that's privileged. */
-    drv.name += "-env";
-    drv.env.emplace("name", drv.name);
-    drv.inputSrcs.insert(std::move(getEnvShPath));
-    for (auto & [outputName, output] : drv.outputs) {
-        std::visit(
-            overloaded{
-                [&](const DerivationOutput::InputAddressed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
-                },
-                [&](const DerivationOutput::CAFixed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
-                },
-                [&](const auto &) {
-                    // Do nothing for other types (CAFloating, Deferred, Impure)
-                },
-            },
-            output.raw);
-    }
-    drv.fillInOutputPaths(*evalStore);
-
-    auto shellDrvPath = evalStore->writeDerivation(drv);
-
-    /* Build the derivation. */
-    store->buildPaths(
-        {DerivedPath::Built{
-            .drvPath = makeConstantStorePathRef(shellDrvPath),
-            .outputs = OutputsSpec::All{},
-        }},
-        bmNormal,
-        evalStore);
-
-    // `get-env.sh` will write its JSON output to an arbitrary output
-    // path, so return the first non-empty output path.
-    for (auto & [_0, optPath] : deepQueryPartialDerivationOutputMap(*evalStore, shellDrvPath)) {
-        assert(optPath);
-        auto accessor = evalStore->requireStoreObjectAccessor(*optPath);
-        if (auto st = accessor->maybeLstat(CanonPath::root); st && st->fileSize.value_or(0))
-            return *optPath;
-    }
-
-    throw Error("get-env.sh failed to produce an environment");
-}
 
 struct Common : InstallableCommand, MixProfile
 {
@@ -718,6 +628,17 @@ struct CmdDevelop : Common, MixEnvironment
 
 struct CmdPrintDevEnv : Common, MixJSON
 {
+    bool printPath = false;
+
+    CmdPrintDevEnv()
+    {
+        addFlag({
+            .longName = "print-path",
+            .description = "Print the store path of the development environment rather than the contents.",
+            .handler = {&printPath, true},
+        });
+    }
+
     std::string description() override
     {
         return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
@@ -737,15 +658,17 @@ struct CmdPrintDevEnv : Common, MixJSON
 
     void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto buildEnvironment = getBuildEnvironment(store, installable).first;
+        auto buildEnvironment = getBuildEnvironment(store, installable);
 
         logger->stop();
 
         if (json) {
-            printJSON(buildEnvironment.toJSON());
+            printJSON(buildEnvironment.first.toJSON());
+        } else if (printPath) {
+            logger->writeToStdout(store->printStorePath(buildEnvironment.second));
         } else {
             AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
-            logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));
+            logger->writeToStdout(makeRcScript(store, buildEnvironment.first, tmpDir));
         }
     }
 };
