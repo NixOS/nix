@@ -10,6 +10,7 @@
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/util/util.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
@@ -63,7 +64,7 @@ std::string EvalState::realiseString(Value & s, StorePathSet * storePathsOutMayb
     nix::NixStringContext stringContext;
     auto rawStr = coerceToString(pos, s, stringContext, "while realising a string").toOwned();
     auto rewrites = realiseContext(stringContext, storePathsOutMaybe, isIFD);
-
+    ensureLazyPathsCopied(stringContext);
     return nix::rewriteStrings(rawStr, rewrites);
 }
 
@@ -88,7 +89,11 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
                     ensureValid(b.drvPath->getBaseStorePath());
                 },
                 [&](const NixStringContextElem::Opaque & o) {
-                    ensureValid(o.path);
+                    /* If the path happens to be mounted on the storeFS, that means it's lazy path string and would get
+                       copied to the store on-demand (when referenced in a derivation). The string is equal to final
+                       store path where the store object would end up (the path is hashed before mounting). */
+                    if (!storeFS->getMount(CanonPath(store->printStorePath(o.path))))
+                        ensureValid(o.path);
                     if (maybePathsOut)
                         maybePathsOut->emplace(o.path);
                 },
@@ -158,7 +163,8 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     return res;
 }
 
-SourcePath EvalState::realisePath(const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks)
+SourcePath EvalState::realisePath(
+    const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks, CopyLazyPaths copyLazyPaths)
 {
     NixStringContext context;
 
@@ -167,6 +173,8 @@ SourcePath EvalState::realisePath(const PosIdx pos, Value & v, std::optional<Sym
     try {
         if (!context.empty() && path.accessor == rootFS) {
             auto rewrites = realiseContext(context);
+            if (copyLazyPaths == CopyLazyPaths::Copy)
+                ensureLazyPathsCopied(context);
             path = {path.accessor, CanonPath(rewriteStrings(path.path.abs(), rewrites))};
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
@@ -441,10 +449,11 @@ static RegisterPrimOp primop_import(
 /* !!! Should we pass the Pos or the file name too? */
 extern "C" typedef void (*ValueInitializer)(EvalState & state, Value & v);
 
-/* Load a ValueInitializer from a DSO and return whatever it initializes */
+/* Load a ValueInitializer from a DSO and return whatever it initializes. FIXME: This doesn't
+   work with chroot stores. */
 void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    auto path = state.realisePath(pos, *args[0]);
+    auto path = state.realisePath(pos, *args[0], SymlinkResolution::Full, EvalState::CopyLazyPaths::Copy);
 
     std::string sym(
         state.forceStringNoCtx(*args[1], pos, "while evaluating the second argument passed to builtins.importNative"));
@@ -471,7 +480,7 @@ void prim_importNative(EvalState & state, const PosIdx pos, Value ** args, Value
     /* We don't dlclose because v may be a primop referencing a function in the shared object file */
 }
 
-/* Execute a program and parse its output */
+/* Execute a program and parse its output. FIXME: This doesn't work with chroot stores. */
 void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the first argument passed to builtins.exec");
@@ -509,6 +518,7 @@ void prim_exec(EvalState & state, const PosIdx pos, Value ** args, Value & v)
             .debugThrow();
     }
 
+    state.ensureLazyPathsCopied(context);
     auto output = runProgram(program, true, toOsStrings(std::move(commandArgs)));
     Expr * parsed;
     try {
@@ -1726,7 +1736,10 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 [&](const NixStringContextElem::Built & b) {
                     drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
                 },
-                [&](const NixStringContextElem::Opaque & o) { drv.inputSrcs.insert(o.path); },
+                [&](const NixStringContextElem::Opaque & o) {
+                    state.ensureLazyPathCopied(o.path);
+                    drv.inputSrcs.insert(o.path);
+                },
             },
             c.raw);
     }
@@ -1930,6 +1943,10 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
     auto path =
         state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")
             .path;
+    /* Here we are leaving the realm of the rootFS accessor and must actually fetch to the store.
+       TODO: This could probably get optimised to avoid the fetching altogether to short-circuit when the path
+       is already mounted on storeFS. */
+    state.ensureLazyPathsCopied(context);
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
@@ -2666,9 +2683,10 @@ static void prim_toFile(EvalState & state, const PosIdx pos, Value ** args, Valu
     StorePathSet refs;
 
     for (auto c : context) {
-        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw))
+        if (auto p = std::get_if<NixStringContextElem::Opaque>(&c.raw)) {
+            state.ensureLazyPathCopied(p->path);
             refs.insert(p->path);
-        else
+        } else
             state
                 .error<EvalError>(
                     "files created by %1% may not reference derivations, but %2% references %3%",

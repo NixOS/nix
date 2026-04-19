@@ -738,6 +738,26 @@ public:
     std::optional<std::string> tryAttrsToString(
         const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
 
+    enum class CopyLazyPaths : bool {
+        PreserveLazy = false,
+        Copy = true,
+    };
+
+    /**
+     * For efficiency reasons, some store paths (as seen by the evaluator) in
+     * the storeFS at their content-addressed locations don't get copied to the
+     * store eagerly. This saves on needless I/O and possibly IPC if all the
+     * evaluator does is just evaluate nix expressions from those locations.
+     * This function copies such store objects to the store if they aren't already valid.
+     */
+    void ensureLazyPathCopied(const StorePath & path);
+
+    /**
+     * Ensure that all NixStringContextElem::Opaque context elements get fetched
+     * to the store.
+     */
+    void ensureLazyPathsCopied(const NixStringContext & context);
+
     /**
      * String coercion.
      *
@@ -1044,9 +1064,14 @@ public:
 
     /**
      * Coerce `v` to a path and realise it, i.e. build anything in the value's string context using `realiseContext()`.
+     * @param copyLazyPaths When encountering a lazy path (i.e. a string with Opaque context that's also "mounted" on
+     * the storeFS), fetch the store path to the store.
      */
     SourcePath realisePath(
-        const PosIdx pos, Value & v, std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full);
+        const PosIdx pos,
+        Value & v,
+        std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full,
+        CopyLazyPaths copyLazyPaths = CopyLazyPaths::PreserveLazy);
 
     /**
      * Realise the given string with context, and return the string with outputs instead of downstream output

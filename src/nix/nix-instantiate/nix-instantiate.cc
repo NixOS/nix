@@ -66,7 +66,7 @@ void processExpr(
                 if (strict)
                     state.forceValueDeep(vRes);
                 std::set<const void *> seen;
-                printAmbiguous(state, vRes, std::cout, &seen);
+                printAmbiguous(state, vRes, std::cout, &seen, &context);
                 std::cout << std::endl;
             }
         } else {
@@ -94,6 +94,8 @@ void processExpr(
                 std::cout << fmt("%s%s\n", drvPathS, (outputName != "out" ? "!" + outputName : ""));
             }
         }
+
+        state.ensureLazyPathsCopied(context);
     }
 }
 
