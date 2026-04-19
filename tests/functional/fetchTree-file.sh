@@ -118,5 +118,33 @@ EOF
 EOF
 }
 
+# builtins.fetchTree (both the attribute-set and URL-like string forms) must
+# work with only the `fetch-tree` experimental feature enabled, i.e. without
+# also enabling `flakes`.
+test_fetch_tree_without_flakes () {
+    echo foo > test_input_no_flakes
+    tar cfz test_input_no_flakes.tar.gz test_input_no_flakes
+
+    # Attribute-set form.
+    nix --experimental-features 'nix-command fetch-tree' eval --impure --file - <<EOF
+    let
+        tree = builtins.fetchTree { type = "file"; url = "file://$PWD/test_input_no_flakes"; };
+    in
+    assert builtins.readFile tree == "foo\n";
+    tree
+EOF
+
+    # URL-like string form — previously errored with
+    #   "passing a string argument to 'fetchTree' requires the 'flakes' experimental feature"
+    nix --experimental-features 'nix-command fetch-tree' eval --impure --expr \
+        "builtins.fetchTree \"file://$PWD/test_input_no_flakes.tar.gz\"" >/dev/null
+
+    # Without fetch-tree (and without flakes), the builtin is unavailable.
+    expectStderr 1 nix --experimental-features 'nix-command' eval --impure --expr \
+        "builtins.fetchTree \"file://$PWD/test_input_no_flakes.tar.gz\"" \
+        | grepQuiet "attribute 'fetchTree' missing"
+}
+
 test_fetch_file
 test_file_flake_input
+test_fetch_tree_without_flakes
