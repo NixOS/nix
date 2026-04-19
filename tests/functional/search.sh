@@ -49,3 +49,45 @@ e=$'\x1b' # grep doesn't support \e, \033 or even \x1b
 (( $(nix search -f search.nix foo ^ --exclude 'foo|bar' | grep -Ec 'foo|bar') == 0 ))
 (( $(nix search -f search.nix foo ^ -e foo --exclude bar | grep -Ec 'foo|bar') == 0 ))
 [[ $(nix search -f search.nix '' ^ -e bar --json | jq -c 'keys') == '["foo","hello"]' ]]
+
+## Tests for --calc-derivation
+
+# Check that --calc-derivation adds both outPath and drvPath to JSON output
+[[ -n $(nix search -f search.nix '' hello --json --calc-derivation | jq -r '.hello.outPath') ]]
+[[ -n $(nix search -f search.nix '' hello --json --calc-derivation | jq -r '.hello.drvPath') ]]
+
+# Check that without --calc-derivation, paths are not present
+[[ $(nix search -f search.nix '' hello --json | jq 'has("hello") and (.hello | has("outPath") | not) and (.hello | has("drvPath") | not)') == 'true' ]]
+
+# Check that other fields are still present with --calc-derivation
+[[ $(nix search -f search.nix '' hello --json --calc-derivation | jq 'has("hello") and (.hello | has("pname")) and (.hello | has("version")) and (.hello | has("description"))') == 'true' ]]
+
+## Tests for --json-lines
+
+# Check that --json-lines outputs one JSON object per line
+(( $(nix search -f search.nix '' ^ --json-lines | wc -l) == 3 ))
+
+# Check that each line is valid JSON
+nix search -f search.nix '' hello --json-lines | jq -e 'has("hello")'
+
+# Check that --json-lines works with --calc-derivation
+[[ -n $(nix search -f search.nix '' hello --json-lines --calc-derivation | jq -r '.hello.outPath') ]]
+
+## Tests for --apply
+
+# Check that --apply works for simple transformations
+[[ $(nix search -f search.nix '' hello --apply 'drv: { drvName = drv.name; }' | jq -r '.hello.drvName') == 'hello-0.1' ]]
+
+# Check that --apply can access outPath
+[[ -n $(nix search -f search.nix '' hello --apply 'drv: { out = drv.outPath; }' | jq -r '.hello.out') ]]
+
+# Check that --apply can transform derivation attributes
+[[ $(nix search -f search.nix '' hello --apply 'drv: { name = drv.name; type = drv.type; }' | jq 'has("hello") and (.hello | has("name")) and (.hello | has("type"))') == 'true' ]]
+
+## Tests for --check-cache
+
+# Check that --check-cache adds cached field
+[[ $(nix search -f search.nix '' hello --json --check-cache | jq 'has("hello") and (.hello | has("cached"))') == 'true' ]]
+
+# Check that cached field is a boolean
+[[ $(nix search -f search.nix '' hello --json --check-cache | jq '.hello.cached | type') == '"boolean"' ]]
