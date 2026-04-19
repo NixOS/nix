@@ -35,8 +35,15 @@ struct MakeReadOnly
     {
         try {
             /* This will make the path read-only. */
-            if (!path.empty())
-                canonicaliseTimestampAndPermissions(path.string());
+            if (!path.empty()) {
+                auto parent = path.parent_path();
+                if (parent.empty())
+                    parent = ".";
+                AutoCloseFD dirFd = openDirectory(parent);
+                if (!dirFd)
+                    throw SysError("opening parent directory of %s", PathFmt(path));
+                canonicaliseTimestampAndPermissions(dirFd.get(), OsFilename{path.filename()});
+            }
         } catch (...) {
             ignoreExceptionInDestructor();
         }

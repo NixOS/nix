@@ -590,7 +590,8 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(
-                    store->printStorePath(info->path),
+                    ensureLocalStore()->realStoreDirFd.get(),
+                    OsFilename{std::filesystem::path(info->path.to_string())},
                     {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(

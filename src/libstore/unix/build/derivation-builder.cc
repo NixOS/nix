@@ -1271,10 +1271,11 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
     /* Path must be the same after normalisation. This is an additional sanity check in addition to
        existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
        a single path component without any `..`, `.` components. */
-    auto relPath = CanonPath::fromFilename(name);
+    auto relPath = std::filesystem::path(name);
+    assert(relPath == relPath.filename());
     AutoCloseFD fd = openFileEnsureBeneathNoSymlinks(
         tmpDirFd.get(), relPath, O_WRONLY | O_TRUNC | O_CREAT | O_CLOEXEC | O_EXCL, 0666);
-    auto path = tmpDir / relPath.rel(); /* This is used only for error messages. */
+    auto path = tmpDir / relPath; /* This is used only for error messages. */
     if (!fd)
         throw SysError("creating file %s", PathFmt(path));
     writeFile(fd.get(), contents);
@@ -1514,7 +1515,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            rewriting doesn't contain a hard link to /etc/shadow or
            something like that. */
         canonicalisePathMetaData(
-            actualPath,
+            store.realStoreDirFd.get(),
+            OsFilename{actualPath.filename()},
             {
 #ifndef _WIN32
                 .uidRange = buildUser ? std::optional(buildUser->getUIDRange()) : std::nullopt,
@@ -1650,7 +1652,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */
                 canonicalisePathMetaData(
-                    actualPath,
+                    store.realStoreDirFd.get(),
+                    OsFilename{actualPath.filename()},
                     {
 #ifndef _WIN32
                         // builder UIDs are already dealt with
@@ -1828,7 +1831,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
         canonicalisePathMetaData(
-            actualPath,
+            store.realStoreDirFd.get(),
+            OsFilename{actualPath.filename()},
             {
 #ifndef _WIN32
                 // builder UIDs are already dealt with
