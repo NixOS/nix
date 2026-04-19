@@ -17,6 +17,12 @@ class EvalState;
  *
  * See: https://github.com/NixOS/nix/issues/9730
  */
-void printAmbiguous(EvalState & state, Value & v, std::ostream & str, std::set<const void *> * seen, size_t depth = 0);
+void printAmbiguous(
+    EvalState & state,
+    Value & v,
+    std::ostream & str,
+    std::set<const void *> * seen,
+    NixStringContext * context = nullptr,
+    size_t depth = 0);
 
 } // namespace nix

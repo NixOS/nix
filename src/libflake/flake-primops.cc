@@ -19,10 +19,12 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/util/mounted-source-accessor.hh"
 #include "nix/util/pos-idx.hh"
 #include "nix/util/pos-table.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix::flake::primops {
 
@@ -52,6 +54,21 @@ PrimOp getFlake(const Settings & settings)
                     "cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)",
                     flakeRefS,
                     state.positions[pos]);
+
+            /* Backwards compatibility: since flakes used to be copied to the store eagerly, some users
+               relied on being able to do builtins.getFlake on a flakeref with discarded string context.
+               So if a flake input has a physical source path that is inside the store, first try to look it up in the
+               storeFS. */
+            if (auto sourcePath = flakeRef.input.getSourcePath();
+                flakeRef.input.getType() == "path" && sourcePath && state.store->isInStore(sourcePath->string())) {
+                auto [storePath, subPath] = state.store->toStorePath(sourcePath->string());
+                if (auto mount = state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath)))) {
+                    auto path = state.storePath(storePath) / CanonPath(subPath);
+                    if (!flakeRef.subdir.empty())
+                        path = path / flakeRef.subdir;
+                    return callFlake(state, lockFlake(settings, state, path, lockFlags), v);
+                }
+            }
 
             callFlake(state, lockFlake(settings, state, flakeRef, lockFlags), v);
         }
