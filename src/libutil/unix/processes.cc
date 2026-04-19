@@ -270,7 +270,13 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
         // Not supported, since then we don't know when to free the stack.
         assert(!(options.cloneFlags & CLONE_VM));
 
-        size_t stackSize = 1 * 1024 * 1024;
+        size_t stackSize =
+#  if defined(__SANITIZE_ADDRESS__) || (defined(__has_feature) && __has_feature(address_sanitizer))
+            8
+#  else
+            1
+#  endif
+            * 1024 * 1024;
         auto stack = static_cast<char *>(
             mmap(0, stackSize, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0));
         if (stack == MAP_FAILED)
