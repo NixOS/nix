@@ -206,11 +206,13 @@ nix_expr = dependency('nix-expr', required : false)
 if nix_expr.found() and get_option('default_library') != 'static'
   add_languages('cpp')
   subdir('plugins')
+  plugin_test_deps = [ libplugintest ]
+  if get_option('plugin-c-api')
+    plugin_test_deps += [ libplugintest_dlsym ]
+  endif
   suites += {
     'name' : 'plugins',
-    'deps' : [
-      libplugintest,
-    ],
+    'deps' : plugin_test_deps,
     'tests' : [
       'plugins.sh',
     ],

@@ -18,6 +18,10 @@
   # Significantly improves evaluation performance on allocation-heavy
   # workloads (~10-15% on large evaluations).
   withMimalloc ? !stdenv.hostPlatform.isWindows,
+
+  # Whether to embed the public C API into the `nix` executable so plugins can
+  # resolve those symbols without linking Nix libraries directly.
+  withPluginCApi ? false,
 }:
 
 let
@@ -69,6 +73,26 @@ mkMesonExecutable (finalAttrs: {
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
       (fileset.fileFilter (file: file.hasExt "md") ./.)
     ]
+    ++ lib.optionals withPluginCApi [
+      (fileset.fileFilter (file: file.hasExt "cc") ../libutil-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libutil-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libutil-c)
+      (fileset.fileFilter (file: file.hasExt "cc") ../libstore-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libstore-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libstore-c)
+      (fileset.fileFilter (file: file.hasExt "cc") ../libfetchers-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libfetchers-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libfetchers-c)
+      (fileset.fileFilter (file: file.hasExt "cc") ../libexpr-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libexpr-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libexpr-c)
+      (fileset.fileFilter (file: file.hasExt "cc") ../libflake-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libflake-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libflake-c)
+      (fileset.fileFilter (file: file.hasExt "cc") ../libmain-c)
+      (fileset.fileFilter (file: file.hasExt "h") ../libmain-c)
+      (fileset.fileFilter (file: file.hasExt "hh") ../libmain-c)
+    ]
   );
 
   buildInputs = [
@@ -81,6 +105,7 @@ mkMesonExecutable (finalAttrs: {
 
   mesonFlags = [
     (lib.mesonEnable "mimalloc" withMimalloc)
+    (lib.mesonBool "plugin-c-api" withPluginCApi)
   ];
 
   postInstall = lib.optionalString stdenv.hostPlatform.isStatic ''

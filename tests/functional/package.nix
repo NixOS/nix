@@ -89,6 +89,10 @@ mkMesonDerivation (
       "--print-errorlogs"
     ];
 
+    mesonFlags = [
+      (lib.mesonBool "plugin-c-api" true)
+    ];
+
     doCheck = true;
 
     installPhase = ''
