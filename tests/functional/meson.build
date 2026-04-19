@@ -68,6 +68,7 @@ suites = [
       'binary-cache.sh',
       'multiple-outputs.sh',
       'nix-build.sh',
+      'nix-run.sh',
       'gc-concurrent.sh',
       'repair.sh',
       'fixed.sh',
