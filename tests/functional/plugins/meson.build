@@ -10,7 +10,7 @@ libplugintest = shared_module(
   build_by_default : false,
 )
 
-if get_option('plugin-c-api')
+if get_option('plugin-c-api') and not host_machine.system().startswith('windows')
   libplugintest_dlsym = shared_module(
     'plugintest_dlsym',
     'plugintest_dlsym.cc',

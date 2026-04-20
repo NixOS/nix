@@ -1,6 +1,4 @@
-#ifndef _WIN32
-#  include <dlfcn.h>
-#endif
+#include <dlfcn.h>
 
 #include <stdexcept>
 #include <string>
@@ -23,7 +21,6 @@ void requireSymbol(void * handle, const char * symbol)
 
 extern "C" void nix_plugin_entry()
 {
-#ifndef _WIN32
     void * handle = dlopen(nullptr, RTLD_LAZY);
     if (!handle) {
         std::string message = "failed to access main executable symbols";
@@ -44,5 +41,4 @@ extern "C" void nix_plugin_entry()
     for (auto * symbol : symbols) {
         requireSymbol(handle, symbol);
     }
-#endif
 }
