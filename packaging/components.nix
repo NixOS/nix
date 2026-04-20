@@ -488,7 +488,7 @@ in
     version = fineVersion;
     nix-cli = callPackage ../src/nix/package.nix {
       version = fineVersion;
-      withPluginCApi = true;
+      withPluginCApi = !stdenv.hostPlatform.isWindows;
     };
   };
 
