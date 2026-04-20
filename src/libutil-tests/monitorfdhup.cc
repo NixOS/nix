@@ -15,9 +15,11 @@ namespace nix {
 // which sets a process-global flag.  We must clear it after each
 // test so subsequent tests that call checkInterrupt() are not
 // poisoned.
-class MonitorFdHupTest : public ::testing::Test {
+class MonitorFdHupTest : public ::testing::Test
+{
 protected:
-    void TearDown() override {
+    void TearDown() override
+    {
         setInterrupted(false);
     }
 };
