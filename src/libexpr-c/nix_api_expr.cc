@@ -19,27 +19,6 @@
 #  include <boost/unordered/concurrent_flat_map.hpp>
 #endif
 
-/**
- * @brief Allocate and initialize using self-reference
- *
- * This allows a brace initializer to reference the object being constructed.
- *
- * @warning Use with care, as the pointer points to an object that is not fully constructed yet.
- *
- * @tparam T Type to allocate
- * @tparam F A function type for `init`, taking a T* and returning the initializer for T
- * @param init Function that takes a T* and returns the initializer for T
- * @return Pointer to allocated and initialized object
- */
-template<typename T, typename F>
-static T * unsafe_new_with_self(F && init)
-{
-    // Allocate
-    void * p = ::operator new(sizeof(T), static_cast<std::align_val_t>(alignof(T)));
-    // Initialize with placement new
-    return new (p) T(init(static_cast<T *>(p)));
-}
-
 extern "C" {
 
 nix_err nix_libexpr_init(nix_c_context * context)
