@@ -308,6 +308,14 @@ struct FileTransferRequest
     }
 
     /**
+     * `uri` with any userinfo (`user:password@`) stripped, for use in
+     * progress, warning and error messages so credentials embedded in
+     * the URL don't leak into logs. Returns `uri` verbatim if it can't
+     * be parsed.
+     */
+    std::string displayUri() const;
+
+    /**
      * Returns the method description for logging purposes.
      */
     std::string verb(bool continuous = false) const
