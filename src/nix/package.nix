@@ -8,6 +8,13 @@
   nix-main,
   nix-cmd,
 
+  nix-expr-c,
+  nix-fetchers-c,
+  nix-flake-c,
+  nix-main-c,
+  nix-store-c,
+  nix-util-c,
+
   mimalloc,
 
   # Configuration Options
@@ -73,26 +80,6 @@ mkMesonExecutable (finalAttrs: {
       (fileset.fileFilter (file: file.hasExt "hh") ./.)
       (fileset.fileFilter (file: file.hasExt "md") ./.)
     ]
-    ++ lib.optionals withPluginCApi [
-      (fileset.fileFilter (file: file.hasExt "cc") ../libutil-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libutil-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libutil-c)
-      (fileset.fileFilter (file: file.hasExt "cc") ../libstore-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libstore-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libstore-c)
-      (fileset.fileFilter (file: file.hasExt "cc") ../libfetchers-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libfetchers-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libfetchers-c)
-      (fileset.fileFilter (file: file.hasExt "cc") ../libexpr-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libexpr-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libexpr-c)
-      (fileset.fileFilter (file: file.hasExt "cc") ../libflake-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libflake-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libflake-c)
-      (fileset.fileFilter (file: file.hasExt "cc") ../libmain-c)
-      (fileset.fileFilter (file: file.hasExt "h") ../libmain-c)
-      (fileset.fileFilter (file: file.hasExt "hh") ../libmain-c)
-    ]
   );
 
   buildInputs = [
@@ -100,6 +87,14 @@ mkMesonExecutable (finalAttrs: {
     nix-expr
     nix-main
     nix-cmd
+  ]
+  ++ lib.optionals withPluginCApi [
+    nix-expr-c
+    nix-fetchers-c
+    nix-flake-c
+    nix-main-c
+    nix-store-c
+    nix-util-c
   ]
   ++ lib.optional withMimalloc mimalloc;
 

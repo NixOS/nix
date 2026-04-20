@@ -31,35 +31,15 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
-plugin_c_api_sources = []
-plugin_c_api_cpp_args = []
+deps_plugin_c_apis = []
 if get_option('plugin-c-api')
-  plugin_c_api_config = configuration_data()
-  plugin_c_api_config.set_quoted('PACKAGE_VERSION', meson.project_version())
-
-  plugin_c_api_sources = [
-    configure_file(
-      configuration : plugin_c_api_config,
-      output : 'nix_api_util_config.h',
-    ),
-  ] + files(
-    'plugin-c-api/nix_api_util.cc',
-    'plugin-c-api/nix_api_store.cc',
-    'plugin-c-api/nix_api_fetchers.cc',
-    'plugin-c-api/nix_api_expr.cc',
-    'plugin-c-api/nix_api_external.cc',
-    'plugin-c-api/nix_api_value.cc',
-    'plugin-c-api/nix_api_flake.cc',
-    'plugin-c-api/nix_api_main.cc',
-  )
-
-  plugin_c_api_cpp_args = [
-    '-I' + (meson.project_source_root() / '../libutil-c'),
-    '-I' + (meson.project_source_root() / '../libstore-c'),
-    '-I' + (meson.project_source_root() / '../libfetchers-c'),
-    '-I' + (meson.project_source_root() / '../libexpr-c'),
-    '-I' + (meson.project_source_root() / '../libflake-c'),
-    '-I' + (meson.project_source_root() / '../libmain-c'),
+  deps_plugin_c_apis = [
+    dependency('nix-util-c-whole-archive'),
+    dependency('nix-store-c-whole-archive'),
+    dependency('nix-fetchers-c-whole-archive'),
+    dependency('nix-expr-c-whole-archive'),
+    dependency('nix-flake-c-whole-archive'),
+    dependency('nix-main-c-whole-archive'),
   ]
 endif
 
@@ -221,11 +201,10 @@ include_dirs = [ include_directories('.') ]
 
 this_exe = executable(
   meson.project_name(),
-  sources + plugin_c_api_sources,
-  dependencies : deps_private_subproject + deps_private + deps_other,
+  sources,
+  dependencies : deps_private_subproject + deps_private + deps_other + deps_plugin_c_apis,
   include_directories : include_dirs,
   link_args : linker_export_flags,
-  cpp_args : plugin_c_api_cpp_args,
   export_dynamic : get_option('plugin-c-api'),
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
