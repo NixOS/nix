@@ -216,6 +216,8 @@ private:
 
     std::function<void(AutoCloseFD, CanonPath)> makeDirFdCallback();
 
+    AutoCloseFD openSubdirectory(const CanonPath & path);
+
 public:
     PosixDirectorySourceAccessor(
         AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, unsigned dirFdCacheSize)
@@ -248,6 +250,10 @@ public:
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
 
     DirEntries readDirectory(const CanonPath & path) override;
+
+    void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override;
 
     std::string readLink(const CanonPath & path) override;
 
@@ -359,7 +365,7 @@ try {
     throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
-SourceAccessor::DirEntries PosixDirectorySourceAccessor::readDirectory(const CanonPath & path)
+AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & path)
 try {
     AutoCloseFD dirFdOwning;
 
@@ -379,6 +385,14 @@ try {
         }
     }
 
+    return dirFdOwning;
+} catch (SymlinkNotAllowed & e) {
+    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+SourceAccessor::DirEntries PosixDirectorySourceAccessor::readDirectory(const CanonPath & path)
+try {
+    AutoCloseFD dirFdOwning = openSubdirectory(path);
     AutoCloseDir dir(::fdopendir(dirFdOwning.get()));
     if (!dir)
         throw SysError("reading directory '%s'", showPath(path));
@@ -429,6 +443,17 @@ try {
     return entries;
 } catch (SymlinkNotAllowed & e) {
     throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+void PosixDirectorySourceAccessor::readDirectory(
+    const CanonPath & dirPath,
+    std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback)
+{
+    auto fd = openSubdirectory(dirPath);
+    PosixDirectorySourceAccessor accessor{
+        std::move(fd), fsPath / dirPath.rel(), trackLastModified, /*dirFdCacheSize=*/0};
+    callback(accessor, CanonPath::root);
+    PosixSourceAccessorBase::maybeUpdateMtime(accessor.mtime);
 }
 
 std::string PosixDirectorySourceAccessor::readLink(const CanonPath & path)

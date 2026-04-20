@@ -138,6 +138,22 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      */
     virtual DirEntries readDirectory(const CanonPath & path) = 0;
 
+    /**
+     * Variation of readDirectory that receives a SourceAccessor possibly scoped to \ref dirPath.
+     * Primary meant for recursive traversal functions that would benefit from *at-style syscalls
+     * relative to a particular directory.
+     *
+     * @note Like `readFile`, this method should *not* follow symlinks.
+     * @param callback Caller-provided function invoked with a maximally deeply scoped SourceAccessor and the path that
+     * would have to be prepended to each path relative to dirPath to access a particular file with it.
+     */
+    virtual void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback)
+    {
+        callback(*this, dirPath);
+    }
+
     virtual std::string readLink(const CanonPath & path) = 0;
 
     virtual void dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter = defaultPathFilter);
