@@ -281,7 +281,11 @@ struct curlFileTransfer : public FileTransfer
             try {
                 if (!done && enqueued)
                     fail(FileTransferError(
-                        Interrupted, {}, "%s of '%s' was interrupted", Uncolored(request.noun()), request.uri));
+                        Interrupted,
+                        {},
+                        "%s of '%s' was interrupted",
+                        Uncolored(request.noun()),
+                        request.displayUri()));
             } catch (...) {
                 ignoreExceptionInDestructor();
             }
@@ -297,7 +301,7 @@ struct curlFileTransfer : public FileTransfer
                 /* Already descriptive enough. */
             } catch (nix::Error & e) {
                 /* Add more context to the error message. */
-                e.addTrace({}, "during %s of '%s'", Uncolored(request.noun()), request.uri.to_string());
+                e.addTrace({}, "during %s of '%s'", Uncolored(request.noun()), request.displayUri());
             } catch (...) {
                 /* Can't add more context to the error. */
             }
@@ -361,7 +365,7 @@ struct curlFileTransfer : public FileTransfer
         try {
             size_t realSize = size * nmemb;
             std::string line((char *) contents, realSize);
-            printMsg(lvlVomit, "got header for '%s': %s", request.uri, trim(line));
+            printMsg(lvlVomit, "got header for '%s': %s", request.displayUri(), trim(line));
 
             static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
@@ -450,8 +454,8 @@ struct curlFileTransfer : public FileTransfer
                     *logger,
                     lvlTalkative,
                     actFileTransfer,
-                    fmt("%s '%s'", request.verb(/*continuous=*/true), request.uri),
-                    Logger::Fields{request.uri.to_string()},
+                    fmt("%s '%s'", request.verb(/*continuous=*/true), request.displayUri()),
+                    Logger::Fields{request.displayUri()},
                     request.parentAct);
                 // Reset the start time to when we actually started the download.
                 startTime = std::chrono::steady_clock::now();
@@ -716,7 +720,7 @@ struct curlFileTransfer : public FileTransfer
             debug(
                 "finished %s of '%s'; curl status = %d, HTTP status = %d, body = %d bytes, duration = %.2f s",
                 Uncolored(request.noun()),
-                request.uri,
+                request.displayUri(),
                 code,
                 httpStatus,
                 result.bodySize,
@@ -815,14 +819,14 @@ struct curlFileTransfer : public FileTransfer
                                                                                        std::move(response),
                                                                                        "%s of '%s' was interrupted",
                                                                                        Uncolored(request.noun()),
-                                                                                       request.uri)
+                                                                                       request.displayUri())
                            : httpStatus != 0
                                ? FileTransferError(
                                      err,
                                      std::move(response),
                                      "unable to %s '%s': HTTP error %d%s",
                                      Uncolored(request.verb()),
-                                     request.uri,
+                                     request.displayUri(),
                                      httpStatus,
                                      code == CURLE_OK ? "" : fmt(" (curl error: %s)", curl_easy_strerror(code)))
                                : FileTransferError(
@@ -830,7 +834,7 @@ struct curlFileTransfer : public FileTransfer
                                      std::move(response),
                                      "unable to %s '%s': %s (%d) %s",
                                      Uncolored(request.verb()),
-                                     request.uri,
+                                     request.displayUri(),
                                      curl_easy_strerror(code),
                                      code,
                                      errbuf);
@@ -1081,7 +1085,7 @@ struct curlFileTransfer : public FileTransfer
             }
 
             for (auto & item : incoming) {
-                debug("starting %s of '%s'", Uncolored(item->request.noun()), item->request.uri);
+                debug("starting %s of '%s'", Uncolored(item->request.noun()), item->request.displayUri());
                 item->init();
                 curl_multi_add_handle(curlm.get(), item->req);
                 item->active = true;
@@ -1133,7 +1137,7 @@ struct curlFileTransfer : public FileTransfer
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
             && item->request.uri.scheme() != "s3")
-            throw nix::Error("uploading to '%s' is not supported", item->request.uri.to_string());
+            throw nix::Error("uploading to '%s' is not supported", item->request.displayUri());
 
         {
             auto state(state_.lock());
@@ -1192,6 +1196,20 @@ ref<FileTransfer> getFileTransfer()
 ref<FileTransfer> makeFileTransfer(const FileTransferSettings & settings)
 {
     return makeCurlFileTransfer(settings);
+}
+
+std::string FileTransferRequest::displayUri() const
+{
+    try {
+        auto parsed = uri.parsed();
+        if (parsed.authority && parsed.authority->user) {
+            parsed.authority->user.reset();
+            parsed.authority->password.reset();
+            return parsed.to_string();
+        }
+    } catch (BadURL &) {
+    }
+    return uri.to_string();
 }
 
 void FileTransferRequest::setupForS3()
@@ -1283,7 +1301,7 @@ void FileTransfer::download(
         state->request.notify_one();
     });
 
-    request.dataCallback = [_state, uri = request.uri.to_string()](std::string_view data) -> PauseTransfer {
+    request.dataCallback = [_state, uri = request.displayUri()](std::string_view data) -> PauseTransfer {
         auto state(_state->lock());
 
         if (state->quit)
