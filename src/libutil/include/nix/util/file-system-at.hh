@@ -90,6 +90,8 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
  * @param flags (Unix) `O_*` flags (must not include `O_NOFOLLOW`)
  * @param mode (Unix) Mode for `O_{CREAT,TMPFILE}`
  *
+ * @param dirFdCallback Callback invoked that gets the ownership of an intermediate directory fd.
+ *
  * @pre `path.isRoot()` is false
  *
  * @throws SymlinkNotAllowed if an interior path component is a
@@ -118,12 +120,12 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 #ifdef _WIN32
     ACCESS_MASK desiredAccess,
     ULONG createOptions,
-    ULONG createDisposition = FILE_OPEN
+    ULONG createDisposition = FILE_OPEN,
 #else
     int flags,
-    mode_t mode = 0
+    mode_t mode = 0,
 #endif
-);
+    std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback = nullptr);
 
 #ifdef __linux__
 namespace linux {
