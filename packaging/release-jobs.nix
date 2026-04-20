@@ -1,5 +1,5 @@
 # Hydra jobset containing only the artifacts consumed by
-# `maintainers/upload-release.{pl,py}`, so a release can be cut without
+# `maintainers/upload-release.pl`, so a release can be cut without
 # waiting on the full `hydraJobs` CI matrix.
 #
 # Evaluated as a legacy (non-flake) jobset because Hydra hard-codes flake
@@ -36,8 +36,7 @@ let
     # `fallback-paths.nix` and (on x86_64-linux) the rendered manual via
     # its `doc` output.
     build.nix-everything = hydraJobs.build.nix-everything;
-    buildCross.nix-everything.riscv64-unknown-linux-gnu =
-      hydraJobs.buildCross.nix-everything.riscv64-unknown-linux-gnu;
+    buildCross.nix-everything = hydraJobs.buildCross.nix-everything;
 
     inherit (hydraJobs)
       manual
