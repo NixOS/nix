@@ -50,15 +50,7 @@ headers += files('nix_api_flake.h')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-this_static_library = static_library(
-  'nixflakec-static',
-  sources,
-  dependencies : deps_public + deps_private + deps_other,
-  include_directories : include_dirs,
-  install : true,
-)
-
-this_library = shared_library(
+this_libraries = both_libraries(
   'nixflakec',
   sources,
   soversion : nix_soversion,

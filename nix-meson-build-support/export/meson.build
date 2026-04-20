@@ -14,6 +14,14 @@ extra_pkg_config_variables = get_variable('extra_pkg_config_variables', {})
 fs = import('fs')
 plugin_c_api_enabled = get_variable('plugin_c_api_enabled', false)
 
+if plugin_c_api_enabled
+  this_libraries = get_variable('this_libraries')
+  this_library = this_libraries.get_shared_lib()
+  this_static_library = this_libraries.get_static_lib()
+else
+  this_library = get_variable('this_library')
+endif
+
 extra_cflags = []
 if not meson.project_name().endswith('-c')
   extra_cflags += [ '-std=c++23' ]
