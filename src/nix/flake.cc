@@ -1090,20 +1090,25 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 
         StorePathSet sources;
 
-        auto storePath = store->toStorePath(flake.flake.path.path.abs()).first;
+        auto getStorePath = [&](const FlakeRef & lockedRef) {
+            return dryRun ? lockedRef.input.computeStorePath(*store)
+                          : std::get<StorePath>(lockedRef.input.fetchToStore(fetchSettings, *store));
+        };
+
+        auto storePath = getStorePath(flake.flake.lockedRef);
 
         sources.insert(storePath);
 
         // FIXME: use graph output, handle cycles.
-        auto traverse = [&store, json = json, dryRun = dryRun, &sources](
+        auto traverse = [&store, json = json, &sources, &getStorePath](
                             this const auto & self, const flake::Node & node) -> nlohmann::json {
             nlohmann::json jsonObj2 = json ? nlohmann::json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
                     std::optional<StorePath> storePath;
-                    if (!(*inputNode)->lockedRef.input.isRelative()) {
-                        storePath = dryRun ? (*inputNode)->lockedRef.input.computeStorePath(*store)
-                                           : (*inputNode)->lockedRef.input.fetchToStore(fetchSettings, *store).first;
+                    const auto & lockedRef = (*inputNode)->lockedRef;
+                    if (!lockedRef.input.isRelative()) {
+                        storePath = getStorePath(lockedRef);
                         sources.insert(*storePath);
                     }
                     if (json) {
