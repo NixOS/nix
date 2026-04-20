@@ -87,6 +87,13 @@ void LocalStore::addTempRoot(const StorePath & path)
 
     createTempRootsFile();
 
+    /* Record the store path in the temporary roots file so it will be
+       seen by a future run of the garbage collector. */
+    auto s = printStorePath(path) + '\0';
+    writeFull(_fdTempRoots.lock()->get(), s);
+
+    /* Any GC *started* past this point knows about the new temproots. */
+
     /* Open/create the global GC lock file. */
     {
         auto fdGCLock(_fdGCLock.lock());
@@ -102,8 +109,9 @@ restart:
 
     if (!gcLock.acquired) {
         /* We couldn't get a shared global GC lock, so the garbage
-           collector is running. So we have to connect to the garbage
-           collector and inform it about our root. */
+           collector is running, which may have started before we
+           wrote the new temproots. So we have to connect to the
+           garbage collector and inform it about our root. */
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
@@ -148,10 +156,7 @@ restart:
         }
     }
 
-    /* Record the store path in the temporary roots file so it will be
-       seen by a future run of the garbage collector. */
-    auto s = printStorePath(path) + '\0';
-    writeFull(_fdTempRoots.lock()->get(), s);
+    /* Any GC past this point knows about the new temproots. */
 }
 
 static std::string censored = "{censored}";
