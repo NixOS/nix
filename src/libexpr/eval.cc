@@ -2583,7 +2583,7 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
             fetchSettings,
             *store,
             path.resolveSymlinks(SymlinkResolution::Ancestors),
-            settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+            settings.isReadOnly() ? FetchMode::DryRun : FetchMode::Copy,
             path.baseName(),
             ContentAddressMethod::Raw::NixArchive,
             nullptr,
