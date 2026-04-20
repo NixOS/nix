@@ -26,6 +26,7 @@ suites += {
     'nix-run.sh',
     'nix-shell.sh',
     'post-hook.sh',
+    'realisation-delete.sh',
     'recursive.sh',
     'repl.sh',
     'selfref-gc.sh',

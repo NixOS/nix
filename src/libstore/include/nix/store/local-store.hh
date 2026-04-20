@@ -340,6 +340,8 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
+    void deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs) override;
+
     /**
      * Called by `collectGarbage` to trace in reverse.
      *
