@@ -113,6 +113,10 @@ mkMesonExecutable (finalAttrs: {
     echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
   '';
 
+  passthru = {
+    exportsPluginCApi = withPluginCApi;
+  };
+
   meta = {
     mainProgram = "nix";
     platforms = lib.platforms.unix ++ lib.platforms.windows;
