@@ -140,7 +140,11 @@ struct DerivationBuilderCallbacks
  */
 struct DerivationBuilder : RestrictionContext
 {
-    DerivationBuilder() = default;
+    explicit DerivationBuilder(const StorePathSet & inputPaths)
+        : RestrictionContext(inputPaths)
+    {
+    }
+
     virtual ~DerivationBuilder() = default;
 
     /**
@@ -184,6 +188,13 @@ struct DerivationBuilder : RestrictionContext
      * killed.
      */
     virtual bool killChild() = 0;
+
+    /**
+     * Called by `DerivationBuilderDeleter` before deletion. Runs
+     * cleanup logic that needs to call virtual methods (which
+     * cannot safely be called from a destructor).
+     */
+    virtual void cleanupOnDestruction() noexcept {}
 };
 
 /**

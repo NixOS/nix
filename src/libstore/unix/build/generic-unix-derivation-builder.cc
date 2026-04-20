@@ -1,39 +1,33 @@
-#include "external-derivation-builder.hh"
+#include "generic-unix-derivation-builder.hh"
 #include "derivation-builder-common.hh"
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
 #include "nix/util/processes.hh"
+#include "nix/store/builtins.hh"
 #include "nix/store/build/child.hh"
-#include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/restricted-store.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/resource.h>
 
-#include "nix/util/strings.hh"
-
-#include <nlohmann/json.hpp>
+#if NIX_WITH_AWS_AUTH
+#  include "nix/store/aws-creds.hh"
+#endif
 
 namespace nix {
 
-struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
+struct GenericUnixDerivationBuilder : DerivationBuilder, DerivationBuilderParams, BuilderCore
 {
-    ExternalBuilder externalBuilder;
-
-    ExternalDerivationBuilder(
-        LocalStore & store,
-        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-        DerivationBuilderParams params,
-        ExternalBuilder externalBuilder)
+    GenericUnixDerivationBuilder(
+        LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilder{params.inputPaths}
         , DerivationBuilderParams{std::move(params)}
         , BuilderCore{store, std::move(miscMethods), drv}
-        , externalBuilder{std::move(externalBuilder)}
     {
-        experimentalFeatureSettings.require(Xp::ExternalBuilders);
     }
 
     void cleanupOnDestruction() noexcept override
@@ -126,92 +120,84 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams, B
 
         miscMethods->openLogFile();
 
-        nix::setupPTYMaster(
-            builderOut,
-            buildUser.get(),
-#ifdef __APPLE__
-            true
-#else
-            false
-#endif
-        );
+        nix::setupPTYMaster(builderOut, buildUser.get());
 
         buildResult.startTime = time(0);
 
         /* Start child */
         {
-            if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-                throw Error("'recursive-nix' is not supported yet by external derivation builders");
+#if NIX_WITH_AWS_AUTH
+            auto awsCredentials = nix::preResolveAwsCredentials(drv);
+#endif
 
-            auto json = nlohmann::json::object();
+            struct RunChildArgs
+            {
+                StringMap env;
+                StringMap inputRewrites;
+#if NIX_WITH_AWS_AUTH
+                std::optional<AwsCredentials> awsCredentials;
+#endif
+            };
 
-            json.emplace("version", 1);
-            json.emplace("builder", drv.builder);
-            {
-                auto l = nlohmann::json::array();
-                for (auto & i : drv.args)
-                    l.push_back(rewriteStrings(i, inputRewrites));
-                json.emplace("args", std::move(l));
-            }
-            {
-                auto j = nlohmann::json::object();
-                for (auto & [name, value] : env)
-                    j.emplace(name, rewriteStrings(value, inputRewrites));
-                json.emplace("env", std::move(j));
-            }
-            json.emplace("topTmpDir", topTmpDir.native());
-            json.emplace("tmpDir", tmpDir.native());
-            json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-            json.emplace("storeDir", store.storeDir);
-            json.emplace("realStoreDir", store.config->realStoreDir.get());
-            json.emplace("system", drv.platform);
-            {
-                auto l = nlohmann::json::array();
-                for (auto & i : inputPaths)
-                    l.push_back(store.printStorePath(i));
-                json.emplace("inputPaths", std::move(l));
-            }
-            {
-                auto l = nlohmann::json::object();
-                for (auto & i : scratchOutputs)
-                    l.emplace(i.first, store.printStorePath(i.second));
-                json.emplace("outputs", std::move(l));
-            }
+            RunChildArgs args{
+                .env = std::move(env),
+                .inputRewrites = std::move(inputRewrites),
+#if NIX_WITH_AWS_AUTH
+                .awsCredentials = std::move(awsCredentials),
+#endif
+            };
 
-            // TODO(cole-h): writing this to stdin is too much effort right now, if we want to revisit
-            // that, see this comment by Eelco about how to make it not suck:
-            // https://github.com/DeterminateSystems/nix-src/pull/141#discussion_r2205493257
-            auto jsonFile = std::filesystem::path{topTmpDir} / "build.json";
-            writeFile(jsonFile, json.dump());
+            pid = startProcess([this, args = std::move(args)]() mutable {
+                auto & env = args.env;
+                auto & inputRewrites = args.inputRewrites;
+#if NIX_WITH_AWS_AUTH
+                auto & awsCredentials = args.awsCredentials;
+#endif
 
-            pid = startProcess([&]() {
                 nix::setupPTYSlave(builderOut.get());
+
+                bool sendException = true;
 
                 try {
                     commonChildInit();
 
-                    Strings args = {externalBuilder.program};
+                    BuiltinBuilderContext ctx{
+                        .drv = drv,
+                        .hashedMirrors = settings.getLocalSettings().hashedMirrors,
+                        .tmpDirInSandbox = tmpDirInSandbox(),
+#if NIX_WITH_AWS_AUTH
+                        .awsCredentials = awsCredentials,
+#endif
+                    };
 
-                    if (!externalBuilder.args.empty()) {
-                        args.insert(args.end(), externalBuilder.args.begin(), externalBuilder.args.end());
-                    }
+                    nix::setupBuiltinFetchurlContext(ctx, drv);
 
-                    args.insert(args.end(), jsonFile);
-
-                    if (chdir(tmpDir.c_str()) == -1)
+                    if (chdir(tmpDirInSandbox().c_str()) == -1)
                         throw SysError("changing into %1%", PathFmt(tmpDir));
 
-                    nix::chownToBuilder(buildUser.get(), topTmpDir);
+                    unix::closeExtraFDs();
+
+                    struct rlimit limit = {0, RLIM_INFINITY};
+                    setrlimit(RLIMIT_CORE, &limit);
+
+                    /* Make sure the builder inherits a predictable umask. It must not be group-writable, since
+                     * registerOutputs rejects those as defense-in-depth. */
+                    umask(0022);
 
                     if (buildUser)
                         nix::dropPrivileges(*buildUser);
 
-                    debug("executing external builder: %s", concatStringsSep(" ", args));
-                    execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
+                    writeFull(STDERR_FILENO, std::string("\2\n"));
 
-                    throw SysError("executing %s", PathFmt(externalBuilder.program));
+                    sendException = false;
+
+                    if (drv.isBuiltin())
+                        nix::runBuiltinBuilder(ctx, drv, scratchOutputs, store);
+
+                    nix::execBuilder(drv, inputRewrites, env);
+
                 } catch (...) {
-                    handleChildException(true);
+                    handleChildException(sendException);
                     _exit(1);
                 }
             });
@@ -236,14 +222,10 @@ struct ExternalDerivationBuilder : DerivationBuilder, DerivationBuilderParams, B
     }
 };
 
-DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params,
-    const ExternalBuilder & handler)
+DerivationBuilderUnique makeGenericUnixDerivationBuilder(
+    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
 {
-    return DerivationBuilderUnique(
-        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
+    return DerivationBuilderUnique(new GenericUnixDerivationBuilder(store, std::move(miscMethods), std::move(params)));
 }
 
 } // namespace nix
