@@ -333,10 +333,14 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
         }
     }
 
-    AutoCloseFD parentFdOwning =
-        openFileEnsureBeneathNoSymlinks(startFd, relPath, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, std::move(cb));
-
-    return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
+    try {
+        AutoCloseFD parentFdOwning =
+            openFileEnsureBeneathNoSymlinks(startFd, relPath, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, std::move(cb));
+        return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
+    } catch (SymlinkNotAllowed & e) {
+        /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */
+        throw SymlinkNotAllowed(anchor / e.path, "path '%s' is a symlink", showPath(anchor / e.path));
+    }
 }
 
 std::optional<SourceAccessor::Stat> PosixDirectorySourceAccessor::maybeLstat(const CanonPath & path)
