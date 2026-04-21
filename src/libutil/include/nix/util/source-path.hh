@@ -114,11 +114,6 @@ struct SourcePath
         return {accessor, accessor->resolveSymlinks(path, mode)};
     }
 
-    void invalidateCache() const
-    {
-        accessor->invalidateCache(path);
-    }
-
     friend class std::hash<nix::SourcePath>;
 };
 

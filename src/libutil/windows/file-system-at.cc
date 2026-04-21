@@ -229,7 +229,13 @@ PosixStat fstat(Descriptor fd)
 }
 
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
-    Descriptor dirFd, const CanonPath & path, ACCESS_MASK desiredAccess, ULONG createOptions, ULONG createDisposition)
+    Descriptor dirFd,
+    const CanonPath & path,
+    ACCESS_MASK desiredAccess,
+    ULONG createOptions,
+    ULONG createDisposition,
+    /* FIXME: Actually call this callback. */
+    [[maybe_unused]] std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback)
 {
     assert(!path.isRoot());
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */

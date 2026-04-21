@@ -259,7 +259,7 @@ hashPath(char * algo, int base32, char * path)
     PPCODE:
         try {
             Hash h = hashPath(
-                PosixSourceAccessor::createAtRoot(path),
+                makeFSSourceAccessor(absPath(path)),
                 FileIngestionMethod::NixArchive, parseHashAlgo(algo)).first;
             auto s = h.to_string(base32 ? HashFormat::Nix32 : HashFormat::Base16, false);
             XPUSHs(sv_2mortal(newSVpv(s.c_str(), 0)));
@@ -339,7 +339,7 @@ StoreWrapper::addToStore(char * srcPath, int recursive, char * algo)
             auto method = recursive ? ContentAddressMethod::Raw::NixArchive : ContentAddressMethod::Raw::Flat;
             auto path = THIS->store->addToStore(
                 std::string(baseNameOf(srcPath)),
-                PosixSourceAccessor::createAtRoot(srcPath),
+                makeFSSourceAccessor(absPath(srcPath)),
                 method, parseHashAlgo(algo));
             XPUSHs(sv_2mortal(newSVpv(THIS->store->printStorePath(path).c_str(), 0)));
         } catch (Error & e) {

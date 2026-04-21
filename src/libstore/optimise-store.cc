@@ -153,13 +153,7 @@ void LocalStore::optimisePath_(
        Also note that if `path' is a symlink, then we're hashing the
        contents of the symlink (i.e. the result of readlink()), not
        the contents of the target (which may not even exist). */
-    Hash hash = ({
-        hashPath(
-            {make_ref<PosixSourceAccessor>(), CanonPath(path.string())},
-            FileSerialisationMethod::NixArchive,
-            HashAlgorithm::SHA256)
-            .hash;
-    });
+    Hash hash = hashPath(makeFSSourceAccessor(path), FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256).hash;
     debug("%s has hash '%s'", PathFmt(path), hash.to_string(HashFormat::Nix32, true));
 
     /* Check if this is a known hash. */

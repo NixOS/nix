@@ -140,20 +140,27 @@ void unix::fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t 
     }
 }
 
-static AutoCloseFD
-openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
+    Descriptor dirFd,
+    const CanonPath & path,
+    int flags,
+    mode_t mode,
+    std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback)
 {
     AutoCloseFD parentFd;
     auto nrComponents = std::ranges::distance(path);
     assert(nrComponents >= 1);
     auto components = std::views::take(path, nrComponents - 1); /* Everything but last component */
     auto getParentFd = [&]() { return parentFd ? parentFd.get() : dirFd; };
+    auto currentRelPath = CanonPath::root;
 
     /* This rather convoluted loop is necessary to avoid TOCTOU when validating that
        no inner path component is a symlink. */
     for (auto it = components.begin(); it != components.end(); ++it) {
         auto component = std::string(*it);                        /* Copy into a string to make NUL terminated. */
         assert(component != ".." && !component.starts_with('/')); /* In case invariant is broken somehow.. */
+        auto prevRelPath = currentRelPath;
+        currentRelPath = currentRelPath / *it;
 
         AutoCloseFD parentFd2 = ::openat(
             getParentFd(), /* First iteration uses dirFd. */
@@ -188,6 +195,9 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
             return AutoCloseFD{};
         }
 
+        if (dirFdCallback && parentFd)
+            dirFdCallback(std::move(parentFd), std::move(prevRelPath));
+
         parentFd = std::move(parentFd2);
     }
 
@@ -221,7 +231,12 @@ openFileEnsureBeneathNoSymlinksIterative(Descriptor dirFd, const CanonPath & pat
     return res;
 }
 
-AutoCloseFD openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode)
+AutoCloseFD openFileEnsureBeneathNoSymlinks(
+    Descriptor dirFd,
+    const CanonPath & path,
+    int flags,
+    mode_t mode,
+    std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback)
 {
     /* Just in case the invariant is somehow broken. */
     assert(!path.rel().starts_with('/'));
@@ -263,7 +278,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & 
     }
 #endif
 
-    return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode);
+    return openFileEnsureBeneathNoSymlinksIterative(dirFd, path, flags, mode, std::move(dirFdCallback));
 }
 
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
