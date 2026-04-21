@@ -660,21 +660,6 @@ bool isExecutableFileAmbient(const std::filesystem::path & exe)
                   == 0;
 }
 
-std::filesystem::path makeParentCanonical(const std::filesystem::path & rawPath)
-{
-    std::filesystem::path path(absPath(rawPath));
-    try {
-        auto parent = path.parent_path();
-        if (parent == path) {
-            // `path` is a root directory => trivially canonical
-            return parent;
-        }
-        return std::filesystem::canonical(parent) / path.filename();
-    } catch (std::filesystem::filesystem_error & e) {
-        throw SystemError(e.code(), "canonicalising parent path of %1%", PathFmt(path));
-    }
-}
-
 void chmod(const std::filesystem::path & path, mode_t mode)
 {
     if (

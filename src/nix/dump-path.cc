@@ -61,7 +61,7 @@ struct CmdDumpPath2 : Command
     void run() override
     {
         auto sink = getNarSink();
-        dumpPath(path.string(), sink);
+        dumpPath(path, sink);
         sink.flush();
     }
 };
