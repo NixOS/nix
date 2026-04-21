@@ -1502,9 +1502,11 @@ ref<GitRepo> Settings::getTarballCache() const
 
 } // namespace fetchers
 
+static Sync<std::map<std::filesystem::path, GitRepo::WorkdirInfo>> workdirInfoCache_;
+
 GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path & path)
 {
-    static Sync<std::map<std::filesystem::path, WorkdirInfo>> _cache;
+    auto & _cache = workdirInfoCache_;
     {
         auto cache(_cache.lock());
         auto i = cache->find(path);
@@ -1514,6 +1516,11 @@ GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path &
     auto workdirInfo = GitRepo::openRepo(path, {})->getWorkdirInfo();
     _cache.lock()->emplace(path, workdirInfo);
     return workdirInfo;
+}
+
+void GitRepo::invalidateWorkdirInfoCache()
+{
+    workdirInfoCache_.lock()->clear();
 }
 
 bool isLegalRefName(const std::string & refName)

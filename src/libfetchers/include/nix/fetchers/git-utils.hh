@@ -88,6 +88,9 @@ struct GitRepo
 
     static WorkdirInfo getCachedWorkdirInfo(const std::filesystem::path & path);
 
+    /* Drop all entries from the getCachedWorkdirInfo() cache. */
+    static void invalidateWorkdirInfoCache();
+
     /* Get the ref that HEAD points to. */
     virtual std::optional<std::string> getWorkdirRef() = 0;
 

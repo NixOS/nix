@@ -281,6 +281,62 @@ exec 3>&- # Close fifo
 wait $repl_pid # Wait for process to finish
 grep -q "afterChange" repl_output
 
+# Regression: `:reload` on a flake loaded from a *git* work tree must pick up
+# uncommitted changes. Guards against the per-process workdir-info cache
+# pinning the tree to the rev seen on first load.
+if [[ $(type -p git) ]]; then
+    createGitRepo gitflake
+    cat > gitflake/flake.nix <<EOF
+{ outputs = { self }: { changingThing = "beforeChange"; }; }
+EOF
+    git -C gitflake add flake.nix
+    git -C gitflake commit -m init
+
+    rm -f repl_fifo repl_output
+    mkfifo repl_fifo
+    touch repl_output
+    nix repl ./gitflake --experimental-features 'flakes' < repl_fifo >> repl_output 2>&1 &
+    repl_pid=$!
+    exec 3>repl_fifo
+    echo "changingThing" >&3
+    for _ in $(seq 1 1000); do
+        grep -q "beforeChange" repl_output && break
+        sleep 0.1
+    done
+    grep -q "beforeChange" repl_output || fail "git flake didn't load"
+    sed -i 's/beforeChange/afterChange/' gitflake/flake.nix
+    echo ":reload" >&3
+    echo "changingThing" >&3
+    echo "exit" >&3
+    exec 3>&-
+    wait $repl_pid
+    grep -q "afterChange" repl_output || fail ":reload didn't pick up git work tree change"
+fi
+
+# Regression: a failed `:l` / `:lf` must not be remembered for `:reload`,
+# and an error in one loaded file must not drop later ones from the reload list.
+cat > reloadA.nix <<EOF
+{ fromA = 1; }
+EOF
+cat > reloadB.nix <<EOF
+{ fromB = 2; }
+EOF
+testReplResponseNoRegex '
+:l reloadA.nix
+:l ./does-not-exist.nix
+:l reloadB.nix
+:r
+fromA + fromB
+' '3'
+# Same for flakes.
+testReplResponseNoRegex '
+:lf ./does-not-exist-flake
+:lf ./flake
+:r
+foo
+' '1' \
+    --experimental-features 'flakes'
+
 # Test recursive printing and formatting
 # Normal output should print attributes in lexicographical order non-recursively
 testReplResponseNoRegex '

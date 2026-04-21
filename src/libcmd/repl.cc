@@ -688,21 +688,19 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
 void NixRepl::loadFile(const std::filesystem::path & path)
 {
-    loadedFiles.remove(path);
-    loadedFiles.push_back(path);
     Value v, v2;
     state->evalFile(lookupFileArg(*state, path.string()), v);
     state->autoCallFunction(*autoArgs, v, v2);
     addAttrsToScope(v2);
+    // Remember for :reload only on success.
+    loadedFiles.remove(path);
+    loadedFiles.push_back(path);
 }
 
 void NixRepl::loadFlake(const std::string & flakeRefS)
 {
     if (flakeRefS.empty())
         throw Error("cannot use ':load-flake' without a path specified. (Use '.' for the current working directory.)");
-
-    loadedFlakes.remove(flakeRefS);
-    loadedFlakes.push_back(flakeRefS);
 
     std::filesystem::path cwd;
     try {
@@ -730,6 +728,10 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
             }),
         v);
     addAttrsToScope(v);
+
+    // Remember for :reload only on success.
+    loadedFlakes.remove(flakeRefS);
+    loadedFlakes.push_back(flakeRefS);
 }
 
 void NixRepl::initEnv()
@@ -772,28 +774,44 @@ void NixRepl::reloadFilesAndFlakes()
 
 void NixRepl::loadFiles()
 {
-    decltype(loadedFiles) old = loadedFiles;
-    loadedFiles.clear();
+    // loadFile() rebuilds loadedFiles; keep failed entries and continue.
+    decltype(loadedFiles) old;
+    std::swap(old, loadedFiles);
 
     for (auto & i : old) {
         notice("Loading %1%...", PathFmt(i));
-        loadFile(i);
+        try {
+            loadFile(i);
+        } catch (Error & e) {
+            loadedFiles.push_back(i);
+            printMsg(lvlError, e.msg());
+        }
     }
 
     for (auto & [i, what] : getValues()) {
         notice("Loading installable '%1%'...", what);
-        addAttrsToScope(*i);
+        try {
+            addAttrsToScope(*i);
+        } catch (Error & e) {
+            printMsg(lvlError, e.msg());
+        }
     }
 }
 
 void NixRepl::loadFlakes()
 {
-    Strings old = loadedFlakes;
-    loadedFlakes.clear();
+    // See loadFiles().
+    Strings old;
+    std::swap(old, loadedFlakes);
 
     for (auto & i : old) {
         notice("Loading flake '%1%'...", i);
-        loadFlake(i);
+        try {
+            loadFlake(i);
+        } catch (Error & e) {
+            loadedFlakes.push_back(i);
+            printMsg(lvlError, e.msg());
+        }
     }
 }
 
