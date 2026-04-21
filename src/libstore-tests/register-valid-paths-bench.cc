@@ -22,7 +22,7 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
 
         auto tmpRoot = createTempDir();
         auto realStoreDir = tmpRoot / "nix/store";
-        std::filesystem::create_directories(realStoreDir);
+        createDirs(realStoreDir);
 
         std::shared_ptr<Store> store = openStore(fmt("local?root=%s", tmpRoot.string()));
         auto localStore = std::dynamic_pointer_cast<LocalStore>(store);

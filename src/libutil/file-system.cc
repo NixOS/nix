@@ -393,7 +393,7 @@ void createDir(const std::filesystem::path & path, mode_t mode)
 void createDirs(const std::filesystem::path & path)
 {
     try {
-        std::filesystem::create_directories(path);
+        std::filesystem::create_directories(path); // NOLINT(bugprone-unsafe-functions)
     } catch (std::filesystem::filesystem_error & e) {
         throw SystemError(e.code(), "creating directory %1%", PathFmt(path));
     }
