@@ -96,6 +96,13 @@ if nix-build multiple-outputs.nix -A cyclic --no-out-link; then
     exit 1
 fi
 
+# TODO inspect why this doesn't work with floating content-addressing
+# derivations.
+if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
+    expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
+    expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'
+fi
+
 # Do a GC. This should leave an empty store.
 echo "collecting garbage..."
 rm "$TEST_ROOT"/result*
@@ -103,10 +110,3 @@ nix-store --gc --keep-derivations --keep-outputs
 nix-store --gc --print-roots
 rm -rf "$NIX_STORE_DIR"/.links
 rmdir "$NIX_STORE_DIR"
-
-# TODO inspect why this doesn't work with floating content-addressing
-# derivations.
-if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
-    expect 1 nix build -f multiple-outputs.nix invalid-output-name-1 2>&1 | grep 'contains illegal character'
-    expect 1 nix build -f multiple-outputs.nix invalid-output-name-2 2>&1 | grep 'contains illegal character'
-fi
