@@ -8,6 +8,7 @@
 # and share builds through the binary cache.
 #
 # Hydra jobset configuration:
+#   Identifier:      maintenance-<X.Y>-release
 #   Type:            Legacy
 #   Nix expression:  packaging/release-jobs.nix in input `src`
 #   Inputs:
@@ -36,7 +37,13 @@ let
     # `fallback-paths.nix` and (on x86_64-linux) the rendered manual via
     # its `doc` output.
     build.nix-everything = hydraJobs.build.nix-everything;
-    buildCross.nix-everything = hydraJobs.buildCross.nix-everything;
+    buildCross.nix-everything = {
+      # Only the cross targets that end up in `fallback-paths.nix`.
+      inherit (hydraJobs.buildCross.nix-everything)
+        riscv64-unknown-linux-gnu
+        x86_64-unknown-freebsd
+        ;
+    };
 
     inherit (hydraJobs)
       manual
