@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       eval_id:
-        description: "Hydra evaluation ID"
+        description: "Hydra evaluation ID (from the maintenance-X.Y-release jobset)"
         required: true
         type: number
       is_latest:
