@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include <exception> // Needed by rapidcheck on Darwin
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck/gen/Arbitrary.h>
 
 #include "nix/store/outputs-spec.hh"
