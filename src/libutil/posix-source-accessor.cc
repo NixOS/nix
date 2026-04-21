@@ -293,15 +293,42 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
 
     maybeEvictFromGlobalCaches();
 
+    std::shared_ptr<AutoCloseFD> intermediateParentFd;
+    CanonPath anchor = CanonPath::root;
+
     if (dirFdCache) {
-        if (auto cachedFd = dirFdCache->lock()->get(parent)) {
-            assert((*cachedFd)->get());
-            return {(*cachedFd)->get(), *cachedFd};
+        auto cache = dirFdCache->lock();
+        auto p = parent;
+        while (true) {
+            if (auto intermediateDirFdHit = cache->get(p)) {
+                if (p == parent)
+                    return {(*intermediateDirFdHit)->get(), *intermediateDirFdHit};
+                intermediateParentFd = intermediateDirFdHit->get_ptr();
+                anchor = p;
+                break;
+            }
+            if (p.isRoot())
+                break;
+            p.pop();
         }
     }
 
-    AutoCloseFD parentFdOwning = openFileEnsureBeneathNoSymlinks(
-        dirFd.get(), parent, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, makeDirFdCallback());
+    Descriptor startFd = intermediateParentFd ? intermediateParentFd->get() : dirFd.get();
+    CanonPath relPath = intermediateParentFd ? parent.removePrefix(anchor) : parent;
+
+    std::function<void(AutoCloseFD, CanonPath)> cb;
+    if (auto base = makeDirFdCallback()) {
+        if (intermediateParentFd) {
+            cb = [base = std::move(base), prefix = anchor](AutoCloseFD fd, CanonPath relKey) {
+                base(std::move(fd), prefix / relKey);
+            };
+        } else {
+            cb = std::move(base);
+        }
+    }
+
+    AutoCloseFD parentFdOwning =
+        openFileEnsureBeneathNoSymlinks(startFd, relPath, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, std::move(cb));
 
     return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
 }
