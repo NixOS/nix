@@ -208,6 +208,13 @@ private:
     }
 
     /**
+     * Helper for opening the parent directory used for other FD-relative operations down the line.
+     * Also caches the resulting dirFd. Throws FileNotFound if some intermediate directory or the parent
+     * doesn't exist.
+     */
+    std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParentAndUpsert(const CanonPath & path, bool ignoreMissing);
+
+    /**
      * Get the parent directory of path. The second pair element might be an owning file descriptor
      * if path.parent().isRoot() is false.
      */
@@ -343,25 +350,39 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
     }
 }
 
+std::pair<Descriptor, std::shared_ptr<AutoCloseFD>>
+PosixDirectorySourceAccessor::openParentAndUpsert(const CanonPath & path, bool ignoreMissing)
+{
+    auto [parentFd, parentFdOwning] = openParent(path);
+    if (parentFd == INVALID_DESCRIPTOR) {
+        if (errno == ENOENT || errno == ENOTDIR) /* Intermediate component might not exist. */ {
+            if (ignoreMissing)
+                return {INVALID_DESCRIPTOR, {}};
+            else
+                throw FileNotFound("path '%s' does not exist", showPath(path));
+        }
+        throw SysError("opening directory '%1%'", showPath(path.parent().value()));
+    }
+
+    if (dirFdCache && parentFdOwning) {
+        assert(*parentFdOwning);
+        insertIntoDirFdCache(path.parent().value(), ref<AutoCloseFD>(parentFdOwning));
+    }
+
+    return {parentFd, parentFdOwning};
+}
+
 std::optional<SourceAccessor::Stat> PosixDirectorySourceAccessor::maybeLstat(const CanonPath & path)
-try {
+{
     PosixStat st;
 
     if (path.isRoot()) {
         /* Must never fail - we already have the file descriptor for the directory. */
         st = nix::fstat(dirFd.get());
     } else {
-        auto [parentFd, parentFdOwning] = openParent(path);
-        if (parentFd == INVALID_DESCRIPTOR) {
-            if (errno == ENOENT || errno == ENOTDIR)
-                return std::nullopt;
-            throw SysError("opening directory '%1%'", showPath(path.parent().value()));
-        }
-
-        if (dirFdCache && parentFdOwning) {
-            assert(*parentFdOwning);
-            insertIntoDirFdCache(path.parent().value(), ref<AutoCloseFD>(parentFdOwning));
-        }
+        auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/true);
+        if (parentFd == INVALID_DESCRIPTOR)
+            return std::nullopt;
 
         /* We know that CanonPath returns a NUL-terminated string_view, so the use of ->data() here is safe. */
         if (::fstatat(parentFd, path.baseName()->data(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
@@ -373,20 +394,26 @@ try {
 
     maybeUpdateMtime(st.st_mtime);
     return sourceAccessorStatFromPosixStat(st);
-} catch (SymlinkNotAllowed & e) {
-    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
 void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
-try {
+{
     if (path.isRoot())
         throw NotARegularFile("'%s' is not a regular file", showPath(path));
 
-    AutoCloseFD fileFd =
-        openFileEnsureBeneathNoSymlinks(dirFd.get(), path, O_RDONLY | O_CLOEXEC, /*mode=*/0, makeDirFdCallback());
+    /* TODO: We can do better when we have openat2. */
+    auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
+    AutoCloseFD fileFd;
+
+    try {
+        fileFd = openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_RDONLY | O_CLOEXEC);
+    } catch (SymlinkNotAllowed & e) {
+        auto parent = path.parent().value();
+        throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+    }
 
     if (!fileFd) {
-        if (errno == ENOENT || errno == ENOTDIR) /* Intermediate component might not exist. */
+        if (errno == ENOENT)
             throw FileNotFound("file '%s' does not exist", showPath(path));
         throw SysError("opening '%s'", showPath(path));
     }
@@ -397,12 +424,10 @@ try {
     PosixFileSourceAccessor fileAccessor(std::move(fileFd), fsPath / path.rel(), trackLastModified, st);
     maybeUpdateMtime(st.st_mtime);
     fileAccessor.readFile(CanonPath::root, sink, sizeCallback);
-} catch (SymlinkNotAllowed & e) {
-    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
 AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & path)
-try {
+{
     AutoCloseFD dirFdOwning;
 
     if (path.isRoot()) {
@@ -411,8 +436,16 @@ try {
         if (!dirFdOwning)
             throw SysError("opening directory '%s'", showPath(path));
     } else {
-        dirFdOwning = openFileEnsureBeneathNoSymlinks(
-            dirFd.get(), path, O_DIRECTORY | O_RDONLY | O_CLOEXEC, /*mode=*/0, makeDirFdCallback());
+        /* TODO: We can do better when we have openat2. */
+        auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
+
+        try {
+            dirFdOwning =
+                openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+        } catch (SymlinkNotAllowed & e) {
+            auto parent = path.parent().value();
+            throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+        }
 
         if (!dirFdOwning) {
             if (errno == ENOTDIR)
@@ -422,8 +455,6 @@ try {
     }
 
     return dirFdOwning;
-} catch (SymlinkNotAllowed & e) {
-    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
 SourceAccessor::DirEntries PosixDirectorySourceAccessor::readDirectory(const CanonPath & path)
@@ -497,17 +528,7 @@ try {
     if (path.isRoot())
         throw NotASymlink("file '%s' is not a symlink", showPath(path));
 
-    auto [parentFd, parentFdOwning] = openParent(path);
-    if (parentFd == INVALID_DESCRIPTOR) {
-        if (errno == ENOENT || errno == ENOTDIR)
-            throw FileNotFound("path '%s' does not exist", showPath(path));
-        throw SysError("opening directory '%1%'", showPath(path.parent().value()));
-    }
-
-    if (dirFdCache && parentFdOwning) {
-        assert(*parentFdOwning);
-        insertIntoDirFdCache(path.parent().value(), ref<AutoCloseFD>(parentFdOwning));
-    }
+    auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
 
     try {
         return readLinkAt(parentFd, CanonPath(path.baseName().value()));
