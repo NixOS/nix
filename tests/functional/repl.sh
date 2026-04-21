@@ -281,6 +281,30 @@ exec 3>&- # Close fifo
 wait $repl_pid # Wait for process to finish
 grep -q "afterChange" repl_output
 
+# Regression: a failed `:l` / `:lf` must not be remembered for `:reload`,
+# and an error in one loaded file must not drop later ones from the reload list.
+cat > reloadA.nix <<EOF
+{ fromA = 1; }
+EOF
+cat > reloadB.nix <<EOF
+{ fromB = 2; }
+EOF
+testReplResponseNoRegex '
+:l reloadA.nix
+:l ./does-not-exist.nix
+:l reloadB.nix
+:r
+fromA + fromB
+' '3'
+# Same for flakes.
+testReplResponseNoRegex '
+:lf ./does-not-exist-flake
+:lf ./flake
+:r
+foo
+' '1' \
+    --experimental-features 'flakes'
+
 # Test recursive printing and formatting
 # Normal output should print attributes in lexicographical order non-recursively
 testReplResponseNoRegex '
