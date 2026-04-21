@@ -278,7 +278,8 @@ ref<SourceAccessor> getFSSourceAccessor();
  *
  * Symlinks in parents of `root` are resolved. Final symlink is not.
  */
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
+ref<SourceAccessor> makeFSSourceAccessor(
+    std::filesystem::path root, bool trackLastModified = false, FinalSymlink finalSymlink = FinalSymlink::DontFollow);
 
 /**
  * Construct an accessor that presents a "union" view of a vector of

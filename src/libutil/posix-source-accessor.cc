@@ -661,14 +661,14 @@ ref<SourceAccessor> getFSSourceAccessor()
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
 {
 #ifndef _WIN32
     assert(root.is_absolute());
-    AutoCloseFD fd = openFileReadonly(root, FinalSymlink::DontFollow);
+    AutoCloseFD fd = openFileReadonly(root, finalSymlink);
 
     if (!fd) {
-        if (errno != ELOOP)
+        if (finalSymlink == FinalSymlink::Follow || errno != ELOOP)
             throw NativeSysError("opening file %1%", PathFmt(root));
 
         /* A helper class that holds the symlink destination in memory. */
