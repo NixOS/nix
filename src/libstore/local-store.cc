@@ -1365,7 +1365,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                 printError(
                     "link %s was modified! expected hash %s, got '%s'", PathFmt(link.path()), name.string(), hash);
                 if (repair) {
-                    std::filesystem::remove(link.path());
+                    unlinkIfExists(link.path());
                     printInfo("removed link %s", PathFmt(link.path()));
                 } else {
                     errors = true;

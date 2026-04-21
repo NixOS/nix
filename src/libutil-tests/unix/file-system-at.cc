@@ -42,8 +42,6 @@ TEST(fchmodatTryNoFollow, works)
     auto dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
     ASSERT_TRUE(dirFd);
 
-    struct ::stat st;
-
     using nix::testing::ThrowsSysError;
 
     /* Check that symlinks are not followed and targets are not changed.
@@ -82,22 +80,18 @@ TEST(fchmodatTryNoFollow, works)
     };
 
     expectSymlinkChmod("filelink", 0777);
-    ASSERT_EQ(stat((tmpDir / "file").c_str(), &st), 0);
-    EXPECT_EQ(st.st_mode & 0777, 0644);
+    ASSERT_EQ(stat(tmpDir / "file").st_mode & 0777, 0644);
 
     expectSymlinkChmod("dirlink", 0777);
-    ASSERT_EQ(stat((tmpDir / "dir").c_str(), &st), 0);
-    EXPECT_EQ(st.st_mode & 0777, 0755);
+    ASSERT_EQ(stat(tmpDir / "dir").st_mode & 0777, 0755);
 
     /* Check fchmodatTryNoFollow works on regular files and directories. */
 
     EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), CanonPath("file"), 0600));
-    ASSERT_EQ(stat((tmpDir / "file").c_str(), &st), 0);
-    EXPECT_EQ(st.st_mode & 0777, 0600);
+    ASSERT_EQ(stat(tmpDir / "file").st_mode & 0777, 0600);
 
     EXPECT_NO_THROW(fchmodatTryNoFollow(dirFd.get(), CanonPath("dir"), 0700));
-    ASSERT_EQ(stat((tmpDir / "dir").c_str(), &st), 0);
-    EXPECT_EQ(st.st_mode & 0777, 0700);
+    ASSERT_EQ(stat(tmpDir / "dir").st_mode & 0777, 0700);
 
     EXPECT_THAT([&] { fchmodatTryNoFollow(dirFd.get(), CanonPath("nonexistent"), 0600); }, ThrowsSysError(ENOENT));
 }

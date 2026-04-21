@@ -22,13 +22,10 @@ public:
     };
 
     ~nix_api_store_test_base() override
-    {
-        if (exists(std::filesystem::path{nixDir})) {
-            for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-            }
-            std::filesystem::remove_all(nixDir);
-        }
+    try {
+        nix::deletePath(nixDir);
+    } catch (...) {
+        nix::ignoreExceptionInDestructor();
     }
 
     std::string nixDir;

@@ -95,19 +95,10 @@ std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::pa
     return generation;
 }
 
-static void removeFile(const std::filesystem::path & path)
-{
-    try {
-        std::filesystem::remove(path);
-    } catch (std::filesystem::filesystem_error & e) {
-        throw SystemError(e.code(), "removing file %1%", PathFmt(path));
-    }
-}
-
 void deleteGeneration(const std::filesystem::path & profile, GenerationNumber gen)
 {
     std::filesystem::path generation = makeName(profile, gen);
-    removeFile(generation);
+    unlinkIfExists(generation);
 }
 
 /**

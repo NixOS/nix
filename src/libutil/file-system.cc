@@ -679,6 +679,14 @@ void chmod(const std::filesystem::path & path, mode_t mode)
 #  define UNLINK_PROC ::unlink
 #endif
 
+void unlinkIfExists(const std::filesystem::path & path)
+{
+    if (UNLINK_PROC(path.c_str()) == -1) {
+        if (errno != ENOENT)
+            throw SysError("removing %s", PathFmt(path));
+    }
+}
+
 void unlink(const std::filesystem::path & path)
 {
     if (UNLINK_PROC(path.c_str()) == -1)

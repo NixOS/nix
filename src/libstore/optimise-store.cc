@@ -164,7 +164,7 @@ void LocalStore::optimisePath_(
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
 
     /* Maybe delete the link, if it has been corrupted. */
-    if (std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
+    if (pathExists(linkPath)) {
         auto stLink = lstat(linkPath);
         if (st.st_size != stLink.st_size || (repair && hash != ({
                                                            hashPath(
@@ -178,11 +178,11 @@ void LocalStore::optimisePath_(
             warn(
                 "There may be more corrupted paths."
                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
-            std::filesystem::remove(linkPath);
+            unlinkIfExists(linkPath);
         }
     }
 
-    if (!std::filesystem::exists(std::filesystem::symlink_status(linkPath))) {
+    if (!pathExists(linkPath)) {
         /* Nope, create a hard link in the links directory. */
         try {
             std::filesystem::create_hard_link(path, linkPath);

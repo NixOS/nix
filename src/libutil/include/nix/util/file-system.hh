@@ -515,6 +515,13 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group);
 void unlink(const std::filesystem::path & path);
 
 /**
+ * Remove a file, throwing an exception on error. ENOENT is ignored.
+ *
+ * @param path Path to the file to remove.
+ */
+void unlinkIfExists(const std::filesystem::path & path);
+
+/**
  * Try to remove a file, ignoring errors.
  *
  * @param path Path to the file to try to remove.
