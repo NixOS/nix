@@ -30,9 +30,13 @@ endif
 whole_archive_dep_name = meson.project_name() + '-whole-archive'
 installed_whole_archive_link_arg = ''
 if plugin_c_api_enabled and host_machine.system() == 'darwin'
-  installed_whole_archive_link_arg = '-Wl,-force_load,${libdir}/' + fs.name(this_static_library.full_path())
+  installed_whole_archive_link_arg = '-Wl,-force_load,${libdir}/' + fs.name(
+    this_static_library.full_path(),
+  )
 elif plugin_c_api_enabled and not host_machine.system().startswith('windows')
-  installed_whole_archive_link_arg = '-Wl,--whole-archive,${libdir}/' + fs.name(this_static_library.full_path()) + ',--no-whole-archive'
+  installed_whole_archive_link_arg = '-Wl,--whole-archive,${libdir}/' + fs.name(
+    this_static_library.full_path(),
+  ) + ',--no-whole-archive'
 endif
 
 import('pkgconfig').generate(

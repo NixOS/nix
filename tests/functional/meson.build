@@ -207,7 +207,9 @@ if nix_expr.found() and get_option('default_library') != 'static'
   add_languages('cpp')
   subdir('plugins')
   plugin_test_deps = [ libplugintest ]
-  if get_option('plugin-c-api') and not host_machine.system().startswith('windows')
+  if get_option('plugin-c-api') and not host_machine.system().startswith(
+    'windows',
+  )
     plugin_test_deps += [ libplugintest_dlsym ]
   endif
   suites += {
