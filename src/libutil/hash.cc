@@ -2,8 +2,7 @@
 
 #include <blake3.h>
 #include <openssl/crypto.h>
-#include <openssl/md5.h>
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #include "nix/util/args.hh"
 #include "nix/util/hash.hh"
@@ -288,24 +287,34 @@ Hash newHashAllowEmpty(std::string_view hashStr, std::optional<HashAlgorithm> ha
 union Hash::Ctx
 {
     blake3_hasher blake3;
-    MD5_CTX md5;
-    SHA_CTX sha1;
-    SHA256_CTX sha256;
-    SHA512_CTX sha512;
+    EVP_MD_CTX * evp;
 };
+
+static const EVP_MD * getEVPAlgo(HashAlgorithm ha)
+{
+    switch (ha) {
+    case HashAlgorithm::BLAKE3:
+        return nullptr;
+    case HashAlgorithm::MD5:
+        return EVP_md5();
+    case HashAlgorithm::SHA1:
+        return EVP_sha1();
+    case HashAlgorithm::SHA256:
+        return EVP_sha256();
+    case HashAlgorithm::SHA512:
+        return EVP_sha512();
+    }
+    return nullptr;
+}
 
 static void start(HashAlgorithm ha, Hash::Ctx & ctx)
 {
-    if (ha == HashAlgorithm::BLAKE3)
+    if (ha == HashAlgorithm::BLAKE3) {
         blake3_hasher_init(&ctx.blake3);
-    else if (ha == HashAlgorithm::MD5)
-        MD5_Init(&ctx.md5);
-    else if (ha == HashAlgorithm::SHA1)
-        SHA1_Init(&ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256)
-        SHA256_Init(&ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512)
-        SHA512_Init(&ctx.sha512);
+    } else {
+        ctx.evp = EVP_MD_CTX_new();
+        EVP_DigestInit_ex(ctx.evp, getEVPAlgo(ha), nullptr);
+    }
 }
 
 // BLAKE3 data size threshold beyond which parallel hashing with TBB is likely faster.
@@ -333,28 +342,19 @@ static void update(HashAlgorithm ha, Hash::Ctx & ctx, std::string_view data)
 {
     if (ha == HashAlgorithm::BLAKE3)
         blake3_hasher_update_with_heuristics(&ctx.blake3, data);
-    else if (ha == HashAlgorithm::MD5)
-        MD5_Update(&ctx.md5, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA1)
-        SHA1_Update(&ctx.sha1, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA256)
-        SHA256_Update(&ctx.sha256, data.data(), data.size());
-    else if (ha == HashAlgorithm::SHA512)
-        SHA512_Update(&ctx.sha512, data.data(), data.size());
+    else
+        EVP_DigestUpdate(ctx.evp, data.data(), data.size());
 }
 
 static void finish(HashAlgorithm ha, Hash::Ctx & ctx, unsigned char * hash)
 {
-    if (ha == HashAlgorithm::BLAKE3)
+    if (ha == HashAlgorithm::BLAKE3) {
         blake3_hasher_finalize(&ctx.blake3, hash, BLAKE3_OUT_LEN);
-    else if (ha == HashAlgorithm::MD5)
-        MD5_Final(hash, &ctx.md5);
-    else if (ha == HashAlgorithm::SHA1)
-        SHA1_Final(hash, &ctx.sha1);
-    else if (ha == HashAlgorithm::SHA256)
-        SHA256_Final(hash, &ctx.sha256);
-    else if (ha == HashAlgorithm::SHA512)
-        SHA512_Final(hash, &ctx.sha512);
+    } else {
+        unsigned int len;
+        EVP_DigestFinal_ex(ctx.evp, hash, &len);
+        EVP_MD_CTX_free(ctx.evp);
+    }
 }
 
 Hash hashString(HashAlgorithm ha, std::string_view s, const ExperimentalFeatureSettings & xpSettings)
@@ -385,6 +385,9 @@ HashSink::HashSink(HashAlgorithm ha)
 HashSink::~HashSink()
 {
     bufPos = 0;
+    if (ha != HashAlgorithm::BLAKE3 && ctx->evp) {
+        EVP_MD_CTX_free(ctx->evp);
+    }
     delete ctx;
 }
 
@@ -399,12 +402,23 @@ HashResult HashSink::finish()
     flush();
     Hash hash(ha);
     nix::finish(ha, *ctx, hash.hash);
+    if (ha != HashAlgorithm::BLAKE3)
+        ctx->evp = nullptr; // already freed by nix::finish
     return HashResult(hash, bytes);
 }
 
 HashResult HashSink::currentHash()
 {
     flush();
+    if (ha != HashAlgorithm::BLAKE3) {
+        EVP_MD_CTX * ctx2 = EVP_MD_CTX_new();
+        EVP_MD_CTX_copy_ex(ctx2, ctx->evp);
+        Hash hash(ha);
+        unsigned int len;
+        EVP_DigestFinal_ex(ctx2, hash.hash, &len);
+        EVP_MD_CTX_free(ctx2);
+        return HashResult(hash, bytes);
+    }
     Hash::Ctx ctx2 = *ctx;
     Hash hash(ha);
     nix::finish(ha, ctx2, hash.hash);
