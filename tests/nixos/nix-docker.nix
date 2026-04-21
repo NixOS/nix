@@ -1,4 +1,4 @@
-# Test the container built by ../../docker.nix.
+# Test the container built by ../../packaging/docker.nix.
 
 {
   config,
@@ -8,8 +8,8 @@
 let
   pkgs = config.nodes.machine.nixpkgs.pkgs;
 
-  nixImage = pkgs.callPackage ../../docker.nix { };
-  nixUserImage = pkgs.callPackage ../../docker.nix {
+  nixImage = pkgs.callPackage ../../packaging/docker.nix { };
+  nixUserImage = pkgs.callPackage ../../packaging/docker.nix {
     name = "nix-user";
     uid = 1000;
     gid = 1000;
