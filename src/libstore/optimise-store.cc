@@ -7,6 +7,10 @@
 
 #include <cstdlib>
 #include <cstring>
+#ifdef __APPLE__
+#  include <regex>
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
