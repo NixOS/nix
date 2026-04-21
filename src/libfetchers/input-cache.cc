@@ -1,4 +1,5 @@
 #include "nix/fetchers/input-cache.hh"
+#include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
 
@@ -65,6 +66,10 @@ struct InputCacheImpl : InputCache
     void clear() override
     {
         cache_.lock()->clear();
+        /* The workdir info cache has the same "per evaluation" lifetime
+           as the input cache, so flush it here as well so that e.g.
+           `:reload` in `nix repl` picks up changes in git work trees. */
+        GitRepo::invalidateWorkdirInfoCache();
     }
 };
 
