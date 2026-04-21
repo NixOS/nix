@@ -591,11 +591,6 @@ std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path
     return st;
 }
 
-void PosixSourceAccessor::invalidateCache(const CanonPath & path)
-{
-    cache.erase(makeAbsPath(path).string());
-}
-
 std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
 {
     if (auto parent = path.parent())

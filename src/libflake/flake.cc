@@ -863,8 +863,6 @@ LockedFlake lockFlake(
                                 CanonPath((topRef.subdir == "" ? "" : topRef.subdir + "/") + "flake.lock"),
                                 newLockFileS,
                                 commitMessage);
-
-                            flake.lockFilePath().invalidateCache();
                         }
 
                         /* Rewriting the lockfile changed the top-level

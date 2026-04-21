@@ -76,8 +76,6 @@ public:
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
 
-    void invalidateCache(const CanonPath & path) override;
-
 private:
 
     /**
