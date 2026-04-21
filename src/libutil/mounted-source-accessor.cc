@@ -73,6 +73,11 @@ struct MountedSourceAccessorImpl : MountedSourceAccessor
         }
     }
 
+    void invalidateCache() override
+    {
+        mounts.visit_all([](auto & kv) { kv.second->invalidateCache(); });
+    }
+
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
     {
         auto [accessor, subpath] = resolve(path);

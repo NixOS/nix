@@ -73,7 +73,7 @@ void checkpointJson(CharacterizationTest & test, std::string_view testStem, cons
     json gotJson = static_cast<json>(got);
 
     if (testAccept()) {
-        std::filesystem::create_directories(file.parent_path());
+        createDirs(file.parent_path());
         writeFile(file, gotJson.dump(2) + "\n");
         ADD_FAILURE() << "Updating golden master " << file;
     } else {
@@ -98,7 +98,7 @@ void checkpointJson(CharacterizationTest & test, std::string_view testStem, cons
     json gotJson = static_cast<json>(*got);
 
     if (testAccept()) {
-        std::filesystem::create_directories(file.parent_path());
+        createDirs(file.parent_path());
         writeFile(file, gotJson.dump(2) + "\n");
         ADD_FAILURE() << "Updating golden master " << file;
     } else {

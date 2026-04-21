@@ -60,7 +60,7 @@ struct CharacterizationTest : virtual ::testing::Test
         auto got = test();
 
         if (testAccept()) {
-            std::filesystem::create_directories(file.parent_path());
+            createDirs(file.parent_path());
             writeFile2(file, got);
             GTEST_SKIP() << "Updating golden master " << file;
         } else {

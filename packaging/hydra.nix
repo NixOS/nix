@@ -218,6 +218,8 @@ rec {
       tidyScope = pkgs.nixComponents2.overrideScope (
         self: super: {
           withClangTidy = true;
+          # clang-tidy doesn't seem to like unity builds.
+          withUnityBuild = false;
           # nix-everything is built via callPackage (not the layer system), so
           # enableClangTidyLayer's doCheck=false doesn't reach it. Set it here
           # so checkInputs (the *-tests.tests.run derivations) aren't pulled in.

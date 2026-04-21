@@ -815,7 +815,7 @@ struct GitInputScheme : InputScheme
             repoDir = cacheDir;
             repoInfo.gitDir = ".";
 
-            std::filesystem::create_directories(cacheDir.parent_path());
+            createDirs(cacheDir.parent_path());
             PathLocks cacheDirLock({cacheDir.string()});
 
             auto repo = GitRepo::openRepo(cacheDir, {.create = true, .bare = true});

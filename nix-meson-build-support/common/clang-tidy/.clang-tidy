@@ -41,8 +41,6 @@ Checks:
   - -bugprone-unused-local-non-trivial-variable
   # 2 warnings - returning const& from parameter
   - -bugprone-return-const-ref-from-parameter
-  # 1 warning - unsafe C functions (e.g., getenv)
-  - -bugprone-unsafe-functions
   # 1 warning - signed char misuse
   - -bugprone-signed-char-misuse
   # 1 warning - calling parent virtual instead of override
@@ -90,3 +88,7 @@ CheckOptions:
   bugprone-reserved-identifier.AllowedIdentifiers: '__asan_default_options;__wrap___assert_fail;_SingleDerivedPathRaw;_DerivedPathRaw;_SingleBuiltPathRaw;_BuiltPathRaw'
   # Allow explicitly discarding return values with (void) cast
   bugprone-unused-return-value.AllowCastToVoid: true
+  bugprone-unsafe-functions.ReportDefaultFunctions: false
+  # Repurpose bugprone-unsafe-functions to lint functions that we'd want to wrap.
+  bugprone-unsafe-functions.CustomFunctions: >
+    ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";

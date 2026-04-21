@@ -1172,6 +1172,7 @@ void EvalState::resetFileCache()
     fileEvalCache->clear();
     inputCache->clear();
     positions.clear();
+    rootFS->invalidateCache();
 }
 
 void EvalState::eval(Expr * e, Value & v)

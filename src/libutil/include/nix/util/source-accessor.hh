@@ -231,9 +231,10 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     }
 
     /**
-     * Invalidate any cached value the accessor may have for the specified path.
+     * Drop any cached state that could go stale across external filesystem
+     * mutation (e.g. cached directory fds).
      */
-    virtual void invalidateCache(const CanonPath & path) {}
+    virtual void invalidateCache() {}
 };
 
 /**

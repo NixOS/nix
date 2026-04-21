@@ -238,9 +238,15 @@ public:
 
     ~PosixDirectorySourceAccessor()
     {
+        invalidateCache();
+    }
+
+    void invalidateCache() override
+    {
         if (dirFdCache) {
             auto cache = dirFdCache->lock();
             globalDirFdCount.fetch_sub(cache->size(), std::memory_order_relaxed);
+            cache->clear();
         }
     }
 
