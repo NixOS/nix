@@ -510,11 +510,53 @@ try {
     throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
 }
 
-#endif
+#else
 
-} // namespace
+/**
+ * A source accessor that uses the Windows filesystem.
+ * @todo Should be moved into a separate file.
+ */
+class WindowsSourceAccessor : public detail::PosixSourceAccessorBase
+{
+    /**
+     * Optional root path to prefix all operations into the native file
+     * system. This allows prepending funny things like `C:\` that
+     * `CanonPath` intentionally doesn't support.
+     */
+    const std::filesystem::path root;
 
-PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
+public:
+
+    WindowsSourceAccessor();
+    WindowsSourceAccessor(std::filesystem::path && root, bool trackLastModified = false);
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+
+    using SourceAccessor::readFile;
+
+    bool pathExists(const CanonPath & path) override;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
+
+private:
+
+    /**
+     * Throw an error if `path` or any of its ancestors are symlinks.
+     */
+    void assertNoSymlinks(CanonPath path);
+
+    std::optional<PosixStat> cachedLstat(const CanonPath & path);
+
+    std::filesystem::path makeAbsPath(const CanonPath & path);
+};
+
+WindowsSourceAccessor::WindowsSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
     : PosixSourceAccessorBase(trackLastModified)
     , root(std::move(argRoot))
 {
@@ -522,12 +564,12 @@ PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool 
     displayPrefix = root.string();
 }
 
-PosixSourceAccessor::PosixSourceAccessor()
-    : PosixSourceAccessor(std::filesystem::path{})
+WindowsSourceAccessor::WindowsSourceAccessor()
+    : WindowsSourceAccessor(std::filesystem::path{})
 {
 }
 
-std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
+std::filesystem::path WindowsSourceAccessor::makeAbsPath(const CanonPath & path)
 {
     return root.empty()    ? (std::filesystem::path{path.abs()})
            : path.isRoot() ? /* Don't append a slash for the root of the accessor, since
@@ -537,19 +579,13 @@ std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
                            : root / path.rel();
 }
 
-void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
+void WindowsSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     assertNoSymlinks(path);
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = toDescriptor(open(
-        ap.string().c_str(),
-        O_RDONLY
-#ifndef _WIN32
-            | O_NOFOLLOW | O_CLOEXEC
-#endif
-        ));
+    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY));
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
 
@@ -563,7 +599,7 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void
     source.drainInto(sink, size);
 }
 
-bool PosixSourceAccessor::pathExists(const CanonPath & path)
+bool WindowsSourceAccessor::pathExists(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
@@ -573,7 +609,7 @@ bool PosixSourceAccessor::pathExists(const CanonPath & path)
 using Cache = boost::concurrent_flat_map<std::string, std::optional<PosixStat>>;
 static Cache cache;
 
-std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
+std::optional<PosixStat> WindowsSourceAccessor::cachedLstat(const CanonPath & path)
 {
     // Note: we convert std::filesystem::path to std::string because the
     // former is not hashable on libc++.
@@ -591,7 +627,7 @@ std::optional<PosixStat> PosixSourceAccessor::cachedLstat(const CanonPath & path
     return st;
 }
 
-std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
+std::optional<SourceAccessor::Stat> WindowsSourceAccessor::maybeLstat(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
@@ -603,7 +639,7 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     return sourceAccessorStatFromPosixStat(*st);
 }
 
-SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & path)
+SourceAccessor::DirEntries WindowsSourceAccessor::readDirectory(const CanonPath & path)
 {
     assertNoSymlinks(path);
     DirEntries res;
@@ -655,19 +691,19 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     return res;
 }
 
-std::string PosixSourceAccessor::readLink(const CanonPath & path)
+std::string WindowsSourceAccessor::readLink(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
     return nix::readLink(makeAbsPath(path)).string();
 }
 
-std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
+std::optional<std::filesystem::path> WindowsSourceAccessor::getPhysicalPath(const CanonPath & path)
 {
     return makeAbsPath(path);
 }
 
-void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
+void WindowsSourceAccessor::assertNoSymlinks(CanonPath path)
 {
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
@@ -676,6 +712,10 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
         path.pop();
     }
 }
+
+#endif
+
+} // namespace
 
 ref<SourceAccessor> getFSSourceAccessor()
 {
@@ -768,9 +808,9 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
 
     else
         throw Error("file %1% has an unsupported type", PathFmt(root));
+#else
+    return make_ref<WindowsSourceAccessor>(std::move(root), trackLastModified);
 #endif
-
-    return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
 }
 
 } // namespace nix
