@@ -138,6 +138,32 @@ TEST_F(FSSourceAccessorTest, works)
     }
 }
 
+TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "fd-based accessor is Unix-only";
+#endif
+    auto accessor = makeFSSourceAccessor(tmpDir);
+
+    createDirs(tmpDir / "a" / "b");
+    writeFile(tmpDir / "a" / "b" / "f", "old");
+
+    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/f")));
+
+    deletePath(tmpDir / "a" / "b");
+    createDirs(tmpDir / "a" / "b");
+    writeFile(tmpDir / "a" / "b" / "g", "new");
+    createSymlink("g", tmpDir / "a" / "b" / "l");
+
+    accessor->invalidateCache();
+
+    EXPECT_FALSE(accessor->pathExists(CanonPath("a/b/f")));
+    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/g")));
+    EXPECT_THAT(accessor, HasContents(CanonPath("a/b/g"), "new"));
+    EXPECT_THAT(accessor, HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
+    EXPECT_THAT(accessor, HasSymlink(CanonPath("a/b/l"), "g"));
+}
+
 /* ----------------------------------------------------------------------------
  * RestoreSink non-directory at root (no dirFd)
  * --------------------------------------------------------------------------*/

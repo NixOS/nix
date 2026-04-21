@@ -69,6 +69,12 @@ struct UnionSourceAccessor : SourceAccessor
         return SourceAccessor::showPath(path);
     }
 
+    void invalidateCache() override
+    {
+        for (auto & accessor : accessors)
+            accessor->invalidateCache();
+    }
+
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
     {
         for (auto & accessor : accessors) {
