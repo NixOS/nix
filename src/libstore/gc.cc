@@ -641,7 +641,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            if (std::holds_alternative<StorePathSet>(options.pathsToDelete)
+            if (!options.deleteDeadReferrers && std::holds_alternative<StorePathSet>(options.pathsToDelete)
                 && !std::get<StorePathSet>(options.pathsToDelete).contains(*path))
                 return;
 

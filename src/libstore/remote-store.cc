@@ -682,6 +682,10 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
 {
     auto conn(getConnection());
 
+    bool supportsDeleteDeadReferrers = conn->protoVersion.features.contains(WorkerProto::featureDeleteDeadReferrers);
+    if (!supportsDeleteDeadReferrers && options.deleteDeadReferrers)
+        throw Error("Your daemon version is too old to support deleting dead referrers.");
+
     if (conn->protoVersion.features.contains(WorkerProto::featureDeleteDeadSpecific)) {
         conn->to << WorkerProto::Op::CollectGarbage;
         WorkerProto::write(*this, *conn, options.action);
@@ -702,6 +706,8 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
         WorkerProto::write(*this, *conn, options.action);
         WorkerProto::write(*this, *conn, paths);
     }
+    if (supportsDeleteDeadReferrers)
+        conn->to << options.deleteDeadReferrers;
     conn->to << options.ignoreLiveness
              << options.maxFreed
              /* removed options */

@@ -131,6 +131,11 @@ struct WorkerProto
     static constexpr std::string_view featureDeleteDeadSpecific = "delete-dead-specific";
 
     /**
+     * Feature for allowing deletion of any dead referrers of the specified paths.
+     */
+    static constexpr std::string_view featureDeleteDeadReferrers = "delete-dead-referrers";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
