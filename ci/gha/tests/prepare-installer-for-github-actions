@@ -2,10 +2,14 @@
 
 set -euo pipefail
 
-nix build -L ".#installerScriptForGHA" ".#binaryTarball"
+nix build -L \
+  ".#installerScriptForGHA" \
+  ".#binaryTarball" \
+  ".#rustInstaller"
 
 mkdir -p out
 cp ./result/install "out/install"
 name="$(basename "$(realpath ./result-1)")"
 # everything before the first dash
 cp -r ./result-1 "out/${name%%-*}"
+cp ./result-2/bin/nix-installer "out/nix-installer"
