@@ -55,6 +55,8 @@ struct ServeUnixSocketOptions
     mode_t socketMode = 0666;
 };
 
+MakeError(AbortServeSocket, BaseError);
+
 /**
  * Run a server loop that accepts connections and calls the handler for each.
  *
@@ -70,6 +72,7 @@ struct ServeUnixSocketOptions
  *
  * This function never returns normally. It runs until interrupted
  * (e.g., via SIGINT), at which point it throws `Interrupted`.
+ * Can be explicitly exited by throwing AbortServeSocket.
  *
  * @param options Configuration for the server.
  * @param handler Callback invoked for each accepted connection.
