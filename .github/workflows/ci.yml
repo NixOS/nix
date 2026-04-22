@@ -164,19 +164,19 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
-            experimental-installer: false
+            rust-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
-            experimental-installer: false
-          - scenario: on ubuntu (experimental)
+            rust-installer: false
+          - scenario: on ubuntu (rust)
             runs-on: ubuntu-24.04
             os: linux
-            experimental-installer: true
-          - scenario: on macos (experimental)
+            rust-installer: true
+          - scenario: on macos (rust)
             runs-on: macos-14
             os: darwin
-            experimental-installer: true
+            rust-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -188,22 +188,19 @@ jobs:
         path: out
     - name: Looking up the installer tarball URL
       id: installer-tarball-url
-      run: |
-        echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-        TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
-        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
+      run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
     - uses: cachix/install-nix-action@616559265b40713947b9c190a8ff4b507b5df49b # v31.10.4
-      if: ${{ !matrix.experimental-installer }}
+      if: ${{ !matrix.rust-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
         install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
-    - uses: ./.github/actions/install-nix-action
-      if: ${{ matrix.experimental-installer }}
-      with:
-        dogfood: false
-        experimental-installer: true
-        tarball_url: ${{ steps.installer-tarball-url.outputs.tarball-path }}
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run rust installer
+      if: ${{ matrix.rust-installer }}
+      run: |
+        chmod +x out/nix-installer
+        ./out/nix-installer install --no-confirm
+      env:
+        RUST_BACKTRACE: full
     - run: sudo apt install fish zsh
       if: matrix.os == 'linux'
     - run: brew install fish
