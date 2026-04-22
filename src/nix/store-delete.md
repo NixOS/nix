@@ -8,6 +8,18 @@ R""(
   # nix store delete /nix/store/fdhrijyv3670djsgprx596nn89iwlj2s-hello-2.10
   ```
 
+* Garbage collect a closure:
+
+  ```console
+  # nix store delete --recursive --skip-alive nixpkgs#hello
+  ```
+
+* Garbage collect a closure including dead referrers of the closure:
+
+  ```console
+  # nix store delete --recursive --skip-alive --delete-dead-referrers nixpkgs#hello
+  ```
+
 # Description
 
 This command deletes the store paths specified by [*installables*](./nix.md#installables),

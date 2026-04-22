@@ -11,8 +11,9 @@ nix_gc_closure() {
     nix build -f dependencies2.nix input0_drv --out-link "$TEST_ROOT/gc-root"
     input0=$(realpath "$TEST_ROOT/gc-root")
     input1=$(nix build -f dependencies2.nix input1_drv --no-link --print-out-paths)
-    input2_out=$(nix build -f dependencies2.nix input2_drv --no-link --print-out-paths | head -n1)
-    input2_out2=$(nix build -f dependencies2.nix input2_drv --no-link --print-out-paths | tail -n1)
+    input2=$(nix build -f dependencies2.nix input2_drv --no-link --print-out-paths)
+    input2_out=$(printf "%s" "$input2" | head -n1)
+    input2_out2=$(printf "%s" "$input2" | tail -n1)
     top=$(nix build -f dependencies2.nix --no-link --print-out-paths)
     somthing_else=$(nix store add-path ./dependencies2.nix)
 
