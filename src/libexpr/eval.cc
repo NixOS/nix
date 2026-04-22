@@ -277,6 +277,8 @@ EvalState::EvalState(
            mounted fetchTree. */
         auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
                                           : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+        /* Cache positive lstat/readlink results to speed up resolveSymlinks. */
+        accessor = makeCachingSourceAccessor(accessor);
 
         /* Apply access control if needed. */
         if (settings.restrictEval || settings.pureEval)
