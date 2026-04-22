@@ -466,6 +466,9 @@
                 )
               )
             )
+        // lib.optionalAttrs (self.hydraJobs.rustInstaller ? ${system}) {
+          rustInstaller = self.hydraJobs.rustInstaller.${system};
+        }
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
           dockerImage =
             let

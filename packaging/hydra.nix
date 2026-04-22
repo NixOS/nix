@@ -298,6 +298,32 @@ rec {
     }
   );
 
+  # `NixOS/nix-installer` with this revision's Nix closure embedded.
+  rustInstaller =
+    lib.genAttrs
+      (
+        linux64BitSystems
+        ++ [
+          "x86_64-darwin"
+          "aarch64-darwin"
+        ]
+      )
+      (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+          # Embed the native (glibc) Nix even though the Linux installer
+          # binary is static/musl.
+          tarball = pkgs.callPackage ./rust-installer/tarball.nix {
+            nix = pkgs.nixComponents2.nix-everything;
+          };
+          builder = if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
+        in
+        builder.callPackage ./rust-installer {
+          inherit tarball;
+        }
+      );
+
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
