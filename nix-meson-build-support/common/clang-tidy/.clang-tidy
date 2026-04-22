@@ -92,3 +92,4 @@ CheckOptions:
   # Repurpose bugprone-unsafe-functions to lint functions that we'd want to wrap.
   bugprone-unsafe-functions.CustomFunctions: >
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
+    ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";

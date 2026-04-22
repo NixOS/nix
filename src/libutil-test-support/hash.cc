@@ -1,6 +1,4 @@
-#ifdef __APPLE__
-#  include <exception> // Needed by rapidcheck on Darwin
-#endif
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck.h>
 
 #include "nix/util/hash.hh"

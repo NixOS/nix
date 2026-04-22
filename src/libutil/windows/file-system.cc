@@ -77,7 +77,7 @@ std::filesystem::path defaultTempDir()
 void deletePath(const std::filesystem::path & path)
 {
     std::error_code ec;
-    std::filesystem::remove_all(path, ec);
+    std::filesystem::remove_all(path, ec); // NOLINT(bugprone-unsafe-functions)
     if (ec && ec != std::errc::no_such_file_or_directory)
         throw SysError(ec.default_error_condition().value(), "recursively deleting %1%", PathFmt(path));
 }

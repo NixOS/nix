@@ -257,20 +257,6 @@ TEST(pathExists, bogusPathDoesNotExist)
 }
 
 /* ----------------------------------------------------------------------------
- * makeParentCanonical
- * --------------------------------------------------------------------------*/
-
-TEST(makeParentCanonical, noParent)
-{
-    ASSERT_EQ(makeParentCanonical("file"), absPath(std::filesystem::path("file")));
-}
-
-TEST(makeParentCanonical, root)
-{
-    ASSERT_EQ(makeParentCanonical(FS_ROOT), FS_ROOT_NO_TRAILING_SLASH);
-}
-
-/* ----------------------------------------------------------------------------
  * chmodIfNeeded
  * --------------------------------------------------------------------------*/
 

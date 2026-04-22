@@ -66,7 +66,7 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
         state.PauseTiming();
         localStore.reset();
         store.reset();
-        std::filesystem::remove_all(tmpRoot);
+        deletePath(tmpRoot);
         state.ResumeTiming();
     }
 
