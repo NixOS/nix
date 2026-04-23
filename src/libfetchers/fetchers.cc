@@ -304,19 +304,6 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
-    /* Acquire a path lock on this input. Note that fetching the same input in parallel is supposed to be safe (it's up
-     * to the fetchers to guarantee this), so this is merely intended to avoid work duplication. */
-    auto lockFilePath =
-        getCacheDir() / "fetcher-locks"
-        / hashString(HashAlgorithm::SHA256, attrsToJSON(toAttrs()).dump()).to_string(HashFormat::Base16, false);
-    std::filesystem::create_directories(lockFilePath.parent_path());
-    PathLocks lock(
-        {lockFilePath.string()}, fmt("waiting for another Nix process to finish fetching input '%s'...", to_string()));
-
-    static auto inTest = getEnv("_NIX_TEST_CONCURRENT_FETCHES") == "1";
-    if (inTest)
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-
     /* The tree may already be in the Nix store, or it could be
        substituted (which is often faster than fetching from the
        original source). So check that. We only do this for final
@@ -357,6 +344,21 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
+
+    /* Acquire a path lock on this input. Note that fetching the same input in parallel is supposed to be safe (it's up
+     * to the fetchers to guarantee this), so this is merely intended to avoid work duplication. Note that we don't need
+     * this when substituting the input. */
+    auto lockFilePath =
+        getCacheDir() / "fetcher-locks"
+        / hashString(HashAlgorithm::SHA256, attrsToJSON(toAttrs()).dump()).to_string(HashFormat::Base16, false);
+    createDirs(lockFilePath.parent_path());
+    PathLocks lock(
+        {lockFilePath.string()}, fmt("waiting for another Nix process to finish fetching input '%s'...", to_string()));
+    lock.setDeletion(true);
+
+    static auto inTest = getEnv("_NIX_TEST_CONCURRENT_FETCHES") == "1";
+    if (inTest)
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto [accessor, result] = scheme->getAccessor(settings, store, *this);
 
