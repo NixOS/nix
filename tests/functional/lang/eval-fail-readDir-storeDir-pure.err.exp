@@ -1,0 +1,1 @@
+error: access to absolute path '/home' is forbidden in pure evaluation mode (use '--impure' to override)
