@@ -69,6 +69,8 @@ SSHMaster::SSHMaster(
     std::string_view sshPublicHostKey,
     bool useMaster,
     bool compress,
+    unsigned int serverAliveInterval,
+    unsigned int serverAliveCountMax,
     Descriptor logFD)
     : authority(authority)
     , hostnameAndUser([authority]() {
@@ -83,6 +85,8 @@ SSHMaster::SSHMaster(
     , sshPublicHostKey(parsePublicHostKey(authority.host, sshPublicHostKey))
     , useMaster(useMaster && !fakeSSH)
     , compress(compress)
+    , serverAliveInterval(serverAliveInterval)
+    , serverAliveCountMax(serverAliveCountMax)
     , logFD(logFD)
     , tmpDir(make_ref<AutoDelete>(createTempDir("", "nix", 0700)))
 {
@@ -103,6 +107,11 @@ void SSHMaster::addCommonSSHOpts(OsStrings & args)
     }
     if (compress)
         args.push_back(OS_STR("-C"));
+
+    if (serverAliveInterval > 0) {
+        args.push_back(string_to_os_string(fmt("-oServerAliveInterval=%d", serverAliveInterval)));
+        args.push_back(string_to_os_string(fmt("-oServerAliveCountMax=%d", serverAliveCountMax)));
+    }
 
     if (authority.port)
         args.push_back(string_to_os_string(fmt("-p%d", *authority.port)));
