@@ -49,6 +49,7 @@ this_libraries = both_libraries(
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,
+  override_options : [ 'b_lto=false' ],
   install : true,
 )
 plugin_c_api_enabled = true
