@@ -220,6 +220,7 @@ endif
 
 subdir('ca')
 subdir('dyn-drv')
+subdir('fetchers')
 subdir('flakes')
 subdir('git')
 subdir('git-hashing')
@@ -250,6 +251,10 @@ foreach suite : suites
     asan_options += ':log_path=@0@'.format(
       meson.current_build_dir() / 'asan-log',
     )
+
+    # TODO: use Meson's 'should_fail' with a custom exit code once we require
+    # Meson >= 1.11.0 for proper expected failure support. For now, tests that
+    # demonstrate known bugs use skipTest in the test script itself.
 
     test(
       name,
