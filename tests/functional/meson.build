@@ -100,7 +100,6 @@ suites = [
       'fetchGitVerification.sh',
       'readfile-context.sh',
       'nix-channel.sh',
-      'recursive.sh',
       'dependencies.sh',
       'check-reqs.sh',
       'build-remote-content-addressed-fixed.sh',

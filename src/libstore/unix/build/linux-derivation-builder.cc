@@ -833,31 +833,6 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
         DerivationBuilderImpl::killSandbox(getStats);
     }
-
-    void addDependencyImpl(const StorePath & path) override
-    {
-        auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
-
-        /* Bind-mount the path into the sandbox. This requires
-           entering its mount namespace, which is not possible
-           in multithreaded programs. So we do this in a
-           child process.*/
-        Pid child(startProcess([&]() {
-            if (usingUserNamespace && (setns(sandboxUserNamespace.get(), CLONE_NEWUSER) == -1))
-                throw SysError("entering sandbox user namespace");
-
-            if (setns(sandboxMountNamespace.get(), CLONE_NEWNS) == -1)
-                throw SysError("entering sandbox mount namespace");
-
-            doBind(source, target);
-
-            _exit(0);
-        }));
-
-        int status = child.wait();
-        if (!statusOk(status))
-            throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
-    }
 };
 
 } // namespace nix

@@ -5,13 +5,12 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include "nix/store/build-result.hh"
+#include "nix/store/local-store.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
-#include "nix/util/processes.hh"
 #include "nix/util/json-impls.hh"
-#include "nix/store/restricted-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 
 namespace nix {
@@ -138,7 +137,7 @@ struct DerivationBuilderCallbacks
  * rather than incoming call edges that either should be removed, or
  * become (higher order) function parameters.
  */
-struct DerivationBuilder : RestrictionContext
+struct DerivationBuilder
 {
     DerivationBuilder() = default;
     virtual ~DerivationBuilder() = default;

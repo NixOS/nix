@@ -14,7 +14,6 @@
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
-#include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
@@ -147,11 +146,6 @@ public:
             ignoreExceptionInDestructor();
         }
         try {
-            stopDaemon();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        try {
             cleanupBuild(false);
         } catch (...) {
             ignoreExceptionInDestructor();
@@ -231,24 +225,7 @@ protected:
      */
     std::vector<std::thread> daemonWorkerThreads;
 
-    const StorePathSet & originalPaths() override
-    {
-        return inputPaths;
-    }
-
-    bool isAllowed(const StorePath & path) override
-    {
-        return inputPaths.count(path) || addedPaths.count(path);
-    }
-
-    bool isAllowed(const DrvOutput & id) override
-    {
-        return addedDrvOutputs.count(id);
-    }
-
     bool isAllowed(const DerivedPath & req);
-
-    friend struct RestrictedStore;
 
     /**
      * Whether we need to perform hash rewriting if there are valid output paths.
@@ -358,22 +335,7 @@ protected:
      */
     void processSandboxSetupMessages();
 
-private:
-
-    /**
-     * Start an in-process nix daemon thread for recursive-nix.
-     */
-    void startDaemon();
-
-    /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
-     */
-    void stopDaemon();
-
 protected:
-
-    void addDependencyImpl(const StorePath & path) override;
 
     /**
      * Make a file owned by the builder.
@@ -571,9 +533,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
        open and modifies them after they have been chown'ed to
        root. */
     killSandbox(true);
-
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug(
@@ -834,11 +793,6 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
         throw Error(
             "home directory %1% exists; please remove it to assure purity of builds without sandboxing",
             PathFmt(homeDir));
-
-    /* Fire up a Nix daemon to process recursive Nix calls from the
-       builder. */
-    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-        startDaemon();
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
@@ -1150,107 +1104,6 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::startDaemon()
-{
-    experimentalFeatureSettings.require(Xp::RecursiveNix);
-
-    auto store = makeRestrictedStore(
-        [&] {
-            auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize = 0;
-            config->stateDir = "/no-such-path";
-            config->logDir = "/no-such-path";
-            return config;
-        }(),
-        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-        *this);
-
-    addedPaths.clear();
-
-    auto socketName = ".nix-socket";
-    std::filesystem::path socketPath = tmpDir / socketName;
-    env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
-
-    daemonSocket = createUnixDomainSocket(socketPath, 0600);
-
-    chownToBuilder(socketPath);
-
-    daemonThread = std::thread([this, store]() {
-        while (true) {
-
-            /* Accept a connection. */
-            struct sockaddr_un remoteAddr;
-            socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-            AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-            if (!remote) {
-                if (errno == EINTR || errno == EAGAIN)
-                    continue;
-                if (errno == EINVAL || errno == ECONNABORTED)
-                    break;
-                throw SysError("accepting connection");
-            }
-
-            unix::closeOnExec(remote.get());
-
-            debug("received daemon connection");
-
-            auto workerThread = std::thread([store, remote{std::move(remote)}]() {
-                try {
-                    daemon::processConnection(
-                        store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
-                    debug("terminated daemon connection");
-                } catch (const Interrupted &) {
-                    debug("interrupted daemon connection");
-                } catch (SystemError &) {
-                    ignoreExceptionExceptInterrupt();
-                }
-            });
-
-            daemonWorkerThreads.push_back(std::move(workerThread));
-        }
-
-        debug("daemon shutting down");
-    });
-}
-
-void DerivationBuilderImpl::stopDaemon()
-{
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
-        // According to the POSIX standard, the 'shutdown' function should
-        // return an ENOTCONN error when attempting to shut down a socket that
-        // hasn't been connected yet. This situation occurs when the 'accept'
-        // function is called on a socket without any accepted connections,
-        // leaving the socket unconnected. While Linux doesn't seem to produce
-        // an error for sockets that have only been accepted, more
-        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
-        // return the ENOTCONN error. Therefore, we handle this error here to
-        // avoid raising an exception for compliant behaviour.
-        if (errno == ENOTCONN) {
-            daemonSocket.close();
-        } else {
-            throw SysError("shutting down daemon socket");
-        }
-    }
-
-    if (daemonThread.joinable())
-        daemonThread.join();
-
-    // FIXME: should prune worker threads more quickly.
-    // FIXME: shutdown the client socket to speed up worker termination.
-    for (auto & thread : daemonWorkerThreads)
-        thread.join();
-    daemonWorkerThreads.clear();
-
-    // release the socket.
-    daemonSocket.close();
-}
-
-void DerivationBuilderImpl::addDependencyImpl(const StorePath & path)
-{
-    addedPaths.insert(path);
-}
-
 void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
     if (!buildUser)
@@ -1434,8 +1287,6 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         referenceablePaths.insert(p);
     for (auto & i : scratchOutputs)
         referenceablePaths.insert(i.second);
-    for (auto & p : addedPaths)
-        referenceablePaths.insert(p);
 
     /* Check whether the output paths were created, and make all
        output paths read-only.  Then get the references of each output (that we
