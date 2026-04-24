@@ -1,9 +1,9 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <optional>
-
-#include "nix/util/types.hh"
+#include <string_view>
 
 namespace nix {
 
@@ -14,8 +14,23 @@ namespace nix {
 void saveMountNamespace();
 
 /**
+ * Save the parent mount namespace and enter a private one via
+ * `unshare(CLONE_NEWNS)`.
+ */
+void tryEnterPrivateMountNamespace();
+
+/**
+ * Remount `path` writable if its mount is read-only, leaving
+ * already-writable mounts untouched. This throws if we aren't in a
+ * private mount namespace, since remounting would leak into the
+ * host mount table.
+ */
+void remountReadOnlyWritable(const std::filesystem::path & path);
+
+/**
  * Restore the mount namespace saved by saveMountNamespace(). Ignored
- * if saveMountNamespace() was never called.
+ * if `saveMountNamespace()` was never called, or if
+ * `tryEnterPrivateMountNamespace()` never succeeded.
  */
 void restoreMountNamespace();
 

@@ -397,15 +397,8 @@ void mainWrapped(int argc, char ** argv)
     flakeSettings.configureEvalSettings(evalSettings);
 
 #ifdef __linux__
-    if (isRootUser()) {
-        try {
-            saveMountNamespace();
-            if (unshare(CLONE_NEWNS) == -1)
-                throw SysError("setting up a private mount namespace");
-        } catch (Error & e) {
-            warn("failed to set up a private mount namespace: %s", e.msg());
-        }
-    }
+    if (isRootUser())
+        tryEnterPrivateMountNamespace();
 #endif
 
     programPath = argv[0];
