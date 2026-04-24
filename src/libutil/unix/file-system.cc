@@ -97,53 +97,6 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
     return st;
 }
 
-void setWriteTime(
-    const std::filesystem::path & path, time_t accessedTime, time_t modificationTime, std::optional<bool> optIsSymlink)
-{
-    // Would be nice to use std::filesystem unconditionally, but
-    // doesn't support access time just modification time.
-    //
-    // System clock vs File clock issues also make that annoying.
-#if HAVE_UTIMENSAT && HAVE_DECL_AT_SYMLINK_NOFOLLOW
-    struct timespec times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_nsec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_nsec = 0,
-        },
-    };
-    if (utimensat(AT_FDCWD, path.c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
-        throw SysError("changing modification time of %s (using `utimensat`)", PathFmt(path));
-#else
-    struct timeval times[2] = {
-        {
-            .tv_sec = accessedTime,
-            .tv_usec = 0,
-        },
-        {
-            .tv_sec = modificationTime,
-            .tv_usec = 0,
-        },
-    };
-#  if HAVE_LUTIMES
-    if (lutimes(path.c_str(), times) == -1)
-        throw SysError("changing modification time of %s", PathFmt{path});
-#  else
-    bool isSymlink = optIsSymlink ? *optIsSymlink : std::filesystem::is_symlink(path);
-
-    if (!isSymlink) {
-        if (utimes(path.c_str(), times) == -1)
-            throw SysError("changing modification time of %s (not a symlink)", PathFmt{path});
-    } else {
-        throw Error("Cannot change modification time of symlink %s", PathFmt{path});
-    }
-#  endif
-#endif
-}
-
 #ifdef __FreeBSD__
 #  define MOUNTEDPATHS_PARAM , std::set<std::filesystem::path> & mountedPaths
 #  define MOUNTEDPATHS_ARG , mountedPaths
@@ -167,9 +120,9 @@ static void _deletePath(
     }
 #endif
 
-    auto name = CanonPath::fromFilename(path.filename().native());
+    auto name = OsFilename{path.filename()};
 
-    auto st_ = maybeFstatat(parentfd, name.rel());
+    auto st_ = maybeFstatat(parentfd, OsCanonPath{name});
     if (!st_)
         return;
     auto & st = *st_;
@@ -203,7 +156,7 @@ static void _deletePath(
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK)
             try {
-                unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
+                unix::fchmodatTryNoFollow(parentfd, OsCanonPath{name}, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
@@ -211,7 +164,7 @@ static void _deletePath(
                 throw;
             }
 
-        int fd = openat(parentfd, name.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
             throw SysError("opening directory %1%", PathFmt(path));
         AutoCloseDir dir(fdopendir(fd));
@@ -231,7 +184,7 @@ static void _deletePath(
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
-    if (unlinkat(parentfd, name.rel_c_str(), flags) == -1) {
+    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT)
             return;
         try {
@@ -251,7 +204,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     auto parentDirPath = path.parent_path();
     assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = openDirectory(parentDirPath);
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
     if (!dirfd) {
         if (errno == ENOENT)
             return;

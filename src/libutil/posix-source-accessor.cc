@@ -711,12 +711,24 @@ std::optional<std::filesystem::path> WindowsSourceAccessor::getPhysicalPath(cons
 
 void WindowsSourceAccessor::assertNoSymlinks(CanonPath path)
 {
+#ifdef _WIN32
+    /* On Windows, iterate from root outward so we detect symlinks before
+       trying to access paths beyond them (which would fail with INVALID_NAME). */
+    CanonPath current = CanonPath::root;
+    for (auto & component : path) {
+        current = current / component;
+        auto st = cachedLstat(current);
+        if (st && S_ISLNK(st->st_mode))
+            throw SymlinkNotAllowed(std::filesystem::path(current.rel()), "path '%s' is a symlink", showPath(current));
+    }
+#else
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
         if (st && S_ISLNK(st->st_mode))
-            throw SymlinkNotAllowed(path, "path '%s' is a symlink", showPath(path));
+            throw SymlinkNotAllowed(std::filesystem::path(path.rel()), "path '%s' is a symlink", showPath(path));
         path.pop();
     }
+#endif
 }
 
 #endif
@@ -791,9 +803,9 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
         if (!parentFd)
             throw SysError("opening %1%", PathFmt(root));
 
-        auto relPath = CanonPath::fromFilename(root.filename().native());
+        auto relPath = OsFilename{root.filename()};
         if (trackLastModified) {
-            auto st = fstatat(parentFd.get(), root.filename());
+            auto st = fstatat(parentFd.get(), relPath);
             mtime = st.st_mtime;
         }
 
