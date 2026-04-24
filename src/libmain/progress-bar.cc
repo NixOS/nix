@@ -174,7 +174,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s, std::optional<std::string_view> machine = {}) override
     {
         if (lvl > verbosity)
             return;
@@ -209,7 +209,8 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent,
+        std::optional<std::string_view> machine) override
     {
         auto state(state_.lock());
 
@@ -228,7 +229,9 @@ public:
                 name = name.substr(0, name.size() - 4);
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
-            if (machineName != "")
+            if (machineName.empty() && machine)
+                machineName = *machine;
+            if (!machineName.empty())
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
 
             // Used to be curRound and nrRounds, but the
