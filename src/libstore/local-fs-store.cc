@@ -74,6 +74,14 @@ struct LocalStoreAccessor : SourceAccessor
         return accessor->readDirectory(path);
     }
 
+    void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override
+    {
+        requireStoreObject(dirPath);
+        return accessor->readDirectory(dirPath, std::move(callback));
+    }
+
     void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         requireStoreObject(path);

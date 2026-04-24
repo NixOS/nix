@@ -288,4 +288,10 @@ ref<SourceAccessor> makeFSSourceAccessor(
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
 
+/**
+ * Make a wrapper source accessor that caches positive lookup results.
+ * Useful for the evaluator which already assumes a mostly immutable view of the filesystem.
+ */
+ref<SourceAccessor> makeCachingSourceAccessor(ref<SourceAccessor> next);
+
 } // namespace nix

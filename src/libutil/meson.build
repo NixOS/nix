@@ -136,6 +136,7 @@ sources = [ config_priv_h ] + files(
   'base-n.cc',
   'base-nix-32.cc',
   'bump-memory-resource.cc',
+  'caching-source-accessor.cc',
   'canon-path.cc',
   'compression-algo.cc',
   'compression-settings.cc',

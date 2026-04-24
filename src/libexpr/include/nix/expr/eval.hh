@@ -489,7 +489,15 @@ private:
 
     LookupPath lookupPath;
 
-    const ref<boost::concurrent_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>>
+    struct LookupPathResolvedState
+    {
+        SourcePath path;
+        const ref<boost::concurrent_flat_map<CanonPath, std::optional<SourcePath>>> resolvedPaths;
+    };
+
+    const ref<
+        boost::
+            concurrent_flat_map<std::string, std::shared_ptr<LookupPathResolvedState>, StringViewHash, std::equal_to<>>>
         lookupPathResolved;
 
     /**
@@ -626,9 +634,10 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`.
+     * If it is not found, return `nullptr`.
      */
-    std::optional<SourcePath> resolveLookupPathPath(const LookupPath::Path & elem, bool initAccessControl = false);
+    std::shared_ptr<LookupPathResolvedState>
+    resolveLookupPathPath(const LookupPath::Path & elem, bool initAccessControl = false);
 
     /**
      * Evaluate an expression to normal form
