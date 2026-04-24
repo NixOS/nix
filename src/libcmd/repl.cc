@@ -226,6 +226,36 @@ ReplExitStatus NixRepl::mainLoop()
     }
 }
 
+/**
+ * Find the position of the last `.` in `s` that is not inside a quoted
+ * attribute (i.e. not between an unescaped opening `"` and its close).
+ * Returns std::string::npos when no unquoted dot exists.
+ */
+static size_t findLastUnquotedDot(const std::string & s)
+{
+    size_t lastDot = std::string::npos;
+    bool inQuote = false;
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '"')
+            inQuote = !inQuote;
+        else if (s[i] == '.' && !inQuote)
+            lastDot = i;
+    }
+    return lastDot;
+}
+
+/**
+ * Format an attribute name for use in a completion string.  Names that
+ * are valid identifiers are returned bare; everything else is wrapped in
+ * double quotes (using `printAttributeName`).
+ */
+static std::string formatAttrName(std::string_view name)
+{
+    std::ostringstream ss;
+    printAttributeName(ss, name);
+    return ss.str();
+}
+
 StringSet NixRepl::completePrefix(const std::string & prefix)
 {
     StringSet completions;
@@ -254,7 +284,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             }
         } catch (Error &) {
         }
-    } else if ((dot = cur.rfind('.')) == std::string::npos) {
+    } else if ((dot = findLastUnquotedDot(cur)) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
@@ -275,6 +305,15 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             auto expr = cur.substr(0, dot);
             auto cur2 = cur.substr(dot + 1);
 
+            /* If the user started typing a quoted attribute name
+               (e.g. `foo."bar`), strip the opening quote so we can
+               match against the raw attribute names. */
+            bool insideQuote = false;
+            if (!cur2.empty() && cur2[0] == '"') {
+                cur2 = cur2.substr(1);
+                insideQuote = true;
+            }
+
             Expr * e = parseString(expr);
             Value v;
             e->eval(*state, *env, v);
@@ -287,7 +326,22 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                 std::string_view name = state->symbols[i.name];
                 if (name.substr(0, cur2.size()) != cur2)
                     continue;
-                completions.insert(concatStrings(prev, expr, ".", name));
+                auto formattedName = formatAttrName(name);
+                if (insideQuote) {
+                    /* The user already typed an opening `"`, so the
+                       completion string must include it to keep the
+                       character offsets aligned with the input buffer.
+                       `formattedName` already wraps names that need
+                       quoting in `"…"`, so we can use it directly for
+                       those.  For plain identifiers that the user
+                       gratuitously quoted, wrap them ourselves. */
+                    if (formattedName.size() >= 2 && formattedName[0] == '"')
+                        completions.insert(concatStrings(prev, expr, ".", formattedName));
+                    else
+                        completions.insert(concatStrings(prev, expr, ".\"", formattedName, "\""));
+                } else {
+                    completions.insert(concatStrings(prev, expr, ".", formattedName));
+                }
             }
 
         } catch (ParseError & e) {
