@@ -214,7 +214,7 @@ void HttpBinaryCacheStore::upsertFile(
     } catch (FileTransferError & e) {
         UploadToHTTP err(e.message());
         err.addTrace({}, "while uploading to HTTP binary cache at '%s'", config->cacheUri.to_string());
-        throw err;
+        throw std::move(err);
     }
 }
 

@@ -123,7 +123,7 @@ void insertionsort(Iter begin, Iter end, Comparator comp = {})
  * to the specified comparator.
  */
 template<std::forward_iterator Iter, typename Comparator = std::less<std::iter_value_t<Iter>>>
-Iter strictlyDecreasingPrefix(Iter begin, Iter end, Comparator && comp = {})
+Iter strictlyDecreasingPrefix(Iter begin, Iter end, const Comparator & comp = {})
 {
     if (begin == end)
         return begin;
@@ -138,7 +138,7 @@ Iter strictlyDecreasingPrefix(Iter begin, Iter end, Comparator && comp = {})
  * to the specified comparator.
  */
 template<std::bidirectional_iterator Iter, typename Comparator = std::less<std::iter_value_t<Iter>>>
-Iter strictlyDecreasingSuffix(Iter begin, Iter end, Comparator && comp = {})
+Iter strictlyDecreasingSuffix(Iter begin, Iter end, const Comparator & comp = {})
 {
     if (begin == end)
         return end;
@@ -153,9 +153,9 @@ Iter strictlyDecreasingSuffix(Iter begin, Iter end, Comparator && comp = {})
  * to the specified comparator.
  */
 template<std::bidirectional_iterator Iter, typename Comparator = std::less<std::iter_value_t<Iter>>>
-Iter weaklyIncreasingPrefix(Iter begin, Iter end, Comparator && comp = {})
+Iter weaklyIncreasingPrefix(Iter begin, Iter end, const Comparator & comp = {})
 {
-    return strictlyDecreasingPrefix(begin, end, std::not_fn(std::forward<Comparator>(comp)));
+    return strictlyDecreasingPrefix(begin, end, std::not_fn(comp));
 }
 
 /**
@@ -163,9 +163,9 @@ Iter weaklyIncreasingPrefix(Iter begin, Iter end, Comparator && comp = {})
  * to the specified comparator.
  */
 template<std::bidirectional_iterator Iter, typename Comparator = std::less<std::iter_value_t<Iter>>>
-Iter weaklyIncreasingSuffix(Iter begin, Iter end, Comparator && comp = {})
+Iter weaklyIncreasingSuffix(Iter begin, Iter end, const Comparator & comp = {})
 {
-    return strictlyDecreasingSuffix(begin, end, std::not_fn(std::forward<Comparator>(comp)));
+    return strictlyDecreasingSuffix(begin, end, std::not_fn(comp));
 }
 
 /**

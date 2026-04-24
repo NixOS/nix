@@ -207,7 +207,7 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
  * database is busy.
  */
 template<typename T, typename F>
-T retrySQLite(F && fun)
+T retrySQLite(const F & fun)
 {
     time_t nextWarning = time(nullptr) + 1;
 

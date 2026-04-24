@@ -3465,7 +3465,7 @@ void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
         if (pos) {
             error.atPos(pos());
         }
-        throw error;
+        throw std::move(error);
     }
 }
 

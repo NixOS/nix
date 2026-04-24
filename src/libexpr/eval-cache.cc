@@ -106,7 +106,7 @@ struct AttrDb
     }
 
     template<typename F>
-    AttrId doSQLite(F && fun)
+    AttrId doSQLite(const F & fun)
     {
         if (failed)
             return 0;

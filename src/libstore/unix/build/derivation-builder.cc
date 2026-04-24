@@ -974,7 +974,7 @@ void DerivationBuilderImpl::openSlave()
 {
     std::string slaveName = getPtsName(builderOut.get());
 
-    AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY);
+    AutoCloseFD builderOut = open(slaveName.c_str(), O_RDWR | O_NOCTTY | O_CLOEXEC);
     if (!builderOut)
         throw SysError("opening pseudoterminal slave");
 
@@ -1056,7 +1056,7 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
             FdSource source(builderOut.get());
             auto ex = readError(source);
             ex.addTrace({}, "while setting up the build environment");
-            throw ex;
+            throw std::move(ex);
         }
         debug("sandbox setup: " + msg);
         msgs.push_back(std::move(msg));

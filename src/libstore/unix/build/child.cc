@@ -26,7 +26,7 @@ void commonChildInit()
         throw SysError("cannot dup stderr into stdout");
 
     /* Reroute stdin to /dev/null. */
-    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR);
+    int fdDevNull = open(pathNullDevice.c_str(), O_RDWR | O_CLOEXEC);
     if (fdDevNull == -1)
         throw SysError("cannot open '%1%'", pathNullDevice);
     if (dup2(fdDevNull, STDIN_FILENO) == -1)

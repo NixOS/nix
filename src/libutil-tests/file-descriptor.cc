@@ -130,7 +130,7 @@ TEST(ReadLine, TreatsEioAsEof)
     ASSERT_EQ(unlockpt(master), 0);
 
     // Open and immediately close the slave to trigger EIO on the master.
-    int slave = open(ptsname(master), O_RDWR | O_NOCTTY);
+    int slave = open(ptsname(master), O_RDWR | O_NOCTTY | O_CLOEXEC);
     ASSERT_NE(slave, -1);
     close(slave);
 
@@ -153,7 +153,7 @@ TEST(ReadLine, PartialLineBeforeEio)
     ASSERT_EQ(grantpt(master), 0);
     ASSERT_EQ(unlockpt(master), 0);
 
-    int slave = open(ptsname(master), O_RDWR | O_NOCTTY);
+    int slave = open(ptsname(master), O_RDWR | O_NOCTTY | O_CLOEXEC);
     ASSERT_NE(slave, -1);
 
     // Write a partial line (no terminator) from the slave, then close it.

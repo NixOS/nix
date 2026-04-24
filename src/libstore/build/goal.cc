@@ -58,13 +58,13 @@ Goal::ChildEvent Goal::ChildEvents::popChildEvent()
 using handle_type = nix::Goal::handle_type;
 using Suspend = nix::Goal::Suspend;
 
-Co::Co(Co && rhs)
+Co::Co(Co && rhs) noexcept
 {
     this->handle = rhs.handle;
     rhs.handle = nullptr;
 }
 
-Co & Co::operator=(Co && rhs)
+Co & Co::operator=(Co && rhs) noexcept
 {
     if (handle) {
         handle.promise().alive = false;

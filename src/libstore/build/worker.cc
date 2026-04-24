@@ -61,7 +61,7 @@ std::shared_ptr<G> Worker::initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args &
     if (auto goal = goal_weak.lock())
         return goal;
 
-    auto goal = std::make_shared<G>(args...);
+    auto goal = std::make_shared<G>(std::forward<Args>(args)...);
     goal_weak = goal;
     wakeUp(goal);
     return goal;

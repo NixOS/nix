@@ -255,8 +255,8 @@ public:
 
         explicit Co(handle_type handle)
             : handle(handle) {};
-        Co & operator=(Co &&);
-        Co(Co && rhs);
+        Co & operator=(Co &&) noexcept;
+        Co(Co && rhs) noexcept;
         Co & operator=(const Co &) = delete;
         Co(const Co & rhs) = delete;
         ~Co();
