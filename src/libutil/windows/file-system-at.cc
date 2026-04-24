@@ -3,9 +3,13 @@
 #include "nix/util/signals.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/util/util.hh"
+#include "nix/util/windows-environment.hh"
+
+#include <boost/outcome.hpp>
+#include <span>
 
 #include <fileapi.h>
-#include <error.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winioctl.h>
@@ -17,6 +21,8 @@ namespace windows {
 
 namespace {
 
+namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
+
 /**
  * Open a file/directory relative to a directory handle using NtCreateFile.
  *
@@ -25,9 +31,9 @@ namespace {
  * @param desiredAccess Access rights requested
  * @param createOptions NT create options flags
  * @param createDisposition FILE_OPEN, FILE_CREATE, etc.
- * @return Handle to the opened file/directory (caller must close)
+ * @return Handle to the opened file/directory, or NTSTATUS on error
  */
-AutoCloseFD ntOpenAt(
+outcome::unchecked<AutoCloseFD, NTSTATUS> maybeNtOpenAt(
     Descriptor dirFd,
     std::wstring_view pathComponent,
     ACCESS_MASK desiredAccess,
@@ -68,10 +74,23 @@ AutoCloseFD ntOpenAt(
     );
 
     if (status != 0)
-        throw WinError(
-            RtlNtStatusToDosError(status), "opening %s relative to directory handle", PathFmt(pathComponent));
+        return outcome::failure(status);
 
     return AutoCloseFD{h};
+}
+
+AutoCloseFD ntOpenAt(
+    Descriptor dirFd,
+    std::wstring_view pathComponent,
+    ACCESS_MASK desiredAccess,
+    ULONG createOptions,
+    ULONG createDisposition = FILE_OPEN)
+{
+    auto result = maybeNtOpenAt(dirFd, pathComponent, desiredAccess, createOptions, createDisposition);
+    if (!result)
+        throw WinError(
+            RtlNtStatusToDosError(result.error()), "opening %s relative to directory handle", PathFmt(pathComponent));
+    return std::move(result.value());
 }
 
 /**
@@ -81,13 +100,11 @@ AutoCloseFD ntOpenAt(
  * @param path Relative path to the symlink
  * @return Handle to the symlink
  */
-AutoCloseFD openSymlinkAt(Descriptor dirFd, const CanonPath & path)
+AutoCloseFD openSymlinkAt(Descriptor dirFd, const OsCanonPath & path)
 {
-    assert(!path.isRoot());
-    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    assert(!path.empty());
 
-    std::wstring wpath = string_to_os_string(path.rel());
-    return ntOpenAt(dirFd, wpath, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+    return ntOpenAt(dirFd, path.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
 }
 
 /**
@@ -190,6 +207,54 @@ OsString readSymlinkTarget(HANDLE linkHandle)
 }
 
 /**
+ * Write symlink target to an open file handle using reparse point.
+ *
+ * @param handle Open file handle (must have GENERIC_WRITE access)
+ * @param target The symlink target (what it points to)
+ */
+void writeSymlinkTarget(HANDLE handle, const std::filesystem::path & target)
+{
+    /* Build the reparse data buffer for a symbolic link.
+       Layout: SubstituteName and PrintName stored consecutively in PathBuffer.
+       We use the same string for both. */
+    size_t targetBytes = target.native().size() * sizeof(wchar_t);
+    size_t bufSize = offsetof(ReparseDataBuffer, SymbolicLinkReparseBuffer.PathBuffer) + targetBytes * 2;
+    std::vector<uint8_t> buf(bufSize, 0);
+
+    auto * reparse = reinterpret_cast<ReparseDataBuffer *>(buf.data());
+    reparse->ReparseTag = IO_REPARSE_TAG_SYMLINK;
+    reparse->ReparseDataLength =
+        static_cast<unsigned short>(bufSize - offsetof(ReparseDataBuffer, SymbolicLinkReparseBuffer));
+    reparse->Reserved = 0;
+
+    auto & symlink = reparse->SymbolicLinkReparseBuffer;
+    /* SubstituteName comes first */
+    symlink.SubstituteNameOffset = 0;
+    symlink.SubstituteNameLength = static_cast<unsigned short>(targetBytes);
+    /* PrintName follows SubstituteName */
+    symlink.PrintNameOffset = static_cast<unsigned short>(targetBytes);
+    symlink.PrintNameLength = static_cast<unsigned short>(targetBytes);
+    /* SYMLINK_FLAG_RELATIVE = 1 for relative symlinks, 0 for absolute */
+    symlink.Flags = target.is_relative() ? 1 : 0;
+
+    /* Copy target into PathBuffer twice (SubstituteName and PrintName) */
+    memcpy(symlink.PathBuffer, target.c_str(), targetBytes);
+    memcpy(reinterpret_cast<char *>(symlink.PathBuffer) + targetBytes, target.c_str(), targetBytes);
+
+    DWORD bytesReturned;
+    if (!DeviceIoControl(
+            handle,
+            FSCTL_SET_REPARSE_POINT,
+            buf.data(),
+            static_cast<DWORD>(bufSize),
+            nullptr,
+            0,
+            &bytesReturned,
+            nullptr))
+        throw WinError("setting reparse point for symlink");
+}
+
+/**
  * Check if a handle refers to a reparse point (e.g., symlink).
  *
  * @param handle Open file/directory handle
@@ -207,6 +272,92 @@ bool isReparsePoint(HANDLE handle)
 } // anonymous namespace
 
 } // namespace windows
+
+OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path)
+{
+    AutoCloseFD linkHandle(windows::openSymlinkAt(dirFd, path));
+    return windows::readSymlinkTarget(linkHandle.get());
+}
+
+void createFileSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target)
+{
+    assert(!path.empty());
+
+    /* Create the file that will become the symlink */
+    auto handle = windows::ntOpenAt(
+        dirFd, path.c_str(), GENERIC_WRITE | DELETE, FILE_NON_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE);
+
+    windows::writeSymlinkTarget(handle.get(), target);
+}
+
+void createDirectorySymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target)
+{
+    assert(!path.empty());
+
+    /* Create the directory that will become the symlink */
+    auto handle = windows::ntOpenAt(
+        dirFd, path.c_str(), GENERIC_WRITE | DELETE, FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT, FILE_CREATE);
+
+    windows::writeSymlinkTarget(handle.get(), target);
+}
+
+void createUnknownSymlinkAt(Descriptor dirFd, const OsCanonPath & path, const OsString & target)
+{
+    assert(!path.empty());
+
+    std::filesystem::path targetPath(target);
+    bool isDirectory = false;
+
+    if (targetPath.is_absolute()) {
+        /* For absolute targets, use std::filesystem::status directly */
+        std::error_code ec;
+        auto status = std::filesystem::status(targetPath, ec);
+        isDirectory = !ec && std::filesystem::is_directory(status);
+    } else {
+        /* For relative targets, the target is relative to the symlink's parent directory.
+           Open the parent directory first, then try to open the target relative to it. */
+        Descriptor parentFd = dirFd;
+        AutoCloseFD parentFdOwned;
+
+        auto parentPath = path.path().parent_path();
+        if (!parentPath.empty()) {
+            /* Open the parent directory of the symlink */
+            parentFdOwned = windows::ntOpenAt(dirFd, parentPath.c_str(), FILE_TRAVERSE | SYNCHRONIZE, FILE_DIRECTORY_FILE);
+            parentFd = parentFdOwned.get();
+        }
+
+        /* Try to open the target as a directory and verify with fstat. */
+        auto result = windows::maybeNtOpenAt(
+            parentFd, targetPath.make_preferred().wstring(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_DIRECTORY_FILE);
+        if (result) {
+            auto st = fstat(result.value().get());
+            isDirectory = S_ISDIR(st.st_mode);
+        }
+    }
+
+    if (isDirectory)
+        createDirectorySymlinkAt(dirFd, path, target);
+    else
+        createFileSymlinkAt(dirFd, path, target);
+}
+
+outcome::unchecked<AutoCloseFD, std::error_code>
+openDirectoryAt(Descriptor dirFd, const OsCanonPath & path, bool create)
+{
+    assert(!path.empty());
+
+    // Use FILE_OPEN_REPARSE_POINT to avoid following symlinks
+    auto result = windows::maybeNtOpenAt(
+        dirFd,
+        path.c_str(),
+        FILE_TRAVERSE | SYNCHRONIZE,
+        FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT,
+        create ? FILE_CREATE : FILE_OPEN);
+    if (result)
+        return std::move(result.value());
+
+    return outcome::failure(std::error_code(RtlNtStatusToDosError(result.error()), std::system_category()));
+}
 
 PosixStat fstat(Descriptor fd)
 {
@@ -228,17 +379,41 @@ PosixStat fstat(Descriptor fd)
     return st;
 }
 
+PosixStat fstatat(Descriptor dirFd, const OsCanonPath & path)
+{
+    assert(!path.empty());
+
+    /* Open the file without following symlinks */
+    auto handle = windows::ntOpenAt(dirFd, path.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+
+    return fstat(handle.get());
+}
+
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const OsCanonPath & path)
+{
+    assert(!path.empty());
+
+    auto result =
+        windows::maybeNtOpenAt(dirFd, path.c_str(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+    if (result)
+        return fstat(result.value().get());
+
+    auto lastError = RtlNtStatusToDosError(result.error());
+    if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+        return std::nullopt;
+    throw windows::WinError(lastError, "getting status of %s", PathFmt(descriptorToPath(dirFd) / path.path()));
+}
+
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
     Descriptor dirFd,
-    const CanonPath & path,
+    const OsCanonPath & path,
     ACCESS_MASK desiredAccess,
     ULONG createOptions,
     ULONG createDisposition,
     /* FIXME: Actually call this callback. */
-    [[maybe_unused]] std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback)
+    [[maybe_unused]] std::function<void(AutoCloseFD dirFd, OsCanonPath relPath)> dirFdCallback)
 {
-    assert(!path.isRoot());
-    assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
+    assert(!path.empty());
 
     AutoCloseFD parentFd;
     auto nrComponents = std::ranges::distance(path);
@@ -246,21 +421,19 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     auto components = std::views::take(path, nrComponents - 1); /* Everything but last component */
     auto getParentFd = [&]() { return parentFd ? parentFd.get() : dirFd; };
 
-    /* Helper to construct CanonPath from components up to (and including) the given iterator */
+    /* Helper to construct OsCanonPath from components up to (and including) the given iterator */
     auto pathUpTo = [&](auto it) {
-        return std::ranges::fold_left(components.begin(), it, CanonPath::root, [](auto lhs, auto rhs) {
-            lhs.push(rhs);
-            return lhs;
-        });
+        return std::ranges::fold_left(
+            components.begin(), it, OsCanonPath{}, [](OsCanonPath acc, const OsFilename & comp) { return acc / comp; });
     };
 
     /* Helper to check if a component is a symlink and throw SymlinkNotAllowed if so */
-    auto throwIfSymlink = [&](std::wstring_view component, const CanonPath & pathForError) {
+    auto throwIfSymlink = [&](std::wstring_view component, const OsCanonPath & pathForError) {
         try {
             auto testHandle = windows::ntOpenAt(
                 getParentFd(), component, FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
             if (windows::isReparsePoint(testHandle.get()))
-                throw SymlinkNotAllowed(pathForError);
+                throw SymlinkNotAllowed(pathForError.path());
         } catch (SymlinkNotAllowed &) {
             throw;
         } catch (...) {
@@ -271,63 +444,89 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     /* Iterate through each path component to ensure no symlinks in intermediate directories.
      * This prevents TOCTOU issues by opening each component relative to the parent. */
     for (auto it = components.begin(); it != components.end(); ++it) {
-        std::wstring wcomponent = string_to_os_string(std::string(*it));
+        auto wcomponent = (*it).path().native();
 
         /* Open directory without following symlinks */
-        AutoCloseFD parentFd2;
-        try {
-            parentFd2 = windows::ntOpenAt(
-                getParentFd(),
-                wcomponent,
-                FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
-                FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
-            );
-        } catch (windows::WinError & e) {
-            /* Check if this is because it's a symlink */
-            if (e.lastError == ERROR_CANT_ACCESS_FILE || e.lastError == ERROR_ACCESS_DENIED) {
+        auto result = windows::maybeNtOpenAt(
+            getParentFd(),
+            wcomponent,
+            FILE_TRAVERSE | SYNCHRONIZE,                  // Just need traversal rights
+            FILE_DIRECTORY_FILE | FILE_OPEN_REPARSE_POINT // Open directory, don't follow symlinks
+        );
+        if (!result) {
+            auto lastError = RtlNtStatusToDosError(result.error());
+            /* Check if this is because it's a symlink - these errors can indicate
+               we tried to traverse through a symlink or open a symlink as a directory */
+            if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_ACCESS_DENIED
+                || lastError == ERROR_INVALID_NAME || lastError == ERROR_DIRECTORY) {
                 throwIfSymlink(wcomponent, pathUpTo(std::next(it)));
             }
-            throw;
+            /* ERROR_DIRECTORY means the component is not a directory (e.g., it's a file).
+               Return invalid handle to indicate the path doesn't exist.
+               Set the Win32 error so the caller can inspect it. */
+            if (lastError == ERROR_DIRECTORY || lastError == ERROR_FILE_NOT_FOUND
+                || lastError == ERROR_PATH_NOT_FOUND) {
+                SetLastError(lastError);
+                return AutoCloseFD{};
+            }
+            throw windows::WinError(lastError, "opening directory component '%s'", PathFmt(pathUpTo(std::next(it)).path()));
         }
 
         /* Check if what we opened is actually a symlink */
-        if (windows::isReparsePoint(parentFd2.get())) {
-            throw SymlinkNotAllowed(pathUpTo(std::next(it)));
+        if (windows::isReparsePoint(result.value().get())) {
+            throw SymlinkNotAllowed(pathUpTo(std::next(it)).path());
         }
 
-        parentFd = std::move(parentFd2);
+        parentFd = std::move(result.value());
     }
 
     /* Now open the final component with requested flags */
-    std::wstring finalComponent = string_to_os_string(std::string(path.baseName().value()));
+    auto finalComponent = path.path().filename().native();
 
-    AutoCloseFD finalHandle;
-    try {
-        finalHandle = windows::ntOpenAt(
-            getParentFd(),
-            finalComponent,
-            desiredAccess,
-            createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
-            createDisposition);
-    } catch (windows::WinError & e) {
-        /* Check if final component is a symlink when we requested to not follow it */
-        if (e.lastError == ERROR_CANT_ACCESS_FILE) {
+    auto finalResult = windows::maybeNtOpenAt(
+        getParentFd(),
+        finalComponent,
+        desiredAccess,
+        createOptions | FILE_OPEN_REPARSE_POINT, // Don't follow symlinks on final component either
+        createDisposition);
+    if (!finalResult) {
+        auto lastError = RtlNtStatusToDosError(finalResult.error());
+        /* Check if final component is a symlink when we requested to not follow it. */
+        if (lastError == ERROR_CANT_ACCESS_FILE || lastError == ERROR_INVALID_NAME) {
             throwIfSymlink(finalComponent, path);
         }
-        throw;
+        /* We suspect Wine incorrectly returns ERROR_DIRECTORY when opening a
+           directory symlink with FILE_OPEN_REPARSE_POINT | FILE_DIRECTORY_FILE,
+           as if it doesn't realize the reparse point itself is directory-typed.
+           Real Windows probably opens it successfully and hits the
+           isReparsePoint check below instead. Not yet verified on real Windows.
+
+           This is Claude's guess, but @Ericson3214 found it plausible enough of
+           a Wine bug to go ahead and do it. This keeps the unit tests passing in
+           Wine now, and if they fail on real Windows (without taking this
+           branch), then we'll update the code and this comment accordingly. On
+           the other hand, if they don't fail, then we'll avoid this bogus
+           "directory is actually symlink" stuff on real Windows where it
+           counts, and we'll have the evidence we need to submit a Wine bug.
+         */
+        if (lastError == ERROR_DIRECTORY && windows::isWine()) {
+            throwIfSymlink(finalComponent, path);
+        }
+        /* Return invalid handle for ENOENT/EEXIST style errors, or when trying to
+           open a non-directory as a directory (ERROR_DIRECTORY).
+           Set the Win32 error so the caller can inspect it. */
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_FILE_EXISTS || lastError == ERROR_DIRECTORY) {
+            SetLastError(lastError);
+            return AutoCloseFD{};
+        }
+        throw windows::WinError(lastError, "opening file '%s'", PathFmt(path.path()));
     }
 
     /* Final check: did we accidentally open a symlink? */
-    if (windows::isReparsePoint(finalHandle.get()))
-        throw SymlinkNotAllowed(path);
+    if (windows::isReparsePoint(finalResult.value().get()))
+        throw SymlinkNotAllowed(path.path());
 
-    return finalHandle;
-}
-
-OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
-{
-    AutoCloseFD linkHandle(windows::openSymlinkAt(dirFd, path));
-    return windows::readSymlinkTarget(linkHandle.get());
+    return std::move(finalResult.value());
 }
 
 } // namespace nix

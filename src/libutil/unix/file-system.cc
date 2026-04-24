@@ -167,9 +167,9 @@ static void _deletePath(
     }
 #endif
 
-    auto name = CanonPath::fromFilename(path.filename().native());
+    auto name = OsFilename{path.filename()};
 
-    auto st_ = maybeFstatat(parentfd, name.rel());
+    auto st_ = maybeFstatat(parentfd, OsCanonPath{name});
     if (!st_)
         return;
     auto & st = *st_;
@@ -203,7 +203,7 @@ static void _deletePath(
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
         if ((st.st_mode & PERM_MASK) != PERM_MASK)
             try {
-                unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
+                unix::fchmodatTryNoFollow(parentfd, OsCanonPath{name}, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
                 e.addTrace({}, "while making directory %1% accessible for deletion", PathFmt(path));
                 if (e.errNo == EOPNOTSUPP)
@@ -211,7 +211,7 @@ static void _deletePath(
                 throw;
             }
 
-        int fd = openat(parentfd, name.rel_c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
+        int fd = openat(parentfd, name.c_str(), O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
         if (fd == -1)
             throw SysError("opening directory %1%", PathFmt(path));
         AutoCloseDir dir(fdopendir(fd));
@@ -231,7 +231,7 @@ static void _deletePath(
     }
 
     int flags = S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0;
-    if (unlinkat(parentfd, name.rel_c_str(), flags) == -1) {
+    if (unlinkat(parentfd, name.c_str(), flags) == -1) {
         if (errno == ENOENT)
             return;
         try {
@@ -251,7 +251,9 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
     auto parentDirPath = path.parent_path();
     assert(parentDirPath != path);
 
-    AutoCloseFD dirfd = openDirectory(parentDirPath);
+    /* It's ok to follow symlinks in the parent since we only need to
+       ensure that there's no TOCTOU when traversing inside the path. */
+    AutoCloseFD dirfd = openDirectory(parentDirPath, FinalSymlink::Follow);
     if (!dirfd) {
         if (errno == ENOENT)
             return;
