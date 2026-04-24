@@ -764,9 +764,9 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
         } else if (std::get_if<ChildEOF>(&event)) {
             buildLog->flush();
             break;
-        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
+        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
             hook.reset();
-            co_return doneFailure(std::move(*timeout));
+            co_return doneFailure(std::move(**timeout));
         }
     }
 
@@ -1035,9 +1035,9 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         } else if (std::get_if<ChildEOF>(&event)) {
             buildLog->flush();
             break;
-        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
+        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
             builder->killChild();
-            co_return doneFailure(std::move(*timeout));
+            co_return doneFailure(std::move(**timeout));
         }
     }
 

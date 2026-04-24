@@ -37,7 +37,8 @@ struct DerivationResolutionGoal : public Goal
 {
     friend class Worker;
 
-    DerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode);
+    DerivationResolutionGoal(
+        const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode);
 
     /**
      * If the derivation needed to be resolved, this is resulting
@@ -55,7 +56,7 @@ private:
     /**
      * The derivation stored at drvPath.
      */
-    std::unique_ptr<Derivation> drv;
+    ref<const Derivation> drv;
 
     /**
      * The remainder is state held during the build.

@@ -265,7 +265,7 @@ public:
      * @ref DerivationResolutionGoal "derivation resolution goal"
      */
     std::shared_ptr<DerivationResolutionGoal>
-    makeDerivationResolutionGoal(const StorePath & drvPath, const Derivation & drv, BuildMode buildMode);
+    makeDerivationResolutionGoal(const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode);
 
     /**
      * @ref DerivationBuildingGoal "derivation building goal"
