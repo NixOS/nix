@@ -346,7 +346,7 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
         return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
     } catch (SymlinkNotAllowed & e) {
         /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */
-        throw SymlinkNotAllowed(anchor / e.path, "path '%s' is a symlink", showPath(anchor / e.path));
+        throw SymlinkNotAllowed(anchor / e.path, "path '%s' (or its ancestor) is a symlink", showPath(anchor / e.path));
     }
 }
 
@@ -420,7 +420,7 @@ void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink,
 
     auto st = nix::fstat(fileFd.get());
     if (!S_ISREG(st.st_mode))
-        throw Error("file '%s' has an unsupported type", showPath(path));
+        throw NotARegularFile("file '%s' is not a regular file", showPath(path));
     PosixFileSourceAccessor fileAccessor(std::move(fileFd), fsPath / path.rel(), trackLastModified, st);
     maybeUpdateMtime(st.st_mtime);
     fileAccessor.readFile(CanonPath::root, sink, sizeCallback);
