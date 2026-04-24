@@ -460,7 +460,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
 void RemoteStore::addMultipleToStore(
     PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (getConnection()->protoVersion < WorkerProto::Version{.number = {1, 32}}) {
+    if (getConnection()->protoVersion.number < WorkerProto::Version::Number{1, 32}) {
         Store::addMultipleToStore(std::move(pathsToCopy), act, repair, checkSigs);
         return;
     }
