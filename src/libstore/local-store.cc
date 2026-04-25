@@ -432,6 +432,12 @@ LocalStore::~LocalStore()
         future.get();
     }
 
+    {
+        auto state(_state->lock());
+        if (state->gcThread.joinable())
+            state->gcThread.join();
+    }
+
     try {
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
