@@ -4,6 +4,10 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
 
+#ifdef __APPLE__
+#  include "nix/store/spotlight-apps.hh"
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -239,6 +243,12 @@ void switchLink(std::filesystem::path link, std::filesystem::path target)
         target = target.filename();
 
     replaceSymlink(target, link);
+
+#ifdef __APPLE__
+    /* Best-effort macOS Spotlight integration for `.app` bundles - see
+       nix/store/spotlight-apps.hh. Issue: NixOS/nix#7055. */
+    nix::darwin::syncProfileAppBundles(link);
+#endif
 }
 
 void switchGeneration(const std::filesystem::path & profile, std::optional<GenerationNumber> dstGen, bool dryRun)
