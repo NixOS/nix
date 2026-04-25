@@ -40,6 +40,7 @@ enum struct HttpStatus : long {
     NoContent = 204,
     PartialContent = 206,
     NotModified = 304,
+    BadRequest = 400,
     Unauthorized = 401,
     Forbidden = 403,
     NotFound = 404,
@@ -131,7 +132,7 @@ struct curlMultiError final : CloneableError<curlMultiError, Error>
 
 } // namespace
 
-struct curlFileTransfer : public FileTransfer
+struct curlFileTransfer : public FileTransfer, public std::enable_shared_from_this<curlFileTransfer>
 {
     const FileTransferSettings & settings;
 
@@ -191,6 +192,20 @@ struct curlFileTransfer : public FileTransfer
         bool hasContentEncoding:1 = false;
 
         /**
+         * Whether this item has been parked on the credential broker since its
+         * last 2xx response. Passed to credentialHook->shouldRefresh() so the
+         * hook can decline a second refresh (clock skew, server-side revocation
+         * — the refresh didn't help). Cleared on 2xx so a long Range-resumable
+         * download spanning multiple token lifetimes can refresh more than once.
+         *
+         * Not a bitfield: belt-and-suspenders. parkOnCredentials() sets it
+         * synchronously on the parking thread (sequential with the worker's
+         * post-finish() bitfield writes), but keeping it out of the shared
+         * byte means a future reshuffle can't reintroduce the race.
+         */
+        bool credsRefreshedSinceLast2xx = false;
+
+        /**
          * Server-provided minimum retry delay, parsed from the `Retry-After`
          * response header. Reset on each new HTTP status line, and consumed
          * (cleared) by maybeRetry() so it applies to at most one retry attempt.
@@ -229,6 +244,21 @@ struct curlFileTransfer : public FileTransfer
             requestHeaders = std::move(tmpSList);
         }
 
+        void buildRequestHeaders()
+        {
+            requestHeaders.reset();
+            if (!request.expectedETag.empty())
+                appendHeaders("If-None-Match: " + request.expectedETag);
+            if (!request.mimeType.empty())
+                appendHeaders("Content-Type: " + request.mimeType);
+            for (const auto & [name, value] : request.headers)
+                appendHeaders(fmt("%s: %s", name, value));
+#if NIX_WITH_AWS_AUTH
+            if (request.awsSessionToken)
+                appendHeaders("x-amz-security-token: " + *request.awsSessionToken);
+#endif
+        }
+
         TransferItem(
             curlFileTransfer & fileTransfer,
             const FileTransferRequest & request,
@@ -261,14 +291,7 @@ struct curlFileTransfer : public FileTransfer
             })
         {
             result.urls.push_back(request.uri.to_string());
-
-            if (!request.expectedETag.empty())
-                appendHeaders("If-None-Match: " + request.expectedETag);
-            if (!request.mimeType.empty())
-                appendHeaders("Content-Type: " + request.mimeType);
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                appendHeaders(fmt("%s: %s", it->first, it->second));
-            }
+            buildRequestHeaders();
         }
 
         ~TransferItem()
@@ -367,13 +390,26 @@ struct curlFileTransfer : public FileTransfer
             std::string line((char *) contents, realSize);
             printMsg(lvlVomit, "got header for '%s': %s", request.displayUri(), trim(line));
 
-            static std::regex statusLine("HTTP/[^ ]+ +[0-9]+(.*)", std::regex::extended | std::regex::icase);
+            static std::regex statusLine("HTTP/[^ ]+ +([0-9]+)(.*)", std::regex::extended | std::regex::icase);
             if (std::smatch match; std::regex_match(line, match, statusLine)) {
+                auto statusCode = string2Int<int>(match.str(1)).value_or(0);
                 result.etag = "";
                 result.data.clear();
                 result.bodySize = 0;
-                statusMsg = trim(match.str(1));
-                acceptRanges = false;
+                statusMsg = trim(match.str(2));
+                // An error response doesn't carry Accept-Ranges, but it also
+                // doesn't revoke the server's range support established by a
+                // prior 2xx. Preserve across 3xx/4xx/5xx so a 403-on-resume
+                // can still retry after a credential refresh — a redirect hop
+                // (CURLOPT_FOLLOWLOCATION) doesn't carry Accept-Ranges either.
+                if (statusCode >= 200 && statusCode < 300) {
+                    acceptRanges = false;
+                    // A 2xx confirms the refreshed creds work — clear the
+                    // loop-guard so a future expiry can refresh again. 1xx
+                    // (100 Continue) and 3xx (FOLLOWLOCATION hops) don't
+                    // validate auth.
+                    credsRefreshedSinceLast2xx = false;
+                }
                 hasContentEncoding = false;
                 retryAfterMs = std::nullopt;
                 appendCurrentUrl();
@@ -585,6 +621,10 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
+            // Proxy CONNECT responses confuse headerCallback — a "200 Connection
+            // established" is not an origin 2xx and shouldn't reset per-response
+            // state (acceptRanges, credsRefreshedSinceLast2xx).
+            curl_easy_setopt(req, CURLOPT_SUPPRESS_CONNECT_HEADERS, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(
                 req,
@@ -761,9 +801,26 @@ struct curlFileTransfer : public FileTransfer
                     // The file is definitely not there
                     err = NotFound;
                 } else if (
-                    httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::Forbidden
-                    || httpStatus == HttpStatus::ProxyAuthRequired) {
-                    // Don't retry on authentication/authorization failures
+                    request.credentialHook
+                    && request.credentialHook->shouldRefresh(
+                        request,
+                        httpStatus,
+                        errorSink ? std::string_view{errorSink->s} : "",
+                        credsRefreshedSinceLast2xx)
+                    // Mid-stream resume only works via Range; if the server (or
+                    // a redirect hop) didn't advertise it, the refresh would
+                    // produce a fresh 200 the sink can't accept.
+                    && (writtenToSink == 0 || (acceptRanges && !hasContentEncoding))) {
+                    // Park on the broker — no doomed retry. parkOnCredentials
+                    // sets credsRefreshedSinceLast2xx; the broker calls
+                    // fetchAndApply and re-enqueues. attempt is not
+                    // incremented; the loop-guard is the flag, not the budget.
+                    errorSink.reset();
+                    fileTransfer.parkOnCredentials(ref{shared_from_this()});
+                    return;
+                } else if (httpStatus == HttpStatus::Forbidden) {
+                    err = Forbidden;
+                } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
                     err = Forbidden;
                 } else if (
                     httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
@@ -877,6 +934,17 @@ struct curlFileTransfer : public FileTransfer
             }();
 
             if (!canRetry) {
+                // The credential broker released this item with no credentials
+                // applied — fetchAndApply returned false. Surface "provider"
+                // not "permissions"; once per process so cache-miss probes
+                // against a broken chain don't spam.
+                if (request.credentialHook && !request.usernameAuth && httpStatus == HttpStatus::Forbidden) {
+                    static std::atomic<bool> haveWarned{false};
+                    warnOnce(
+                        haveWarned,
+                        "credential provider returned no credentials; "
+                        "run with -vvvvv to see the provider's debug output");
+                }
                 fail(std::move(exc));
                 return;
             }
@@ -928,6 +996,21 @@ struct curlFileTransfer : public FileTransfer
 
         std::priority_queue<ref<TransferItem>, std::vector<ref<TransferItem>>, EmbargoComparator> incoming;
         std::vector<std::weak_ptr<Item>> unpause;
+
+        /**
+         * Credential broker: items parked here are not in `incoming` and the
+         * worker won't touch them. One detached fetch thread per key; on
+         * completion it applies credentials, moves waiters into `incoming`,
+         * and calls wakeupMulti().
+         */
+        struct CredentialBrokerEntry
+        {
+            std::vector<ref<TransferItem>> waiters;
+            bool inFlight = false;
+        };
+
+        std::map<std::string, CredentialBrokerEntry> credentialBroker;
+
     private:
         bool quitting = false;
     public:
@@ -938,6 +1021,7 @@ struct curlFileTransfer : public FileTransfer
             while (!incoming.empty())
                 incoming.pop();
             unpause.clear();
+            credentialBroker.clear();
         }
 
         bool isQuitting()
@@ -1154,13 +1238,123 @@ struct curlFileTransfer : public FileTransfer
     ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
-        if (request.uri.scheme() == "s3") {
-            auto modifiedRequest = request;
-            modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-        }
+        ref<TransferItem> item = [&] {
+            if (request.uri.scheme() == "s3") {
+                auto modifiedRequest = request;
+                modifiedRequest.setupForS3();
+                return make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback));
+            }
+            return make_ref<TransferItem>(*this, request, std::move(callback));
+        }();
 
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        // Cold-start: the credential hook is set but the synchronous fetch
+        // failed. Park on the broker instead of firing a doomed unauthenticated
+        // request — the broker re-enqueues once the fetch lands.
+        if (item->request.credentialHook && !item->request.usernameAuth) {
+            item->enqueued = true;
+            parkOnCredentials(item);
+            return ItemHandle(item.get_ptr());
+        }
+        return enqueueItem(item);
+    }
+
+    /**
+     * Park an item on the credential broker. If no fetch is in flight for its
+     * key, spawn one detached thread; otherwise just add to waiters. The item
+     * is NOT in state->incoming while parked — no doomed requests.
+     */
+    void parkOnCredentials(ref<TransferItem> item)
+    {
+        auto & hook = *item->request.credentialHook;
+        // Set on the parking thread (worker for finish(), caller for cold-
+        // start) — never on the broker thread, which would race the worker's
+        // post-finish() bitfield writes.
+        item->credsRefreshedSinceLast2xx = true;
+        bool spawn;
+        {
+            auto state(state_.lock());
+            if (state->isQuitting())
+                return; // ~TransferItem will fail() it
+            auto & entry = state->credentialBroker[hook.key];
+            entry.waiters.push_back(item);
+            spawn = !std::exchange(entry.inFlight, true);
+        }
+        if (!spawn)
+            return;
+
+        // One fetch thread per key; late arrivals during the slow fetch join
+        // waiters and the thread loops to drain them (subsequent iterations
+        // hit the now-warm provider cache). Captures weak_ptr so a process
+        // shutting down between spawn and lock just drops everything.
+        try {
+            std::thread([self = weak_from_this(), key = hook.key]() {
+                try {
+                    if (auto ft = self.lock())
+                        ft->releaseCredentialWaiters(key, /*doFetch=*/true);
+                } catch (...) {
+                    // wakeupMulti() / appendHeaders() can throw; an exception
+                    // escaping a std::thread entry calls std::terminate().
+                    ignoreExceptionExceptInterrupt();
+                }
+            }).detach();
+        } catch (const std::system_error & e) {
+            // Thread spawn failed (EAGAIN under ulimit -u). Re-enqueue waiters
+            // without fetching — they'll fire with whatever creds they have,
+            // and credsRefreshedSinceLast2xx=true makes the hook decline next
+            // time. Don't run fetchAndApply inline (would block the worker).
+            debug("failed to spawn credential fetch thread: %s", e.what());
+            releaseCredentialWaiters(hook.key, /*doFetch=*/false);
+        }
+    }
+
+    /**
+     * Drain waiters[key], optionally calling fetchAndApply on each (first call
+     * does the real fetch; rest hit the provider's cache on success, or are
+     * skipped on failure since the cache doesn't negative-cache), then
+     * re-enqueue. Loops until no late arrivals; clears inFlight only at exit.
+     */
+    void releaseCredentialWaiters(const std::string & key, bool doFetch)
+    {
+        for (;;) {
+            std::vector<ref<TransferItem>> batch;
+            {
+                auto state(state_.lock());
+                auto it = state->credentialBroker.find(key);
+                if (it == state->credentialBroker.end())
+                    return;
+                if (it->second.waiters.empty()) {
+                    it->second.inFlight = false;
+                    return;
+                }
+                batch = std::move(it->second.waiters);
+                it->second.waiters.clear();
+            }
+
+            for (auto & item : batch) {
+                // Item is parked (not in incoming, not in worker's items map);
+                // request and requestHeaders are separate memory locations
+                // from the bitfield byte the worker may still be touching.
+                //
+                // CredentialsProviderCached doesn't negative-cache: if the
+                // first fetch fails, calls 2..N would re-walk the chain
+                // serially (up to 30s each on a blackholed IMDS). Short-
+                // circuit — the rest fire with whatever creds they have and
+                // credsRefreshedSinceLast2xx makes the hook decline next time.
+                if (doFetch && !item->request.credentialHook->fetchAndApply(item->request))
+                    doFetch = false;
+                item->buildRequestHeaders();
+                item->embargo = std::chrono::steady_clock::now();
+            }
+
+            {
+                auto state(state_.lock());
+                if (state->isQuitting())
+                    return;
+                for (auto & item : batch)
+                    state->incoming.push(item);
+            }
+            wakeupMulti();
+        }
     }
 
     void unpauseTransfer(std::weak_ptr<Item> item)
@@ -1223,19 +1417,65 @@ void FileTransferRequest::setupForS3()
     awsSigV4Provider = "aws:amz:" + parsedS3.region.value_or("us-east-1") + ":s3";
 
     // check if the request already has pre-resolved credentials
-    std::optional<std::string> sessionToken;
     if (usernameAuth) {
         debug("Using pre-resolved AWS credentials from parent process");
-        sessionToken = preResolvedAwsSessionToken;
-    } else if (auto creds = getAwsCredentialsProvider()->maybeGetCredentials(parsedS3)) {
-        usernameAuth = UsernameAuth{
-            .username = creds->accessKeyId,
-            .password = creds->secretAccessKey,
+        awsSessionToken = preResolvedAwsSessionToken;
+    } else {
+        auto provider = getAwsCredentialsProvider();
+        // tryGetCredentials is noexcept and must not touch nix::logger — the
+        // broker calls it from a detached thread that isn't joined by any
+        // destructor (residual risk at -vvvvv via the AWS CRT log hook).
+        auto fetchAndApply = [provider, s3Url = parsedS3](FileTransferRequest & req) -> bool {
+            auto creds = provider->tryGetCredentials(s3Url);
+            if (!creds)
+                return false;
+            req.usernameAuth = UsernameAuth{
+                .username = std::move(creds->accessKeyId),
+                .password = std::move(creds->secretAccessKey),
+            };
+            req.awsSessionToken = std::move(creds->sessionToken);
+            return true;
         };
-        sessionToken = creds->sessionToken;
+        // S3 documents ExpiredToken/TokenRefreshRequired as HTTP 400
+        // (https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html);
+        // AccessDenied (missing key in unlistable bucket) is 403. Check the
+        // body <Code> status-agnostic — AWS SDKs do the same.
+        auto shouldRefresh = [](const FileTransferRequest & req,
+                                long httpStatus,
+                                std::string_view body,
+                                bool refreshedSinceLast2xx) -> bool {
+            if (refreshedSinceLast2xx)
+                return false;
+            if (httpStatus != std::to_underlying(HttpStatus::Forbidden)
+                && httpStatus != std::to_underlying(HttpStatus::BadRequest))
+                return false;
+            // No creds yet (cold-start) — the 403 is AccessDenied from an
+            // unauthenticated request, expected. The broker has already been
+            // tried once if refreshedSinceLast2xx; here it's the first time.
+            if (!req.usernameAuth)
+                return httpStatus == std::to_underlying(HttpStatus::Forbidden);
+            // HEAD has no body, so we can't read <Code>. With creds set, a
+            // 400 on S3 is overwhelmingly ExpiredToken (fileExists() HEADs
+            // before every NAR upload during `nix copy`, so this matters).
+            // refreshedSinceLast2xx bounds us to one speculative retry; a
+            // genuine InvalidRequest costs one extra round-trip then fails
+            // as before. 403 (unlistable-bucket missing key) still declines.
+            if (body.empty())
+                return httpStatus == std::to_underlying(HttpStatus::BadRequest);
+            static const std::regex codeRe("<Code>(ExpiredToken|TokenRefreshRequired)</Code>", std::regex::optimize);
+            return std::regex_search(body.begin(), body.end(), codeRe);
+        };
+        credentialHook = CredentialHook{
+            .key = parsedS3.profile.value_or("") + '\0' + parsedS3.region.value_or(""),
+            .shouldRefresh = std::move(shouldRefresh),
+            .fetchAndApply = std::move(fetchAndApply),
+        };
+
+        // One synchronous attempt — hot cache is instant. On failure the item
+        // is parked at enqueue time (no doomed first 403).
+        if (!credentialHook->fetchAndApply(*this))
+            debug("initial AWS credential fetch failed; will park on broker");
     }
-    if (sessionToken)
-        headers.emplace_back("x-amz-security-token", *sessionToken);
 #else
     // When built without AWS support, just try as public bucket
     debug("S3 request without authentication (built without AWS support)");
