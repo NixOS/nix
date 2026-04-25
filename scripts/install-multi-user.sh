@@ -472,6 +472,9 @@ EOF
         # TODO: I think it would be good to accumulate a list of all
         #       of the copies so that people don't hit this 2 or 3x in
         #       a row for different files.
+        if [ -n "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+            continue
+        fi
         if [ -e "$profile_target$PROFILE_BACKUP_SUFFIX" ]; then
             # this backup process first released in Nix 2.1
 
@@ -784,14 +787,16 @@ I will:
  - set up the "default profile" by creating some Nix-related files in
    $ROOT_HOME
 EOF
-        for profile_target in "${PROFILE_TARGETS[@]}"; do
-            if [ -e "$profile_target" ]; then
-                cat <<EOF
+        if [ -z "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+            for profile_target in "${PROFILE_TARGETS[@]}"; do
+                if [ -e "$profile_target" ]; then
+                    cat <<EOF
  - back up $profile_target to $profile_target$PROFILE_BACKUP_SUFFIX
  - update $profile_target to include some Nix configuration
 EOF
-            fi
-        done
+                fi
+            done
+        fi
         poly_service_setup_note
         if ! ui_confirm "Ready to continue?"; then
             failure <<EOF
@@ -909,6 +914,11 @@ EOF
 }
 
 configure_shell_profile() {
+    if [ -n "${NIX_INSTALLER_NO_MODIFY_PROFILE:-}" ]; then
+        reminder "Skipping shell profile modification (--no-modify-profile). To use Nix, manually source:"
+        reminder "  ${PROFILE_NIX_FILE}"
+        return
+    fi
     task "Setting up shell profiles: ${PROFILE_TARGETS[*]}"
     for profile_target in "${PROFILE_TARGETS[@]}"; do
         if [ -e "$profile_target" ]; then
