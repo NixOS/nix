@@ -109,13 +109,20 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
 void bind(Socket fd, const std::filesystem::path & path)
 {
     tryUnlink(path);
-
+#ifdef __FreeBSD__
+    bindConnectProcHelper("bind", ::bindat, fd, path.string());
+#else
     bindConnectProcHelper("bind", ::bind, fd, path.string());
-}
+#endif
+} // namespace nix
 
 void connect(Socket fd, const std::filesystem::path & path)
 {
+#ifdef __FreeBSD__
+    bindConnectProcHelper("connect", ::connectat, fd, path.string());
+#else
     bindConnectProcHelper("connect", ::connect, fd, path.string());
+#endif
 }
 
 AutoCloseFD connect(const std::filesystem::path & path)
