@@ -417,9 +417,9 @@ void printFreed(bool dryRun, const GCResults & results)
 {
     /* bytesFreed cannot be reliably computed without actually deleting store paths because of hardlinking. */
     if (dryRun)
-        std::cout << fmt("%d store paths would be deleted\n", results.paths.size());
+        logger->cout("%d store paths would be deleted", results.paths.size());
     else
-        std::cout << fmt("%d store paths deleted, %s freed\n", results.paths.size(), renderSize(results.bytesFreed));
+        logger->cout("%d store paths deleted, %s freed", results.paths.size(), renderSize(results.bytesFreed));
 }
 
 } // namespace nix
