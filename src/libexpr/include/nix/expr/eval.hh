@@ -134,6 +134,14 @@ struct PrimOp
     bool internal = false;
 
     /**
+     * If true, this primop was registered via `extraPrimOps` (e.g. from
+     * a plugin or flake subsystem) rather than being a core Nix builtin.
+     * Used by `builtins.serializeFunction` to detect primops that may
+     * not be available in the deserialization environment.
+     */
+    bool isPluginPrimOp = false;
+
+    /**
      * Validity check to be performed by functions that introduce primops,
      * such as RegisterPrimOp() and Value::mkPrimOp().
      */

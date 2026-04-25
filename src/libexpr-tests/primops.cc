@@ -5,6 +5,7 @@
 #include "nix/util/memory-source-accessor.hh"
 
 #include "nix/expr/tests/libexpr.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 namespace nix {
 class CaptureLogger : public Logger
@@ -631,9 +632,671 @@ TEST_F(PrimOpTest, toStringAttrsThrows)
     ASSERT_THROW(eval("builtins.toString {}"), EvalError);
 }
 
-TEST_F(PrimOpTest, toStringLambdaThrows)
+TEST_F(PrimOpTest, toStringLambda)
 {
-    ASSERT_THROW(eval("builtins.toString (x: x)"), EvalError);
+    auto v = eval("builtins.toString (x: x)");
+    ASSERT_THAT(v, IsStringEq("(x: x)"));
+}
+
+TEST_F(PrimOpTest, toStringLambdaWithFormals)
+{
+    auto v = eval("builtins.toString ({ a, b ? 1 }: a)");
+    ASSERT_THAT(v, IsStringEq("({ a, b ? 1 }: a)"));
+}
+
+TEST_F(PrimOpTest, toStringPrimOp)
+{
+    auto v = eval("builtins.toString builtins.head");
+    ASSERT_THAT(v, IsStringEq("builtins.head"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionSimple)
+{
+    auto v = eval("builtins.serializeFunction (x: x)");
+    ASSERT_THAT(v, IsStringEq("(x: x)"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionWithClosure)
+{
+    auto v = eval("let x = 1; in builtins.serializeFunction (y: x + y)");
+    ASSERT_THAT(v, IsStringEq("(let x = 1; in (y: (x + y)))"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionWithMultipleCaptured)
+{
+    auto v = eval("let x = 1; y = 2; in builtins.serializeFunction (z: x + y + z)");
+    ASSERT_THAT(v, IsStringEq("(let x = 1; y = 2; in (z: ((x + y) + z)))"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionWithStringClosure)
+{
+    auto v = eval(R"(let name = "world"; in builtins.serializeFunction (x: "hello ${name}"))");
+    ASSERT_THAT(v, IsStringEq(R"((let name = "world"; in (x: ("hello " + name))))"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionNoClosure)
+{
+    auto v = eval("builtins.serializeFunction ({ a, b ? 1 }: a + b)");
+    ASSERT_THAT(v, IsStringEq("({ a, b ? 1 }: (a + b))"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionPrimOp)
+{
+    auto v = eval("builtins.serializeFunction builtins.head");
+    ASSERT_THAT(v, IsStringEq("builtins.head"));
+}
+
+TEST_F(PrimOpTest, serializeFunctionPrimOpRoundTrip)
+{
+    auto v = eval(R"nix(
+        let f = builtins.deserializeFunction (builtins.serializeFunction builtins.head);
+        in f [42 1 2]
+    )nix");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+TEST_F(PrimOpTest, deserializeFunctionSimple)
+{
+    auto v = eval(R"nix(let f = builtins.deserializeFunction "(x: x + 1)"; in f 41)nix");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+TEST_F(PrimOpTest, deserializeFunctionNonFunctionThrows)
+{
+    ASSERT_THROW(eval(R"nix(builtins.deserializeFunction "42")nix"), EvalError);
+}
+
+TEST_F(PrimOpTest, serializeDeserializeRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          original = let x = 10; in (y: x + y);
+          serialized = builtins.serializeFunction original;
+          restored = builtins.deserializeFunction serialized;
+        in restored 5
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 15);
+}
+
+TEST_F(PrimOpTest, serializeDeserializeRoundTripString)
+{
+    auto v = eval(R"(
+        let
+          greeting = "hello";
+          original = (name: "${greeting} ${name}");
+          serialized = builtins.serializeFunction original;
+          restored = builtins.deserializeFunction serialized;
+        in restored "world"
+    )");
+    ASSERT_THAT(v, IsStringEq("hello world"));
+}
+
+// `toString` for partially applied primops shows only the base name (lossy).
+TEST_F(PrimOpTest, toStringPartiallyAppliedPrimOp)
+{
+    auto v = eval("builtins.toString (builtins.map builtins.head)");
+    ASSERT_THAT(v, IsStringEq("(builtins.map builtins.head)"));
+}
+
+// serializeFunction preserves partially applied primop arguments.
+TEST_F(PrimOpTest, serializeFunctionPartiallyAppliedPrimOp)
+{
+    auto v = eval("builtins.serializeFunction (builtins.map builtins.head)");
+    ASSERT_THAT(v, IsStringEq("(builtins.map builtins.head)"));
+}
+
+// Partially applied primop round-trips through serialize/deserialize.
+TEST_F(PrimOpTest, serializeDeserializePartialPrimOpRoundTrip)
+{
+    auto v = eval(R"nix(
+        let
+          f = builtins.deserializeFunction
+                (builtins.serializeFunction (builtins.map builtins.head));
+        in f [[1 2] [3 4] [5 6]]
+    )nix");
+    ASSERT_EQ(v.type(), nList);
+    ASSERT_EQ(v.listSize(), 3);
+}
+
+// Nested closures: inner closure bindings are now reconstructed.
+TEST_F(PrimOpTest, serializeFunctionNestedClosureRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          inner = let x = 10; in (y: x + y);
+          serialized = builtins.serializeFunction (z: inner z);
+          restored = builtins.deserializeFunction serialized;
+        in restored 5
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 15);
+}
+
+// `with`-bound variables are now captured in serialized output.
+TEST_F(PrimOpTest, serializeFunctionWithBindingCaptured)
+{
+    auto v = eval(R"nix(
+        let
+          serialized = with { greeting = "hi"; };
+            builtins.serializeFunction (x: greeting);
+          restored = builtins.deserializeFunction serialized;
+        in restored null
+    )nix");
+    ASSERT_THAT(v, IsStringEq("hi"));
+}
+
+// Recursive attrset in closure: emits back-reference to let-binding name.
+TEST_F(PrimOpTest, serializeFunctionRecursiveAttrset)
+{
+    auto v = eval("let s = { x = s; }; in builtins.serializeFunction (y: s)");
+    // The let binding is recursive: `let s = { x = s; }; in ...`
+    auto s = std::string(v.string_view());
+    EXPECT_THAT(s, ::testing::HasSubstr("let "));
+    EXPECT_THAT(s, ::testing::HasSubstr("s"));
+}
+
+// Recursive attrset round-trips through serialize/deserialize.
+TEST_F(PrimOpTest, serializeDeserializeRecursiveAttrsetRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          s = { x = s; val = 42; };
+          serialized = builtins.serializeFunction (y: s.val);
+          restored = builtins.deserializeFunction serialized;
+        in restored null
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+// Edge case: closure with list and attrset values round-trips correctly.
+TEST_F(PrimOpTest, serializeDeserializeRoundTripCompound)
+{
+    auto v = eval(R"(
+        let
+          xs = [1 2 3];
+          cfg = { a = true; b = null; };
+        in
+          let
+            serialized = builtins.serializeFunction (f: { inherit xs cfg; val = f; });
+            restored = builtins.deserializeFunction serialized;
+            result = restored 42;
+          in result.xs
+    )");
+    ASSERT_EQ(v.type(), nList);
+    ASSERT_EQ(v.listSize(), 3);
+}
+
+// Edge case: float precision.
+TEST_F(PrimOpTest, serializeFunctionFloatPrecision)
+{
+    auto v = eval(R"(
+        let pi = 3.14159265358979;
+        in builtins.serializeFunction (x: x + pi)
+    )");
+    auto s = std::string(v.string_view());
+    // std::to_string produces 6 decimal places by default.
+    EXPECT_THAT(s, ::testing::HasSubstr("3.141593"));
+}
+
+// Plugin primops: the isPluginPrimOp flag is set for extraPrimOps.
+// We can't easily test the serialization rejection in the test harness
+// (the EvalState is already constructed), but we verify the flag works
+// on a hand-crafted PrimOp.
+TEST_F(PrimOpTest, pluginPrimOpFlagIsSet)
+{
+    auto * v = state.allocValue();
+    v->mkPrimOp(new PrimOp{
+        .name = "fakePlugin",
+        .args = {"x"},
+        .impl = [](EvalState &, const PosIdx, Value **, Value & v) { v.mkNull(); },
+        .isPluginPrimOp = true,
+    });
+    ASSERT_TRUE(v->primOp()->isPluginPrimOp);
+
+    // Built-in primops do not have the flag set.
+    auto builtinHead = eval("builtins.head", false);
+    state.forceValue(builtinHead, noPos);
+    ASSERT_TRUE(builtinHead.isPrimOp());
+    ASSERT_FALSE(builtinHead.primOp()->isPluginPrimOp);
+}
+
+// Attrset form: accepts { fn, allowedPluginPrimOps }.
+TEST_F(PrimOpTest, serializeFunctionAttrsetForm)
+{
+    auto v = eval(R"(
+        builtins.serializeFunction {
+          fn = x: x + 1;
+          allowedPluginPrimOps = [];
+        }
+    )");
+    ASSERT_THAT(v, IsStringEq("(x: (x + 1))"));
+}
+
+// Attrset form without fn attribute throws.
+TEST_F(PrimOpTest, serializeFunctionAttrsetNoFnThrows)
+{
+    ASSERT_THROW(eval("builtins.serializeFunction { }"), EvalError);
+}
+
+// preserveStringContext = false (default): plain string, no appendContext.
+TEST_F(PrimOpTest, serializeFunctionStringContextNotPreservedByDefault)
+{
+    auto v = eval(R"nix(
+        let s = "hello";
+        in builtins.serializeFunction (x: s)
+    )nix");
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
+// preserveStringContext = true: strings with context get appendContext wrapping.
+// We can't easily create real store path context in the test harness, so
+// we verify the flag is accepted and plain strings (no context) are unaffected.
+TEST_F(PrimOpTest, serializeFunctionPreserveStringContextFlagAccepted)
+{
+    auto v = eval(R"nix(
+        builtins.serializeFunction {
+          fn = x: "hello";
+          preserveStringContext = true;
+        }
+    )nix");
+    // Plain string without context: no appendContext wrapping needed.
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
+// Eta-reduction: direct `builtins.head` access is now detected.
+TEST_F(PrimOpTest, serializeFunctionEtaReducesDirectBuiltin)
+{
+    auto v = eval("builtins.serializeFunction (x: builtins.head x)");
+    ASSERT_THAT(v, IsStringEq("builtins.head"));
+}
+
+// Eta-reduction: polyfill in closure normalizes to the underlying primop.
+TEST_F(PrimOpTest, serializeFunctionEtaReducesClosurePolyfill)
+{
+    auto v = eval("let head = builtins.head; in builtins.serializeFunction (x: head x)");
+    ASSERT_THAT(v, IsStringEq("builtins.head"));
+}
+
+// Eta-reduction does not apply when the body does more than forward args.
+TEST_F(PrimOpTest, serializeFunctionNoEtaWhenBodyDiffers)
+{
+    auto v = eval("builtins.serializeFunction (x: builtins.head x + 1)");
+    auto s = std::string(v.string_view());
+    EXPECT_THAT(s, ::testing::HasSubstr("(x:"));
+}
+
+// Multi-arg eta-reduction: `x: y: f x y` reduces to `f`.
+TEST_F(PrimOpTest, serializeFunctionEtaReducesMultiArg)
+{
+    auto v = eval(R"(
+        let elemAt = builtins.elemAt;
+        in builtins.serializeFunction (list: index: elemAt list index)
+    )");
+    ASSERT_THAT(v, IsStringEq("builtins.elemAt"));
+}
+
+// Multi-arg eta-reduction with direct builtin: `x: y: builtins.elemAt x y`.
+TEST_F(PrimOpTest, serializeFunctionEtaReducesMultiArgDirectBuiltin)
+{
+    auto v = eval("builtins.serializeFunction (list: index: builtins.elemAt list index)");
+    ASSERT_THAT(v, IsStringEq("builtins.elemAt"));
+}
+
+// Multi-arg eta-reduction with a user-defined function.
+TEST_F(PrimOpTest, serializeFunctionEtaReducesMultiArgLambda)
+{
+    auto v = eval(R"(
+        let myAdd = a: b: a + b;
+        in builtins.serializeFunction (x: y: myAdd x y)
+    )");
+    // Reduces to `myAdd` which itself has a closure with no free vars,
+    // so it serializes as the lambda body.
+    ASSERT_THAT(v, IsStringEq("(a: (b: (a + b)))"));
+}
+
+// Eta-reduction does not apply to partial forwarding.
+TEST_F(PrimOpTest, serializeFunctionNoEtaPartialForward)
+{
+    auto v = eval(R"(
+        let f = a: b: a + b;
+        in builtins.serializeFunction (x: f x 1)
+    )");
+    auto s = std::string(v.string_view());
+    // Not eta-reduced: second arg is `1`, not a lambda param.
+    EXPECT_THAT(s, ::testing::HasSubstr("(x:"));
+}
+
+/*
+ * Dynamic derivations scenario tests.
+ *
+ * The dynamic derivations use case (RFC 0092) requires serializing a
+ * function during evaluation, passing it into a build sandbox, and
+ * deserializing it there to produce further derivations.  These tests
+ * simulate that pipeline: construct a function that builds derivation-
+ * like attrsets, serialize it, deserialize it, and verify the result.
+ */
+
+// Scenario: a "mkDerivation" helper captures shared config from the
+// evaluation phase, gets serialized into a builder, and is called at
+// build time with per-source-file arguments.
+TEST_F(PrimOpTest, dynDrvMkDerivationFactory)
+{
+    auto v = eval(R"(
+        let
+          system = "x86_64-linux";
+          baseFlags = ["-O2" "-Wall"];
+          mkCompile = src: {
+            name = "compile-${src}";
+            inherit system;
+            flags = baseFlags ++ [src];
+          };
+          serialized = builtins.serializeFunction mkCompile;
+          restored = builtins.deserializeFunction serialized;
+          drv = restored "main.c";
+        in drv.name
+    )");
+    ASSERT_THAT(v, IsStringEq("compile-main.c"));
+}
+
+// Scenario: the serialized function captures a dependency map (like a
+// lockfile parsed during evaluation) and uses it at build time.
+TEST_F(PrimOpTest, dynDrvLockfileDependencyMap)
+{
+    auto v = eval(R"(
+        let
+          lockfile = {
+            "express" = { version = "4.18.2"; resolved = "/nix/store/fake-express"; };
+            "lodash" = { version = "4.17.21"; resolved = "/nix/store/fake-lodash"; };
+          };
+          resolve = name: lockfile.${name}.resolved;
+          serialized = builtins.serializeFunction resolve;
+          restored = builtins.deserializeFunction serialized;
+        in restored "lodash"
+    )");
+    ASSERT_THAT(v, IsStringEq("/nix/store/fake-lodash"));
+}
+
+// Scenario: higher-order -- a serialized function itself returns
+// functions (e.g. a build system that produces per-target builders).
+TEST_F(PrimOpTest, dynDrvHigherOrderBuilder)
+{
+    auto v = eval(R"(
+        let
+          cc = "/nix/store/fake-gcc";
+          mkBuilder = target: src: {
+            name = "${target}-${src}";
+            compiler = cc;
+          };
+          serialized = builtins.serializeFunction mkBuilder;
+          restored = builtins.deserializeFunction serialized;
+          builder = restored "aarch64";
+          drv = builder "kernel.c";
+        in drv.compiler
+    )");
+    ASSERT_THAT(v, IsStringEq("/nix/store/fake-gcc"));
+}
+
+// Scenario: the function uses builtins (primops) captured through
+// partial application -- e.g. a pre-configured map operation.
+TEST_F(PrimOpTest, dynDrvPartialPrimopInClosure)
+{
+    auto v = eval(R"nix(
+        let
+          transform = builtins.map (x: x * 2);
+          apply = inputs: transform inputs;
+          serialized = builtins.serializeFunction apply;
+          restored = builtins.deserializeFunction serialized;
+        in restored [1 2 3]
+    )nix");
+    ASSERT_EQ(v.type(), nList);
+    ASSERT_EQ(v.listSize(), 3);
+}
+
+// Scenario: mutual recursion between closure values -- a "plugin
+// system" where plugins reference each other.
+TEST_F(PrimOpTest, dynDrvMutuallyRecursiveClosures)
+{
+    auto v = eval(R"(
+        let
+          plugins = {
+            a = { name = "plugin-a"; deps = [ plugins.b ]; };
+            b = { name = "plugin-b"; deps = []; };
+          };
+          getName = p: (builtins.head plugins.${p}.deps).name or plugins.${p}.name;
+          serialized = builtins.serializeFunction getName;
+          restored = builtins.deserializeFunction serialized;
+        in restored "a"
+    )");
+    ASSERT_THAT(v, IsStringEq("plugin-b"));
+}
+
+// Limitation test: string context is lost on round-trip.
+// In a real dynamic derivation scenario, store paths in closure strings
+// would lose their dependency tracking after deserialization.
+// We verify this by checking that a path-containing string in a closure
+// loses its context after serialize/deserialize.
+TEST_F(PrimOpTest, dynDrvStringContextLostOnRoundTrip)
+{
+    // builtins.storePath would add context, but requires a real store path.
+    // Instead, test that the serialized string itself carries context
+    // from the closure (via copyContext in serializeValue), but the
+    // deserialized result does not.  We use builtins.toFile to create
+    // a real store path with context.
+    //
+    // This test cannot easily be written without a store, so we test
+    // the simpler case: a plain string in a closure round-trips as a
+    // plain string (no context to lose), documenting the gap.
+    auto v = eval(R"(
+        let
+          path = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello";
+          f = _: path;
+          serialized = builtins.serializeFunction f;
+          restored = builtins.deserializeFunction serialized;
+        in restored null
+    )");
+    // The string survives, but in a real scenario with store path context
+    // attached, the context would be lost after deserialization.
+    ASSERT_THAT(v, IsStringEq("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-hello"));
+}
+
+// Scenario: `preserveStringContext` emits `builtins.appendContext` wrapping
+// for strings with context.  We verify the output format since the test
+// harness uses a dummy store that cannot validate real store paths.
+TEST_F(PrimOpTest, dynDrvPreserveStringContextOutput)
+{
+    auto v = eval(R"nix(
+        let
+          s = "hello";
+          f = _: s;
+        in builtins.serializeFunction { fn = f; preserveStringContext = true; }
+    )nix");
+    // Plain string without context: no wrapping needed even with the flag.
+    auto out = std::string(v.string_view());
+    ASSERT_EQ(out.find("appendContext"), std::string::npos);
+}
+
+// Scenario: eta-reduced polyfills in a dynamic derivation pipeline.
+// A `lib.head`-style polyfill round-trips to the underlying primop.
+TEST_F(PrimOpTest, dynDrvEtaReducedPolyfill)
+{
+    auto v = eval(R"(
+        let
+          head = builtins.head;
+          getFirst = x: head x;
+          serialized = builtins.serializeFunction getFirst;
+          restored = builtins.deserializeFunction serialized;
+        in restored [ 42 1 2 ]
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+// Scenario: a build system that combines eval-time configuration,
+// a polyfilled lib function, and a dependency map -- the full pipeline.
+TEST_F(PrimOpTest, dynDrvFullPipeline)
+{
+    auto v = eval(R"(
+        let
+          system = "x86_64-linux";
+          concatStringsSep = builtins.concatStringsSep;
+          deps = { "main.c" = [ "stdio.h" "stdlib.h" ]; };
+          mkCompileCmd = src: {
+            name = "compile-${src}";
+            inherit system;
+            includes = concatStringsSep " " (builtins.map (h: "-I${h}") (deps.${src} or []));
+          };
+          serialized = builtins.serializeFunction mkCompileCmd;
+          restored = builtins.deserializeFunction serialized;
+          cmd = restored "main.c";
+        in cmd.includes
+    )");
+    ASSERT_THAT(v, IsStringEq("-Istdio.h -Istdlib.h"));
+}
+
+// Scenario: the attrset form with `allowedPluginPrimOps` in a
+// dynamic derivation pipeline.  Plugin primops are not available in
+// the test harness, but we verify the option is accepted and does
+// not interfere with normal serialization.
+TEST_F(PrimOpTest, dynDrvAttrsetFormWithOptions)
+{
+    auto v = eval(R"(
+        let
+          f = x: x + 1;
+          serialized = builtins.serializeFunction {
+            fn = f;
+            allowedPluginPrimOps = [ "hypotheticalPlugin" ];
+            preserveStringContext = true;
+          };
+          restored = builtins.deserializeFunction serialized;
+        in restored 41
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+// The `derivation` function (a top-level constant, not a primop) is
+// available after deserialization because `deserializeFunction` parses
+// in the base environment.
+TEST_F(PrimOpTest, dynDrvDerivationRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          mkDrv = builtins.deserializeFunction
+            (builtins.serializeFunction
+              (name: derivation {
+                inherit name;
+                system = "x86_64-linux";
+                builder = "/bin/sh";
+              }));
+        in (mkDrv "hello").name
+    )");
+    ASSERT_THAT(v, IsStringEq("hello"));
+}
+
+// The `derivation` function works when captured indirectly in a closure.
+TEST_F(PrimOpTest, dynDrvDerivationInClosure)
+{
+    auto v = eval(R"(
+        let
+          system = "x86_64-linux";
+          mkDrv = name: derivation {
+            inherit name system;
+            builder = "/bin/sh";
+          };
+          serialized = builtins.serializeFunction mkDrv;
+          restored = builtins.deserializeFunction serialized;
+        in (restored "test").type
+    )");
+    ASSERT_THAT(v, IsStringEq("derivation"));
+}
+
+// `import` serializes as `builtins.import` and is available after
+// deserialization.
+TEST_F(PrimOpTest, dynDrvImportPrimOpRoundTrip)
+{
+    auto v = eval(R"nix(
+        let
+          serialized = builtins.serializeFunction (x: import x);
+        in serialized
+    )nix");
+    ASSERT_THAT(v, IsStringEq("builtins.import"));
+}
+
+// externalBindings: named closure variables become wrapper function params.
+TEST_F(PrimOpTest, serializeFunctionExternalBindings)
+{
+    auto v = eval(R"(
+        let
+          greet = name: "hello ${name}";
+        in builtins.serializeFunction {
+          fn = x: greet x;
+          externalBindings = ["greet"];
+        }
+    )");
+    auto s = std::string(v.string_view());
+    // The output should be a wrapper function taking `greet` as a parameter.
+    EXPECT_THAT(s, ::testing::HasSubstr("{ greet }"));
+    // `greet` should NOT be inlined as a let binding.
+    ASSERT_EQ(s.find("let "), std::string::npos);
+}
+
+// externalBindings round-trip: caller provides bindings at deserialization.
+TEST_F(PrimOpTest, serializeFunctionExternalBindingsRoundTrip)
+{
+    auto v = eval(R"(
+        let
+          double = x: x * 2;
+          serialized = builtins.serializeFunction {
+            fn = x: double x;
+            externalBindings = ["double"];
+          };
+          restored = builtins.deserializeFunction serialized;
+        in restored { double = x: x * 2; } 21
+    )");
+    ASSERT_EQ(v.type(), nInt);
+    ASSERT_EQ(v.integer().value, 42);
+}
+
+// externalBindings with mixed inline and external bindings.
+TEST_F(PrimOpTest, serializeFunctionMixedBindings)
+{
+    auto v = eval(R"(
+        let
+          prefix = "hello";
+          greet = name: "${prefix} ${name}";
+        in builtins.serializeFunction {
+          fn = x: greet x + prefix;
+          externalBindings = ["greet"];
+        }
+    )");
+    auto s = std::string(v.string_view());
+    // `greet` is external (wrapper param), `prefix` is inline (let binding).
+    EXPECT_THAT(s, ::testing::HasSubstr("{ greet }"));
+    EXPECT_THAT(s, ::testing::HasSubstr("prefix"));
+}
+
+// externalBindings in a dynamic derivation scenario: lib functions
+// provided at deserialization time, not inlined.
+TEST_F(PrimOpTest, dynDrvExternalLibBindings)
+{
+    auto v = eval(R"(
+        let
+          concatStrings = builtins.concatStringsSep "";
+          serialized = builtins.serializeFunction {
+            fn = items: concatStrings items;
+            externalBindings = ["concatStrings"];
+          };
+          restored = builtins.deserializeFunction serialized;
+          f = restored { concatStrings = builtins.concatStringsSep ""; };
+        in f ["a" "b" "c"]
+    )");
+    ASSERT_THAT(v, IsStringEq("abc"));
 }
 
 class ToStringPrimOpTest : public PrimOpTest,

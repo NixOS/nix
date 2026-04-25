@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::BLAKE3Hashes);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::FunctionSerialization);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -278,6 +278,160 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             Enables support for BLAKE3 hashes.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
+    },
+    {
+        .tag = Xp::FunctionSerialization,
+        .name = "function-serialization",
+        .description = R"(
+            Allow serializing and deserializing Nix functions.
+
+            When enabled, `builtins.toString` can coerce functions to
+            strings, and two new builtins become available:
+
+            - `builtins.serializeFunction` produces a self-contained Nix
+              expression string for a lambda, including `let` bindings
+              for captured closure variables.
+
+            - `builtins.deserializeFunction` parses a string as a Nix
+              expression that must evaluate to a function.
+
+            ## Relation to dynamic derivations
+
+            This feature serializes *pure computation* -- functions that
+            transform data.  It is useful for bundling eval-time logic
+            and captured configuration into a single string that can be
+            passed into a build sandbox and evaluated there (with
+            recursive Nix).
+
+            For the core dynamic derivations use case of constructing
+            real derivations with real store path dependencies, enable
+            `preserveStringContext` in the attrset form to emit
+            `builtins.appendContext` calls that reconstruct store path
+            contexts on deserialization.
+
+            ### What works today
+
+            The serialize/deserialize pipeline handles: closures with
+            captured configuration, dependency maps, higher-order
+            builders, partially applied primops, `lib` polyfills (via
+            eta-reduction), `with`-bound variables, recursive values,
+            and (with `preserveStringContext`) store path dependencies.
+
+            Existing approaches that this feature complements:
+            - Raw `.drv` format (no Nix evaluator needed in sandbox)
+            - Recursive Nix with a static `.nix` file + JSON data
+            - `nix-instantiate` inside the sandbox
+
+            This feature adds the ability to bundle eval-time logic and
+            data into a single string, avoiding the split between "JSON
+            data" and "static `.nix` file" in the approaches above.
+
+            ### Handling `lib` function polyfills
+
+            nixpkgs `lib` often wraps builtins in lambda polyfills for
+            backwards compatibility (e.g. `lib.head = x: builtins.head x`
+            instead of `lib.head = builtins.head`).  This poses a
+            challenge: the same logical function can be either a primop
+            or a lambda depending on the nixpkgs/Nix version, producing
+            different serialized forms.
+
+            The serializer handles this via eta-reduction: lambdas whose
+            body is a direct call to a closure variable or a `builtins.*`
+            select, with the lambda's parameters forwarded in order, are
+            reduced to the underlying function.  Three patterns are
+            detected:
+
+            - Closure variable: `let head = builtins.head; in (x: head x)`
+              serializes as `builtins.head`
+            - Direct builtin select: `x: builtins.head x` serializes as
+              `builtins.head`
+            - Multi-arg: `list: index: builtins.elemAt list index`
+              serializes as `builtins.elemAt`
+
+            This means `lib.head` and `builtins.head` produce identical
+            serialized output regardless of whether the polyfill is in
+            place.
+
+            Patterns not handled by eta-reduction:
+
+            - Wrappers that reorder, drop, or add arguments
+              (e.g. `lib.flip f a b = f b a`)
+            - Wrappers that add validation or coercion before calling
+              the underlying function
+            - Wrappers where the called function is computed dynamically
+              (e.g. via `builtins.getAttr`)
+
+            These cases serialize as full lambdas with closure bindings,
+            which is correct but produces different output than a direct
+            primop reference.  The serialized form is still valid and
+            will deserialize correctly within the same Nix version.
+
+            ### Interaction with `derivation` and `import`
+
+            The `derivation` function and other top-level constants
+            (e.g. `derivationStrict`, `import`) are available after
+            deserialization because `builtins.deserializeFunction`
+            parses in the base environment.  Functions that call
+            `derivation` round-trip correctly:
+
+            ```nix
+            let mkDrv = builtins.deserializeFunction
+              (builtins.serializeFunction (name: derivation {
+                inherit name; system = "x86_64-linux"; builder = "/bin/sh";
+              }));
+            in (mkDrv "hello").name   # => "hello"
+            ```
+
+            `import` is a primop and serializes as `builtins.import`.
+            The only issue is file availability: paths in `import`
+            calls are absolute (resolved at parse time) and must exist
+            in the deserialization environment.
+
+            ### Remaining gaps for dynamic derivations
+
+            - **No `.drv` file creation in sandbox**: deserialized
+              functions can produce derivation attrsets and even call
+              `derivation` to create them, but the resulting `.drv`
+              files can only be registered in the store via recursive
+              Nix (the restricted daemon socket, issue #8602).  This is
+              a store/scheduler feature, not an evaluator feature.
+
+            ## Known limitations
+
+            - **String context loss by default**: store path dependency
+              contexts are lost on round-trip unless
+              `preserveStringContext = true` is set in the attrset form.
+              When enabled, strings with context are wrapped in
+              `builtins.appendContext` calls in the serialized output.
+
+            - **Serialized form is not stable across Nix versions.**
+              Primops are serialized as `builtins.<name>`, which may
+              change between versions.  Eta-reduction normalizes common
+              `lib` polyfill patterns (see above), but not all
+              variations can be detected.  The format should only be
+              used within a single Nix version, not for persistent
+              storage.
+
+            - **User-provided primops** (from plugins or the flake
+              subsystem) are rejected by default at serialization time,
+              since the plugin may not be loaded in the deserialization
+              environment.  The `allowedPluginPrimOps` option accepts a
+              list of names presumed available at deserialization time.
+
+            - Float precision is limited by `std::to_string` (6 decimal
+              places).  Fixable with a higher-precision formatter, but
+              this changes float value serialization.
+
+            - Paths are serialized as absolute paths (the Nix parser
+              resolves relative paths at parse time).  If the referenced
+              file does not exist in the deserialization environment
+              (e.g. a build sandbox), operations like `import` or string
+              interpolation on the path will fail.
+
+            - `builtins.deserializeFunction` evaluates arbitrary Nix
+              expressions; only use it on trusted input.  This is
+              inherent to the string-eval approach.
+        )",
     },
 }};
 
