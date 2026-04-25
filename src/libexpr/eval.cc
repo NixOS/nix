@@ -1,4 +1,5 @@
 #include "nix/expr/eval.hh"
+#include "nix/expr/diagnose.hh"
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
@@ -1678,7 +1679,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     primOpCalls[fn->name]++;
 
                 try {
-                    fn->impl(*this, vCur.determinePos(noPos), args.data(), vCur);
+                    fn->impl(*this, vCur.determinePos(pos), args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1728,7 +1729,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2
                     // etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->impl(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->impl(*this, vCur.determinePos(pos), vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -2926,8 +2927,43 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls
        uniqList on a list of sets.)  Will remove this eventually. */
-    if (&v1 == &v2)
+    if (&v1 == &v2) {
+        diagnose(settings.lintFunctionComparison, [&](bool) -> std::optional<EvalBaseError> {
+            // Walk the value tree without forcing, looking for functions
+            // that pointer equality is silently masking. Track visited
+            // pointers to handle cyclic structures.
+            std::set<const void *> seen;
+            auto hasFunction = [&](this const auto &self, Value & v) -> bool {
+                if (!seen.insert(&v).second)
+                    return false;
+                switch (v.type()) {
+                case nFunction:
+                    return true;
+                case nAttrs:
+                    for (auto & attr : *v.attrs())
+                        if (self(*attr.value))
+                            return true;
+                    return false;
+                case nList:
+                    for (auto elem : v.listView())
+                        if (self(*elem))
+                            return true;
+                    return false;
+                default:
+                    return false;
+                }
+            };
+            if (!hasFunction(v1))
+                return std::nullopt;
+            return EvalBaseError(
+                *this,
+                ErrorInfo{
+                    .msg = HintFmt(
+                        "function comparison is unreliable; it may return true or false depending on structure and evaluation order"),
+                    .pos = positions[pos]});
+        });
         return true;
+    }
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
@@ -2987,8 +3023,18 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
         return true;
     }
 
-    /* Functions are incomparable. */
+    /* Function comparison is unreliable: returns false here, but the
+       value identity optimization (pointer equality) may have already
+       short-circuited and returned true for the same logical comparison. */
     case nFunction:
+        diagnose(settings.lintFunctionComparison, [&](bool) -> std::optional<EvalBaseError> {
+            return EvalBaseError(
+                *this,
+                ErrorInfo{
+                    .msg = HintFmt(
+                        "function comparison is unreliable; it may return true or false depending on structure and evaluation order"),
+                    .pos = positions[pos]});
+        });
         return false;
 
     case nExternal:

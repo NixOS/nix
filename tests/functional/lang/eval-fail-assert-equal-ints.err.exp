@@ -6,6 +6,10 @@ error:
             2| abort "unreachable"
 
        … while comparing attribute 'b'
+         at /pwd/lang/eval-fail-assert-equal-ints.nix:1:19:
+            1| assert { b = 1; } == { b = 2; };
+             |                   ^
+            2| abort "unreachable"
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-equal-ints.nix:1:10:

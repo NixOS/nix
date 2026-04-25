@@ -46,11 +46,6 @@ error:
        (199 duplicate frames omitted)
 
        error: stack overflow; max-call-depth exceeded
-       at /path/to/tests/functional/repl/doc-functor.nix:90:23:
-           89|     */
-           90|     __functor = self: self.__functor self;
-             |                       ^
-           91|   };
 
 nix-repl> :doc diverging
 error:

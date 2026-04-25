@@ -1,0 +1,6 @@
+warning: function comparison is unreliable; it may return true or false depending on structure and evaluation order (lint-function-comparison)
+         at /pwd/lang/eval-okay-lint-function-comparison-warn-nested.nix:3:12:
+              2| # so comparison reaches the function case and warns.
+              3| [ (x: x) ] == [ (x: x) ]
+               |            ^
+              4|
