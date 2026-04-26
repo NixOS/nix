@@ -89,7 +89,7 @@ public:
      * @see https://github.com/NixOS/nix/issues/14642
      */
     template<class F>
-    void visit(F && f)
+    void visit(const F & f)
     {
         std::visit(
             overloaded{

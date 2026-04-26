@@ -557,7 +557,7 @@ public:
                 std::numeric_limits<decltype(nFormals)>::max());
             if (pos)
                 err.atPos(positions[pos]);
-            throw err;
+            throw std::move(err);
         }
         std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
     };

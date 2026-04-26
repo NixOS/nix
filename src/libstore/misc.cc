@@ -149,7 +149,7 @@ querySubstitutablePathInfosAsync(Store & store, const StorePathCAMap & paths, Su
         }
         if (lastStoresException.has_value()) {
             if (!settings.getWorkerSettings().tryFallback) {
-                throw *lastStoresException;
+                throw std::move(*lastStoresException);
             } else
                 logError(lastStoresException->info());
         }

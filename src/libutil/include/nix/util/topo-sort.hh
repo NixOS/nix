@@ -20,7 +20,7 @@ using TopoSortResult = std::variant<std::vector<T>, Cycle<T>>;
 
 template<typename T, typename Compare, std::invocable<const T &> F>
     requires std::same_as<std::remove_cvref_t<std::invoke_result_t<F, const T &>>, std::set<T, Compare>>
-TopoSortResult<T> topoSort(std::set<T, Compare> items, F && getChildren)
+TopoSortResult<T> topoSort(std::set<T, Compare> items, const F & getChildren)
 {
     std::vector<T> sorted;
     decltype(items) visited, parents;

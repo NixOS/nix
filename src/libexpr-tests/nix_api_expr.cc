@@ -20,8 +20,8 @@ TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
     auto delTmpDir = std::make_unique<nix::AutoDelete>(tmpDir, true);
     auto nixpkgs = tmpDir / "pkgs";
     auto nixos = tmpDir / "cfg";
-    std::filesystem::create_directories(nixpkgs);
-    std::filesystem::create_directories(nixos);
+    nix::createDirs(nixpkgs);
+    nix::createDirs(nixos);
 
     std::string nixpkgsEntry = "nixpkgs=" + nixpkgs.string();
     std::string nixosEntry = "nixos-config=" + nixos.string();

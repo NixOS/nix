@@ -97,7 +97,7 @@ void EvalErrorBuilder<T>::debugThrow()
     auto error = std::move(this->error);
     delete this;
 
-    throw error;
+    throw std::move(error);
 }
 
 template<class T>

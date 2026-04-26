@@ -51,11 +51,6 @@ Checks:
   - -bugprone-macro-parentheses
   # 1 warning - increment/decrement in conditions
   - -bugprone-inc-dec-in-conditions
-  # 2 warnings - std::move on forwarding reference (auto&&) in ranges lambdas
-  - -bugprone-move-forwarding-reference
-  # 2 warnings - coroutine pattern: co_await await(std::move(waitees)) then reuse.
-  # Relies on moved-from containers being empty (holds for libstdc++/libc++).
-  - -bugprone-use-after-move
   # 2 warnings - sorts Value* by ->string_view(), not by pointer value (false positive)
   - -bugprone-nondeterministic-pointer-iteration-order
   # 9 warnings - intentional std::bit_cast/memcpy on Value* arrays (evaluator hot path)
@@ -68,7 +63,7 @@ Checks:
   # template; fires when T=unsigned char but that instantiation is correct.
   - -bugprone-unintended-char-ostream-output
   #
-  # Non-bugprone checks (also disabled to pass on current codebase):
+  # Non-bugprone checks (some disabled to pass on current codebase):
   #
   # 4 warnings - exceptions not derived from std::exception
   # All thrown exceptions must derive from std::exception
@@ -77,6 +72,14 @@ Checks:
   # - cppcoreguidelines-pro-type-cstyle-cast
   # 11 warnings - coroutine lambdas with captures (intentional pattern in async goal/store code)
   # - cppcoreguidelines-avoid-capturing-lambda-coroutines
+  - performance-noexcept-swap
+  - performance-noexcept-move-constructor
+  - performance-noexcept-destructor
+  - performance-use-std-move
+  - misc-throw-by-value-catch-by-reference
+  - cppcoreguidelines-missing-std-forward
+  - android-cloexec-open
+  - android-cloexec-pipe2
   # Custom nix checks (when added)
   - nix-*
 
@@ -93,3 +96,5 @@ CheckOptions:
   bugprone-unsafe-functions.CustomFunctions: >
     ::std::filesystem::create_directories, nix::createDirs, "Use nix::createDirs (it wraps exceptions)";
     ::std::filesystem::remove_all, nix::deletePath, "Use nix::deletePath (remove_all is not TOCTOU safe)";
+
+ExtraArgs: ["-Werror=unnecessary-virtual-specifier"]

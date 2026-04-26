@@ -359,9 +359,15 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
         }
     };
 
-    AutoCloseFD fd = std::filesystem::is_socket(path)
-                         ? connect(path)
-                         : toDescriptor(open(path.string().c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
+    AutoCloseFD fd = std::filesystem::is_socket(path) ? connect(path)
+                                                      : toDescriptor(open(
+                                                            path.string().c_str(),
+                                                            O_CREAT | O_APPEND | O_WRONLY
+#ifndef _WIN32
+                                                                | O_CLOEXEC
+#endif
+                                                            ,
+                                                            0644));
     if (!fd)
         throw SysError("opening log file %1%", PathFmt(path));
 

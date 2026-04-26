@@ -92,6 +92,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 co_await await(std::move(waitees));
 
                 if (nrFailed == 0) {
+                    // optimization depending on moved containers being empty afterwards
+                    // NOLINTNEXTLINE(bugprone-use-after-move)
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
                     co_await await(std::move(waitees));
 
@@ -111,6 +113,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             }
         }
 
+        // optimization depending on moved containers being empty afterwards
+        // NOLINTNEXTLINE(bugprone-use-after-move)
         co_await await(std::move(waitees));
 
         trace("all outputs substituted (maybe)");

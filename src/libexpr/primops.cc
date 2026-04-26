@@ -694,7 +694,7 @@ static RegisterPrimOp primop_isPath({
 });
 
 template<typename Callable>
-static inline void withExceptionContext(Trace trace, Callable && func)
+static inline void withExceptionContext(Trace trace, const Callable & func)
 {
     try {
         func();

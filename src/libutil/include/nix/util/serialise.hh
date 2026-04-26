@@ -177,6 +177,7 @@ struct FdSink : BufferedSink
     FdSink(const FdSink &) = delete;
     FdSink & operator=(const FdSink &) = delete;
 
+    // NOLINTNEXTLINE(performance-noexcept-move-constructor) - can throw
     FdSink & operator=(FdSink && s)
     {
         flush();

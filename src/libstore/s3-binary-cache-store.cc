@@ -173,7 +173,7 @@ void S3BinaryCacheStore::upsertFile(
     } catch (FileTransferError & e) {
         UploadToS3 err(e.message());
         err.addTrace({}, "while uploading to S3 binary cache at '%s'", config->cacheUri.to_string());
-        throw err;
+        throw std::move(err);
     }
 }
 

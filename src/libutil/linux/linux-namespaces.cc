@@ -95,11 +95,11 @@ void saveMountNamespace()
 {
     static std::once_flag done;
     std::call_once(done, []() {
-        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY | O_CLOEXEC);
         if (!fdSavedMountNamespace)
             throw SysError("saving parent mount namespace");
 
-        fdSavedRoot = open("/proc/self/root", O_RDONLY);
+        fdSavedRoot = open("/proc/self/root", O_RDONLY | O_CLOEXEC);
     });
 }
 

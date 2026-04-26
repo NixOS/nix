@@ -47,7 +47,7 @@ SQLiteError::SQLiteError(
         exp.err.msg = HintFmt(
             err == SQLITE_PROTOCOL ? "SQLite database '%s' is busy (SQLITE_PROTOCOL)" : "SQLite database '%s' is busy",
             path ? path : "(in-memory)");
-        throw exp;
+        throw std::move(exp);
     } else
         throw SQLiteError(path, errMsg, err, exterr, offset, std::move(hf));
 }

@@ -146,7 +146,7 @@ Goal::Co PathSubstitutionGoal::init()
     }
     if (lastStoresException.has_value()) {
         if (!worker.settings.tryFallback) {
-            throw *lastStoresException;
+            throw std::move(*lastStoresException);
         } else
             logError(lastStoresException->info());
     }

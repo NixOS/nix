@@ -578,7 +578,7 @@ struct ExperimentalFeatureSettings : Config
      */
     template<typename GetReason>
         requires std::invocable<GetReason> && std::convertible_to<std::invoke_result_t<GetReason>, std::string>
-    void require(const ExperimentalFeature & feature, GetReason && getReason) const
+    void require(const ExperimentalFeature & feature, const GetReason & getReason) const
     {
         if (isEnabled(feature))
             return;
