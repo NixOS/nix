@@ -31,6 +31,18 @@ deps_private_maybe_subproject = [
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
 
+deps_plugin_c_apis = []
+if get_option('plugin-c-api')
+  deps_plugin_c_apis = [
+    dependency('nix-util-c-whole-archive'),
+    dependency('nix-store-c-whole-archive'),
+    dependency('nix-fetchers-c-whole-archive'),
+    dependency('nix-expr-c-whole-archive'),
+    dependency('nix-flake-c-whole-archive'),
+    dependency('nix-main-c-whole-archive'),
+  ]
+endif
+
 mimalloc = dependency('mimalloc', required : get_option('mimalloc'))
 if mimalloc.found()
   deps_private += mimalloc
@@ -190,9 +202,10 @@ include_dirs = [ include_directories('.') ]
 this_exe = executable(
   meson.project_name(),
   sources,
-  dependencies : deps_private_subproject + deps_private + deps_other,
+  dependencies : deps_private_subproject + deps_private + deps_other + deps_plugin_c_apis,
   include_directories : include_dirs,
   link_args : linker_export_flags,
+  export_dynamic : get_option('plugin-c-api'),
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
