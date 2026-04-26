@@ -10,6 +10,7 @@
 #include "nix/expr/attr-path.hh"
 #include "nix/util/hilite.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/expr/value-to-json.hh"
 
 #include <regex>
 #include <nlohmann/json.hpp>
@@ -29,6 +30,10 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 {
     std::vector<std::string> res;
     std::vector<std::string> excludeRes;
+    std::optional<std::string> apply;
+    bool calcDerivation = false;
+    bool checkCache = false;
+    bool jsonLines = false;
 
     CmdSearch()
     {
@@ -40,6 +45,31 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                 .description = "Hide packages whose attribute path, name or description contain *regex*.",
                 .labels = {"regex"},
                 .handler = {[this](std::string s) { excludeRes.push_back(s); }},
+            });
+        addFlag(
+            Flag{
+                .longName = "apply",
+                .description = "Apply the function *expr* to each matching derivation (implies --json).",
+                .labels = {"expr"},
+                .handler = {&apply},
+            });
+        addFlag(
+            Flag{
+                .longName = "calc-derivation",
+                .description = "Calculate output paths and derivation paths for matching derivations. This will instantiate the derivations (write .drv files to the store).",
+                .handler = {&calcDerivation, true},
+            });
+        addFlag(
+            Flag{
+                .longName = "check-cache",
+                .description = "Check if the output path is available in a binary cache without downloading. Implies --json.",
+                .handler = {&checkCache, true},
+            });
+        addFlag(
+            Flag{
+                .longName = "json-lines",
+                .description = "Output results as JSON Lines (JSONL) format, one result per line. Implies --json.",
+                .handler = {&jsonLines, true},
             });
     }
 
@@ -62,8 +92,13 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
-        settings.readOnlyMode = true;
-        evalSettings.enableImportFromDerivation.setDefault(false);
+        // Disable IFD by default for performance, but allow override via --option
+        if (!evalSettings.enableImportFromDerivation.isOverridden())
+            evalSettings.enableImportFromDerivation = false;
+
+        // By default, run in read-only mode for performance (don't instantiate drvs).
+        // But if --calc-derivation or IFD is enabled, we need to allow instantiation.
+        settings.readOnlyMode = !calcDerivation && !evalSettings.enableImportFromDerivation;
 
         // Recommend "^" here instead of ".*" due to differences in resulting highlighting
         if (res.empty())
@@ -83,9 +118,20 @@ struct CmdSearch : InstallableValueCommand, MixJSON
 
         auto state = getEvalState();
 
+        // --json-lines, --apply, and --check-cache imply --json
+        if (jsonLines || apply || checkCache)
+            json = true;
+
         std::optional<nlohmann::json> jsonOut;
-        if (json)
+        if (json && !jsonLines)
             jsonOut = json::object();
+
+        // Parse apply expression once if provided
+        Value * vApply = nullptr;
+        if (apply) {
+            vApply = state->allocValue();
+            state->eval(state->parseExprFromString(*apply, state->rootPath(".")), *vApply);
+        }
 
         uint64_t results = 0;
 
@@ -95,7 +141,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve({attrPath});
             auto attrPathStr = attrPath.to_string(*state);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPathStr));
+            Activity act(*logger, json ? lvlDebug : lvlInfo, actUnknown, fmt("evaluating '%s'", attrPathStr));
             try {
                 auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {
@@ -146,11 +192,82 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     if (found) {
                         results++;
                         if (json) {
-                            (*jsonOut)[attrPathStr] = {
-                                {"pname", name.name},
-                                {"version", name.version},
-                                {"description", description},
-                            };
+                            nlohmann::json jsonEntry;
+
+                            if (vApply) {
+                                try {
+                                    // Get the derivation value and apply the user's function
+                                    auto & v = cursor.forceValue();
+                                    auto vRes = state->allocValue();
+                                    state->callFunction(*vApply, v, *vRes, noPos);
+
+                                    // Convert result to JSON
+                                    NixStringContext context;
+                                    jsonEntry = printValueAsJSON(*state, true, *vRes, noPos, context, false);
+                                } catch (Error & e) {
+                                    // If apply fails, output error information
+                                    jsonEntry = json::object({
+                                        {"pname", name.name},
+                                        {"version", name.version},
+                                        {"description", description},
+                                        {"applyError", e.msg()},
+                                    });
+                                }
+                            } else {
+                                // Default output: pname, version, description
+                                jsonEntry = json::object({
+                                    {"pname", name.name},
+                                    {"version", name.version},
+                                    {"description", description},
+                                });
+
+                                if (calcDerivation) {
+                                    try {
+                                        // Calculate both outPath and drvPath
+                                        // This will instantiate the derivation (write .drv file)
+                                        auto aOutPath = cursor.maybeGetAttr(state->s.outPath);
+                                        if (aOutPath) {
+                                            auto outPathStr = aOutPath->getString();
+                                            jsonEntry["outPath"] = outPathStr;
+                                        }
+
+                                        auto drvPath = cursor.forceDerivation();
+                                        jsonEntry["drvPath"] = state->store->printStorePath(drvPath);
+                                    } catch (Error & e) {
+                                        jsonEntry["derivationError"] = e.msg();
+                                    }
+                                }
+
+                                if (checkCache) {
+                                    try {
+                                        // Get outPath without instantiating
+                                        auto aOutPath = cursor.maybeGetAttr(state->s.outPath);
+                                        if (aOutPath) {
+                                            auto outPathStr = aOutPath->getString();
+                                            auto outPath = state->store->parseStorePath(outPathStr);
+
+                                            // Check if path is substitutable (cached)
+                                            StorePathSet paths{outPath};
+                                            auto substitutable = state->store->querySubstitutablePaths(paths);
+                                            jsonEntry["cached"] = substitutable.count(outPath) > 0;
+                                        } else {
+                                            jsonEntry["cached"] = false;
+                                        }
+                                    } catch (Error & e) {
+                                        // If we can't check, mark as unknown
+                                        jsonEntry["cached"] = false;
+                                    }
+                                }
+                            }
+
+                            if (jsonLines) {
+                                // Output as JSON Lines (one JSON object per line)
+                                auto jsonLine = json::object();
+                                jsonLine[attrPathStr] = jsonEntry;
+                                logger->cout("%s", jsonLine.dump());
+                            } else {
+                                (*jsonOut)[attrPathStr] = jsonEntry;
+                            }
                         } else {
                             if (results > 1)
                                 logger->cout("");
@@ -188,7 +305,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
         for (auto & cursor : installable->getCursors(*state))
             visit(*cursor, cursor->getAttrPath(), true);
 
-        if (json)
+        if (json && !jsonLines)
             printJSON(*jsonOut);
 
         if (!json && !results)
