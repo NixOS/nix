@@ -84,6 +84,7 @@
       - [nix-store --query](command-ref/nix-store/query.md)
       - [nix-store --read-log](command-ref/nix-store/read-log.md)
       - [nix-store --realise](command-ref/nix-store/realise.md)
+      - [nix-store --register-validity](command-ref/nix-store/register-validity.md)
       - [nix-store --repair-path](command-ref/nix-store/repair-path.md)
       - [nix-store --restore](command-ref/nix-store/restore.md)
       - [nix-store --serve](command-ref/nix-store/serve.md)

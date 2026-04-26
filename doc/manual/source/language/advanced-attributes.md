@@ -11,7 +11,7 @@ Derivations can declare some infrequently used optional attributes.
     this attribute should be a list of pairs `[ name1 path1 name2
     path2 ...  ]`. The references graph of each *pathN* will be stored
     in a text file *nameN* in the temporary build directory. The text
-    files have the format used by `nix-store --register-validity`
+    files have the format used by [`nix-store --register-validity`](@docroot@/command-ref/nix-store/register-validity.md)
     (with the deriver fields left empty). For example, when the
     following derivation is built:
 
