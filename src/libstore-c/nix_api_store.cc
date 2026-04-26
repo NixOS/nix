@@ -15,6 +15,7 @@
 #include "nix/util/base-nix-32.hh"
 
 #include "nix/store/globals.hh"
+#include "nix/store/content-address.hh"
 
 extern "C" {
 
@@ -376,6 +377,112 @@ nix_err nix_store_copy_path(
         auto repairFlag = repair ? nix::RepairFlag::Repair : nix::RepairFlag::NoRepair;
         auto checkSigsFlag = checkSigs ? nix::CheckSigsFlag::CheckSigs : nix::CheckSigsFlag::NoCheckSigs;
         nix::copyStorePath(*srcStore->ptr, *dstStore->ptr, path->path, repairFlag, checkSigsFlag);
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_path_info * nix_store_query_path_info(nix_c_context * context, Store * store, const StorePath * path)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto info = store->ptr->queryPathInfo(path->path);
+        return new nix_path_info{info};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+void nix_path_info_free(nix_path_info * path_info)
+{
+    delete path_info;
+}
+
+nix_err nix_path_info_get_nar_hash(
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto res = path_info->info->narHash.to_string(nix::HashFormat::Nix32, true);
+        return call_nix_get_string_callback(res, callback, user_data);
+    }
+    NIXC_CATCH_ERRS
+}
+
+uint64_t nix_path_info_get_nar_size(nix_c_context * context, const nix_path_info * path_info)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        return path_info->info->narSize;
+    }
+    NIXC_CATCH_ERRS_RES(0);
+}
+
+nix_err nix_path_info_get_references(
+    nix_c_context * context,
+    const nix_path_info * path_info,
+    void * user_data,
+    nix_err (*callback)(void * user_data, const StorePath * store_path))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & ref : path_info->info->references) {
+                const StorePath tmp{ref};
+                auto err = callback(user_data, &tmp);
+                if (err != NIX_OK)
+                    return err;
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+StorePath * nix_path_info_get_deriver(nix_c_context * context, const nix_path_info * path_info)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (path_info->info->deriver)
+            return new StorePath{*path_info->info->deriver};
+        return nullptr;
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_path_info_get_sigs(
+    nix_c_context * context,
+    const nix_path_info * path_info,
+    void * user_data,
+    nix_err (*callback)(void * user_data, const char * sig, unsigned int sig_len))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & sig : path_info->info->sigs) {
+                auto s = sig.to_string();
+                auto err = callback(user_data, s.data(), s.size());
+                if (err != NIX_OK)
+                    return err;
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_path_info_get_ca(
+    nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (path_info->info->ca && callback) {
+            auto res = renderContentAddress(*path_info->info->ca);
+            return call_nix_get_string_callback(res, callback, user_data);
+        }
     }
     NIXC_CATCH_ERRS
 }
