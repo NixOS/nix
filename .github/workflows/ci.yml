@@ -214,8 +214,20 @@ jobs:
 
   clang-tidy:
     needs: basic-checks
-    runs-on: ubuntu-24.04
-    name: clang-tidy
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - scenario: on ubuntu
+            runs-on: ubuntu-24.04
+            os: linux
+            system: x86_64-linux
+          - scenario: on macos
+            runs-on: macos-14
+            os: darwin
+            system: aarch64-darwin
+    runs-on: ${{ matrix.runs-on }}
+    name: clang-tidy ${{ matrix.scenario }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -226,9 +238,9 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         extra_nix_config: "sandbox = true"
     - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      if: matrix.os == 'linux'
     - name: Run clang-tidy
-      run: nix build .#hydraJobs.clangTidy.x86_64-linux -L
-
+      run: nix build .#hydraJobs.clangTidy.${{ matrix.system }} -L
 
   flake_regressions:
     needs: tests
