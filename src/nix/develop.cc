@@ -1,4 +1,6 @@
 #include "nix/cmd/command.hh"
+#include "nix/cmd/installable-value.hh"
+#include "nix/expr/eval-cache.hh"
 #include "nix/util/config-global.hh"
 #include "nix/expr/eval.hh"
 #include "nix/cmd/installable-flake.hh"
@@ -9,6 +11,7 @@
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/store/derivations.hh"
+#include "nix/util/error.hh"
 
 #ifndef _WIN32 // TODO re-enable on Windows
 #  include "run.hh"
@@ -18,6 +21,7 @@
 #include <sstream>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <optional>
 
 #include "nix/util/strings.hh"
 
@@ -507,6 +511,57 @@ struct Common : InstallableCommand, MixProfile
             shellOutPath,
         };
     }
+
+    /**
+     * Checks if installable has a `.devShell` attribute, or is itself a devshell.
+     * @return A pair of: the StorePath of either or nullopt if neither, and the system.
+     */
+    std::pair<std::optional<StorePath>, std::string> maybeGetDevShell(ref<Store> store, ref<Installable> installable)
+    {
+        auto evalStore = getEvalStore();
+
+        std::string system;
+
+        auto state = getEvalState();
+        bool isDevShell = false;
+        std::optional<ref<eval_cache::AttrCursor>> cursor = std::nullopt;
+        try {
+            auto installableValue = InstallableValue::require(installable);
+            cursor = installableValue->getCursor(*state);
+            auto isDevShellAttr = (*cursor)->maybeGetAttr(state->s.isDevShell);
+            if (isDevShellAttr) {
+                isDevShell = isDevShellAttr->getBool();
+                system = (*cursor)->getAttr(state->s.system)->getString();
+            }
+        } catch (UsageError) {
+            isDevShell = false;
+        }
+
+        std::optional<StorePath> devShell = std::nullopt;
+        if (isDevShell) {
+            devShell = Installable::toStorePath(evalStore, store, Realise::Outputs, OperateOn::Output, installable);
+        } else {
+            auto devShellAttr = cursor ? (*cursor)->maybeGetAttr(state->s.devShell) : nullptr;
+            if (devShellAttr) {
+                auto devShellDrvPath = devShellAttr->forceDerivation();
+                system = devShellAttr->getAttr(state->s.system)->getString();
+
+                store->buildPaths(
+                    {DerivedPath::Built{
+                        .drvPath = makeConstantStorePathRef(devShellDrvPath),
+                        .outputs = OutputsSpec::All{},
+                    }},
+                    bmNormal,
+                    evalStore);
+
+                auto path = deepQueryPartialDerivationOutput(*store, devShellDrvPath, "out", evalStore.get());
+                assert(path);
+                devShell = *path;
+            }
+        }
+
+        return {devShell, system};
+    }
 };
 
 struct CmdDevelop : Common, MixEnvironment
@@ -586,171 +641,236 @@ struct CmdDevelop : Common, MixEnvironment
 
     void run(ref<Store> store, ref<Installable> installable) override
     {
-        auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
-
-        auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
-
-        AutoDelete tmpDir(createTempDir("", "nix-develop"), true);
-
-        auto script = makeRcScript(store, buildEnvironment, tmpDir);
-
-        if (verbosity >= lvlDebug)
-            script += "set -x\n";
-
-        script += fmt("command rm -f '%s'\n", rcFilePath.string());
-
-        if (phase) {
-            if (!command.empty())
-                throw UsageError("you cannot use both '--command' and '--phase'");
-            // FIXME: foundMakefile is set by buildPhase, need to get
-            // rid of that.
-            script += fmt("foundMakefile=1\n");
-            script += fmt("runHook %1%Phase\n", *phase);
-        }
-
-        else if (!command.empty()) {
-            std::vector<std::string> args;
-            args.reserve(command.size());
-            for (const auto & s : command)
-                args.push_back(escapeShellArgAlways(s));
-            script += fmt("exec %s\n", concatStringsSep(" ", args));
-        }
-
-        else {
-            script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\nshopt -u expand_aliases\n" + script
-                     + "\nshopt -s expand_aliases\n";
-            if (developSettings.bashPrompt != "")
-                script += fmt("[ -n \"$PS1\" ] && PS1=%s;\n", escapeShellArgAlways(developSettings.bashPrompt.get()));
-            if (developSettings.bashPromptPrefix != "")
-                script +=
-                    fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
-                        escapeShellArgAlways(developSettings.bashPromptPrefix.get()));
-            if (developSettings.bashPromptSuffix != "")
-                script +=
-                    fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", escapeShellArgAlways(developSettings.bashPromptSuffix.get()));
-        }
+        std::filesystem::path program;
+        Strings args;
 
         setEnviron();
-        // prevent garbage collection until shell exits
-        setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
 
-        std::filesystem::path shell = "bash";
-        bool foundInteractive = false;
+        auto [devShell, devShellSystem] = maybeGetDevShell(store, installable);
 
-        try {
-            auto state = getEvalState();
+        std::string system;
+        AutoDelete tmpDir;
 
-            auto nixpkgsLockFlags = lockFlags;
-            nixpkgsLockFlags.inputOverrides = {};
-            nixpkgsLockFlags.inputUpdates = {};
+        if (devShell) {
+            // prevent garbage collection until shell exits
+            setEnv("NIX_GCROOT", store->printStorePath(*devShell).c_str());
 
-            auto nixpkgs = defaultNixpkgsFlakeRef();
-            if (auto * i = dynamic_cast<const InstallableFlake *>(&*installable))
-                nixpkgs = i->nixpkgsFlakeRef();
-
-            auto bashInstallable = make_ref<InstallableFlake>(
-                nullptr, //< Don't barf when the command is run with --arg/--argstr
-                state,
-                std::move(nixpkgs),
-                "bashInteractive",
-                ExtendedOutputsSpec::Default(),
-                Strings{},
-                Strings{"legacyPackages." + settings.thisSystem.get() + "."},
-                nixpkgsLockFlags);
-
-            for (auto & path : Installable::toStorePathSet(
-                     getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
-                auto s = store->printStorePath(path) + "/bin/bash";
-                if (pathExists(s)) {
-                    shell = s;
-                    foundInteractive = true;
-                    break;
+            if (verbosity >= lvlDebug)
+                setEnv("NIX_DEVSHELL_VERBOSE", "1");
+            if (phase) {
+                setEnv("NIX_DEVSHELL_PHASE", phase->c_str());
+                // Need to chdir since phases assume in flake directory
+                // chdir if installable is a flake of type git+file or path
+                auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
+                if (installableFlake) {
+                    auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
+                    if (sourcePath) {
+                        setEnv("NIX_DEVSHELL_PHASE_SRCPATH", sourcePath->c_str());
+                    }
                 }
+            } else if (!command.empty()) {
+                std::vector<std::string> args;
+                args.reserve(command.size());
+                for (const auto & s : command)
+                    args.push_back(escapeShellArgAlways(s));
+                setEnv("NIX_DEVSHELL_COMMAND", concatStringsSep(" ", args).c_str());
+            } else {
+                setEnv("NIX_DEVSHELL_PROMPT", developSettings.bashPrompt.get().c_str());
+                setEnv("NIX_DEVSHELL_PROMPT_PREFIX", developSettings.bashPromptPrefix.get().c_str());
+                setEnv("NIX_DEVSHELL_PROMPT_SUFFIX", developSettings.bashPromptSuffix.get().c_str());
             }
 
-            if (!foundInteractive)
-                throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
+            program = std::filesystem::path(store->printStorePath(*devShell)) / "bin" / "setup";
+            if (!std::filesystem::exists(program))
+                throw Error("%s's devShell does not provide bin/setup");
 
-        } catch (Error &) {
-            ignoreExceptionExceptInterrupt();
-        }
+            system = devShellSystem;
+        } else {
+            /* Legacy devshell path */
 
-        // Override SHELL with the one chosen for this environment.
-        // This is to make sure the system shell doesn't leak into the build environment.
-        setEnvOs(OS_STR("SHELL"), shell.c_str());
-        /* See: https://github.com/NixOS/nix/issues/5873
-           Format via .string() and not PathFmt intentionally. */
-        script += fmt("SHELL=\"%s\"\n", shell.string());
-        if (foundInteractive)
-            script += fmt("PATH=\"%s${PATH:+:$PATH}\"\n", std::filesystem::path(shell).parent_path().string());
-        writeFull(rcFileFd.get(), script);
+            auto [buildEnvironment, gcroot] = getBuildEnvironment(store, installable);
+
+            auto [rcFileFd, rcFilePath] = createTempFile("nix-shell");
+
+            tmpDir = createTempDir("", "nix-develop");
+
+            auto script = makeRcScript(store, buildEnvironment, tmpDir);
+
+            if (verbosity >= lvlDebug)
+                script += "set -x\n";
+
+            script += fmt("command rm -f '%s'\n", rcFilePath.string());
+
+            if (phase) {
+                if (!command.empty())
+                    throw UsageError("you cannot use both '--command' and '--phase'");
+                // FIXME: foundMakefile is set by buildPhase, need to get
+                // rid of that.
+                script += fmt("foundMakefile=1\n");
+                script += fmt("runHook %1%Phase\n", *phase);
+            }
+
+            else if (!command.empty()) {
+                std::vector<std::string> args;
+                args.reserve(command.size());
+                for (const auto & s : command)
+                    args.push_back(escapeShellArgAlways(s));
+                script += fmt("exec %s\n", concatStringsSep(" ", args));
+            }
+
+            else {
+                script = "[ -n \"$PS1\" ] && [ -e ~/.bashrc ] && source ~/.bashrc;\nshopt -u expand_aliases\n" + script
+                         + "\nshopt -s expand_aliases\n";
+                if (developSettings.bashPrompt != "")
+                    script +=
+                        fmt("[ -n \"$PS1\" ] && PS1=%s;\n", escapeShellArgAlways(developSettings.bashPrompt.get()));
+                if (developSettings.bashPromptPrefix != "")
+                    script +=
+                        fmt("[ -n \"$PS1\" ] && PS1=%s\"$PS1\";\n",
+                            escapeShellArgAlways(developSettings.bashPromptPrefix.get()));
+                if (developSettings.bashPromptSuffix != "")
+                    script += fmt(
+                        "[ -n \"$PS1\" ] && PS1+=%s;\n", escapeShellArgAlways(developSettings.bashPromptSuffix.get()));
+            }
+
+            // prevent garbage collection until shell exits
+            setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
+
+            std::filesystem::path shell = "bash";
+            bool foundInteractive = false;
+
+            try {
+                auto state = getEvalState();
+
+                auto nixpkgsLockFlags = lockFlags;
+                nixpkgsLockFlags.inputOverrides = {};
+                nixpkgsLockFlags.inputUpdates = {};
+
+                auto nixpkgs = defaultNixpkgsFlakeRef();
+                if (auto * i = dynamic_cast<const InstallableFlake *>(&*installable))
+                    nixpkgs = i->nixpkgsFlakeRef();
+
+                auto bashInstallable = make_ref<InstallableFlake>(
+                    nullptr, //< Don't barf when the command is run with --arg/--argstr
+                    state,
+                    std::move(nixpkgs),
+                    "bashInteractive",
+                    ExtendedOutputsSpec::Default(),
+                    Strings{},
+                    Strings{"legacyPackages." + settings.thisSystem.get() + "."},
+                    nixpkgsLockFlags);
+
+                for (auto & path : Installable::toStorePathSet(
+                         getEvalStore(), store, Realise::Outputs, OperateOn::Output, {bashInstallable})) {
+                    auto s = store->printStorePath(path) + "/bin/bash";
+                    if (pathExists(s)) {
+                        shell = s;
+                        foundInteractive = true;
+                        break;
+                    }
+                }
+
+                if (!foundInteractive)
+                    throw Error("package 'nixpkgs#bashInteractive' does not provide a 'bin/bash'");
+
+            } catch (Error &) {
+                ignoreExceptionExceptInterrupt();
+            }
+
+            program = shell;
+
+            // Override SHELL with the one chosen for this environment.
+            // This is to make sure the system shell doesn't leak into the build environment.
+            setEnvOs(OS_STR("SHELL"), shell.c_str());
+            /* See: https://github.com/NixOS/nix/issues/5873
+            Format via .string() and not PathFmt intentionally. */
+            script += fmt("SHELL=\"%s\"\n", shell.string());
+            if (foundInteractive)
+                script += fmt("PATH=\"%s${PATH:+:$PATH}\"\n", std::filesystem::path(shell).parent_path().string());
+            writeFull(rcFileFd.get(), script);
 
 #ifdef _WIN32 // TODO re-enable on Windows
-        throw UnimplementedError("Cannot yet spawn processes on Windows");
+            throw UnimplementedError("Cannot yet spawn processes on Windows");
 #else
-        // If running a phase or single command, don't want an interactive shell running after
-        // Ctrl-C, so don't pass --rcfile
-        auto args = phase || !command.empty() ? Strings{shell.filename().string(), rcFilePath}
-                                              : Strings{shell.filename().string(), "--rcfile", rcFilePath};
+            // If running a phase or single command, don't want an interactive shell running after
+            // Ctrl-C, so don't pass --rcfile
+            args = phase || !command.empty() ? Strings{shell.filename().string(), rcFilePath}
+                                             : Strings{shell.filename().string(), "--rcfile", rcFilePath};
 
-        // Need to chdir since phases assume in flake directory
-        if (phase) {
-            // chdir if installable is a flake of type git+file or path
-            auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
-            if (installableFlake) {
-                auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
-                if (sourcePath) {
-                    if (chdir(sourcePath->c_str()) == -1) {
-                        throw SysError("chdir to %s failed", PathFmt(*sourcePath));
+            // Need to chdir since phases assume in flake directory
+            if (phase) {
+                // chdir if installable is a flake of type git+file or path
+                auto installableFlake = installable.dynamic_pointer_cast<InstallableFlake>();
+                if (installableFlake) {
+                    auto sourcePath = installableFlake->getLockedFlake()->flake.resolvedRef.input.getSourcePath();
+                    if (sourcePath) {
+                        if (chdir(sourcePath->c_str()) == -1) {
+                            throw SysError("chdir to %s failed", PathFmt(*sourcePath));
+                        }
                     }
                 }
             }
+
+            system = buildEnvironment.getSystem();
         }
 
         // Release our references to eval caches to ensure they are persisted to disk, because
         // we are about to exec out of this process without running C++ destructors.
         getEvalState()->evalCaches.clear();
 
-        execProgramInStore(store, UseLookupPath::Use, shell, args, buildEnvironment.getSystem());
+        execProgramInStore(store, UseLookupPath::Use, program, args, system);
 #endif
-    }
-};
-
-struct CmdPrintDevEnv : Common, MixJSON
-{
-    std::string description() override
-    {
-        return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
-    }
-
-    std::string doc() override
-    {
-        return
-#include "print-dev-env.md"
-            ;
-    }
-
-    Category category() override
-    {
-        return catUtility;
-    }
-
-    void run(ref<Store> store, ref<Installable> installable) override
-    {
-        auto buildEnvironment = getBuildEnvironment(store, installable).first;
-
-        logger->stop();
-
-        if (json) {
-            printJSON(buildEnvironment.toJSON());
-        } else {
-            AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
-            logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));
         }
-    }
-};
+    };
 
-static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
-static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");
+    struct CmdPrintDevEnv : Common, MixJSON
+    {
+        std::string description() override
+        {
+            return "print shell code that can be sourced by bash to reproduce the build environment of a derivation";
+        }
+
+        std::string doc() override
+        {
+            return
+#include "print-dev-env.md"
+                ;
+        }
+
+        Category category() override
+        {
+            return catUtility;
+        }
+
+        void run(ref<Store> store, ref<Installable> installable) override
+        {
+            auto devShell = maybeGetDevShell(store, installable).first;
+
+            if (devShell) {
+                auto file = std::filesystem::path(store->printStorePath(*devShell)) / (json ? "env.json" : "env");
+                if (!std::filesystem::exists(file))
+                    throw Error("%s's devShell does not provide %s", installable->what(), file.filename().string());
+
+                logger->stop();
+                logger->writeToStdout(readFile(file));
+            } else {
+                /* Legacy devshell path*/
+
+                auto buildEnvironment = getBuildEnvironment(store, installable).first;
+
+                logger->stop();
+
+                if (json) {
+                    printJSON(buildEnvironment.toJSON());
+                } else {
+                    AutoDelete tmpDir(createTempDir("", "nix-dev-env"), true);
+                    logger->writeToStdout(makeRcScript(store, buildEnvironment, tmpDir));
+                }
+            }
+        }
+    };
+
+    static auto rCmdPrintDevEnv = registerCommand<CmdPrintDevEnv>("print-dev-env");
+    static auto rCmdDevelop = registerCommand<CmdDevelop>("develop");
 
 } // namespace nix
