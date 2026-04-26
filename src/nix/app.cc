@@ -95,6 +95,8 @@ UnresolvedApp InstallableValue::toApp(EvalState & state)
                     c.raw));
         }
 
+        state.ensureLazyPathsCopied(context);
+
         return UnresolvedApp{App{
             .context = std::move(context2),
             .program = program,
