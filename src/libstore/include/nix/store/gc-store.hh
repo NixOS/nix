@@ -62,6 +62,11 @@ struct GCOptions
      * Stop after at least `maxFreed` bytes have been freed.
      */
     uint64_t maxFreed{std::numeric_limits<uint64_t>::max()};
+
+    /**
+     * Allow dead referrers of candidate paths to also be deleted.
+     */
+    bool deleteDeadReferrers = false;
 };
 
 struct GCResults

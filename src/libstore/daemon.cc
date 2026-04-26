@@ -755,6 +755,8 @@ static void performOp(
             else
                 options.pathsToDelete = paths;
         }
+        if (rconn.version.features.contains(WorkerProto::featureDeleteDeadReferrers))
+            conn.from >> options.deleteDeadReferrers;
         conn.from >> options.ignoreLiveness >> options.maxFreed;
         // obsolete fields
         readInt(conn.from);

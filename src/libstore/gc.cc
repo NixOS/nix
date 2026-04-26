@@ -609,6 +609,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             /* Bail out if we've previously discovered that this path
                is alive. */
             if (alive.count(*path)) {
+                debug("cannot delete '%s' because '%s' is alive", printStorePath(start), printStorePath(*path));
                 alive.insert(start);
                 return;
             }
@@ -641,9 +642,14 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 return markAlive();
             }
 
-            if (std::holds_alternative<StorePathSet>(options.pathsToDelete)
-                && !std::get<StorePathSet>(options.pathsToDelete).contains(*path))
+            if (!options.deleteDeadReferrers && std::holds_alternative<StorePathSet>(options.pathsToDelete)
+                && !std::get<StorePathSet>(options.pathsToDelete).contains(*path)) {
+                debug(
+                    "cannot delete '%s' because '%s' is not in the specified paths to delete",
+                    printStorePath(start),
+                    printStorePath(*path));
                 return;
+            }
 
             {
                 auto hashPart = path->hashPart();
@@ -707,19 +713,19 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         std::visit(
             overloaded{
                 [&](const StorePathSet & paths) {
-                    for (auto & i : paths) {
-                        switch (options.action) {
-                        case GCOptions::gcDeleteDead:
-                            printInfo("deleting garbage within specified paths...");
-                            break;
-                        case GCOptions::gcDeleteSpecific:
-                            printInfo("deleting specified paths...");
-                            break;
-                        case GCOptions::gcReturnDead:
-                        case GCOptions::gcReturnLive:
-                            printInfo("determining live/dead paths...");
-                        }
+                    switch (options.action) {
+                    case GCOptions::gcDeleteDead:
+                        printInfo("deleting garbage within specified paths...");
+                        break;
+                    case GCOptions::gcDeleteSpecific:
+                        printInfo("deleting specified paths...");
+                        break;
+                    case GCOptions::gcReturnDead:
+                    case GCOptions::gcReturnLive:
+                        printInfo("determining live/dead paths...");
+                    }
 
+                    for (auto & i : paths) {
                         maybeDeleteReferrersClosure(i);
 
                         if (options.action == GCOptions::gcDeleteSpecific && !dead.count(i))
@@ -728,6 +734,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                                 "To find out why, use: "
                                 "nix-store --query --roots and nix-store --query --referrers",
                                 printStorePath(i));
+                        else if (!dead.count(i))
+                            debug("cannot delete '%s' because it's still alive", printStorePath(i));
                     }
                 },
                 [&](const GCOptions::WholeStore & _) {

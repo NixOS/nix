@@ -24,6 +24,12 @@ struct CmdStoreDelete : StorePathsCommand
                 "Do not emit errors when attempting to delete something that is still alive, useful with --recursive.",
             .handler = {&options.action, GCOptions::gcDeleteDead},
         });
+
+        addFlag({
+            .longName = "delete-dead-referrers",
+            .description = "Also allow deletion of any dead referrers of the specified paths.",
+            .handler = {&options.deleteDeadReferrers, true},
+        });
     }
 
     std::string description() override
