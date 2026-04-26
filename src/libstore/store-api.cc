@@ -1,3 +1,4 @@
+#include "nix/util/error.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/source-accessor.hh"
@@ -1220,13 +1221,59 @@ Derivation Store::readInvalidDerivation(const StorePath & drvPath)
     return readDerivationCommon(*this, drvPath, false);
 }
 
+static std::list<std::filesystem::path> getDefaultSecretKeys()
+{
+    const auto secretKeyDir = settings.nixStateDir / "keys";
+    const auto publicKeyDir = settings.nixStateDir / "public-keys";
+    const auto defaultSecretKeyFile = secretKeyDir / "secret-key";
+    const auto defaultPublicKeyFile = publicKeyDir / "public-key";
+
+    auto tryGenerateDefaults = [&]() {
+        if (pathExists(defaultSecretKeyFile))
+            return true;
+        try {
+            if (!pathExists(secretKeyDir))
+                createDir(secretKeyDir, S_IRUSR | S_IWUSR | S_IEXEC);
+            if (!pathExists(publicKeyDir))
+                createDir(publicKeyDir, S_IRUSR | S_IWUSR | S_IEXEC | S_IRGRP | S_IROTH);
+        } catch (SystemError & e) {
+            printError("warning: cannot generate default keypair: %s, skipping signing with default key", e.what());
+            return false;
+        }
+        if (pathExists(defaultPublicKeyFile)) {
+            printError(
+                "warning: cannot generate default keypair because a public key already exists at %s, skipping signing with default key",
+                defaultPublicKeyFile.string());
+            return false;
+        }
+        auto secretKey = SecretKey::generate(getHostName());
+        try {
+            writeFile(defaultSecretKeyFile, secretKey.to_string(), S_IRUSR | S_IWUSR);
+            writeFile(defaultPublicKeyFile, secretKey.toPublicKey().to_string(), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        } catch (Error & e) {
+            printError("warning: cannot generate default keypair: %s, skipping signing with default key", e.what());
+            deletePath(defaultSecretKeyFile);
+            deletePath(defaultPublicKeyFile);
+        }
+        return true;
+    };
+
+    std::list<std::filesystem::path> keys;
+
+    for (const auto & keyFile : settings.secretKeyFiles.get()) {
+        if (keyFile == defaultSecretKeyFile && !tryGenerateDefaults())
+            continue;
+        keys.push_back(keyFile);
+    }
+
+    return keys;
+}
+
 void Store::signPathInfo(ValidPathInfo & info)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.secretKeyFiles;
-
-    for (auto & secretKeyFile : secretKeyFiles.get()) {
+    for (auto & secretKeyFile : getDefaultSecretKeys()) {
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         info.sign(*this, signer);
@@ -1237,9 +1284,7 @@ void Store::signRealisation(Realisation & realisation)
 {
     // FIXME: keep secret keys in memory.
 
-    auto secretKeyFiles = settings.secretKeyFiles;
-
-    for (auto & secretKeyFile : secretKeyFiles.get()) {
+    for (auto & secretKeyFile : getDefaultSecretKeys()) {
         SecretKey secretKey(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         realisation.sign(realisation.id, signer);
