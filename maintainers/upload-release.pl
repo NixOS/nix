@@ -64,7 +64,13 @@ my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
 my $flakeUrl = $evalInfo->{flake};
 my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
-my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
+# Flake jobsets (`maintenance-X.Y`) expose the rev via the flake URL.
+# The release-artifacts jobset (`maintenance-X.Y-release`) is a legacy
+# jobset whose checkout is passed in as input `src`.
+my $nixRev = ($flakeInfo
+              ? $flakeInfo->{revision}
+              : $evalInfo->{jobsetevalinputs}->{src}->{revision}
+                // $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
 my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix-everything.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
