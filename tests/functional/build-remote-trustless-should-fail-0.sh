@@ -9,7 +9,7 @@ restartDaemon
 
 requireSandboxSupport
 requiresUnprivilegedUserNamespaces
-[[ $busybox =~ busybox ]] || skipTest "no busybox"
+requireBusybox
 
 unset NIX_STORE_DIR
 
