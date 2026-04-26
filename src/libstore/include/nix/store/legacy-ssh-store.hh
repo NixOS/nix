@@ -181,17 +181,10 @@ public:
         bool includeOutputs = false,
         bool includeDerivers = false) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
-
-    /**
-     * Custom variation that atomically creates temp locks on the remote
-     * side.
-     *
-     * This exists to prevent a race where the remote host
-     * garbage-collects paths that are already there. Optionally, ask
-     * the remote host to substitute missing paths.
-     */
-    StorePathSet queryValidPaths(const StorePathSet & paths, bool lock, SubstituteFlag maybeSubstitute = NoSubstitute);
+    StorePathSet queryValidPaths(
+        const StorePathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        AddTempRootsFlag maybeAddTempRoots = NoAddTempRoots) override;
 
     void connect() override;
 

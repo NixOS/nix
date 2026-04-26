@@ -100,7 +100,8 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
         const StoreDirConfig & remoteStore,
         bool * daemonException,
         const StorePathSet & paths,
-        SubstituteFlag maybeSubstitute);
+        SubstituteFlag maybeSubstitute,
+        AddTempRootsFlag maybeAddTempRoots);
 
     std::optional<UnkeyedValidPathInfo>
     queryPathInfo(const StoreDirConfig & store, bool * daemonException, const StorePath & path);

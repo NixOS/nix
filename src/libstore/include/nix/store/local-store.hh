@@ -11,6 +11,7 @@
 #include <chrono>
 #include <future>
 #include <string>
+#include <variant>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
@@ -264,7 +265,10 @@ public:
 
     bool isValidPathUncached(const StorePath & path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(
+        const StorePathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        AddTempRootsFlag maybeAddTempRoots = NoAddTempRoots) override;
 
     StorePathSet queryAllValidPaths() override;
 
@@ -297,7 +301,7 @@ public:
         const StorePathSet & references,
         RepairFlag repair) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
 private:
 
@@ -317,6 +321,8 @@ private:
      * Connection to the garbage collector.
      */
     Sync<AutoCloseFD> _fdRootsSocket;
+
+    Sync<LRUCache<StorePath, std::monostate>> _tempRootsCache;
 
 public:
 

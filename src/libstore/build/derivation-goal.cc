@@ -62,9 +62,12 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
+    StorePathSet outputPaths;
     for (auto & i : drv->outputsAndOptPaths(worker.store))
         if (i.second.second)
-            worker.store.addTempRoot(*i.second.second);
+            outputPaths.insert(*i.second.second);
+
+    worker.store.addTempRoots(outputPaths);
 
     /* We don't yet have any safe way to cache an impure derivation at
        this step. */

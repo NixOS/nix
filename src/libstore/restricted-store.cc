@@ -123,7 +123,7 @@ struct RestrictedStore : public virtual IndirectRootStore, public virtual GcStor
         unsupported("buildDerivation");
     }
 
-    void addTempRoot(const StorePath & path) override {}
+    void addTempRoots(const StorePathSet & paths) override {}
 
     void addIndirectRoot(const std::filesystem::path & path) override {}
 

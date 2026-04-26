@@ -54,7 +54,10 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     bool isValidPathUncached(const StorePath & path) override;
 
-    StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
+    StorePathSet queryValidPaths(
+        const StorePathSet & paths,
+        SubstituteFlag maybeSubstitute = NoSubstitute,
+        AddTempRootsFlag maybeAddTempRoots = NoAddTempRoots) override;
 
     StorePathSet queryAllValidPaths() override;
 
@@ -118,7 +121,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void ensurePath(const StorePath & path) override;
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
     Roots findRoots(bool censor) override;
 

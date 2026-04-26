@@ -77,7 +77,7 @@ void LocalStore::createTempRootsFile()
     }
 }
 
-void LocalStore::addTempRoot(const StorePath & path)
+void LocalStore::addTempRoots(const StorePathSet & paths)
 {
     if (config->readOnly) {
         debug(
@@ -86,6 +86,35 @@ void LocalStore::addTempRoot(const StorePath & path)
     }
 
     createTempRootsFile();
+
+    /* Record the store paths in the temporary roots file so they will be
+       seen by a future run of the garbage collector. */
+
+    std::string s;
+
+    {
+        auto tempRootsCache(_tempRootsCache.lock());
+
+        for (auto & path : paths)
+            if (!tempRootsCache->get(path)) {
+                tempRootsCache->upsert(path, {});
+                s += printStorePath(path) + '\0';
+            }
+    }
+
+    if (s.empty())
+        return;
+
+    {
+        auto fdTempRoots(_fdTempRoots.lock());
+
+        /* This might not be atomic, but that's fine. Writes go in-order, and if
+           we partially write a store path, findTempRoots() will just ignore it,
+           and we'll send it the new temproots below if it's still running. */
+        writeFull(fdTempRoots->get(), s);
+    }
+
+    /* Any GC *started* past this point knows about the new temproots. */
 
     /* Open/create the global GC lock file. */
     {
@@ -102,8 +131,9 @@ restart:
 
     if (!gcLock.acquired) {
         /* We couldn't get a shared global GC lock, so the garbage
-           collector is running. So we have to connect to the garbage
-           collector and inform it about our root. */
+           collector is running, which may have started before we
+           wrote the new temproots. So we have to connect to the
+           garbage collector and inform it about our root. */
         auto fdRootsSocket(_fdRootsSocket.lock());
 
         if (!*fdRootsSocket) {
@@ -126,12 +156,14 @@ restart:
         }
 
         try {
-            debug("sending GC root '%s'", printStorePath(path));
-            writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
-            char c;
-            readFull(fdRootsSocket->get(), &c, 1);
-            assert(c == '1');
-            debug("got ack for GC root '%s'", printStorePath(path));
+            for (auto & path : paths) {
+                debug("sending GC root '%s'", printStorePath(path));
+                writeFull(fdRootsSocket->get(), printStorePath(path) + "\n", false);
+                char c;
+                readFull(fdRootsSocket->get(), &c, 1);
+                assert(c == '1');
+                debug("got ack for GC root '%s'", printStorePath(path));
+            }
         } catch (SystemError & e) {
             /* The garbage collector may have exited, so we need to
                restart. */
@@ -148,10 +180,7 @@ restart:
         }
     }
 
-    /* Record the store path in the temporary roots file so it will be
-       seen by a future run of the garbage collector. */
-    auto s = printStorePath(path) + '\0';
-    writeFull(_fdTempRoots.lock()->get(), s);
+    /* Any GC past this point knows about the new temproots. */
 }
 
 static std::string censored = "{censored}";

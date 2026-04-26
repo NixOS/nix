@@ -131,6 +131,11 @@ struct WorkerProto
     static constexpr std::string_view featureDeleteDeadSpecific = "delete-dead-specific";
 
     /**
+     * Feature for optionally adding temproots during QueryValidPaths
+     */
+    static constexpr std::string_view featureQueryValidPathsAddTempRoots = "query-valid-paths-add-temp-roots";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
