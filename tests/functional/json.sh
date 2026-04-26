@@ -51,7 +51,7 @@ if type script &>/dev/null; then
     if [[ $acceptsCommandFlag -eq 0 ]]; then
       script -e -q /dev/null "$@"
     else
-      script -e -q /dev/null -c "$(shellEscapeArray "$@")"
+      script -e -q -c "$(shellEscapeArray "$@")" /dev/null
     fi
   }
   runScript nix eval --json --expr "{ a.b.c = true; }" > "$TEST_HOME/actual.json"
