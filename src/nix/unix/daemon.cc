@@ -331,6 +331,13 @@ static void daemonLoop(
                         if (setsid() == -1)
                             throw SysError("creating a new session");
 
+                        // The parent's signal handler thread (which calls
+                        // sigwait) does not survive fork().  Start a new
+                        // one so that SIGTERM/SIGINT are routed through
+                        // triggerInterrupt() for a graceful shutdown
+                        // instead of being permanently blocked.
+                        unix::startSignalHandlerThread();
+
                         // Restore normal handling of SIGCHLD.
                         setSigChldAction(false);
 
