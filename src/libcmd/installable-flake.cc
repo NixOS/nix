@@ -6,6 +6,7 @@
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
 
@@ -159,11 +160,16 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
     for (auto & attrPath : attrPaths) {
         debug("trying flake output attribute '%s'", attrPath);
 
-        auto attr = root->findAlongAttrPath(AttrPath::parse(state, attrPath));
-        if (attr) {
-            res.push_back(ref(*attr));
-        } else {
-            suggestions += attr.getSuggestions();
+        try {
+            auto attr = root->findAlongAttrPath(AttrPath::parse(state, attrPath));
+            if (attr) {
+                res.push_back(ref(*attr));
+            } else {
+                suggestions += attr.getSuggestions();
+            }
+        } catch (TypeError & e) {
+            debug("error resolving attribute '%s': %s", attrPath, e.msg());
+            // Continue to next attribute path
         }
     }
 
