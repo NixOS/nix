@@ -183,12 +183,6 @@ static void fetchTree(
             }
             input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
         } else {
-            if (!experimentalFeatureSettings.isEnabled(Xp::Flakes))
-                state
-                    .error<EvalError>(
-                        "passing a string argument to '%s' requires the 'flakes' experimental feature", fetcher)
-                    .atPos(pos)
-                    .debugThrow();
             input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
     }
@@ -317,7 +311,7 @@ static RegisterPrimOp primop_fetchTree({
           - `"mercurial"`
 
          *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
-         The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
+         Indirect references (such as `nixpkgs`) additionally require the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled, because they are resolved via the flake registry.
 
           > **Example**
           >
