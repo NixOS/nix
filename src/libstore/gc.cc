@@ -360,7 +360,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     bool keepOutputs = gcSettings.keepOutputs;
     bool keepDerivations = gcSettings.keepDerivations;
 
-    boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead, alive;
+    boost::unordered_flat_set<StorePath, std::hash<StorePath>> roots, dead;
+    StorePathSet alive;
 
     /* Return early if nothing to delete */
     if (std::holds_alternative<StorePathSet>(options.pathsToDelete)
@@ -622,15 +623,12 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 alive.insert(*path);
                 alive.insert(start);
                 try {
-                    StorePathSet closure;
                     computeFSClosure(
                         *path,
-                        closure,
+                        alive,
                         /* flipDirection */ false,
                         keepOutputs,
                         keepDerivations);
-                    for (auto & p : closure)
-                        alive.insert(p);
                 } catch (InvalidPath &) {
                 }
             };
