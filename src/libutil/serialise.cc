@@ -211,6 +211,9 @@ bool FdSource::hasData()
         return true;
 
     while (true) {
+#ifdef _WIN32
+        /* Windows' fd_set is a bounded handle array, so FD_SET can't
+           overflow; on Unix use poll() since fd may exceed FD_SETSIZE. */
         fd_set fds;
         FD_ZERO(&fds);
         Socket sock = toSocket(fd);
@@ -227,6 +230,20 @@ bool FdSource::hasData()
             throw SysError("polling file descriptor");
         }
         return FD_ISSET(sock, &fds);
+#else
+        struct pollfd pfd;
+        pfd.fd = fd;
+        pfd.events = POLLIN;
+        pfd.revents = 0;
+
+        auto n = poll(&pfd, 1, 0);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            throw SysError("polling file descriptor");
+        }
+        return n > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR)) != 0;
+#endif
     }
 }
 
