@@ -41,7 +41,6 @@ let
       # Only the cross targets that end up in `fallback-paths.nix`.
       inherit (hydraJobs.buildCross.nix-everything)
         riscv64-unknown-linux-gnu
-        x86_64-unknown-freebsd
         ;
     };
 
