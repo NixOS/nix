@@ -81,6 +81,20 @@ public:
         )",
         {"substitution-max-jobs"}};
 
+    Setting<unsigned int> parallelStoreJobs{
+        this,
+        0,
+        "parallel-store-jobs",
+        R"(
+          Number of worker threads used for batch operations over store paths
+          (querying path validity in bulk, and processing the path graph during
+          `nix copy`). `0` (the default) uses the number of available CPU cores.
+
+          Increase this for I/O-bound workloads — most notably, uploading to a
+          remote binary cache — where threads spend most of their time waiting
+          on network round-trips rather than CPU.
+        )"};
+
     Setting<time_t> maxSilentTime{
         this,
         0,
