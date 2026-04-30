@@ -414,6 +414,28 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         });
     }
 
+    /**
+     * Count the number of `parent` lines in a commit's raw header.
+     * This reflects the true parent count from the commit object,
+     * unaffected by shallow boundaries (unlike `git_commit_parentcount`
+     * which returns 0 for shallow boundary commits).
+     */
+    static unsigned int getRawParentCount(const git_commit * commit)
+    {
+        unsigned int count = 0;
+        const char * header = git_commit_raw_header(commit);
+        for (const char * p = header; *p;) {
+            if (strncmp(p, "parent ", 7) == 0)
+                ++count;
+            // Skip to next line
+            p = strchr(p, '\n');
+            if (!p)
+                break;
+            ++p;
+        }
+        return count;
+    }
+
     uint64_t getRevCount(const Hash & rev) override
     {
         boost::concurrent_flat_set<git_oid, std::hash<git_oid>> done;
@@ -432,18 +454,22 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             auto _commit = lookupObject(*repo, oid, GIT_OBJECT_COMMIT);
             auto commit = (const git_commit *) &*_commit;
 
-            for (auto n : std::views::iota(0U, git_commit_parentcount(commit))) {
+            auto apiParents = git_commit_parentcount(commit);
+            auto rawParents = getRawParentCount(commit);
+            if (apiParents < rawParents)
+                throw Error(
+                    "Git commit '%s' has an incomplete history "
+                    "(shallow boundary; %u of %u parents locally available). "
+                    "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
+                    "or set the shallow parameter to true in builtins.fetchGit, "
+                    "or fetch the complete history for this branch.",
+                    *git_commit_id(commit),
+                    apiParents,
+                    rawParents);
+
+            for (auto n : std::views::iota(0U, apiParents)) {
                 auto parentOid = git_commit_parent_id(commit, n);
-                if (!parentOid) {
-                    throw Error(
-                        "Failed to retrieve the parent of Git commit '%s': %s. "
-                        "This may be due to an incomplete repository history. "
-                        "To resolve this, either enable the shallow parameter in your flake URL (?shallow=1) "
-                        "or add set the shallow parameter to true in builtins.fetchGit, "
-                        "or fetch the complete history for this branch.",
-                        *git_commit_id(commit),
-                        git_error_last()->message);
-                }
+                assert(parentOid);
                 if (done.insert(*parentOid))
                     pool.enqueue(std::bind(process, *parentOid));
             }
