@@ -6,6 +6,7 @@
 #include "nix/store/nar-info.hh"
 #include "nix/store/binary-cache-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/util/environment-variables.hh"
 
 #include <future>
 #include <regex>
@@ -174,6 +175,14 @@ struct CmdServe : StoreCommand
                     read++;
                     state.firstByte.reset();
                 }
+
+                static bool truncate = getEnv("_NIX_TEST_NIX_SERVE_TRUNCATE_NAR").value_or("") == "1";
+                static std::atomic<uint64_t> truncatePoint{200000};
+                if (truncate && pos > truncatePoint) {
+                    truncatePoint += 200000;
+                    return MHD_CONTENT_READER_END_WITH_ERROR;
+                }
+
                 try {
                     read += state.source->read(buf, max);
                     return read;
