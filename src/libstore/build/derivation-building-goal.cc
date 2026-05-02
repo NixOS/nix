@@ -986,12 +986,12 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             builder = localBuildCap.externalBuilder
                           ? makeExternalDerivationBuilder(
                                 localBuildCap.localStore,
-                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params),
                                 *localBuildCap.externalBuilder)
                           : makeDerivationBuilder(
                                 localBuildCap.localStore,
-                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params));
         }
 
