@@ -31,6 +31,8 @@ void builtinUnpackChannel(const BasicDerivation & drv, const std::map<std::strin
     size_t fileCount;
     std::string fileName;
     auto entries = DirectoryIterator{out};
+    if (entries == DirectoryIterator{})
+        throw Error("channel tarball '%s' is empty", src);
     fileName = entries->path().string();
     fileCount = std::distance(entries.begin(), entries.end());
 
