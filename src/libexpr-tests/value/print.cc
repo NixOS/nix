@@ -580,7 +580,10 @@ TEST_F(ValuePrintingTests, ansiColorsAttrsRepeated)
     Value vAttrs;
     vAttrs.mkAttrs(builder.finish());
 
-    test(vAttrs, "{ a = { }; b = " ANSI_MAGENTA "«repeated»" ANSI_NORMAL "; }", PrintOptions{.ansiColors = true});
+    test(
+        vAttrs,
+        "{ a = { } /* 0 */; b = " ANSI_MAGENTA "«repeated@0»" ANSI_NORMAL "; }",
+        PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, ansiColorsListRepeated)
@@ -596,7 +599,7 @@ TEST_F(ValuePrintingTests, ansiColorsListRepeated)
     Value vList;
     vList.mkList(list);
 
-    test(vList, "[ { } " ANSI_MAGENTA "«repeated»" ANSI_NORMAL " ]", PrintOptions{.ansiColors = true});
+    test(vList, "[ { } /* 0 */ " ANSI_MAGENTA "«repeated@0»" ANSI_NORMAL " ]", PrintOptions{.ansiColors = true});
 }
 
 TEST_F(ValuePrintingTests, listRepeated)
@@ -612,7 +615,7 @@ TEST_F(ValuePrintingTests, listRepeated)
     Value vList;
     vList.mkList(list);
 
-    test(vList, "[ { } «repeated» ]", PrintOptions{});
+    test(vList, "[ { } /* 0 */ «repeated@0» ]", PrintOptions{});
     test(vList, "[ { } { } ]", PrintOptions{.trackRepeated = false});
 }
 

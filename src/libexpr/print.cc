@@ -11,6 +11,14 @@
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
+struct NullBuffer : std::streambuf
+{
+    int overflow(int c) override
+    {
+        return c;
+    }
+};
+
 namespace nix {
 
 void printElided(
@@ -164,6 +172,7 @@ private:
     PrintOptions options;
     NixStringContext * context;
     std::optional<ValuesSeen> seen;
+    std::optional<std::unordered_map<const void *, size_t>> repeated;
     size_t totalAttrsPrinted = 0;
     size_t totalListItemsPrinted = 0;
     std::string indent;
@@ -198,11 +207,11 @@ private:
         }
     }
 
-    void printRepeated()
+    void printRepeated(size_t id)
     {
         if (options.ansiColors)
             output << ANSI_MAGENTA;
-        output << "«repeated»";
+        output << "«repeated@" << id << "»";
         if (options.ansiColors)
             output << ANSI_NORMAL;
     }
@@ -332,7 +341,8 @@ private:
     void printAttrs(Value & v, size_t depth)
     {
         if (seen && !seen->insert(v.attrs()).second) {
-            printRepeated();
+            auto repeated_id = repeated->insert(std::make_pair(v.attrs(), repeated->size()));
+            printRepeated(repeated_id.first->second);
             return;
         }
 
@@ -377,6 +387,12 @@ private:
         } else {
             output << "{ ... }";
         }
+        if (repeated) {
+            auto repeated_id = repeated->find(v.attrs());
+            if (repeated_id != repeated->end()) {
+                output << " /* " << repeated_id->second << " */";
+            }
+        }
     }
 
     /**
@@ -410,7 +426,8 @@ private:
     void printList(Value & v, size_t depth)
     {
         if (seen && v.listSize() && !seen->insert(&v).second) {
-            printRepeated();
+            auto repeated_id = repeated->insert(std::make_pair(&v, repeated->size()));
+            printRepeated(repeated_id.first->second);
             return;
         }
 
@@ -444,6 +461,12 @@ private:
             output << "]";
         } else {
             output << "[ ... ]";
+        }
+        if (repeated) {
+            auto repeated_id = repeated->find(&v);
+            if (repeated_id != repeated->end()) {
+                output << " /* " << repeated_id->second << " */";
+            }
         }
     }
 
@@ -651,13 +674,30 @@ public:
         indent.clear();
 
         if (options.trackRepeated) {
+            // Record IDs for repeated values
             seen.emplace();
+            repeated.emplace();
+
+            NullBuffer nullBuffer;
+            auto s = output.rdbuf(&nullBuffer);
+
+            print(v, 0);
+
+            // Now actually print (with IDs for repeated values)
+            totalAttrsPrinted = 0;
+            totalListItemsPrinted = 0;
+
+            indent.clear();
+            seen.emplace();
+
+            output.rdbuf(s);
+
+            print(v, 0);
         } else {
             seen.reset();
+            repeated.reset();
+            print(v, 0);
         }
-
-        ValuesSeen seen;
-        print(v, 0);
     }
 };
 
