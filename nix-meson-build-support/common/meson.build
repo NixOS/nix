@@ -14,7 +14,7 @@ if host_machine.system() == 'cygwin'
   )
 endif
 
-add_project_arguments(
+warning_flags = [
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
   '-Werror=switch',
@@ -27,19 +27,22 @@ add_project_arguments(
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
+  '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
+  '-Wno-subobject-linkage', # GCC doesn't like unity builds.
+  # Catch brace elision bugs: when WorkerProto::Version changed from `unsigned int`
+  # to `struct { unsigned int major; uint8_t minor; }`, `.version = 16` silently
+  # became `.version = {16, 0}` instead of failing, breaking protocol compatibility
+  # in a subtle way
+  '-Werror=c99-designator',
+]
+
+add_project_arguments(
+  cxx.get_supported_arguments(warning_flags),
   language : 'cpp',
 )
 
 # GCC doesn't benefit much from precompiled headers.
 do_pch = cxx.get_id() == 'clang'
-
-if cxx.get_id() == 'gcc'
-  add_project_arguments(
-    '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
-    '-Wno-subobject-linkage', # GCC doesn't like unity builds.
-    language : 'cpp',
-  )
-endif
 
 # This is a clang-only option for improving build times.
 # It forces the instantiation of templates in the PCH itself and
@@ -50,11 +53,6 @@ endif
 # instantiations in libutil and libstore.
 if cxx.get_id() == 'clang'
   add_project_arguments('-fpch-instantiate-templates', language : 'cpp')
-  # Catch brace elision bugs: when WorkerProto::Version changed from `unsigned int`
-  # to `struct { unsigned int major; uint8_t minor; }`, `.version = 16` silently
-  # became `.version = {16, 0}` instead of failing, breaking protocol compatibility
-  # in a subtle way
-  add_project_arguments('-Werror=c99-designator', language : 'cpp')
 endif
 
 # Detect if we're using libstdc++ (GCC's standard library)
