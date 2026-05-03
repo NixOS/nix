@@ -703,7 +703,7 @@ SortedSymbols AttrCursor::getAttrs()
 
 bool AttrCursor::isDerivation()
 {
-    auto aType = maybeGetAttr("type");
+    auto aType = maybeGetAttr(root->state.s.type);
     return aType && aType->getString() == "derivation";
 }
 
