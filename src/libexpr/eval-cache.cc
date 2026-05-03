@@ -88,7 +88,11 @@ struct AttrDb
         state->queryAttribute.create(
             state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ?");
 
-        state->queryAttributes.create(state->db, "select name from Attributes where parent = ?");
+        /* Explicitly order by 'name' to facilitate fast lookups for callers. SQLite's binary
+           collation matches the sorting order used by 'SortedSymbols::Compare'. This sort is
+           practically free as it leverages the primary key index. We specify it explicitly
+           because SQL does not guarantee result order without an 'ORDER BY' clause. */
+        state->queryAttributes.create(state->db, "select name from Attributes where parent = ? order by name");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -119,7 +123,7 @@ struct AttrDb
         }
     }
 
-    AttrId setAttrs(AttrKey key, const std::vector<Symbol> & attrs)
+    AttrId setAttrs(AttrKey key, const SortedSymbols & attrs)
     {
         return doSQLite([&]() {
             auto state(_state->lock());
@@ -256,11 +260,12 @@ struct AttrDb
             return {{rowId, placeholder_t()}};
         case AttrType::FullAttrs: {
             // FIXME: expensive, should separate this out.
+            // Rows arrive ordered by `name`.
             std::vector<Symbol> attrs;
             auto queryAttributes(state->queryAttributes.use()(rowId));
             while (queryAttributes.next())
                 attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
-            return {{rowId, attrs}};
+            return {{rowId, SortedSymbols{std::move(attrs)}}};
         }
         case AttrType::String: {
             NixStringContext context;
@@ -441,10 +446,12 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
         fetchCachedValue();
 
         if (cachedValue) {
-            if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
-                for (auto & attr : *attrs)
-                    if (attr == name)
-                        return std::make_shared<AttrCursor>(root, std::make_pair(ref(shared_from_this()), attr));
+            if (auto attrs = std::get_if<SortedSymbols>(&cachedValue->second)) {
+                auto it =
+                    std::lower_bound(attrs->begin(), attrs->end(), name, SortedSymbols::Compare{root->state.symbols});
+                if (it != attrs->end() && *it == name) {
+                    return std::make_shared<AttrCursor>(root, std::make_pair(ref(shared_from_this()), name));
+                }
                 return nullptr;
             } else if (std::get_if<placeholder_t>(&cachedValue->second)) {
                 auto attr = root->db->getAttr({cachedValue->first, name});
@@ -664,12 +671,12 @@ std::vector<std::string> AttrCursor::getListOfStrings()
     return res;
 }
 
-std::vector<Symbol> AttrCursor::getAttrs()
+SortedSymbols AttrCursor::getAttrs()
 {
     if (root->db) {
         fetchCachedValue();
         if (cachedValue && !std::get_if<placeholder_t>(&cachedValue->second)) {
-            if (auto attrs = std::get_if<std::vector<Symbol>>(&cachedValue->second)) {
+            if (auto attrs = std::get_if<SortedSymbols>(&cachedValue->second)) {
                 debug("using cached attrset attribute '%s'", getAttrPathStr());
                 return *attrs;
             } else
@@ -682,13 +689,11 @@ std::vector<Symbol> AttrCursor::getAttrs()
     if (v.type() != nAttrs)
         root->state.error<TypeError>("'%s' is not an attribute set", getAttrPathStr()).debugThrow();
 
-    std::vector<Symbol> attrs;
+    std::vector<Symbol> raw;
     for (auto & attr : *getValue().attrs())
-        attrs.push_back(attr.name);
-    std::sort(attrs.begin(), attrs.end(), [&](Symbol a, Symbol b) {
-        std::string_view sa = root->state.symbols[a], sb = root->state.symbols[b];
-        return sa < sb;
-    });
+        raw.push_back(attr.name);
+    std::sort(raw.begin(), raw.end(), SortedSymbols::Compare{root->state.symbols});
+    SortedSymbols attrs{std::move(raw)};
 
     if (root->db)
         cachedValue = {root->db->setAttrs(getKey(), attrs), attrs};
