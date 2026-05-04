@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include <algorithm>
 #include <array>
+#include <cstring>
 #include <optional>
 #include <ranges>
 
@@ -564,26 +565,46 @@ Full parse(
  */
 static void printString(std::string & res, std::string_view s)
 {
-    res += '"';
-    static constexpr auto chunkSize = 1024;
-    std::array<char, 2 * chunkSize + 2> buffer;
-    while (!s.empty()) {
-        auto chunk = s.substr(0, /*n=*/chunkSize);
-        s.remove_prefix(chunk.size());
-        char * buf = buffer.data();
-        char * p = buf;
-        for (auto c : chunk) {
-            auto escape = unescapes.lookup(c);
-            if (escape.has_value()) {
-                *p++ = '\\';
-                *p++ = escape.value();
-            } else {
-                *p++ = c;
+    /* Bulk-memcpy unescaped runs and handle escapes inline; write straight
+       into res via resize_and_overwrite (no zero-fill, no scratch buffer). */
+    auto oldSize = res.size();
+    res.resize_and_overwrite(oldSize + s.size() * 2 + 2, [&](char * data, size_t) -> size_t {
+        char * p = data + oldSize;
+        *p++ = '"';
+        while (!s.empty()) {
+            size_t i = 0;
+            while (i < s.size()) {
+                char c = s[i];
+                if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t')
+                    break;
+                ++i;
             }
+            if (i > 0) {
+                std::memcpy(p, s.data(), i);
+                p += i;
+            }
+            if (i == s.size())
+                break;
+            *p++ = '\\';
+            switch (s[i]) {
+            case '\n':
+                *p++ = 'n';
+                break;
+            case '\r':
+                *p++ = 'r';
+                break;
+            case '\t':
+                *p++ = 't';
+                break;
+            default:
+                *p++ = s[i];
+                break;
+            }
+            s.remove_prefix(i + 1);
         }
-        res.append(buf, p - buf);
-    }
-    res += '"';
+        *p++ = '"';
+        return p - data;
+    });
 }
 
 static void printUnquotedString(std::string & res, std::string_view s)
