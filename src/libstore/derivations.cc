@@ -589,6 +589,26 @@ static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIt
     res += ']';
 }
 
+/* Stream printed paths directly; iterating StorePath-sorted preserves the
+   "<storeDir>/<baseName>" order since storeDir is a common prefix. */
+static void printUnquotedStorePaths(std::string & res, const StoreDirConfig & store, const StorePathSet & paths)
+{
+    res += '[';
+    bool first = true;
+    for (auto & p : paths) {
+        if (first)
+            first = false;
+        else
+            res += ',';
+        res += '"';
+        res.append(store.storeDir);
+        res += '/';
+        res.append(p.to_string());
+        res += '"';
+    }
+    res += ']';
+}
+
 static void unparseDerivedPathMapNode(
     const StoreDirConfig & store, std::string & s, const DerivedPathMap<StringSet>::ChildNode & node)
 {
@@ -733,8 +753,7 @@ std::string Derivation::unparse(
     }
 
     s += "],"sv;
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
-    printUnquotedStrings(s, paths.begin(), paths.end());
+    printUnquotedStorePaths(s, store, inputSrcs);
 
     s += ',';
     printUnquotedString(s, platform);
