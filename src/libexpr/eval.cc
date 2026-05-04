@@ -47,6 +47,7 @@
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "nix/util/strings-inline.hh"
 
@@ -2267,17 +2268,18 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
 
 void EvalState::forceValueDeep(Value & v)
 {
-    std::set<const Value *> seen;
+    /* Only attrsets and lists can recurse cyclically, so only those need cycle
+       detection. Leaves are skipped to avoid a hash op per leaf. */
+    boost::unordered_flat_set<const Value *> seen;
 
     [&, &state(*this)](this const auto & recurse, Value & v) {
         auto _level = state.addCallDepth(v.determinePos(noPos));
 
-        if (!seen.insert(&v).second)
-            return;
-
         state.forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
+            if (!seen.insert(&v).second)
+                return;
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
@@ -2298,6 +2300,8 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
+            if (!seen.insert(&v).second)
+                return;
             size_t index = 0;
             for (auto v2 : v.listView())
                 try {
