@@ -22,19 +22,19 @@ namespace nix {
 
 void BufferedSink::operator()(std::string_view data)
 {
-    if (!buffer)
-        buffer = decltype(buffer)(new char[bufSize]);
-
     while (!data.empty()) {
         /* Optimisation: bypass the buffer if the data exceeds the
            buffer size. */
         if (bufPos + data.size() >= bufSize) {
             flush();
             writeUnbuffered(data);
-            break;
+            return;
         }
         /* Otherwise, copy the bytes to the buffer.  Flush the buffer
-           when it's full. */
+           when it's full. Allocate lazily: callers that only pass
+           >= bufSize chunks (e.g. NAR restore) skip the alloc entirely. */
+        if (!buffer)
+            buffer = decltype(buffer)(new char[bufSize]);
         size_t n = bufPos + data.size() > bufSize ? bufSize - bufPos : data.size();
         memcpy(buffer.get() + bufPos, data.data(), n);
         data.remove_prefix(n);
