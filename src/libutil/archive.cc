@@ -32,6 +32,12 @@ static ArchiveSettings archiveSettings;
 
 static GlobalConfig::Register rArchiveSettings(&archiveSettings);
 
+/* Maximum directory nesting depth for dumpPath()/parseDump(). Bounds
+   stack usage so deep trees cannot overflow the (possibly coroutine)
+   stack these run on. Chosen to fit comfortably in the default 128 KiB
+   boost coroutine stack. */
+static constexpr size_t narMaxDepth = 64;
+
 PathFilter defaultPathFilter = [](const std::string &) { return true; };
 
 void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & filter)
@@ -49,8 +55,11 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
 
     sink << narVersionMagic1;
 
-    [&, &this_(*this)](this const auto & dump, const CanonPath & path) -> void {
+    [&, &this_(*this)](this const auto & dump, const CanonPath & path, size_t depth) -> void {
         checkInterrupt();
+
+        if (depth >= narMaxDepth)
+            throw Error("path '%s' exceeds maximum NAR directory depth of %d", this_.showPath(path), narMaxDepth);
 
         auto st = this_.lstat(path);
 
@@ -86,7 +95,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             for (auto & i : unhacked)
                 if (filter((path / i.first).abs())) {
                     sink << "entry" << "(" << "name" << i.first << "node";
-                    dump(path / i.second);
+                    dump(path / i.second, depth + 1);
                     sink << ")";
                 }
         }
@@ -98,7 +107,7 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
             throw Error("file '%s' has an unsupported type", path);
 
         sink << ")";
-    }(path);
+    }(path, 0);
 }
 
 time_t dumpPathAndGetMtime(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
@@ -159,35 +168,47 @@ struct CaseInsensitiveCompare
     }
 };
 
-static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path)
+static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath & path, size_t depth)
 {
-    auto getString = [&]() {
+    if (depth >= narMaxDepth)
+        throw badArchive("NAR directory nesting exceeds maximum depth of %d", narMaxDepth);
+
+    /* NAR keywords are all <= 10 bytes; a little slack keeps error
+       messages useful for short garbage without allowing large
+       allocations. */
+    constexpr size_t narMaxTag = 32;
+    /* Format-defined bounds, intentionally independent of host
+       NAME_MAX/PATH_MAX. */
+    constexpr size_t narMaxName = 255;
+    constexpr size_t narMaxTarget = 4095;
+
+    auto getString = [&](size_t max) {
         checkInterrupt();
-        return readString(source);
+        return readString(source, max);
     };
 
     auto expectTag = [&](std::string_view expected) {
-        auto tag = getString();
+        auto tag = getString(narMaxTag);
         if (tag != expected)
-            throw badArchive("expected tag '%s', got '%s'", expected, tag.substr(0, 1024));
+            throw badArchive("expected tag '%s', got '%s'", expected, tag);
     };
 
     expectTag("(");
 
     expectTag("type");
 
-    auto type = getString();
+    auto type = getString(narMaxTag);
 
     if (type == "regular") {
         sink.createRegularFile(path, [&](auto & crf) {
-            auto tag = getString();
+            auto tag = getString(narMaxTag);
 
             if (tag == "executable") {
-                auto s2 = getString();
+                auto s2 = getString(0);
                 if (s2 != "")
                     throw badArchive("executable marker has non-empty value");
                 crf.isExecutable();
-                tag = getString();
+                tag = getString(narMaxTag);
             }
 
             if (tag != "contents")
@@ -206,7 +227,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
             std::string prevName;
 
             while (1) {
-                auto tag = getString();
+                auto tag = getString(narMaxTag);
 
                 if (tag == ")")
                     break;
@@ -218,7 +239,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
                 expectTag("name");
 
-                auto name = getString();
+                auto name = getString(narMaxName);
                 if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos
                     || name.find((char) 0) != std::string::npos)
                     throw badArchive("NAR contains invalid file name '%1%'", name);
@@ -243,7 +264,7 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
 
                 expectTag("node");
 
-                parse(dirSink, source, relDirPath / name);
+                parse(dirSink, source, relDirPath / name, depth + 1);
 
                 expectTag(")");
             }
@@ -253,7 +274,9 @@ static void parse(FileSystemObjectSink & sink, Source & source, const CanonPath 
     else if (type == "symlink") {
         expectTag("target");
 
-        auto target = getString();
+        auto target = getString(narMaxTarget);
+        if (target.empty() || target.find((char) 0) != std::string::npos)
+            throw badArchive("NAR contains invalid symlink target");
         sink.createSymlink(path, target);
 
         expectTag(")");
@@ -274,7 +297,7 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     }
     if (version != narVersionMagic1)
         throw badArchive("input doesn't look like a Nix archive");
-    parse(sink, source, CanonPath::root);
+    parse(sink, source, CanonPath::root, 0);
 }
 
 void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
