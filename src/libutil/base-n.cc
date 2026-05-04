@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string_view>
 
 #include "nix/util/array-from-string-literal.hh"
@@ -10,13 +11,24 @@ namespace nix {
 
 constexpr static const std::array<char, 16> base16Chars = "0123456789abcdef"_arrayNoNull;
 
+/* Two-char hex encoding per input byte; written via memcpy so the encoder
+   emits two characters per iteration without bounds checks. */
+constexpr static const std::array<std::array<char, 2>, 256> base16Pairs = []() {
+    std::array<std::array<char, 2>, 256> arr{};
+    for (int i = 0; i < 256; ++i) {
+        arr[i][0] = base16Chars[i >> 4];
+        arr[i][1] = base16Chars[i & 0xf];
+    }
+    return arr;
+}();
+
 std::string base16::encode(std::span<const std::byte> b)
 {
-    std::string buf;
-    buf.reserve(b.size() * 2);
+    std::string buf(b.size() * 2, '\0');
+    char * p = buf.data();
     for (size_t i = 0; i < b.size(); i++) {
-        buf.push_back(base16Chars[(uint8_t) b.data()[i] >> 4]);
-        buf.push_back(base16Chars[(uint8_t) b.data()[i] & 0x0f]);
+        std::memcpy(p, base16Pairs[static_cast<uint8_t>(b.data()[i])].data(), 2);
+        p += 2;
     }
     return buf;
 }
