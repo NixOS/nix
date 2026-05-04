@@ -49,7 +49,14 @@ StorePathSet StoreDirConfig::parseStorePathSet(const StringSet & paths) const
 
 std::string StoreDirConfig::printStorePath(const StorePath & path) const
 {
-    return (storeDir + "/").append(path.to_string());
+    /* One allocation instead of two (storeDir + "/" was a temporary). */
+    auto baseName = path.to_string();
+    std::string res;
+    res.reserve(storeDir.size() + 1 + baseName.size());
+    res.append(storeDir);
+    res += '/';
+    res.append(baseName);
+    return res;
 }
 
 StringSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
