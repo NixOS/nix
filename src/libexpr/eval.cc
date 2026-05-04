@@ -308,6 +308,7 @@ EvalState::EvalState(
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
+    , posValueCache(make_ref<decltype(posValueCache)::element_type>())
     , lookupPathResolved(make_ref<decltype(lookupPathResolved)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
@@ -968,14 +969,31 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, PosIdx p)
 {
+    /* Position attrsets are immutable, so reuse the cached Value. */
+    if (Value * cached = nullptr; posValueCache->visit(p, [&](const auto & kv) { cached = kv.second; }) && cached) {
+        v = *cached;
+        return;
+    }
+
+    Value * fresh = allocValue();
     auto origin = positions.originOf(p);
     if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
         attrs.alloc(s.file).mkString(path->path.abs(), mem);
         makePositionThunks(*this, p, attrs.alloc(s.line), attrs.alloc(s.column));
-        v.mkAttrs(attrs);
+        fresh->mkAttrs(attrs);
     } else
-        v.mkNull();
+        fresh->mkNull();
+
+    /* On a concurrent miss for the same PosIdx, adopt the winner's Value
+       and discard ours. */
+    if (!posValueCache->try_emplace(p, fresh)) {
+        Value * winner = nullptr;
+        posValueCache->visit(p, [&](const auto & kv) { winner = kv.second; });
+        if (winner)
+            fresh = winner;
+    }
+    v = *fresh;
 }
 
 void EvalState::mkStorePathString(const StorePath & p, Value & v)
@@ -1175,6 +1193,7 @@ void EvalState::resetFileCache()
     fileEvalCache->clear();
     inputCache->clear();
     lookupPathResolved->clear();
+    posValueCache->clear();
     positions.clear();
     rootFS->invalidateCache();
 }

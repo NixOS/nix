@@ -487,6 +487,19 @@ private:
      */
     const ref<boost::concurrent_flat_map<SourcePath, ref<DocCommentMap>>> positionToDocComment;
 
+    /**
+     * Cache for `mkPos` attrsets keyed by PosIdx. `unsafeGetAttrPos` produces
+     * many repeated positions during a full Nixpkgs eval; caching skips the
+     * Bindings + 3 Values + path string allocation per call.
+     */
+    const ref<boost::concurrent_flat_map<
+        PosIdx,
+        Value *,
+        std::hash<PosIdx>,
+        std::equal_to<PosIdx>,
+        traceable_allocator<std::pair<const PosIdx, Value *>>>>
+        posValueCache;
+
     LookupPath lookupPath;
 
     struct LookupPathResolvedState
