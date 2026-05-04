@@ -33,6 +33,7 @@
 #include <cstring>
 #include <sstream>
 #include <regex>
+#include <unordered_map>
 
 #ifndef _WIN32
 #  include <dlfcn.h>
@@ -3625,7 +3626,15 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
         std::optional<ListBuilder> list;
     };
 
-    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
+    /* Hash map for O(1) lookups; node-based so values are individually
+       GC-traceable, and Item's non-copyable ListBuilder rules out a flat map. */
+    std::unordered_map<
+        Symbol,
+        Item,
+        std::hash<Symbol>,
+        std::equal_to<Symbol>,
+        traceable_allocator<std::pair<const Symbol, Item>>>
+        attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
@@ -3638,25 +3647,33 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
             attrsSeen.try_emplace(attr.name).first->second.size++;
     }
 
-    for (auto & [sym, elem] : attrsSeen)
-        elem.list.emplace(state.buildList(elem.size));
+    /* Output Bindings must be Symbol-id sorted; the hash map isn't, so
+       build a sorted (Symbol, Item *) view. */
+    std::vector<std::pair<Symbol, Item *>> ordered;
+    ordered.reserve(attrsSeen.size());
+    for (auto & [sym, item] : attrsSeen)
+        ordered.emplace_back(sym, &item);
+    std::ranges::sort(ordered, [](const auto & a, const auto & b) { return a.first < b.first; });
+
+    for (auto & [sym, item] : ordered)
+        item->list.emplace(state.buildList(item->size));
 
     for (auto & vElem : listItems) {
         for (auto & attr : *vElem->attrs()) {
-            auto & item = attrsSeen.at(attr.name);
+            auto & item = attrsSeen.find(attr.name)->second;
             (*item.list)[item.pos++] = attr.value;
         }
     }
 
-    auto attrs = state.buildBindings(attrsSeen.size());
+    auto attrs = state.buildBindings(ordered.size());
 
-    for (auto & [sym, elem] : attrsSeen) {
+    for (auto & [sym, item] : ordered) {
         auto name = Value::toPtr(state.symbols[sym]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();
         auto arg = state.allocValue();
-        arg->mkList(*elem.list);
+        arg->mkList(*item->list);
         call2->mkApp(call1, arg);
         attrs.insert(sym, call2);
     }
