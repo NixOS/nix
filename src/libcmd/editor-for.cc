@@ -9,7 +9,8 @@ namespace nix {
 std::tuple<OsStrings, AutoCloseFD, AutoDelete> editorFor(const SourcePath & file, uint32_t line, bool readOnly)
 {
     auto path = file.getPhysicalPath();
-    OsString editor = getEnvOsNonEmpty(OS_STR("EDITOR")).value_or(OS_STR("cat"));
+    OsString editor =
+        getEnvOsNonEmpty(OS_STR("VISUAL")).value_or(getEnvOsNonEmpty(OS_STR("EDITOR")).value_or(OS_STR("cat")));
     auto args = tokenizeString<OsStrings>(editor);
     if (line > 0
         && (editor.contains(OS_STR("emacs")) || editor.contains(OS_STR("nano")) || editor.contains(OS_STR("vim"))
