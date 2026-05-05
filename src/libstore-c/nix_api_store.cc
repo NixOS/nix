@@ -304,6 +304,62 @@ nix_err nix_derivation_to_json(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_derivation_get_outputs(
+    nix_c_context * context,
+    const nix_derivation * drv,
+    void * userdata,
+    void (*callback)(nix_c_context * context, void * userdata, const char * output_name))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (!callback)
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Callback is null");
+    try {
+        for (const auto & [outputName, _output] : drv->drv.outputs) {
+            callback(context, userdata, outputName.c_str());
+            if (context && context->last_err_code != NIX_OK)
+                return context->last_err_code;
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_input_drv_outputs(
+    nix_c_context * context,
+    const nix_derivation * drv,
+    void * userdata,
+    void (*callback)(
+        nix_c_context * context, void * userdata, const StorePath * input_drv_path, const char * output_name))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (!callback)
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Callback is null");
+    try {
+        for (const auto & [inputDrvPath, childNode] : drv->drv.inputs.drvs.map) {
+            const StorePath borrowedPath{inputDrvPath};
+            for (const auto & outputName : childNode.value) {
+                callback(context, userdata, &borrowedPath, outputName.c_str());
+                if (context && context->last_err_code != NIX_OK)
+                    return context->last_err_code;
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_has_dynamic_inputs(nix_c_context * context, const nix_derivation * drv, bool * out_has_dynamic)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    if (!out_has_dynamic)
+        return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Output pointer is null");
+    try {
+        *out_has_dynamic = nix::hasDynamicDrvDep(drv->drv.inputs.drvs.map);
+    }
+    NIXC_CATCH_ERRS
+}
+
 StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_derivation * derivation)
 {
     if (context)
