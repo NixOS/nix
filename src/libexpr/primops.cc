@@ -306,8 +306,14 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     auto isValidDerivationInStore = [&]() -> std::optional<StorePath> {
         if (!state.store->isStorePath(path2))
             return std::nullopt;
+        if (!isDerivation(path2))
+            return std::nullopt;
         auto storePath = state.store->parseStorePath(path2);
-        if (!(state.store->isValidPath(storePath) && isDerivation(path2)))
+        /* Add a temp root before checking validity to prevent GC
+           from deleting the path between our check and the
+           subsequent readDerivation(). */
+        state.store->addTempRoot(storePath);
+        if (!state.store->isValidPath(storePath))
             return std::nullopt;
         return storePath;
     };

@@ -24,6 +24,11 @@ PackageInfo::PackageInfo(EvalState & state, ref<Store> store, const std::string 
 
     this->drvPath = drvPath;
 
+    /* Prevent GC from deleting the .drv before we read it. This
+       constructor is only called from CLI entry points (nix-build)
+       where the path originates from a previous session, so it
+       has no temp root from the current process. */
+    store->addTempRoot(drvPath);
     auto drv = store->derivationFromPath(drvPath);
 
     name = drvPath.name();
