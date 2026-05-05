@@ -1,4 +1,5 @@
 #include "nix/store/daemon.hh"
+#include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
@@ -1025,6 +1026,18 @@ static void performOp(
         conn.to << 1;
         break;
     }
+
+    case WorkerProto::Op::AddDerivationJson: {
+        auto s = readString(conn.from);
+
+        logger->startWork();
+        auto drv = Derivation::parseJsonAndValidate(*store, nlohmann::json::parse(s));
+        auto drvPath = store->writeDerivation(drv);
+        logger->stopWork();
+
+        WorkerProto::write(*store, conn, drvPath);
+        break;
+    };
 
     default:
         throw Error("invalid operation %1%", op);
