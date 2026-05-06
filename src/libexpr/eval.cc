@@ -1948,6 +1948,24 @@ void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
         && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
 }
 
+void ExprOpAnd::evalAssert(EvalState & state, Env & env, Value & v)
+{
+    try {
+        e1->evalAssert(state, env, v);
+    } catch (Error & e) {
+        e.addTrace(state.positions[pos], "while evaluating the left operand of the && operator");
+        throw;
+    }
+    if (state.forceBool(v, pos, "in the left operand of the AND (&&) operator")) {
+        try {
+            e2->evalAssert(state, env, v);
+        } catch (Error & e) {
+            e.addTrace(state.positions[pos], "while evaluating the right operand of the && operator");
+            throw;
+        }
+    }
+}
+
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
@@ -1960,6 +1978,21 @@ void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
     v.mkBool(
         !state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator")
         || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
+}
+
+void ExprOpImpl::evalAssert(EvalState & state, Env & env, Value & v)
+{
+    e1->eval(state, env, v);
+    if (state.forceBool(v, pos, "in the left operand of the IMPL (->) operator")) {
+        try {
+            e2->evalAssert(state, env, v);
+        } catch (Error & e) {
+            e.addTrace(state.positions[pos], "while evaluating the right operand of the -> operator");
+            throw;
+        }
+    } else {
+        v.mkBool(true);
+    }
 }
 
 void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)

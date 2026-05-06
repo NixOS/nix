@@ -762,9 +762,19 @@ private:
 };
 
 MakeBinOp(ExprOpNEq, "!=");
-MakeBinOp(ExprOpAnd, "&&");
+
+struct ExprOpAnd : Expr
+{
+    MakeBinOpMembers(ExprOpAnd, "&&") void evalAssert(EvalState & state, Env & env, Value & v) override;
+};
+
 MakeBinOp(ExprOpOr, "||");
-MakeBinOp(ExprOpImpl, "->");
+
+struct ExprOpImpl : Expr
+{
+    MakeBinOpMembers(ExprOpImpl, "->") void evalAssert(EvalState & state, Env & env, Value & v) override;
+};
+
 MakeBinOp(ExprOpConcatLists, "++");
 
 struct ExprOpUpdate : Expr
