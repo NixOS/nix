@@ -643,7 +643,11 @@ struct ExprLet : Expr
     ExprLet(ExprAttrs * attrs, Expr * body)
         : attrs(attrs)
         , body(body) {};
+    void evalAssert(EvalState & state, Env & env, Value & v) override;
     COMMON_METHODS
+private:
+    template<bool IsAssert>
+    void evalImpl(EvalState & state, Env & env, Value & v);
 };
 
 struct ExprWith : Expr

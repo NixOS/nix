@@ -1355,7 +1355,8 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
     v.mkAttrs(sort ? bindings.finish() : bindings.alreadySorted());
 }
 
-void ExprLet::eval(EvalState & state, Env & env, Value & v)
+template<bool IsAssert>
+void ExprLet::evalImpl(EvalState & state, Env & env, Value & v)
 {
     /* Create a new environment that contains the attributes in this
        `let'. */
@@ -1376,7 +1377,21 @@ void ExprLet::eval(EvalState & state, Env & env, Value & v)
                    ? makeDebugTraceStacker(state, *this, env2, getPos(), "while evaluating a '%1%' expression", "let")
                    : nullptr;
 
-    body->eval(state, env2, v);
+    if constexpr (IsAssert) {
+        body->evalAssert(state, env2, v);
+    } else {
+        body->eval(state, env2, v);
+    }
+}
+
+void ExprLet::eval(EvalState & state, Env & env, Value & v)
+{
+    evalImpl<false>(state, env, v);
+}
+
+void ExprLet::evalAssert(EvalState & state, Env & env, Value & v)
+{
+    evalImpl<true>(state, env, v);
 }
 
 void ExprList::eval(EvalState & state, Env & env, Value & v)

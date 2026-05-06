@@ -1,0 +1,8 @@
+error:
+       … while evaluating the condition of the assertion '(let a = false; b = null; in (a == b))'
+         at /pwd/lang/eval-fail-assert-let-equal-type.nix:1:1:
+            1| assert
+             | ^
+            2|   let
+
+       error: a Boolean of value 'false' is not equal to null of value 'null'
