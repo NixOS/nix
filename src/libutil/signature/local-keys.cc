@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <sodium.h>
+#include <openssl/core_names.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
@@ -191,8 +192,17 @@ Signature SecretKey::signDetached(std::string_view data) const
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
 
-        if (EVP_DigestSignInit(ctx.get(), nullptr, nullptr, nullptr, pkey.get()) <= 0)
-            throw Error("EVP_DigestSignInit failed");
+        /* Generate a deterministic signature (i.e. only depending on the key and the data) since Ed25519 is also
+           deterministic. Note from RFC-9882: "The signer SHOULD NOT use the deterministic variant of ML-DSA on
+           platforms where side-channel attacks or fault attacks are a concern." */
+        int deterministic = 1;
+        OSSL_PARAM params[] = {
+            OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, &deterministic),
+            OSSL_PARAM_construct_end(),
+        };
+
+        if (EVP_DigestSignInit_ex(ctx.get(), nullptr, nullptr, nullptr, nullptr, pkey.get(), params) <= 0)
+            throw Error("EVP_DigestSignInit_ex failed");
 
         size_t sigLen = 0;
         if (EVP_DigestSign(ctx.get(), nullptr, &sigLen, (const unsigned char *) data.data(), data.size()) <= 0)

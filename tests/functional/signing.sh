@@ -2,10 +2,10 @@
 
 source common.sh
 
+runTests() {
+
 clearStoreIfPossible
 clearCache
-
-runTests() {
 
 keyType="$1"
 
@@ -130,4 +130,4 @@ done
 }
 
 runTests ed25519
-#runTests ml-dsa-65
+runTests ml-dsa-65
