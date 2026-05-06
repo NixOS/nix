@@ -118,6 +118,14 @@ struct Expr
     virtual void eval(EvalState & state, Env & env, Value & v);
 
     /**
+     * Like eval, but may throw a detailed assertion error instead of
+     * producing a false value.  The default delegates to eval.
+     * Subclasses are encouraged to override this to improve assert
+     * error messages.
+     */
+    virtual void evalAssert(EvalState & state, Env & env, Value & v);
+
+    /**
      * Create a thunk for the delayed computation of the given expression
      * in the given environment. But if the expression is a variable,
      * then look it up right away. This significantly reduces the number
@@ -741,7 +749,14 @@ struct ExprOpNot : Expr
         MakeBinOpMembers(name, s) \
     }
 
-MakeBinOp(ExprOpEq, "==");
+struct ExprOpEq : Expr
+{
+    MakeBinOpMembers(ExprOpEq, "==") void evalAssert(EvalState & state, Env & env, Value & v) override;
+private:
+    template<bool IsAssert>
+    void evalImpl(EvalState & state, Env & env, Value & v);
+};
+
 MakeBinOp(ExprOpNEq, "!=");
 MakeBinOp(ExprOpAnd, "&&");
 MakeBinOp(ExprOpOr, "||");

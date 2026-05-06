@@ -1221,6 +1221,11 @@ void Expr::eval(EvalState & state, Env & env, Value & v)
     unreachable();
 }
 
+void Expr::evalAssert(EvalState & state, Env & env, Value & v)
+{
+    eval(state, env, v);
+}
+
 void ExprInt::eval(EvalState & state, Env & env, Value & v)
 {
     v = this->v;
@@ -1865,25 +1870,23 @@ void ExprIf::eval(EvalState & state, Env & env, Value & v)
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
+    Value condVal;
+    try {
+        cond->evalAssert(state, env, condVal);
+    } catch (Error & e) {
         std::ostringstream out;
         cond->show(state.symbols, out);
-        auto exprStr = out.view();
-
-        if (auto eq = dynamic_cast<ExprOpEq *>(cond)) {
-            try {
-                Value v1;
-                eq->e1->eval(state, env, v1);
-                Value v2;
-                eq->e2->eval(state, env, v2);
-                state.eqValues<true>(v1, v2, eq->pos, "in an equality assertion");
-            } catch (AssertionError & e) {
-                e.addTrace(state.positions[pos], "while evaluating the condition of the assertion '%s'", exprStr);
-                throw;
-            }
-        }
-
-        state.error<AssertionError>("assertion '%1%' failed", exprStr).atPos(pos).withFrame(env, *this).debugThrow();
+        e.addTrace(state.positions[pos], "while evaluating the condition of the assertion '%s'", out.view());
+        throw;
+    }
+    // Fallback for evalAssert calls that produce a false value without
+    // throwing — e.g. boolean operators (&&, ->) where no sub-expression
+    // triggered an assertion error, or expressions without an evalAssert
+    // override.
+    if (!state.forceBool(condVal, pos, "in the condition of the assert statement")) {
+        std::ostringstream out;
+        cond->show(state.symbols, out);
+        state.error<AssertionError>("assertion '%1%' failed", out.view()).atPos(pos).withFrame(env, *this).debugThrow();
     }
     body->eval(state, env, v);
 }
@@ -1893,13 +1896,25 @@ void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
     v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
 }
 
-void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
+template<bool IsAssert>
+void ExprOpEq::evalImpl(EvalState & state, Env & env, Value & v)
 {
     Value v1;
     e1->eval(state, env, v1);
     Value v2;
     e2->eval(state, env, v2);
-    v.mkBool(state.eqValues(v1, v2, pos, "while testing two values for equality"));
+    v.mkBool(state.eqValues<IsAssert>(
+        v1, v2, pos, IsAssert ? "in an equality assertion" : "while testing two values for equality"));
+}
+
+void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
+{
+    evalImpl<false>(state, env, v);
+}
+
+void ExprOpEq::evalAssert(EvalState & state, Env & env, Value & v)
+{
+    evalImpl<true>(state, env, v);
 }
 
 void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
