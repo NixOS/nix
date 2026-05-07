@@ -13,9 +13,9 @@
 
       networking.firewall.allowedTCPPorts = [ 5000 ];
 
-      # TODO stop using this, because it has to depend on an older version of Nix that still has the perl bindings.
       services.nix-serve = {
         enable = true;
+        package = pkgs.nix-serve-ng;
         secretKeyFile =
           let
             key = pkgs.writeTextFile {
