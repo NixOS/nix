@@ -416,11 +416,18 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto host = getHost(input);
         auto owner = getOwner(input);
         auto repo = getRepo(input);
+        auto ref = *input.getRef();
         auto url = fmt("https://%s/%s/%s.git", host, owner, repo);
+
+        Cache::Key refToRevKey{"gitHubRefToRev", {{"url", url}, {"ref", ref}}};
+        if (auto res = settings.getCache()->lookupWithTTL(refToRevKey))
+            return RefInfo{.rev = getRevAttr(*res, "rev")};
+
         auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
         auto token = getAccessToken(settings, host, hostAndPath).value_or("");
+        auto rev = resolveRemoteRef(url, ref, token);
 
-        auto rev = resolveRemoteRef(url, *input.getRef(), token);
+        settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
         return RefInfo{.rev = rev};
     }
 
