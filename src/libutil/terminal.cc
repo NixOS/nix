@@ -148,14 +148,16 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
 //////////////////////////////////////////////////////////////////////
 
-static Sync<std::pair<unsigned short, unsigned short>> windowSize{{0, 0}};
+// Note: this object intentionally leaks to avoid a destructor ordering issue (specifically, ~ProgressBar() calling
+// getWindowSize() after windowSize has been destroyed).
+static auto * const windowSize = new Sync<std::pair<unsigned short, unsigned short>>{{0, 0}};
 
 void updateWindowSize()
 {
 #ifndef _WIN32
     struct winsize ws;
     if (ioctl(2, TIOCGWINSZ, &ws) == 0) {
-        auto windowSize_(windowSize.lock());
+        auto windowSize_(windowSize->lock());
         windowSize_->first = ws.ws_row;
         windowSize_->second = ws.ws_col;
     }
@@ -163,7 +165,7 @@ void updateWindowSize()
     CONSOLE_SCREEN_BUFFER_INFO info;
     // From https://stackoverflow.com/a/12642749
     if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info) != 0) {
-        auto windowSize_(windowSize.lock());
+        auto windowSize_(windowSize->lock());
         // From https://github.com/libuv/libuv/blob/v1.48.0/src/win/tty.c#L1130
         windowSize_->first = info.srWindow.Bottom - info.srWindow.Top + 1;
         windowSize_->second = info.dwSize.X;
@@ -173,7 +175,7 @@ void updateWindowSize()
 
 std::pair<unsigned short, unsigned short> getWindowSize()
 {
-    return *windowSize.lock();
+    return *windowSize->lock();
 }
 
 } // namespace nix
