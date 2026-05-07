@@ -56,6 +56,7 @@ let
   };
 
   private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
+  annotated-tag-object = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
   private-flake-git-refs = pkgs.runCommand "private-flake-git-refs" { } ''
         mkdir -p $out/info
@@ -108,6 +109,12 @@ let
           printf '0000'
           first_ref_pkt_line "${nixpkgs.rev} HEAD"
           pkt_line "${nixpkgs.rev} refs/heads/master
+    "
+          pkt_line "${nixpkgs.rev} refs/pull/357207/head
+    "
+          pkt_line "${annotated-tag-object} refs/tags/annotated
+    "
+          pkt_line "${nixpkgs.rev} refs/tags/annotated^{}
     "
           printf '0000'
         } > $out/info/refs
@@ -249,6 +256,16 @@ in
       assert info["revision"] == "${nixpkgs.rev}", f"revision mismatch: {info['revision']} != ${nixpkgs.rev}"
       cat_log()
 
+      out = client.succeed("nix flake metadata github:NixOS/nixpkgs/pull/357207/head --json --tarball-ttl 0")
+      print(out)
+      info = json.loads(out)
+      assert info["revision"] == "${nixpkgs.rev}", f"pull ref revision mismatch: {info['revision']} != ${nixpkgs.rev}"
+
+      out = client.succeed("nix flake metadata github:NixOS/nixpkgs/annotated --json --tarball-ttl 0")
+      print(out)
+      info = json.loads(out)
+      assert info["revision"] == "${nixpkgs.rev}", f"annotated tag revision mismatch: {info['revision']} != ${nixpkgs.rev}"
+
       # ... otherwise it should use the API
       out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
       print(out)
@@ -277,6 +294,9 @@ in
 
       # Shut down the web server. The flake should be cached on the client.
       github.succeed("systemctl stop httpd.service")
+
+      info = json.loads(client.succeed("nix flake metadata github:NixOS/nixpkgs --json --tarball-ttl 0"))
+      assert info["revision"] == "${nixpkgs.rev}", f"cached revision mismatch: {info['revision']} != ${nixpkgs.rev}"
 
       info = json.loads(client.succeed("nix flake metadata nixpkgs --json"))
       date = time.strftime("%Y%m%d%H%M%S", time.gmtime(info['lastModified']))

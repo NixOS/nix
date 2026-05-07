@@ -1581,14 +1581,37 @@ Hash resolveRemoteRef(const std::string & url, const std::string & ref, const st
     if (git_remote_ls(&refs, &refCount, remote.get()))
         throw GitError("listing remote refs for '%s'", url);
 
-    auto headsRef = "refs/heads/" + ref;
-    auto tagsRef = "refs/tags/" + ref;
+    auto findRef = [&](const std::string & refName, bool preferPeeled) -> std::optional<Hash> {
+        if (preferPeeled) {
+            auto peeledRef = refName + "^{}";
+            for (size_t i = 0; i < refCount; i++) {
+                if (std::string_view(refs[i]->name) == peeledRef)
+                    return toHash(refs[i]->oid);
+            }
+        }
 
-    for (size_t i = 0; i < refCount; i++) {
-        std::string_view name(refs[i]->name);
-        if (ref == "HEAD" ? name == "HEAD" : (name == headsRef || name == tagsRef))
-            return toHash(refs[i]->oid);
+        for (size_t i = 0; i < refCount; i++) {
+            if (std::string_view(refs[i]->name) == refName)
+                return toHash(refs[i]->oid);
+        }
+
+        return std::nullopt;
+    };
+
+    std::vector<std::pair<std::string, bool>> candidates;
+    if (ref == "HEAD") {
+        candidates.push_back({"HEAD", false});
+    } else if (ref.rfind("refs/", 0) == 0) {
+        candidates.push_back({ref, ref.rfind("refs/tags/", 0) == 0});
+    } else {
+        candidates.push_back({"refs/" + ref, ref.rfind("tags/", 0) == 0});
+        candidates.push_back({"refs/tags/" + ref, true});
+        candidates.push_back({"refs/heads/" + ref, false});
     }
+
+    for (auto & [candidate, preferPeeled] : candidates)
+        if (auto resolved = findRef(candidate, preferPeeled))
+            return *resolved;
 
     throw Error("could not find ref '%s' in remote '%s'", ref, url);
 }

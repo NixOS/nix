@@ -181,8 +181,9 @@ bool isLegalRefName(const std::string & refName);
 
 /**
  * Resolve a ref on a remote repository to a commit hash using
- * libgit2's smart HTTP transport. The ref can be "HEAD" or a branch/tag
- * name (matched against refs/heads and refs/tags).
+ * libgit2's smart HTTP transport. The ref can be "HEAD", a branch/tag
+ * name, or another ref name. Shorthand names are matched against
+ * refs/heads, refs/tags, and refs.
  *
  * If a token is provided, it is used for authentication via the
  * libgit2 credential callback (x-access-token basic auth).

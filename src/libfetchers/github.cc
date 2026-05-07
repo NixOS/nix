@@ -420,12 +420,21 @@ struct GitHubInputScheme : GitArchiveInputScheme
         auto url = fmt("https://%s/%s/%s.git", host, owner, repo);
 
         Cache::Key refToRevKey{"gitHubRefToRev", {{"url", url}, {"ref", ref}}};
-        if (auto res = settings.getCache()->lookupWithTTL(refToRevKey))
-            return RefInfo{.rev = getRevAttr(*res, "rev")};
+        auto cached = settings.getCache()->lookupExpired(refToRevKey);
+        if (cached && !cached->expired)
+            return RefInfo{.rev = getRevAttr(cached->value, "rev")};
 
         auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
         auto token = getAccessToken(settings, host, hostAndPath).value_or("");
-        auto rev = resolveRemoteRef(url, ref, token);
+        Hash rev(HashAlgorithm::SHA1);
+        try {
+            rev = resolveRemoteRef(url, ref, token);
+        } catch (Error & e) {
+            if (!cached)
+                throw;
+            warn("%s; using cached GitHub revision for ref '%s' of '%s'", e.message(), ref, url);
+            return RefInfo{.rev = getRevAttr(cached->value, "rev")};
+        }
 
         settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
         return RefInfo{.rev = rev};
