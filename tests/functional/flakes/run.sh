@@ -44,6 +44,7 @@ nix run -f shell-hello.nix env > "$TEST_ROOT"/actual-env
 # - __LLVM_PROFILE_RT_INIT_ONCE - implementation detail of LLVM source code coverage collection
 sed -i \
   -e 's/PATH=.*/PATH=.../' \
+  -e '/^IN_NIX_SHELL=.*/d' \
   -e 's/_=.*/_=.../' \
   -e '/^TMPDIR=\/var\/folders\/.*/d' \
   -e '/^__CF_USER_TEXT_ENCODING=.*$/d' \
