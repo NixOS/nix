@@ -30,6 +30,7 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/common')
 
 sources = files(
+  'nix_api_eval.cc',
   'nix_api_expr.cc',
   'nix_api_external.cc',
   'nix_api_value.cc',

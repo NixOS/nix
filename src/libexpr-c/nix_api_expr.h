@@ -342,6 +342,51 @@ void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * o
 
 /** @} */ // doxygen group GC
 
+/** @addtogroup libexpr_eval
+ * @ingroup libexpr
+ * @brief Higher-level evaluation helpers
+ * @{
+ */
+
+/**
+ * @brief Attempt to interpret a Nix value as a derivation.
+ *
+ * If the value represents a derivation, returns its drvPath. Returns NULL
+ * (without setting an error) when the value is not a derivation and the
+ * caller should recurse into its attributes instead.
+ *
+ * Derivation metadata (name, system, outputs, meta) can be queried from
+ * the value itself using the existing attrset accessors
+ * (nix_get_attr_byname, nix_get_string, etc.).
+ *
+ * @param[out] context Optional, stores error information. Check
+ *  last_err_code to distinguish NULL-from-error from NULL-as-not-derivation.
+ * @param[in] state The evaluation state.
+ * @param[in] value The value to inspect.
+ * @param[in] ignoreAssertionFailures Whether to ignore AssertionErrors
+ *  in the derivation's meta evaluation.
+ * @return A new StorePath, or NULL. Free with nix_store_path_free().
+ */
+StorePath *
+nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures);
+
+/**
+ * @brief Auto-call a function with auto-args (the --arg / --argstr pattern).
+ *
+ * This corresponds to nix::EvalState::autoCallFunction.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] state The evaluation state.
+ * @param[in] auto_args An attrset value containing auto-args, or NULL for
+ *  empty.
+ * @param[in] fn_val The function to call.
+ * @param[out] result Pre-allocated nix_value to receive the result.
+ */
+nix_err nix_value_auto_call_function(
+    nix_c_context * context, EvalState * state, nix_value * auto_args, nix_value * fn_val, nix_value * result);
+
+/** @} */ // doxygen group libexpr_eval
+
 // cffi end
 #ifdef __cplusplus
 }
