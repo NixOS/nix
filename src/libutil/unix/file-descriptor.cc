@@ -2,6 +2,8 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
 
+#include <sys/syscall.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 #include <span>
