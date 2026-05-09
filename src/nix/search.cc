@@ -11,7 +11,10 @@
 #include "nix/util/hilite.hh"
 #include "nix/util/strings-inline.hh"
 
+#include <algorithm>
+#include <optional>
 #include <regex>
+#include <string_view>
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
@@ -24,6 +27,62 @@ std::string wrap(std::string prefix, std::string s)
 {
     return concatStrings(prefix, s, ANSI_NORMAL);
 }
+
+static bool hasNoRegexMetacharacters(std::string_view re)
+{
+    return re.find_first_of(".[]()*+?{}|\\^$") == std::string_view::npos;
+}
+
+/**
+ * Locale-independent ASCII lower-casing. We deliberately avoid
+ * `nix::toLower`, which routes through `std::tolower` and therefore depends
+ * on the active C locale. `std::regex` with `icase` uses its own (C++)
+ * locale for case-folding; for the literal pre-filter to be equivalent to
+ * the regex it replaces, both must fold the same way. Folding ASCII bytes
+ * directly keeps us aligned with `std::regex`'s default ("C" locale)
+ * behaviour regardless of what `setlocale` may later do to the process.
+ */
+static std::string asciiLower(std::string_view s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s)
+        out.push_back(c >= 'A' && c <= 'Z' ? char(c + ('a' - 'A')) : c);
+    return out;
+}
+
+static bool containsCI(std::string_view haystack, std::string_view needleLower)
+{
+    auto it = std::search(haystack.begin(), haystack.end(), needleLower.begin(), needleLower.end(), [](char a, char b) {
+        char la = (a >= 'A' && a <= 'Z') ? char(a + ('a' - 'A')) : a;
+        return la == b;
+    });
+    return it != haystack.end();
+}
+
+/**
+ * A user-supplied search pattern, compiled as a POSIX-extended regex with an
+ * optional case-insensitive substring fast path.
+ *
+ * libc++'s std::regex allocates backtracking state on every call, so on the
+ * `nix search` workload regex matching dominates the profile. When the pattern
+ * contains no POSIX-extended regex metacharacters, a case-insensitive substring
+ * search is equivalent and orders of magnitude cheaper; we use it as a
+ * pre-filter before invoking std::regex.
+ */
+struct SearchPattern
+{
+    std::regex regex;
+    /** Lowercased pattern text, set iff `re` had no regex metacharacters. */
+    std::optional<std::string> literal;
+
+    explicit SearchPattern(const std::string & re)
+        : regex(re, std::regex::extended | std::regex::icase)
+    {
+        if (hasNoRegexMetacharacters(re))
+            literal = asciiLower(re);
+    }
+};
 
 struct CmdSearch : InstallableValueCommand, MixJSON
 {
@@ -70,16 +129,13 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             throw UsageError(
                 "Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
 
-        std::vector<std::regex> regexes;
-        std::vector<std::regex> excludeRegexes;
-        regexes.reserve(res.size());
-        excludeRegexes.reserve(excludeRes.size());
-
+        std::vector<SearchPattern> patterns, excludeSearchPatterns;
+        patterns.reserve(res.size());
+        excludeSearchPatterns.reserve(excludeRes.size());
         for (auto & re : res)
-            regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
-
+            patterns.emplace_back(re);
         for (auto & re : excludeRes)
-            excludeRegexes.emplace_back(re, std::regex::extended | std::regex::icase);
+            excludeSearchPatterns.emplace_back(re);
 
         auto state = getEvalState();
 
@@ -119,26 +175,37 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     std::vector<std::smatch> nameMatches;
                     bool found = false;
 
-                    for (auto & regex : excludeRegexes) {
-                        if (std::regex_search(attrPathStr, regex) || std::regex_search(name.name, regex)
-                            || std::regex_search(description, regex))
+                    auto literalMissesAllFields = [&](const std::optional<std::string> & lit) {
+                        return lit && !containsCI(attrPathStr, *lit) && !containsCI(name.name, *lit)
+                               && !containsCI(description, *lit);
+                    };
+
+                    auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
+                        const auto end = std::sregex_iterator();
+                        while (it != end) {
+                            vec.push_back(*it++);
+                            found = true;
+                        }
+                    };
+
+                    for (auto & p : excludeSearchPatterns) {
+                        if (literalMissesAllFields(p.literal))
+                            continue;
+                        if (std::regex_search(attrPathStr, p.regex) || std::regex_search(name.name, p.regex)
+                            || std::regex_search(description, p.regex))
                             return;
                     }
 
-                    for (auto & regex : regexes) {
+                    for (auto & p : patterns) {
+                        if (literalMissesAllFields(p.literal)) {
+                            found = false;
+                            break;
+                        }
                         found = false;
-                        auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
-                            const auto end = std::sregex_iterator();
-                            while (it != end) {
-                                vec.push_back(*it++);
-                                found = true;
-                            }
-                        };
-
-                        addAll(std::sregex_iterator(attrPathStr.begin(), attrPathStr.end(), regex), attrPathMatches);
-                        addAll(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
-                        addAll(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
-
+                        addAll(std::sregex_iterator(attrPathStr.begin(), attrPathStr.end(), p.regex), attrPathMatches);
+                        addAll(std::sregex_iterator(name.name.begin(), name.name.end(), p.regex), nameMatches);
+                        addAll(
+                            std::sregex_iterator(description.begin(), description.end(), p.regex), descriptionMatches);
                         if (!found)
                             break;
                     }
