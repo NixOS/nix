@@ -100,12 +100,44 @@ struct ErrorInfo
      */
     unsigned int status = 1;
 
+    /**
+     * High-level description of what evaluation was being performed,
+     * e.g. "evaluation of installable nixpkgs#hello" or
+     * "evaluation of \u00abstring\u00bb". Set automatically from the
+     * thread-local EvalContextGuard when a BaseError is constructed.
+     */
+    std::optional<std::string> evalContext;
+
     Suggestions suggestions;
 
     static std::optional<std::string> programName;
 };
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
+
+/**
+ * Return the current thread-local evaluation context string, if any.
+ */
+const std::optional<std::string> & currentEvalContext();
+
+/**
+ * RAII guard that sets a thread-local evaluation context string.
+ * When a BaseError is constructed while a guard is active, the context
+ * is automatically stamped onto ErrorInfo::evalContext.
+ *
+ * Usage:
+ *   EvalContextGuard ctx("evaluation of installable nixpkgs#hello");
+ *   // ... any BaseError thrown here will carry the context ...
+ */
+class EvalContextGuard
+{
+    std::optional<std::string> previous;
+public:
+    explicit EvalContextGuard(std::string context);
+    ~EvalContextGuard();
+    EvalContextGuard(const EvalContextGuard &) = delete;
+    EvalContextGuard & operator=(const EvalContextGuard &) = delete;
+};
 
 /**
  * Structured representation of a trace display decision.
@@ -176,33 +208,41 @@ public:
     BaseError(unsigned int status, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .status = status}
     {
+        err.evalContext = currentEvalContext();
     }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(fs, std::forward<Args>(args)...), .pos = {}}
     {
+        err.evalContext = currentEvalContext();
     }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .suggestions = sug}
     {
+        err.evalContext = currentEvalContext();
     }
 
     BaseError(HintFmt hint)
         : err{.level = lvlError, .msg = hint, .pos = {}}
     {
+        err.evalContext = currentEvalContext();
     }
 
     BaseError(ErrorInfo && e)
         : err(std::move(e))
     {
+        if (!err.evalContext)
+            err.evalContext = currentEvalContext();
     }
 
     BaseError(const ErrorInfo & e)
         : err(e)
     {
+        if (!err.evalContext)
+            err.evalContext = currentEvalContext();
     }
 
     /** The error message without "error: " prefixed to it. */

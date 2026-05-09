@@ -1,4 +1,5 @@
 #include "nix/cmd/installable-attr-path.hh"
+#include "nix/util/error.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/util/util.hh"
 #include "nix/cmd/command.hh"
@@ -36,6 +37,7 @@ std::pair<Value *, PosIdx> InstallableAttrPath::toValue(EvalState & state)
 
 DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 {
+    EvalContextGuard ctx(fmt("during evaluation of attribute '%s'", attrPath));
     auto [v, pos] = toValue(*state);
 
     if (std::optional derivedPathWithInfo =

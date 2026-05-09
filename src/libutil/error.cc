@@ -49,6 +49,24 @@ bool BaseError::hasPos() const
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
 
+static thread_local std::optional<std::string> evalContextStr;
+
+const std::optional<std::string> & currentEvalContext()
+{
+    return evalContextStr;
+}
+
+EvalContextGuard::EvalContextGuard(std::string context)
+    : previous(evalContextStr)
+{
+    evalContextStr = std::move(context);
+}
+
+EvalContextGuard::~EvalContextGuard()
+{
+    evalContextStr = std::move(previous);
+}
+
 std::ostream & operator<<(std::ostream & os, const HintFmt & hf)
 {
     return os << hf.str();
@@ -466,17 +484,20 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             return t.pos && *t.pos;
         });
 
-        // Use the outermost trace (first in the full list) as a summary on the
-        // "error:" line. This always shows the top-level context regardless of
-        // truncation, e.g. "error: while evaluating the attribute 'x' at foo.nix:42:1"
-        // Position is shown inline (no code snippet).
-        for (const auto & trace : einfo.traces) {
-            if (!trace.hint.str().empty()) {
-                oss << trace.hint.str();
-                if (trace.pos && *trace.pos)
-                    oss << ", " ANSI_BLUE "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL;
-                oss << "\n";
-                break;
+        // Use evalContext if available, otherwise fall back to the outermost
+        // trace hint. This provides a high-level summary on the "error:" line,
+        // e.g. "error: during evaluation of installable nixpkgs#hello"
+        if (einfo.evalContext) {
+            oss << *einfo.evalContext << "\n";
+        } else {
+            for (const auto & trace : einfo.traces) {
+                if (!trace.hint.str().empty()) {
+                    oss << trace.hint.str();
+                    if (trace.pos && *trace.pos)
+                        oss << ", " ANSI_BLUE "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL;
+                    oss << "\n";
+                    break;
+                }
             }
         }
 

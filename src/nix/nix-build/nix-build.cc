@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/current-process.hh"
+#include "nix/util/error.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/store-open.hh"
@@ -415,6 +416,7 @@ static void main_nix_build(int argc, char ** argv)
 
     for (auto e : exprs) {
         Value vRoot;
+        EvalContextGuard ctx(fmt("during %s evaluation", myName));
         state->eval(e, vRoot);
 
         auto takesNixShellAttr = [&](const Value & v) {

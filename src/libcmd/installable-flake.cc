@@ -1,4 +1,5 @@
 #include "nix/cmd/installable-flake.hh"
+#include "nix/util/error.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/util/util.hh"
 #include "nix/cmd/command.hh"
@@ -66,6 +67,7 @@ InstallableFlake::InstallableFlake(
 
 DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
+    EvalContextGuard ctx(fmt("during evaluation of installable '%s'", what()));
     Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
     auto attr = getCursor(*state);

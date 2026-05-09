@@ -395,4 +395,86 @@ TEST(ErrorTraceGolden, sixTracesWithTruncation)
         "       error: the error");
 }
 
+// --- EvalContext tests ---
+
+TEST(ErrorTraceContext, guardSetsContext)
+{
+    EvalContextGuard ctx("during evaluation of installable nixpkgs#hello");
+    EXPECT_EQ(currentEvalContext(), "during evaluation of installable nixpkgs#hello");
+}
+
+TEST(ErrorTraceContext, guardRestoresOnDestruction)
+{
+    {
+        EvalContextGuard ctx("inner context");
+        EXPECT_EQ(currentEvalContext(), "inner context");
+    }
+    EXPECT_FALSE(currentEvalContext().has_value());
+}
+
+TEST(ErrorTraceContext, guardsNest)
+{
+    EvalContextGuard outer("outer");
+    EXPECT_EQ(*currentEvalContext(), "outer");
+    {
+        EvalContextGuard inner("inner");
+        EXPECT_EQ(*currentEvalContext(), "inner");
+    }
+    EXPECT_EQ(*currentEvalContext(), "outer");
+}
+
+TEST(ErrorTraceContext, errorStampsContext)
+{
+    EvalContextGuard ctx("during evaluation of «test»");
+    try {
+        throw Error("something went wrong");
+    } catch (Error & e) {
+        EXPECT_EQ(e.info().evalContext, "during evaluation of «test»");
+    }
+}
+
+TEST(ErrorTraceContext, noGuardMeansNoContext)
+{
+    try {
+        throw Error("something went wrong");
+    } catch (Error & e) {
+        EXPECT_FALSE(e.info().evalContext.has_value());
+    }
+}
+
+TEST(ErrorTraceContext, errorInfoPreservesExistingContext)
+{
+    // If ErrorInfo already has evalContext, BaseError doesn't overwrite it
+    ErrorInfo ei{
+        .level = lvlError,
+        .msg = HintFmt("msg"),
+        .pos = {},
+        .evalContext = "pre-set context",
+    };
+    EvalContextGuard ctx("guard context");
+    try {
+        throw Error(ei);
+    } catch (Error & e) {
+        EXPECT_EQ(e.info().evalContext, "pre-set context");
+    }
+}
+
+TEST(ErrorTraceGolden, evalContextSummaryLine)
+{
+    // When evalContext is set, it becomes the summary instead of the first trace
+    auto pos = std::make_shared<Pos>(42, 1, Pos::String{make_ref<std::string>("myfile.nix")});
+    std::list<Trace> traces;
+    traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "while evaluating the attribute 'x'")});
+    traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "while calling 'add'")});
+
+    auto einfo = makeErrorInfo("type error", std::move(traces));
+    einfo.evalContext = "during evaluation of installable nixpkgs#hello";
+
+    auto output = renderError(einfo, false);
+    // Summary line uses evalContext, not the first trace
+    EXPECT_THAT(output, ::testing::StartsWith("error: during evaluation of installable nixpkgs#hello\n"));
+    // The outermost trace still appears in the trace list
+    EXPECT_THAT(output, ::testing::HasSubstr("while evaluating the attribute 'x'"));
+}
+
 } // namespace nix
