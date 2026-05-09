@@ -39,6 +39,23 @@ grepQuiet "relative path literal 'test/file' should be prefixed" "$TEST_ROOT/std
 NIX_CONFIG='warn-short-path-literals = true' nix eval --no-warn-short-path-literals --expr 'test/file' 2>"$TEST_ROOT"/stderr
 grepQuietInverse "relative path literal" "$TEST_ROOT/stderr"
 
+# Test: warn-short-path-literals must NOT appear in NIX_CONFIG injected into
+# post-build-hook subprocesses. If it did, every nix command in the hook would
+# emit a spurious deprecation warning even though the user never set the old name.
+NIX_CONFIG_HOOK_OUT="$TEST_ROOT/nix-config-hook-out"
+NIX_CONFIG_HOOK="$TEST_ROOT/nix-config-hook.sh"
+cat > "$NIX_CONFIG_HOOK" <<EOF
+#!/bin/sh
+printf '%s' "\$NIX_CONFIG" > $NIX_CONFIG_HOOK_OUT
+EOF
+chmod +x "$NIX_CONFIG_HOOK"
+# shellcheck disable=SC2016
+nix build --no-sandbox \
+    --option post-build-hook "$NIX_CONFIG_HOOK" \
+    --expr "derivation { name = \"t\"; system = \"$system\"; builder = \"$busybox\"; args = [\"sh\" \"-c\" \"echo > \$out\"]; }"
+grepQuietInverse "warn-short-path-literals" "$NIX_CONFIG_HOOK_OUT" \
+    || fail "warn-short-path-literals must not appear in NIX_CONFIG passed to post-build-hook"
+
 # Tests for NIX_CONFIG and setting precedence
 
 # Test: New setting via NIX_CONFIG

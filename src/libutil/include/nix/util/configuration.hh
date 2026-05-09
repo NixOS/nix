@@ -146,6 +146,13 @@ public:
     {
         bool isAlias;
         AbstractSetting * setting;
+        /**
+         * If true, this setting is excluded from `getSettings()` and
+         * therefore from `GlobalConfig::toKeyValue()` / `NIX_CONFIG`,
+         * but CLI flags are still registered via `convertToArgs()`.
+         * Used by `DeprecatedWarnSetting`.
+         */
+        bool excludeFromKeyValue = false;
     };
 
     using Settings = std::map<std::string, SettingData>;
@@ -161,6 +168,13 @@ public:
     bool set(const std::string & name, const std::string & value) override;
 
     void addSetting(AbstractSetting * setting);
+
+    /**
+     * Exclude a previously-added setting from `getSettings()` and
+     * therefore from `GlobalConfig::toKeyValue()` / `NIX_CONFIG`.
+     * CLI flags (from `convertToArgs()`) are still registered.
+     */
+    void excludeSettingFromKeyValue(const std::string & name);
 
     void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 

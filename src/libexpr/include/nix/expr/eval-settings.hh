@@ -15,6 +15,13 @@ struct PrimOp;
  * A deprecated bool setting that migrates to a `Setting<Diagnose>`.
  * When set to true, it emits a deprecation warning and sets the target
  * `Setting<Diagnose>` setting to `Warn`.
+ *
+ * It calls `Config::excludeSettingFromKeyValue()` after registration so
+ * that it is excluded from `GlobalConfig::toKeyValue()`. That prevents the
+ * deprecated name from being injected into `NIX_CONFIG` when nix spawns
+ * subprocesses such as post-build-hook scripts and nix repl, which would
+ * cause every nix command in those subprocesses to emit a spurious
+ * deprecation warning even though the user never set the old name.
  */
 class DeprecatedWarnSetting : public BaseSetting<bool>
 {
@@ -34,6 +41,7 @@ public:
         , targetName(targetName)
     {
         options->addSetting(this);
+        options->excludeSettingFromKeyValue(name);
     }
 
     void assign(const bool & v) override;

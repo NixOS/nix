@@ -66,6 +66,13 @@ void Config::addSetting(AbstractSetting * setting)
     }
 }
 
+void Config::excludeSettingFromKeyValue(const std::string & name)
+{
+    auto i = _settings.find(name);
+    assert(i != _settings.end());
+    i->second.excludeFromKeyValue = true;
+}
+
 AbstractConfig::AbstractConfig(StringMap initials)
     : unknownSettings(std::move(initials))
 {
@@ -88,7 +95,8 @@ void AbstractConfig::reapplyUnknownSettings()
 void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly) const
 {
     for (const auto & opt : _settings)
-        if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
+        if (!opt.second.isAlias && !opt.second.excludeFromKeyValue
+            && (!overriddenOnly || opt.second.setting->overridden)
             && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
             res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
 }
