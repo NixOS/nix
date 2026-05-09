@@ -58,13 +58,18 @@ const std::optional<std::string> & currentEvalContext()
 
 EvalContextGuard::EvalContextGuard(std::string context)
     : previous(evalContextStr)
+    , didSet(!evalContextStr.has_value())
 {
-    evalContextStr = std::move(context);
+    // Only the outermost guard sets the context — inner guards are no-ops.
+    if (didSet)
+        evalContextStr = std::move(context);
 }
 
 EvalContextGuard::~EvalContextGuard()
 {
-    evalContextStr = std::move(previous);
+    // Always restore, so the context is unset once the outermost guard is destroyed.
+    if (didSet)
+        evalContextStr = std::move(previous);
 }
 
 std::ostream & operator<<(std::ostream & os, const HintFmt & hf)

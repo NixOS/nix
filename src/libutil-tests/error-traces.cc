@@ -412,13 +412,14 @@ TEST(ErrorTraceContext, guardRestoresOnDestruction)
     EXPECT_FALSE(currentEvalContext().has_value());
 }
 
-TEST(ErrorTraceContext, guardsNest)
+TEST(ErrorTraceContext, outerGuardWins)
 {
     EvalContextGuard outer("outer");
     EXPECT_EQ(*currentEvalContext(), "outer");
     {
         EvalContextGuard inner("inner");
-        EXPECT_EQ(*currentEvalContext(), "inner");
+        // Outermost guard wins — inner guard is a no-op
+        EXPECT_EQ(*currentEvalContext(), "outer");
     }
     EXPECT_EQ(*currentEvalContext(), "outer");
 }

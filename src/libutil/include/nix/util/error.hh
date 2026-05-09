@@ -125,6 +125,9 @@ const std::optional<std::string> & currentEvalContext();
  * When a BaseError is constructed while a guard is active, the context
  * is automatically stamped onto ErrorInfo::evalContext.
  *
+ * Only the outermost guard takes effect — nested guards are no-ops,
+ * so the context always reflects the top-level user action.
+ *
  * Usage:
  *   EvalContextGuard ctx("evaluation of installable nixpkgs#hello");
  *   // ... any BaseError thrown here will carry the context ...
@@ -132,6 +135,7 @@ const std::optional<std::string> & currentEvalContext();
 class EvalContextGuard
 {
     std::optional<std::string> previous;
+    bool didSet;
 public:
     explicit EvalContextGuard(std::string context);
     ~EvalContextGuard();
