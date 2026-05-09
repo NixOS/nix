@@ -9,7 +9,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/util/current-process.hh"
-#include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/store-open.hh"

@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/cmd/repl.hh"
 

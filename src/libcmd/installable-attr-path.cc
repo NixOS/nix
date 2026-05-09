@@ -1,5 +1,5 @@
 #include "nix/cmd/installable-attr-path.hh"
-#include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/util/util.hh"
 #include "nix/cmd/command.hh"

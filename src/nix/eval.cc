@@ -1,5 +1,5 @@
 #include "nix/cmd/command-installable-value.hh"
-#include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"

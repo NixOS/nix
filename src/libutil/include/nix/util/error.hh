@@ -19,6 +19,7 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/config.hh"
+#include "nix/util/eval-context.hh"
 
 #include <concepts>
 #include <cstring>
@@ -114,34 +115,6 @@ struct ErrorInfo
 };
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
-
-/**
- * Return the current thread-local evaluation context string, if any.
- */
-const std::optional<std::string> & currentEvalContext();
-
-/**
- * RAII guard that sets a thread-local evaluation context string.
- * When a BaseError is constructed while a guard is active, the context
- * is automatically stamped onto ErrorInfo::evalContext.
- *
- * Only the outermost guard takes effect — nested guards are no-ops,
- * so the context always reflects the top-level user action.
- *
- * Usage:
- *   EvalContextGuard ctx("evaluation of installable nixpkgs#hello");
- *   // ... any BaseError thrown here will carry the context ...
- */
-class EvalContextGuard
-{
-    std::optional<std::string> previous;
-    bool didSet;
-public:
-    explicit EvalContextGuard(std::string context);
-    ~EvalContextGuard();
-    EvalContextGuard(const EvalContextGuard &) = delete;
-    EvalContextGuard & operator=(const EvalContextGuard &) = delete;
-};
 
 /**
  * Structured representation of a trace display decision.

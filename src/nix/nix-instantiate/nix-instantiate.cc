@@ -1,5 +1,5 @@
 #include "nix/store/globals.hh"
-#include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/expr/print-ambiguous.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"

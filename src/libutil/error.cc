@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/signals.hh"
