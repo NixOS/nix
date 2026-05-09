@@ -50,6 +50,7 @@ sources = files(
   'derived-path.cc',
   'error_traces.cc',
   'eval.cc',
+  'eval-traces.cc',
   'json.cc',
   'lazy-fetcher-attr.cc',
   'main.cc',

@@ -22,10 +22,12 @@
 
 #include <concepts>
 #include <cstring>
+#include <functional>
 #include <list>
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -104,6 +106,48 @@ struct ErrorInfo
 };
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
+
+/**
+ * Structured representation of a trace display decision.
+ * Separates the algorithm (which traces to show, skip, deduplicate)
+ * from the rendering (formatting to a stream).
+ */
+struct TraceEvent
+{
+    enum Kind
+    {
+        /** A trace frame to be printed. */
+        Print,
+        /** A chunk of duplicate frames was omitted. */
+        DuplicatesOmitted,
+        /** The trace was truncated (show-trace not enabled). */
+        Truncated,
+    };
+
+    Kind kind;
+
+    /** For Print: pointer to the trace to display. */
+    const Trace * trace = nullptr;
+
+    /** For DuplicatesOmitted: how many frames were omitted. */
+    size_t count = 0;
+};
+
+/**
+ * Compute the structured list of trace display events from a trace list.
+ *
+ * This encodes the truncation, deduplication, and TracePrint::Always logic
+ * without any rendering, making it independently testable.
+ *
+ * @param traces The list of traces (innermost first).
+ * @param showTrace Whether --show-trace is enabled.
+ * @param hasPos A predicate that returns true if a trace has a displayable position.
+ *        In production this checks `pos && *pos`, but tests can supply a custom predicate.
+ */
+std::vector<TraceEvent> computeTraceDisplay(
+    const std::list<Trace> & traces,
+    bool showTrace,
+    std::function<bool(const Trace &)> hasPos = {});
 
 /**
  * BaseError should generally not be caught, as it has Interrupted as

@@ -214,6 +214,68 @@ void printSkippedTracesMaybe(
     skippedTraces.clear();
 }
 
+std::vector<TraceEvent> computeTraceDisplay(
+    const std::list<Trace> & traces,
+    bool showTrace,
+    std::function<bool(const Trace &)> hasPos)
+{
+    if (!hasPos)
+        hasPos = [](const Trace & t) { return t.pos && *t.pos; };
+
+    std::vector<TraceEvent> events;
+    std::set<Trace> tracesSeen;
+    std::vector<const Trace *> skippedTraces;
+    size_t count = 0;
+    bool truncate = false;
+
+    auto flushSkipped = [&]() {
+        if (skippedTraces.empty())
+            return;
+        if (skippedTraces.size() <= 5) {
+            for (auto * t : skippedTraces) {
+                events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = t});
+                if (hasPos(*t))
+                    count++;
+            }
+        } else {
+            events.push_back(TraceEvent{.kind = TraceEvent::DuplicatesOmitted, .count = skippedTraces.size()});
+            tracesSeen.clear();
+        }
+        skippedTraces.clear();
+    };
+
+    for (const auto & trace : traces) {
+        if (trace.hint.str().empty())
+            continue;
+
+        if (!showTrace && count > 3) {
+            truncate = true;
+        }
+
+        if (!truncate || trace.print == TracePrint::Always) {
+            if (tracesSeen.count(trace)) {
+                skippedTraces.push_back(&trace);
+                continue;
+            }
+
+            flushSkipped();
+            tracesSeen.insert(trace);
+
+            events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = &trace});
+            if (hasPos(trace))
+                count++;
+        }
+    }
+
+    flushSkipped();
+
+    if (truncate) {
+        events.push_back(TraceEvent{.kind = TraceEvent::Truncated});
+    }
+
+    return events;
+}
+
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
     std::string prefix;
@@ -364,46 +426,27 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto ellipsisIndent = "  ";
 
     if (!einfo.traces.empty()) {
-        // Stack traces seen since we last printed a chunk of `duplicate frames
-        // omitted`.
-        std::set<Trace> tracesSeen;
-        // A consecutive sequence of stack traces that are all in `tracesSeen`.
-        std::vector<Trace> skippedTraces;
+        auto events = computeTraceDisplay(einfo.traces, showTrace, [](const Trace & t) {
+            return t.pos && *t.pos;
+        });
+
         size_t count = 0;
-        bool truncate = false;
-
-        for (const auto & trace : einfo.traces) {
-            if (trace.hint.str().empty())
-                continue;
-
-            if (!showTrace && count > 3) {
-                truncate = true;
+        for (const auto & event : events) {
+            switch (event.kind) {
+            case TraceEvent::Print:
+                printTrace(oss, ellipsisIndent, count, *event.trace);
+                break;
+            case TraceEvent::DuplicatesOmitted:
+                oss << "\n"
+                    << ANSI_WARNING "(" << event.count << " duplicate frames omitted)" ANSI_NORMAL << "\n";
+                break;
+            case TraceEvent::Truncated:
+                oss << "\n"
+                    << ANSI_WARNING
+                    "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
+                    << "\n";
+                break;
             }
-
-            if (!truncate || trace.print == TracePrint::Always) {
-
-                if (tracesSeen.count(trace)) {
-                    skippedTraces.push_back(trace);
-                    continue;
-                }
-
-                tracesSeen.insert(trace);
-
-                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-                count++;
-
-                printTrace(oss, ellipsisIndent, count, trace);
-            }
-        }
-
-        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-        if (truncate) {
-            oss << "\n"
-                << ANSI_WARNING
-                "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
-                << "\n";
         }
 
         oss << "\n" << prefix;
