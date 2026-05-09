@@ -466,6 +466,20 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
             return t.pos && *t.pos;
         });
 
+        // Use the outermost trace (first in the full list) as a summary on the
+        // "error:" line. This always shows the top-level context regardless of
+        // truncation, e.g. "error: while evaluating the attribute 'x' at foo.nix:42:1"
+        // Position is shown inline (no code snippet).
+        for (const auto & trace : einfo.traces) {
+            if (!trace.hint.str().empty()) {
+                oss << trace.hint.str();
+                if (trace.pos && *trace.pos)
+                    oss << ", " ANSI_BLUE "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL;
+                oss << "\n";
+                break;
+            }
+        }
+
         size_t count = 0;
         for (const auto & event : events) {
             switch (event.kind) {

@@ -330,7 +330,8 @@ TEST(ErrorTraceGolden, threeTracesNoTruncation)
 
     auto output = renderError(makeErrorInfo("cannot coerce a string to an integer", std::move(traces)), false);
     EXPECT_EQ(output,
-        "error:\n"
+        "error: while evaluating the attribute 'x', at \xc2\xabstring\xc2\xbb:42:1\n"
+        "\n"
         "       \xe2\x80\xa6 while evaluating the attribute 'x'\n"
         "         at \xc2\xabstring\xc2\xbb:42:1:\n"
         "\n"
@@ -353,7 +354,8 @@ TEST(ErrorTraceGolden, sixTracesWithTruncation)
     // Without --show-trace: outer traces truncated, inner kept
     auto truncated = renderError(makeErrorInfo("the error", traces), false);
     EXPECT_EQ(truncated,
-        "error:\n"
+        "error: trace 1, at \xc2\xabstring\xc2\xbb:42:1\n"
+        "\n"
         "       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n"
         "\n"
         "       \xe2\x80\xa6 trace 4\n"
@@ -370,7 +372,8 @@ TEST(ErrorTraceGolden, sixTracesWithTruncation)
     // With --show-trace: all traces shown, no truncation
     auto full = renderError(makeErrorInfo("the error", traces), true);
     EXPECT_EQ(full,
-        "error:\n"
+        "error: trace 1, at \xc2\xabstring\xc2\xbb:42:1\n"
+        "\n"
         "       \xe2\x80\xa6 trace 1\n"
         "         at \xc2\xabstring\xc2\xbb:42:1:\n"
         "\n"
