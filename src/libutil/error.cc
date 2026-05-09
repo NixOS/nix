@@ -225,7 +225,6 @@ std::vector<TraceEvent> computeTraceDisplay(
     std::vector<TraceEvent> events;
     std::set<Trace> tracesSeen;
     std::vector<const Trace *> skippedTraces;
-    size_t count = 0;
     bool truncate = false;
 
     auto flushSkipped = [&]() {
@@ -234,8 +233,6 @@ std::vector<TraceEvent> computeTraceDisplay(
         if (skippedTraces.size() <= 5) {
             for (auto * t : skippedTraces) {
                 events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = t});
-                if (hasPos(*t))
-                    count++;
             }
         } else {
             events.push_back(TraceEvent{.kind = TraceEvent::DuplicatesOmitted, .count = skippedTraces.size()});
@@ -244,15 +241,60 @@ std::vector<TraceEvent> computeTraceDisplay(
         skippedTraces.clear();
     };
 
+    // When not showing the full trace, we truncate outer (earlier) frames
+    // and keep the inner (later) frames closest to the error. This way the
+    // output reads bottom-up: error message at the end, innermost context
+    // just above, and the truncation message at the top.
+    //
+    // To decide where to truncate, we walk the list from the inner end
+    // (back) and count how many positioned traces we'd keep. The first
+    // trace that would exceed the limit marks the truncation boundary.
+    size_t keepFrom = 0; // index in the trace list from which we start keeping
+    if (!showTrace) {
+        // Collect non-empty traces to index them
+        std::vector<const Trace *> nonEmpty;
+        for (const auto & trace : traces) {
+            if (!trace.hint.str().empty())
+                nonEmpty.push_back(&trace);
+        }
+
+        // Walk from the inner end to find the cutoff
+        size_t count = 0;
+        size_t cutoff = 0; // how many traces from the end we keep
+        for (size_t i = nonEmpty.size(); i > 0; i--) {
+            auto * t = nonEmpty[i - 1];
+            if (t->print == TracePrint::Always) {
+                cutoff = nonEmpty.size() - (i - 1);
+                continue;
+            }
+            if (hasPos(*t))
+                count++;
+            if (count > 3) {
+                truncate = true;
+                break;
+            }
+            cutoff = nonEmpty.size() - (i - 1);
+        }
+
+        if (truncate) {
+            keepFrom = nonEmpty.size() - cutoff;
+        }
+    }
+
+    if (truncate) {
+        events.push_back(TraceEvent{.kind = TraceEvent::Truncated});
+    }
+
+    // Now emit the kept traces, handling deduplication
+    size_t idx = 0;
     for (const auto & trace : traces) {
         if (trace.hint.str().empty())
             continue;
 
-        if (!showTrace && count > 3) {
-            truncate = true;
-        }
+        bool keep = !truncate || idx >= keepFrom || trace.print == TracePrint::Always;
+        idx++;
 
-        if (!truncate || trace.print == TracePrint::Always) {
+        if (keep) {
             if (tracesSeen.count(trace)) {
                 skippedTraces.push_back(&trace);
                 continue;
@@ -262,16 +304,10 @@ std::vector<TraceEvent> computeTraceDisplay(
             tracesSeen.insert(trace);
 
             events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = &trace});
-            if (hasPos(trace))
-                count++;
         }
     }
 
     flushSkipped();
-
-    if (truncate) {
-        events.push_back(TraceEvent{.kind = TraceEvent::Truncated});
-    }
 
     return events;
 }

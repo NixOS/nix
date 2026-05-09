@@ -374,8 +374,16 @@ TEST_F(EvalTraceTest, renderedOutputTruncationBeforeMessage)
     ASSERT_NE(posTrunc, std::string::npos) << "truncation message not found in output:\n" << output;
     ASSERT_NE(posMsg, std::string::npos) << "error msg not found in output:\n" << output;
 
+    // Truncation should appear at the top, before all kept traces
     EXPECT_LT(posTrunc, posMsg)
         << "Truncation message should appear before the error message.\nOutput:\n" << output;
+
+    // Find the first kept trace in the output
+    auto posFirstTrace = findInOutput(output, "trace ");
+    if (posFirstTrace != std::string::npos) {
+        EXPECT_LT(posTrunc, posFirstTrace)
+            << "Truncation message should appear before all kept traces.\nOutput:\n" << output;
+    }
 }
 
 TEST_F(EvalTraceTest, renderedOutputShowTraceShowsMore)

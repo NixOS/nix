@@ -135,10 +135,8 @@ TEST(ErrorTrace, noTruncationUnderLimit)
 
 TEST(ErrorTrace, truncationAtLimit)
 {
-    // 4 traces with positions → count exceeds 3 on the 4th, but the 4th
-    // is already committed before the check on the 5th iteration.
-    // The check is: after count > 3, truncate = true. Since count increments
-    // after printing, trace 0..3 get printed (count=4), then trace 4 is truncated.
+    // 6 traces with positions. Truncation keeps the inner (last) 3-4 traces
+    // and drops the outer (first) ones. The Truncated event appears first.
     std::list<Trace> traces;
     for (int i = 0; i < 6; i++)
         traces.push_back(withpos("trace " + std::to_string(i)));
@@ -146,10 +144,13 @@ TEST(ErrorTrace, truncationAtLimit)
     auto events = computeTraceDisplay(traces, false, prodHasPos);
     EXPECT_TRUE(hasTruncated(events));
     auto hints = printedHints(events);
-    // First 4 should be printed (count goes 1,2,3,4 — truncation triggers when count>3
-    // which is checked BEFORE printing, so count=4 means the 5th trace sees count>3)
-    EXPECT_THAT(hints, ::testing::Contains("trace 0"));
-    EXPECT_THAT(hints, ::testing::Not(::testing::Contains("trace 5")));
+    // Inner traces (near the error) should be kept
+    EXPECT_THAT(hints, ::testing::Contains("trace 5"));
+    // Outer traces should be truncated
+    EXPECT_THAT(hints, ::testing::Not(::testing::Contains("trace 0")));
+    // Truncated event should be first
+    ASSERT_FALSE(events.empty());
+    EXPECT_EQ(events.front().kind, TraceEvent::Truncated);
 }
 
 TEST(ErrorTrace, tracesWithoutPositionsDontCountTowardLimit)
@@ -168,24 +169,26 @@ TEST(ErrorTrace, tracesWithoutPositionsDontCountTowardLimit)
 
 TEST(ErrorTrace, alwaysPrintBypassesTruncation)
 {
+    // TracePrint::Always traces in the truncated (outer) region still appear
     std::list<Trace> traces;
+    traces.push_back(nopos("always at top", TracePrint::Always));
     for (int i = 0; i < 10; i++)
         traces.push_back(withpos("default " + std::to_string(i)));
-    traces.push_back(nopos("always visible", TracePrint::Always));
 
     auto events = computeTraceDisplay(traces, false, prodHasPos);
     EXPECT_TRUE(hasTruncated(events));
     auto hints = printedHints(events);
-    EXPECT_THAT(hints, ::testing::Contains("always visible"));
+    EXPECT_THAT(hints, ::testing::Contains("always at top"));
 }
 
 TEST(ErrorTrace, alwaysPrintPreservesOrderAmongOtherAlways)
 {
+    // Two Always traces in the outer (truncated) region preserve their relative order
     std::list<Trace> traces;
-    for (int i = 0; i < 10; i++)
-        traces.push_back(withpos("filler " + std::to_string(i)));
     traces.push_back(nopos("ctx A", TracePrint::Always));
     traces.push_back(nopos("ctx B", TracePrint::Always));
+    for (int i = 0; i < 10; i++)
+        traces.push_back(withpos("filler " + std::to_string(i)));
 
     auto events = computeTraceDisplay(traces, false, prodHasPos);
     auto hints = printedHints(events);
@@ -264,24 +267,23 @@ TEST(ErrorTrace, mutualRecursionDedupResets)
 
 TEST(ErrorTrace, truncationAndDeduplicationInteract)
 {
-    // With showTrace=false, traces with positions get truncated after 3 pos-count,
-    // and dedup only applies to the visible portion.
+    // With showTrace=false, outer traces are truncated and inner traces kept.
     std::list<Trace> traces;
-    // 2 unique traces with positions
-    traces.push_back(withpos("A"));
-    traces.push_back(withpos("B"));
+    // 5 outer traces with positions (will be truncated)
+    for (int i = 0; i < 5; i++)
+        traces.push_back(withpos("head " + std::to_string(i)));
     // Then many without positions (don't count toward limit)
     for (int i = 0; i < 10; i++)
         traces.push_back(nopos("repeated"));
-    // Then more with positions (should trigger truncation)
-    for (int i = 0; i < 5; i++)
-        traces.push_back(withpos("tail " + std::to_string(i)));
+    // 2 inner traces with positions (should be kept)
+    traces.push_back(withpos("tail A"));
+    traces.push_back(withpos("tail B"));
 
     auto events = computeTraceDisplay(traces, false, prodHasPos);
     auto hints = printedHints(events);
-    // A and B should appear
-    EXPECT_THAT(hints, ::testing::Contains("A"));
-    EXPECT_THAT(hints, ::testing::Contains("B"));
+    // Inner traces should be kept
+    EXPECT_THAT(hints, ::testing::Contains("tail A"));
+    EXPECT_THAT(hints, ::testing::Contains("tail B"));
 }
 
 } // namespace nix
