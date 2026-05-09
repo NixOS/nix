@@ -5,6 +5,8 @@
 #include "nix/util/position.hh"
 #include "nix/util/terminal.hh"
 
+#include <sstream>
+
 namespace nix {
 
 namespace {
@@ -284,6 +286,110 @@ TEST(ErrorTrace, truncationAndDeduplicationInteract)
     // Inner traces should be kept
     EXPECT_THAT(hints, ::testing::Contains("tail A"));
     EXPECT_THAT(hints, ::testing::Contains("tail B"));
+}
+
+// ---- Golden-string rendered output tests ----
+//
+// These pin the exact rendered output (ANSI-stripped) for a few key scenarios.
+// They catch any formatting change, intentional or not.
+
+namespace {
+
+std::string renderError(const ErrorInfo & einfo, bool showTrace)
+{
+    std::ostringstream oss;
+    showErrorInfo(oss, einfo, showTrace);
+    return filterANSIEscapes(oss.str(), true);
+}
+
+ErrorInfo makeErrorInfo(std::string msg, std::list<Trace> traces)
+{
+    return ErrorInfo{
+        .level = lvlError,
+        .msg = HintFmt("%s", msg),
+        .pos = {},
+        .traces = std::move(traces),
+    };
+}
+
+} // namespace
+
+TEST(ErrorTraceGolden, noTraces)
+{
+    auto output = renderError(makeErrorInfo("type error: expected int, got string", {}), false);
+    EXPECT_EQ(output, "error: type error: expected int, got string");
+}
+
+TEST(ErrorTraceGolden, threeTracesNoTruncation)
+{
+    auto pos = std::make_shared<Pos>(42, 1, Pos::String{make_ref<std::string>("myfile.nix")});
+    std::list<Trace> traces;
+    traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "while evaluating the attribute 'x'")});
+    traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "while calling 'add'")});
+    traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "while evaluating 'add 1 \"a\"'")});
+
+    auto output = renderError(makeErrorInfo("cannot coerce a string to an integer", std::move(traces)), false);
+    EXPECT_EQ(output,
+        "error:\n"
+        "       \xe2\x80\xa6 while evaluating the attribute 'x'\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 while calling 'add'\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 while evaluating 'add 1 \"a\"'\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       error: cannot coerce a string to an integer");
+}
+
+TEST(ErrorTraceGolden, sixTracesWithTruncation)
+{
+    auto pos = std::make_shared<Pos>(42, 1, Pos::String{make_ref<std::string>("myfile.nix")});
+    std::list<Trace> traces;
+    for (int i = 1; i <= 6; i++)
+        traces.push_back(Trace{.pos = pos, .hint = HintFmt("%s", "trace " + std::to_string(i))});
+
+    // Without --show-trace: outer traces truncated, inner kept
+    auto truncated = renderError(makeErrorInfo("the error", traces), false);
+    EXPECT_EQ(truncated,
+        "error:\n"
+        "       (stack trace truncated; use '--show-trace' to show the full, detailed trace)\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 4\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 5\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 6\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       error: the error");
+
+    // With --show-trace: all traces shown, no truncation
+    auto full = renderError(makeErrorInfo("the error", traces), true);
+    EXPECT_EQ(full,
+        "error:\n"
+        "       \xe2\x80\xa6 trace 1\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 2\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 3\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 4\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 5\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       \xe2\x80\xa6 trace 6\n"
+        "         at \xc2\xabstring\xc2\xbb:42:1:\n"
+        "\n"
+        "       error: the error");
 }
 
 } // namespace nix
