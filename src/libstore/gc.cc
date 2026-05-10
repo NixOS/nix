@@ -538,10 +538,16 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     /* Fast incremental GC: delete only leaf paths older than threshold.
        Single-round execution - run multiple times to clean up deep dependency chains. */
     if (options.pruneOlderThan) {
+        if (!dynamic_cast<LocalStore *>(this)) {
+            throw Error(
+                "Fast incremental GC (--prune-older-than) requires direct store access. "
+                "Remote store support will be added in a future version.");
+        }
+
         auto cutoffTime = time(nullptr) - *options.pruneOlderThan;
         boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>> rootHashes;
         for (auto & path : roots)
-            rootHashes.insert(path.hashPart());
+            rootHashes.insert(std::string(path.hashPart()));
 
         /* Expand roots based on keep-outputs and keep-derivations settings */
         if (gcSettings.keepDerivations || gcSettings.keepOutputs) {
@@ -571,7 +577,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         /* Prepare SQL statement once for both dry-run and actual deletion */
         SQLiteStmt stmt;
         stmt.create(_state->lock()->db, R"(
-            SELECT v.path, v.narSize, v.hash FROM ValidPaths v
+            SELECT v.path, v.narSize FROM ValidPaths v
             WHERE v.registrationTime < ?
               AND NOT EXISTS (
                 SELECT 1 FROM Refs r
@@ -585,7 +591,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             while (use.next()) {
                 auto path = use.getStr(0);
                 auto narSize = use.isNull(1) ? 0 : use.getInt(1);
-                auto hash = use.getStr(2);
+                auto hash = std::string(parseStorePath(path).hashPart());
 
                 if (rootHashes.count(hash))
                     continue;
@@ -611,7 +617,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                 checkInterrupt();
                 auto path = use.getStr(0);
                 auto narSize = use.isNull(1) ? 0 : use.getInt(1);
-                auto hash = use.getStr(2);
+                auto hash = std::string(parseStorePath(path).hashPart());
 
                 if (rootHashes.count(hash))
                     continue;
