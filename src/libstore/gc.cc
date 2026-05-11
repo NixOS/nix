@@ -536,7 +536,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
         readFile(*p);
 
     /* Fast incremental GC: delete only leaf paths older than threshold.
-       Single-round execution - run multiple times to clean up deep dependency chains. */
+       Supports multi-round execution to clean up deep dependency chains in one invocation. */
     if (options.pruneOlderThan) {
         if (!dynamic_cast<LocalStore *>(this)) {
             throw Error(
@@ -607,78 +607,92 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
             return;
         }
 
-        /* Single-round deletion: only delete current leafs.
-           For deep dependency chains, run GC multiple times.
-           This ensures predictable, fast execution. */
-        uint64_t deletedCount = 0;
-        try {
-            auto use = stmt.use()(cutoffTime);
-            while (use.next()) {
-                checkInterrupt();
-                auto path = use.getStr(0);
-                auto narSize = use.isNull(1) ? 0 : use.getInt(1);
-                auto hash = std::string(parseStorePath(path).hashPart());
+        /* Multi-round deletion: delete current leafs in each round.
+           Multiple rounds delete deeper dependency chains in one GC run,
+           amortizing the expensive root-finding phase. */
+        uint64_t totalDeleted = 0;
 
-                if (rootHashes.count(hash))
-                    continue;
+        for (uint64_t round = 1; round <= options.pruneRounds; round++) {
+            uint64_t roundDeleted = 0;
+            try {
+                auto use = stmt.use()(cutoffTime);
+                while (use.next()) {
+                    checkInterrupt();
+                    auto path = use.getStr(0);
+                    auto narSize = use.isNull(1) ? 0 : use.getInt(1);
+                    auto hash = std::string(parseStorePath(path).hashPart());
 
-                bool shouldDelete = false;
-                {
-                    auto shared(_shared.lock());
-                    if (!shared->tempRoots.contains(hash)) {
-                        shared->pending = hash;
-                        shouldDelete = true;
+                    if (rootHashes.count(hash))
+                        continue;
+
+                    bool shouldDelete = false;
+                    {
+                        auto shared(_shared.lock());
+                        if (!shared->tempRoots.contains(hash)) {
+                            shared->pending = hash;
+                            shouldDelete = true;
+                        }
+                    }
+                    if (!shouldDelete)
+                        continue;
+
+                    Finally clearPending([&] {
+                        auto shared(_shared.lock());
+                        shared->pending.reset();
+                        wakeup.notify_all();
+                    });
+
+                    auto realPath = config->realStoreDir.get() / baseNameOf(path);
+
+                    printInfo("deleting '%s'", path);
+                    results.paths.insert(path);
+
+                    try {
+                        /* Invalidate in DB first */
+                        invalidatePathChecked(parseStorePath(path));
+
+                        /* Delete the path */
+                        uint64_t bytesFreed = 0;
+                        deleteStorePath(realPath, bytesFreed, true);
+
+                        /* Use narSize for byte accounting if deleteStorePath didn't measure */
+                        if (bytesFreed == 0 && narSize > 0) {
+                            results.bytesFreed += narSize;
+                        } else {
+                            results.bytesFreed += bytesFreed;
+                        }
+
+                        roundDeleted++;
+                        totalDeleted++;
+                        if (results.bytesFreed >= options.maxFreed)
+                            throw GCLimitReached();
+                    } catch (std::filesystem::filesystem_error & e) {
+                        if (!config->ignoreGcDeleteFailure)
+                            throw;
+                        logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.what())});
+                    } catch (Error & e) {
+                        if (!config->ignoreGcDeleteFailure)
+                            throw;
+                        logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.msg())});
                     }
                 }
-                if (!shouldDelete)
-                    continue;
-
-                Finally clearPending([&] {
-                    auto shared(_shared.lock());
-                    shared->pending.reset();
-                    wakeup.notify_all();
-                });
-
-                auto realPath = config->realStoreDir.get() / baseNameOf(path);
-
-                printInfo("deleting '%s'", path);
-                results.paths.insert(path);
-
-                try {
-                    /* Invalidate in DB first */
-                    invalidatePathChecked(parseStorePath(path));
-
-                    /* Delete the path */
-                    uint64_t bytesFreed = 0;
-                    deleteStorePath(realPath, bytesFreed, true);
-
-                    /* Use narSize for byte accounting if deleteStorePath didn't measure */
-                    if (bytesFreed == 0 && narSize > 0) {
-                        results.bytesFreed += narSize;
-                    } else {
-                        results.bytesFreed += bytesFreed;
-                    }
-
-                    deletedCount++;
-                    if (results.bytesFreed >= options.maxFreed)
-                        throw GCLimitReached();
-                } catch (std::filesystem::filesystem_error & e) {
-                    if (!config->ignoreGcDeleteFailure)
-                        throw;
-                    logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.what())});
-                } catch (Error & e) {
-                    if (!config->ignoreGcDeleteFailure)
-                        throw;
-                    logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.msg())});
-                }
+            } catch (GCLimitReached &) {
+                printInfo(
+                    "fast GC: round %d/%d: deleted %d paths (limit reached)", round, options.pruneRounds, roundDeleted);
+                printInfo("fast GC: total: deleted %d paths, freed %s", totalDeleted, renderSize(results.bytesFreed));
+                return;
             }
-        } catch (GCLimitReached &) {
-            printInfo(
-                "fast GC: deleted %d paths, freed %s (limit reached)", deletedCount, renderSize(results.bytesFreed));
-            return;
+
+            printInfo("fast GC: round %d/%d: deleted %d paths", round, options.pruneRounds, roundDeleted);
+
+            /* Stop early if no paths were deleted in this round */
+            if (roundDeleted == 0) {
+                printInfo("fast GC: no more paths to delete, stopping after %d rounds", round);
+                break;
+            }
         }
 
-        printInfo("fast GC: deleted %d paths, freed %s", deletedCount, renderSize(results.bytesFreed));
+        printInfo("fast GC: total: deleted %d paths, freed %s", totalDeleted, renderSize(results.bytesFreed));
         return;
     }
 

@@ -64,10 +64,17 @@ struct GCOptions
 
     /**
      * Prune unused paths older than this many seconds using fast SQL query.
-     * Only prunes leaf paths (no referrers) in a single round.
-     * Run multiple times to clean up dependency chains layer by layer.
+     * Only prunes leaf paths (no referrers) per round.
+     * Use pruneRounds to run multiple rounds in a single invocation.
      */
     std::optional<uint64_t> pruneOlderThan;
+
+    /**
+     * Number of pruning rounds to run (default 1).
+     * Each round deletes current leaf paths. Multiple rounds amortize
+     * the expensive root-finding phase across deeper dependency chains.
+     */
+    uint64_t pruneRounds{1};
 
     /**
      * The paths from which to delete.
