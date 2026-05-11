@@ -1,0 +1,14 @@
+error: during evaluation of file '.*/eval-context-complex.nix'
+
+       \(stack trace truncated; use '--show-trace' to show the full, detailed trace\)
+
+       … while evaluating the attribute 'value'
+         at .*/eval-context-complex.nix:[0-9]+:[0-9]+:
+
+       … while evaluating the attribute 'value'
+         at .*/eval-context-complex.nix:[0-9]+:[0-9]+:
+
+       … while calling the 'throw' builtin
+         at .*/eval-context-complex.nix:[0-9]+:[0-9]+:
+
+       error: computation error deep in the stack
