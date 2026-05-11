@@ -2,6 +2,7 @@
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/pathlocks.hh"
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
 #include "nix/store/path-references.hh"
@@ -1854,7 +1855,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optFixedPath = output->path(store, drv.name, outputName);
         if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)});
+            /* Skip if a `PathLocks` instance in this process already holds
+               the lock — re-locking via a separate fd would self-deadlock
+               on Linux flock (per-open-file-description). */
+            auto realPath = store.toRealPath(newInfo.path);
+            if (!PathLocks::isHeldByThisProcess(realPath))
+                dynamicOutputLock.lockPaths({realPath});
         }
 
         /* Move files, if needed */

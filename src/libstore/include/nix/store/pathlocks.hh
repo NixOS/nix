@@ -53,6 +53,18 @@ public:
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);
+
+    /**
+     * Returns true if some `PathLocks` instance in this process currently
+     * holds the lock for `realPath` (the non-`.lock` path that
+     * `lockPaths()` would lock). Callers that re-enter the locking code
+     * for the same path (e.g. `addToStore` running on the same path the
+     * current build goal already locked) can use this to skip the
+     * redundant second lock and avoid `flock` self-deadlock — same-process
+     * flock locks held via different open file descriptions are mutually
+     * blocking on Linux.
+     */
+    static bool isHeldByThisProcess(const std::filesystem::path & realPath);
 };
 
 struct FdLock

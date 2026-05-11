@@ -1,9 +1,11 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/sync.hh"
 
 #include <cerrno>
 #include <cstdlib>
+#include <set>
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -11,6 +13,22 @@
 #include <sys/file.h>
 
 namespace nix {
+
+/* Tracks paths currently locked by some `PathLocks` instance in this
+   process. Used by `addToStore` to skip a second `flock(LOCK_EX)` on a
+   path the caller already holds, which would otherwise self-deadlock
+   because Linux flock is per-open-file-description. */
+static Sync<std::set<std::filesystem::path>> & heldRealPaths()
+{
+    static Sync<std::set<std::filesystem::path>> s;
+    return s;
+}
+
+bool PathLocks::isHeldByThisProcess(const std::filesystem::path & realPath)
+{
+    auto held(heldRealPaths().lock());
+    return held->count(realPath) > 0;
+}
 
 AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
 {
@@ -121,6 +139,17 @@ bool PathLocks::lockPaths(const std::set<std::filesystem::path> & paths, const s
                 break;
         }
 
+        /* Register the (real, non-`.lock`) path as held by this process
+           so `addToStore` can detect re-entry and skip a self-deadlocking
+           second `flock`. Done before `fds.push_back` so that if the
+           push throws (e.g. `bad_alloc`), `isHeldByThisProcess` still
+           reports the kernel-held flock and re-entrant callers won't
+           attempt a second, deadlocking acquisition. */
+        {
+            auto held(heldRealPaths().lock());
+            held->insert(path);
+        }
+
         /* Use borrow so that the descriptor isn't closed. */
         fds.push_back(FDPair(fd.release(), lockPath));
     }
@@ -138,6 +167,15 @@ void PathLocks::unlock()
             printError("error (ignored): cannot close lock file on %1%", PathFmt(i.second));
 
         debug("lock released on %1%", PathFmt(i.second));
+
+        /* Mirror the insert in `lockPaths()`: derive the real path from
+           `lockPath` by stripping the trailing `.lock`. */
+        auto realPath = i.second;
+        realPath.replace_extension();
+        {
+            auto held(heldRealPaths().lock());
+            held->erase(realPath);
+        }
     }
 
     fds.clear();

@@ -1050,8 +1050,13 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
             /* Lock the output path.  But don't lock if we're being called
                from a build hook (whose parent process already acquired a
-               lock on this path). */
-            if (!locksHeld.count(printStorePath(info.path)))
+               lock on this path), or if a `PathLocks` instance in this
+               same process is already holding the lock (e.g. the
+               derivation goal that triggered this `addToStore` call).
+               Re-locking in the latter case would self-deadlock because
+               Linux flock is per-open-file-description. */
+            if (!locksHeld.count(printStorePath(info.path))
+                && !PathLocks::isHeldByThisProcess(realPath))
                 outputLock.lockPaths({realPath});
 
             /* The path may have been created by another process in the meantime, so check again. */
@@ -1247,7 +1252,12 @@ StorePath LocalStore::addToStoreFromDump(
 
         auto realPath = toRealPath(dstPath);
 
-        PathLocks outputLock({realPath});
+        /* Skip locking if a `PathLocks` instance in this same process is
+           already holding the lock for `realPath` — re-locking would
+           self-deadlock on Linux flock (per-open-file-description). */
+        PathLocks outputLock;
+        if (!PathLocks::isHeldByThisProcess(realPath))
+            outputLock.lockPaths({realPath});
 
         /* The path may have been created by another process in the meantime, so check again. */
         if (repair || !isValidPathUncached(dstPath)) {
