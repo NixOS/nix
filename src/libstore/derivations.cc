@@ -222,6 +222,7 @@ static BackedStringView parseString(StringViewStream & str)
     size_t start = 0;
     size_t end = str.remaining.size();
     const auto data = str.remaining.data();
+    bool foundClose = false;
     while (start < end) {
         auto idx = str.remaining.find('"', start);
         if (idx == std::string_view::npos) {
@@ -232,10 +233,13 @@ static BackedStringView parseString(StringViewStream & str)
             ;
         if ((idx - pos) % 2 == 0) { // even number of backslashes
             end = idx;
+            foundClose = true;
             break;
         }
         start = idx + 1;
     }
+    if (!foundClose)
+        throw FormatError("unterminated string in derivation");
 
     start = 0;
     const auto content = str.remaining.substr(start, end);

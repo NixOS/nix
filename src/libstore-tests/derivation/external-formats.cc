@@ -15,6 +15,14 @@ TEST_F(DerivationTest, BadATerm_version)
         parseDerivation(*store, readFile(goldenMaster("bad-version.drv")), "whatever", mockXpSettings), FormatError);
 }
 
+TEST_F(DerivationTest, UnterminatedString)
+{
+    ASSERT_THROW(
+        parseDerivation(
+            *store, "Derive([(\"out\",\"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo", "bar", mockXpSettings),
+        FormatError);
+}
+
 TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
 {
     ASSERT_THROW(
