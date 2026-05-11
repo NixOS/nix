@@ -524,32 +524,46 @@ Derivation parseDerivation(
  */
 static void printString(std::string & res, std::string_view s)
 {
-    res += '"';
-    static constexpr auto chunkSize = 1024;
-    std::array<char, 2 * chunkSize + 2> buffer;
-    while (!s.empty()) {
-        auto chunk = s.substr(0, /*n=*/chunkSize);
-        s.remove_prefix(chunk.size());
-        char * buf = buffer.data();
-        char * p = buf;
-        for (auto c : chunk)
-            if (c == '\"' || c == '\\') {
-                *p++ = '\\';
-                *p++ = c;
-            } else if (c == '\n') {
-                *p++ = '\\';
+    /* Bulk-memcpy unescaped runs and handle escapes inline; write straight
+       into res via resize_and_overwrite (no zero-fill, no scratch buffer). */
+    auto oldSize = res.size();
+    res.resize_and_overwrite(oldSize + s.size() * 2 + 2, [&](char * data, size_t) -> size_t {
+        char * p = data + oldSize;
+        *p++ = '"';
+        while (!s.empty()) {
+            size_t i = 0;
+            while (i < s.size()) {
+                char c = s[i];
+                if (c == '"' || c == '\\' || c == '\n' || c == '\r' || c == '\t')
+                    break;
+                ++i;
+            }
+            if (i > 0) {
+                std::memcpy(p, s.data(), i);
+                p += i;
+            }
+            if (i == s.size())
+                break;
+            *p++ = '\\';
+            switch (s[i]) {
+            case '\n':
                 *p++ = 'n';
-            } else if (c == '\r') {
-                *p++ = '\\';
+                break;
+            case '\r':
                 *p++ = 'r';
-            } else if (c == '\t') {
-                *p++ = '\\';
+                break;
+            case '\t':
                 *p++ = 't';
-            } else
-                *p++ = c;
-        res.append(buf, p - buf);
-    }
-    res += '"';
+                break;
+            default:
+                *p++ = s[i];
+                break;
+            }
+            s.remove_prefix(i + 1);
+        }
+        *p++ = '"';
+        return p - data;
+    });
 }
 
 static void printUnquotedString(std::string & res, std::string_view s)
@@ -585,6 +599,26 @@ static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIt
         else
             res += ',';
         printUnquotedString(res, *i);
+    }
+    res += ']';
+}
+
+/* Stream printed paths directly; iterating StorePath-sorted preserves the
+   "<storeDir>/<baseName>" order since storeDir is a common prefix. */
+static void printUnquotedStorePaths(std::string & res, const StoreDirConfig & store, const StorePathSet & paths)
+{
+    res += '[';
+    bool first = true;
+    for (auto & p : paths) {
+        if (first)
+            first = false;
+        else
+            res += ',';
+        res += '"';
+        res.append(store.storeDir);
+        res += '/';
+        res.append(p.to_string());
+        res += '"';
     }
     res += ']';
 }
@@ -733,8 +767,7 @@ std::string Derivation::unparse(
     }
 
     s += "],"sv;
-    auto paths = store.printStorePathSet(inputSrcs); // FIXME: slow
-    printUnquotedStrings(s, paths.begin(), paths.end());
+    printUnquotedStorePaths(s, store, inputSrcs);
 
     s += ',';
     printUnquotedString(s, platform);

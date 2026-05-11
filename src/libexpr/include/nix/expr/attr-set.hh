@@ -419,13 +419,23 @@ public:
      */
     std::vector<const Attr *> lexicographicOrder(const SymbolTable & symbols) const
     {
+        /* Cache string_views once instead of re-resolving in the comparator
+           on every O(N log N) compare. */
+        struct AttrWithName
+        {
+            std::string_view sv;
+            const Attr * a;
+        };
+
+        std::vector<AttrWithName> tagged;
+        tagged.reserve(size());
+        for (const auto & a : *this)
+            tagged.push_back({symbols[a.name], &a});
+        std::ranges::sort(tagged, {}, &AttrWithName::sv);
         std::vector<const Attr *> res;
-        res.reserve(size());
-        std::ranges::transform(*this, std::back_inserter(res), [](const Attr & a) { return &a; });
-        std::ranges::sort(res, [&](const Attr * a, const Attr * b) {
-            std::string_view sa = symbols[a->name], sb = symbols[b->name];
-            return sa < sb;
-        });
+        res.reserve(tagged.size());
+        for (const auto & t : tagged)
+            res.push_back(t.a);
         return res;
     }
 

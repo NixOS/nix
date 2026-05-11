@@ -47,6 +47,7 @@
 #include <nlohmann/json.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/unordered/concurrent_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include "nix/util/strings-inline.hh"
 
@@ -307,6 +308,7 @@ EvalState::EvalState(
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
+    , posValueCache(make_ref<decltype(posValueCache)::element_type>())
     , lookupPathResolved(make_ref<decltype(lookupPathResolved)::element_type>())
     , regexCache(makeRegexCache())
 #if NIX_USE_BOEHMGC
@@ -967,14 +969,31 @@ void EvalState::mkThunk_(Value & v, Expr * expr)
 
 void EvalState::mkPos(Value & v, PosIdx p)
 {
+    /* Position attrsets are immutable, so reuse the cached Value. */
+    if (Value * cached = nullptr; posValueCache->visit(p, [&](const auto & kv) { cached = kv.second; }) && cached) {
+        v = *cached;
+        return;
+    }
+
+    Value * fresh = allocValue();
     auto origin = positions.originOf(p);
     if (auto path = std::get_if<SourcePath>(&origin)) {
         auto attrs = buildBindings(3);
         attrs.alloc(s.file).mkString(path->path.abs(), mem);
         makePositionThunks(*this, p, attrs.alloc(s.line), attrs.alloc(s.column));
-        v.mkAttrs(attrs);
+        fresh->mkAttrs(attrs);
     } else
-        v.mkNull();
+        fresh->mkNull();
+
+    /* On a concurrent miss for the same PosIdx, adopt the winner's Value
+       and discard ours. */
+    if (!posValueCache->try_emplace(p, fresh)) {
+        Value * winner = nullptr;
+        posValueCache->visit(p, [&](const auto & kv) { winner = kv.second; });
+        if (winner)
+            fresh = winner;
+    }
+    v = *fresh;
 }
 
 void EvalState::mkStorePathString(const StorePath & p, Value & v)
@@ -1174,6 +1193,7 @@ void EvalState::resetFileCache()
     fileEvalCache->clear();
     inputCache->clear();
     lookupPathResolved->clear();
+    posValueCache->clear();
     positions.clear();
     rootFS->invalidateCache();
 }
@@ -2267,17 +2287,18 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
 
 void EvalState::forceValueDeep(Value & v)
 {
-    std::set<const Value *> seen;
+    /* Only attrsets and lists can recurse cyclically, so only those need cycle
+       detection. Leaves are skipped to avoid a hash op per leaf. */
+    boost::unordered_flat_set<const Value *> seen;
 
     [&, &state(*this)](this const auto & recurse, Value & v) {
         auto _level = state.addCallDepth(v.determinePos(noPos));
 
-        if (!seen.insert(&v).second)
-            return;
-
         state.forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
+            if (!seen.insert(&v).second)
+                return;
             for (auto & i : *v.attrs())
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
@@ -2298,6 +2319,8 @@ void EvalState::forceValueDeep(Value & v)
         }
 
         else if (v.isList()) {
+            if (!seen.insert(&v).second)
+                return;
             size_t index = 0;
             for (auto v2 : v.listView())
                 try {
