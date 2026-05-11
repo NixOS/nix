@@ -212,7 +212,7 @@ LocalStore::LocalStore(ref<const Config> config)
 #if HAVE_POSIX_FALLOCATE
             res = posix_fallocate(fd.get(), 0, gcSettings.reservedSize);
 #endif
-            if (res == -1) {
+            if (res != 0) {
                 writeFull(fd.get(), std::string(gcSettings.reservedSize, 'X'));
                 [[gnu::unused]] auto res2 =
 
