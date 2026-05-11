@@ -60,7 +60,11 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
-        EvalContextGuard ctx(fmt("during evaluation of '%s'", installable->what()));
+        auto what = installable->what();
+        EvalContextGuard ctx(
+            expr ? fmt("during evaluation of expression '%s'", *expr)
+            : what.empty() ? "during evaluation"
+            : fmt("during evaluation of '%s'", what));
 
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");

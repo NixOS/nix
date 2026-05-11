@@ -1,5 +1,6 @@
 #include "nix/store/globals.hh"
 #include "nix/cmd/installables.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/cmd/installable-derived-path.hh"
 #include "nix/cmd/installable-attr-path.hh"
 #include "nix/cmd/installable-flake.hh"
@@ -460,6 +461,10 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 
         auto state = getEvalState();
         auto vFile = state->allocValue();
+
+        EvalContextGuard ctx(
+            expr ? fmt("during evaluation of expression '%s'", *expr)
+            : fmt("during evaluation of file '%s'", file->string()));
 
         if (file == "-") {
             auto e = state->parseStdin();
