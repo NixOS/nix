@@ -535,6 +535,147 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
     if (auto p = getEnv("_NIX_TEST_GC_SYNC_2"))
         readFile(*p);
 
+    /* Fast incremental GC: delete only leaf paths older than threshold.
+       Single-round execution - run multiple times to clean up deep dependency chains. */
+    if (options.pruneOlderThan) {
+        auto cutoffTime = time(nullptr) - *options.pruneOlderThan;
+        boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>> rootHashes;
+        for (auto & path : roots)
+            rootHashes.insert(path.hashPart());
+
+        /* Expand roots based on keep-outputs and keep-derivations settings */
+        if (gcSettings.keepDerivations || gcSettings.keepOutputs) {
+            std::vector<std::string> additionalRoots;
+
+            for (auto & root : roots) {
+                /* keep-derivations: if an output is rooted, keep its .drv */
+                if (gcSettings.keepDerivations) {
+                    auto derivers = queryValidDerivers(root);
+                    for (auto & drv : derivers)
+                        additionalRoots.emplace_back(std::string(drv.hashPart()));
+                }
+
+                /* keep-outputs: if a .drv is rooted, keep its outputs */
+                if (gcSettings.keepOutputs && root.isDerivation()) {
+                    for (auto & [name, maybeOutPath] : queryPartialDerivationOutputMap(root)) {
+                        if (maybeOutPath && isValidPath(*maybeOutPath))
+                            additionalRoots.emplace_back(std::string(maybeOutPath->hashPart()));
+                    }
+                }
+            }
+
+            for (auto & hash : additionalRoots)
+                rootHashes.insert(hash);
+        }
+
+        /* Prepare SQL statement once for both dry-run and actual deletion */
+        SQLiteStmt stmt;
+        stmt.create(_state->lock()->db, R"(
+            SELECT v.path, v.narSize, v.hash FROM ValidPaths v
+            WHERE v.registrationTime < ?
+              AND NOT EXISTS (
+                SELECT 1 FROM Refs r
+                WHERE r.reference = v.id AND r.reference != r.referrer
+              )
+        )");
+
+        /* Dry-run mode: just report what would be deleted */
+        if (options.action == GCOptions::gcReturnDead) {
+            auto use = stmt.use()(cutoffTime);
+            while (use.next()) {
+                auto path = use.getStr(0);
+                auto narSize = use.isNull(1) ? 0 : use.getInt(1);
+                auto hash = use.getStr(2);
+
+                if (rootHashes.count(hash))
+                    continue;
+
+                auto shared(_shared.lock());
+                if (shared->tempRoots.contains(hash))
+                    continue;
+
+                results.paths.insert(path);
+                if (narSize > 0)
+                    results.bytesFreed += narSize;
+            }
+            return;
+        }
+
+        /* Single-round deletion: only delete current leafs.
+           For deep dependency chains, run GC multiple times.
+           This ensures predictable, fast execution. */
+        uint64_t deletedCount = 0;
+        try {
+            auto use = stmt.use()(cutoffTime);
+            while (use.next()) {
+                checkInterrupt();
+                auto path = use.getStr(0);
+                auto narSize = use.isNull(1) ? 0 : use.getInt(1);
+                auto hash = use.getStr(2);
+
+                if (rootHashes.count(hash))
+                    continue;
+
+                bool shouldDelete = false;
+                {
+                    auto shared(_shared.lock());
+                    if (!shared->tempRoots.contains(hash)) {
+                        shared->pending = hash;
+                        shouldDelete = true;
+                    }
+                }
+                if (!shouldDelete)
+                    continue;
+
+                Finally clearPending([&] {
+                    auto shared(_shared.lock());
+                    shared->pending.reset();
+                    wakeup.notify_all();
+                });
+
+                auto realPath = config->realStoreDir.get() / baseNameOf(path);
+
+                printInfo("deleting '%s'", path);
+                results.paths.insert(path);
+
+                try {
+                    /* Invalidate in DB first */
+                    invalidatePathChecked(parseStorePath(path));
+
+                    /* Delete the path */
+                    uint64_t bytesFreed = 0;
+                    deleteStorePath(realPath, bytesFreed, true);
+
+                    /* Use narSize for byte accounting if deleteStorePath didn't measure */
+                    if (bytesFreed == 0 && narSize > 0) {
+                        results.bytesFreed += narSize;
+                    } else {
+                        results.bytesFreed += bytesFreed;
+                    }
+
+                    deletedCount++;
+                    if (results.bytesFreed >= options.maxFreed)
+                        throw GCLimitReached();
+                } catch (std::filesystem::filesystem_error & e) {
+                    if (!config->ignoreGcDeleteFailure)
+                        throw;
+                    logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.what())});
+                } catch (Error & e) {
+                    if (!config->ignoreGcDeleteFailure)
+                        throw;
+                    logWarning({.msg = HintFmt("ignoring GC failure for %1%: %2%", PathFmt(realPath), e.msg())});
+                }
+            }
+        } catch (GCLimitReached &) {
+            printInfo(
+                "fast GC: deleted %d paths, freed %s (limit reached)", deletedCount, renderSize(results.bytesFreed));
+            return;
+        }
+
+        printInfo("fast GC: deleted %d paths, freed %s", deletedCount, renderSize(results.bytesFreed));
+        return;
+    }
+
     /* Helper function that deletes a path from the store and throws
        GCLimitReached if we've deleted enough garbage. */
     auto deleteFromStore = [&](std::string_view baseName, bool isKnownPath) {

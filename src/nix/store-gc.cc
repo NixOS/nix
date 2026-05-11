@@ -20,6 +20,14 @@ struct CmdStoreGC : StoreCommand, MixDryRun
             .labels = {"n"},
             .handler = {&options.maxFreed},
         });
+
+        addFlag({
+            .longName = "prune-older-than",
+            .description =
+                "Prune unused paths older than *n* seconds using fast SQL query. Only prunes leaf paths (no referrers) in a single round. Run multiple times to clean up dependency chains.",
+            .labels = {"n"},
+            .handler = {&options.pruneOlderThan},
+        });
     }
 
     std::string description() override

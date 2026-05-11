@@ -63,6 +63,13 @@ struct GCOptions
     bool ignoreLiveness{false};
 
     /**
+     * Prune unused paths older than this many seconds using fast SQL query.
+     * Only prunes leaf paths (no referrers) in a single round.
+     * Run multiple times to clean up dependency chains layer by layer.
+     */
+    std::optional<uint64_t> pruneOlderThan;
+
+    /**
      * The paths from which to delete.
      */
     using GCPaths = std::variant<WholeStore, SpecificPaths>;
