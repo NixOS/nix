@@ -163,34 +163,40 @@ void LocalStore::optimisePath_(
     /* Check if this is a known hash. */
     std::filesystem::path linkPath = std::filesystem::path{linksDir} / hash.to_string(HashFormat::Nix32, false);
 
+    /* Stat the link once, if it exists. */
+    auto stLink = maybeLstat(linkPath);
+
     /* Maybe delete the link, if it has been corrupted. */
-    if (pathExists(linkPath)) {
-        auto stLink = lstat(linkPath);
-        if (st.st_size != stLink.st_size || (repair && hash != ({
-                                                           hashPath(
-                                                               makeFSSourceAccessor(linkPath),
-                                                               FileSerialisationMethod::NixArchive,
-                                                               HashAlgorithm::SHA256)
-                                                               .hash;
-                                                       }))) {
+    if (stLink) {
+        if (st.st_size != stLink->st_size || (repair && hash != ({
+                                                            hashPath(
+                                                                makeFSSourceAccessor(linkPath),
+                                                                FileSerialisationMethod::NixArchive,
+                                                                HashAlgorithm::SHA256)
+                                                                .hash;
+                                                        }))) {
             // XXX: Consider overwriting linkPath with our valid version.
             warn("removing corrupted link %s", PathFmt(linkPath));
             warn(
                 "There may be more corrupted paths."
                 "\nYou should run `nix-store --verify --check-contents --repair` to fix them all");
             unlinkIfExists(linkPath);
+            stLink.reset();
         }
     }
 
-    if (!pathExists(linkPath)) {
+    if (!stLink) {
         /* Nope, create a hard link in the links directory. */
         try {
             std::filesystem::create_hard_link(path, linkPath);
-            inodeHash.insert(st.st_ino);
+            stLink = lstat(linkPath);
+            inodeHash.insert(stLink->st_ino);
         } catch (std::filesystem::filesystem_error & e) {
             if (e.code() == std::errc::file_exists) {
                 /* Fall through if another process created ‘linkPath’ before
                    we did. */
+                stLink = lstat(linkPath);
+                inodeHash.insert(stLink->st_ino);
             }
 
             else if (e.code() == std::errc::no_space_on_device) {
@@ -210,9 +216,8 @@ void LocalStore::optimisePath_(
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = lstat(linkPath);
 
-    if (st.st_ino == stLink.st_ino) {
+    if (st.st_ino == stLink->st_ino) {
         debug("%1% is already linked to %2%", PathFmt(path), PathFmt(linkPath));
         return;
     }
@@ -235,7 +240,7 @@ void LocalStore::optimisePath_(
 
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
-        inodeHash.insert(st.st_ino);
+        inodeHash.insert(stLink->st_ino);
     } catch (std::filesystem::filesystem_error & e) {
         if (e.code() == std::errc::too_many_links) {
             /* Too many links to the same file (>= 32000 on most file
