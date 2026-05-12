@@ -285,6 +285,16 @@ struct BasicDerivation
     StringPairs env;
     std::optional<StructuredAttrs> structuredAttrs;
 
+    /**
+     * Metadata excluded from the derivation hash.
+     *
+     * Eagerly extracted from `__meta` in structured attrs at parse
+     * time. When populated, `__meta` and `derivation-meta` system
+     * feature have been removed from `structuredAttrs`, so they
+     * don't affect the derivation hash via `unparse()`.
+     */
+    std::optional<nlohmann::json::object_t> meta;
+
     std::string name;
 
     BasicDerivation() = default;
@@ -293,6 +303,14 @@ struct BasicDerivation
     BasicDerivation & operator=(BasicDerivation &&) = default;
     BasicDerivation & operator=(const BasicDerivation &) = default;
     virtual ~BasicDerivation() {};
+
+    /**
+     * If the derivation opts into `derivation-meta` (both `__meta`
+     * and `derivation-meta` in `requiredSystemFeatures` are present
+     * in structured attrs), extract `__meta` into the `meta` field
+     * and remove both from `structuredAttrs`.
+     */
+    void extractMeta(const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     bool isBuiltin() const;
 
@@ -336,12 +354,17 @@ struct Derivation : BasicDerivation
     DerivedPathMap<std::set<OutputName, std::less<>>> inputDrvs;
 
     /**
-     * Print a derivation.
+     * Print a derivation in ATerm format.
+     *
+     * @param includeMeta If true (default), re-inject `meta` back
+     *   into the structured attrs as `__meta` and `derivation-meta`.
+     *   Set to false for output hashing, where meta is excluded.
      */
     std::string unparse(
         const StoreDirConfig & store,
         bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
+        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr,
+        bool includeMeta = true) const;
 
     /**
      * Determine whether this derivation should be resolved before building.
@@ -493,18 +516,10 @@ bool isDerivation(std::string_view fileName);
 
 /**
  * Check if structured attributes indicate derivation-meta feature usage.
- * Returns true when both `__meta` and `derivation-meta` system feature are present.
+ * Returns true when both `__meta` (as an object) and `derivation-meta`
+ * system feature are present.
  */
 bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs);
-
-/**
- * Check if the `derivation-meta` feature should be applied to this derivation.
- * Returns true when:
- * - The derivation has structured attributes
- * - The derivation has `__meta` in structured attributes
- * - The derivation requires the `derivation-meta` system feature
- */
-bool usesDerivationMeta(const BasicDerivation & drv);
 
 /**
  * Calculate the name that will be used for the store path for this
@@ -615,12 +630,6 @@ struct Sink;
 
 Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name);
 void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
-
-/**
- * Convert a derivation to JSON, with optional experimental feature settings.
- * This is exposed for testing purposes to allow passing mock experimental feature settings.
- */
-void derivationToJson(nlohmann::json & res, const Derivation & d, const ExperimentalFeatureSettings & xpSettings);
 
 /**
  * This creates an opaque and almost certainly unique string

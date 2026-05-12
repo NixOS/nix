@@ -31,6 +31,7 @@ properties:
   args: { "$ref": "#/$defs/common/properties/args" }
   env: { "$ref": "#/$defs/common/properties/env" }
   structuredAttrs: { "$ref": "#/$defs/common/properties/structuredAttrs" }
+  meta: { "$ref": "#/$defs/common/properties/meta" }
 
   inputs:
     type: object
@@ -181,6 +182,19 @@ additionalProperties: false
           Structured attributes are JSON, and thus embedded as-is.
         type: object
         additionalProperties: true
+
+      meta:
+        title: Derivation metadata
+        description: |
+          Metadata excluded from the output hash, when the
+          [`derivation-meta`](@docroot@/development/experimental-features.md#xp-feature-derivation-meta)
+          experimental feature is enabled.
+
+          Set to `null` when the feature is enabled but the derivation does not use it.
+          Absent when the feature is disabled.
+        oneOf:
+          - type: object
+          - type: "null"
 
   output:
     overall:

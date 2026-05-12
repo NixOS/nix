@@ -16,7 +16,6 @@
   "impureHostDeps": [
     "/usr/bin/ditto"
   ],
-  "meta": null,
   "noChroot": true,
   "outputChecks": {
     "perOutput": {

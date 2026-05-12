@@ -1711,6 +1711,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         drv.structuredAttrs = std::move(*jsonObject);
     }
 
+    drv.extractMeta();
+
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */

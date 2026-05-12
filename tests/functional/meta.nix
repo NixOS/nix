@@ -55,16 +55,28 @@ rec {
     __meta = "just a string";
   };
 
-  # Derivation where derivation-meta is in systemFeatures along with other features
-  # Verify that only derivation-meta is filtered, not the others
-  metaWithOtherFeatures = mkDerivation {
+  # Derivation with unsorted requiredSystemFeatures but no derivation-meta - should be fine
+  unsortedFeaturesNonMeta = mkDerivation {
+    name = "meta-test";
+    __structuredAttrs = true;
+    buildCommand = ''
+      echo "Hello from meta test" > "''${outputs[out]}"
+    '';
+    requiredSystemFeatures = [
+      "big-parallel"
+      "benchmark"
+    ];
+  };
+
+  # Derivation with unsorted requiredSystemFeatures - should be rejected
+  unsortedFeatures = mkDerivation {
     name = "meta-test";
     __structuredAttrs = true;
     buildCommand = ''
       echo "Hello from meta test" > "''${outputs[out]}"
     '';
     __meta = {
-      description = "With other features";
+      description = "Unsorted features";
     };
     requiredSystemFeatures = [
       "big-parallel"

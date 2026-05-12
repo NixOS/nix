@@ -97,6 +97,7 @@ schemas += [
     'schema' : schema_dir / 'derivation-v4.yaml',
     'files' : [
       'dyn-dep-derivation.json',
+      'meta-derivation.json',
       'simple-derivation.json',
       'try-resolve' / 'no-inputs-before.json',
       'try-resolve' / 'with-inputs-before.json',

@@ -183,6 +183,17 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
             return pathS;
     };
 
+    if (parsed) {
+        auto & structuredAttrs = parsed->structuredAttrs;
+
+        /* After extractMeta, __meta should not remain in structuredAttrs.
+           If it does, the derivation has __meta without opting into
+           derivation-meta via requiredSystemFeatures. */
+        if (structuredAttrs.contains("__meta")) {
+            throw Error("derivation has '__meta' attribute but does not require 'derivation-meta' system feature");
+        }
+    }
+
     if (shouldWarn && parsed) {
         auto & structuredAttrs = parsed->structuredAttrs;
 
@@ -354,18 +365,6 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
             getStringSetAttr(env, parsed, "requiredSystemFeatures").value_or(defaults.requiredSystemFeatures),
         .preferLocalBuild = getBoolAttr(env, parsed, "preferLocalBuild", defaults.preferLocalBuild),
         .allowSubstitutes = getBoolAttr(env, parsed, "allowSubstitutes", defaults.allowSubstitutes),
-        .meta = [&]() -> std::optional<nlohmann::json::object_t> {
-            if (!parsed)
-                return std::nullopt;
-
-            auto & structuredAttrs = parsed->structuredAttrs;
-
-            // Only extract __meta if derivation-meta feature is used
-            if (hasDerivationMetaFeature(structuredAttrs)) {
-                return getObject(structuredAttrs.at("__meta"));
-            }
-            return std::nullopt;
-        }(),
     };
 }
 
@@ -378,6 +377,8 @@ StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivat
         res.insert(i);
     if (!drv.type().hasKnownOutputPaths())
         res.insert("ca-derivations");
+    if (drv.meta.has_value())
+        res.insert("derivation-meta");
     return res;
 }
 
@@ -584,11 +585,6 @@ static DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json 
         .requiredSystemFeatures = getStringSet(valueAt(json, "requiredSystemFeatures")),
         .preferLocalBuild = getBoolean(valueAt(json, "preferLocalBuild")),
         .allowSubstitutes = getBoolean(valueAt(json, "allowSubstitutes")),
-        .meta = [&]() -> std::optional<nlohmann::json::object_t> {
-            if (auto * metaPtr = optionalValueAt(json, "meta"))
-                return metaPtr->get<std::optional<nlohmann::json::object_t>>();
-            return std::nullopt;
-        }(),
     };
 }
 
@@ -623,7 +619,6 @@ static void derivationOptionsToJson(nlohmann::json & json, const DerivationOptio
     json["requiredSystemFeatures"] = o.requiredSystemFeatures;
     json["preferLocalBuild"] = o.preferLocalBuild;
     json["allowSubstitutes"] = o.allowSubstitutes;
-    json["meta"] = o.meta;
 }
 
 template<typename Inputs>

@@ -5,7 +5,6 @@
   "exportReferencesGraph": {},
   "impureEnvVars": [],
   "impureHostDeps": [],
-  "meta": null,
   "noChroot": false,
   "outputChecks": {
     "perOutput": {}

@@ -163,7 +163,7 @@ INSTANTIATE_TEST_SUITE_P(
             drv.name + ".json",                                                                       \
             [&]() -> json {                                                                           \
                 json res;                                                                             \
-                derivationToJson(res, drv, mockXpSettings);                                           \
+                adl_serializer<Derivation>::to_json(res, drv, mockXpSettings);                        \
                 return res;                                                                           \
             },                                                                                        \
             [](const auto & file) { return json::parse(readFile(file)); },                            \
@@ -332,16 +332,13 @@ Derivation makeMetaDerivation()
         },
     };
 
-    // Add structured attributes with __meta
-    nlohmann::json::object_t structuredAttrs;
-    structuredAttrs["__meta"] = nlohmann::json::object_t{
+    // Meta has been eagerly extracted from structuredAttrs
+    drv.structuredAttrs = StructuredAttrs{.structuredAttrs = {}};
+    drv.meta = nlohmann::json::object_t{
         {"description", "A test derivation"},
-        {"version", "1.0"},
         {"maintainer", "test@example.com"},
+        {"version", "1.0"},
     };
-    structuredAttrs["requiredSystemFeatures"] = nlohmann::json::array({"derivation-meta"});
-
-    drv.structuredAttrs = StructuredAttrs{.structuredAttrs = structuredAttrs};
 
     return drv;
 }

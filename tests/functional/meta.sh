@@ -40,6 +40,19 @@ nix-instantiate meta.nix -A withoutStructuredAttrs
 echo "Testing empty __meta..."
 nix-instantiate meta.nix -A emptyMeta
 
+# Unsorted requiredSystemFeatures without derivation-meta should be fine
+echo "Testing that unsorted requiredSystemFeatures is allowed without derivation-meta..."
+nix-instantiate meta.nix -A unsortedFeaturesNonMeta
+
+# Unsorted requiredSystemFeatures should be rejected
+# 1. Avoid unnecessary entropy.
+# 2. Permit a clean data model. In practical terms, allow the derivation-meta
+#    flag to be reinjected into the ATerm format for serialization without
+#    having to remember its index in the original ATerm input.
+echo "Testing that unsorted requiredSystemFeatures is rejected..."
+expectStderr 1 nix-instantiate meta.nix -A unsortedFeatures \
+  | grepQuiet "'requiredSystemFeatures' must be sorted when using 'derivation-meta'"
+
 # Test that filtering removes requiredSystemFeatures entirely when it becomes empty
 echo "Testing that empty requiredSystemFeatures is removed entirely..."
 pathWithout=$(nix-store -q "$(nix-instantiate meta.nix -A withoutRequiredSystemFeatures)")

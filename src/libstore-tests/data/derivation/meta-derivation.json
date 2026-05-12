@@ -24,11 +24,7 @@
       "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"
     }
   },
-  "structuredAttrs": {
-    "requiredSystemFeatures": [
-      "derivation-meta"
-    ]
-  },
+  "structuredAttrs": {},
   "system": "x86_64-linux",
   "version": 4
 }
