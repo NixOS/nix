@@ -773,9 +773,35 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     }
 };
 
+struct GitRepoCacheKey
+{
+    std::filesystem::path path;
+    GitRepo::Options options;
+
+    bool operator<(const GitRepoCacheKey & other) const
+    {
+        if (path != other.path) return path < other.path;
+        if (options.create != other.options.create) return options.create < other.options.create;
+        if (options.bare != other.options.bare) return options.bare < other.options.bare;
+        return options.packfilesOnly < other.options.packfilesOnly;
+    }
+};
+
+static Sync<std::map<GitRepoCacheKey, std::shared_ptr<GitRepoImpl>>> gitRepoCache_;
+
 ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Options options)
 {
-    return make_ref<GitRepoImpl>(path, options);
+    GitRepoCacheKey key{path, options};
+    {
+        auto cache(gitRepoCache_.lock());
+        auto it = cache->find(key);
+        if (it != cache->end()) {
+            return ref<GitRepo>(it->second);
+        }
+    }
+    auto repo = make_ref<GitRepoImpl>(path, options);
+    gitRepoCache_.lock()->emplace(key, repo.get_ptr());
+    return repo;
 }
 
 /**
@@ -1521,6 +1547,7 @@ GitRepo::WorkdirInfo GitRepo::getCachedWorkdirInfo(const std::filesystem::path &
 void GitRepo::invalidateWorkdirInfoCache()
 {
     workdirInfoCache_.lock()->clear();
+    gitRepoCache_.lock()->clear();
 }
 
 bool isLegalRefName(const std::string & refName)
