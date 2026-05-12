@@ -7,6 +7,7 @@
 #include "nix/util/users.hh"
 #include "nix/util/util.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/json-utils.hh"
 #include "nix/store/ssh.hh"
 
 #include <git2/attr.h>
@@ -290,7 +291,8 @@ void Fetch::fetch(
 
     const auto obj = objUrls[0];
     try {
-        std::string sha256 = obj.at("oid"); // oid is also the sha256
+        // Use the committed pointer's oid/size for integrity, not server's claim
+        std::string sha256 = pointer->oid;
         std::string ourl = obj.at("actions").at("download").at("href");
         auto authHeader = [&]() -> std::optional<std::string> {
             const auto & download = obj.at("actions").at("download");
@@ -302,7 +304,20 @@ void Fetch::fetch(
                 return std::nullopt;
             return std::string(*authIt);
         }();
-        const uint64_t size = obj.at("size");
+        const uint64_t size = pointer->size;
+
+        auto objOid = getString(valueAt(getObject(obj), "oid"));
+        auto objSize = getUnsigned(valueAt(getObject(obj), "size"));
+        if (objOid != pointer->oid || objSize != pointer->size) {
+            throw Error(
+                "LFS server returned mismatched oid/size for '%s' (got oid=%s size=%d, expected oid=%s size=%d)",
+                pointerFilePath,
+                objOid,
+                objSize,
+                pointer->oid,
+                pointer->size);
+        }
+
         sizeCallback(size);
         downloadToSink(ourl, authHeader, sink, sha256, size);
 
