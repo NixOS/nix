@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/worker-protocol.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/common-protocol.hh"
@@ -132,6 +133,16 @@ StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv)
 
 StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
+    /* Check that the store supports derivation-meta before writing,
+       to produce a clear error instead of a confusing hash mismatch. */
+    if (drv.meta && !hasProtoFeature(WorkerProto::featureDerivationMeta)) {
+        throw Error(
+            "derivation '%s' uses 'derivation-meta', but the store '%s' does not support this feature; "
+            "consider updating it to Nix 2.35, or disable your use of 'derivation-meta' in your derivations",
+            drv.name,
+            config.getHumanReadableURI());
+    }
+
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
     /* In case the derivation is already valid, we bail out early since that's

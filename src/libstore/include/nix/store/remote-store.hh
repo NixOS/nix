@@ -161,6 +161,8 @@ public:
 
     unsigned int getProtocol() override;
 
+    bool hasProtoFeature(std::string_view feature) override;
+
     std::optional<TrustedFlag> isTrustedClient() override;
 
     void flushBadConnections();
@@ -173,6 +175,8 @@ public:
     void shutdownConnections();
 
     struct Connection;
+
+    struct ConnectionHandle;
 
     ref<Connection> openConnectionWrapper();
 
@@ -187,8 +191,6 @@ protected:
     virtual void setOptions(Connection & conn);
 
     void setOptions() override;
-
-    struct ConnectionHandle;
 
     ConnectionHandle getConnection();
 

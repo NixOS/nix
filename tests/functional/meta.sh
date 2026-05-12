@@ -4,14 +4,18 @@ source common.sh
 
 TODO_NixOS
 
-# Requires daemon support for derivation-meta feature (hash modulo)
-requireDaemonNewerThan "2.33"
-
-clearStore
-
-# Enable the experimental feature
 enableFeatures derivation-meta
+
+# When the daemon doesn't support derivation-meta, the client should
+# produce a clear error about missing support.
+if ! isDaemonNewer "2.35"; then
+    expectStderr 1 nix-instantiate meta.nix -A metaDiff1 \
+      | grepQuiet "'derivation-meta', but the store"
+    exit 0
+fi
+
 restartDaemon
+clearStore
 
 # Test the quotient property for derivation-meta
 # See: https://nix.dev/manual/nix/latest/store/derivation/outputs/input-address#hash-quotient-drv
