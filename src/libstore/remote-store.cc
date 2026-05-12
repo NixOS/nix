@@ -321,6 +321,16 @@ std::optional<StorePath> RemoteStore::queryPathFromHashPart(const std::string & 
     return WorkerProto::Serialise<std::optional<StorePath>>::read(*this, *conn);
 }
 
+void RemoteStore::bumpLastUsageTime(const StorePath & path)
+{
+    auto conn(getConnection());
+    if (conn->protoVersion.features.contains(WorkerProto::featurePathLastUsageTime)) {
+        conn->to << WorkerProto::Op::BumpLastUsageTime;
+        WorkerProto::write(*this, *conn, path);
+        conn.processStderr();
+    }
+}
+
 ref<const ValidPathInfo> RemoteStore::addCAToStore(
     Source & dump,
     std::string_view name,

@@ -140,8 +140,10 @@ StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
        to avoid sending a lot of drv contents to the daemon. */
     addTempRoot(path);
 
-    if (isValidPath(path) && !repair)
+    if (isValidPath(path) && !repair) {
+        bumpLastUsageTime(path);
         return path;
+    }
 
     StringSource s{contents};
     auto path2 = addToStoreFromDump(
