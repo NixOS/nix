@@ -43,7 +43,9 @@ struct Signature
 
 enum KeyType {
     Ed25519,
+    MLDSA44,
     MLDSA65,
+    MLDSA87,
 };
 
 KeyType parseKeyType(std::string_view s);

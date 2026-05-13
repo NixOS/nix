@@ -130,4 +130,6 @@ done
 }
 
 runTests ed25519
+runTests ml-dsa-44
 runTests ml-dsa-65
+runTests ml-dsa-87
