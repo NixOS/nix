@@ -1,5 +1,6 @@
 #include "nix/util/args.hh"
 #include "nix/store/content-address.hh"
+#include "nix/util/file-content-address.hh"
 #include "nix/util/split.hh"
 #include "nix/util/json-utils.hh"
 
@@ -128,6 +129,20 @@ FileIngestionMethod ContentAddressMethod::getFileIngestionMethod() const
         return FileIngestionMethod::Git;
     case ContentAddressMethod::Raw::Text:
         return FileIngestionMethod::Flat;
+    default:
+        assert(false);
+    }
+}
+
+FileSerialisationMethod ContentAddressMethod::getFileSerialisationMethod() const
+{
+    switch (raw) {
+    case ContentAddressMethod::Raw::Flat:
+    case ContentAddressMethod::Raw::Text:
+        return FileSerialisationMethod::Flat;
+    case ContentAddressMethod::Raw::NixArchive:
+    case ContentAddressMethod::Raw::Git:
+        return FileSerialisationMethod::NixArchive;
     default:
         assert(false);
     }

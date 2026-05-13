@@ -1,4 +1,5 @@
 #include "nix/store/daemon.hh"
+#include "nix/util/file-content-address.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
@@ -11,6 +12,7 @@
 #include "nix/store/indirect-root-store.hh"
 #include "nix/store/remote-store.hh"
 #include "nix/store/path-with-outputs.hh"
+#include "nix/store/submit-store.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
@@ -1014,6 +1016,37 @@ static void performOp(
         break;
     }
 
+    case WorkerProto::Op::AddToStoreScanning: {
+        auto name = readString(conn.from);
+        auto camStr = readString(conn.from);
+
+        experimentalFeatureSettings.require(Xp::DynamicDerivations);
+
+        if (!conn.protoVersion.features.contains(WorkerProto::featureAddToStoreScanning))
+            throw Error("Adding to store with scanning was requested, but not supported in negotiated protocol");
+
+        if (!recursive)
+            throw Error("AddToStoreScanning only valid inside a `recursive-nix` derivation builder");
+
+        auto & submitStore = require<SubmitStore>(*store);
+
+        logger->startWork();
+        auto pathInfo = [&]() {
+            // NB: FramedSource must be out of scope before logger->stopWork();
+            // FIXME: this means that if there is an error
+            // half-way through, the client will keep sending
+            // data, since we haven't sent it the error yet.
+            auto [contentAddressMethod, hashAlgo] = ContentAddressMethod::parseWithAlgo(camStr);
+            FramedSource source(conn.from);
+            FileSerialisationMethod dumpMethod = contentAddressMethod.getFileSerialisationMethod();
+            return submitStore.addToStoreScanning(source, name, dumpMethod, contentAddressMethod, hashAlgo);
+        }();
+        logger->stopWork();
+
+        WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
@@ -1039,8 +1072,10 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 
     /* Exchange the greeting. */
     auto localVersion = WorkerProto::latest;
-    if (recursive)
+    if (recursive) {
         localVersion.features.insert(std::string{WorkerProto::featureDisableSetOptions});
+        localVersion.features.insert(std::string{WorkerProto::featureAddToStoreScanning});
+    }
 
     WorkerProto::BasicServerConnection conn;
     conn.protoVersion = WorkerProto::BasicServerConnection::handshake(to, from, localVersion);

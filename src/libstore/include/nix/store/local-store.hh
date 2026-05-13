@@ -304,6 +304,19 @@ public:
         const StorePathSet & references,
         RepairFlag repair) override;
 
+    // Designed to be used from RestrictedStore,
+    // allows filtering the references while scanning.
+    // Not an entirely separate function in order to reduce duplication
+    StorePath addToStoreFromDump(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
+        HashAlgorithm hashAlgo,
+        const StorePathSet & references,
+        RepairFlag repair,
+        bool filterReferences);
+
     void addTempRoot(const StorePath & path) override;
 
 private:
