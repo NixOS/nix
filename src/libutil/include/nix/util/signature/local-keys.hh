@@ -90,6 +90,12 @@ struct SecretKey : Key
 
     PublicKey toPublicKey() const;
 
+    /**
+     * Return a PEM PKCS#8 encoding of this secret key. The Nix-specific
+     * key name is not included. Only ML-DSA keys are supported.
+     */
+    std::string toPEM() const;
+
     static SecretKey generate(std::string_view name, KeyType type);
 
 private:
@@ -116,6 +122,13 @@ struct PublicKey : Key
      * @param sig the raw signature bytes (not Base64 encoded).
      */
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
+
+    /**
+     * Return a PEM SubjectPublicKeyInfo encoding of this public key.
+     * The Nix-specific key name is not included. Only ML-DSA keys are
+     * supported.
+     */
+    std::string toPEM() const;
 
 private:
     PublicKey(KeyType type, std::string_view name, std::string && key)

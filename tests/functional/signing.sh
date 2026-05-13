@@ -16,6 +16,32 @@ nix key generate-secret --key-name cache2.example.org --key-type "$keyType" > "$
 nix key convert-secret-to-public < "$TEST_ROOT"/sk2 > "$TEST_ROOT"/pk2
 pk2=$(cat "$TEST_ROOT"/pk2)
 
+# Test PEM conversion.
+if [[ "$keyType" == "ed25519" ]]; then
+    # Ed25519 keys cannot be converted to PEM.
+    expectStderr 1 nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 | grepQuiet "Ed25519 secret keys cannot be converted to PEM"
+    expectStderr 1 nix key convert-public-to-pem < "$TEST_ROOT"/pk1 | grepQuiet "Ed25519 public keys cannot be converted to PEM"
+else
+    # ML-DSA-* keys can be converted to PEM.
+    nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 > "$TEST_ROOT"/sk1.pem
+    grepQuiet "^-----BEGIN PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
+    grepQuiet "^-----END PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
+
+    nix key convert-public-to-pem < "$TEST_ROOT"/pk1 > "$TEST_ROOT"/pk1.pem
+    grepQuiet "^-----BEGIN PUBLIC KEY-----$" "$TEST_ROOT"/pk1.pem
+    grepQuiet "^-----END PUBLIC KEY-----$" "$TEST_ROOT"/pk1.pem
+
+    # If openssl is available, verify that it can parse the PEM keys.
+    if type -p openssl > /dev/null; then
+        openssl pkey -text -noout < "$TEST_ROOT"/sk1.pem
+        openssl pkey -pubin -text -noout < "$TEST_ROOT"/pk1.pem
+    fi
+
+    # Feeding a secret key to convert-public-to-pem (or vice versa) should fail.
+    expect 1 nix key convert-public-to-pem < "$TEST_ROOT"/sk1
+    expect 1 nix key convert-secret-to-pem < "$TEST_ROOT"/pk1
+fi
+
 # Build a path.
 outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "$TEST_ROOT/sk1 $TEST_ROOT/sk2")
 

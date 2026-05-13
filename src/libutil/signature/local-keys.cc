@@ -18,6 +18,7 @@ namespace {
 using AutoEVP_PKEY = std::unique_ptr<EVP_PKEY, Deleter<EVP_PKEY_free>>;
 using AutoEVP_PKEY_CTX = std::unique_ptr<EVP_PKEY_CTX, Deleter<EVP_PKEY_CTX_free>>;
 using AutoEVP_MD_CTX = std::unique_ptr<EVP_MD_CTX, Deleter<EVP_MD_CTX_free>>;
+using AutoBIO = std::unique_ptr<BIO, Deleter<BIO_free>>;
 
 /**
  * Parse a colon-separated string where the second part is Base64-encoded.
@@ -293,6 +294,35 @@ PublicKey SecretKey::toPublicKey() const
     }
 }
 
+std::string SecretKey::toPEM() const
+{
+    switch (type) {
+
+    case KeyType::Ed25519:
+        throw Error("Ed25519 secret keys cannot be converted to PEM");
+
+    case KeyType::MLDSA44:
+    case KeyType::MLDSA65:
+    case KeyType::MLDSA87: {
+        auto pkey = parsePrivateKey(key, type);
+
+        AutoBIO bio(BIO_new(BIO_s_mem()));
+        if (!bio)
+            throw Error("BIO_new failed");
+
+        if (PEM_write_bio_PrivateKey(bio.get(), pkey.get(), nullptr, nullptr, 0, nullptr, nullptr) <= 0)
+            throw Error("PEM_write_bio_PrivateKey failed");
+
+        char * data = nullptr;
+        long len = BIO_get_mem_data(bio.get(), &data);
+        return std::string(data, len);
+    }
+
+    default:
+        unreachable();
+    }
+}
+
 SecretKey SecretKey::generate(std::string_view name, KeyType type)
 {
     switch (type) {
@@ -396,6 +426,35 @@ bool PublicKey::verifyDetachedAnon(std::string_view data, const Signature & sig)
                    (const unsigned char *) data.data(),
                    data.size())
                == 1;
+    }
+
+    default:
+        unreachable();
+    }
+}
+
+std::string PublicKey::toPEM() const
+{
+    switch (type) {
+
+    case KeyType::Ed25519:
+        throw Error("Ed25519 public keys cannot be converted to PEM");
+
+    case KeyType::MLDSA44:
+    case KeyType::MLDSA65:
+    case KeyType::MLDSA87: {
+        auto pkey = parsePublicKey(key, type);
+
+        AutoBIO bio(BIO_new(BIO_s_mem()));
+        if (!bio)
+            throw Error("BIO_new failed");
+
+        if (PEM_write_bio_PUBKEY(bio.get(), pkey.get()) <= 0)
+            throw Error("PEM_write_bio_PUBKEY failed");
+
+        char * data = nullptr;
+        long len = BIO_get_mem_data(bio.get(), &data);
+        return std::string(data, len);
     }
 
     default:

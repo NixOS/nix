@@ -210,6 +210,50 @@ struct CmdKeyConvertSecretToPublic : Command
     }
 };
 
+struct CmdKeyConvertSecretToPem : Command
+{
+    std::string description() override
+    {
+        return "convert a secret key read from standard input to PEM PKCS#8 format";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "key-convert-secret-to-pem.md"
+            ;
+    }
+
+    void run() override
+    {
+        SecretKey secretKey(drainFD(STDIN_FILENO));
+        logger->stop();
+        writeFull(getStandardOutput(), secretKey.toPEM());
+    }
+};
+
+struct CmdKeyConvertPublicToPem : Command
+{
+    std::string description() override
+    {
+        return "convert a public key read from standard input to PEM SubjectPublicKeyInfo format";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "key-convert-public-to-pem.md"
+            ;
+    }
+
+    void run() override
+    {
+        PublicKey publicKey(drainFD(STDIN_FILENO));
+        logger->stop();
+        writeFull(getStandardOutput(), publicKey.toPEM());
+    }
+};
+
 struct CmdKey : NixMultiCommand
 {
     CmdKey()
@@ -218,6 +262,8 @@ struct CmdKey : NixMultiCommand
               {
                   {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
                   {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+                  {"convert-secret-to-pem", []() { return make_ref<CmdKeyConvertSecretToPem>(); }},
+                  {"convert-public-to-pem", []() { return make_ref<CmdKeyConvertPublicToPem>(); }},
               })
     {
     }

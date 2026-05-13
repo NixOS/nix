@@ -24,7 +24,7 @@ R""(
 
 # Description
 
-This command generates a new Ed25519 secret key for signing store
+This command generates a new secret key for signing store
 paths and prints it on standard output. Use `nix key
 convert-secret-to-public` to get the corresponding public key for
 verifying signed store paths.
@@ -36,10 +36,15 @@ the host name of your cache (e.g.  `cache.example.org`) with a suffix
 denoting the number of the key (to be incremented every time you need
 to revoke a key).
 
+Nix supports keys in the following formats (specified using the `--key-type` option):
+
+* `ed25519` (libsodium). This is the default key type. It produces compact keys and signatures, but may not be resistant to attacks using quantum computers.
+* `ml-dsa-44`, `ml-dsa-65`, `ml-dsa-87` (OpenSSL). These generate much larger keys and signatures, but are believed to be resistant to quantum attacks.
+
 # Format
 
 Both secret and public keys are represented as the key name followed
-by a base-64 encoding of the Ed25519 key data, e.g.
+by a base-64 encoding of the key data, e.g.
 
 ```
 cache.example.org-0:E7lAO+MsPwTFfPXsdPtW8GKui/5ho4KQHVcAGnX+Tti1V4dUxoVoqLyWJ4YESuZJwQ67GVIksDt47og+tPVUZw==
