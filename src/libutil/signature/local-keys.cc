@@ -208,6 +208,16 @@ struct Ed25519SecretKey : SecretKey
         assert(key.size() == crypto_sign_SECRETKEYBYTES);
     }
 
+    static std::unique_ptr<Ed25519SecretKey> generate(std::string_view name)
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        unsigned char sk[crypto_sign_SECRETKEYBYTES];
+        if (crypto_sign_keypair(pk, sk) != 0)
+            throw Error("key generation failed");
+
+        return std::make_unique<Ed25519SecretKey>(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    }
+
     Signature signDetached(std::string_view data) const override
     {
         unsigned char sig[crypto_sign_BYTES];
@@ -284,6 +294,31 @@ struct OpenSSLSecretKey : SecretKey
         , pkey(std::move(pkey))
     {
         assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
+    }
+
+    static std::unique_ptr<OpenSSLSecretKey> generate(std::string_view name, KeyType type)
+    {
+        auto typeS = toOpenSSLKeyType(type);
+        AutoEVP_PKEY_CTX ctx(EVP_PKEY_CTX_new_from_name(nullptr, typeS, nullptr));
+        if (!ctx)
+            throw Error("EVP_PKEY_CTX_new_from_name failed for '%s'", typeS);
+
+        if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
+            throw Error("EVP_PKEY_keygen_init failed");
+
+        EVP_PKEY * rawPkey = nullptr;
+        if (EVP_PKEY_generate(ctx.get(), &rawPkey) <= 0)
+            throw Error("EVP_PKEY_generate failed");
+        AutoEVP_PKEY pkey(rawPkey);
+
+        unsigned char * derBuf = nullptr;
+        int derLen = i2d_PrivateKey(pkey.get(), &derBuf);
+        if (derLen < 0)
+            throw Error("i2d_PrivateKey failed");
+        std::string der((const char *) derBuf, derLen);
+        OPENSSL_free(derBuf);
+
+        return std::make_unique<OpenSSLSecretKey>(type, name, std::move(der), std::move(pkey));
     }
 
     Signature signDetached(std::string_view data) const override
@@ -383,38 +418,12 @@ std::unique_ptr<SecretKey> SecretKey::generate(std::string_view name, KeyType ty
     switch (type) {
 
     case KeyType::Ed25519:
-        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-        unsigned char sk[crypto_sign_SECRETKEYBYTES];
-        if (crypto_sign_keypair(pk, sk) != 0)
-            throw Error("key generation failed");
-
-        return std::make_unique<Ed25519SecretKey>(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+        return Ed25519SecretKey::generate(name);
 
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
-    case KeyType::MLDSA87: {
-        auto typeS = toOpenSSLKeyType(type);
-        AutoEVP_PKEY_CTX ctx(EVP_PKEY_CTX_new_from_name(nullptr, typeS, nullptr));
-        if (!ctx)
-            throw Error("EVP_PKEY_CTX_new_from_name failed for '%s'", typeS);
-
-        if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
-            throw Error("EVP_PKEY_keygen_init failed");
-
-        EVP_PKEY * rawPkey = nullptr;
-        if (EVP_PKEY_generate(ctx.get(), &rawPkey) <= 0)
-            throw Error("EVP_PKEY_generate failed");
-        AutoEVP_PKEY pkey(rawPkey);
-
-        unsigned char * derBuf = nullptr;
-        int derLen = i2d_PrivateKey(pkey.get(), &derBuf);
-        if (derLen < 0)
-            throw Error("i2d_PrivateKey failed");
-        std::string der((const char *) derBuf, derLen);
-        OPENSSL_free(derBuf);
-
-        return std::make_unique<OpenSSLSecretKey>(type, name, std::move(der), std::move(pkey));
-    }
+    case KeyType::MLDSA87:
+        return OpenSSLSecretKey::generate(name, type);
 
     default:
         unreachable();
