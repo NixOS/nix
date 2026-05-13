@@ -54,8 +54,8 @@ struct LocalSigner : Signer
 
 private:
 
-    std::unique_ptr<SecretKey> privateKey;
-    PublicKey publicKey;
+    const std::unique_ptr<SecretKey> privateKey;
+    const std::unique_ptr<PublicKey> publicKey;
 };
 
 } // namespace nix

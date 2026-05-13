@@ -52,26 +52,15 @@ KeyType parseKeyType(std::string_view s);
 
 struct Key
 {
-    KeyType type;
-    std::string name;
-    std::string key;
+    const std::string name;
+    const std::string key;
 
     std::string to_string() const;
 
 protected:
 
-    /**
-     * Construct Key from a string in the format
-     * ‘<name>:<key-in-base64>’.
-     *
-     * @param sensitiveValue Avoid displaying the raw Base64 in error
-     * messages to avoid leaking private keys.
-     */
-    Key(std::string_view s, bool sensitiveValue);
-
-    Key(KeyType type, std::string_view name, std::string && key)
-        : type(type)
-        , name(name)
+    Key(std::string_view name, std::string && key)
+        : name(name)
         , key(std::move(key))
     {
     }
@@ -92,7 +81,7 @@ struct SecretKey : Key
      */
     virtual Signature signDetached(std::string_view s) const;
 
-    virtual PublicKey toPublicKey() const;
+    virtual std::unique_ptr<PublicKey> toPublicKey() const;
 
     /**
      * Return a PEM PKCS#8 encoding of this secret key. The Nix-specific
@@ -100,12 +89,16 @@ struct SecretKey : Key
      */
     virtual std::string toPEM() const;
 
-    static SecretKey generate(std::string_view name, KeyType type);
+    static std::unique_ptr<SecretKey> generate(std::string_view name, KeyType type);
 };
 
 struct PublicKey : Key
 {
-    PublicKey(std::string_view data);
+    using Key::Key;
+
+    virtual ~PublicKey() {};
+
+    static std::unique_ptr<PublicKey> parse(std::string_view s);
 
     /**
      * @return true iff `sig` and this key's names match, and `sig` is a
@@ -119,25 +112,20 @@ struct PublicKey : Key
      *
      * @param sig the raw signature bytes (not Base64 encoded).
      */
-    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
+    virtual bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
 
     /**
      * Return a PEM SubjectPublicKeyInfo encoding of this public key.
      * The Nix-specific key name is not included. Only ML-DSA keys are
      * supported.
      */
-    std::string toPEM() const;
-
-    PublicKey(KeyType type, std::string_view name, std::string && key)
-        : Key(type, name, std::move(key))
-    {
-    }
+    virtual std::string toPEM() const;
 };
 
 /**
  * Map from key names to public keys
  */
-typedef std::map<std::string, PublicKey> PublicKeys;
+typedef std::map<std::string, std::unique_ptr<PublicKey>> PublicKeys;
 
 /**
  * @return true iff ‘sig’ is a correct signature over ‘data’ using one

@@ -183,7 +183,7 @@ struct CmdKeyGenerateSecret : Command
     void run() override
     {
         logger->stop();
-        writeFull(getStandardOutput(), SecretKey::generate(keyName, parseKeyType(keyType)).to_string());
+        writeFull(getStandardOutput(), SecretKey::generate(keyName, parseKeyType(keyType))->to_string());
     }
 };
 
@@ -204,7 +204,7 @@ struct CmdKeyConvertSecretToPublic : Command
     void run() override
     {
         logger->stop();
-        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPublicKey().to_string());
+        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPublicKey()->to_string());
     }
 };
 
@@ -245,9 +245,8 @@ struct CmdKeyConvertPublicToPem : Command
 
     void run() override
     {
-        PublicKey publicKey(drainFD(STDIN_FILENO));
         logger->stop();
-        writeFull(getStandardOutput(), publicKey.toPEM());
+        writeFull(getStandardOutput(), PublicKey::parse(drainFD(STDIN_FILENO))->toPEM());
     }
 };
 

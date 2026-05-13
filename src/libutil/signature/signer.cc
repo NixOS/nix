@@ -18,7 +18,7 @@ Signature LocalSigner::signDetached(std::string_view s) const
 
 const PublicKey & LocalSigner::getPublicKey()
 {
-    return publicKey;
+    return *publicKey;
 }
 
 } // namespace nix
