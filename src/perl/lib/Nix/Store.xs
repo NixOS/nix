@@ -301,7 +301,7 @@ SV * convertHash(char * algo, char * s, int toBase32)
 SV * signString(char * secretKey_, char * msg)
     PPCODE:
         try {
-            auto sig = SecretKey(secretKey_).signDetached(msg).to_string();
+            auto sig = SecretKey::parse(secretKey_)->signDetached(msg).to_string();
             XPUSHs(sv_2mortal(newSVpv(sig.c_str(), sig.size())));
         } catch (Error & e) {
             croak("%s", e.what());

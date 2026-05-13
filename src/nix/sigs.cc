@@ -121,8 +121,7 @@ struct CmdSign : StorePathsCommand
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
-        SecretKey secretKey(readFile(secretKeyFile));
-        LocalSigner signer(std::move(secretKey));
+        LocalSigner signer(SecretKey::parse(readFile(secretKeyFile)));
 
         size_t added{0};
 
@@ -204,9 +203,8 @@ struct CmdKeyConvertSecretToPublic : Command
 
     void run() override
     {
-        SecretKey secretKey(drainFD(STDIN_FILENO));
         logger->stop();
-        writeFull(getStandardOutput(), secretKey.toPublicKey().to_string());
+        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPublicKey().to_string());
     }
 };
 
@@ -226,9 +224,8 @@ struct CmdKeyConvertSecretToPem : Command
 
     void run() override
     {
-        SecretKey secretKey(drainFD(STDIN_FILENO));
         logger->stop();
-        writeFull(getStandardOutput(), secretKey.toPEM());
+        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPEM());
     }
 };
 

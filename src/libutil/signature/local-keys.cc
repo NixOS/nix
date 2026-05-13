@@ -192,29 +192,31 @@ std::string Key::to_string() const
     return serializeColonBase64(name, key);
 }
 
-SecretKey::SecretKey(std::string_view s)
-    : Key{s, true}
+Signature SecretKey::signDetached(std::string_view s) const
 {
-    if (key.size() == crypto_sign_SECRETKEYBYTES)
-        type = KeyType::Ed25519;
-    else if (auto pkey = parsePrivateKey(key)) {
-        if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
-            type = KeyType::MLDSA44;
-        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
-            type = KeyType::MLDSA65;
-        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
-            type = KeyType::MLDSA87;
-        else
-            throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
-    } else
-        throw Error("secret key is not valid");
+    throw Error("signing is not implemented for this key type");
 }
 
-Signature SecretKey::signDetached(std::string_view data) const
+PublicKey SecretKey::toPublicKey() const
 {
-    switch (type) {
+    throw Error("conversion to public key is not implemented for this key type");
+}
 
-    case KeyType::Ed25519:
+std::string SecretKey::toPEM() const
+{
+    throw Error("conversion to PEM is not implemented for this key type");
+}
+
+struct Ed25519SecretKey : SecretKey
+{
+    Ed25519SecretKey(std::string_view name, std::string && _key)
+        : SecretKey(KeyType::Ed25519, name, std::move(_key))
+    {
+        assert(key.size() == crypto_sign_SECRETKEYBYTES);
+    }
+
+    Signature signDetached(std::string_view data) const override
+    {
         unsigned char sig[crypto_sign_BYTES];
         unsigned long long sigLen;
         crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
@@ -222,10 +224,26 @@ Signature SecretKey::signDetached(std::string_view data) const
             .keyName = name,
             .sig = std::string((char *) sig, sigLen),
         };
+    }
 
-    case KeyType::MLDSA44:
-    case KeyType::MLDSA65:
-    case KeyType::MLDSA87: {
+    PublicKey toPublicKey() const override
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
+        return PublicKey(type, name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    }
+};
+
+struct OpenSSLSecretKey : SecretKey
+{
+    OpenSSLSecretKey(KeyType type, std::string_view name, std::string && key)
+        : SecretKey(type, name, std::move(key))
+    {
+        assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
+    }
+
+    Signature signDetached(std::string_view data) const override
+    {
         auto pkey = parsePrivateKey(key, type);
 
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
@@ -261,23 +279,8 @@ Signature SecretKey::signDetached(std::string_view data) const
         };
     }
 
-    default:
-        unreachable();
-    }
-}
-
-PublicKey SecretKey::toPublicKey() const
-{
-    switch (type) {
-
-    case KeyType::Ed25519:
-        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-        crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
-        return PublicKey(type, name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
-
-    case KeyType::MLDSA44:
-    case KeyType::MLDSA65:
-    case KeyType::MLDSA87: {
+    PublicKey toPublicKey() const override
+    {
         auto pkey = parsePrivateKey(key, type);
 
         unsigned char * derBuf = nullptr;
@@ -290,21 +293,8 @@ PublicKey SecretKey::toPublicKey() const
         return PublicKey(type, name, std::move(der));
     }
 
-    default:
-        unreachable();
-    }
-}
-
-std::string SecretKey::toPEM() const
-{
-    switch (type) {
-
-    case KeyType::Ed25519:
-        throw Error("Ed25519 secret keys cannot be converted to PEM");
-
-    case KeyType::MLDSA44:
-    case KeyType::MLDSA65:
-    case KeyType::MLDSA87: {
+    std::string toPEM() const override
+    {
         auto pkey = parsePrivateKey(key, type);
 
         AutoBIO bio(BIO_new(BIO_s_mem()));
@@ -318,9 +308,33 @@ std::string SecretKey::toPEM() const
         long len = BIO_get_mem_data(bio.get(), &data);
         return std::string(data, len);
     }
+};
 
-    default:
-        unreachable();
+std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
+{
+    try {
+        auto [name, key] = parseColonBase64(s, "key");
+
+        if (key.size() == crypto_sign_SECRETKEYBYTES)
+            return std::make_unique<Ed25519SecretKey>(name, std::move(key));
+        else if (auto pkey = parsePrivateKey(key)) {
+            KeyType type;
+            if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
+                type = KeyType::MLDSA44;
+            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
+                type = KeyType::MLDSA65;
+            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
+                type = KeyType::MLDSA87;
+            else
+                throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
+            return std::make_unique<OpenSSLSecretKey>(type, name, std::move(key));
+        } else
+            throw Error("secret key is not valid");
+
+    } catch (Error & e) {
+        // Don't show the entire key for security.
+        e.addTrace({}, "while decoding key '%s…'", s.substr(0, 32));
+        throw;
     }
 }
 
@@ -334,7 +348,7 @@ SecretKey SecretKey::generate(std::string_view name, KeyType type)
         if (crypto_sign_keypair(pk, sk) != 0)
             throw Error("key generation failed");
 
-        return SecretKey(KeyType::Ed25519, name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+        return Ed25519SecretKey(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
 
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
@@ -359,7 +373,7 @@ SecretKey SecretKey::generate(std::string_view name, KeyType type)
         std::string der((const char *) derBuf, derLen);
         OPENSSL_free(derBuf);
 
-        return SecretKey(type, name, std::move(der));
+        return OpenSSLSecretKey(type, name, std::move(der));
     }
 
     default:

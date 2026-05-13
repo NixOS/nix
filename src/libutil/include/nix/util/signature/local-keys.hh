@@ -81,28 +81,26 @@ struct PublicKey;
 
 struct SecretKey : Key
 {
-    SecretKey(std::string_view s);
+    using Key::Key;
+
+    virtual ~SecretKey() {};
+
+    static std::unique_ptr<SecretKey> parse(std::string_view s);
 
     /**
      * Return a detached signature of the given string.
      */
-    Signature signDetached(std::string_view s) const;
+    virtual Signature signDetached(std::string_view s) const;
 
-    PublicKey toPublicKey() const;
+    virtual PublicKey toPublicKey() const;
 
     /**
      * Return a PEM PKCS#8 encoding of this secret key. The Nix-specific
      * key name is not included. Only ML-DSA keys are supported.
      */
-    std::string toPEM() const;
+    virtual std::string toPEM() const;
 
     static SecretKey generate(std::string_view name, KeyType type);
-
-private:
-    SecretKey(KeyType type, std::string_view name, std::string && key)
-        : Key(type, name, std::move(key))
-    {
-    }
 };
 
 struct PublicKey : Key
@@ -130,12 +128,10 @@ struct PublicKey : Key
      */
     std::string toPEM() const;
 
-private:
     PublicKey(KeyType type, std::string_view name, std::string && key)
         : Key(type, name, std::move(key))
     {
     }
-    friend struct SecretKey;
 };
 
 /**

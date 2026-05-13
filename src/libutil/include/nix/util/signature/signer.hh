@@ -46,7 +46,7 @@ using Signers = std::map<std::string, Signer *>;
  */
 struct LocalSigner : Signer
 {
-    LocalSigner(SecretKey && privateKey);
+    LocalSigner(std::unique_ptr<SecretKey> && privateKey);
 
     Signature signDetached(std::string_view s) const override;
 
@@ -54,7 +54,7 @@ struct LocalSigner : Signer
 
 private:
 
-    SecretKey privateKey;
+    std::unique_ptr<SecretKey> privateKey;
     PublicKey publicKey;
 };
 

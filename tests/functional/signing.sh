@@ -19,7 +19,7 @@ pk2=$(cat "$TEST_ROOT"/pk2)
 # Test PEM conversion.
 if [[ "$keyType" == "ed25519" ]]; then
     # Ed25519 keys cannot be converted to PEM.
-    expectStderr 1 nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 | grepQuiet "Ed25519 secret keys cannot be converted to PEM"
+    expectStderr 1 nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 | grepQuiet "conversion to PEM is not implemented for this key type"
     expectStderr 1 nix key convert-public-to-pem < "$TEST_ROOT"/pk1 | grepQuiet "Ed25519 public keys cannot be converted to PEM"
 else
     # ML-DSA-* keys can be converted to PEM.

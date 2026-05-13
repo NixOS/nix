@@ -17,8 +17,8 @@ PublicKeys getDefaultPublicKeys()
 
     for (const auto & secretKeyFile : settings.secretKeyFiles.get()) {
         try {
-            SecretKey secretKey(readFile(secretKeyFile));
-            publicKeys.emplace(secretKey.name, secretKey.toPublicKey());
+            auto secretKey = SecretKey::parse(readFile(secretKeyFile));
+            publicKeys.emplace(secretKey->name, secretKey->toPublicKey());
         } catch (SystemError & e) {
             /* Ignore unreadable key files. That's normal in a
                multi-user installation. */
