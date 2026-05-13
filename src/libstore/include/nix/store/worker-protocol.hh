@@ -263,6 +263,7 @@ enum struct WorkerProto::Op : uint64_t {
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
     SubmitOutput = 1000, // Only used within derivations with feature
+    AddToStoreScanning = 1001,
 };
 
 struct WorkerProto::ClientHandshakeInfo

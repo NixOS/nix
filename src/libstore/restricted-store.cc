@@ -4,6 +4,7 @@
 #include "nix/util/callback.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/local-store.hh"
+#include "nix/util/repair-flag.hh"
 
 namespace nix {
 
@@ -114,6 +115,13 @@ public:
     void registerDrvOutput(const Realisation & info) override;
 
     void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
+
+    ref<const ValidPathInfo> addToStoreScanning(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
+        HashAlgorithm hashAlgo) override;
 
     void queryRealisationUncached(
         const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
@@ -260,6 +268,19 @@ void RestrictedStore::registerDrvOutput(const Realisation & info)
 void RestrictedStore::submitOutput(const SingleDerivedPath & path, const OutputName & output)
 {
     this->goal.submitOutput(path, output);
+}
+
+ref<const ValidPathInfo> RestrictedStore::addToStoreScanning(
+    Source & dump,
+    std::string_view name,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
+    HashAlgorithm hashAlgo)
+{
+    auto path = next->addToStoreFromDump(
+        dump, name, dumpMethod, hashMethod, hashAlgo, queryAllValidPaths(), RepairFlag::NoRepair, true);
+
+    return queryPathInfo(path);
 }
 
 void RestrictedStore::queryRealisationUncached(
