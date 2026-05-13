@@ -279,7 +279,7 @@ ref<const ValidPathInfo> RestrictedStore::addToStoreScanning(
 {
     auto path = next->addToStoreFromDump(
         dump, name, dumpMethod, hashMethod, hashAlgo, queryAllValidPaths(), RepairFlag::NoRepair, true);
-
+    goal.addDependency(path);
     return queryPathInfo(path);
 }
 
