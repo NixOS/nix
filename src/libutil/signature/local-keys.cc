@@ -64,6 +64,7 @@ static const char * toOpenSSLKeyType(KeyType type)
     case KeyType::MLDSA87:
         return "ML-DSA-87";
     case KeyType::Ed25519:
+    default:
         throw Error("key type is not supported by OpenSSL");
     }
 }
