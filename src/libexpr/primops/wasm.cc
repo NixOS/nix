@@ -460,7 +460,7 @@ struct NixWasmInstance
         while (!args.empty()) {
             auto arg = &getValue(args[0]);
             auto tmp = state.allocValue();
-            tmp->mkApp(res, {arg});
+            tmp->mkApp(res, arg);
             res = tmp;
             args = args.subspan(1);
         }
