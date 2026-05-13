@@ -53,30 +53,6 @@ std::string serializeColonBase64(std::string_view name, std::string_view data)
     return std::string(name) + ":" + base64::encode(std::as_bytes(std::span<const char>{data.data(), data.size()}));
 }
 
-/**
- * DER encodings of the ML-DSA algorithm OIDs as they appear inside a
- * PKCS#8 `PrivateKeyInfo` or `SubjectPublicKeyInfo`:
- *
- * - ML-DSA-44: `2.16.840.1.101.3.4.3.17`
- * - ML-DSA-65: `2.16.840.1.101.3.4.3.18`
- * - ML-DSA-87: `2.16.840.1.101.3.4.3.19`
- */
-constexpr std::string_view mlDsa44OidDer = "\x06\x09\x60\x86\x48\x01\x65\x03\x04\x03\x11";
-constexpr std::string_view mlDsa65OidDer = "\x06\x09\x60\x86\x48\x01\x65\x03\x04\x03\x12";
-constexpr std::string_view mlDsa87OidDer = "\x06\x09\x60\x86\x48\x01\x65\x03\x04\x03\x13";
-
-std::optional<KeyType> isMLDSA(std::string_view data)
-{
-    auto prefix = data.substr(0, 64);
-    if (prefix.find(mlDsa44OidDer) != std::string_view::npos)
-        return KeyType::MLDSA44;
-    if (prefix.find(mlDsa65OidDer) != std::string_view::npos)
-        return KeyType::MLDSA65;
-    if (prefix.find(mlDsa87OidDer) != std::string_view::npos)
-        return KeyType::MLDSA87;
-    return std::nullopt;
-}
-
 static const char * toOpenSSLKeyType(KeyType type)
 {
     switch (type) {
@@ -94,12 +70,18 @@ static const char * toOpenSSLKeyType(KeyType type)
 /**
  * Parse a DER-encoded PKCS#8 `PrivateKeyInfo` and verify that the key is ML-DSA-*.
  */
-AutoEVP_PKEY parseMLDSAPrivateKey(std::string_view der, KeyType type)
+static AutoEVP_PKEY parsePrivateKey(std::string_view der)
 {
     auto p = (const unsigned char *) der.data();
     AutoEVP_PKEY pkey(d2i_AutoPrivateKey(nullptr, &p, der.size()));
+    return pkey;
+}
+
+static AutoEVP_PKEY parsePrivateKey(std::string_view der, KeyType type)
+{
+    auto pkey = parsePrivateKey(der);
     if (!pkey)
-        throw Error("d2i_AutoPrivateKey failed for ML-DSA key");
+        throw Error("private key is not PKCS#8-encoded");
 
     auto typeS = toOpenSSLKeyType(type);
 
@@ -112,12 +94,16 @@ AutoEVP_PKEY parseMLDSAPrivateKey(std::string_view der, KeyType type)
 /**
  * Parse a DER-encoded `SubjectPublicKeyInfo` and verify that the key is ML-DSA-*.
  */
-AutoEVP_PKEY parseMLDSAPublicKey(std::string_view der, KeyType type)
+static AutoEVP_PKEY parsePublicKey(std::string_view der)
 {
     auto p = (const unsigned char *) der.data();
     AutoEVP_PKEY pkey(d2i_PUBKEY(nullptr, &p, der.size()));
-    if (!pkey)
-        throw Error("d2i_PUBKEY failed for ML-DSA key");
+    return pkey;
+}
+
+static AutoEVP_PKEY parsePublicKey(std::string_view der, KeyType type)
+{
+    auto pkey = parsePublicKey(der);
 
     auto typeS = toOpenSSLKeyType(type);
 
@@ -209,9 +195,16 @@ SecretKey::SecretKey(std::string_view s)
 {
     if (key.size() == crypto_sign_SECRETKEYBYTES)
         type = KeyType::Ed25519;
-    else if (auto mldsa = isMLDSA(key))
-        type = *mldsa;
-    else
+    else if (auto pkey = parsePrivateKey(key)) {
+        if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
+            type = KeyType::MLDSA44;
+        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
+            type = KeyType::MLDSA65;
+        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
+            type = KeyType::MLDSA87;
+        else
+            throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
+    } else
         throw Error("secret key is not valid");
 }
 
@@ -231,7 +224,7 @@ Signature SecretKey::signDetached(std::string_view data) const
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
     case KeyType::MLDSA87: {
-        auto pkey = parseMLDSAPrivateKey(key, type);
+        auto pkey = parsePrivateKey(key, type);
 
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
@@ -283,7 +276,7 @@ PublicKey SecretKey::toPublicKey() const
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
     case KeyType::MLDSA87: {
-        auto pkey = parseMLDSAPrivateKey(key, type);
+        auto pkey = parsePrivateKey(key, type);
 
         unsigned char * derBuf = nullptr;
         int derLen = i2d_PUBKEY(pkey.get(), &derBuf);
@@ -348,9 +341,16 @@ PublicKey::PublicKey(std::string_view s)
 {
     if (key.size() == crypto_sign_PUBLICKEYBYTES)
         type = KeyType::Ed25519;
-    else if (auto mldsa = isMLDSA(key))
-        type = *mldsa;
-    else
+    else if (auto pkey = parsePublicKey(key)) {
+        if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
+            type = KeyType::MLDSA44;
+        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
+            type = KeyType::MLDSA65;
+        else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
+            type = KeyType::MLDSA87;
+        else
+            throw Error("public key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
+    } else
         throw Error("public key is not valid");
 }
 
@@ -380,7 +380,7 @@ bool PublicKey::verifyDetachedAnon(std::string_view data, const Signature & sig)
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
     case KeyType::MLDSA87: {
-        auto pkey = parseMLDSAPublicKey(key, type);
+        auto pkey = parsePublicKey(key, type);
 
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
