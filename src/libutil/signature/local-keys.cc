@@ -79,20 +79,6 @@ AutoEVP_PKEY parsePrivateKey(std::string_view der)
     return pkey;
 }
 
-AutoEVP_PKEY parsePrivateKey(std::string_view der, KeyType type)
-{
-    auto pkey = parsePrivateKey(der);
-    if (!pkey)
-        throw Error("private key is not PKCS#8-encoded");
-
-    auto typeS = toOpenSSLKeyType(type);
-
-    if (EVP_PKEY_is_a(pkey.get(), typeS) != 1)
-        throw Error("private key is not '%s' (got '%s')", typeS, EVP_PKEY_get0_type_name(pkey.get()));
-
-    return pkey;
-}
-
 /**
  * Parse a DER-encoded `SubjectPublicKeyInfo` and verify that the key is ML-DSA-*.
  */
@@ -244,18 +230,18 @@ struct Ed25519SecretKey : SecretKey
 struct OpenSSLPublicKey : PublicKey
 {
     KeyType type;
+    AutoEVP_PKEY pkey;
 
-    OpenSSLPublicKey(KeyType type, std::string_view name, std::string && key)
+    OpenSSLPublicKey(KeyType type, std::string_view name, std::string && key, AutoEVP_PKEY && pkey)
         : PublicKey(name, std::move(key))
         , type(type)
+        , pkey(std::move(pkey))
     {
         assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
     }
 
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
     {
-        auto pkey = parsePublicKey(key, type);
-
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
@@ -274,8 +260,6 @@ struct OpenSSLPublicKey : PublicKey
 
     std::string toPEM() const override
     {
-        auto pkey = parsePublicKey(key, type);
-
         AutoBIO bio(BIO_new(BIO_s_mem()));
         if (!bio)
             throw Error("BIO_new failed");
@@ -292,18 +276,18 @@ struct OpenSSLPublicKey : PublicKey
 struct OpenSSLSecretKey : SecretKey
 {
     KeyType type;
+    AutoEVP_PKEY pkey;
 
-    OpenSSLSecretKey(KeyType type, std::string_view name, std::string && key)
+    OpenSSLSecretKey(KeyType type, std::string_view name, std::string && key, AutoEVP_PKEY && pkey)
         : SecretKey(name, std::move(key))
         , type(type)
+        , pkey(std::move(pkey))
     {
         assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
     }
 
     Signature signDetached(std::string_view data) const override
     {
-        auto pkey = parsePrivateKey(key, type);
-
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
@@ -339,8 +323,6 @@ struct OpenSSLSecretKey : SecretKey
 
     std::unique_ptr<PublicKey> toPublicKey() const override
     {
-        auto pkey = parsePrivateKey(key, type);
-
         unsigned char * derBuf = nullptr;
         int derLen = i2d_PUBKEY(pkey.get(), &derBuf);
         if (derLen < 0)
@@ -348,13 +330,13 @@ struct OpenSSLSecretKey : SecretKey
         std::string der((const char *) derBuf, derLen);
         OPENSSL_free(derBuf);
 
-        return std::make_unique<OpenSSLPublicKey>(type, name, std::move(der));
+        auto pubKey = parsePublicKey(der, type);
+
+        return std::make_unique<OpenSSLPublicKey>(type, name, std::move(der), std::move(pubKey));
     }
 
     std::string toPEM() const override
     {
-        auto pkey = parsePrivateKey(key, type);
-
         AutoBIO bio(BIO_new(BIO_s_mem()));
         if (!bio)
             throw Error("BIO_new failed");
@@ -385,7 +367,7 @@ std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
                 type = KeyType::MLDSA87;
             else
                 throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
-            return std::make_unique<OpenSSLSecretKey>(type, name, std::move(key));
+            return std::make_unique<OpenSSLSecretKey>(type, name, std::move(key), std::move(pkey));
         } else
             throw Error("secret key is not valid");
 
@@ -431,7 +413,7 @@ std::unique_ptr<SecretKey> SecretKey::generate(std::string_view name, KeyType ty
         std::string der((const char *) derBuf, derLen);
         OPENSSL_free(derBuf);
 
-        return std::make_unique<OpenSSLSecretKey>(type, name, std::move(der));
+        return std::make_unique<OpenSSLSecretKey>(type, name, std::move(der), std::move(pkey));
     }
 
     default:
@@ -456,7 +438,7 @@ std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
                 type = KeyType::MLDSA87;
             else
                 throw Error("public key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
-            return std::make_unique<OpenSSLPublicKey>(type, name, std::move(key));
+            return std::make_unique<OpenSSLPublicKey>(type, name, std::move(key), std::move(pkey));
         } else
             throw Error("public key is not valid");
     } catch (Error & e) {
