@@ -50,6 +50,7 @@ enum KeyType {
 
 KeyType parseKeyType(std::string_view s);
 
+// FIXME: remove this class.
 struct Key
 {
     const std::string name;
