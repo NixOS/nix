@@ -31,10 +31,20 @@ check_funcs = [
     'posix_fallocate',
     'Optionally used to preallocate files to be large enough before writing to them.',
   ],
+  [
+    'bindat',
+    'Avoids forking when binding AF_UNIX sockets with paths longer than sun_path.',
+    '#include <sys/socket.h>',
+  ],
+  [
+    'connectat',
+    'Avoids forking when connecting AF_UNIX sockets with paths longer than sun_path.',
+    '#include <sys/socket.h>',
+  ],
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
-  define_value = cxx.has_function(funcspec[0]).to_int()
+  define_value = cxx.has_function(funcspec[0], prefix : funcspec.get(2, '')).to_int()
   configdata_priv.set(define_name, define_value, description : funcspec[1])
 endforeach
 

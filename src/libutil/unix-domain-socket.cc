@@ -1,3 +1,5 @@
+#include "util-config-private.hh"
+
 #include "nix/util/file-system.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/util/util.hh"
@@ -9,6 +11,7 @@
 #  include <winsock2.h>
 #  include <afunix.h>
 #else
+#  include <fcntl.h>
 #  include <sys/socket.h>
 #  include <sys/un.h>
 #  include "nix/util/processes.hh"
@@ -49,12 +52,77 @@ AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mo
     return fdSocket;
 }
 
-/**
- * Use string for path, because no `struct sockaddr_un` variant supports native wide character paths.
- */
-static void
-bindConnectProcHelper(std::string_view operationName, auto && operation, Socket fd, const std::string & path)
+enum class SocketOp { Bind, Connect };
+
+static const char * opName(SocketOp op)
 {
+    return op == SocketOp::Bind ? "bind" : "connect";
+}
+
+#ifndef _WIN32
+
+/**
+ * Tries the dirfd-anchored fast path for a socket whose absolute path
+ * overflows sun_path. Returns false when the path can't be handled this way,
+ * leaving the caller to fall back to the fork+chdir helper.
+ *
+ * For this case, FreeBSD has bindat and connectat. Linux doesn't, but
+ * its /proc/self/fd/<N>/<base> magic symlink lets plain bind and connect reach
+ * the same place by resolving through an open dirfd.
+ */
+static bool
+tryBindConnectAtDir([[maybe_unused]] SocketOp op, [[maybe_unused]] Socket fd, const std::filesystem::path & path)
+{
+#  if (HAVE_BINDAT && HAVE_CONNECTAT) || defined(__linux__)
+    auto base = path.filename();
+
+    struct sockaddr_un addr{};
+    addr.sun_family = AF_UNIX;
+    auto * psaddr = reinterpret_cast<struct sockaddr *>(&addr);
+
+    if (base.native().size() + 1 >= sizeof(addr.sun_path))
+        throw Error("socket path '%s' is too long", PathFmt(path));
+
+    // O_PATH opens the directory as a path-resolution-only handle, with no read permission needed.
+    AutoCloseFD dirfd = ::open(path.parent_path().c_str(), O_PATH | O_DIRECTORY | O_CLOEXEC);
+    if (!dirfd)
+        return false;
+
+#    if HAVE_BINDAT && HAVE_CONNECTAT
+    memcpy(addr.sun_path, base.c_str(), base.native().size() + 1);
+    int r = (op == SocketOp::Bind) ? ::bindat(dirfd.get(), fd, psaddr, sizeof(addr))
+                                   : ::connectat(dirfd.get(), fd, psaddr, sizeof(addr));
+    if (r == -1)
+        throw SysError("cannot %s to socket at '%s'", opName(op), PathFmt(path));
+    return true;
+#    else // __linux__
+    // A long basename plus a multi-digit dirfd can push this past sun_path even when the
+    // basename alone fits, so fall back to fork+chdir for that pathological case.
+    auto proc = std::filesystem::path("/proc/self/fd") / std::to_string(dirfd.get()) / base;
+    if (proc.native().size() + 1 >= sizeof(addr.sun_path))
+        return false;
+    memcpy(addr.sun_path, proc.c_str(), proc.native().size() + 1);
+    auto syscall = (op == SocketOp::Bind) ? ::bind : ::connect;
+    if (syscall(fd, psaddr, sizeof(addr)) == -1) {
+        // /proc not being mounted is the case where fork+chdir remains useful.
+        if (errno == ENOENT || errno == ENOTDIR)
+            return false;
+        throw SysError("cannot %s to socket at '%s'", opName(op), PathFmt(path));
+    }
+    return true;
+#    endif
+#  else
+    return false;
+#  endif
+}
+
+#endif // !_WIN32
+
+static void bindConnectProcHelper(SocketOp op, Socket fd, const std::filesystem::path & path)
+{
+    auto pathStr = path.string();
+    auto syscall = (op == SocketOp::Bind) ? ::bind : ::connect;
+
     struct sockaddr_un addr;
     addr.sun_family = AF_UNIX;
 
@@ -65,24 +133,27 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
     // special case.
     auto * psaddr = reinterpret_cast<struct sockaddr *>(&addr);
 
-    if (path.size() + 1 >= sizeof(addr.sun_path)) {
+    if (pathStr.size() + 1 >= sizeof(addr.sun_path)) {
 #ifdef _WIN32
-        throw Error("cannot %s to socket at '%s': path is too long", operationName, path);
+        throw Error("cannot %s to socket at '%s': path is too long", opName(op), pathStr);
 #else
+        if (tryBindConnectAtDir(op, fd, path))
+            return;
+
         Pipe pipe;
         pipe.create();
         Pid pid = startProcess([&] {
             try {
                 pipe.readSide.close();
-                auto dir = std::filesystem::path(path).parent_path();
-                if (chdir(dir.string().c_str()) == -1)
+                auto dir = path.parent_path();
+                if (chdir(dir.c_str()) == -1)
                     throw SysError("chdir to %s failed", PathFmt(dir));
-                std::string base(baseNameOf(path));
-                if (base.size() + 1 >= sizeof(addr.sun_path))
-                    throw Error("socket path '%s' is too long", base);
-                memcpy(addr.sun_path, base.c_str(), base.size() + 1);
-                if (operation(fd, psaddr, sizeof(addr)) == -1)
-                    throw SysError("cannot %s to socket at '%s'", operationName, path);
+                auto base = path.filename();
+                if (base.native().size() + 1 >= sizeof(addr.sun_path))
+                    throw Error("socket path '%s' is too long", PathFmt(path));
+                memcpy(addr.sun_path, base.c_str(), base.native().size() + 1);
+                if (syscall(fd, psaddr, sizeof(addr)) == -1)
+                    throw SysError("cannot %s to socket at '%s'", opName(op), PathFmt(path));
                 writeFull(pipe.writeSide.get(), "0\n");
             } catch (SysError & e) {
                 writeFull(pipe.writeSide.get(), fmt("%d\n", e.errNo));
@@ -93,29 +164,28 @@ bindConnectProcHelper(std::string_view operationName, auto && operation, Socket 
         pipe.writeSide.close();
         auto errNo = string2Int<int>(chomp(drainFD(pipe.readSide.get())));
         if (!errNo || *errNo == -1)
-            throw Error("cannot %s to socket at '%s'", operationName, path);
+            throw Error("cannot %s to socket at '%s'", opName(op), PathFmt(path));
         else if (*errNo > 0) {
             errno = *errNo;
-            throw SysError("cannot %s to socket at '%s'", operationName, path);
+            throw SysError("cannot %s to socket at '%s'", opName(op), PathFmt(path));
         }
 #endif
     } else {
-        memcpy(addr.sun_path, path.c_str(), path.size() + 1);
-        if (operation(fd, psaddr, sizeof(addr)) == -1)
-            throw SysError("cannot %s to socket at '%s'", operationName, path);
+        memcpy(addr.sun_path, pathStr.c_str(), pathStr.size() + 1);
+        if (syscall(fd, psaddr, sizeof(addr)) == -1)
+            throw SysError("cannot %s to socket at '%s'", opName(op), PathFmt(path));
     }
 }
 
 void bind(Socket fd, const std::filesystem::path & path)
 {
     tryUnlink(path);
-
-    bindConnectProcHelper("bind", ::bind, fd, path.string());
+    bindConnectProcHelper(SocketOp::Bind, fd, path);
 }
 
 void connect(Socket fd, const std::filesystem::path & path)
 {
-    bindConnectProcHelper("connect", ::connect, fd, path.string());
+    bindConnectProcHelper(SocketOp::Connect, fd, path);
 }
 
 AutoCloseFD connect(const std::filesystem::path & path)

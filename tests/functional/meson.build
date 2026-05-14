@@ -127,6 +127,7 @@ suites = [
       'legacy-ssh-store.sh',
       'linux-sandbox.sh',
       'logging.sh',
+      'long-socket-path.sh',
       'misc.sh',
       'multiple-outputs.sh',
       'nar-access.sh',
