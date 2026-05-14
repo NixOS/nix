@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::Provenance);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::MLDSA);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -302,6 +302,14 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .name = "provenance",
         .description = R"(
             Enable keeping track of the provenance of store paths.
+        )",
+        .trackingUrl = "",
+    },
+    {
+        .tag = Xp::MLDSA,
+        .name = "ml-dsa",
+        .description = R"(
+            Enable support for ML-DSA keys and signatures.
         )",
         .trackingUrl = "",
     },

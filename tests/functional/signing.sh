@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+experimental_features="ml-dsa"
+
 source common.sh
 
 runTests() {

@@ -258,6 +258,9 @@ struct OpenSSLPublicKey : PublicKey
 
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
     {
+        if (!experimentalFeatureSettings.isEnabled(Xp::MLDSA))
+            return false;
+
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
@@ -304,6 +307,8 @@ struct OpenSSLSecretKey : SecretKey
 
     static std::unique_ptr<OpenSSLSecretKey> generate(std::string_view name, KeyType type)
     {
+        experimentalFeatureSettings.require(Xp::MLDSA);
+
         auto typeS = toOpenSSLKeyType(type);
         AutoEVP_PKEY_CTX ctx(EVP_PKEY_CTX_new_from_name(nullptr, typeS, nullptr));
         if (!ctx)
@@ -329,6 +334,8 @@ struct OpenSSLSecretKey : SecretKey
 
     Signature signDetached(std::string_view data) const override
     {
+        experimentalFeatureSettings.require(Xp::MLDSA);
+
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
@@ -364,6 +371,8 @@ struct OpenSSLSecretKey : SecretKey
 
     std::unique_ptr<PublicKey> toPublicKey() const override
     {
+        experimentalFeatureSettings.require(Xp::MLDSA);
+
         unsigned char * derBuf = nullptr;
         int derLen = i2d_PUBKEY(pkey.get(), &derBuf);
         if (derLen < 0)
@@ -398,7 +407,7 @@ std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
 
         if (key.size() == crypto_sign_SECRETKEYBYTES)
             return std::make_unique<Ed25519SecretKey>(name, std::move(key));
-        else if (auto pkey = parsePrivateKey(key)) {
+        else if (auto pkey = parsePrivateKey(key); experimentalFeatureSettings.isEnabled(Xp::MLDSA) && pkey) {
             KeyType type;
             if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
                 type = KeyType::MLDSA44;
@@ -443,7 +452,7 @@ std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
 
         if (key.size() == crypto_sign_PUBLICKEYBYTES)
             return std::make_unique<Ed25519PublicKey>(name, std::move(key));
-        else if (auto pkey = parsePublicKey(key)) {
+        else if (auto pkey = parsePublicKey(key); experimentalFeatureSettings.isEnabled(Xp::MLDSA) && pkey) {
             KeyType type;
             if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
                 type = KeyType::MLDSA44;
