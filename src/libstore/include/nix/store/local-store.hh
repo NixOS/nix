@@ -338,6 +338,13 @@ private:
 
     AutoCloseFD openGCLock();
 
+    enum class GCTrigger {
+        Explicit,
+        Auto,
+    };
+
+    void collectGarbage(const GCOptions & options, GCResults & results, GCTrigger gcTrigger);
+
 public:
 
     Roots findRoots(bool censor) override;
