@@ -162,7 +162,7 @@ struct CmdKeyGenerateSecret : Command
 
         addFlag({
             .longName = "key-type",
-            .description = "Type of key: `ed25519` or `ml-dsa-65`.",
+            .description = fmt("Type of key: one of %s.", concatStringsSep(", ", getKeyTypes())),
             .labels = {"type"},
             .handler = {&keyType},
         });

@@ -137,17 +137,15 @@ Strings Signature::toStrings(const std::set<Signature> & sigs)
     return res;
 }
 
-KeyType parseKeyType(std::string_view s)
+static std::unordered_map<std::string_view, KeyType> keyTypeMap{
+    {"ed25519", KeyType::Ed25519},
+    {"ml-dsa-44", KeyType::MLDSA44},
+    {"ml-dsa-65", KeyType::MLDSA65},
+    {"ml-dsa-87", KeyType::MLDSA87},
+};
+
+const StringSet & getKeyTypes()
 {
-    static std::unordered_map<std::string_view, KeyType> keyTypeMap{
-        {"ed25519", KeyType::Ed25519},
-        {"ml-dsa-44", KeyType::MLDSA44},
-        {"ml-dsa-65", KeyType::MLDSA65},
-        {"ml-dsa-87", KeyType::MLDSA87},
-    };
-    auto i = keyTypeMap.find(s);
-    if (i != keyTypeMap.end())
-        return i->second;
     static StringSet validKeyTypes = [] {
         StringSet s;
         for (const auto & [k, _] : keyTypeMap) {
@@ -155,7 +153,15 @@ KeyType parseKeyType(std::string_view s)
         }
         return s;
     }();
-    throw UsageError("unknown key type '%s'; valid key types are %s", s, concatStringsSep(", ", validKeyTypes));
+    return validKeyTypes;
+}
+
+KeyType parseKeyType(std::string_view s)
+{
+    auto i = keyTypeMap.find(s);
+    if (i != keyTypeMap.end())
+        return i->second;
+    throw UsageError("unknown key type '%s'; valid key types are %s", s, concatStringsSep(", ", getKeyTypes()));
 }
 
 std::string Key::to_string() const
