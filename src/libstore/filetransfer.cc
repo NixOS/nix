@@ -579,6 +579,14 @@ struct curlFileTransfer : public FileTransfer
 #endif
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransfer.settings.connectTimeout.get());
 
+            /* Enable TCP keepalive to detect dead connections and server closures.
+               Probes every 30s to catch network failures and idle timeouts early. */
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPALIVE, 1L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPIDLE, 30L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPINTVL, 30L);
+            /* Don't reuse idle connections older than 90s. */
+            curl_easy_setopt(req, CURLOPT_MAXAGE_CONN, 90L);
+
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransfer.settings.stalledDownloadTimeout.get());
 
