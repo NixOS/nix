@@ -690,7 +690,29 @@ struct curlFileTransfer : public FileTransfer
                 // We treat most errors as transient, but won't retry when hopeless
                 Error err = Transient;
 
-                if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
+                // S3 returns certain retryable errors as HTTP 400/500/503 with XML error codes.
+                // These take precedence over the generic HTTP status handling below.
+                // Only parse the response body on status codes where S3 XML errors can appear.
+                static const std::set<std::string> s3RetryableErrors{
+                    "RequestTimeout",     // HTTP 400 - stale connection reuse
+                    "IncompleteBody",     // HTTP 400 - network issue
+                    "InternalError",      // HTTP 500 - S3 internal failure
+                    "SlowDown",           // HTTP 503 - throttling
+                    "ServiceUnavailable", // HTTP 503 - temporary unavailability
+                };
+                // S3 error responses have the form <Error><Code>...</Code>...</Error>.
+                // Require the <Error> root to avoid matching unrelated XML with a <Code> element.
+                static std::regex s3ErrorCodeRegex("<Error>[^]*<Code>([^<]+)</Code>");
+                std::smatch s3Match;
+                bool isS3XmlStatus = httpStatus == 400 || httpStatus == 500 || httpStatus == 503;
+                auto s3ErrorCode =
+                    (isS3XmlStatus && errorSink && std::regex_search(errorSink->s, s3Match, s3ErrorCodeRegex))
+                        ? s3Match[1].str()
+                        : "";
+
+                if (s3RetryableErrors.count(s3ErrorCode)) {
+                    debug("S3 error '%s', will retry", s3ErrorCode);
+                } else if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == 401 || httpStatus == 407) {
