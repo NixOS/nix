@@ -142,6 +142,11 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
 
+static inline bool isLocal(BuildMode bm)
+{
+    return bm != bmNormal;
+}
+
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
 Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
@@ -434,8 +439,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         return LocalBuildCapability{*localStoreP, ext};
     }();
 
-    auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co {
-        trace("trying to build");
+    auto acquireResources = [&](bool & done, bool remote, PathLocks & outputLocks) -> Goal::Co {
+        // Enable split locks if build hooks are used for all applicable builds
+        if (!worker.settings.avoidLocal)
+            remote = false;
+        if (remote)
+            trace("trying to build remotely");
+        else
+            trace("trying to build locally");
 
         /**
          * Output paths to acquire locks on, if known a priori.
@@ -449,19 +460,20 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         /* FIXME: Should lock something like the drv itself so we don't build same
            CA drv concurrently */
         if (auto * localStore = dynamic_cast<LocalStore *>(&worker.store)) {
-            /* If we aren't a local store, we might need to use the local store as
-               a build remote, but that would cause a deadlock. */
-            /* FIXME: Make it so we can use ourselves as a build remote even if we
-               are the local store (separate locking for building vs scheduling? */
             /* FIXME: find some way to lock for scheduling for the other stores so
                a forking daemon with --store still won't farm out redundant builds.
                */
             for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-                if (i.second.second)
-                    lockFiles.insert(localStore->toRealPath(*i.second.second));
-                else {
+                if (i.second.second) {
+                    auto lockPath = localStore->toRealPath(*i.second.second);
+                    if (remote)
+                        lockPath += "-remote";
+                    lockFiles.insert(std::move(lockPath));
+                } else {
                     auto lockPath = localStore->toRealPath(drvPath);
                     lockPath += "." + i.first;
+                    if (remote)
+                        lockPath += "-remote";
                     lockFiles.insert(std::move(lockPath));
                 }
             }
@@ -517,7 +529,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     auto tryHookLoop = [&](bool & valid) -> Goal::Co {
         {
             PathLocks outputLocks;
-            co_await acquireResources(valid, outputLocks);
+            co_await acquireResources(valid, true, outputLocks);
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
@@ -550,7 +562,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 
             while (true) {
                 co_await waitForAWhile();
-                co_await acquireResources(valid, outputLocks);
+                co_await acquireResources(valid, true, outputLocks);
                 if (valid)
                     break;
 
@@ -584,7 +596,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     auto tryBuildLocally = [&](bool & valid) -> Goal::Co {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;
-            co_await acquireResources(valid, outputLocks);
+            co_await acquireResources(valid, false, outputLocks);
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
@@ -596,7 +608,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         co_return Return{};
     };
 
-    if (buildMode != bmNormal) {
+    if (isLocal(buildMode)) {
         // Check and repair modes operate on the state of this store specifically,
         // so they must always build locally.
         bool valid = false;
@@ -1202,9 +1214,11 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 
     try {
 
+        auto canBuildLocally =
+            (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs) && !worker.settings.avoidLocal;
+
         /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
-                          << drv->platform << worker.store.printStorePath(drvPath)
+        worker.hook->sink << "try" << (canBuildLocally ? 1 : 0) << drv->platform << worker.store.printStorePath(drvPath)
                           << drvOptions.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 

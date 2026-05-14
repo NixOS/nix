@@ -29,6 +29,7 @@ const WorkerProto::Version WorkerProto::latest = {
                 WorkerProto::featureRealisationWithPath,
             },
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+            std::string{WorkerProto::featureLocalBuilds},
         },
 };
 
@@ -67,6 +68,8 @@ BuildMode WorkerProto::Serialise<BuildMode>::read(const StoreDirConfig & store, 
         return bmRepair;
     case 2:
         return bmCheck;
+    case 3:
+        return bmLocal;
     default:
         throw Error("Invalid build mode");
     }
@@ -84,6 +87,9 @@ void WorkerProto::Serialise<BuildMode>::write(
         break;
     case bmCheck:
         conn.to << uint8_t{2};
+        break;
+    case bmLocal:
+        conn.to << uint8_t{3};
         break;
     default:
         assert(false);

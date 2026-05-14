@@ -14,7 +14,8 @@ Machine::Machine(
     decltype(speedFactor) speedFactor,
     decltype(supportedFeatures) supportedFeatures,
     decltype(mandatoryFeatures) mandatoryFeatures,
-    decltype(sshPublicHostKey) sshPublicHostKey)
+    decltype(sshPublicHostKey) sshPublicHostKey,
+    decltype(forceLocal) forceLocal)
     : storeUri(
           StoreReference::parse(
               // Backwards compatibility: if the URI is schemeless, is not a path,
@@ -32,6 +33,7 @@ Machine::Machine(
     , supportedFeatures(supportedFeatures)
     , mandatoryFeatures(mandatoryFeatures)
     , sshPublicHostKey(sshPublicHostKey)
+    , forceLocal(forceLocal)
 {
     if (speedFactor < 0.0)
         throw UsageError("speed factor must be >= 0");
@@ -155,6 +157,17 @@ static Machine parseBuilderLine(const StringSet & defaultSystems, const std::str
         return result.value();
     };
 
+    auto parseBoolField = [&](size_t fieldIndex) {
+        auto token = tokens[fieldIndex];
+        bool isTrue = token == "true" || token == "yes" || token == "1";
+        bool isFalse = token == "false" || token == "no" || token == "0";
+        if (!isTrue && !isFalse) {
+            throw FormatError(
+                "bad machine specification: failed to convert column #%lu in a row: '%s' to 'bool'", fieldIndex, line);
+        }
+        return isTrue;
+    };
+
     auto ensureBase64 = [&](size_t fieldIndex) {
         const auto & str = tokens[fieldIndex];
         try {
@@ -188,7 +201,9 @@ static Machine parseBuilderLine(const StringSet & defaultSystems, const std::str
         // `mandatoryFeatures`
         isSet(6) ? tokenizeString<StringSet>(tokens[6], ",") : StringSet{},
         // `sshPublicHostKey`
-        isSet(7) ? ensureBase64(7) : ""};
+        isSet(7) ? ensureBase64(7) : "",
+        // `forceLocal`
+        isSet(8) ? parseBoolField(8) : false};
 }
 
 static Machines parseBuilderLines(const StringSet & defaultSystems, const std::vector<std::string> & builders)

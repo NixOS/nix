@@ -89,7 +89,7 @@ void ChrootDerivationBuilder::cleanupBuild(bool force)
 
     /* Move paths out of the chroot for easier debugging of
        build failures. */
-    if (!force && buildMode == bmNormal)
+    if (!force && (buildMode == bmNormal || buildMode == bmLocal))
         for (auto & [_, status] : initialOutputs) {
             if (!status.known)
                 continue;

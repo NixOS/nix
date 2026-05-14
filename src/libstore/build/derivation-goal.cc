@@ -75,7 +75,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         auto checkResult = checkPathValidity();
 
         /* If they are all valid, then we're done. */
-        if (checkResult && checkResult->second == PathStatus::Valid && buildMode == bmNormal) {
+        if (checkResult && checkResult->second == PathStatus::Valid
+            && (buildMode == bmNormal || buildMode == bmLocal)) {
             co_return doneSuccess(BuildResult::Success::AlreadyValid, checkResult->first);
         }
 
@@ -134,7 +135,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         bool allValid = checkResult && checkResult->second == PathStatus::Valid;
 
-        if (buildMode == bmNormal && allValid) {
+        if ((buildMode == bmNormal || buildMode == bmLocal) && allValid) {
             co_return doneSuccess(BuildResult::Success::Substituted, checkResult->first);
         }
         if (buildMode == bmRepair && allValid) {

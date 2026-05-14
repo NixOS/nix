@@ -136,6 +136,11 @@ struct WorkerProto
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
     /**
+     * Feature for forcing local builds
+     */
+    static constexpr std::string_view featureLocalBuilds = "local-builds";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
