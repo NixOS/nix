@@ -393,17 +393,7 @@ LocalStore::LocalStore(ref<const Config> config)
 AutoCloseFD LocalStore::openGCLock()
 {
     auto fnGCLock = config->stateDir.get() / "gc.lock";
-    auto fdGCLock = open(
-        fnGCLock.string().c_str(),
-        O_RDWR | O_CREAT
-#ifndef _WIN32
-            | O_CLOEXEC
-#endif
-        ,
-        0600);
-    if (!fdGCLock)
-        throw SysError("opening global GC lock %1%", PathFmt(fnGCLock));
-    return toDescriptor(fdGCLock);
+    return openLockFile(fnGCLock, /*create=*/true);
 }
 
 void LocalStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
