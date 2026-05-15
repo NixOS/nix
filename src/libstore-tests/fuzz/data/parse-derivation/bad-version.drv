@@ -1,0 +1,1 @@
+DrvWithVersion("invalid-version",[],[("/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv",["cat","dog"])],["/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"],"wasm-sel4","foo",["bar","baz"],[("BIG_BAD","WOLF")])
