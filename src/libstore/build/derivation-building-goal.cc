@@ -1044,8 +1044,36 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     trace("build done");
 
     SingleDrvOutputs builtOutputs;
+    /* Locks acquired between the two phases of output registration.
+       Covers output store paths that `outputLocks` doesn't already
+       cover -- floating CA outputs and hash-mismatching fixed-output
+       derivations. See `DerivationBuilder::unprepareBuild`. */
+    PathLocks dynamicOutputLocks;
+    dynamicOutputLocks.setDeletion(true);
     try {
-        builtOutputs = builder->unprepareBuild();
+        auto dynamicLockPaths = builder->unprepareBuild();
+
+        /* Acquire dynamic output locks with the same try-lock +
+           coroutine yield pattern used for the pre-build locks above.
+           A blocking flock here would freeze the worker thread on a
+           lock another goal in this same daemon already holds via a
+           different file descriptor (POSIX flock is per-OFD), which is
+           exactly the deadlock reported in issue #15846. */
+        if (!dynamicLockPaths.empty() && !dynamicOutputLocks.lockPaths(dynamicLockPaths, "", false)) {
+            Activity act(
+                *logger,
+                lvlWarn,
+                actBuildWaiting,
+                fmt("waiting for lock on %s",
+                    Magenta(concatMapStringsSep(
+                        ", ", dynamicLockPaths, [](auto & p) { return "'" + p.string() + "'"; }))));
+
+            do {
+                co_await waitForAWhile();
+            } while (!dynamicOutputLocks.lockPaths(dynamicLockPaths, "", false));
+        }
+
+        builtOutputs = builder->registerOutputs();
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();

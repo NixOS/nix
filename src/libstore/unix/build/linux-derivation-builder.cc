@@ -815,7 +815,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
         });
     }
 
-    SingleDrvOutputs unprepareBuild() override
+    std::set<std::filesystem::path> unprepareBuild() override
     {
         sandboxMountNamespace = -1;
         sandboxUserNamespace = -1;

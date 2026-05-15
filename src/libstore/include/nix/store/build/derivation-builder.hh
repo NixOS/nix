@@ -2,6 +2,7 @@
 ///@file
 
 #include <filesystem>
+#include <set>
 #include <nlohmann/json_fwd.hpp>
 
 #include "nix/store/build-result.hh"
@@ -166,16 +167,42 @@ struct DerivationBuilder : RestrictionContext
 
     /**
      * Tear down build environment after the builder exits (either on
-     * its own or if it is killed).
+     * its own or if it is killed), validate its exit status, and
+     * prepare outputs for registration.
      *
-     * @returns The first case indicates failure during output
-     * processing. A status code and exception are returned, providing
-     * more information. The second case indicates success, and
-     * realisations for each output of the derivation are returned.
+     * This computes the content-addressed paths of all CA outputs and
+     * canonicalises the scratch output trees. It does NOT yet move the
+     * outputs into their final store locations.
+     *
+     * @returns The set of "actual" output store paths that need to be
+     * locked before calling `registerOutputs()`. These are paths that
+     * the per-derivation output locks acquired before the build started
+     * do not already cover — namely the paths of floating CA outputs,
+     * and of fixed-output derivations whose actual content hash differs
+     * from the declared one.
+     *
+     * After this returns, the caller must acquire `PathLocks` on the
+     * returned paths (typically with a try-lock + coroutine yield retry
+     * loop, to avoid blocking the daemon's worker thread on a flock
+     * already held by another goal in the same process), and then call
+     * `registerOutputs()`.
+     *
+     * @throws BuilderFailureError
+     * @throws BuildError
+     */
+    virtual std::set<std::filesystem::path> unprepareBuild() = 0;
+
+    /**
+     * Move the prepared outputs into the store, register them as valid
+     * and apply output checks. Must be called after `unprepareBuild()`,
+     * with the caller holding `PathLocks` on the set of paths it
+     * returned.
+     *
+     * @returns realisations for each output of the derivation.
      *
      * @throws BuildError
      */
-    virtual SingleDrvOutputs unprepareBuild() = 0;
+    virtual SingleDrvOutputs registerOutputs() = 0;
 
     /**
      * Forcibly kill the child process, if any.

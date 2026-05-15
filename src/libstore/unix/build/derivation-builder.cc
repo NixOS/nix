@@ -276,7 +276,9 @@ public:
 
     std::optional<Descriptor> startBuild() override;
 
-    SingleDrvOutputs unprepareBuild() override;
+    std::set<std::filesystem::path> unprepareBuild() override;
+
+    SingleDrvOutputs registerOutputs() override;
 
 protected:
 
@@ -448,10 +450,36 @@ protected:
 private:
 
     /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
+     * Per-output state computed by `unprepareBuild()` and consumed by
+     * `registerOutputs()`. We split the work into two phases so that
+     * the caller (the build goal coroutine) can acquire the dynamic
+     * output locks between them with a try-lock + yield retry loop,
+     * avoiding the same-process flock self-deadlock that happens when
+     * a sibling goal in the same daemon already holds the lock on
+     * `newInfo.path` (see issue #15846).
      */
-    SingleDrvOutputs registerOutputs();
+    struct PendingOutput
+    {
+        std::string outputName;
+        ValidPathInfo newInfo;
+        std::filesystem::path actualPath;
+        StorePathSet references;
+        AutoCloseFD tempDirFd;
+        AutoDelete delTempDir;
+    };
+
+    std::vector<PendingOutput> pendingOutputs;
+
+    /**
+     * First phase of output registration. Validates that the builder
+     * produced all expected outputs, canonicalises them, computes their
+     * content-addressed paths (for CA outputs) and stashes the result
+     * in `pendingOutputs`. Called from `unprepareBuild()`.
+     *
+     * @returns The set of "actual" output store paths that need to be
+     * locked dynamically before `registerOutputs()` runs.
+     */
+    std::set<std::filesystem::path> preRegisterOutputs();
 
 protected:
 
@@ -557,7 +585,7 @@ bool DerivationBuilderImpl::killChild()
     return ret;
 }
 
-SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
+std::set<std::filesystem::path> DerivationBuilderImpl::unprepareBuild()
 {
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -614,13 +642,14 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
         };
     }
 
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs = registerOutputs();
-
-    cleanupBuild(true);
-
-    return builtOutputs;
+    /* Compute output info and canonicalise the scratch outputs.
+       Returns the set of store paths that need to be locked
+       dynamically before `registerOutputs()` can move things into
+       place. The caller (the build goal coroutine) is expected to
+       acquire these locks with a try-lock + yield retry loop, so the
+       daemon's worker thread won't get blocked on a flock that a
+       sibling goal in the same process already holds. */
+    return preRegisterOutputs();
 }
 
 /* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
@@ -1448,9 +1477,12 @@ void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & en
     execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
-SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
+std::set<std::filesystem::path> DerivationBuilderImpl::preRegisterOutputs()
 {
-    std::map<std::string, ValidPathInfo> infos;
+    /* Output state we'll hand off to `registerOutputs()` once the
+       caller has acquired the dynamic locks we return. */
+    pendingOutputs.clear();
+    std::set<std::filesystem::path> dynamicLockPaths;
 
     /* Set of inodes seen during calls to canonicalisePathMetaData()
        for this build's outputs.  This needs to be shared between
@@ -1869,21 +1901,66 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)},
             inodesSeen);
 
+        /* Update outputRewrites so the next iteration's hash rewriting
+           sees this output's final path. The previous one-pass code
+           did this at the end of the register step; we do it eagerly
+           here because the register step now happens in a separate
+           call (`registerOutputs()`) after the caller has acquired the
+           dynamic locks.
+
+           In bmCheck mode the previous code did not call `finish()`
+           for newly-built (non-AlreadyRegistered) outputs; preserve
+           that behaviour. */
+        if (buildMode != bmCheck)
+            finish(newInfo.path);
+
+        /* Determine whether the actual output path needs to be locked
+           dynamically. This happens with floating CA derivations and
+           with hash-mismatching fixed-output derivations -- i.e.,
+           cases where `newInfo.path` is not covered by the
+           per-derivation output locks the caller acquired before the
+           build started. */
+        auto finalDestPath = store.printStorePath(newInfo.path);
+        auto optFixedPath = output->path(store, drv.name, outputName);
+        if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
+            assert(newInfo.ca);
+            dynamicLockPaths.insert(store.toRealPath(newInfo.path));
+        }
+
+        /* Stash everything `registerOutputs()` needs so it can run
+           after the caller has acquired the dynamic locks. */
+        pendingOutputs.push_back(PendingOutput{
+            .outputName = outputName,
+            .newInfo = std::move(newInfo),
+            .actualPath = std::move(actualPath),
+            .references = std::move(references),
+            .tempDirFd = std::move(tempDirFd),
+            .delTempDir = std::move(delTempDir),
+        });
+    }
+
+    return dynamicLockPaths;
+}
+
+SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
+{
+    std::map<std::string, ValidPathInfo> infos;
+
+    /* For each output prepared by `preRegisterOutputs()`, move the
+       scratch tree into its final store location and register it.
+       The caller is responsible for having acquired the dynamic locks
+       on the paths returned by `unprepareBuild()`; no flock happens
+       here. */
+    for (auto & pending : pendingOutputs) {
+        const auto & outputName = pending.outputName;
+        auto & newInfo = pending.newInfo;
+        auto & actualPath = pending.actualPath;
+        const auto & references = pending.references;
+
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
            their usual "final destination" */
         auto finalDestPath = store.printStorePath(newInfo.path);
-
-        /* Lock final output path, if not already locked. This happens with
-           floating CA derivations and hash-mismatching fixed-output
-           derivations. */
-        PathLocks dynamicOutputLock;
-        dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(store, drv.name, outputName);
-        if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
-            assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)});
-        }
 
         /* Move files, if needed */
         if (store.toRealPath(newInfo.path) != actualPath) {
@@ -1967,7 +2044,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             newInfo.ultimate = true;
             store.signPathInfo(newInfo);
 
-            finish(newInfo.path);
+            /* The `outputRewrites` update normally done by `finish()` was
+               performed eagerly in `preRegisterOutputs()`. */
 
             /* If it's a CA path, register it right away. This is necessary if it
                isn't statically known so that we can safely unlock the path before
@@ -1989,11 +2067,17 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         infos.emplace(outputName, std::move(newInfo));
     }
 
+    /* All scratch outputs have either been moved into the store or
+       deleted; the RAII guards in `pendingOutputs` can be released
+       now. */
+    pendingOutputs.clear();
+
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
     checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
 
     if (buildMode == bmCheck) {
+        cleanupBuild(true);
         return {};
     }
 
@@ -2033,6 +2117,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         }
         builtOutputs.emplace(outputName, thisRealisation);
     }
+
+    cleanupBuild(true);
 
     return builtOutputs;
 }
