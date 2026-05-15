@@ -34,3 +34,10 @@ option(
   value : true,
   description : 'Check JSON schema validity of schemas and examples (requires jv)',
 )
+
+option(
+  'fuzzers',
+  type : 'feature',
+  value : 'disabled',
+  description : 'Build libFuzzer fuzzing harnesses (requires clang). See src/libutil-fuzz/ etc.',
+)

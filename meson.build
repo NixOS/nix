@@ -58,6 +58,11 @@ if get_option('functional-tests')
   subproject('nix-functional-tests')
 endif
 
+# libFuzzer harnesses. Clang only; off by default.
+if get_option('fuzzers').enabled()
+  subproject('libutil-fuzz')
+endif
+
 if get_option('json-schema-checks')
   subproject('json-schema-checks')
 endif

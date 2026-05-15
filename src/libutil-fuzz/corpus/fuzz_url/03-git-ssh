@@ -1,0 +1,1 @@
+git+ssh://user@host:22/path/to/repo.git?ref=main#commit
