@@ -86,6 +86,7 @@ public:
     void setKillSignal(int signal);
     void setKillTimeout(std::chrono::milliseconds duration);
     pid_t release();
+    pid_t get();
 #endif
 
     friend void swap(Pid & lhs, Pid & rhs) noexcept
@@ -171,6 +172,14 @@ struct SpawnOptions
      * Ignored on non-Linux because it's irrelevant.
      */
     bool restoreMounts = true;
+#ifdef __linux__
+    /**
+     * @brief (Linux-only) capabilities to keep across the uid/gid change
+     * and raise as ambient capabilities, so that the spawned program has
+     * them even when it's not run as root.
+     */
+    std::set<long> caps;
+#endif
 };
 
 struct RunOptions
