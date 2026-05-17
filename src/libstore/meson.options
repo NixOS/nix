@@ -39,3 +39,10 @@ option(
   type : 'feature',
   description : 'build support for AWS authentication with S3',
 )
+
+option(
+  'pasta-path',
+  type : 'string',
+  value : 'pasta',
+  description : 'Path to the location of pasta (provided by passt)',
+)

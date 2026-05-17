@@ -79,6 +79,7 @@ sources = files(
   'nix_api_store.cc',
   'outputs-query.cc',
   'outputs-spec.cc',
+  'pasta.cc',
   'path-info.cc',
   'path.cc',
   'realisation.cc',

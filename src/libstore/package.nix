@@ -18,6 +18,7 @@
   cmake, # for resolving aws-crt-cpp dep
 
   busybox-sandbox-shell ? null,
+  passt ? null,
   pkgsStatic,
 
   # Configuration Options
@@ -95,7 +96,10 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optionals withSandboxShell [
     (lib.mesonOption "sandbox-shell" sandboxShell)
-  ];
+  ]
+  ++ lib.optional (passt != null && stdenv.hostPlatform.isLinux) (
+    lib.mesonOption "pasta-path" "${passt}/bin/pasta"
+  );
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;

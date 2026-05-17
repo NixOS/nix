@@ -3,6 +3,8 @@
 #include "chroot-derivation-builder.hh"
 #include "chroot-linux-derivation-builder.hh"
 
+#include "nix/util/processes.hh"
+#include "nix/store/build/pasta.hh"
 #include "store-config-private.hh"
 
 #include "nix/store/globals.hh"
@@ -18,6 +20,7 @@
 #include <string_view>
 #include <cstdint>
 #include <fcntl.h>
+#include <regex>
 
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -29,6 +32,8 @@
 #include <sys/syscall.h>
 #include <sys/prctl.h>
 #include <grp.h>
+#include <linux/capability.h>
+#include <unistd.h>
 
 #if HAVE_SECCOMP
 #  include <seccomp.h>
@@ -368,9 +373,11 @@ void ChrootLinuxDerivationBuilder::startChild()
 
         - The private network namespace ensures that the builder
             cannot talk to the outside world (or vice versa).  It
-            only has a private loopback interface. (Fixed-output
-            derivations are not run in a private network namespace
-            to allow functions like fetchurl to work.)
+            only has a private loopback interface. If a copy of
+            `pasta` is available, Fixed-output derivations are run
+            inside a private network namespace with internet
+            access, otherwise they are run in the host's network
+            namespace, to allow functions like fetchurl to work.
 
         - The IPC namespace prevents the builder from communicating
             with outside processes using SysV IPC mechanisms (shared
@@ -387,6 +394,10 @@ void ChrootLinuxDerivationBuilder::startChild()
         CLONE_PARENT to ensure that the real builder is parented to
         us.
     */
+
+    // don't launch pasta unless we have a tun device. in a build sandbox we
+    // commonly do not, and trying to run pasta anyway naturally won't work.
+    runPasta = !derivationType.isSandboxed() && settings.pastaPath != "" && pathExists("/dev/net/tun");
 
     userNamespaceSync.create();
 
@@ -416,7 +427,7 @@ void ChrootLinuxDerivationBuilder::startChild()
 
             ProcessOptions options;
             options.cloneFlags = CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_PARENT | SIGCHLD;
-            if (derivationType.isSandboxed())
+            if (settings.pastaPath != "" || derivationType.isSandboxed())
                 options.cloneFlags |= CLONE_NEWNET;
             if (usingUserNamespace)
                 options.cloneFlags |= CLONE_NEWUSER;
@@ -522,6 +533,14 @@ void ChrootLinuxDerivationBuilder::startChild()
     /* Signal the builder that we've updated its user namespace. */
     writeFull(userNamespaceSync.writeSide.get(), "1\n");
     userNamespaceSyncDone = true;
+
+    if (runPasta)
+        pastaPid = pasta::setupPasta(
+            settings.pastaPath,
+            pid.get(),
+            useBuildUsers(localSettings) ? std::optional(buildUser->getUID()) : std::nullopt,
+            useBuildUsers(localSettings) ? std::optional(buildUser->getGID()) : std::nullopt,
+            usingUserNamespace);
 }
 
 void ChrootLinuxDerivationBuilder::enterChroot()
@@ -532,6 +551,9 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         throw Error("user namespace initialisation failed");
 
     userNamespaceSync.readSide = -1;
+
+    if (runPasta)
+        pasta::waitForPastaInterface();
 
     if (derivationType.isSandboxed()) {
 
@@ -629,9 +651,19 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         /* N.B. it is realistic that these paths might not exist. It
             happens when testing Nix building fixed-output derivations
             within a pure derivation. */
-        for (auto & path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"})
-            if (pathExists(path))
-                ss.push_back(path);
+        for (auto & path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
+            if (pathExists(path)) {
+                // Special handling for resolv.conf when using pasta
+                if (runPasta && std::string(path) == "/etc/resolv.conf") {
+                    // We'll write a modified version instead of bind-mounting
+                    auto resolvConf = readFile(std::string(path));
+                    auto modifiedResolvConf = pasta::rewriteResolvConf(resolvConf);
+                    writeFile(chrootRootDir + "/etc/resolv.conf", modifiedResolvConf);
+                } else {
+                    ss.push_back(path);
+                }
+            }
+        }
 
         if (auto & caFile = fileTransferSettings.caFile.get()) {
             if (pathExists(*caFile))
@@ -817,6 +849,26 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
     int status = child.wait();
     if (!statusOk(status))
         throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
+}
+
+std::string ChrootLinuxDerivationBuilder::rewriteResolvConf(std::string fromHost)
+{
+    if (!runPasta) {
+        return fromHost;
+    }
+
+    static constexpr auto flags = std::regex::ECMAScript | std::regex::multiline;
+    static auto lineRegex = std::regex("^nameserver\\s.*$", flags);
+    static auto v4Regex = std::regex("^nameserver\\s+\\d{1,3}\\.", flags);
+    static auto v6Regex = std::regex("^nameserver.*:", flags);
+    std::string nsInSandbox = "\n";
+    if (std::regex_search(fromHost, v4Regex)) {
+        nsInSandbox += fmt("nameserver %s\n", PASTA_HOST_IPV4);
+    }
+    if (std::regex_search(fromHost, v6Regex)) {
+        nsInSandbox += fmt("nameserver %s\n", PASTA_HOST_IPV6);
+    }
+    return std::regex_replace(fromHost, lineRegex, "") + nsInSandbox;
 }
 
 } // namespace nix

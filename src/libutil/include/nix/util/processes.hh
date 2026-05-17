@@ -65,6 +65,7 @@ public:
     void setKillSignal(int signal);
     void setKillTimeout(std::chrono::milliseconds duration);
     pid_t release();
+    pid_t get();
 #endif
 
     friend void swap(Pid & lhs, Pid & rhs) noexcept
@@ -120,6 +121,11 @@ std::string runProgram(
 
 struct RunOptions
 {
+    struct Redirection
+    {
+        int from, to;
+    };
+
     std::filesystem::path program;
     bool lookupPath = true;
     OsStrings args;
@@ -132,12 +138,18 @@ struct RunOptions
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
     bool isInteractive = false;
+    std::vector<Redirection> redirections;
+#ifdef __linux__
+    std::set<long> caps;
+#endif
 };
 
 // Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
+
+Pid startProgram(const RunOptions & options, std::shared_ptr<Pipe> out);
 
 class ExecError final : public CloneableError<ExecError, Error>
 {
