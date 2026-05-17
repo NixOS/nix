@@ -16,6 +16,8 @@ PAYLOAD = b"hello from flaky server\n"
 PORT = 0  # set after server starts
 fail_count = 0
 retry_after = "1"
+fail_status = 503
+fail_body = b""
 lock = threading.Lock()
 
 
@@ -27,9 +29,15 @@ class FlakyHandler(http.server.BaseHTTPRequestHandler):
             if n > 0:
                 fail_count = n - 1
         if n > 0:
-            self.send_response(503)
-            self.send_header("Retry-After", retry_after)
+            self.send_response(fail_status)
+            if fail_status == 503:
+                self.send_header("Retry-After", retry_after)
+            if fail_body:
+                self.send_header("Content-Type", "application/xml")
+                self.send_header("Content-Length", str(len(fail_body)))
             self.end_headers()
+            if fail_body:
+                self.wfile.write(fail_body)
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -41,11 +49,19 @@ class FlakyHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-def set_failures(n: int, ra: int = 1) -> None:
-    global fail_count, retry_after
+def s3_error_xml(code: str, message: str = "test") -> bytes:
+    return (f'<?xml version="1.0" encoding="UTF-8"?>'
+            f'<Error><Code>{code}</Code>'
+            f'<Message>{message}</Message></Error>').encode()
+
+
+def set_failures(n: int, ra: int = 1, status: int = 503, body: bytes = b"") -> None:
+    global fail_count, retry_after, fail_status, fail_body
     with lock:
         fail_count = n
         retry_after = str(ra)
+        fail_status = status
+        fail_body = body
 
 
 def fetch(extra_opts: str = "") -> tuple[int, str, list[int]]:
@@ -71,6 +87,7 @@ def main() -> None:
         test_retry_exhaustion()
         test_raised_retry_attempts()
         test_download_attempts_alias()
+        test_s3_xml_error_retried()
     finally:
         httpd.shutdown()
 
@@ -134,6 +151,18 @@ def test_download_attempts_alias():
 
     assert rc != 0, f"Expected failure: {out}"
     assert len(delays) == 1, f"Expected 1 retry, got {len(delays)}: {out}"
+
+
+def test_s3_xml_error_retried():
+    """HTTP 400 with S3 RequestTimeout XML error body is retried."""
+    set_failures(2, ra=0, status=400, body=s3_error_xml("RequestTimeout"))
+    rc, out, delays = fetch(
+        "--option filetransfer-retry-attempts 4 "
+        "--option filetransfer-retry-delay-rate-limited 50"
+    )
+    assert rc == 0, f"Expected success: {out}"
+    assert len(delays) == 2, f"Expected 2 retries, got {len(delays)}: {out}"
+
 
 
 if __name__ == "__main__":
