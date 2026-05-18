@@ -685,8 +685,12 @@ struct curlFileTransfer : public FileTransfer
                 if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
-                } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
-                    // Don't retry on authentication/authorization failures
+                } else if (httpStatus == 401 || httpStatus == 407) {
+                    err = Unauthorized;
+                } else if (httpStatus == 403) {
+                    // Don't retry on authentication/authorization failures.
+                    // Note: the only reason we treat this differently from 401/407 is S3 returns 403 if a file doesn't
+                    // exist and the bucket is unlistable.
                     err = Forbidden;
                 } else if (httpStatus == 429) {
                     // 429 means too many requests, so we retry (with a substantially longer delay)
