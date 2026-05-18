@@ -385,7 +385,7 @@ public:
     void
     download(FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback = {});
 
-    enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
+    enum Error { NotFound, Unauthorized, Forbidden, Misc, Transient, Interrupted };
 };
 
 /**
