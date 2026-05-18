@@ -103,7 +103,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix flake check ${{ inputs.flake }} -L --system ${{ inputs.system }}
+      - run: nix flake check --keep-going ${{ inputs.flake }} -L --system ${{ inputs.system }}
 
   vm_tests_smoke:
     if: inputs.run_vm_tests && github.event_name != 'merge_group'
