@@ -133,7 +133,6 @@ def main():
             build_id = get_build_id(lib)
             if build_id is None:
                 print(f"  {lib} (no build ID, uploading binary)", file=sys.stderr)
-                debug_files.append(lib)
                 continue
 
             local = find_debug_file_in_dirs(build_id, args.debug_dir)
