@@ -128,6 +128,8 @@ def main():
         debug_files = []
         print("ELF files to process:", file=sys.stderr)
         for lib in libs:
+            debug_files.append(lib)
+
             build_id = get_build_id(lib)
             if build_id is None:
                 print(f"  {lib} (no build ID, uploading binary)", file=sys.stderr)
@@ -142,9 +144,9 @@ def main():
 
             debuginfo = fetch_debuginfo(build_id)
             if debuginfo is None:
-                print(f"  {lib} ({build_id}): no separate debug info, uploading binary", file=sys.stderr)
-                debug_files.append(lib)
+                print(f"  {lib} ({build_id}): no separate debug info", file=sys.stderr)
                 continue
+
             print(f"  {lib} ({build_id}): member={debuginfo['member']}", file=sys.stderr)
             nar_path = download_nar(build_id, debuginfo["archive"])
             debug_file = extract_debug_symbols(nar_path, debuginfo["member"], build_id)
