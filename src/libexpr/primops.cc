@@ -1047,7 +1047,35 @@ static void prim_addErrorContext(EvalState & state, const PosIdx pos, Value ** a
 static RegisterPrimOp primop_addErrorContext(
     PrimOp{
         .name = "__addErrorContext",
+        .args = {"context", "value"},
         .arity = 2,
+        .doc = R"(
+            Evaluate *context*, which can be coerced to a string,
+            and append it to any error or stack traces displayed while evaluating *value*.
+            Then return *value*.
+
+            This function is useful for providing helpful context in complex Nix expressions
+            when the evaluation of *value* fails.
+            The additional context is applied when evaluating *value* itself fails,
+            not when attributes or elements of *value* are evaluated.
+
+            For example, the module system from nixpkgs uses this to show
+            the relevant information about the options that were evaluating
+            when an error occurs.
+
+            ```nix-repl
+            nix-repl> addErrorContext "while evaluating foo" (throw "bar")
+            error:
+                   … while evaluating foo
+
+                   … while calling the 'throw' builtin
+                     at «string»:1:56:
+                        1| with builtins; addErrorContext "while evaluating foo" (throw "bar")
+                         |                                                        ^
+
+                   error: bar
+            ```
+        )",
         // The normal trace item is redundant
         .addTrace = false,
         .impl = prim_addErrorContext,
