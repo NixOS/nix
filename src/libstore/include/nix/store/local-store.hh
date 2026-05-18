@@ -147,7 +147,7 @@ public:
           Whether to request garbage collector roots from an external daemon.
 
           When enabled, the garbage collector connects to a Unix domain socket
-          at [`<state-dir>`](@docroot@/store/types/local-store.md#store-option-state)`/gc-roots-socket/socket` to discover additional roots
+          at [`<state-dir>`](@docroot@/store/types/local-store.md#store-local-store-state)`/gc-roots-socket/socket` to discover additional roots
           that should not be collected. This is useful when the Nix daemon runs
           without root privileges and cannot scan `/proc` for runtime roots.
 
