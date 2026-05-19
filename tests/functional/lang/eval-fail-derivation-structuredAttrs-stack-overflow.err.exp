@@ -1,10 +1,10 @@
 error:
        … while evaluating the attribute 'outPath'
-         at «nix-internal»/derivation-internal.nix:53:7:
-           52|     value = commonAttrs // {
-           53|       outPath = strict.${outputName};
+         at «nix-internal»/derivation-internal.nix:55:7:
+           54|     value = commonAttrs // {
+           55|       outPath = strict.${outputName};
              |       ^
-           54|       drvPath = strict.drvPath;
+           56|       inherit outputName;
 
        … while calling the 'derivationStrict' builtin
          at «nix-internal»/derivation-internal.nix:40:12:

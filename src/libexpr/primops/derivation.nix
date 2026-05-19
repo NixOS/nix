@@ -44,14 +44,14 @@ let
     // {
       all = map (x: x.value) outputsList;
       inherit drvAttrs;
+      drvPath = strict.drvPath;
+      type = "derivation";
     };
 
   outputsList = map (outputName: {
     name = outputName;
     value = commonAttrs // {
       outPath = strict.${outputName};
-      drvPath = strict.drvPath;
-      type = "derivation";
       inherit outputName;
     };
   }) outputs;

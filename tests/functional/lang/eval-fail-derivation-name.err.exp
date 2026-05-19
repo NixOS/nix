@@ -4,7 +4,7 @@ error:
      <number>|     value = commonAttrs // {
      <number>|       outPath = strict.${outputName};
              |       ^
-     <number>|       drvPath = strict.drvPath;
+     <number>|       inherit outputName;
 
        … while calling the 'derivationStrict' builtin
          at «nix-internal»/derivation-internal.nix:<number>:<number>:
