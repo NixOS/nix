@@ -28,9 +28,10 @@
 */
 let
   inherit (builtins) listToAttrs head;
+  defaultOutputs = [ "out" ];
 in
 drvAttrs@{
-  outputs ? [ "out" ],
+  outputs ? defaultOutputs,
   ...
 }:
 
