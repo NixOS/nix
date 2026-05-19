@@ -401,6 +401,7 @@ struct EvalSettings : Config
         "lint-absolute-path-literals",
         R"(
           Controls the handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
+          See [path literals](@docroot@/language/syntax.md#path-literal).
           These may be considered antipatterns, as explained below.
 
           Possible values:
@@ -410,14 +411,14 @@ struct EvalSettings : Config
           - `fatal`: Treat as a parse error
 
           There are two use cases for these literals.
-          - Specifying a location without reading its contents during evaluation, e.g. using `toString`
-          - Providing more sources for expressions and builds, e.g. using string interpolation
+          - Specifying a location without reading its contents during evaluation, e.g. using [`toString`](@docroot@/language/builtins.md#builtins-toString)
+          - Providing more sources for expressions and builds, e.g. using [string interpolation](@docroot@/language/string-interpolation.md)
 
           These two kinds of literals have significant disadvantages for both use cases.
 
           The simpler use case is specifying a location without reading its contents.
           This comes with the risk of accidentally copying unintended files into the store, making a snapshot of those files readable by all system users.
-          This happens easily, because string interpolation (`"${some-path-value}"`) and some other operations blur the line between these two use cases: they implicitly convert the path value to a store path by copying its contents to the store.
+          This happens easily, because [string interpolation](@docroot@/language/string-interpolation.md#interpolated-expression) (`"${some-path-value}"`) and some other operations blur the line between these two use cases: they implicitly convert the path value to a store path by copying its contents to the store.
           Arguably, this makes path literals unfit for the simple string-like use case.
 
           Additionally, a home path literal can make the home directory *location* of the evaluating user an implicit input to the evaluation, specifically when `toString` is called, e.g. `toString ~/.config`.
