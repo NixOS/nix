@@ -400,23 +400,39 @@ struct EvalSettings : Config
         Diagnose::Ignore,
         "lint-absolute-path-literals",
         R"(
-          Controls handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
+          Controls the handling of absolute path literals (paths starting with `/`) and home path literals (paths starting with `~/`).
+          These may be considered antipatterns, as explained below.
+
+          Possible values:
 
           - `ignore`: Ignore without warning (default)
           - `warn`: Emit a warning about non-portability
           - `fatal`: Treat as a parse error
 
-          It is true that some files are more difficult to reference with relative paths,
-          because they would require lots of `../../..` upward traversing to reach them.
-          But firstly, it is probably not a good idea to reference these files ---
-          such paths often make Nix expressions less portable and reproducible,
-          as they depend on the file system layout of the machine evaluating the expression.
+          There are two use cases for these literals.
+          - Specifying a location without reading its contents during evaluation, e.g. using `toString`
+          - Providing more sources for expressions and builds, e.g. using string interpolation
 
-          Secondly, with [pure evaluation mode](#conf-pure-eval), most such files are prohibited to access anyway,
-          whether by absolute or relative paths.
-          In that case, enabling this lint in fatal mode is less disruptive,
-          because the paths pure eval allows are usually not the ones that would be ergonomically expressed with absolute paths anyway.
-        )",
+          These two kinds of literals have significant disadvantages for both use cases.
+
+          The simpler use case is specifying a location without reading its contents.
+          This comes with the risk of accidentally copying unintended files into the store, making a snapshot of those files readable by all system users.
+          This happens easily, because string interpolation (`"${some-path-value}"`) and some other operations blur the line between these two use cases: they implicitly convert the path value to a store path by copying its contents to the store.
+          Arguably, this makes path literals unfit for the simple string-like use case.
+
+          Additionally, a home path literal can make the home directory *location* of the evaluating user an implicit input to the evaluation, specifically when `toString` is called, e.g. `toString ~/.config`.
+          Evaluating on different accounts or machines will result in different derivations - an evaluation impurity.
+
+          Sometimes the intent is to read the file system contents at the path, as part of evaluation or instantiation.
+          In that case, using absolute or home path literals is undesirable for different reasons.
+          It requires that anyone who uses your expressions sets up more sources in those exact locations.
+          This is not a requirement that should normally be imposed on users, because it causes extra work, may not be possible to achieve for all users, or may conflict with their preferred file system layout.
+          Furthermore, it is non-hermetic, so it's difficult to version-control such expressions correctly.
+          A similar problem can be caused by upward relative path literals like `../../..`, which is not checked by this option, but by [pure evaluation mode](#conf-pure-eval).
+
+          [Pure evaluation mode](#conf-pure-eval) by itself also disallows home path literals, with a different error message.
+          It does not disallow absolute path literals, as it only restricts access to the *contents* of most file system locations.
+          )",
     };
 
     Setting<Diagnose> lintUrlLiterals{
