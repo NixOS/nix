@@ -63,6 +63,8 @@ const char * toOpenSSLKeyType(KeyType type)
         return "ML-DSA-65";
     case KeyType::MLDSA87:
         return "ML-DSA-87";
+    case KeyType::ECDSAP384:
+        return "EC";
     case KeyType::Ed25519:
     default:
         throw Error("key type is not supported by OpenSSL");
@@ -70,7 +72,49 @@ const char * toOpenSSLKeyType(KeyType type)
 }
 
 /**
- * Parse a DER-encoded PKCS#8 `PrivateKeyInfo` and verify that the key is ML-DSA-*.
+ * Return the digest algorithm to use with `EVP_DigestSign` / `EVP_DigestVerify`
+ * for a given key type, or `nullptr` if the algorithm performs hashing
+ * internally (as ML-DSA does).
+ */
+const char * digestForKeyType(KeyType type)
+{
+    switch (type) {
+    case KeyType::MLDSA44:
+    case KeyType::MLDSA65:
+    case KeyType::MLDSA87:
+        return nullptr;
+    case KeyType::ECDSAP384:
+        return "SHA384";
+    case KeyType::Ed25519:
+    default:
+        unreachable();
+    }
+}
+
+/**
+ * Determine the `KeyType` of a parsed OpenSSL key, or return `std::nullopt` if
+ * we don't support it.
+ */
+std::optional<KeyType> detectOpenSSLKeyType(EVP_PKEY * pkey)
+{
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-44") == 1)
+        return KeyType::MLDSA44;
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-65") == 1)
+        return KeyType::MLDSA65;
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-87") == 1)
+        return KeyType::MLDSA87;
+    if (EVP_PKEY_is_a(pkey, "EC") == 1) {
+        char curve[64] = {0};
+        size_t curveLen = 0;
+        if (EVP_PKEY_get_utf8_string_param(pkey, OSSL_PKEY_PARAM_GROUP_NAME, curve, sizeof(curve), &curveLen) == 1
+            && std::string_view(curve, curveLen) == "secp384r1")
+            return KeyType::ECDSAP384;
+    }
+    return std::nullopt;
+}
+
+/**
+ * Parse a DER-encoded PKCS#8 `PrivateKeyInfo`.
  */
 AutoEVP_PKEY parsePrivateKey(std::string_view der)
 {
@@ -80,7 +124,7 @@ AutoEVP_PKEY parsePrivateKey(std::string_view der)
 }
 
 /**
- * Parse a DER-encoded `SubjectPublicKeyInfo` and verify that the key is ML-DSA-*.
+ * Parse a DER-encoded `SubjectPublicKeyInfo`.
  */
 AutoEVP_PKEY parsePublicKey(std::string_view der)
 {
@@ -93,10 +137,12 @@ AutoEVP_PKEY parsePublicKey(std::string_view der, KeyType type)
 {
     auto pkey = parsePublicKey(der);
 
-    auto typeS = toOpenSSLKeyType(type);
-
-    if (EVP_PKEY_is_a(pkey.get(), typeS) != 1)
-        throw Error("public key is not '%s'' (got '%s')", typeS, EVP_PKEY_get0_type_name(pkey.get()));
+    auto detected = pkey ? detectOpenSSLKeyType(pkey.get()) : std::nullopt;
+    if (!detected || *detected != type)
+        throw Error(
+            "public key is not '%s' (got '%s')",
+            toOpenSSLKeyType(type),
+            pkey ? EVP_PKEY_get0_type_name(pkey.get()) : "<invalid>");
 
     return pkey;
 }
@@ -142,6 +188,7 @@ static std::unordered_map<std::string_view, KeyType> keyTypeMap{
     {"ml-dsa-44", KeyType::MLDSA44},
     {"ml-dsa-65", KeyType::MLDSA65},
     {"ml-dsa-87", KeyType::MLDSA87},
+    {"ecdsa-p384", KeyType::ECDSAP384},
 };
 
 const StringSet & getKeyTypes()
@@ -253,20 +300,23 @@ struct OpenSSLPublicKey : PublicKey
         , type(type)
         , pkey(std::move(pkey))
     {
-        assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
+        assert(
+            type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87
+            || type == KeyType::ECDSAP384);
     }
 
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
     {
-        if (!experimentalFeatureSettings.isEnabled(Xp::MLDSA))
+        if (!experimentalFeatureSettings.isEnabled(Xp::CNSA))
             return false;
 
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
 
-        if (EVP_DigestVerifyInit(ctx.get(), nullptr, nullptr, nullptr, pkey.get()) <= 0)
-            throw Error("EVP_DigestVerifyInit failed");
+        if (EVP_DigestVerifyInit_ex(ctx.get(), nullptr, digestForKeyType(type), nullptr, nullptr, pkey.get(), nullptr)
+            <= 0)
+            throw Error("EVP_DigestVerifyInit_ex failed");
 
         return EVP_DigestVerify(
                    ctx.get(),
@@ -302,12 +352,14 @@ struct OpenSSLSecretKey : SecretKey
         , type(type)
         , pkey(std::move(pkey))
     {
-        assert(type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87);
+        assert(
+            type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87
+            || type == KeyType::ECDSAP384);
     }
 
     static std::unique_ptr<OpenSSLSecretKey> generate(std::string_view name, KeyType type)
     {
-        experimentalFeatureSettings.require(Xp::MLDSA);
+        experimentalFeatureSettings.require(Xp::CNSA);
 
         auto typeS = toOpenSSLKeyType(type);
         AutoEVP_PKEY_CTX ctx(EVP_PKEY_CTX_new_from_name(nullptr, typeS, nullptr));
@@ -316,6 +368,16 @@ struct OpenSSLSecretKey : SecretKey
 
         if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
             throw Error("EVP_PKEY_keygen_init failed");
+
+        if (type == KeyType::ECDSAP384) {
+            char curve[] = "secp384r1";
+            OSSL_PARAM params[] = {
+                OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, curve, 0),
+                OSSL_PARAM_construct_end(),
+            };
+            if (EVP_PKEY_CTX_set_params(ctx.get(), params) <= 0)
+                throw Error("EVP_PKEY_CTX_set_params failed");
+        }
 
         EVP_PKEY * rawPkey = nullptr;
         if (EVP_PKEY_generate(ctx.get(), &rawPkey) <= 0)
@@ -334,22 +396,31 @@ struct OpenSSLSecretKey : SecretKey
 
     Signature signDetached(std::string_view data) const override
     {
-        experimentalFeatureSettings.require(Xp::MLDSA);
+        experimentalFeatureSettings.require(Xp::CNSA);
 
         AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
         if (!ctx)
             throw Error("EVP_MD_CTX_new failed");
 
         /* Generate a deterministic signature (i.e. only depending on the key and the data) since Ed25519 is also
-           deterministic. Note from RFC-9882: "The signer SHOULD NOT use the deterministic variant of ML-DSA on
-           platforms where side-channel attacks or fault attacks are a concern." */
+           deterministic. For ML-DSA we set OSSL_SIGNATURE_PARAM_DETERMINISTIC; for ECDSA we request RFC-6979
+           deterministic nonces via OSSL_SIGNATURE_PARAM_NONCE_TYPE. Note from RFC-9882: "The signer SHOULD NOT
+           use the deterministic variant of ML-DSA on platforms where side-channel attacks or fault attacks are a
+           concern." */
         int deterministic = 1;
-        OSSL_PARAM params[] = {
+        unsigned int nonceType = 1;
+        OSSL_PARAM mlDsaParams[] = {
             OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, &deterministic),
             OSSL_PARAM_construct_end(),
         };
+        OSSL_PARAM ecdsaParams[] = {
+            OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &nonceType),
+            OSSL_PARAM_construct_end(),
+        };
+        OSSL_PARAM * params = type == KeyType::ECDSAP384 ? ecdsaParams : mlDsaParams;
 
-        if (EVP_DigestSignInit_ex(ctx.get(), nullptr, nullptr, nullptr, nullptr, pkey.get(), params) <= 0)
+        if (EVP_DigestSignInit_ex(ctx.get(), nullptr, digestForKeyType(type), nullptr, nullptr, pkey.get(), params)
+            <= 0)
             throw Error("EVP_DigestSignInit_ex failed");
 
         size_t sigLen = 0;
@@ -371,7 +442,7 @@ struct OpenSSLSecretKey : SecretKey
 
     std::unique_ptr<PublicKey> toPublicKey() const override
     {
-        experimentalFeatureSettings.require(Xp::MLDSA);
+        experimentalFeatureSettings.require(Xp::CNSA);
 
         unsigned char * derBuf = nullptr;
         int derLen = i2d_PUBKEY(pkey.get(), &derBuf);
@@ -407,17 +478,11 @@ std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
 
         if (key.size() == crypto_sign_SECRETKEYBYTES)
             return std::make_unique<Ed25519SecretKey>(name, std::move(key));
-        else if (auto pkey = parsePrivateKey(key); experimentalFeatureSettings.isEnabled(Xp::MLDSA) && pkey) {
-            KeyType type;
-            if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
-                type = KeyType::MLDSA44;
-            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
-                type = KeyType::MLDSA65;
-            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
-                type = KeyType::MLDSA87;
-            else
+        else if (auto pkey = parsePrivateKey(key); experimentalFeatureSettings.isEnabled(Xp::CNSA) && pkey) {
+            auto type = detectOpenSSLKeyType(pkey.get());
+            if (!type)
                 throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
-            return std::make_unique<OpenSSLSecretKey>(type, name, std::move(key), std::move(pkey));
+            return std::make_unique<OpenSSLSecretKey>(*type, name, std::move(key), std::move(pkey));
         } else
             throw Error("secret key is not valid");
 
@@ -438,6 +503,7 @@ std::unique_ptr<SecretKey> SecretKey::generate(std::string_view name, KeyType ty
     case KeyType::MLDSA44:
     case KeyType::MLDSA65:
     case KeyType::MLDSA87:
+    case KeyType::ECDSAP384:
         return OpenSSLSecretKey::generate(name, type);
 
     default:
@@ -452,17 +518,11 @@ std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
 
         if (key.size() == crypto_sign_PUBLICKEYBYTES)
             return std::make_unique<Ed25519PublicKey>(name, std::move(key));
-        else if (auto pkey = parsePublicKey(key); experimentalFeatureSettings.isEnabled(Xp::MLDSA) && pkey) {
-            KeyType type;
-            if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-44") == 1)
-                type = KeyType::MLDSA44;
-            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-65") == 1)
-                type = KeyType::MLDSA65;
-            else if (EVP_PKEY_is_a(pkey.get(), "ML-DSA-87") == 1)
-                type = KeyType::MLDSA87;
-            else
+        else if (auto pkey = parsePublicKey(key); experimentalFeatureSettings.isEnabled(Xp::CNSA) && pkey) {
+            auto type = detectOpenSSLKeyType(pkey.get());
+            if (!type)
                 throw Error("public key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
-            return std::make_unique<OpenSSLPublicKey>(type, name, std::move(key), std::move(pkey));
+            return std::make_unique<OpenSSLPublicKey>(*type, name, std::move(key), std::move(pkey));
         } else
             throw Error("public key is not valid");
     } catch (Error & e) {

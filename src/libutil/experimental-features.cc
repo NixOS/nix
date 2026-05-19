@@ -25,7 +25,7 @@ struct ExperimentalFeatureDetails
  * feature, we either have no issue at all if few features are not added
  * at the end of the list, or a proper merge conflict if they are.
  */
-constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::MLDSA);
+constexpr size_t numXpFeatures = 1 + static_cast<size_t>(Xp::CNSA);
 
 constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails = {{
     {
@@ -306,10 +306,12 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .trackingUrl = "",
     },
     {
-        .tag = Xp::MLDSA,
-        .name = "ml-dsa",
+        .tag = Xp::CNSA,
+        .name = "cnsa",
         .description = R"(
-            Enable support for ML-DSA keys and signatures.
+            Enable support for keys and signatures using algorithms from the
+            Commercial National Security Algorithm (CNSA) Suite: ECDSA P-384
+            and ML-DSA.
         )",
         .trackingUrl = "",
     },

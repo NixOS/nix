@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-experimental_features="ml-dsa"
+experimental_features="cnsa"
 
 source common.sh
 
@@ -24,7 +24,7 @@ if [[ "$keyType" == "ed25519" ]]; then
     expectStderr 1 nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 | grepQuiet "conversion to PEM is not implemented for this key type"
     expectStderr 1 nix key convert-public-to-pem < "$TEST_ROOT"/pk1 | grepQuiet "conversion to PEM is not implemented for this key type"
 else
-    # ML-DSA-* keys can be converted to PEM.
+    # ML-DSA-* and ECDSA-P-384 keys can be converted to PEM.
     nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 > "$TEST_ROOT"/sk1.pem
     grepQuiet "^-----BEGIN PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
     grepQuiet "^-----END PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
@@ -161,3 +161,4 @@ runTests ed25519
 runTests ml-dsa-44
 runTests ml-dsa-65
 runTests ml-dsa-87
+runTests ecdsa-p384

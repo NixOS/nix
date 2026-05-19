@@ -40,6 +40,7 @@ Nix supports keys in the following formats (specified using the `--key-type` opt
 
 * `ed25519` (libsodium). This is the default key type. It produces compact keys and signatures, but may not be resistant to attacks using quantum computers.
 * `ml-dsa-44`, `ml-dsa-65`, `ml-dsa-87` (OpenSSL). These generate much larger keys and signatures, but are believed to be resistant to quantum attacks.
+* `ecdsa-p384` (OpenSSL). ECDSA over the NIST P-384 curve using SHA-384. This is a CNSA-approved classical algorithm but is not believed to be resistant to quantum attacks.
 
 # Format
 

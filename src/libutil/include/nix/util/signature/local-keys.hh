@@ -46,6 +46,7 @@ enum KeyType {
     MLDSA44,
     MLDSA65,
     MLDSA87,
+    ECDSAP384,
 };
 
 KeyType parseKeyType(std::string_view s);
@@ -88,7 +89,7 @@ struct SecretKey : Key
 
     /**
      * Return a PEM PKCS#8 encoding of this secret key. The Nix-specific
-     * key name is not included. Only ML-DSA keys are supported.
+     * key name is not included. Only OpenSSL-backed keys (ML-DSA and ECDSA P-384) are supported.
      */
     virtual std::string toPEM() const;
 
@@ -119,7 +120,7 @@ struct PublicKey : Key
 
     /**
      * Return a PEM SubjectPublicKeyInfo encoding of this public key.
-     * The Nix-specific key name is not included. Only ML-DSA keys are
+     * The Nix-specific key name is not included. Only OpenSSL-backed keys (ML-DSA and ECDSA P-384) are
      * supported.
      */
     virtual std::string toPEM() const;
