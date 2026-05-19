@@ -1,16 +1,16 @@
 error:
        … while evaluating the attribute 'outPath'
          at «nix-internal»/derivation-internal.nix:<number>:<number>:
-     <number>|     value = commonAttrs // {
-     <number>|       outPath = strict.${outputName};
+     <number>|       drvPath = strict.drvPath;
+     <number>|       outPath = strict.out;
              |       ^
-     <number>|       inherit outputName;
+     <number>|       out = self;
 
        … while calling the 'derivationStrict' builtin
          at «nix-internal»/derivation-internal.nix:<number>:<number>:
-     <number>|
-     <number>|   strict = derivationStrict drvAttrs;
-             |            ^
+     <number>|   let
+     <number>|     strict = derivationStrict drvAttrs;
+             |              ^
      <number>|
 
        … while evaluating derivation '~jiggle~'
