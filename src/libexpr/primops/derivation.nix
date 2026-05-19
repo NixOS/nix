@@ -43,7 +43,7 @@ let
       inherit drvAttrs;
     };
 
-  outputToAttrListElement = outputName: {
+  outputsList = map (outputName: {
     name = outputName;
     value = commonAttrs // {
       outPath = strict.${outputName};
@@ -51,9 +51,7 @@ let
       type = "derivation";
       inherit outputName;
     };
-  };
-
-  outputsList = map outputToAttrListElement outputs;
+  }) outputs;
 
 in
 (builtins.head outputsList).value
