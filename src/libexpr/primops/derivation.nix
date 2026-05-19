@@ -26,6 +26,9 @@
   Note that `derivation` is very bare-bones, and provides almost no commands during the build.
   Most likely, you'll want to use functions like `stdenv.mkDerivation` in Nixpkgs to set up a basic environment.
 */
+let
+  inherit (builtins) listToAttrs head;
+in
 drvAttrs@{
   outputs ? [ "out" ],
   ...
@@ -37,7 +40,7 @@ let
 
   commonAttrs =
     drvAttrs
-    // (builtins.listToAttrs outputsList)
+    // (listToAttrs outputsList)
     // {
       all = map (x: x.value) outputsList;
       inherit drvAttrs;
@@ -54,4 +57,4 @@ let
   }) outputs;
 
 in
-(builtins.head outputsList).value
+(head outputsList).value

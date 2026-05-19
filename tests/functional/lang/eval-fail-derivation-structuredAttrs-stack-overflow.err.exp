@@ -1,17 +1,17 @@
 error:
        … while evaluating the attribute 'outPath'
-         at «nix-internal»/derivation-internal.nix:50:7:
-           49|     value = commonAttrs // {
-           50|       outPath = strict.${outputName};
+         at «nix-internal»/derivation-internal.nix:53:7:
+           52|     value = commonAttrs // {
+           53|       outPath = strict.${outputName};
              |       ^
-           51|       drvPath = strict.drvPath;
+           54|       drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin
-         at «nix-internal»/derivation-internal.nix:37:12:
-           36|
-           37|   strict = derivationStrict drvAttrs;
+         at «nix-internal»/derivation-internal.nix:40:12:
+           39|
+           40|   strict = derivationStrict drvAttrs;
              |            ^
-           38|
+           41|
 
        … while evaluating derivation 'test'
          whose name attribute is located at /pwd/lang/eval-fail-derivation-structuredAttrs-stack-overflow.nix:5:3
