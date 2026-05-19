@@ -110,7 +110,7 @@ struct PostBuildHookState
     std::unique_ptr<Pipe> out;
     Pid pid;
 
-    PostBuildHookState(Logger & logger, const std::string hook, const std::string drvPath)
+    PostBuildHookState(std::shared_ptr<Logger>, const std::string hook, const std::string drvPath)
         : hook(hook)
         , act(logger,
               lvlTalkative,
@@ -134,7 +134,7 @@ struct PostBuildHookState
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
-    Logger & logger,
+    std::shared_ptr<Logger> logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
 
@@ -465,7 +465,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 
         if (!outputLocks.lockPaths(lockFiles, "", false)) {
             Activity act(
-                *logger,
+                logger,
                 lvlWarn,
                 actBuildWaiting,
                 fmt("waiting for lock on %s",
@@ -539,7 +539,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             // First attempt was postponed. Retry in a loop with an activity
             // that lives until accept or decline.
             Activity act(
-                *logger,
+                logger,
                 lvlWarn,
                 actBuildWaiting,
                 fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
@@ -700,7 +700,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
         worker.settings.logLines,
         std::make_unique<Activity>(
-            *logger,
+            logger,
             lvlInfo,
             actBuild,
             msg,
@@ -829,7 +829,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
         outputPaths.insert(output.outPath);
 
     if (worker.settings.postBuildHook.get() != "") {
-        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+        auto hookState = runPostBuildHook(worker.settings, worker.store, logger, drvPath, outputPaths);
         worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
         while (true) {
             auto event = co_await WaitForChildEvent{};
@@ -884,7 +884,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         buildLog = std::make_unique<BuildLog>(
             worker.settings.logLines,
             std::make_unique<Activity>(
-                *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
+                logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -1000,7 +1000,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         } else {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
-                    *logger,
+                    logger,
                     lvlWarn,
                     actBuildWaiting,
                     fmt("waiting for a free build user ID for '%s'", Magenta(worker.store.printStorePath(drvPath))));
@@ -1073,7 +1073,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         }
 
         if (worker.settings.postBuildHook.get() != "") {
-            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+            auto hookState = runPostBuildHook(worker.settings, worker.store, logger, drvPath, outputPaths);
             worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
             while (true) {
                 auto event = co_await WaitForChildEvent{};
@@ -1101,7 +1101,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
-    Logger & logger,
+    std::shared_ptr<Logger> logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths)
 {

@@ -452,7 +452,7 @@ struct curlFileTransfer : public FileTransfer
         {
             if (!_act) {
                 _act = std::make_unique<Activity>(
-                    *logger,
+                    logger,
                     lvlTalkative,
                     actFileTransfer,
                     fmt("%s '%s'", request.verb(/*continuous=*/true), request.displayUri()),

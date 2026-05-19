@@ -716,9 +716,9 @@ public:
 
 } // namespace
 
-std::unique_ptr<Logger> makeProgressBar()
+std::shared_ptr<Logger> makeProgressBar()
 {
-    return std::make_unique<ProgressBar>(isTTY());
+    return std::make_shared<ProgressBar>(isTTY());
 }
 
 } // namespace nix

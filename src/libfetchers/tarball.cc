@@ -165,7 +165,7 @@ static DownloadTarballResult downloadTarball_(
 
     // TODO: fall back to cached value if download fails.
 
-    auto act = std::make_unique<Activity>(*logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", url));
+    auto act = std::make_unique<Activity>(logger, lvlInfo, actUnknown, fmt("unpacking '%s' into the Git cache", url));
 
     AutoDelete cleanupTemp;
 

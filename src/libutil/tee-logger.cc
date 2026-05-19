@@ -6,10 +6,10 @@ namespace {
 
 class TeeLogger final : public Logger
 {
-    std::vector<std::unique_ptr<Logger>> loggers;
+    std::vector<std::shared_ptr<Logger>> loggers;
 
 public:
-    TeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
+    TeeLogger(std::vector<std::shared_ptr<Logger>> && loggers)
         : loggers(std::move(loggers))
     {
     }
@@ -99,10 +99,10 @@ public:
 
 } // namespace
 
-std::unique_ptr<Logger>
-makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers)
+std::shared_ptr<Logger>
+makeTeeLogger(std::shared_ptr<Logger> mainLogger, std::vector<std::shared_ptr<Logger>> && extraLoggers)
 {
-    std::vector<std::unique_ptr<Logger>> allLoggers;
+    std::vector<std::shared_ptr<Logger>> allLoggers;
     allLoggers.push_back(std::move(mainLogger));
     for (auto & l : extraLoggers)
         allLoggers.push_back(std::move(l));

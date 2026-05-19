@@ -72,7 +72,7 @@ std::pair<StorePath, Hash> fetchToStore2(
     }
 
     Activity act(
-        *logger,
+        logger,
         lvlChatty,
         actUnknown,
         fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));

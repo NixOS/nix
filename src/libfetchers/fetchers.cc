@@ -502,7 +502,7 @@ void InputScheme::clone(
 
     auto [accessor, input2] = getAccessor(settings, store, input);
 
-    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
+    Activity act(logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
     RestoreSink sink(/*startFsync=*/false);
     sink.dstPath = destDir;

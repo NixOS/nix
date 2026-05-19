@@ -30,7 +30,7 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-std::unique_ptr<Logger> logger = makeSimpleLogger(true);
+std::shared_ptr<Logger> logger = makeSimpleLogger(true);
 
 void Logger::warn(const std::string & msg)
 {
@@ -165,9 +165,9 @@ void writeToStderr(std::string_view s)
     writeFullLogging(getStandardError(), s);
 }
 
-std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
+std::shared_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
 {
-    return std::make_unique<SimpleLogger>(printBuildLogs);
+    return std::make_shared<SimpleLogger>(printBuildLogs);
 }
 
 std::atomic<uint64_t> nextId{0};
@@ -182,7 +182,7 @@ static uint64_t getPid()
 }
 
 Activity::Activity(
-    Logger & logger,
+    std::shared_ptr<Logger> logger,
     Verbosity lvl,
     ActivityType type,
     const std::string & s,
@@ -191,7 +191,7 @@ Activity::Activity(
     : logger(logger)
     , id(nextId++ + (((uint64_t) getPid()) << 32))
 {
-    logger.startActivity(id, lvl, type, s, fields, parent);
+    logger->startActivity(id, lvl, type, s, fields, parent);
 }
 
 void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
@@ -341,12 +341,12 @@ struct JSONLogger : Logger
     }
 };
 
-std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
+std::shared_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {
     return std::make_unique<JSONLogger>(fd, includeNixPrefix);
 }
 
-std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
+std::shared_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix)
 {
     struct JSONFileLogger : JSONLogger
     {
@@ -378,7 +378,7 @@ void applyJSONLogger()
 {
     if (auto & opt = loggerSettings.jsonLogPath.get()) {
         try {
-            std::vector<std::unique_ptr<Logger>> loggers;
+            std::vector<std::shared_ptr<Logger>> loggers;
             loggers.push_back(makeJSONLogger(*opt, false));
             try {
                 logger = makeTeeLogger(std::move(logger), std::move(loggers));
@@ -435,7 +435,7 @@ bool handleJSONLogMessage(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(
-                        *logger, (Verbosity) json["level"], type, json["text"], getFields(json["fields"]), act.id));
+                        logger, (Verbosity) json["level"], type, json["text"], getFields(json["fields"]), act.id));
         }
 
         else if (action == "stop")
@@ -481,7 +481,7 @@ bool handleJSONLogMessage(
 Activity::~Activity()
 {
     try {
-        logger.stopActivity(id);
+        logger->stopActivity(id);
     } catch (...) {
         ignoreExceptionInDestructor();
     }

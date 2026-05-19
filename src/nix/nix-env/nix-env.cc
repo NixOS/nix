@@ -1089,7 +1089,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
             if (i.hasFailed())
                 continue;
 
-            // Activity act(*logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
+            // Activity act(logger, lvlDebug, "outputting query result '%1%'", i.attrPath);
 
             if (globals.prebuiltOnly && !validPaths.count(i.queryOutPath())
                 && !substitutablePaths.count(i.queryOutPath()))

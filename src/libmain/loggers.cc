@@ -21,7 +21,7 @@ LogFormat parseLogFormat(const std::string & logFormatStr)
     throw Error("option 'log-format' has an invalid value '%s'", logFormatStr);
 }
 
-std::unique_ptr<Logger> makeDefaultLogger()
+std::shared_ptr<Logger> makeDefaultLogger()
 {
     switch (defaultLogFormat) {
     case LogFormat::raw:

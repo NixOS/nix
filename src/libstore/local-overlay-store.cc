@@ -239,7 +239,7 @@ void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint
 
 void LocalOverlayStore::optimiseStore()
 {
-    Activity act(*logger, actOptimiseStore);
+    Activity act(logger, actOptimiseStore);
 
     // Note for LocalOverlayStore, queryAllValidPaths only returns paths in upper layer
     auto paths = queryAllValidPaths();

@@ -32,7 +32,7 @@ public:
 
 class CaptureLogging
 {
-    std::unique_ptr<Logger> oldLogger;
+    std::shared_ptr<Logger> oldLogger;
 public:
     CaptureLogging()
     {

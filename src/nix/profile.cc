@@ -739,7 +739,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers,
 
             upgradedCount++;
 
-            Activity act(*logger, lvlChatty, actUnknown, fmt("checking '%s' for updates", element.source->attrPath));
+            Activity act(logger, lvlChatty, actUnknown, fmt("checking '%s' for updates", element.source->attrPath));
 
             auto installable = make_ref<InstallableFlake>(
                 this,

@@ -53,7 +53,7 @@ struct CmdCopySigs : StorePathsCommand
         // logger->setExpected(doneLabel, storePaths.size());
 
         auto doPath = [&](const StorePath & storePath) {
-            // Activity act(*logger, lvlInfo, "getting signatures for '%s'", storePath);
+            // Activity act(logger, lvlInfo, "getting signatures for '%s'", storePath);
 
             checkInterrupt();
 

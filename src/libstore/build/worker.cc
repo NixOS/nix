@@ -19,9 +19,9 @@ namespace nix {
 Worker::Worker(Store & store, Store & evalStore)
     /* Can't use make_ref, because the constructor is private. */
     : wakerState(ref<Waker>(new Waker{}))
-    , act(*logger, actRealise)
-    , actDerivations(*logger, actBuilds)
-    , actSubstitutions(*logger, actCopyPaths)
+    , act(logger, actRealise)
+    , actDerivations(logger, actBuilds)
+    , actSubstitutions(logger, actCopyPaths)
 #ifdef _WIN32
     , ioport{CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)}
 #endif

@@ -323,7 +323,7 @@ struct MercurialInputScheme : InputScheme
                             }))
                          .second
                      == "1")) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
+            Activity act(logger, lvlTalkative, actUnknown, fmt("fetching Mercurial repository '%s'", actualUrl));
 
             if (pathExists(cacheDir)) {
                 try {

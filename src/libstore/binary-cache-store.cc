@@ -445,7 +445,7 @@ void BinaryCacheStore::queryPathInfoUncached(
         auto uri = config.getReference().render(/*FIXME withParams=*/false);
         auto storePathS = printStorePath(storePath);
         auto act = std::make_shared<Activity>(
-            *logger,
+            logger,
             lvlTalkative,
             actQueryPathInfo,
             fmt("querying info about '%s' on '%s'", storePathS, uri),

@@ -898,7 +898,7 @@ void copyStorePath(
     const auto & dstCfg = dstStore.config;
     auto storePathS = srcStore.printStorePath(storePath);
     Activity act(
-        *logger,
+        logger,
         lvlInfo,
         actCopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
@@ -1008,7 +1008,7 @@ std::map<StorePath, StorePath> copyPaths(
     if (missing.empty())
         return {};
 
-    Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
+    Activity act(logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
@@ -1056,7 +1056,7 @@ std::map<StorePath, StorePath> copyPaths(
             const auto & dstCfg = dstStore.config;
             auto storePathS = srcStore.printStorePath(missingPath);
             Activity act(
-                *logger,
+                logger,
                 lvlInfo,
                 actCopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),

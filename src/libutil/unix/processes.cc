@@ -231,18 +231,22 @@ static int childEntry(void * arg)
 }
 #endif
 
+std::vector<std::shared_ptr<Logger>> heldLoggers;
+
 pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 {
     auto newLogger = makeSimpleLogger();
     ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork) {
-            /* Set a simple logger, while releasing (not destroying)
-               the parent logger. We don't want to run the parent
-               logger's destructor since that will crash (e.g. when
-               ~ProgressBar() tries to join a thread that doesn't
-               exist. */
-            logger.release();
-            logger = std::move(newLogger);
+            /**
+             * Set a simple logger.
+             *
+             * We don't want to run the parent logger's destructor
+             * since that will crash (e.g. when ~ProgressBar() tries
+             * to join a thread that doesn't exist, so we keep the
+             * previous logger alive. */
+            heldLoggers.push_back(logger);
+            logger = newLogger;
         }
         try {
 #ifdef __linux__

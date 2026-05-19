@@ -3243,7 +3243,7 @@ Expr * EvalState::parseStdin()
     // NOTE this method (and parseExprFromString) must take care to *fully copy* their
     // input into their respective Pos::Origin until the parser stops overwriting its
     // input data.
-    // Activity act(*logger, lvlTalkative, "parsing standard input");
+    // Activity act(logger, lvlTalkative, "parsing standard input");
     auto buffer = drainFD(0);
     // drainFD should have left some extra space for terminators
     buffer.append("\0\0", 2);

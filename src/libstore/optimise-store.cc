@@ -285,7 +285,7 @@ void LocalStore::optimisePath_(
 
 void LocalStore::optimiseStore(OptimiseStats & stats)
 {
-    Activity act(*logger, actOptimiseStore);
+    Activity act(logger, actOptimiseStore);
 
     auto paths = queryAllValidPaths();
     InodeHash inodeHash = loadInodeHash();
@@ -299,7 +299,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         if (!isValidPath(i))
             continue; /* path was GC'ed, probably */
         {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+            Activity act(logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
             optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
         }
         done++;

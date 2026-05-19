@@ -193,12 +193,12 @@ void setCurActivity(const ActivityId activityId);
 
 struct Activity
 {
-    Logger & logger;
+    std::shared_ptr<Logger> logger;
 
     const ActivityId id;
 
     Activity(
-        Logger & logger,
+        std::shared_ptr<Logger> logger,
         Verbosity lvl,
         ActivityType type,
         const std::string & s = "",
@@ -206,7 +206,10 @@ struct Activity
         ActivityId parent = getCurActivity());
 
     Activity(
-        Logger & logger, ActivityType type, const Logger::Fields & fields = {}, ActivityId parent = getCurActivity())
+        std::shared_ptr<Logger> logger,
+        ActivityType type,
+        const Logger::Fields & fields = {},
+        ActivityId parent = getCurActivity())
         : Activity(logger, lvlError, type, "", fields, parent) {};
 
     Activity(const Activity & act) = delete;
@@ -233,7 +236,7 @@ struct Activity
 
     void result(ResultType type, const Logger::Fields & fields) const
     {
-        logger.result(id, type, fields);
+        logger->result(id, type, fields);
     }
 
     friend class Logger;
@@ -255,21 +258,21 @@ struct PushActivity
     }
 };
 
-extern std::unique_ptr<Logger> logger;
+extern std::shared_ptr<Logger> logger;
 
-std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
+std::shared_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
 /**
  * Create a logger that sends log messages to `mainLogger` and the
  * list of loggers in `extraLoggers`. Only `mainLogger` is used for
  * writing to stdout and getting user input.
  */
-std::unique_ptr<Logger>
-makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers);
+std::shared_ptr<Logger>
+makeTeeLogger(std::shared_ptr<Logger> mainLogger, std::vector<std::shared_ptr<Logger>> && extraLoggers);
 
-std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
+std::shared_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix = true);
 
-std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
+std::shared_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool includeNixPrefix = true);
 
 void applyJSONLogger();
 
