@@ -17,7 +17,9 @@
   # Whether to link against mimalloc for malloc override.
   # Significantly improves evaluation performance on allocation-heavy
   # workloads (~10-15% on large evaluations).
-  withMimalloc ? !stdenv.hostPlatform.isWindows,
+  # mimalloc is disabled on FreeBSD due to a crash in nixpkgs 25.11.
+  # Once the nixpkgs flake is updated, mimalloc can be enabled again.
+  withMimalloc ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isFreeBSD,
 }:
 
 let
