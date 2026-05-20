@@ -311,7 +311,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enable support for keys and signatures using algorithms from the
             Commercial National Security Algorithm (CNSA) Suite: ECDSA P-384
-            and ML-DSA.
+            and ML-DSA-44, ML-DSA-65, and ML-DSA-87.
         )",
         .trackingUrl = "",
     },
