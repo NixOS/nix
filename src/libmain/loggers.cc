@@ -50,7 +50,7 @@ void setLogFormat(const std::string & logFormatStr)
 void setLogFormat(const LogFormat & logFormat)
 {
     defaultLogFormat = logFormat;
-    logger = makeDefaultLogger();
+    logger = makeDefaultLogger().release();
 }
 
 } // namespace nix

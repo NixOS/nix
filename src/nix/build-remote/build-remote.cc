@@ -54,7 +54,7 @@ static bool allSupportedLocally(Store & store, const StringSet & requiredFeature
 static int main_build_remote(int argc, char ** argv)
 {
     {
-        logger = makeJSONLogger(getStandardError());
+        logger = makeJSONLogger(getStandardError()).release();
 
         /* Ensure we don't get any SSH passphrase or host key popups. */
         unsetenv("DISPLAY");

@@ -9,7 +9,7 @@ namespace nix {
 
 void commonChildInit()
 {
-    logger = makeSimpleLogger();
+    logger = makeSimpleLogger().release();
 
     const static std::string pathNullDevice = "/dev/null";
     restoreProcessContext(false);

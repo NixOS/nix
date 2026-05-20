@@ -1074,14 +1074,11 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
     conn.to = std::move(to);
     conn.from = std::move(from);
 
-    auto tunnelLogger_ = std::make_unique<TunnelLogger>(conn.to, conn.protoVersion);
-    auto tunnelLogger = tunnelLogger_.get();
-    std::unique_ptr<Logger> prevLogger_;
-    auto prevLogger = logger.get();
+    auto tunnelLogger = new TunnelLogger(conn.to, conn.protoVersion);
+    auto prevLogger = logger;
     // FIXME
     if (!recursive) {
-        prevLogger_ = std::move(logger);
-        logger = std::move(tunnelLogger_);
+        logger = tunnelLogger;
         applyJSONLogger();
     }
 
