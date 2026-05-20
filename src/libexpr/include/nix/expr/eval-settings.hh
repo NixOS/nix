@@ -418,6 +418,16 @@ struct EvalSettings : Config
 
           The simpler use case is specifying a location without reading its contents.
           This comes with the risk of accidentally copying unintended files into the store, making a snapshot of those files readable by all system users.
+          Example:
+          ```nix
+          let
+            path = /var/lib/oxidized; # forgot toString
+          in ''
+            [some config file]
+            location_foo = ${path}/foo
+            location_bar = ${path}/bar
+          ''
+          ```
           This happens easily, because [string interpolation](@docroot@/language/string-interpolation.md#interpolated-expression) (`"${some-path-value}"`) and some other operations blur the line between these two use cases: they implicitly convert the path value to a store path by copying its contents to the store.
           Arguably, this makes path literals unfit for the simple string-like use case.
 
