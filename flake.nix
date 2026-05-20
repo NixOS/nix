@@ -16,7 +16,6 @@
   # work around https://github.com/NixOS/nix/issues/7730
   inputs.flake-parts.inputs.nixpkgs-lib.follows = "nixpkgs";
   inputs.git-hooks-nix.inputs.nixpkgs.follows = "nixpkgs";
-  inputs.git-hooks-nix.inputs.nixpkgs-stable.follows = "nixpkgs";
   # work around 7730 and https://github.com/NixOS/nix/issues/7807
   inputs.git-hooks-nix.inputs.flake-compat.follows = "";
   inputs.git-hooks-nix.inputs.gitignore.follows = "";
