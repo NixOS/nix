@@ -297,6 +297,10 @@ EvalState::EvalState(
           CanonPath("derivation-internal.nix"),
 #include "primops/derivation.nix.gen.hh"
           )}
+    , importedDrvToDerivation{internalFS->addFile(
+          CanonPath("imported-drv-to-derivation.nix"),
+#include "imported-drv-to-derivation.nix.gen.hh"
+          )}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , inputCache(fetchers::InputCache::create())
