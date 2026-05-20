@@ -14,9 +14,19 @@ TEST(local_keys, signAndVerify)
         auto pk = sk->toPublicKey();
 
         auto sig = sk->signDetached("hello world");
+        auto sig2 = sk->signDetached("hello world");
+        ASSERT_EQ(sig, sig2); // checks idempotence of signing
 
         ASSERT_EQ(sig.keyName, "test-key-1");
         ASSERT_TRUE(pk->verifyDetached("hello world", sig));
+
+        auto sk2 = SecretKey::parse(sk->to_string());
+        ASSERT_EQ(sk2->name, sk->name);
+        ASSERT_EQ(sk2->key, sk->key);
+
+        auto pk2 = PublicKey::parse(pk->to_string());
+        ASSERT_EQ(pk2->name, pk->name);
+        ASSERT_EQ(pk2->key, pk->key);
     }
 }
 
