@@ -1376,7 +1376,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         /* If this is a builtin builder, call it now. This should not return. */
         if (drv.isBuiltin()) {
             try {
-                logger = makeJSONLogger(getStandardError());
+                logger = makeJSONLogger(getStandardError()).release();
 
                 for (auto & e : drv.outputs)
                     ctx.outputs.insert_or_assign(e.first, store.printStorePath(scratchOutputs.at(e.first)));

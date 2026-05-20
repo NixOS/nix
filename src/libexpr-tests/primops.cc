@@ -32,17 +32,17 @@ public:
 
 class CaptureLogging
 {
-    std::unique_ptr<Logger> oldLogger;
+    Logger * oldLogger;
 public:
     CaptureLogging()
     {
-        oldLogger = std::move(logger);
-        logger = std::make_unique<CaptureLogger>();
+        oldLogger = logger;
+        logger = new CaptureLogger();
     }
 
     ~CaptureLogging()
     {
-        logger = std::move(oldLogger);
+        logger = oldLogger;
     }
 };
 
@@ -144,7 +144,7 @@ TEST_F(PrimOpTest, trace)
     CaptureLogging l;
     auto v = eval("builtins.trace \"test string 123\" 123");
     ASSERT_THAT(v, IsIntEq(123));
-    auto text = (dynamic_cast<CaptureLogger *>(logger.get()))->get();
+    auto text = (dynamic_cast<CaptureLogger *>(logger))->get();
     ASSERT_NE(text.find("test string 123"), std::string::npos);
 }
 
