@@ -1,15 +1,11 @@
 #include "nix/expr/value-to-json.hh"
 #include "nix/expr/eval-inline.hh"
-#include "nix/expr/print.hh"
 #include "nix/store/store-api.hh"
+#include "value-path.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/signals.hh"
-#include "nix/util/util.hh"
 
 #include <cstdlib>
-#include <sstream>
-#include <variant>
-#include <vector>
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
@@ -18,27 +14,7 @@ using json = nlohmann::json;
 
 MakeError(JSONCycleError, InfiniteRecursionError);
 
-using ValuePath = std::vector<std::variant<Symbol, size_t>>;
 using SeenValuePaths = boost::unordered_flat_map<const void *, ValuePath>;
-
-static std::string showValuePath(const SymbolTable & symbols, const ValuePath & p)
-{
-    if (p.empty())
-        return "the top-level value";
-    std::ostringstream out;
-    out << "the value at ";
-    for (auto & seg : p)
-        std::visit(
-            overloaded{
-                [&](Symbol s) {
-                    out << '.';
-                    printAttributeName(out, symbols[s]);
-                },
-                [&](size_t i) { out << '[' << i << ']'; },
-            },
-            seg);
-    return out.str();
-}
 
 static json valueToJSON(
     EvalState & state,

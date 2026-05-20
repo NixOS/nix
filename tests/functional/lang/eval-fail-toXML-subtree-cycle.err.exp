@@ -1,0 +1,14 @@
+error:
+       … while calling the 'toXML' builtin
+         at /pwd/lang/eval-fail-toXML-subtree-cycle.nix:9:1:
+            8| in
+            9| builtins.toXML root
+             | ^
+           10|
+
+       error: infinite recursion encountered while converting Nix value to XML: the value at .branch.twig is the same as the value at .branch (only cycle-free Nix values can be converted to XML)
+       at /pwd/lang/eval-fail-toXML-subtree-cycle.nix:2:12:
+            1| let
+            2|   branch = {
+             |            ^
+            3|     twig = branch;

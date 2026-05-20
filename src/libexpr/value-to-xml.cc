@@ -1,11 +1,19 @@
 #include "nix/expr/value-to-xml.hh"
 #include "nix/util/xml-writer.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/util/finally.hh"
 #include "nix/util/signals.hh"
+#include "value-path.hh"
 
 #include <cstdlib>
+#include <sstream>
+#include <boost/unordered/unordered_flat_map.hpp>
 
 namespace nix {
+
+MakeError(XMLCycleError, InfiniteRecursionError);
+
+using SeenValuePaths = boost::unordered_flat_map<const void *, ValuePath>;
 
 static XMLAttrs singletonAttrs(const std::string & name, std::string_view value)
 {
@@ -22,6 +30,8 @@ static void printValueAsXML(
     XMLWriter & doc,
     NixStringContext & context,
     StringSet & drvsSeen,
+    SeenValuePaths & seen,
+    ValuePath * currentPath,
     const PosIdx pos);
 
 static void posToXML(EvalState & state, XMLAttrs & xmlAttrs, const Pos & pos)
@@ -39,7 +49,9 @@ static void showAttrs(
     const Bindings & attrs,
     XMLWriter & doc,
     NixStringContext & context,
-    StringSet & drvsSeen)
+    StringSet & drvsSeen,
+    SeenValuePaths & seen,
+    ValuePath * currentPath)
 {
     StringSet names;
 
@@ -50,7 +62,13 @@ static void showAttrs(
             posToXML(state, xmlAttrs, state.positions[a->pos]);
 
         XMLOpenElement _(doc, "attr", xmlAttrs);
-        printValueAsXML(state, strict, location, *a->value, doc, context, drvsSeen, a->pos);
+        if (currentPath)
+            currentPath->emplace_back(a->name);
+        Finally popSegment([&] {
+            if (currentPath)
+                currentPath->pop_back();
+        });
+        printValueAsXML(state, strict, location, *a->value, doc, context, drvsSeen, seen, currentPath, a->pos);
     }
 }
 
@@ -62,6 +80,8 @@ static void printValueAsXML(
     XMLWriter & doc,
     NixStringContext & context,
     StringSet & drvsSeen,
+    SeenValuePaths & seen,
+    ValuePath * currentPath,
     const PosIdx pos)
 {
     checkInterrupt();
@@ -70,6 +90,25 @@ static void printValueAsXML(
 
     if (strict)
         state.forceValue(v, pos);
+
+    auto cycleError = [&](const ValuePath & firstSeenAt) {
+        if (currentPath)
+            state
+                .error<InfiniteRecursionError>(
+                    "infinite recursion encountered while converting Nix value to XML: %s is the same as %s (only cycle-free Nix values can be converted to XML)",
+                    showValuePath(state.symbols, *currentPath),
+                    showValuePath(state.symbols, firstSeenAt))
+                .atPos(v.determinePos(pos))
+                .debugThrow();
+        else
+            // Internal signal caught by the public wrapper, which then re-runs
+            // with path tracking against a discard XMLWriter. Bypasses
+            // EvalErrorBuilder so we don't need an explicit template
+            // instantiation in eval-error.cc.
+            throw XMLCycleError(
+                state,
+                "infinite recursion encountered while converting Nix value to XML (only cycle-free Nix values can be converted to XML)");
+    };
 
     switch (v.type()) {
 
@@ -117,22 +156,41 @@ static void printValueAsXML(
             XMLOpenElement _(doc, "derivation", xmlAttrs);
 
             if (drvPath != "" && drvsSeen.insert(drvPath).second)
-                showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen);
+                showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen, seen, currentPath);
             else
                 doc.writeEmptyElement("repeated");
         }
 
         else {
+            const void * key = v.attrs();
+            auto [it, fresh] = seen.try_emplace(key, currentPath ? *currentPath : ValuePath{});
+            if (!fresh)
+                cycleError(it->second);
+            Finally cleanup([&] { seen.erase(key); });
             XMLOpenElement _(doc, "attrs");
-            showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen);
+            showAttrs(state, strict, location, *v.attrs(), doc, context, drvsSeen, seen, currentPath);
         }
 
         break;
 
     case nList: {
+        const void * key = &v;
+        auto [it, fresh] = seen.try_emplace(key, currentPath ? *currentPath : ValuePath{});
+        if (!fresh)
+            cycleError(it->second);
+        Finally cleanup([&] { seen.erase(key); });
         XMLOpenElement _(doc, "list");
-        for (auto v2 : v.listView())
-            printValueAsXML(state, strict, location, *v2, doc, context, drvsSeen, pos);
+        size_t i = 0;
+        for (auto v2 : v.listView()) {
+            if (currentPath)
+                currentPath->emplace_back(i);
+            Finally popSegment([&] {
+                if (currentPath)
+                    currentPath->pop_back();
+            });
+            printValueAsXML(state, strict, location, *v2, doc, context, drvsSeen, seen, currentPath, pos);
+            i++;
+        }
         break;
     }
 
@@ -200,10 +258,23 @@ void printValueAsXML(
     NixStringContext & context,
     const PosIdx pos)
 {
-    XMLWriter doc(true, out);
-    XMLOpenElement root(doc, "expr");
     StringSet drvsSeen;
-    printValueAsXML(state, strict, location, v, doc, context, drvsSeen, pos);
+    SeenValuePaths seen;
+    try {
+        XMLWriter doc(true, out);
+        XMLOpenElement root(doc, "expr");
+        printValueAsXML(state, strict, location, v, doc, context, drvsSeen, seen, nullptr, pos);
+    } catch (XMLCycleError &) {
+        // The fast pass detected a cycle. Re-walk against a discard target with path tracking
+        // so we can produce a richer error that names both ends of the cycle.
+        std::ostringstream discard;
+        XMLWriter doc(true, discard);
+        XMLOpenElement root(doc, "expr");
+        seen.clear();
+        drvsSeen.clear();
+        ValuePath path;
+        printValueAsXML(state, strict, location, v, doc, context, drvsSeen, seen, &path, pos);
+    }
 }
 
 } // namespace nix
