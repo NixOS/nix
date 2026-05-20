@@ -399,6 +399,7 @@ public:
     const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
+    const SourcePath importedDrvToDerivation;
 
     /**
      * Store used to materialise .drv files.
@@ -409,8 +410,6 @@ public:
      * Store used to build stuff.
      */
     const ref<Store> buildStore;
-
-    RootValue vImportedDrvToDerivation = nullptr;
 
     const ref<fetchers::InputCache> inputCache;
 
