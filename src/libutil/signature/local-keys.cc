@@ -20,6 +20,12 @@ using AutoEVP_PKEY_CTX = std::unique_ptr<EVP_PKEY_CTX, Deleter<EVP_PKEY_CTX_free
 using AutoEVP_MD_CTX = std::unique_ptr<EVP_MD_CTX, Deleter<EVP_MD_CTX_free>>;
 using AutoBIO = std::unique_ptr<BIO, Deleter<BIO_free>>;
 
+std::string_view keyNamePart(std::string_view s)
+{
+    auto colon = s.find(':');
+    return colon == std::string_view::npos ? std::string_view{} : s.substr(0, colon);
+}
+
 /**
  * Parse a colon-separated string where the second part is Base64-encoded.
  *
@@ -487,8 +493,7 @@ std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
             throw Error("secret key is not valid");
 
     } catch (Error & e) {
-        // Don't show the entire key for security.
-        e.addTrace({}, "while decoding key '%s…'", s.substr(0, 32));
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
         throw;
     }
 }
@@ -526,8 +531,7 @@ std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
         } else
             throw Error("public key is not valid");
     } catch (Error & e) {
-        // Don't show the entire key for security.
-        e.addTrace({}, "while decoding key '%s'", s);
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
         throw;
     }
 }
