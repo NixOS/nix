@@ -179,8 +179,8 @@ TEST(local_keys, rfc6979EcdsaP384TestVector)
  * encodes the outer SEQUENCE, version, AlgorithmIdentifier (with the
  * variant's OID), and the two OCTET STRING headers.
  *
- * Source: github.com/usnistgov/ACVP-Server,
- * gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json.
+ * Source:
+ * https://github.com/usnistgov/ACVP-Server/blob/15c0f3deeefbfa8cb6cd32a99e1ca3b738c66bf0/gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json
  */
 static void
 runMlDsaAcvpTest(std::string_view variant, std::string_view derPrefixHex, size_t expectedSkSize, size_t expectedSigSize)
