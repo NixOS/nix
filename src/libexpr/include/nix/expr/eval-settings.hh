@@ -433,6 +433,11 @@ struct EvalSettings : Config
 
           Additionally, a home path literal can make the home directory *location* of the evaluating user an implicit input to the evaluation, specifically when `toString` is called, e.g. `toString ~/.config`.
           Evaluating on different accounts or machines will result in different derivations - an evaluation impurity.
+          Example:
+          ```nix
+          builtins.baseNameOf (builtins.dirOf ~/.)
+          ```
+          => "alice" or "bob"
 
           Sometimes the intent is to read the file system contents at the path, as part of evaluation or instantiation.
           In that case, using absolute or home path literals is undesirable for different reasons.
