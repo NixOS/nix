@@ -1,6 +1,9 @@
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/base-n.hh"
 #include "nix/util/configuration.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/util.hh"
+#include "nix/util/tests/test-data.hh"
 
 #include <gtest/gtest.h>
 
@@ -162,6 +165,89 @@ TEST(local_keys, rfc6979EcdsaP384TestVector)
 
     auto pk = sk->toPublicKey();
     ASSERT_TRUE(pk->verifyDetached("sample", sig));
+}
+
+/**
+ * Run an ACVP ML-DSA-sigGen-FIPS204 test vector (external/pure interface,
+ * deterministic, empty context). For each variant we load the ACVP `sk`,
+ * `message` and expected `signature` from data files, wrap the expanded-key
+ * `sk` in a PKCS#8 PrivateKeyInfo DER (per draft-ietf-lamps-dilithium-
+ * certificates), feed it to SecretKey::parse, sign the message, and assert
+ * the signature bytes match the ACVP output exactly.
+ *
+ * `derPrefixHex` is the PKCS#8 prefix to prepend to the raw expanded sk; it
+ * encodes the outer SEQUENCE, version, AlgorithmIdentifier (with the
+ * variant's OID), and the two OCTET STRING headers.
+ *
+ * Source: github.com/usnistgov/ACVP-Server,
+ * gen-val/json-files/ML-DSA-sigGen-FIPS204/internalProjection.json.
+ */
+static void
+runMlDsaAcvpTest(std::string_view variant, std::string_view derPrefixHex, size_t expectedSkSize, size_t expectedSigSize)
+{
+    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::CNSA);
+
+    auto dataDir = getUnitTestData() / "local-keys";
+    auto sk = base16::decode(chomp(readFile(dataDir / (std::string(variant) + "-sk.hex"))));
+    auto message = base16::decode(chomp(readFile(dataDir / (std::string(variant) + "-message.hex"))));
+    auto expSig = base16::decode(chomp(readFile(dataDir / (std::string(variant) + "-signature.hex"))));
+
+    ASSERT_EQ(sk.size(), expectedSkSize);
+    ASSERT_EQ(expSig.size(), expectedSigSize);
+
+    auto der = base16::decode(derPrefixHex) + sk;
+    auto skString =
+        std::string(variant) + ":" + base64::encode(std::as_bytes(std::span<const char>{der.data(), der.size()}));
+    auto parsed = SecretKey::parse(skString);
+
+    auto sig = parsed->signDetached(message);
+    ASSERT_EQ(sig.keyName, std::string(variant));
+    ASSERT_EQ(sig.sig, expSig);
+
+    auto pk = parsed->toPublicKey();
+    ASSERT_TRUE(pk->verifyDetached(message, sig));
+}
+
+TEST(local_keys, mlDsa44AcvpTestVector)
+{
+    // ACVP tgId 1 / tcId 4. id-ml-dsa-44 OID = 2.16.840.1.101.3.4.3.17.
+    runMlDsaAcvpTest(
+        "mldsa44",
+        "30820A18"                   // SEQUENCE (2584)
+        "020100"                     // INTEGER version=0
+        "300B0609608648016503040311" // AlgorithmIdentifier: id-ml-dsa-44
+        "04820A04"                   // OCTET STRING privateKey (2564)
+        "04820A00",                  // OCTET STRING expandedKey (2560)
+        2560,
+        2420);
+}
+
+TEST(local_keys, mlDsa65AcvpTestVector)
+{
+    // ACVP tgId 3 / tcId 40. id-ml-dsa-65 OID = 2.16.840.1.101.3.4.3.18.
+    runMlDsaAcvpTest(
+        "mldsa65",
+        "30820FD8"                   // SEQUENCE (4056)
+        "020100"                     // INTEGER version=0
+        "300B0609608648016503040312" // AlgorithmIdentifier: id-ml-dsa-65
+        "04820FC4"                   // OCTET STRING privateKey (4036)
+        "04820FC0",                  // OCTET STRING expandedKey (4032)
+        4032,
+        3309);
+}
+
+TEST(local_keys, mlDsa87AcvpTestVector)
+{
+    // ACVP tgId 5 / tcId 73. id-ml-dsa-87 OID = 2.16.840.1.101.3.4.3.19.
+    runMlDsaAcvpTest(
+        "mldsa87",
+        "30821338"                   // SEQUENCE (4920)
+        "020100"                     // INTEGER version=0
+        "300B0609608648016503040313" // AlgorithmIdentifier: id-ml-dsa-87
+        "04821324"                   // OCTET STRING privateKey (4900)
+        "04821320",                  // OCTET STRING expandedKey (4896)
+        4896,
+        4627);
 }
 
 } // namespace nix
