@@ -1,0 +1,5 @@
+f = x: x
+y = f ''
+  world
+''
+y
