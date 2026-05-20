@@ -171,7 +171,7 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
  * but those must be reported as errors, not trigger continuation. The
  * exception subtype is what distinguishes the two cases.
  */
-MakeError(IncompleteReplExpr, ParseError);
+MakeError(IncompleteReplExpr, Error);
 
 static bool isIncompleteInput(const ParseError & e)
 {
