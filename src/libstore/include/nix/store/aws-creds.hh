@@ -61,14 +61,13 @@ public:
      */
     virtual AwsCredentials getCredentials(const ParsedS3URL & url) = 0;
 
-    std::optional<AwsCredentials> maybeGetCredentials(const ParsedS3URL & url)
-    {
-        try {
-            return getCredentials(url);
-        } catch (AwsAuthError & e) {
-            return std::nullopt;
-        }
-    }
+    /**
+     * Like getCredentials but skips the warn() and cache-erase in the error
+     * path. Safer for detached threads that may outlive nix::logger — though
+     * the AWS CRT's process-global log hook can still touch the logger at high
+     * verbosity. noexcept — swallows everything, returns nullopt.
+     */
+    virtual std::optional<AwsCredentials> tryGetCredentials(const ParsedS3URL & url) noexcept = 0;
 
     virtual ~AwsCredentialProvider() {}
 };

@@ -84,7 +84,11 @@ public:
           or upload) before giving up. Retries apply to transient
           failures: connection-level errors, HTTP 408, 429, and most
           5xx responses. Authentication failures (401/403/407),
-          404/410, and other 4xx responses are not retried.
+          404/410, and other 4xx responses are not retried, except
+          that an S3 response with an `ExpiredToken` or
+          `TokenRefreshRequired` error code triggers a one-time
+          asynchronous credential refresh and retry, which does not
+          count against this limit.
         )",
         {"download-attempts"}};
 
@@ -299,7 +303,49 @@ struct FileTransferRequest
      * When provided along with usernameAuth, this will be used instead of fetching fresh credentials.
      */
     std::optional<std::string> preResolvedAwsSessionToken;
+
+    /**
+     * Current AWS session token, applied as the x-amz-security-token header.
+     * Populated by setupForS3() (either from preResolvedAwsSessionToken or the
+     * provider) and refreshed by credentialHook->fetchAndApply().
+     */
+    std::optional<std::string> awsSessionToken;
 #endif
+
+    /**
+     * Optional hook for credential-based retry. When set, finish() consults
+     * shouldRefresh() on failure; if it returns true the transfer is parked
+     * (removed from the worker's queue) until one detached fetch per key
+     * completes, then re-enqueued. No doomed requests fire while waiting.
+     *
+     * Items with the same key share one fetch — the broker calls
+     * fetchAndApply() per parked item, but the underlying provider is
+     * expected to cache so only the first call per key does real work.
+     */
+    struct CredentialHook
+    {
+        std::string key;
+
+        /**
+         * Decide if this failure warrants parking on a credential refresh.
+         * @param errorBody empty for HEAD or when no body was captured.
+         * @param refreshedSinceLast2xx true if the broker has already
+         *   released this item once since its last 2xx response.
+         */
+        std::function<bool(
+            const FileTransferRequest &, long httpStatus, std::string_view errorBody, bool refreshedSinceLast2xx)>
+            shouldRefresh;
+
+        /**
+         * Fetch fresh credentials and apply them to the request. Called by
+         * the broker on a detached thread. Must be noexcept and must not
+         * touch nix::logger (the thread isn't joined by any destructor).
+         * Return true if credentials were obtained.
+         */
+        std::function<bool(FileTransferRequest &)> fetchAndApply;
+    };
+
+    std::optional<CredentialHook> credentialHook;
 
     FileTransferRequest(VerbatimURL uri)
         : uri(std::move(uri))
