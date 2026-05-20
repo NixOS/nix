@@ -11,7 +11,7 @@
 #include "nix/util/hilite.hh"
 #include "nix/util/strings-inline.hh"
 
-#include <regex>
+#include <boost/regex.hpp>
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
@@ -70,16 +70,16 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             throw UsageError(
                 "Must provide at least one regex! To match all packages, use '%s'.", "nix search <installable> ^");
 
-        std::vector<std::regex> regexes;
-        std::vector<std::regex> excludeRegexes;
+        std::vector<boost::regex> regexes;
+        std::vector<boost::regex> excludeRegexes;
         regexes.reserve(res.size());
         excludeRegexes.reserve(excludeRes.size());
 
         for (auto & re : res)
-            regexes.push_back(std::regex(re, std::regex::extended | std::regex::icase));
+            regexes.push_back(boost::regex(re, boost::regex::extended | boost::regex::icase));
 
         for (auto & re : excludeRes)
-            excludeRegexes.emplace_back(re, std::regex::extended | std::regex::icase);
+            excludeRegexes.emplace_back(re, boost::regex::extended | boost::regex::icase);
 
         auto state = getEvalState();
 
@@ -114,30 +114,31 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                     auto description = aDescription ? aDescription->getString() : "";
                     std::replace(description.begin(), description.end(), '\n', ' ');
 
-                    std::vector<std::smatch> attrPathMatches;
-                    std::vector<std::smatch> descriptionMatches;
-                    std::vector<std::smatch> nameMatches;
+                    std::vector<boost::smatch> attrPathMatches;
+                    std::vector<boost::smatch> descriptionMatches;
+                    std::vector<boost::smatch> nameMatches;
                     bool found = false;
 
                     for (auto & regex : excludeRegexes) {
-                        if (std::regex_search(attrPathStr, regex) || std::regex_search(name.name, regex)
-                            || std::regex_search(description, regex))
+                        if (boost::regex_search(attrPathStr, regex) || boost::regex_search(name.name, regex)
+                            || boost::regex_search(description, regex))
                             return;
                     }
 
                     for (auto & regex : regexes) {
                         found = false;
-                        auto addAll = [&found](std::sregex_iterator it, std::vector<std::smatch> & vec) {
-                            const auto end = std::sregex_iterator();
+                        auto addAll = [&found](boost::sregex_iterator it, std::vector<boost::smatch> & vec) {
+                            const auto end = boost::sregex_iterator();
                             while (it != end) {
                                 vec.push_back(*it++);
                                 found = true;
                             }
                         };
 
-                        addAll(std::sregex_iterator(attrPathStr.begin(), attrPathStr.end(), regex), attrPathMatches);
-                        addAll(std::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
-                        addAll(std::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
+                        addAll(boost::sregex_iterator(attrPathStr.begin(), attrPathStr.end(), regex), attrPathMatches);
+                        addAll(boost::sregex_iterator(name.name.begin(), name.name.end(), regex), nameMatches);
+                        addAll(
+                            boost::sregex_iterator(description.begin(), description.end(), regex), descriptionMatches);
 
                         if (!found)
                             break;
