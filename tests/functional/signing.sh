@@ -1,14 +1,48 @@
 #!/usr/bin/env bash
 
+experimental_features="cnsa"
+
 source common.sh
+
+runTests() {
 
 clearStoreIfPossible
 clearCache
 
-nix-store --generate-binary-cache-key cache1.example.org "$TEST_ROOT"/sk1 "$TEST_ROOT"/pk1
+keyType="$1"
+
+nix key generate-secret --key-name cache1.example.org --key-type "$keyType" > "$TEST_ROOT"/sk1
+nix key convert-secret-to-public < "$TEST_ROOT"/sk1 > "$TEST_ROOT"/pk1
 pk1=$(cat "$TEST_ROOT"/pk1)
-nix-store --generate-binary-cache-key cache2.example.org "$TEST_ROOT"/sk2 "$TEST_ROOT"/pk2
+nix key generate-secret --key-name cache2.example.org --key-type "$keyType" > "$TEST_ROOT"/sk2
+nix key convert-secret-to-public < "$TEST_ROOT"/sk2 > "$TEST_ROOT"/pk2
 pk2=$(cat "$TEST_ROOT"/pk2)
+
+# Test PEM conversion.
+if [[ "$keyType" == "ed25519" ]]; then
+    # Ed25519 keys cannot be converted to PEM.
+    expectStderr 1 nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 | grepQuiet "conversion to PEM is not implemented for this key type"
+    expectStderr 1 nix key convert-public-to-pem < "$TEST_ROOT"/pk1 | grepQuiet "conversion to PEM is not implemented for this key type"
+else
+    # ML-DSA-* and ECDSA-P-384 keys can be converted to PEM.
+    nix key convert-secret-to-pem < "$TEST_ROOT"/sk1 > "$TEST_ROOT"/sk1.pem
+    grepQuiet "^-----BEGIN PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
+    grepQuiet "^-----END PRIVATE KEY-----$" "$TEST_ROOT"/sk1.pem
+
+    nix key convert-public-to-pem < "$TEST_ROOT"/pk1 > "$TEST_ROOT"/pk1.pem
+    grepQuiet "^-----BEGIN PUBLIC KEY-----$" "$TEST_ROOT"/pk1.pem
+    grepQuiet "^-----END PUBLIC KEY-----$" "$TEST_ROOT"/pk1.pem
+
+    # If openssl is available, verify that it can parse the PEM keys.
+    if type -p openssl > /dev/null; then
+        openssl pkey -text -noout < "$TEST_ROOT"/sk1.pem
+        openssl pkey -pubin -text -noout < "$TEST_ROOT"/pk1.pem
+    fi
+
+    # Feeding a secret key to convert-public-to-pem (or vice versa) should fail.
+    expect 1 nix key convert-public-to-pem < "$TEST_ROOT"/sk1
+    expect 1 nix key convert-secret-to-pem < "$TEST_ROOT"/pk1
+fi
 
 # Build a path.
 outPath=$(nix-build dependencies.nix --no-out-link --secret-key-files "$TEST_ROOT/sk1 $TEST_ROOT/sk2")
@@ -120,3 +154,11 @@ for file in "$TEST_ROOT/storemultisig/"*.narinfo; do
         exit 1
     fi
 done
+
+}
+
+runTests ed25519
+runTests ml-dsa-44
+runTests ml-dsa-65
+runTests ml-dsa-87
+runTests ecdsa-p384

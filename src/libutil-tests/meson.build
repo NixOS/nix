@@ -68,6 +68,7 @@ sources = files(
   'hash.cc',
   'hilite.cc',
   'json-utils.cc',
+  'local-keys.cc',
   'logging.cc',
   'lru-cache.cc',
   'memory-source-accessor.cc',

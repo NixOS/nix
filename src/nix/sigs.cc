@@ -121,8 +121,7 @@ struct CmdSign : StorePathsCommand
 
     void run(ref<Store> store, StorePaths && storePaths) override
     {
-        SecretKey secretKey(readFile(secretKeyFile));
-        LocalSigner signer(std::move(secretKey));
+        LocalSigner signer(SecretKey::parse(readFile(secretKeyFile)));
 
         size_t added{0};
 
@@ -149,6 +148,7 @@ static auto rCmdSign = registerCommand2<CmdSign>({"store", "sign"});
 struct CmdKeyGenerateSecret : Command
 {
     std::string keyName;
+    std::string keyType = "ed25519";
 
     CmdKeyGenerateSecret()
     {
@@ -158,6 +158,13 @@ struct CmdKeyGenerateSecret : Command
             .labels = {"name"},
             .handler = {&keyName},
             .required = true,
+        });
+
+        addFlag({
+            .longName = "key-type",
+            .description = fmt("Type of key: one of %s.", concatStringsSep(", ", getKeyTypes())),
+            .labels = {"type"},
+            .handler = {&keyType},
         });
     }
 
@@ -176,7 +183,7 @@ struct CmdKeyGenerateSecret : Command
     void run() override
     {
         logger->stop();
-        writeFull(getStandardOutput(), SecretKey::generate(keyName).to_string());
+        writeFull(getStandardOutput(), SecretKey::generate(keyName, parseKeyType(keyType))->to_string());
     }
 };
 
@@ -196,9 +203,50 @@ struct CmdKeyConvertSecretToPublic : Command
 
     void run() override
     {
-        SecretKey secretKey(drainFD(STDIN_FILENO));
         logger->stop();
-        writeFull(getStandardOutput(), secretKey.toPublicKey().to_string());
+        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPublicKey()->to_string());
+    }
+};
+
+struct CmdKeyConvertSecretToPem : Command
+{
+    std::string description() override
+    {
+        return "convert a secret key read from standard input to PEM PKCS#8 format";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "key-convert-secret-to-pem.md"
+            ;
+    }
+
+    void run() override
+    {
+        logger->stop();
+        writeFull(getStandardOutput(), SecretKey::parse(drainFD(STDIN_FILENO))->toPEM());
+    }
+};
+
+struct CmdKeyConvertPublicToPem : Command
+{
+    std::string description() override
+    {
+        return "convert a public key read from standard input to PEM SubjectPublicKeyInfo format";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "key-convert-public-to-pem.md"
+            ;
+    }
+
+    void run() override
+    {
+        logger->stop();
+        writeFull(getStandardOutput(), PublicKey::parse(drainFD(STDIN_FILENO))->toPEM());
     }
 };
 
@@ -210,6 +258,8 @@ struct CmdKey : NixMultiCommand
               {
                   {"generate-secret", []() { return make_ref<CmdKeyGenerateSecret>(); }},
                   {"convert-secret-to-public", []() { return make_ref<CmdKeyConvertSecretToPublic>(); }},
+                  {"convert-secret-to-pem", []() { return make_ref<CmdKeyConvertSecretToPem>(); }},
+                  {"convert-public-to-pem", []() { return make_ref<CmdKeyConvertPublicToPem>(); }},
               })
     {
     }

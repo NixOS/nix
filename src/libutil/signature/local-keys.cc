@@ -1,15 +1,30 @@
 #include <nlohmann/json.hpp>
 #include <ranges>
 #include <sodium.h>
+#include <openssl/core_names.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 
 #include "nix/util/base-n.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/util.hh"
+#include "nix/util/deleter.hh"
 
 namespace nix {
 
 namespace {
+
+using AutoEVP_PKEY = std::unique_ptr<EVP_PKEY, Deleter<EVP_PKEY_free>>;
+using AutoEVP_PKEY_CTX = std::unique_ptr<EVP_PKEY_CTX, Deleter<EVP_PKEY_CTX_free>>;
+using AutoEVP_MD_CTX = std::unique_ptr<EVP_MD_CTX, Deleter<EVP_MD_CTX_free>>;
+using AutoBIO = std::unique_ptr<BIO, Deleter<BIO_free>>;
+
+std::string_view keyNamePart(std::string_view s)
+{
+    auto colon = s.find(':');
+    return colon == std::string_view::npos ? std::string_view{} : s.substr(0, colon);
+}
 
 /**
  * Parse a colon-separated string where the second part is Base64-encoded.
@@ -43,6 +58,99 @@ std::pair<std::string, std::string> parseColonBase64(std::string_view s, std::st
 std::string serializeColonBase64(std::string_view name, std::string_view data)
 {
     return std::string(name) + ":" + base64::encode(std::as_bytes(std::span<const char>{data.data(), data.size()}));
+}
+
+const char * toOpenSSLKeyType(KeyType type)
+{
+    switch (type) {
+    case KeyType::MLDSA44:
+        return "ML-DSA-44";
+    case KeyType::MLDSA65:
+        return "ML-DSA-65";
+    case KeyType::MLDSA87:
+        return "ML-DSA-87";
+    case KeyType::ECDSAP384:
+        return "EC";
+    case KeyType::Ed25519:
+    default:
+        throw Error("key type is not supported by OpenSSL");
+    }
+}
+
+/**
+ * Return the digest algorithm to use with `EVP_DigestSign` / `EVP_DigestVerify`
+ * for a given key type, or `nullptr` if the algorithm performs hashing
+ * internally (as ML-DSA does).
+ */
+const char * digestForKeyType(KeyType type)
+{
+    switch (type) {
+    case KeyType::MLDSA44:
+    case KeyType::MLDSA65:
+    case KeyType::MLDSA87:
+        return nullptr;
+    case KeyType::ECDSAP384:
+        return "SHA384";
+    case KeyType::Ed25519:
+    default:
+        unreachable();
+    }
+}
+
+/**
+ * Determine the `KeyType` of a parsed OpenSSL key, or return `std::nullopt` if
+ * we don't support it.
+ */
+std::optional<KeyType> detectOpenSSLKeyType(EVP_PKEY * pkey)
+{
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-44") == 1)
+        return KeyType::MLDSA44;
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-65") == 1)
+        return KeyType::MLDSA65;
+    if (EVP_PKEY_is_a(pkey, "ML-DSA-87") == 1)
+        return KeyType::MLDSA87;
+    if (EVP_PKEY_is_a(pkey, "EC") == 1) {
+        char curve[64] = {0};
+        size_t curveLen = 0;
+        if (EVP_PKEY_get_utf8_string_param(pkey, OSSL_PKEY_PARAM_GROUP_NAME, curve, sizeof(curve), &curveLen) == 1
+            && std::string_view(curve, curveLen) == "secp384r1")
+            return KeyType::ECDSAP384;
+    }
+    return std::nullopt;
+}
+
+/**
+ * Parse a DER-encoded PKCS#8 `PrivateKeyInfo`.
+ */
+AutoEVP_PKEY parsePrivateKey(std::string_view der)
+{
+    auto p = (const unsigned char *) der.data();
+    AutoEVP_PKEY pkey(d2i_AutoPrivateKey(nullptr, &p, der.size()));
+    return pkey;
+}
+
+/**
+ * Parse a DER-encoded `SubjectPublicKeyInfo`.
+ */
+AutoEVP_PKEY parsePublicKey(std::string_view der)
+{
+    auto p = (const unsigned char *) der.data();
+    AutoEVP_PKEY pkey(d2i_PUBKEY(nullptr, &p, der.size()));
+    return pkey;
+}
+
+AutoEVP_PKEY parsePublicKey(std::string_view der, KeyType type)
+{
+    auto pkey = parsePublicKey(der);
+
+    auto detected = pkey ? detectOpenSSLKeyType(pkey.get()) : std::nullopt;
+    if (!detected || *detected != type)
+        throw Error(
+            "public key is not '%s' (got '%s')",
+            toOpenSSLKeyType(type),
+            pkey ? EVP_PKEY_get0_type_name(pkey.get()) : "<invalid>");
+
+    return pkey;
 }
 
 } // anonymous namespace
@@ -81,19 +189,32 @@ Strings Signature::toStrings(const std::set<Signature> & sigs)
     return res;
 }
 
-Key::Key(std::string_view s, bool sensitiveValue)
+static std::unordered_map<std::string_view, KeyType> keyTypeMap{
+    {"ed25519", KeyType::Ed25519},
+    {"ml-dsa-44", KeyType::MLDSA44},
+    {"ml-dsa-65", KeyType::MLDSA65},
+    {"ml-dsa-87", KeyType::MLDSA87},
+    {"ecdsa-p384", KeyType::ECDSAP384},
+};
+
+const StringSet & getKeyTypes()
 {
-    try {
-        auto [parsedName, parsedKey] = parseColonBase64(s, "key");
-        name = std::move(parsedName);
-        key = std::move(parsedKey);
-    } catch (Error & e) {
-        std::string extra;
-        if (!sensitiveValue)
-            extra = fmt(" with raw value '%s'", s);
-        e.addTrace({}, "while decoding key named '%s'%s", name, extra);
-        throw;
-    }
+    static StringSet validKeyTypes = [] {
+        StringSet s;
+        for (const auto & [k, _] : keyTypeMap) {
+            s.insert(std::string(k));
+        }
+        return s;
+    }();
+    return validKeyTypes;
+}
+
+KeyType parseKeyType(std::string_view s)
+{
+    auto i = keyTypeMap.find(s);
+    if (i != keyTypeMap.end())
+        return i->second;
+    throw UsageError("unknown key type '%s'; valid key types are %s", s, concatStringsSep(", ", getKeyTypes()));
 }
 
 std::string Key::to_string() const
@@ -101,46 +222,318 @@ std::string Key::to_string() const
     return serializeColonBase64(name, key);
 }
 
-SecretKey::SecretKey(std::string_view s)
-    : Key{s, true}
+Signature SecretKey::signDetached(std::string_view s) const
 {
-    if (key.size() != crypto_sign_SECRETKEYBYTES)
-        throw Error("secret key is not valid");
+    throw Error("signing is not implemented for this key type");
 }
 
-Signature SecretKey::signDetached(std::string_view data) const
+std::unique_ptr<PublicKey> SecretKey::toPublicKey() const
 {
-    unsigned char sig[crypto_sign_BYTES];
-    unsigned long long sigLen;
-    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
-    return Signature{
-        .keyName = name,
-        .sig = std::string((char *) sig, sigLen),
-    };
+    throw Error("conversion to public key is not implemented for this key type");
 }
 
-PublicKey SecretKey::toPublicKey() const
+std::string SecretKey::toPEM() const
 {
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
-    return PublicKey(name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    throw Error("conversion to PEM is not implemented for this key type");
 }
 
-SecretKey SecretKey::generate(std::string_view name)
+struct Ed25519PublicKey : PublicKey
 {
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
+    Ed25519PublicKey(std::string_view name, std::string && _key)
+        : PublicKey(name, std::move(_key))
+    {
+        assert(key.size() == crypto_sign_PUBLICKEYBYTES);
+    }
 
-    return SecretKey(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
+    {
+        if (sig.sig.size() != crypto_sign_BYTES)
+            return false;
+
+        return crypto_sign_verify_detached(
+                   (unsigned char *) sig.sig.data(),
+                   (unsigned char *) data.data(),
+                   data.size(),
+                   (unsigned char *) key.data())
+               == 0;
+    }
+};
+
+struct Ed25519SecretKey : SecretKey
+{
+    Ed25519SecretKey(std::string_view name, std::string && _key)
+        : SecretKey(name, std::move(_key))
+    {
+        assert(key.size() == crypto_sign_SECRETKEYBYTES);
+    }
+
+    static std::unique_ptr<Ed25519SecretKey> generate(std::string_view name)
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        unsigned char sk[crypto_sign_SECRETKEYBYTES];
+        if (crypto_sign_keypair(pk, sk) != 0)
+            throw Error("key generation failed");
+
+        return std::make_unique<Ed25519SecretKey>(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    }
+
+    Signature signDetached(std::string_view data) const override
+    {
+        unsigned char sig[crypto_sign_BYTES];
+        unsigned long long sigLen;
+        crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
+        return Signature{
+            .keyName = name,
+            .sig = std::string((char *) sig, sigLen),
+        };
+    }
+
+    std::unique_ptr<PublicKey> toPublicKey() const override
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
+        return std::make_unique<Ed25519PublicKey>(name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    }
+};
+
+struct OpenSSLPublicKey : PublicKey
+{
+    KeyType type;
+    AutoEVP_PKEY pkey;
+
+    OpenSSLPublicKey(KeyType type, std::string_view name, std::string && key, AutoEVP_PKEY && pkey)
+        : PublicKey(name, std::move(key))
+        , type(type)
+        , pkey(std::move(pkey))
+    {
+        assert(
+            type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87
+            || type == KeyType::ECDSAP384);
+    }
+
+    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
+    {
+        if (!experimentalFeatureSettings.isEnabled(Xp::CNSA))
+            return false;
+
+        AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
+        if (!ctx)
+            throw Error("EVP_MD_CTX_new failed");
+
+        if (EVP_DigestVerifyInit_ex(ctx.get(), nullptr, digestForKeyType(type), nullptr, nullptr, pkey.get(), nullptr)
+            <= 0)
+            throw Error("EVP_DigestVerifyInit_ex failed");
+
+        return EVP_DigestVerify(
+                   ctx.get(),
+                   (const unsigned char *) sig.sig.data(),
+                   sig.sig.size(),
+                   (const unsigned char *) data.data(),
+                   data.size())
+               == 1;
+    }
+
+    std::string toPEM() const override
+    {
+        AutoBIO bio(BIO_new(BIO_s_mem()));
+        if (!bio)
+            throw Error("BIO_new failed");
+
+        if (PEM_write_bio_PUBKEY(bio.get(), pkey.get()) <= 0)
+            throw Error("PEM_write_bio_PUBKEY failed");
+
+        char * data = nullptr;
+        long len = BIO_get_mem_data(bio.get(), &data);
+        return std::string(data, len);
+    }
+};
+
+struct OpenSSLSecretKey : SecretKey
+{
+    KeyType type;
+    AutoEVP_PKEY pkey;
+
+    OpenSSLSecretKey(KeyType type, std::string_view name, std::string && key, AutoEVP_PKEY && pkey)
+        : SecretKey(name, std::move(key))
+        , type(type)
+        , pkey(std::move(pkey))
+    {
+        assert(
+            type == KeyType::MLDSA44 || type == KeyType::MLDSA65 || type == KeyType::MLDSA87
+            || type == KeyType::ECDSAP384);
+    }
+
+    static std::unique_ptr<OpenSSLSecretKey> generate(std::string_view name, KeyType type)
+    {
+        experimentalFeatureSettings.require(Xp::CNSA);
+
+        auto typeS = toOpenSSLKeyType(type);
+        AutoEVP_PKEY_CTX ctx(EVP_PKEY_CTX_new_from_name(nullptr, typeS, nullptr));
+        if (!ctx)
+            throw Error("EVP_PKEY_CTX_new_from_name failed for '%s'", typeS);
+
+        if (EVP_PKEY_keygen_init(ctx.get()) <= 0)
+            throw Error("EVP_PKEY_keygen_init failed");
+
+        if (type == KeyType::ECDSAP384) {
+            char curve[] = "secp384r1";
+            OSSL_PARAM params[] = {
+                OSSL_PARAM_construct_utf8_string(OSSL_PKEY_PARAM_GROUP_NAME, curve, 0),
+                OSSL_PARAM_construct_end(),
+            };
+            if (EVP_PKEY_CTX_set_params(ctx.get(), params) <= 0)
+                throw Error("EVP_PKEY_CTX_set_params failed");
+        }
+
+        EVP_PKEY * rawPkey = nullptr;
+        if (EVP_PKEY_generate(ctx.get(), &rawPkey) <= 0)
+            throw Error("EVP_PKEY_generate failed");
+        AutoEVP_PKEY pkey(rawPkey);
+
+        unsigned char * derBuf = nullptr;
+        int derLen = i2d_PrivateKey(pkey.get(), &derBuf);
+        if (derLen < 0)
+            throw Error("i2d_PrivateKey failed");
+        std::string der((const char *) derBuf, derLen);
+        OPENSSL_free(derBuf);
+
+        return std::make_unique<OpenSSLSecretKey>(type, name, std::move(der), std::move(pkey));
+    }
+
+    Signature signDetached(std::string_view data) const override
+    {
+        experimentalFeatureSettings.require(Xp::CNSA);
+
+        AutoEVP_MD_CTX ctx(EVP_MD_CTX_new());
+        if (!ctx)
+            throw Error("EVP_MD_CTX_new failed");
+
+        /* Generate a deterministic signature (i.e. only depending on the key and the data) since Ed25519 is also
+           deterministic. For ML-DSA we set OSSL_SIGNATURE_PARAM_DETERMINISTIC; for ECDSA we request RFC-6979
+           deterministic nonces via OSSL_SIGNATURE_PARAM_NONCE_TYPE. Note from RFC-9882: "The signer SHOULD NOT
+           use the deterministic variant of ML-DSA on platforms where side-channel attacks or fault attacks are a
+           concern." */
+        int deterministic = 1;
+        unsigned int nonceType = 1;
+        OSSL_PARAM mlDsaParams[] = {
+            OSSL_PARAM_construct_int(OSSL_SIGNATURE_PARAM_DETERMINISTIC, &deterministic),
+            OSSL_PARAM_construct_end(),
+        };
+        OSSL_PARAM ecdsaParams[] = {
+            OSSL_PARAM_construct_uint(OSSL_SIGNATURE_PARAM_NONCE_TYPE, &nonceType),
+            OSSL_PARAM_construct_end(),
+        };
+        OSSL_PARAM * params = type == KeyType::ECDSAP384 ? ecdsaParams : mlDsaParams;
+
+        if (EVP_DigestSignInit_ex(ctx.get(), nullptr, digestForKeyType(type), nullptr, nullptr, pkey.get(), params)
+            <= 0)
+            throw Error("EVP_DigestSignInit_ex failed");
+
+        size_t sigLen = 0;
+        if (EVP_DigestSign(ctx.get(), nullptr, &sigLen, (const unsigned char *) data.data(), data.size()) <= 0)
+            throw Error("EVP_DigestSign (get length) failed");
+
+        std::string sig(sigLen, '\0');
+        if (EVP_DigestSign(
+                ctx.get(), (unsigned char *) sig.data(), &sigLen, (const unsigned char *) data.data(), data.size())
+            <= 0)
+            throw Error("EVP_DigestSign failed");
+        sig.resize(sigLen);
+
+        return Signature{
+            .keyName = name,
+            .sig = std::move(sig),
+        };
+    }
+
+    std::unique_ptr<PublicKey> toPublicKey() const override
+    {
+        experimentalFeatureSettings.require(Xp::CNSA);
+
+        unsigned char * derBuf = nullptr;
+        int derLen = i2d_PUBKEY(pkey.get(), &derBuf);
+        if (derLen < 0)
+            throw Error("i2d_PUBKEY failed");
+        std::string der((const char *) derBuf, derLen);
+        OPENSSL_free(derBuf);
+
+        auto pubKey = parsePublicKey(der, type);
+
+        return std::make_unique<OpenSSLPublicKey>(type, name, std::move(der), std::move(pubKey));
+    }
+
+    std::string toPEM() const override
+    {
+        AutoBIO bio(BIO_new(BIO_s_mem()));
+        if (!bio)
+            throw Error("BIO_new failed");
+
+        if (PEM_write_bio_PrivateKey(bio.get(), pkey.get(), nullptr, nullptr, 0, nullptr, nullptr) <= 0)
+            throw Error("PEM_write_bio_PrivateKey failed");
+
+        char * data = nullptr;
+        long len = BIO_get_mem_data(bio.get(), &data);
+        return std::string(data, len);
+    }
+};
+
+std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
+{
+    try {
+        auto [name, key] = parseColonBase64(s, "key");
+
+        if (key.size() == crypto_sign_SECRETKEYBYTES)
+            return std::make_unique<Ed25519SecretKey>(name, std::move(key));
+        else if (auto pkey = parsePrivateKey(key); experimentalFeatureSettings.isEnabled(Xp::CNSA) && pkey) {
+            auto type = detectOpenSSLKeyType(pkey.get());
+            if (!type)
+                throw Error("secret key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
+            return std::make_unique<OpenSSLSecretKey>(*type, name, std::move(key), std::move(pkey));
+        } else
+            throw Error("secret key is not valid");
+
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
+        throw;
+    }
 }
 
-PublicKey::PublicKey(std::string_view s)
-    : Key{s, false}
+std::unique_ptr<SecretKey> SecretKey::generate(std::string_view name, KeyType type)
 {
-    if (key.size() != crypto_sign_PUBLICKEYBYTES)
-        throw Error("public key is not valid");
+    switch (type) {
+
+    case KeyType::Ed25519:
+        return Ed25519SecretKey::generate(name);
+
+    case KeyType::MLDSA44:
+    case KeyType::MLDSA65:
+    case KeyType::MLDSA87:
+    case KeyType::ECDSAP384:
+        return OpenSSLSecretKey::generate(name, type);
+
+    default:
+        unreachable();
+    }
+}
+
+std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
+{
+    try {
+        auto [name, key] = parseColonBase64(s, "key");
+
+        if (key.size() == crypto_sign_PUBLICKEYBYTES)
+            return std::make_unique<Ed25519PublicKey>(name, std::move(key));
+        else if (auto pkey = parsePublicKey(key); experimentalFeatureSettings.isEnabled(Xp::CNSA) && pkey) {
+            auto type = detectOpenSSLKeyType(pkey.get());
+            if (!type)
+                throw Error("public key has unsupported type '%s'", EVP_PKEY_get0_type_name(pkey.get()));
+            return std::make_unique<OpenSSLPublicKey>(*type, name, std::move(key), std::move(pkey));
+        } else
+            throw Error("public key is not valid");
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
+        throw;
+    }
 }
 
 bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) const
@@ -153,15 +546,13 @@ bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) con
 
 bool PublicKey::verifyDetachedAnon(std::string_view data, const Signature & sig) const
 {
-    if (sig.sig.size() != crypto_sign_BYTES)
-        throw Error("signature is not valid");
+    // Unsupported key type, can't verify.
+    return false;
+}
 
-    return crypto_sign_verify_detached(
-               (unsigned char *) sig.sig.data(),
-               (unsigned char *) data.data(),
-               data.size(),
-               (unsigned char *) key.data())
-           == 0;
+std::string PublicKey::toPEM() const
+{
+    throw Error("conversion to PEM is not implemented for this key type");
 }
 
 bool verifyDetached(std::string_view data, const Signature & sig, const PublicKeys & publicKeys)
@@ -170,7 +561,7 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
     if (key == publicKeys.end())
         return false;
 
-    return key->second.verifyDetachedAnon(data, sig);
+    return key->second->verifyDetachedAnon(data, sig);
 }
 
 } // namespace nix
