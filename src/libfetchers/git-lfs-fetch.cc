@@ -46,17 +46,7 @@ static void downloadToSink(
             "hash mismatch while fetching %s: expected sha256:%s but got sha256:%s", url, sha256Expected, sha256Actual);
 }
 
-namespace {
-
-struct LfsApiInfo
-{
-    std::string endpoint;
-    std::optional<std::string> authHeader;
-};
-
-} // namespace
-
-static LfsApiInfo getLfsApi(const ParsedURL & url)
+LfsApiInfo getLfsApi(ParsedURL url)
 {
     assert(url.authority.has_value());
     if (url.scheme == "ssh") {
@@ -96,7 +86,41 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
     }
 
-    return {url.to_string() + "/info/lfs", std::nullopt};
+    /**
+     * Try to mimic what git-lfs will do to plain remotes
+     * https://github.com/git-lfs/git-lfs/blob/main/docs/api/server-discovery.md
+     *
+     * Try to be smarter with remotes ending in a /, like
+     * `https://github.com/NixOS/nix/`. This should be
+     * `https://github.com/NixOS/nix.git/info/lfs`, not
+     * `https://github.com/NixOS/nix/.git/info/lfs`
+     */
+    bool hasDotGit = false;
+    for (auto it = url.path.rbegin(); it != url.path.rend(); ++it) {
+        if (it->empty())
+            continue;
+        if (!it->ends_with(".git"))
+            *it += ".git";
+        hasDotGit = true;
+        break;
+    }
+    if (!hasDotGit) {
+        if (url.path.size() > 1) // e.g. {"", ""} (single trailing slash)
+            url.path.back() = ".git";
+        else if (url.path.size() == 1) // {""}
+            url.path.push_back(".git");
+        else { // {}
+            url.path.push_back("");
+            url.path.push_back(".git");
+        }
+    }
+    if (url.path.back().empty())
+        url.path.back() = "info";
+    else
+        url.path.push_back("info");
+    url.path.push_back("lfs");
+
+    return {url.to_string(), std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
