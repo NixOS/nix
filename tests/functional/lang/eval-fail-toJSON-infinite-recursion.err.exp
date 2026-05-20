@@ -1,0 +1,21 @@
+error:
+       … while calling the 'toJSON' builtin
+         at /pwd/lang/eval-fail-toJSON-infinite-recursion.nix:6:1:
+            5| in
+            6| builtins.toJSON a
+             | ^
+            7|
+
+       … while evaluating attribute 'b'
+         at /pwd/lang/eval-fail-toJSON-infinite-recursion.nix:3:5:
+            2|   a = {
+            3|     b = a;
+             |     ^
+            4|   };
+
+       error: infinite recursion encountered while converting Nix value to JSON: the value at .b is the same as the top-level value (only cycle-free data can be represented in JSON)
+       at /pwd/lang/eval-fail-toJSON-infinite-recursion.nix:3:5:
+            2|   a = {
+            3|     b = a;
+             |     ^
+            4|   };

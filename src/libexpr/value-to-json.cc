@@ -1,17 +1,54 @@
 #include "nix/expr/value-to-json.hh"
 #include "nix/expr/eval-inline.hh"
+#include "nix/expr/print.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/finally.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include <cstdlib>
+#include <sstream>
+#include <variant>
+#include <vector>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 
 namespace nix {
 using json = nlohmann::json;
 
-// TODO: rename. It doesn't print.
-json printValueAsJSON(
-    EvalState & state, bool strict, Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
+MakeError(JSONCycleError, InfiniteRecursionError);
+
+using ValuePath = std::vector<std::variant<Symbol, size_t>>;
+using SeenValuePaths = boost::unordered_flat_map<const void *, ValuePath>;
+
+static std::string showValuePath(const SymbolTable & symbols, const ValuePath & p)
+{
+    if (p.empty())
+        return "the top-level value";
+    std::ostringstream out;
+    out << "the value at ";
+    for (auto & seg : p)
+        std::visit(
+            overloaded{
+                [&](Symbol s) {
+                    out << '.';
+                    printAttributeName(out, symbols[s]);
+                },
+                [&](size_t i) { out << '[' << i << ']'; },
+            },
+            seg);
+    return out.str();
+}
+
+static json valueToJSON(
+    EvalState & state,
+    bool strict,
+    Value & v,
+    const PosIdx pos,
+    NixStringContext & context,
+    bool copyToStore,
+    SeenValuePaths & seen,
+    ValuePath * currentPath)
 {
     checkInterrupt();
 
@@ -21,6 +58,24 @@ json printValueAsJSON(
         state.forceValue(v, pos);
 
     json out;
+
+    auto cycleError = [&](const void * key, const ValuePath & firstSeenAt) {
+        if (currentPath)
+            state
+                .error<InfiniteRecursionError>(
+                    "infinite recursion encountered while converting Nix value to JSON: %s is the same as %s (only cycle-free data can be represented in JSON)",
+                    showValuePath(state.symbols, *currentPath),
+                    showValuePath(state.symbols, firstSeenAt))
+                .atPos(pos)
+                .debugThrow();
+        else
+            // Internal signal caught by the public wrapper, which then re-runs
+            // with path tracking. Bypasses EvalErrorBuilder so we don't need
+            // an explicit template instantiation in eval-error.cc.
+            throw JSONCycleError(
+                state,
+                "infinite recursion encountered while converting Nix value to JSON (only cycle-free data can be represented in JSON)");
+    };
 
     switch (v.type()) {
 
@@ -54,15 +109,32 @@ json printValueAsJSON(
             out = *maybeString;
             break;
         }
-        if (auto i = v.attrs()->get(state.s.outPath))
-            return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
-        else {
+        const void * key = v.attrs();
+        auto [it, fresh] = seen.try_emplace(key, currentPath ? *currentPath : ValuePath{});
+        if (!fresh)
+            cycleError(key, it->second);
+        Finally cleanup([&] { seen.erase(key); });
+        if (auto i = v.attrs()->get(state.s.outPath)) {
+            if (currentPath)
+                currentPath->emplace_back(state.s.outPath);
+            Finally popOutPath([&] {
+                if (currentPath)
+                    currentPath->pop_back();
+            });
+            return valueToJSON(state, strict, *i->value, i->pos, context, copyToStore, seen, currentPath);
+        } else {
             out = json::object();
             for (auto & a : v.attrs()->lexicographicOrder(state.symbols)) {
+                if (currentPath)
+                    currentPath->emplace_back(a->name);
+                Finally popSegment([&] {
+                    if (currentPath)
+                        currentPath->pop_back();
+                });
                 try {
                     out.emplace(
                         state.symbols[a->name],
-                        printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
+                        valueToJSON(state, strict, *a->value, a->pos, context, copyToStore, seen, currentPath));
                 } catch (Error & e) {
                     e.addTrace(
                         state.positions[a->pos], HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
@@ -74,11 +146,22 @@ json printValueAsJSON(
     }
 
     case nList: {
+        const void * key = &v;
+        auto [it, fresh] = seen.try_emplace(key, currentPath ? *currentPath : ValuePath{});
+        if (!fresh)
+            cycleError(key, it->second);
+        Finally cleanup([&] { seen.erase(key); });
         out = json::array();
-        int i = 0;
+        size_t i = 0;
         for (auto elem : v.listView()) {
+            if (currentPath)
+                currentPath->emplace_back(i);
+            Finally popSegment([&] {
+                if (currentPath)
+                    currentPath->pop_back();
+            });
             try {
-                out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
+                out.push_back(valueToJSON(state, strict, *elem, pos, context, copyToStore, seen, currentPath));
             } catch (Error & e) {
                 e.addTrace(state.positions[pos], HintFmt("while evaluating list element at index %1%", i));
                 throw;
@@ -102,6 +185,22 @@ json printValueAsJSON(
         state.error<TypeError>("cannot convert %1% to JSON", showType(v)).atPos(v.determinePos(pos)).debugThrow();
     }
     return out;
+}
+
+// TODO: rename. It doesn't print.
+json printValueAsJSON(
+    EvalState & state, bool strict, Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
+{
+    SeenValuePaths seen;
+    try {
+        return valueToJSON(state, strict, v, pos, context, copyToStore, seen, nullptr);
+    } catch (JSONCycleError &) {
+        // The fast pass detected a cycle. Re-run with path tracking so we can
+        // produce a richer error that names both ends of the cycle.
+        seen.clear();
+        ValuePath path;
+        return valueToJSON(state, strict, v, pos, context, copyToStore, seen, &path);
+    }
 }
 
 void printValueAsJSON(

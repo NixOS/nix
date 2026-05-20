@@ -1,0 +1,28 @@
+error:
+       … while calling the 'toJSON' builtin
+         at /pwd/lang/eval-fail-toJSON-subtree-cycle.nix:9:1:
+            8| in
+            9| builtins.toJSON root
+             | ^
+           10|
+
+       … while evaluating attribute 'branch'
+         at /pwd/lang/eval-fail-toJSON-subtree-cycle.nix:6:13:
+            5|   root = {
+            6|     inherit branch;
+             |             ^
+            7|   };
+
+       … while evaluating attribute 'twig'
+         at /pwd/lang/eval-fail-toJSON-subtree-cycle.nix:3:5:
+            2|   branch = {
+            3|     twig = branch;
+             |     ^
+            4|   };
+
+       error: infinite recursion encountered while converting Nix value to JSON: the value at .branch.twig is the same as the value at .branch (only cycle-free data can be represented in JSON)
+       at /pwd/lang/eval-fail-toJSON-subtree-cycle.nix:3:5:
+            2|   branch = {
+            3|     twig = branch;
+             |     ^
+            4|   };
