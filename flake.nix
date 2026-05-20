@@ -465,7 +465,6 @@
                 {
                   # These attributes go right into `packages.<system>`.
                   "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
-                  "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
                 }
                 // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (
                   stdenvName:
@@ -489,6 +488,15 @@
                     }
                 )
               )
+              // {
+                "${pkgName}-static" =
+                  let
+                    pkgs = nixpkgsFor.${system};
+                  in
+                  (
+                    if pkgs.native.stdenv.hostPlatform.isDarwin then pkgs.nativeForStdenv.libcxxStdenv else pkgs.native
+                  ).pkgsStatic.nixComponents2.${pkgName};
+              }
             )
         // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
           dockerImage =
