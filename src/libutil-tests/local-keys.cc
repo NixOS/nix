@@ -7,13 +7,17 @@ namespace nix {
 
 TEST(local_keys, signAndVerify)
 {
-    auto sk = SecretKey::generate("test-key-1", KeyType::Ed25519);
-    auto pk = sk->toPublicKey();
+    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::CNSA);
 
-    auto sig = sk->signDetached("hello world");
+    for (auto type : {KeyType::Ed25519, KeyType::MLDSA44, KeyType::MLDSA65, KeyType::MLDSA87, KeyType::ECDSAP384}) {
+        auto sk = SecretKey::generate("test-key-1", type);
+        auto pk = sk->toPublicKey();
 
-    ASSERT_EQ(sig.keyName, "test-key-1");
-    ASSERT_TRUE(pk->verifyDetached("hello world", sig));
+        auto sig = sk->signDetached("hello world");
+
+        ASSERT_EQ(sig.keyName, "test-key-1");
+        ASSERT_TRUE(pk->verifyDetached("hello world", sig));
+    }
 }
 
 TEST(local_keys, rfc8032TestVector)
