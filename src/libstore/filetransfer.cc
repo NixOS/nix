@@ -800,10 +800,12 @@ struct curlFileTransfer : public FileTransfer
                     || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
-                } else if (
-                    httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::Forbidden
-                    || httpStatus == HttpStatus::ProxyAuthRequired) {
-                    // Don't retry on authentication/authorization failures
+                } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
+                    err = Unauthorized;
+                } else if (httpStatus == HttpStatus::Forbidden) {
+                    // Don't retry on authentication/authorization failures.
+                    // Note: the only reason we treat this differently from 401/407 is S3 returns 403 if a file doesn't
+                    // exist and the bucket is unlistable.
                     err = Forbidden;
                 } else if (
                     httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
