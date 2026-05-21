@@ -332,6 +332,17 @@
       }
     },
     {
+      "exact": true,
+      "from": {
+        "id": "nixpkgs",
+        "type": "indirect"
+      },
+      "to": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/0.1"
+      }
+    },
+    {
       "from": {
         "id": "nixpkgs",
         "type": "indirect"
