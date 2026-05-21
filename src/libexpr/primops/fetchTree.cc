@@ -455,6 +455,7 @@ static void fetch(
         auto attrs = fetchers::Attrs{
             {"type", "tarball"},
             {"url", *url},
+            {"name", name},
         };
         if (expectedHash)
             attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
