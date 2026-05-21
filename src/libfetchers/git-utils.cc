@@ -1612,10 +1612,10 @@ Hash resolveRemoteRef(const std::string & url, const std::string & ref, const st
     std::vector<std::pair<std::string, bool>> candidates;
     if (ref == "HEAD") {
         candidates.push_back({"HEAD", false});
-    } else if (ref.rfind("refs/", 0) == 0) {
-        candidates.push_back({ref, ref.rfind("refs/tags/", 0) == 0});
+    } else if (hasPrefix(ref, "refs/")) {
+        candidates.push_back({ref, hasPrefix(ref, "refs/tags/")});
     } else {
-        candidates.push_back({"refs/" + ref, ref.rfind("tags/", 0) == 0});
+        candidates.push_back({"refs/" + ref, hasPrefix(ref, "tags/")});
         candidates.push_back({"refs/tags/" + ref, true});
         candidates.push_back({"refs/heads/" + ref, false});
     }

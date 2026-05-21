@@ -426,18 +426,16 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
         auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
         auto token = getAccessToken(settings, host, hostAndPath).value_or("");
-        Hash rev(HashAlgorithm::SHA1);
         try {
-            rev = resolveRemoteRef(url, ref, token);
+            auto rev = resolveRemoteRef(url, ref, token);
+            settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
+            return RefInfo{.rev = rev};
         } catch (Error & e) {
             if (!cached)
                 throw;
             warn("%s; using cached GitHub revision for ref '%s' of '%s'", e.message(), ref, url);
             return RefInfo{.rev = getRevAttr(cached->value, "rev")};
         }
-
-        settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
-        return RefInfo{.rev = rev};
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override

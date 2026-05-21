@@ -58,29 +58,46 @@ let
   private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
   annotated-tag-object = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-  private-flake-git-refs = pkgs.runCommand "private-flake-git-refs" { } ''
-        mkdir -p $out/info
-        pkt_line() {
-          local content="$1"
-          local len=$(( ''${#content} + 4 ))
-          printf '%04x%s' "$len" "$content"
-        }
-        # First ref line needs a null byte to separate ref name from capabilities (git smart HTTP protocol)
-        first_ref_pkt_line() {
-          local content="$1"
-          local len=$(( ''${#content} + 4 + 2 ))
-          printf '%04x%s\0\n' "$len" "$content"
-        }
-        {
-          pkt_line "# service=git-upload-pack
-    "
-          printf '0000'
-          first_ref_pkt_line "${private-flake-rev} HEAD"
-          pkt_line "${private-flake-rev} refs/heads/master
-    "
-          printf '0000'
-        } > $out/info/refs
-  '';
+  # Build a mock git smart-HTTP ref advertisement (the `info/refs` response
+  # for `git-upload-pack`). `headRev` is advertised as HEAD; `refLines` are the
+  # remaining "<oid> <refname>" advertisement lines.
+  mkGitRefs =
+    name: headRev: refLines:
+    pkgs.runCommand name { } ''
+      mkdir -p $out/info
+      pkt_line() {
+        local content="$1"
+        # length prefix (4) + content + trailing newline (1)
+        local len=$(( ''${#content} + 4 + 1 ))
+        printf '%04x%s\n' "$len" "$content"
+      }
+      # The first ref line carries a trailing null byte separating the ref name
+      # from the server capabilities (git smart HTTP protocol).
+      first_ref_pkt_line() {
+        local content="$1"
+        # length prefix (4) + content + null byte (1) + trailing newline (1)
+        local len=$(( ''${#content} + 4 + 2 ))
+        printf '%04x%s\0\n' "$len" "$content"
+      }
+      {
+        pkt_line "# service=git-upload-pack"
+        printf '0000'
+        first_ref_pkt_line "${headRev} HEAD"
+        ${lib.concatMapStringsSep "\n        " (l: ''pkt_line "${l}"'') refLines}
+        printf '0000'
+      } > $out/info/refs
+    '';
+
+  private-flake-git-refs = mkGitRefs "private-flake-git-refs" private-flake-rev [
+    "${private-flake-rev} refs/heads/master"
+  ];
+
+  nixpkgs-git-refs = mkGitRefs "nixpkgs-git-refs" nixpkgs.rev [
+    "${nixpkgs.rev} refs/heads/master"
+    "${nixpkgs.rev} refs/pull/357207/head"
+    "${annotated-tag-object} refs/tags/annotated"
+    "${nixpkgs.rev} refs/tags/annotated^{}"
+  ];
 
   private-flake-tarball = pkgs.runCommand "private-flake-tarball" { } ''
     mkdir -p $out/tarball
@@ -88,36 +105,6 @@ let
     mkdir $dir
     echo '{ outputs = {...}: {}; }' > $dir/flake.nix
     tar cfz $out/tarball/${private-flake-rev} $dir --hard-dereference
-  '';
-
-  nixpkgs-git-refs = pkgs.runCommand "nixpkgs-git-refs" { } ''
-        mkdir -p $out/info
-        pkt_line() {
-          local content="$1"
-          local len=$(( ''${#content} + 4 ))
-          printf '%04x%s' "$len" "$content"
-        }
-        # First ref line needs a null byte to separate ref name from capabilities (git smart HTTP protocol)
-        first_ref_pkt_line() {
-          local content="$1"
-          local len=$(( ''${#content} + 4 + 2 ))
-          printf '%04x%s\0\n' "$len" "$content"
-        }
-        {
-          pkt_line "# service=git-upload-pack
-    "
-          printf '0000'
-          first_ref_pkt_line "${nixpkgs.rev} HEAD"
-          pkt_line "${nixpkgs.rev} refs/heads/master
-    "
-          pkt_line "${nixpkgs.rev} refs/pull/357207/head
-    "
-          pkt_line "${annotated-tag-object} refs/tags/annotated
-    "
-          pkt_line "${nixpkgs.rev} refs/tags/annotated^{}
-    "
-          printf '0000'
-        } > $out/info/refs
   '';
 
   archive = pkgs.runCommand "nixpkgs-flake" { } ''
@@ -266,7 +253,8 @@ in
       info = json.loads(out)
       assert info["revision"] == "${nixpkgs.rev}", f"annotated tag revision mismatch: {info['revision']} != ${nixpkgs.rev}"
 
-      # ... otherwise it should use the API
+      # ... otherwise the access token is used to authenticate (passed to the git
+      # credential callback for ref resolution, and to the API for tarball download).
       out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
       print(out)
       info = json.loads(out)

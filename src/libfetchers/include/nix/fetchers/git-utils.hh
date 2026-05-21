@@ -2,7 +2,7 @@
 
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/fs-sink.hh"
-#include "nix/util/types.hh"
+#include "nix/util/hash.hh"
 
 namespace nix {
 
