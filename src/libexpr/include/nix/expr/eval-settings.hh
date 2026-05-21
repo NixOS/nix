@@ -412,7 +412,11 @@ struct EvalSettings : Config
 
           There are two use cases for these literals.
           - Specifying a location without reading its contents during evaluation, e.g. using [`toString`](@docroot@/language/builtins.md#builtins-toString)
+            Example:
+            
           - Providing more sources for expressions and builds, e.g. using [string interpolation](@docroot@/language/string-interpolation.md)
+            Example:
+            
 
           These two kinds of literals have significant disadvantages for both use cases.
 
