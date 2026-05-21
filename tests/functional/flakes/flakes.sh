@@ -284,7 +284,7 @@ nix registry remove flake1
 [[ $(nix registry resolve flake1) = "git+file://$flake1Dir" ]]
 
 # Test the builtin fallback registry.
-[[ $(nix registry resolve nixpkgs --flake-registry http://fail.invalid.org/sdklsdklsd --download-attempts 1) = github:NixOS/nixpkgs/nixpkgs-unstable ]]
+[[ $(nix registry resolve nixpkgs --flake-registry http://fail.invalid.org/sdklsdklsd --download-attempts 1) = https://flakehub.com/f/DeterminateSystems/nixpkgs-weekly/0.1 ]]
 
 # Test 'nix registry list' with a disabled global registry.
 nix registry add user-flake1 git+file://"$flake1Dir"
