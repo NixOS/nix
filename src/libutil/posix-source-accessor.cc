@@ -761,7 +761,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
     AutoCloseFD fd = openFileReadonly(root, finalSymlink);
 
     if (!fd) {
-        if (finalSymlink == FinalSymlink::Follow || errno != ELOOP)
+        if (finalSymlink == FinalSymlink::Follow || errno != NIX_ERR_OPEN_SYMLINK)
             throw NativeSysError("opening file %1%", PathFmt(root));
 
         /* A helper class that holds the symlink destination in memory. */
