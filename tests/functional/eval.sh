@@ -90,3 +90,7 @@ out="$(expectStderr 0 nix eval --option foobar baz --expr '""' --raw)"
 # Test flag alias
 out="$(nix eval --expr '{}' --build-cores 1)"
 [[ "$(echo "$out" | wc -l)" = 1 ]]
+
+# Test that functions with default arguments are auto-called (#5316)
+[[ $(nix eval --expr '{ x ? 1 }: x') == 1 ]]
+[[ $(nix eval --expr '{ x ? 1, y ? 2 }: x + y') == 3 ]]
