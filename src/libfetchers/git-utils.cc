@@ -1551,13 +1551,24 @@ static git_remote_callbacks makeTokenCallbacks(const std::string & token)
 {
     git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
     callbacks.payload = const_cast<void *>(static_cast<const void *>(&token));
-    callbacks.credentials =
-        [](git_credential ** out, const char *, const char *, unsigned int allowed_types, void * payload) -> int {
+    callbacks.credentials = [](git_credential ** out,
+                               const char *,
+                               const char * username_from_url,
+                               unsigned int allowed_types,
+                               void * payload) -> int {
         auto * tok = static_cast<const std::string *>(payload);
-        if (tok->empty())
-            return GIT_PASSTHROUGH;
-        if (allowed_types & GIT_CREDENTIAL_USERPASS_PLAINTEXT)
+        /* HTTPS: authenticate with the access token via basic auth. */
+        if (!tok->empty() && (allowed_types & GIT_CREDENTIAL_USERPASS_PLAINTEXT))
             return git_credential_userpass_plaintext_new(out, "x-access-token", tok->c_str());
+        /* SSH: a `url.<base>.insteadOf` rewrite can turn the HTTPS URL into an
+           SSH one (e.g. ssh://git@github.com/). Authenticate via the user's
+           ssh-agent, the same way git/ssh would, instead of failing with
+           "authentication required but no callback set" (#2842). */
+        const char * username = username_from_url ? username_from_url : "git";
+        if (allowed_types & GIT_CREDENTIAL_SSH_KEY)
+            return git_credential_ssh_key_from_agent(out, username);
+        if (allowed_types & GIT_CREDENTIAL_USERNAME)
+            return git_credential_username_new(out, username);
         return GIT_PASSTHROUGH;
     };
     return callbacks;
