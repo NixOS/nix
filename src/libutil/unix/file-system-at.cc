@@ -188,7 +188,7 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
                 if (auto st = maybeFstatat(getParentFd(), component); st && S_ISLNK(st->st_mode))
                     throw SymlinkNotAllowed(path2);
                 errno = ENOTDIR; /* Restore the errno. */
-            } else if (errno == ELOOP) {
+            } else if (errno == NIX_ERR_OPEN_SYMLINK) {
                 throw SymlinkNotAllowed(path2);
             }
 
@@ -205,7 +205,7 @@ static AutoCloseFD openFileEnsureBeneathNoSymlinksIterative(
     AutoCloseFD res = ::openat(getParentFd(), lastComponent.c_str(), flags | O_NOFOLLOW, mode);
 
     if (!res) {
-        if (errno == ELOOP)
+        if (errno == NIX_ERR_OPEN_SYMLINK)
             throw SymlinkNotAllowed(path);
         /* `O_DIRECTORY | O_NOFOLLOW` on a trailing symlink returns
            `ENOTDIR` rather than `ELOOP`. Post-check via `fstatat` to
@@ -272,7 +272,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 
     if (auto maybeFd = linux::openat2(
             dirFd, path.rel_c_str(), flagsAdj, static_cast<uint64_t>(mode), RESOLVE_BENEATH | RESOLVE_NO_SYMLINKS)) {
-        if (!*maybeFd && errno == ELOOP)
+        if (!*maybeFd && errno == NIX_ERR_OPEN_SYMLINK)
             throw SymlinkNotAllowed(path);
         return std::move(*maybeFd);
     }

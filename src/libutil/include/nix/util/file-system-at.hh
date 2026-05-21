@@ -22,6 +22,12 @@
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
+#elif defined(__FreeBSD__)
+// FreeBSD openat(..., AT_NOFOLLOW) on a symlink returns
+// `EMLINK`, not the posix-specified `ELOOP`.
+#  define NIX_ERR_OPEN_SYMLINK EMLINK
+#else
+#  define NIX_ERR_OPEN_SYMLINK ELOOP
 #endif
 
 namespace nix {
