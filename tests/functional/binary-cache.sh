@@ -129,7 +129,18 @@ basicDownloadTests "file://$cacheDir"
 restartNixServe
 basicDownloadTests "$httpBinaryCacheUrl"
 
+
+# Test whether resuming from a binary cache that doesn't support ranged requests works.
+export _NIX_TEST_NIX_SERVE_TRUNCATE_NAR=1
+restartNixServe
+clearStore
+nix-store -r "$bigFile" --substituters "$httpBinaryCacheUrl" 2>&1 | tee "$TEST_ROOT/log"
+[[ $(grep -c "curl error: Transferred a partial file" "$TEST_ROOT/log") -eq 2 ]]
+unset _NIX_TEST_NIX_SERVE_TRUNCATE_NAR
+
+
 # Regression test: queryMissing() should cache narinfos.
+restartNixServe
 nix path-info -vvvv --store "$httpBinaryCacheUrl" "$bigFile" 2> "$TEST_ROOT/log"
 [[ $(grep -c "downloading.*narinfo'" "$TEST_ROOT/log") -eq 1 ]]
 
