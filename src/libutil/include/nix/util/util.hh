@@ -435,6 +435,20 @@ constexpr auto enumerate(R && range)
 }
 
 /**
+ * An iterator adapter that enumerates the elements of a range,
+ * pairing each element with a boolean indicating whether it is the
+ * last element.
+ */
+template<std::ranges::viewable_range R>
+    requires std::ranges::sized_range<R>
+constexpr auto markLast(R && range)
+{
+    auto n = std::ranges::size(range);
+    return std::views::zip(
+        std::views::iota(size_t{1}) | std::views::transform([n](size_t i) { return i == n; }), std::forward<R>(range));
+}
+
+/**
  * C++17 std::visit boilerplate
  */
 template<class... Ts>
