@@ -299,21 +299,6 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settin
     }
 }
 
-/**
- * Helper class that ensures that paths in substituted source trees
- * are rendered as `«input»/path` rather than
- * `«input»/nix/store/<hash>-source/path`.
- */
-struct SubstitutedSourceAccessor : ForwardingSourceAccessor
-{
-    using ForwardingSourceAccessor::ForwardingSourceAccessor;
-
-    std::string showPath(const CanonPath & path) override
-    {
-        return displayPrefix + path.abs() + displaySuffix;
-    }
-};
-
 std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings & settings, Store & store) const
 {
     // FIXME: cache the accessor
@@ -326,7 +311,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
         storePath = computeStorePath(store);
 
     auto makeStoreAccessor = [&]() -> std::pair<ref<SourceAccessor>, Input> {
-        auto accessor = make_ref<SubstitutedSourceAccessor>(store.requireStoreObjectAccessor(*storePath));
+        auto accessor = store.requireStoreObjectAccessor(*storePath);
 
         // FIXME: use the NAR hash for fingerprinting Git trees since it may have a .gitattributes file and we don't
         // know if we used `git archive` or libgit2 to fetch it.
