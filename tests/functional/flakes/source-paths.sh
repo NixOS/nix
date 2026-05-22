@@ -58,3 +58,8 @@ git -C "$repo" add "$repo/dir/default.nix"
 
 # Check that error messages in impure mode correctly refer to the original path, not a store path.
 expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; }) + \"/README.md\")" --impure | grepQuiet "Path 'README.md' does not exist in Git repository \"$repo\"."
+
+# This should still be the case if the input is in the store.
+narHash=$(nix flake prefetch --json "$repo" | jq -r .locked.narHash)
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; narHash = \"$narHash\"; }) + \"/README.md\")" --impure | grepQuiet "path '«git+file://$repo»/README.md' does not exist"
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; narHash = \"$narHash\"; }) + \"/README.md\")" | grepQuiet "path '«git+file://$repo»/README.md' does not exist"
