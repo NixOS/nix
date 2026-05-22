@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.20.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.0.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -193,6 +193,12 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 
 <!-- Determinate Nix version 3.20.0 -->
 
-* Support resuming from binary caches that don't support ranged requests [DeterminateSystems/nix-src#445](https://github.com/DeterminateSystems/nix-src/pull/445)
+* Determinate Nix supports resuming from binary caches that don't support ranged requests. [DeterminateSystems/nix-src#445](https://github.com/DeterminateSystems/nix-src/pull/445)
 
-* Add a session ID to JSON log messages [DeterminateSystems/nix-src#440](https://github.com/DeterminateSystems/nix-src/pull/440)
+* JSON log messages have a configurable session ID field. [DeterminateSystems/nix-src#440](https://github.com/DeterminateSystems/nix-src/pull/440)
+
+<!-- Determinate Nix version 3.21.0 -->
+
+* Determinate Nix has a command `nix serve` that allows any store to be served as a binary cache. [DeterminateSystems/nix-src#428](https://github.com/DeterminateSystems/nix-src/pull/428)
+
+* Determinate Nix has experimental support for signing store paths using CNSA algorithms. [DeterminateSystems/nix-src#449](https://github.com/DeterminateSystems/nix-src/pull/449)
