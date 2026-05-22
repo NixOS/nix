@@ -853,6 +853,60 @@ StorePathSet LocalStore::queryAllValidPaths()
     });
 }
 
+std::optional<Store::ContentStats> LocalStore::queryStoreStats(ContentStatsOptions opts)
+{
+    ContentStats stats;
+
+    /* Compute pathCount and totalNarSize from `ValidPaths`. When the
+       caller asked for the narSize histogram, we have to iterate
+       every row to bucket each value; otherwise a single aggregate
+       query suffices.
+
+       The accumulators are reset at the top of the lambda because
+       `retrySQLite` re-runs the body on SQLITE_BUSY, and the
+       histogram branch's `++`/`+=` would otherwise double-count
+       across retries. */
+    retrySQLite<void>([&]() {
+        stats.pathCount = 0;
+        stats.totalNarSize = 0;
+        stats.narSizeHistogram.clear();
+
+        auto state(_state->lock());
+        SQLiteStmt stmt;
+        if (opts.histograms) {
+            stmt.create(state->db, "select narSize from ValidPaths");
+            auto use(stmt.use());
+            while (use.next()) {
+                uint64_t narSize = use.getInt(0);
+                stats.pathCount++;
+                stats.totalNarSize += narSize;
+                stats.narSizeHistogram[ContentStats::bucket(narSize)]++;
+            }
+        } else {
+            stmt.create(state->db, "select count(*), coalesce(sum(narSize), 0) from ValidPaths");
+            auto use(stmt.use());
+            if (use.next()) {
+                /* SQLiteStmt::Use::getInt returns int64_t; NAR sizes
+                   in ValidPaths are non-negative by construction, so
+                   the narrowing to uint64_t is well-defined. */
+                stats.pathCount = use.getInt(0);
+                stats.totalNarSize = use.getInt(1);
+            }
+        }
+    });
+
+    /* The dry-run optimiseStore call below populates fullWalk, dedup,
+       and predicted in a single store-directory walk; see
+       LocalStore::optimiseStore for the walk's structure. */
+    OptimiseStats os;
+    optimiseStore(os, /*dryRun=*/true, opts.histograms);
+    stats.dedup = std::move(os.dedup);
+    stats.predictedDedup = std::move(os.predicted);
+    stats.fullWalk = std::move(os.fullWalk);
+
+    return stats;
+}
+
 void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
 {
     auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));

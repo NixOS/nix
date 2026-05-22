@@ -25,10 +25,37 @@ namespace nix {
  */
 const int nixSchemaVersion = 10;
 
+/**
+ * Output accumulator for `LocalStore::optimiseStore` and the
+ * single-path `LocalStore::optimisePath`. The fields fall into three
+ * groups: wet-mode counters (`filesLinked`/`bytesFreed`), the
+ * always-populated `dedup` and `fullWalk` reports from the walk,
+ * and the dry-run-only `predicted`.
+ */
 struct OptimiseStats
 {
-    unsigned long filesLinked = 0;
+    /** Files newly hard-linked this call. Wet mode only; stays zero
+        in dry-run mode (see `predicted`). */
+    uint64_t filesLinked = 0;
+    /** Logical bytes freed this call. Wet mode only; stays zero in
+        dry-run mode (see `predicted`). */
     uint64_t bytesFreed = 0;
+
+    /** Current dedup picture, derived from one stat per `.links/`
+        entry. Populated by every `optimiseStore` call (values stay
+        zero when `.links/` is empty or absent). */
+    Store::ContentStats::Dedup dedup;
+    /** Store-wide totals (each inode credited once) from the recursive
+        walk of every reachable entry under the store directory.
+        Populated by every `optimiseStore` call. Wet-mode linking
+        retroactively decrements these as inodes are orphaned by
+        `rename`. */
+    Store::ContentStats::FullWalk fullWalk;
+
+    /** Populated by `optimiseStore` when called with `dryRun=true`.
+        Callers should leave this `nullopt` on entry; `optimiseStore`
+        emplaces it. The values count what a wet pass would have done. */
+    std::optional<Store::ContentStats::PredictedDedup> predicted;
 };
 
 struct LocalSettings;
@@ -368,9 +395,32 @@ public:
 
     /**
      * Optimise the disk space usage of the Nix store by hard-linking
-     * files with the same contents.
+     * files with identical contents.
+     *
+     * Implementation: one scan of `.links/` (when the directory
+     * exists), then a recursive walk of every top-level entry under
+     * the store directory. Entries that name a valid store path get
+     * the hash treatment (link in wet mode, predict in dry-run);
+     * other entries ("garbage") only have their inodes credited
+     * toward `stats.fullWalk`.
+     *
+     * `stats.fullWalk` is populated on every call. `stats.dedup` is
+     * populated on every call too — values stay zero when `.links/`
+     * doesn't exist on disk.
+     *
+     * In wet mode (`dryRun=false`), regular files / symlinks under
+     * valid paths are hashed and hard-linked into `.links/<hash>`;
+     * `stats.filesLinked` and `stats.bytesFreed` count the work done.
+     *
+     * In dry-run mode (`dryRun=true`), the store is not modified;
+     * `stats.predicted` is emplaced and accumulates the
+     * `{filesLinkable, bytesLinkable}` a wet pass would produce.
+     * Callers should leave `stats.predicted` `nullopt` on entry.
+     *
+     * Pass `computeHistograms=true` to additionally populate
+     * `stats.dedup.sizeHistogram`.
      */
-    void optimiseStore(OptimiseStats & stats);
+    void optimiseStore(OptimiseStats & stats, bool dryRun = false, bool computeHistograms = false);
 
     void optimiseStore() override;
 
@@ -379,6 +429,8 @@ public:
      * symlinks for corruption.
      */
     void optimisePath(const std::filesystem::path & path, RepairFlag repair);
+
+    std::optional<ContentStats> queryStoreStats(ContentStatsOptions opts) override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
@@ -499,13 +551,74 @@ private:
 
     typedef boost::unordered_flat_set<ino_t> InodeHash;
 
-    InodeHash loadInodeHash();
-    Strings readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
-    void optimisePath_(
+    /**
+     * Walk-wide accumulators that every branch of the store walk
+     * touches. Constructed once at the top of the walk; the referenced
+     * sets must outlive it.
+     *
+     * `inodeHash` lets the recursion skip files already known to live
+     * under `.links/` (no second lstat). `seenInodes` deduplicates the
+     * per-inode credit toward `stats.fullWalk`.
+     */
+    struct WalkState
+    {
+        InodeHash & inodeHash;
+        boost::unordered_flat_set<ino_t> & seenInodes;
+    };
+
+    /**
+     * Per-walk state required when `walkSubtree` will hash files.
+     * Passing `nullptr` to `walkSubtree` tells it to treat the
+     * subtree as garbage (credit inodes, no hashing).
+     *
+     * `seenHashes` is read and written only by the dry-run/predict
+     * branch — it records hashes already seen so a second occurrence
+     * of the same content with a different inode counts toward
+     * `stats.predicted`. In wet mode it stays empty (linking happens
+     * by writing to `.links/` directly). Whether the current call is
+     * dry-run or wet is signalled by
+     * `OptimiseStats::predicted.has_value()`.
+     */
+    struct OptimiseState
+    {
+        boost::unordered_flat_set<Hash> seenHashes;
+    };
+
+    /**
+     * Scan `.links/`, populating `state.inodeHash` with each entry's
+     * inode and accumulating the current dedup picture into
+     * `stats.dedup`. Each `.links/` entry's inode is also recorded
+     * in `state.seenInodes` so the subsequent store-directory walk
+     * does not double-count toward `stats.fullWalk`.
+     */
+    void scanLinks(OptimiseStats & stats, WalkState & state, bool computeHistograms);
+
+    /**
+     * Recurse through one subtree of the store directory. For each
+     * inode encountered: credit it toward `stats.fullWalk` exactly
+     * once via `state.seenInodes`. For directories: enumerate
+     * children, skipping entries whose inode is already in
+     * `state.inodeHash` (the `.links/` fast-path).
+     *
+     * When `opt != nullptr`, the subtree is treated as a valid store
+     * path: regular files / symlinks reach the hash branch, where
+     * wet mode (when `stats.predicted` is `nullopt`) actually links
+     * — and may retroactively decrement `stats.fullWalk` for the
+     * orphaned inode — while dry-run mode (`stats.predicted` is
+     * engaged) records what linking would have done. Same-content
+     * first occurrences are neither linked nor predicted; they
+     * become the canonical `.links/<hash>` registration.
+     *
+     * When `opt == nullptr`, the subtree is treated as garbage: its
+     * inodes are credited toward `fullWalk` and the recursion
+     * doesn't hash or link.
+     */
+    void walkSubtree(
         Activity * act,
         OptimiseStats & stats,
         const std::filesystem::path & path,
-        InodeHash & inodeHash,
+        WalkState & state,
+        OptimiseState * opt,
         RepairFlag repair);
 
     // Internal versions that are not wrapped in retry_sqlite.
