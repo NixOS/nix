@@ -108,6 +108,7 @@ nix_sources = [ config_priv_h ] + files(
   'store-gc.cc',
   'store-info.cc',
   'store-repair.cc',
+  'store-stats.cc',
   'store.cc',
   'upgrade-nix.cc',
   'verify.cc',
