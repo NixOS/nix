@@ -274,6 +274,7 @@ ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackL
  * Construct an accessor that presents a "union" view of a vector of
  * underlying accessors. Earlier accessors take precedence over later.
  */
-ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+ref<SourceAccessor>
+makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors, std::shared_ptr<SourceAccessor> displayAccessor);
 
 } // namespace nix

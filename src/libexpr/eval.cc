@@ -299,8 +299,9 @@ EvalState::EvalState(
            instance if we're evaluating a file from the physical
            /nix/store while using a chroot store, and also for lazy
            mounted fetchTree. */
-        auto accessor = settings.pureEval ? storeFS.cast<SourceAccessor>()
-                                          : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS});
+        auto accessor = settings.pureEval
+                            ? storeFS.cast<SourceAccessor>()
+                            : makeUnionSourceAccessor({getFSSourceAccessor(), storeFS}, storeFS.cast<SourceAccessor>());
 
         /* Apply access control if needed. */
         if (settings.restrictEval || settings.pureEval)

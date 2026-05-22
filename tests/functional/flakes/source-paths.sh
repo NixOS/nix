@@ -33,7 +33,7 @@ git -C "$repo" commit -a -m foo
 expectStderr 1 nix eval "git+file://$repo?ref=master#y" | grepQuiet "at «git+file://$repo?rev=.*»/flake.nix:"
 
 expectStderr 1 nix eval "$repo#z" | grepQuiet "error: Path 'foo' does not exist in Git repository \"$repo\"."
-expectStderr 1 nix eval "git+file://$repo?ref=master#z" | grepQuiet "error: '«git+file://$repo?rev=.*»/foo' does not exist"
+expectStderr 1 nix eval "git+file://$repo?ref=master#z" | grepQuiet "error: path '«git+file://$repo?rev=.*»/foo' does not exist"
 expectStderr 1 nix eval "$repo#a" | grepQuiet "error: Path 'foo' does not exist in Git repository \"$repo\"."
 
 echo 123 > "$repo/foo"
@@ -55,3 +55,11 @@ expectStderr 1 nix eval "$repo#b" | grepQuiet "error: Path 'dir' in the reposito
 git -C "$repo" add "$repo/dir/default.nix"
 
 [[ $(nix eval "$repo#b") = 456 ]]
+
+# Check that error messages in impure mode correctly refer to the original path, not a store path.
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; }) + \"/README.md\")" --impure | grepQuiet "Path 'README.md' does not exist in Git repository \"$repo\"."
+
+# This should still be the case if the input is in the store.
+narHash=$(nix flake prefetch --json "$repo" | jq -r .locked.narHash)
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; narHash = \"$narHash\"; }) + \"/README.md\")" --impure | grepQuiet "path '.*git+file://$repo.*/README.md' does not exist"
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; narHash = \"$narHash\"; }) + \"/README.md\")" | grepQuiet "path '.*git+file://$repo.*/README.md' does not exist"

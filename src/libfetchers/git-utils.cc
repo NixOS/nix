@@ -1016,7 +1016,7 @@ struct GitSourceAccessor : SourceAccessor
     {
         auto entry = lookup(state, path);
         if (!entry)
-            throw Error("'%s' does not exist", showPath(path));
+            throw FileNotFound("path '%s' does not exist", showPath(path));
         return entry;
     }
 

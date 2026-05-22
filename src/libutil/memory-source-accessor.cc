@@ -57,7 +57,7 @@ void MemorySourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<voi
 {
     auto * f = open(path, std::nullopt);
     if (!f)
-        throw FileNotFound("file '%s' does not exist", showPath(path));
+        throw FileNotFound("path '%s' does not exist", showPath(path));
     if (auto * r = std::get_if<File::Regular>(&f->raw)) {
         sizeCallback(r->contents.size());
         StringSource source{r->contents};
@@ -107,7 +107,7 @@ MemorySourceAccessor::DirEntries MemorySourceAccessor::readDirectory(const Canon
 {
     auto * f = open(path, std::nullopt);
     if (!f)
-        throw FileNotFound("file '%s' does not exist", showPath(path));
+        throw FileNotFound("path '%s' does not exist", showPath(path));
     if (auto * d = std::get_if<File::Directory>(&f->raw)) {
         DirEntries res;
         for (auto & [name, file] : d->entries)
@@ -122,7 +122,7 @@ std::string MemorySourceAccessor::readLink(const CanonPath & path)
 {
     auto * f = open(path, std::nullopt);
     if (!f)
-        throw FileNotFound("file '%s' does not exist", showPath(path));
+        throw FileNotFound("path '%s' does not exist", showPath(path));
     if (auto * s = std::get_if<File::Symlink>(&f->raw))
         return s->target;
     else

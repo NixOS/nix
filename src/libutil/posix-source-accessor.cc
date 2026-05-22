@@ -52,8 +52,12 @@ void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void
             | O_NOFOLLOW | O_CLOEXEC
 #endif
         ));
-    if (!fd)
-        throw SysError("opening file '%1%'", ap.string());
+    if (!fd) {
+        if (errno == ENOENT)
+            throw FileNotFound("path '%1%' does not exist", showPath(path));
+        else
+            throw SysError("opening file '%1%'", showPath(path));
+    }
 
     auto size = getFileSize(fd.get());
 
