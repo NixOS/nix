@@ -129,7 +129,7 @@ TEST_F(FSSourceAccessorTest, works)
     {
         auto accessor = makeFSSourceAccessor(tmpDir / "nonexistent");
         EXPECT_FALSE(accessor->maybeLstat(CanonPath::root));
-        EXPECT_THROW(accessor->readFile(CanonPath::root), SystemError);
+        EXPECT_THROW(accessor->readFile(CanonPath::root), FileNotFound);
     }
 
     {
