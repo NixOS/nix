@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/local-store.hh"
+#include "nix/store/store-api.hh"
 
 // Needed for template specialisations. This is not good! When we
 // overhaul how store configs work, this should be fixed.
@@ -9,6 +10,22 @@
 #include "nix/util/abstract-setting-to-json.hh"
 
 namespace nix {
+
+TEST(ContentStats, bucket_boundaries)
+{
+    using B = Store::ContentStats;
+    EXPECT_EQ(B::bucket(0), 0);  // 0 is the special case (`bit_width(0) == 0`)
+    EXPECT_EQ(B::bucket(1), 0);  // `bit_width(1) - 1 = 0`, so 0 and 1 share the bucket
+    EXPECT_EQ(B::bucket(2), 1);
+    EXPECT_EQ(B::bucket(3), 1);
+    EXPECT_EQ(B::bucket(1023), 9);
+    EXPECT_EQ(B::bucket(1024), 10);
+    EXPECT_EQ(B::bucket(1u << 20), 20);
+    /* The top bucket saturates: `bit_width(UINT64_MAX) == 64`, so
+       `64 - 1 = 63`, covering every value in [2^63, UINT64_MAX]. */
+    EXPECT_EQ(B::bucket(uint64_t{1} << 63), 63);
+    EXPECT_EQ(B::bucket(std::numeric_limits<uint64_t>::max()), 63);
+}
 
 TEST(LocalStore, storeDir_absolutePath)
 {

@@ -17,6 +17,7 @@
 
 #include <nlohmann/json_fwd.hpp>
 #include <atomic>
+#include <bit>
 #include <map>
 #include <memory>
 #include <string>
@@ -875,6 +876,138 @@ public:
      * with the same contents.
      */
     virtual void optimiseStore() {};
+
+    /**
+     * Options for `Store::queryStoreStats`. Fields map 1:1 to flags
+     * on `nix store stats`.
+     */
+    struct ContentStatsOptions
+    {
+        /** Include power-of-two NAR-size and `.links/` size histograms. */
+        bool histograms = false;
+
+        bool operator==(const ContentStatsOptions &) const = default;
+    };
+
+    /**
+     * Summary statistics for the contents of a store. Per-field
+     * semantics are documented in `src/nix/store-stats.md`; this
+     * header lists each field for callers reading the C++ API.
+     */
+    struct ContentStats
+    {
+        /** Histogram bucketed by `floor(log2(value))`; bucket 0
+            covers 0 and 1, bucket 63 covers everything from 2^63
+            up to UINT64_MAX. */
+        using Histogram = std::map<uint8_t, uint64_t>;
+
+        /** See `Histogram` for bucketing semantics. */
+        static constexpr uint8_t bucket(uint64_t value)
+        {
+            return value == 0 ? 0 : std::bit_width(value) - 1;
+        }
+
+        /** Number of valid store paths. */
+        uint64_t pathCount = 0;
+        /** Sum of each path's NAR size (logical: a file shared by N
+            paths contributes N times). */
+        uint64_t totalNarSize = 0;
+        /** Distribution of NAR sizes across valid paths. Empty
+            unless the producer was asked for histograms. */
+        Histogram narSizeHistogram;
+
+        /**
+         * Already-realised hard-link deduplication, derived from
+         * `.links/` inode metadata (one stat per entry; no hashing).
+         */
+        struct Dedup
+        {
+            /** Entries in `.links/`, i.e. unique file contents. */
+            uint64_t linksFileCount = 0;
+            /** Sum of `st_size` over unique contents. */
+            uint64_t uniqueBytes = 0;
+            /** Sum of `st_blocks*512` over unique contents. */
+            uint64_t uniqueDiskBytes = 0;
+            /** Logical bytes that would be duplicated without
+                hard-linking. */
+            uint64_t dedupBytes = 0;
+            /** On-disk bytes that would be duplicated without
+                hard-linking. */
+            uint64_t dedupDiskBytes = 0;
+            /** `.links/` entries with `nlink > 2` (shared by 2+
+                store paths). */
+            uint64_t dedupedFileCount = 0;
+            /** Sum of `nlink - 2` over `dedupedFileCount` entries:
+                store-file inodes hard-linking avoided creating. */
+            uint64_t inodesSaved = 0;
+            /** Distribution of `.links/` entry sizes. Empty unless
+                the producer was asked for histograms. */
+            Histogram sizeHistogram;
+
+            bool operator==(const Dedup &) const = default;
+        };
+        /** Populated when the producer scanned `.links/`. */
+        std::optional<Dedup> dedup;
+
+        /**
+         * Additional savings a fresh `nix store optimise` would
+         * yield, computed by hashing every unoptimised file in the
+         * walk.
+         */
+        struct PredictedDedup
+        {
+            /** Files that would be replaced with a hard link. */
+            uint64_t filesLinkable = 0;
+            /** Logical bytes that would be freed. */
+            uint64_t bytesLinkable = 0;
+
+            bool operator==(const PredictedDedup &) const = default;
+        };
+        /** Populated when the producer ran the hash walk. */
+        std::optional<PredictedDedup> predictedDedup;
+
+        /**
+         * Store-wide totals from a recursive walk of every reachable
+         * entry under the store directory; each inode is credited
+         * once.
+         */
+        struct FullWalk
+        {
+            /** Closest equivalent to `du --block-size=1` on the
+                store directory. */
+            uint64_t totalDiskBytes = 0;
+            /** Regular-file inode count. */
+            uint64_t fileInodes = 0;
+            /** Directory inode count. */
+            uint64_t dirInodes = 0;
+            /** Symlink inode count. */
+            uint64_t symlinkInodes = 0;
+
+            /** Sum of `fileInodes + dirInodes + symlinkInodes`. */
+            uint64_t totalInodes() const
+            {
+                return fileInodes + dirInodes + symlinkInodes;
+            }
+
+            bool operator==(const FullWalk &) const = default;
+        };
+        /** Populated when the producer walked the store directory. */
+        std::optional<FullWalk> fullWalk;
+
+        bool operator==(const ContentStats &) const = default;
+    };
+
+    /**
+     * Return summary statistics for this store's contents, or
+     * `std::nullopt` if the store cannot supply them. The default
+     * returns `std::nullopt`; concrete stores override (LocalStore
+     * directly; RemoteStore via the worker-protocol
+     * `query-store-stats` feature).
+     */
+    virtual std::optional<ContentStats> queryStoreStats(ContentStatsOptions opts)
+    {
+        return std::nullopt;
+    }
 
     /**
      * Check the integrity of the Nix store.
