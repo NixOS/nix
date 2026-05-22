@@ -30,7 +30,11 @@ if [ "$inode1" = "$inode3" ]; then
 fi
 
 # XXX: This should work through the daemon too
-NIX_REMOTE="" nix-store --optimise
+optimise_output=$(NIX_REMOTE="" nix-store --optimise 2>&1)
+echo "$optimise_output" | grep -q 'previously saved by hard-linking' || \
+    fail "missing previous-savings line in output: $optimise_output"
+echo "$optimise_output" | grep -q 'freed by hard-linking.*this run' || \
+    fail "missing per-run savings line in output: $optimise_output"
 
 inode1="$(stat --format=%i "$outPath1"/foo)"
 inode3="$(stat --format=%i "$outPath3"/foo)"
