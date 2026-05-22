@@ -893,6 +893,93 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
         },
     }))
 
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
+    WorkerProtoTest,
+    contentStatsOptions,
+    "content-stats-options",
+    defaultVersion,
+    (std::tuple<Store::ContentStatsOptions, Store::ContentStatsOptions>{
+        // histograms = false (default).
+        Store::ContentStatsOptions{},
+        // histograms = true.
+        Store::ContentStatsOptions{.histograms = true},
+    }))
+
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
+    WorkerProtoTest,
+    contentStats,
+    "content-stats",
+    defaultVersion,
+    (std::tuple<
+        Store::ContentStats,
+        Store::ContentStats,
+        Store::ContentStats,
+        Store::ContentStats,
+        Store::ContentStats>{
+        // All-default: every optional unset, scalars zero.
+        Store::ContentStats{},
+        // pathCount + totalNarSize + narSizeHistogram populated;
+        // every optional section unset.
+        Store::ContentStats{
+            .pathCount = 42,
+            .totalNarSize = 1024 * 1024,
+            .narSizeHistogram = {{8, 10}, {12, 20}, {20, 12}},
+        },
+        // dedup populated, predictedDedup unset, fullWalk unset.
+        // Different pathCount to exercise the wire's number range.
+        Store::ContentStats{
+            .pathCount = 7,
+            .totalNarSize = 4096,
+            .dedup =
+                Store::ContentStats::Dedup{
+                    .linksFileCount = 30,
+                    .uniqueBytes = 65536,
+                    .uniqueDiskBytes = 73728,
+                    .dedupBytes = 8192,
+                    .dedupDiskBytes = 12288,
+                    .dedupedFileCount = 7,
+                    .inodesSaved = 14,
+                    .sizeHistogram = {{0, 3}, {10, 15}, {16, 12}},
+                },
+        },
+        // dedup + predictedDedup populated; fullWalk unset.
+        Store::ContentStats{
+            .pathCount = 42,
+            .totalNarSize = 1024 * 1024,
+            .narSizeHistogram = {{8, 10}, {12, 20}, {20, 12}},
+            .dedup =
+                Store::ContentStats::Dedup{
+                    .linksFileCount = 30,
+                    .uniqueBytes = 65536,
+                    .uniqueDiskBytes = 73728,
+                    .dedupBytes = 8192,
+                    .dedupDiskBytes = 12288,
+                    .dedupedFileCount = 7,
+                    .inodesSaved = 14,
+                    .sizeHistogram = {{0, 3}, {10, 15}, {16, 12}},
+                },
+            .predictedDedup =
+                Store::ContentStats::PredictedDedup{
+                    .filesLinkable = 17,
+                    .bytesLinkable = 4096,
+                },
+        },
+        // fullWalk populated; dedup and predictedDedup unset. Pins
+        // the wire encoding of fullWalk's optional independently
+        // (not a shape any current producer emits).
+        Store::ContentStats{
+            .pathCount = 99,
+            .totalNarSize = 2048,
+            .fullWalk =
+                Store::ContentStats::FullWalk{
+                    .totalDiskBytes = 1u << 30,
+                    .fileInodes = 100,
+                    .dirInodes = 25,
+                    .symlinkInodes = 8,
+                },
+        },
+    }))
+
 TEST_F(WorkerProtoTest, handshake_log)
 {
     CharacterizationTest::writeTest("handshake-to-client.bin", [&]() -> std::string {

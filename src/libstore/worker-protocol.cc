@@ -1,5 +1,6 @@
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/serialise.hh"
+#include "nix/store/content-stats-json.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/gc-store.hh"
@@ -29,6 +30,7 @@ const WorkerProto::Version WorkerProto::latest = {
                 WorkerProto::featureRealisationWithPath,
             },
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+            std::string{WorkerProto::featureQueryStoreStats},
         },
 };
 
@@ -576,5 +578,8 @@ void WorkerProto::Serialise<GCOptions::GCPaths>::write(
         },
         gcPaths);
 }
+
+WORKER_USE_JSON_SERIALISER(Store::ContentStats)
+WORKER_USE_JSON_SERIALISER(Store::ContentStatsOptions)
 
 } // namespace nix

@@ -134,6 +134,8 @@ public:
 
     void optimiseStore() override;
 
+    std::optional<ContentStats> queryStoreStats(ContentStatsOptions opts) override;
+
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     /**

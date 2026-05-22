@@ -893,6 +893,23 @@ static void performOp(
         conn.to << 1;
         break;
 
+    case WorkerProto::Op::QueryStoreStats: {
+        auto opts = WorkerProto::Serialise<Store::ContentStatsOptions>::read(*store, rconn);
+        logger->startWork();
+        auto stats = store->queryStoreStats(opts);
+        logger->stopWork();
+        /* 0/1 prefix indicates whether a ContentStats payload
+           follows; matches the 0/1 convention used elsewhere in
+           this file. */
+        if (!stats) {
+            conn.to << 0;
+        } else {
+            conn.to << 1;
+            WorkerProto::write(*store, wconn, *stats);
+        }
+        break;
+    }
+
     case WorkerProto::Op::VerifyStore: {
         bool checkContents, repair;
         conn.from >> checkContents >> repair;

@@ -131,6 +131,15 @@ struct WorkerProto
     static constexpr std::string_view featureDeleteDeadSpecificReferrers = "delete-dead-specific-referrers";
 
     /**
+     * Feature gating `WorkerProto::Op::QueryStoreStats`. When the
+     * daemon advertises this, the client can call
+     * `Store::queryStoreStats` and receive a JSON-encoded
+     * `Store::ContentStats` payload; without it the client must
+     * treat stats as unavailable.
+     */
+    static constexpr std::string_view featureQueryStoreStats = "query-store-stats";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -251,6 +260,7 @@ enum struct WorkerProto::Op : uint64_t {
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    QueryStoreStats = 48,
 };
 
 struct WorkerProto::ClientHandshakeInfo
@@ -351,6 +361,12 @@ DECLARE_WORKER_SERIALISER(GCOptions::SpecificPaths);
 
 template<>
 DECLARE_WORKER_SERIALISER(GCOptions::GCPaths);
+
+template<>
+DECLARE_WORKER_SERIALISER(Store::ContentStats);
+
+template<>
+DECLARE_WORKER_SERIALISER(Store::ContentStatsOptions);
 
 template<typename T>
 DECLARE_WORKER_SERIALISER(std::vector<T>);

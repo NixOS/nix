@@ -734,6 +734,23 @@ void RemoteStore::optimiseStore()
     readInt(conn->from);
 }
 
+std::optional<Store::ContentStats> RemoteStore::queryStoreStats(ContentStatsOptions opts)
+{
+    /* Feature check happens after `getConnection()` (which can block
+       on handshake); if the daemon doesn't advertise the feature we
+       return nullopt without sending the op. */
+    auto conn(getConnection());
+    if (!conn->protoVersion.features.contains(WorkerProto::featureQueryStoreStats))
+        return std::nullopt;
+    conn->to << WorkerProto::Op::QueryStoreStats;
+    WorkerProto::write(*this, *conn, opts);
+    conn.processStderr();
+    /* 0/1 prefix matches the daemon side; 0 means no payload follows. */
+    if (readInt(conn->from) == 0)
+        return std::nullopt;
+    return WorkerProto::Serialise<ContentStats>::read(*this, *conn);
+}
+
 bool RemoteStore::verifyStore(bool checkContents, RepairFlag repair)
 {
     auto conn(getConnection());

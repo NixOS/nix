@@ -26,6 +26,29 @@ namespace nix {
         LengthPrefixedProtoHelper<WorkerProto, T>::write(store, conn, t);                                \
     }
 
+/* Wire format: a single length-prefixed JSON string. Decoding goes
+   through the free `to_json`/`from_json` overloads the type's JSON
+   header defines (typically via
+   `NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT`), picked up by
+   nlohmann via ADL. Invoke in a TU that pulls in
+   `<nlohmann/json.hpp>` and the type's JSON serializer header. The
+   `store` parameter (required by the `WorkerProto::Serialise`
+   interface) is unused for JSON-encoded types — translation between
+   value and JSON does not need the `StoreDirConfig`. */
+#define WORKER_USE_JSON_SERIALISER(T)                                                            \
+    T WorkerProto::Serialise<T>::read(                                                           \
+        [[maybe_unused]] const StoreDirConfig & store, WorkerProto::ReadConn conn)               \
+    {                                                                                            \
+        return nlohmann::json::parse(readString(conn.from)).get<T>();                            \
+    }                                                                                            \
+    void WorkerProto::Serialise<T>::write(                                                       \
+        [[maybe_unused]] const StoreDirConfig & store,                                           \
+        WorkerProto::WriteConn conn,                                                             \
+        const T & t)                                                                             \
+    {                                                                                            \
+        conn.to << nlohmann::json(t).dump();                                                     \
+    }
+
 WORKER_USE_LENGTH_PREFIX_SERIALISER(template<typename T>, std::vector<T>)
 #define COMMA_ ,
 WORKER_USE_LENGTH_PREFIX_SERIALISER(template<typename T COMMA_ typename Compare>, std::set<T COMMA_ Compare>)
