@@ -616,6 +616,19 @@ void LocalStore::makeStoreWritable()
         throw SysError("getting info about the Nix store mount point");
 
     if (stat.f_flag & ST_RDONLY) {
+        /* Confine the upcoming remount to this process and its descendants.
+           Without this, libnixstore consumers that don't unshare their
+           own mount namespace (e.g. cachix, PackageKit) silently strip
+           ro/nosuid/nodev from the host's view of the store. */
+        if (unshare(CLONE_NEWNS) == -1) {
+            warn(
+                "could not unshare mount namespace to make the Nix store writable (%s); "
+                "the rw remount may leak into the host namespace",
+                strerror(errno));
+        } else if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1) {
+            throw SysError("making mount namespace private after unshare");
+        }
+
         /* In a user namespace, mount flags like `nodev` and `nosuid` are
            locked and dropping them causes `EPERM`, so here we translate each
            `statvfs` flag to the corresponding `mount` flag individually. */
