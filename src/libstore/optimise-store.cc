@@ -210,9 +210,15 @@ void LocalStore::optimisePath_(
 
     /* Yes!  We've seen a file with the same contents.  Replace the
        current file with a hard link to that file. */
-    auto stLink = lstat(linkPath);
+    auto stLink = maybeLstat(linkPath);
 
-    if (st.st_ino == stLink.st_ino) {
+    /* A concurrent garbage collection may have removed the link in the
+       links directory between the existence check above and now. Skip
+       optimising this path; a later pass will dedup it. */
+    if (!stLink)
+        return;
+
+    if (st.st_ino == stLink->st_ino) {
         debug("%1% is already linked to %2%", PathFmt(path), PathFmt(linkPath));
         return;
     }
@@ -243,6 +249,12 @@ void LocalStore::optimisePath_(
                Just shrug and ignore. */
             if (st.st_size)
                 printInfo("%1% has maximum number of links", PathFmt(linkPath));
+            return;
+        }
+        if (e.code() == std::errc::no_such_file_or_directory) {
+            /* A concurrent garbage collection removed the link in the
+               links directory. Skip optimising this path; a later pass
+               will dedup it. */
             return;
         }
         throw SystemError(e.code(), "creating hard link from %1% to %2%", PathFmt(linkPath), PathFmt(tempLink));
