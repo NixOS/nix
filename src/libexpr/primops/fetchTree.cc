@@ -446,7 +446,7 @@ static void fetch(
             debug(
                 "substitution of '%s' failed, will try to download: %s",
                 state.store->printStorePath(expectedPath),
-                e.what());
+                e.message());
             // Fall through to download
         }
     }
