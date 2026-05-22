@@ -55,3 +55,5 @@ expectStderr 1 nix eval "$repo#b" | grepQuiet "error: Path 'dir' in the reposito
 git -C "$repo" add "$repo/dir/default.nix"
 
 [[ $(nix eval "$repo#b") = 456 ]]
+
+expectStderr 1 nix eval --expr "builtins.readFile ((builtins.fetchTree { type = \"git\"; url = \"file://$repo\"; }) + \"/README.md\")" --impure | grepQuiet "path '$repo/README.md' does not exist"

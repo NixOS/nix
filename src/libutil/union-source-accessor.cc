@@ -5,9 +5,11 @@ namespace nix {
 struct UnionSourceAccessor : SourceAccessor
 {
     std::vector<ref<SourceAccessor>> accessors;
+    std::shared_ptr<SourceAccessor> displayAccessor;
 
-    UnionSourceAccessor(std::vector<ref<SourceAccessor>> _accessors)
+    UnionSourceAccessor(std::vector<ref<SourceAccessor>> _accessors, std::shared_ptr<SourceAccessor> _displayAccessor)
         : accessors(std::move(_accessors))
+        , displayAccessor(std::move(_displayAccessor))
     {
         displayPrefix.clear();
     }
@@ -64,6 +66,8 @@ struct UnionSourceAccessor : SourceAccessor
 
     std::string showPath(const CanonPath & path) override
     {
+        if (displayAccessor)
+            return displayAccessor->showPath(path);
         for (auto & accessor : accessors)
             return accessor->showPath(path);
         return SourceAccessor::showPath(path);
@@ -108,9 +112,10 @@ struct UnionSourceAccessor : SourceAccessor
     }
 };
 
-ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors)
+ref<SourceAccessor>
+makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors, std::shared_ptr<SourceAccessor> displayAccessor)
 {
-    return make_ref<UnionSourceAccessor>(std::move(accessors));
+    return make_ref<UnionSourceAccessor>(std::move(accessors), displayAccessor);
 }
 
 } // namespace nix
