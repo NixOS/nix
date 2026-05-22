@@ -199,42 +199,8 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 
 <!-- Determinate Nix version 3.21.0 -->
 
-* Add `nix serve` command by @edolstra in [DeterminateSystems/nix-src#428](https://github.com/DeterminateSystems/nix-src/pull/428)
+* Add `nix serve` command [DeterminateSystems/nix-src#428](https://github.com/DeterminateSystems/nix-src/pull/428)
 
-* Restore resBuildResult fields for failed builds by @edolstra in [DeterminateSystems/nix-src#453](https://github.com/DeterminateSystems/nix-src/pull/453)
+* Add support for signing store paths using CNSA algorithms [DeterminateSystems/nix-src#449](https://github.com/DeterminateSystems/nix-src/pull/449)
 
-* parseString(): Fix out-of-bounds read by @edolstra in [DeterminateSystems/nix-src#454](https://github.com/DeterminateSystems/nix-src/pull/454)
-
-* filetransfer: handle exceptions thrown from enqueueItem by @cole-h in [DeterminateSystems/nix-src#348](https://github.com/DeterminateSystems/nix-src/pull/348)
-
-* Delete .github/workflows/labels.yml: uses pull_request_target by @grahamc in [DeterminateSystems/nix-src#455](https://github.com/DeterminateSystems/nix-src/pull/455)
-
-* libfetchers: verify git-lfs returns the same objects as git by @RossComputerGuy in [DeterminateSystems/nix-src#456](https://github.com/DeterminateSystems/nix-src/pull/456)
-
-* Send assertion messages to Sentry by @edolstra in [DeterminateSystems/nix-src#457](https://github.com/DeterminateSystems/nix-src/pull/457)
-
-* Include panic() and std::terminate() info in Sentry crash reports by @edolstra in [DeterminateSystems/nix-src#459](https://github.com/DeterminateSystems/nix-src/pull/459)
-
-* cxa-throw: Don't auto-detect by @edolstra in [DeterminateSystems/nix-src#458](https://github.com/DeterminateSystems/nix-src/pull/458)
-
-* HttpBinaryCacheStore: Don't ignore 401/407 errors by @edolstra in [DeterminateSystems/nix-src#461](https://github.com/DeterminateSystems/nix-src/pull/461)
-
-* upload-debug-info-to-sentry.py: Upload binaries in addition to debug files by @edolstra in [DeterminateSystems/nix-src#462](https://github.com/DeterminateSystems/nix-src/pull/462)
-
-* Remove non-atomically initialised variable vImportedDrvToDerivation by @edolstra in [DeterminateSystems/nix-src#464](https://github.com/DeterminateSystems/nix-src/pull/464)
-
-* Re-enable TCP keep-alive and handle S3's XML errors by @edolstra in [DeterminateSystems/nix-src#463](https://github.com/DeterminateSystems/nix-src/pull/463)
-
-* Make static packages use libcxx on Darwin by @RossComputerGuy in [DeterminateSystems/nix-src#452](https://github.com/DeterminateSystems/nix-src/pull/452)
-
-* Add support for signing store paths using CNSA algorithms by @edolstra in [DeterminateSystems/nix-src#449](https://github.com/DeterminateSystems/nix-src/pull/449)
-
-* Add test for resuming downloads by @edolstra in [DeterminateSystems/nix-src#467](https://github.com/DeterminateSystems/nix-src/pull/467)
-
-* Add an exact flake registry override for `nixpkgs` by @grahamc in [DeterminateSystems/nix-src#465](https://github.com/DeterminateSystems/nix-src/pull/465)
-
-* Make fetchTarball lazy by @edolstra in [DeterminateSystems/nix-src#468](https://github.com/DeterminateSystems/nix-src/pull/468)
-
-* Improve path display by @edolstra in [DeterminateSystems/nix-src#469](https://github.com/DeterminateSystems/nix-src/pull/469)
-
-* Fix logging segfault by leaking logger by @edolstra in [DeterminateSystems/nix-src#470](https://github.com/DeterminateSystems/nix-src/pull/470)
+* Make fetchTarball lazy [DeterminateSystems/nix-src#468](https://github.com/DeterminateSystems/nix-src/pull/468)
