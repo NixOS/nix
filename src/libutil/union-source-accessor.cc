@@ -16,13 +16,11 @@ struct UnionSourceAccessor : SourceAccessor
 
     void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
-        for (auto & accessor : accessors) {
-            auto st = accessor->maybeLstat(path);
-            if (st) {
+        for (const auto & [last, accessor] : markLast(accessors))
+            if (last || accessor->maybeLstat(path)) {
                 accessor->readFile(path, sink, sizeCallback);
                 return;
             }
-        }
         throw FileNotFound("path '%s' does not exist", showPath(path));
     }
 
@@ -56,11 +54,9 @@ struct UnionSourceAccessor : SourceAccessor
 
     std::string readLink(const CanonPath & path) override
     {
-        for (auto & accessor : accessors) {
-            auto st = accessor->maybeLstat(path);
-            if (st)
+        for (const auto & [last, accessor] : markLast(accessors))
+            if (last || accessor->maybeLstat(path))
                 return accessor->readLink(path);
-        }
         throw FileNotFound("path '%s' does not exist", showPath(path));
     }
 
