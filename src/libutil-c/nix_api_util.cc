@@ -257,7 +257,7 @@ nix_err nix_set_logger(nix_c_context * context, const nix_logger * vtable, void 
     if (vtable == nullptr)
         return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "logger vtable is null");
     try {
-        nix::logger = std::make_unique<CallbackLogger>(*vtable, userdata);
+        nix::logger = new CallbackLogger(*vtable, userdata);
     }
     NIXC_CATCH_ERRS
 }

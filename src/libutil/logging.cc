@@ -36,7 +36,11 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-std::unique_ptr<Logger> logger = makeSimpleLogger(true);
+/**
+ * This is a raw pointer to allow it to leak.
+ * Avoids races in activity teardown.
+ */
+Logger * logger = makeSimpleLogger(true).release();
 
 void Logger::warn(const std::string & msg)
 {
@@ -403,7 +407,7 @@ void applyJSONLogger()
             std::vector<std::unique_ptr<Logger>> loggers;
             loggers.push_back(makeJSONLogger(*opt, false));
             try {
-                logger = makeTeeLogger(std::move(logger), std::move(loggers));
+                logger = makeTeeLogger(std::unique_ptr<Logger>(logger), std::move(loggers)).release();
             } catch (...) {
                 // `logger` is now gone so give up.
                 abort();

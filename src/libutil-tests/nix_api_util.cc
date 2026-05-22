@@ -145,7 +145,7 @@ TEST_F(nix_api_util_context, nix_set_logger_routes_log_calls)
     LogCapture capture;
     // Restore the default logger before `capture` goes out of scope so
     // the destroy callback runs while `capture` is still alive.
-    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger(); });
+    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger().release(); });
 
     ASSERT_EQ(nix_set_logger(ctx, &captureLoggerVtable, &capture), NIX_OK);
 
@@ -163,7 +163,7 @@ TEST_F(nix_api_util_context, nix_set_logger_routes_log_calls)
 TEST_F(nix_api_util_context, nix_set_logger_routes_activities_and_results)
 {
     LogCapture capture;
-    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger(); });
+    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger().release(); });
 
     ASSERT_EQ(nix_set_logger(ctx, &captureLoggerVtable, &capture), NIX_OK);
 
@@ -191,20 +191,20 @@ TEST_F(nix_api_util_context, nix_set_logger_routes_activities_and_results)
     EXPECT_EQ(capture.stops[0], actId);
 }
 
-TEST_F(nix_api_util_context, nix_set_logger_invokes_destroy_when_replaced)
+TEST_F(nix_api_util_context, nix_set_logger_does_not_invoke_destroy_when_replaced)
 {
     // Both captures must outlive the Finally so that the logger held
     // by `nix::logger` at teardown can call destroy on a live capture.
     LogCapture capture;
     LogCapture capture2;
-    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger(); });
+    Finally restoreLogger([] { nix::logger = nix::makeSimpleLogger().release(); });
 
     ASSERT_EQ(nix_set_logger(ctx, &captureLoggerVtable, &capture), NIX_OK);
     EXPECT_FALSE(capture.destroyed);
 
-    // Replacing the logger must fire destroy on the old userdata.
+    // Replacing the logger won't destroy the old logger.
     ASSERT_EQ(nix_set_logger(ctx, &captureLoggerVtable, &capture2), NIX_OK);
-    EXPECT_TRUE(capture.destroyed);
+    EXPECT_FALSE(capture.destroyed);
     EXPECT_FALSE(capture2.destroyed);
 }
 

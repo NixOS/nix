@@ -273,7 +273,7 @@ struct PushActivity
     }
 };
 
-extern std::unique_ptr<Logger> logger;
+extern Logger * logger;
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 
