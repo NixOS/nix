@@ -29,6 +29,7 @@ const WorkerProto::Version WorkerProto::latest = {
                 WorkerProto::featureRealisationWithPath,
             },
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+            std::string{WorkerProto::featureErrorStatus},
         },
 };
 
