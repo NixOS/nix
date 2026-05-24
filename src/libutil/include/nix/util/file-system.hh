@@ -435,6 +435,12 @@ createTempDir(const std::filesystem::path & tmpRoot = "", const std::string & pr
 AutoCloseFD createAnonymousTempFile();
 
 /**
+ * Create a temporary file at a root, returning a file handle and its path.
+ */
+std::pair<AutoCloseFD, std::filesystem::path>
+createTempFile(const std::filesystem::path & root, const std::filesystem::path & prefix);
+
+/**
  * Create a temporary file, returning a file handle and its path.
  */
 std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesystem::path & prefix = "nix");
