@@ -16,6 +16,7 @@
   - [Environment Variables](installation/env-variables.md)
   - [Upgrading Nix](installation/upgrading.md)
   - [Uninstalling Nix](installation/uninstall.md)
+  - [macOS Spotlight Integration](installation/macos-spotlight-apps.md)
 - [Nix Store](store/index.md)
   - [File System Object](store/file-system-object.md)
     - [Content-Addressing File System Objects](store/file-system-object/content-address.md)
