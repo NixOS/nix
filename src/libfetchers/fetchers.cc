@@ -174,8 +174,7 @@ bool Input::isFinal() const
 
 std::optional<std::filesystem::path> Input::isRelative() const
 {
-    assert(scheme);
-    return scheme->isRelative(*this);
+    return scheme ? scheme->isRelative(*this) : std::nullopt;
 }
 
 Attrs Input::toAttrs() const
