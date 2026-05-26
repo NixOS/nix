@@ -174,8 +174,7 @@ bool Input::isFinal() const
 
 std::optional<std::filesystem::path> Input::isRelative() const
 {
-    assert(scheme);
-    return scheme->isRelative(*this);
+    return scheme ? scheme->isRelative(*this) : std::nullopt;
 }
 
 Attrs Input::toAttrs() const
@@ -403,19 +402,20 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
 
 void Input::clone(const Settings & settings, Store & store, const std::filesystem::path & destDir) const
 {
-    assert(scheme);
+    if (!scheme)
+        throw Error("cannot clone unsupported input '%s'", attrsToJSON(attrs));
     scheme->clone(settings, store, *this, destDir);
 }
 
 std::optional<std::filesystem::path> Input::getSourcePath() const
 {
-    assert(scheme);
-    return scheme->getSourcePath(*this);
+    return scheme ? scheme->getSourcePath(*this) : std::nullopt;
 }
 
 void Input::putFile(const CanonPath & path, std::string_view contents, std::optional<std::string> commitMsg) const
 {
-    assert(scheme);
+    if (!scheme)
+        throw Error("unsupported input '%s' does not support modifying file '%s'", attrsToJSON(attrs), path);
     return scheme->putFile(*this, path, contents, commitMsg);
 }
 
