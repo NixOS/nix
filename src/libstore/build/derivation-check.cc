@@ -7,6 +7,35 @@
 
 namespace nix {
 
+void checkCAFixedOutput(
+    StoreDirConfig & store, const StorePath & drvPath, const DerivationOutput & outputSpec, const ValidPathInfo & info)
+{
+    if (const auto * dof = std::get_if<DerivationOutput::CAFixed>(&outputSpec.raw)) {
+        auto & wanted = dof->ca.hash;
+
+        /* Check wanted hash */
+        assert(info.ca);
+        auto & got = info.ca->hash;
+        if (wanted != got) {
+            throw BuildError(
+                BuildResult::Failure::HashMismatch,
+                "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
+                store.printStorePath(drvPath),
+                wanted.to_string(HashFormat::SRI, true),
+                got.to_string(HashFormat::SRI, true));
+        }
+        if (!info.references.empty()) {
+            auto numViolations = info.references.size();
+            throw BuildError(
+                BuildResult::Failure::HashMismatch,
+                "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                store.printStorePath(drvPath),
+                numViolations,
+                store.printStorePath(*info.references.begin()));
+        }
+    }
+}
+
 void checkOutputs(
     Store & store,
     const StorePath & drvPath,
@@ -27,32 +56,7 @@ void checkOutputs(
         auto * outputSpec = get(drvOutputs, outputName);
         assert(outputSpec);
 
-        if (const auto * dof = std::get_if<DerivationOutput::CAFixed>(&outputSpec->raw)) {
-            auto & wanted = dof->ca.hash;
-
-            /* Check wanted hash */
-            assert(info.ca);
-            auto & got = info.ca->hash;
-            if (wanted != got) {
-                /* Throw an error after registering the path as
-                   valid. */
-                throw BuildError(
-                    BuildResult::Failure::HashMismatch,
-                    "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
-                    store.printStorePath(drvPath),
-                    wanted.to_string(HashFormat::SRI, true),
-                    got.to_string(HashFormat::SRI, true));
-            }
-            if (!info.references.empty()) {
-                auto numViolations = info.references.size();
-                throw BuildError(
-                    BuildResult::Failure::HashMismatch,
-                    "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
-                    store.printStorePath(drvPath),
-                    numViolations,
-                    store.printStorePath(*info.references.begin()));
-            }
-        }
+        checkCAFixedOutput(store, drvPath, *outputSpec, info);
 
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely

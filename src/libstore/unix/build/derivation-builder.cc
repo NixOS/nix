@@ -1887,7 +1887,23 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto optFixedPath = output->path(store, drv.name, outputName);
         if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
-            dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)});
+
+            /* Don't wait on lock for the hash-mismatching fixed-output
+               derivation case, to avoid a deadlock in the case where a build
+               with the correct hash is in progress. */
+            bool locked = dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)}, "", !optFixedPath);
+
+            /* If we can't lock the correct path, clean up and bail now. */
+            if (!locked) {
+                debug(
+                    "failed to lock correct output path of %s, namely %s, not moving output",
+                    store.printStorePath(drvPath),
+                    PathFmt(store.toRealPath(newInfo.path)));
+                deletePath(actualPath);
+                /* Trigger the hash-mismatch error. */
+                checkCAFixedOutput(store, drvPath, *output, newInfo);
+                unreachable();
+            }
         }
 
         /* Move files, if needed */
