@@ -35,6 +35,14 @@ struct PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
+    /**
+     * Set when this path's substitute was found, but one of its references
+     * could not be realised (i.e. the substituter served an incomplete
+     * closure). Lets a downstream derivation goal retry substituting this
+     * path after building its inputs to fill the hole.
+     */
+    bool incompleteClosure = false;
+
 public:
     PathSubstitutionGoal(
         const StorePath & storePath,

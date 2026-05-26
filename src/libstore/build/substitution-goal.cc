@@ -170,6 +170,11 @@ Goal::Co PathSubstitutionGoal::tryToRun(
     trace("all references realised");
 
     if (nrFailed > 0) {
+        /* We found this path's substitute, but couldn't realise its
+           references: the substituter served an incomplete closure. Record
+           this so a downstream derivation goal can retry substituting after
+           building the missing dependencies. */
+        incompleteClosure = true;
         co_return doneFailure(
             nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
             BuildResult::Failure{{

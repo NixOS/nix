@@ -2,6 +2,7 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
+#include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 #include "nix/store/common-protocol.hh"
@@ -49,6 +50,12 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
+    /* Set if substituting an output found the output's substitute but with an
+       incomplete closure. In that case, once we've realised this derivation's
+       inputs (filling the hole), we retry substituting the output rather than
+       rebuilding it. */
+    bool outputIncompleteClosure = false;
+
     auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
         try {
             return derivationOptionsFromStructuredAttrs(
@@ -81,6 +88,10 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         Goals waitees;
 
+        /* The substitution goal for our (known) output path, kept so we can
+           inspect whether it failed due to an incomplete closure. */
+        std::shared_ptr<PathSubstitutionGoal> outputSubGoal;
+
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
@@ -106,10 +117,11 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 }
             } else {
                 auto * cap = getDerivationCA(*drv);
-                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
+                outputSubGoal = worker.makePathSubstitutionGoal(
                     checkResult->first.outPath,
                     buildMode == bmRepair ? Repair : NoRepair,
-                    cap ? std::optional{*cap} : std::nullopt)));
+                    cap ? std::optional{*cap} : std::nullopt);
+                waitees.insert(upcast_goal(outputSubGoal));
             }
         }
 
@@ -118,6 +130,12 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         co_await await(std::move(waitees));
 
         trace("all outputs substituted (maybe)");
+
+        /* Remember whether the output's substitute had an incomplete closure,
+           then drop the goal so we don't pin it across the build below. */
+        if (outputSubGoal)
+            outputIncompleteClosure = outputSubGoal->incompleteClosure;
+        outputSubGoal.reset();
 
         assert(!drv->type().isImpure());
 
@@ -223,6 +241,34 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
     /* We don't need it any more and don't want to hold on to it while suspended. */
     resolutionGoal.reset();
+
+    /* The output's substitute existed but its closure was incomplete (a
+       runtime dependency was missing from the substituters). Now that we've
+       realised this derivation's inputs, that hole is filled, so try once more
+       to substitute the output rather than rebuilding it. If that still fails,
+       we fall through to building as usual. */
+    if (buildMode == bmNormal && outputIncompleteClosure) {
+        auto checkResult = checkPathValidity();
+        if (checkResult && checkResult->second == PathStatus::Valid) {
+            /* Became valid while we were awaiting inputs (e.g. a sibling
+               goal produced this path). Nothing left to do. */
+            co_return doneSuccess(BuildResult::Success::AlreadyValid, checkResult->first);
+        }
+        if (checkResult) {
+            auto * cap = getDerivationCA(*drv);
+            Goals waitees{upcast_goal(worker.makePathSubstitutionGoal(
+                checkResult->first.outPath, NoRepair, cap ? std::optional{*cap} : std::nullopt))};
+            co_await await(std::move(waitees));
+
+            trace("retried output substitution after building inputs");
+
+            nrFailed = nrNoSubstituters = 0;
+
+            checkResult = checkPathValidity();
+            if (checkResult && checkResult->second == PathStatus::Valid)
+                co_return doneSuccess(BuildResult::Success::Substituted, checkResult->first);
+        }
+    }
 
     /* Give up on substitution for the output we want, actually build this derivation */
 

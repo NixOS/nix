@@ -19,6 +19,7 @@ suites += {
     'eval-store.sh',
     'gc.sh',
     'import-from-derivation.sh',
+    'incomplete-closure.sh',
     'issue-13247.sh',
     'multiple-outputs.sh',
     'new-build-cmd.sh',

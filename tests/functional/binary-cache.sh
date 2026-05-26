@@ -176,10 +176,12 @@ grepQuiet "don't know how to build" "$TEST_ROOT/log"
 grepQuiet "building.*input-1" "$TEST_ROOT/log"
 grepQuiet "building.*input-2" "$TEST_ROOT/log"
 
-# Removed for now since 299141ecbd08bae17013226dbeae71e842b4fdd7 / issue #77 is reverted
-
-#grepQuiet "copying path.*input-0" "$TEST_ROOT/log"
-#grepQuiet "copying path.*top" "$TEST_ROOT/log"
+# The missing dependency (input-2) is built from source, which fills the hole
+# in the cached closure of 'top'. Nix then substitutes 'top' (and input-0)
+# rather than rebuilding them.
+grepQuiet "copying path '.*-dependencies-input-0'" "$TEST_ROOT/log"
+grepQuiet "copying path '.*-dependencies-top'" "$TEST_ROOT/log"
+grepQuietInverse "building '.*-dependencies-top.drv'" "$TEST_ROOT/log"
 
 
 # Create a signed binary cache.
