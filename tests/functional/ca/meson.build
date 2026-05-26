@@ -20,6 +20,7 @@ suites += {
     'gc.sh',
     'import-from-derivation.sh',
     'issue-13247.sh',
+    'macho-rewrite.sh',
     'multiple-outputs.sh',
     'new-build-cmd.sh',
     'nix-copy.sh',
