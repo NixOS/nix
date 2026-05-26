@@ -99,7 +99,8 @@ void printCodeLines(std::ostream & out, const std::string & prefix, const Pos & 
 
             out << std::endl << fmt("%1%      |%2%" ANSI_RED "%3%" ANSI_NORMAL, prefix, spaces, arrows);
         }
-    }
+    } else
+        out << std::endl << fmt("%1% %|2$5d|| " ANSI_ITALIC "(empty file)" ANSI_NORMAL, prefix, (errPos.line));
 
     // next line of code.
     if (loc.nextLineOfCode.has_value()) {
@@ -144,9 +145,10 @@ static bool printPosMaybe(std::ostream & oss, std::string_view indent, const std
 {
     bool hasPos = pos && *pos;
     if (hasPos) {
-        oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << ":";
+        auto loc = pos->getCodeLines();
+        oss << indent << ANSI_BLUE << "at " ANSI_WARNING << *pos << ANSI_NORMAL << (loc ? ":" : "");
 
-        if (auto loc = pos->getCodeLines()) {
+        if (loc) {
             printCodeLines(oss, "", *pos, *loc);
             oss << "\n";
         }
