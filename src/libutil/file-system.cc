@@ -515,10 +515,11 @@ AutoCloseFD createAnonymousTempFile()
     return fd;
 }
 
-std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesystem::path & prefix)
+std::pair<AutoCloseFD, std::filesystem::path>
+createTempFile(const std::filesystem::path & root, const std::filesystem::path & prefix)
 {
     assert(!prefix.is_absolute());
-    auto tmpl = (defaultTempDir() / (prefix.string() + ".XXXXXX")).string();
+    auto tmpl = (root / (prefix.string() + ".XXXXXX")).string();
     // FIXME: use O_TMPFILE.
     // `mkstemp` modifies the string to contain the actual filename.
     AutoCloseFD fd = toDescriptor(mkstemp(tmpl.data()));
@@ -529,6 +530,11 @@ std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesyst
     unix::closeOnExec(fd.get());
 #endif
     return {std::move(fd), std::filesystem::path(std::move(tmpl))};
+}
+
+std::pair<AutoCloseFD, std::filesystem::path> createTempFile(const std::filesystem::path & prefix)
+{
+    return createTempFile(defaultTempDir(), prefix);
 }
 
 std::filesystem::path makeTempPath(const std::filesystem::path & root, const std::string & suffix)

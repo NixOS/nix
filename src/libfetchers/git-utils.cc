@@ -812,20 +812,16 @@ struct GitSourceAccessor : SourceAccessor
 
         if (state->lfsFetch) {
             if (state->lfsFetch->shouldFetch(path)) {
-                StringSink s;
                 try {
                     // FIXME: do we need to hold the state lock while
                     // doing this?
                     auto contents =
                         std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-                    state->lfsFetch->fetch(contents, path, s, [&s](uint64_t size) { s.s.reserve(size); });
+                    state->lfsFetch->fetch(contents, path, sink, sizeCallback);
                 } catch (Error & e) {
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
                 }
-                sizeCallback(s.s.size());
-                StringSource source{s.s};
-                source.drainInto(sink);
                 return;
             }
         }
