@@ -273,9 +273,7 @@ struct CmdFlakeMetadata : FlakeCommand, MixJSON
             std::set<ref<flake::Node>> visited{lockedFlake.lockFile.root};
 
             [&](this const auto & recurse, const flake::Node & node, const std::string & prefix) -> void {
-                for (const auto & [i, input] : enumerate(node.inputs)) {
-                    bool last = i + 1 == node.inputs.size();
-
+                for (const auto & [last, input] : markLast(node.inputs)) {
                     if (auto lockedNode = std::get_if<0>(&input.second)) {
                         std::string lastModifiedStr = "";
                         if (auto lastModified = (*lockedNode)->lockedRef.input.getLastModified())
@@ -1260,9 +1258,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             attrs.push_back(attr);
                     }
 
-                    for (const auto & [i, attr] : enumerate(attrs)) {
+                    for (const auto & [last, attr] : markLast(attrs)) {
                         const auto & attrName = state->symbols[attr];
-                        bool last = i + 1 == attrs.size();
                         auto visitor2 = visitor.getAttr(attrName);
                         auto attrPath2(attrPath);
                         attrPath2.push_back(attr);

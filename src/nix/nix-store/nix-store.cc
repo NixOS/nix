@@ -293,8 +293,7 @@ printTree(const StorePath & path, const std::string & firstPad, const std::strin
     auto sorted = store->topoSortPaths(info->references);
     reverse(sorted.begin(), sorted.end());
 
-    for (const auto & [n, i] : enumerate(sorted)) {
-        bool last = n + 1 == sorted.size();
+    for (const auto & [last, i] : markLast(sorted)) {
         printTree(i, tailPad + (last ? treeLast : treeConn), tailPad + (last ? treeNull : treeLine), done);
     }
 }
