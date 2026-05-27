@@ -30,7 +30,7 @@
 
   # Whether to embed the public C API into the `nix` executable so plugins can
   # resolve those symbols without linking Nix libraries directly.
-  withPluginCApi ? false,
+  withPluginCApi ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isStatic,
 }:
 
 let
