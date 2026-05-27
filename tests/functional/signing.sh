@@ -2,12 +2,18 @@
 
 source common.sh
 
+runTests() {
+
 clearStoreIfPossible
 clearCache
 
-nix-store --generate-binary-cache-key cache1.example.org "$TEST_ROOT"/sk1 "$TEST_ROOT"/pk1
+keyType="$1"
+
+nix key generate-secret --key-name cache1.example.org --key-type "$keyType" > "$TEST_ROOT"/sk1
+nix key convert-secret-to-public < "$TEST_ROOT"/sk1 > "$TEST_ROOT"/pk1
 pk1=$(cat "$TEST_ROOT"/pk1)
-nix-store --generate-binary-cache-key cache2.example.org "$TEST_ROOT"/sk2 "$TEST_ROOT"/pk2
+nix key generate-secret --key-name cache2.example.org --key-type "$keyType" > "$TEST_ROOT"/sk2
+nix key convert-secret-to-public < "$TEST_ROOT"/sk2 > "$TEST_ROOT"/pk2
 pk2=$(cat "$TEST_ROOT"/pk2)
 
 # Build a path.
@@ -120,3 +126,7 @@ for file in "$TEST_ROOT/storemultisig/"*.narinfo; do
         exit 1
     fi
 done
+
+}
+
+runTests ed25519

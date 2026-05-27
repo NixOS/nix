@@ -6,10 +6,17 @@
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/util/util.hh"
+#include "nix/util/deleter.hh"
 
 namespace nix {
 
 namespace {
+
+std::string_view keyNamePart(std::string_view s)
+{
+    auto colon = s.find(':');
+    return colon == std::string_view::npos ? std::string_view{} : s.substr(0, colon);
+}
 
 /**
  * Parse a colon-separated string where the second part is Base64-encoded.
@@ -81,19 +88,28 @@ Strings Signature::toStrings(const std::set<Signature> & sigs)
     return res;
 }
 
-Key::Key(std::string_view s, bool sensitiveValue)
+static std::unordered_map<std::string_view, KeyType> keyTypeMap{
+    {"ed25519", KeyType::Ed25519},
+};
+
+const StringSet & getKeyTypes()
 {
-    try {
-        auto [parsedName, parsedKey] = parseColonBase64(s, "key");
-        name = std::move(parsedName);
-        key = std::move(parsedKey);
-    } catch (Error & e) {
-        std::string extra;
-        if (!sensitiveValue)
-            extra = fmt(" with raw value '%s'", s);
-        e.addTrace({}, "while decoding key named '%s'%s", name, extra);
-        throw;
-    }
+    static StringSet validKeyTypes = [] {
+        StringSet s;
+        for (const auto & [k, _] : keyTypeMap) {
+            s.insert(std::string(k));
+        }
+        return s;
+    }();
+    return validKeyTypes;
+}
+
+KeyType parseKeyType(std::string_view s)
+{
+    auto i = keyTypeMap.find(s);
+    if (i != keyTypeMap.end())
+        return i->second;
+    throw UsageError("unknown key type '%s'; valid key types are %s", s, concatStringsSep(", ", getKeyTypes()));
 }
 
 std::string Key::to_string() const
@@ -101,46 +117,116 @@ std::string Key::to_string() const
     return serializeColonBase64(name, key);
 }
 
-SecretKey::SecretKey(std::string_view s)
-    : Key{s, true}
+Signature SecretKey::signDetached(std::string_view s) const
 {
-    if (key.size() != crypto_sign_SECRETKEYBYTES)
-        throw Error("secret key is not valid");
+    throw Error("signing is not implemented for this key type");
 }
 
-Signature SecretKey::signDetached(std::string_view data) const
+std::unique_ptr<PublicKey> SecretKey::toPublicKey() const
 {
-    unsigned char sig[crypto_sign_BYTES];
-    unsigned long long sigLen;
-    crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
-    return Signature{
-        .keyName = name,
-        .sig = std::string((char *) sig, sigLen),
-    };
+    throw Error("conversion to public key is not implemented for this key type");
 }
 
-PublicKey SecretKey::toPublicKey() const
+struct Ed25519PublicKey : PublicKey
 {
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
-    return PublicKey(name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    Ed25519PublicKey(std::string_view name, std::string && _key)
+        : PublicKey(name, std::move(_key))
+    {
+        assert(key.size() == crypto_sign_PUBLICKEYBYTES);
+    }
+
+    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const override
+    {
+        if (sig.sig.size() != crypto_sign_BYTES)
+            return false;
+
+        return crypto_sign_verify_detached(
+                   (unsigned char *) sig.sig.data(),
+                   (unsigned char *) data.data(),
+                   data.size(),
+                   (unsigned char *) key.data())
+               == 0;
+    }
+};
+
+struct Ed25519SecretKey : SecretKey
+{
+    Ed25519SecretKey(std::string_view name, std::string && _key)
+        : SecretKey(name, std::move(_key))
+    {
+        assert(key.size() == crypto_sign_SECRETKEYBYTES);
+    }
+
+    static std::unique_ptr<Ed25519SecretKey> generate(std::string_view name)
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        unsigned char sk[crypto_sign_SECRETKEYBYTES];
+        if (crypto_sign_keypair(pk, sk) != 0)
+            throw Error("key generation failed");
+
+        return std::make_unique<Ed25519SecretKey>(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    }
+
+    Signature signDetached(std::string_view data) const override
+    {
+        unsigned char sig[crypto_sign_BYTES];
+        unsigned long long sigLen;
+        crypto_sign_detached(sig, &sigLen, (unsigned char *) data.data(), data.size(), (unsigned char *) key.data());
+        return Signature{
+            .keyName = name,
+            .sig = std::string((char *) sig, sigLen),
+        };
+    }
+
+    std::unique_ptr<PublicKey> toPublicKey() const override
+    {
+        unsigned char pk[crypto_sign_PUBLICKEYBYTES];
+        crypto_sign_ed25519_sk_to_pk(pk, (unsigned char *) key.data());
+        return std::make_unique<Ed25519PublicKey>(name, std::string((char *) pk, crypto_sign_PUBLICKEYBYTES));
+    }
+};
+
+std::unique_ptr<SecretKey> SecretKey::parse(std::string_view s)
+{
+    try {
+        auto [name, key] = parseColonBase64(s, "key");
+
+        if (key.size() == crypto_sign_SECRETKEYBYTES)
+            return std::make_unique<Ed25519SecretKey>(name, std::move(key));
+        else
+            throw Error("secret key is not valid");
+
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
+        throw;
+    }
 }
 
-SecretKey SecretKey::generate(std::string_view name)
+std::unique_ptr<SecretKey> SecretKey::generate(std::string_view name, KeyType type)
 {
-    unsigned char pk[crypto_sign_PUBLICKEYBYTES];
-    unsigned char sk[crypto_sign_SECRETKEYBYTES];
-    if (crypto_sign_keypair(pk, sk) != 0)
-        throw Error("key generation failed");
+    switch (type) {
 
-    return SecretKey(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
+    case KeyType::Ed25519:
+        return Ed25519SecretKey::generate(name);
+
+    default:
+        unreachable();
+    }
 }
 
-PublicKey::PublicKey(std::string_view s)
-    : Key{s, false}
+std::unique_ptr<PublicKey> PublicKey::parse(std::string_view s)
 {
-    if (key.size() != crypto_sign_PUBLICKEYBYTES)
-        throw Error("public key is not valid");
+    try {
+        auto [name, key] = parseColonBase64(s, "key");
+
+        if (key.size() == crypto_sign_PUBLICKEYBYTES)
+            return std::make_unique<Ed25519PublicKey>(name, std::move(key));
+        else
+            throw Error("public key is not valid");
+    } catch (Error & e) {
+        e.addTrace({}, "while decoding key '%s'", keyNamePart(s));
+        throw;
+    }
 }
 
 bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) const
@@ -153,15 +239,8 @@ bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) con
 
 bool PublicKey::verifyDetachedAnon(std::string_view data, const Signature & sig) const
 {
-    if (sig.sig.size() != crypto_sign_BYTES)
-        throw Error("signature is not valid");
-
-    return crypto_sign_verify_detached(
-               (unsigned char *) sig.sig.data(),
-               (unsigned char *) data.data(),
-               data.size(),
-               (unsigned char *) key.data())
-           == 0;
+    // Unsupported key type, can't verify.
+    return false;
 }
 
 bool verifyDetached(std::string_view data, const Signature & sig, const PublicKeys & publicKeys)
@@ -170,7 +249,7 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
     if (key == publicKeys.end())
         return false;
 
-    return key->second.verifyDetachedAnon(data, sig);
+    return key->second->verifyDetachedAnon(data, sig);
 }
 
 } // namespace nix
