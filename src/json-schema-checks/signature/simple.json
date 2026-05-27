@@ -1,4 +1,1 @@
-{
-    "keyName": "cache.nixos.org-1",
-    "sig": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-}
+../../libutil-tests/data/signature/simple.json

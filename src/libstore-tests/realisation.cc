@@ -35,8 +35,8 @@ DrvOutput testDrvOutput{
     .outputName = "foo",
 };
 
-const SecretKey testSecretKey{
-    "test-key:tU7tTvLcScf8pmz/eTV0BEtLmRsPpZfKaRcd0nCN+pysBZPHSeg61/u2oc7mIOewfuAY1V1BiX32homTaDJ2Jw=="};
+const SecretKey testSecretKey = SecretKey::parse(
+    "test-key:tU7tTvLcScf8pmz/eTV0BEtLmRsPpZfKaRcd0nCN+pysBZPHSeg61/u2oc7mIOewfuAY1V1BiX32homTaDJ2Jw==");
 
 Realisation simple{
     unkeyedSimple,

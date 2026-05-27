@@ -91,6 +91,7 @@ sources = files(
   'processes.cc',
   'ref.cc',
   'serialise.cc',
+  'signature.cc',
   'sort.cc',
   'source-accessor.cc',
   'spawn.cc',

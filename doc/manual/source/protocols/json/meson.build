@@ -14,6 +14,8 @@ schemas = [
   'content-address-v1',
   'store-path-v1',
   'signature-v2',
+  'public-key-v1',
+  'secret-key-v1',
   'store-object-info-v3',
   'derivation-v4',
   'derivation-resolved-v4',

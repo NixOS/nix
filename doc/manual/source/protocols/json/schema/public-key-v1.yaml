@@ -1,0 +1,32 @@
+"$schema": "http://json-schema.org/draft-07/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/public-key-v1.json"
+title: Public Key
+description: |
+  A named Ed25519 public key used for verifying Nix store signatures.
+
+  The `key` field contains the public key encoded as a DER `SubjectPublicKeyInfo` structure
+  ([RFC 5280](https://www.rfc-editor.org/rfc/rfc5280), [RFC 8410](https://www.rfc-editor.org/rfc/rfc8410)),
+  then Base64-encoded.
+
+  For now, the SPKI must use the Ed25519 algorithm (OID 1.3.101.112).
+  The use of SPKI, however, allows us to support more key types in the future in a standards-compliant manner.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - name
+  - key
+properties:
+  name:
+    type: string
+    title: Key Name
+    description: The name of this key
+  key:
+    type: string
+    title: Key Data
+    description: The public key as a DER-encoded SubjectPublicKeyInfo (SPKI), Base64-encoded

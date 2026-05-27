@@ -41,36 +41,43 @@ struct Signature
     auto operator<=>(const Signature &) const = default;
 };
 
-struct Key
+struct PublicKey;
+
+struct SecretKey
 {
     std::string name;
     std::string key;
 
-    std::string to_string() const;
-
-protected:
+    auto operator<=>(const SecretKey &) const = default;
 
     /**
-     * Construct Key from a string in the format
-     * ‘<name>:<key-in-base64>’.
-     *
-     * @param sensitiveValue Avoid displaying the raw Base64 in error
-     * messages to avoid leaking private keys.
+     * Construct from a name and raw key bytes.
      */
-    Key(std::string_view s, bool sensitiveValue);
+    SecretKey(std::string_view name, std::string && key);
 
-    Key(std::string_view name, std::string && key)
-        : name(name)
-        , key(std::move(key))
-    {
-    }
-};
+    /**
+     * Parse a string in the format `<name>:<key-in-Base64>`.
+     */
+    static SecretKey parse(std::string_view s);
 
-struct PublicKey;
+    /**
+     * Decode from a DER-encoded PKCS#8 / OneAsymmetricKey structure (RFC 5958, RFC 8410).
+     *
+     * The 32-byte seed is expanded to the full 64-byte libsodium secret key.
+     */
+    static SecretKey fromPKCS8(std::string_view name, std::string_view der);
 
-struct SecretKey : Key
-{
-    SecretKey(std::string_view s);
+    /**
+     * Encode as a DER PKCS#8 / OneAsymmetricKey structure.
+     *
+     * Per the specification, only the 32-byte seed is stored; the public key can be rederived.
+     */
+    std::string toPKCS8() const;
+
+    /**
+     * Serialize as `<name>:<key-in-Base64>`.
+     */
+    std::string to_string() const;
 
     /**
      * Return a detached signature of the given string.
@@ -80,17 +87,39 @@ struct SecretKey : Key
     PublicKey toPublicKey() const;
 
     static SecretKey generate(std::string_view name);
-
-private:
-    SecretKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
-    {
-    }
 };
 
-struct PublicKey : Key
+struct PublicKey
 {
-    PublicKey(std::string_view data);
+    std::string name;
+    std::string key;
+
+    auto operator<=>(const PublicKey &) const = default;
+
+    /**
+     * Construct from a name and raw key bytes.
+     */
+    PublicKey(std::string_view name, std::string && key);
+
+    /**
+     * Parse a string in the format `<name>:<key-in-Base64>`.
+     */
+    static PublicKey parse(std::string_view s);
+
+    /**
+     * Decode from a DER-encoded SubjectPublicKeyInfo structure (RFC 5280, RFC 8410).
+     */
+    static PublicKey fromSPKI(std::string_view name, std::string_view der);
+
+    /**
+     * Encode as a DER SubjectPublicKeyInfo structure.
+     */
+    std::string toSPKI() const;
+
+    /**
+     * Serialize as `<name>:<key-in-Base64>`.
+     */
+    std::string to_string() const;
 
     /**
      * @return true iff `sig` and this key's names match, and `sig` is a
@@ -105,13 +134,6 @@ struct PublicKey : Key
      * @param sig the raw signature bytes (not Base64 encoded).
      */
     bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
-
-private:
-    PublicKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
-    {
-    }
-    friend struct SecretKey;
 };
 
 /**
@@ -128,3 +150,5 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
 } // namespace nix
 
 JSON_IMPL(nix::Signature)
+JSON_IMPL(nix::PublicKey)
+JSON_IMPL(nix::SecretKey)

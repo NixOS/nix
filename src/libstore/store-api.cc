@@ -1242,7 +1242,7 @@ void Store::signPathInfo(ValidPathInfo & info)
     auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
-        SecretKey secretKey(readFile(secretKeyFile));
+        auto secretKey = SecretKey::parse(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         info.sign(*this, signer);
     }
@@ -1255,7 +1255,7 @@ void Store::signRealisation(Realisation & realisation)
     auto secretKeyFiles = settings.secretKeyFiles;
 
     for (auto & secretKeyFile : secretKeyFiles.get()) {
-        SecretKey secretKey(readFile(secretKeyFile));
+        auto secretKey = SecretKey::parse(readFile(secretKeyFile));
         LocalSigner signer(std::move(secretKey));
         realisation.sign(realisation.id, signer);
     }

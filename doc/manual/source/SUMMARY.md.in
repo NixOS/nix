@@ -126,6 +126,8 @@
     - [Content Address](protocols/json/content-address.md)
     - [Store Path](protocols/json/store-path.md)
     - [Signature](protocols/json/signature.md)
+    - [Public Key](protocols/json/public-key.md)
+    - [Secret Key](protocols/json/secret-key.md)
     - [Store Object Info](protocols/json/store-object-info.md)
     - [Derivation](protocols/json/derivation/index.md)
       - [Resolved Derivation](protocols/json/derivation/resolved.md)

@@ -59,6 +59,20 @@ schemas = [
     ],
   },
   {
+    'stem' : 'public-key',
+    'schema' : schema_dir / 'public-key-v1.yaml',
+    'files' : [
+      'simple.json',
+    ],
+  },
+  {
+    'stem' : 'secret-key',
+    'schema' : schema_dir / 'secret-key-v1.yaml',
+    'files' : [
+      'simple.json',
+    ],
+  },
+  {
     'stem' : 'deriving-path',
     'schema' : schema_dir / 'deriving-path-v1.yaml',
     'files' : [

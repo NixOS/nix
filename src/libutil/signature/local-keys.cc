@@ -1,10 +1,8 @@
-#include <nlohmann/json.hpp>
 #include <ranges>
 #include <sodium.h>
 
 #include "nix/util/base-n.hh"
 #include "nix/util/signature/local-keys.hh"
-#include "nix/util/json-utils.hh"
 #include "nix/util/util.hh"
 
 namespace nix {
@@ -16,21 +14,37 @@ namespace {
  *
  * @param s The string to parse in the format `<name>:<base64-data>`.
  * @param typeName Name of the type being parsed (for error messages).
+ * @param sensitiveValue Avoid displaying the raw value in error messages.
  * @return A pair of (name, decoded-data).
  */
-std::pair<std::string, std::string> parseColonBase64(std::string_view s, std::string_view typeName)
+std::pair<std::string, std::string> parseColonBase64(std::string_view s, std::string_view typeName, bool sensitiveValue)
 {
-    size_t colon = s.find(':');
-    if (colon == std::string::npos || colon == 0)
-        throw FormatError("%s is corrupt", typeName);
+    /* We set this once we've parsed the name, which will make further error
+       messages better. */
+    std::optional<std::string_view> nameView;
+    try {
+        auto colon = s.find(':');
+        if (colon == std::string_view::npos || colon == 0)
+            throw FormatError("%s is corrupt", typeName);
 
-    auto name = std::string(s.substr(0, colon));
-    auto data = base64::decode(s.substr(colon + 1));
+        nameView = s.substr(0, colon);
+        auto name = std::string{*nameView};
+        auto data = base64::decode(s.substr(colon + 1));
 
-    if (name.empty() || data.empty())
-        throw FormatError("%s is corrupt", typeName);
+        if (data.empty())
+            throw FormatError("%s is corrupt", typeName);
 
-    return {std::move(name), std::move(data)};
+        return {std::move(name), std::move(data)};
+    } catch (Error & e) {
+        std::string extra;
+        if (!sensitiveValue)
+            extra = fmt(" with raw value '%s'", s);
+        std::string named;
+        if (nameView)
+            named = fmt(" named '%s'", *nameView);
+        e.addTrace({}, "while decoding %s%s%s", typeName, named, extra);
+        throw;
+    }
 }
 
 /**
@@ -49,7 +63,7 @@ std::string serializeColonBase64(std::string_view name, std::string_view data)
 
 Signature Signature::parse(std::string_view s)
 {
-    auto [keyName, sig] = parseColonBase64(s, "signature");
+    auto [keyName, sig] = parseColonBase64(s, "signature", false);
     return Signature{
         .keyName = std::move(keyName),
         .sig = std::move(sig),
@@ -81,31 +95,23 @@ Strings Signature::toStrings(const std::set<Signature> & sigs)
     return res;
 }
 
-Key::Key(std::string_view s, bool sensitiveValue)
+SecretKey::SecretKey(std::string_view name, std::string && key)
+    : name(name)
+    , key(std::move(key))
 {
-    try {
-        auto [parsedName, parsedKey] = parseColonBase64(s, "key");
-        name = std::move(parsedName);
-        key = std::move(parsedKey);
-    } catch (Error & e) {
-        std::string extra;
-        if (!sensitiveValue)
-            extra = fmt(" with raw value '%s'", s);
-        e.addTrace({}, "while decoding key named '%s'%s", name, extra);
-        throw;
-    }
+    if (this->key.size() != crypto_sign_SECRETKEYBYTES)
+        throw Error("secret key is not valid");
 }
 
-std::string Key::to_string() const
+std::string SecretKey::to_string() const
 {
     return serializeColonBase64(name, key);
 }
 
-SecretKey::SecretKey(std::string_view s)
-    : Key{s, true}
+SecretKey SecretKey::parse(std::string_view s)
 {
-    if (key.size() != crypto_sign_SECRETKEYBYTES)
-        throw Error("secret key is not valid");
+    auto [name, key] = parseColonBase64(s, "secret key", true);
+    return SecretKey(std::move(name), std::move(key));
 }
 
 Signature SecretKey::signDetached(std::string_view data) const
@@ -136,11 +142,23 @@ SecretKey SecretKey::generate(std::string_view name)
     return SecretKey(name, std::string((char *) sk, crypto_sign_SECRETKEYBYTES));
 }
 
-PublicKey::PublicKey(std::string_view s)
-    : Key{s, false}
+PublicKey::PublicKey(std::string_view name, std::string && key)
+    : name(name)
+    , key(std::move(key))
 {
-    if (key.size() != crypto_sign_PUBLICKEYBYTES)
+    if (this->key.size() != crypto_sign_PUBLICKEYBYTES)
         throw Error("public key is not valid");
+}
+
+std::string PublicKey::to_string() const
+{
+    return serializeColonBase64(name, key);
+}
+
+PublicKey PublicKey::parse(std::string_view s)
+{
+    auto [name, key] = parseColonBase64(s, "public key", false);
+    return PublicKey(std::move(name), std::move(key));
 }
 
 bool PublicKey::verifyDetached(std::string_view data, const Signature & sig) const
@@ -174,25 +192,3 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
 }
 
 } // namespace nix
-
-namespace nlohmann {
-void adl_serializer<Signature>::to_json(json & j, const Signature & s)
-{
-    j = {
-        {"keyName", s.keyName},
-        {"sig", base64::encode(std::as_bytes(std::span<const char>{s.sig}))},
-    };
-}
-
-Signature adl_serializer<Signature>::from_json(const json & j)
-{
-    if (j.is_string())
-        return Signature::parse(getString(j));
-    auto obj = getObject(j);
-    return Signature{
-        .keyName = getString(valueAt(obj, "keyName")),
-        .sig = base64::decode(getString(valueAt(obj, "sig"))),
-    };
-}
-
-} // namespace nlohmann

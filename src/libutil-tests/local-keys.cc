@@ -17,11 +17,11 @@ TEST(local_keys, signAndVerify)
     ASSERT_EQ(sig.keyName, "test-key-1");
     ASSERT_TRUE(pk.verifyDetached("hello world", sig));
 
-    auto sk2 = SecretKey(sk.to_string());
+    auto sk2 = SecretKey::parse(sk.to_string());
     ASSERT_EQ(sk2.name, sk.name);
     ASSERT_EQ(sk2.key, sk.key);
 
-    auto pk2 = PublicKey(pk.to_string());
+    auto pk2 = PublicKey::parse(pk.to_string());
     ASSERT_EQ(pk2.name, pk.name);
     ASSERT_EQ(pk2.key, pk.key);
 }
@@ -50,7 +50,7 @@ TEST(local_keys, rfc8032TestVector)
     auto skBytes = seed + pubKeyBytes;
     auto skString = "test:" + base64::encode(std::as_bytes(std::span<const char>{skBytes.data(), skBytes.size()}));
 
-    auto sk = SecretKey(skString);
+    auto sk = SecretKey::parse(skString);
     auto sig = sk.signDetached(message);
 
     ASSERT_EQ(sig.keyName, "test");
