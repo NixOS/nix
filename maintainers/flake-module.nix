@@ -37,30 +37,17 @@
               fi
             ''}";
           };
-          meson-format =
-            let
-              meson = pkgs.meson.overrideAttrs {
-                doCheck = false;
-                doInstallCheck = false;
-                patches = [
-                  (pkgs.fetchpatch {
-                    url = "https://github.com/mesonbuild/meson/commit/38d29b4dd19698d5cad7b599add2a69b243fd88a.patch";
-                    hash = "sha256-PgPBvGtCISKn1qQQhzBW5XfknUe91i5XGGBcaUK4yeE=";
-                  })
-                ];
-              };
-            in
-            {
-              enable = true;
-              files = "(meson.build|meson.options)$";
-              entry = "${pkgs.writeScript "format-meson" ''
-                #!${pkgs.runtimeShell}
-                for file in "$@"; do
-                  ${lib.getExe meson} format -ic ${../meson.format} "$file"
-                done
-              ''}";
-            };
-          nixfmt-rfc-style = {
+          meson-format = {
+            enable = true;
+            files = "(meson.build|meson.options)$";
+            entry = "${pkgs.writeScript "format-meson" ''
+              #!${pkgs.runtimeShell}
+              for file in "$@"; do
+                ${lib.getExe pkgs.meson} format -ic ${../meson.format} "$file"
+              done
+            ''}";
+          };
+          nixfmt = {
             enable = true;
             excludes = [
               # Invalid
