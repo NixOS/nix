@@ -113,7 +113,7 @@
                       config = crossSystem;
                     }
                     // lib.optionalAttrs (crossSystem == "x86_64-w64-mingw32") {
-                      emulator = pkgs: "${pkgs.buildPackages.wineWow64Packages.stable_11}/bin/wine";
+                      emulator = pkgs: "${pkgs.buildPackages.wineWow64Packages.stable}/bin/wine";
                     };
                 overlays = [
                   (overlayFor (pkgs: pkgs.${stdenv}))
