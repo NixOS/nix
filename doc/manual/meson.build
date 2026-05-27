@@ -241,7 +241,9 @@ foreach command : nix_nested_manpages
         meson.current_source_dir() / 'source',
         meson.current_build_dir() / 'source',
         doc_url,
-        meson.current_source_dir() / 'source/command-ref' / command[0] / (page + '.md'),
+        meson.current_source_dir() / 'source/command-ref' / command[0] / (
+          page + '.md'
+        ),
         '@OUTPUT0@',
       ],
       input : [
