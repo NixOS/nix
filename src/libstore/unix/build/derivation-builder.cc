@@ -1230,11 +1230,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             [](auto & sorted) { return sorted; }},
         topoSortResult);
 
-    std::reverse(sortedOutputNames.begin(), sortedOutputNames.end());
-
     OutputPathMap finalOutputs;
 
-    for (auto & outputName : sortedOutputNames) {
+    for (auto & outputName : sortedOutputNames | std::views::reverse) {
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
