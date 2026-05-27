@@ -170,6 +170,9 @@ nix_env_sources = files(
 nix_instantiate_sources = files(
   'nix-instantiate/nix-instantiate.cc',
 )
+nix_run_sources = files(
+  'nix-run/nix-run.cc',
+)
 nix_store_sources = files(
   'nix-store/dotgraph.cc',
   'nix-store/graphml.cc',
@@ -186,6 +189,7 @@ sources = [
   nix_env_buildenv_gen,
   nix_env_sources,
   nix_instantiate_sources,
+  nix_run_sources,
   nix_store_sources,
 ]
 
@@ -221,6 +225,7 @@ nix_symlinks = [
   'nix-hash',
   'nix-instantiate',
   'nix-prefetch-url',
+  'nix-run',
   'nix-shell',
   'nix-store',
 ]
