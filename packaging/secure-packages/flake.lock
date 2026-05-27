@@ -80,16 +80,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1779115762,
-        "narHash": "sha256-Hp/+fmW3u/uG9PeJLuAur8TheOyGTVPLY2q2AkcDTH8=",
-        "rev": "47836af8a912ea891bd3d9ec378ff0e1375fb145",
-        "revCount": 990585,
+        "lastModified": 1779826571,
+        "narHash": "sha256-TdGToOjjyE4OU6J1L7PvNJnBfGZmmyzxXrhrkV1wg9o=",
+        "rev": "6ed3313ea30b8946fba1a378b59d3d5361b90e51",
+        "revCount": 912491,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/secure-packages-rolling/0.1.990585%2Brev-47836af8a912ea891bd3d9ec378ff0e1375fb145/019e3b9c-d32f-74f2-8f0a-18950b3c25cc/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/DeterminateSystems/secure-packages-25.11/0.1.912491%2Brev-6ed3313ea30b8946fba1a378b59d3d5361b90e51/019e6658-99c1-7e32-9759-0f024f615a2c/source.tar.gz"
       },
       "original": {
         "type": "tarball",
-        "url": "https://flakehub.com/f/DeterminateSystems/secure-packages-rolling/0"
+        "url": "https://flakehub.com/f/DeterminateSystems/secure-packages-25.11/0"
       }
     },
     "nixpkgs-23-11": {
