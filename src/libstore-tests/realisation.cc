@@ -35,8 +35,8 @@ DrvOutput testDrvOutput{
     .outputName = "foo",
 };
 
-const SecretKey testSecretKey{
-    "test-key:tU7tTvLcScf8pmz/eTV0BEtLmRsPpZfKaRcd0nCN+pysBZPHSeg61/u2oc7mIOewfuAY1V1BiX32homTaDJ2Jw=="};
+const auto testSecretKey =
+    "test-key:tU7tTvLcScf8pmz/eTV0BEtLmRsPpZfKaRcd0nCN+pysBZPHSeg61/u2oc7mIOewfuAY1V1BiX32homTaDJ2Jw==";
 
 Realisation simple{
     unkeyedSimple,
@@ -164,7 +164,7 @@ TEST_P(RealisationSigningTest, sign)
 {
     const auto & [name, realisation] = GetParam();
 
-    LocalSigner signer(SecretKey{testSecretKey});
+    LocalSigner signer(SecretKey::parse(testSecretKey));
 
     auto sig = realisation.sign(realisation.id, signer);
 
@@ -175,9 +175,9 @@ TEST_P(RealisationSigningTest, verify)
 {
     const auto & [name, realisation] = GetParam();
 
-    auto publicKey = testSecretKey.toPublicKey();
+    auto publicKey = SecretKey::parse(testSecretKey)->toPublicKey();
     PublicKeys publicKeys;
-    publicKeys.insert_or_assign(publicKey.name, publicKey);
+    publicKeys.insert_or_assign(publicKey->name, std::move(publicKey));
 
     readTest(std::string{name} + "-sig.json", [&](const auto & encoded) {
         Signature sig = json::parse(encoded);
@@ -189,13 +189,13 @@ TEST_P(RealisationSigningTest, verify_rejects_wrong_key)
 {
     const auto & [name, realisation] = GetParam();
 
-    auto wrongKey = SecretKey::generate("wrong-key");
-    auto wrongPublicKey = wrongKey.toPublicKey();
+    auto wrongKey = SecretKey::generate("wrong-key", KeyType::Ed25519);
+    auto wrongPublicKey = wrongKey->toPublicKey();
     PublicKeys publicKeys;
-    publicKeys.insert_or_assign(wrongPublicKey.name, wrongPublicKey);
+    publicKeys.insert_or_assign(wrongPublicKey->name, std::move(wrongPublicKey));
 
     auto r = static_cast<const UnkeyedRealisation &>(realisation);
-    LocalSigner signer(SecretKey{testSecretKey});
+    LocalSigner signer(SecretKey::parse(testSecretKey));
     r.sign(realisation.id, signer);
 
     ASSERT_EQ(r.checkSignatures(realisation.id, publicKeys), 0);
@@ -205,12 +205,12 @@ TEST_P(RealisationSigningTest, verify_rejects_tampered_outpath)
 {
     const auto & [name, realisation] = GetParam();
 
-    auto publicKey = testSecretKey.toPublicKey();
+    auto publicKey = SecretKey::parse(testSecretKey)->toPublicKey();
     PublicKeys publicKeys;
-    publicKeys.insert_or_assign(publicKey.name, publicKey);
+    publicKeys.insert_or_assign(publicKey->name, std::move(publicKey));
 
     auto r = static_cast<const UnkeyedRealisation &>(realisation);
-    LocalSigner signer(SecretKey{testSecretKey});
+    LocalSigner signer(SecretKey::parse(testSecretKey));
     r.sign(realisation.id, signer);
 
     // Tamper with the output path after signing.

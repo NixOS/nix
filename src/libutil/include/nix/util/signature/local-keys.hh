@@ -41,23 +41,23 @@ struct Signature
     auto operator<=>(const Signature &) const = default;
 };
 
+enum KeyType {
+    Ed25519,
+};
+
+KeyType parseKeyType(std::string_view s);
+
+const StringSet & getKeyTypes();
+
+// FIXME: remove this class.
 struct Key
 {
-    std::string name;
-    std::string key;
+    const std::string name;
+    const std::string key;
 
     std::string to_string() const;
 
 protected:
-
-    /**
-     * Construct Key from a string in the format
-     * ‘<name>:<key-in-base64>’.
-     *
-     * @param sensitiveValue Avoid displaying the raw Base64 in error
-     * messages to avoid leaking private keys.
-     */
-    Key(std::string_view s, bool sensitiveValue);
 
     Key(std::string_view name, std::string && key)
         : name(name)
@@ -70,27 +70,29 @@ struct PublicKey;
 
 struct SecretKey : Key
 {
-    SecretKey(std::string_view s);
+    using Key::Key;
+
+    virtual ~SecretKey() {};
+
+    static std::unique_ptr<SecretKey> parse(std::string_view s);
 
     /**
      * Return a detached signature of the given string.
      */
-    Signature signDetached(std::string_view s) const;
+    virtual Signature signDetached(std::string_view s) const;
 
-    PublicKey toPublicKey() const;
+    virtual std::unique_ptr<PublicKey> toPublicKey() const;
 
-    static SecretKey generate(std::string_view name);
-
-private:
-    SecretKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
-    {
-    }
+    static std::unique_ptr<SecretKey> generate(std::string_view name, KeyType type);
 };
 
 struct PublicKey : Key
 {
-    PublicKey(std::string_view data);
+    using Key::Key;
+
+    virtual ~PublicKey() {};
+
+    static std::unique_ptr<PublicKey> parse(std::string_view s);
 
     /**
      * @return true iff `sig` and this key's names match, and `sig` is a
@@ -104,20 +106,13 @@ struct PublicKey : Key
      *
      * @param sig the raw signature bytes (not Base64 encoded).
      */
-    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
-
-private:
-    PublicKey(std::string_view name, std::string && key)
-        : Key(name, std::move(key))
-    {
-    }
-    friend struct SecretKey;
+    virtual bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
 };
 
 /**
  * Map from key names to public keys
  */
-typedef std::map<std::string, PublicKey> PublicKeys;
+typedef std::map<std::string, std::unique_ptr<PublicKey>> PublicKeys;
 
 /**
  * @return true iff ‘sig’ is a correct signature over ‘data’ using one

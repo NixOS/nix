@@ -7,23 +7,25 @@ namespace nix {
 
 TEST(local_keys, signAndVerify)
 {
-    auto sk = SecretKey::generate("test-key-1");
-    auto pk = sk.toPublicKey();
+    for (auto type : {KeyType::Ed25519}) {
+        auto sk = SecretKey::generate("test-key-1", type);
+        auto pk = sk->toPublicKey();
 
-    auto sig = sk.signDetached("hello world");
-    auto sig2 = sk.signDetached("hello world");
-    ASSERT_EQ(sig, sig2); // checks idempotence of signing
+        auto sig = sk->signDetached("hello world");
+        auto sig2 = sk->signDetached("hello world");
+        ASSERT_EQ(sig, sig2); // checks idempotence of signing
 
-    ASSERT_EQ(sig.keyName, "test-key-1");
-    ASSERT_TRUE(pk.verifyDetached("hello world", sig));
+        ASSERT_EQ(sig.keyName, "test-key-1");
+        ASSERT_TRUE(pk->verifyDetached("hello world", sig));
 
-    auto sk2 = SecretKey(sk.to_string());
-    ASSERT_EQ(sk2.name, sk.name);
-    ASSERT_EQ(sk2.key, sk.key);
+        auto sk2 = SecretKey::parse(sk->to_string());
+        ASSERT_EQ(sk2->name, sk->name);
+        ASSERT_EQ(sk2->key, sk->key);
 
-    auto pk2 = PublicKey(pk.to_string());
-    ASSERT_EQ(pk2.name, pk.name);
-    ASSERT_EQ(pk2.key, pk.key);
+        auto pk2 = PublicKey::parse(pk->to_string());
+        ASSERT_EQ(pk2->name, pk->name);
+        ASSERT_EQ(pk2->key, pk->key);
+    }
 }
 
 TEST(local_keys, rfc8032TestVector)
@@ -50,15 +52,15 @@ TEST(local_keys, rfc8032TestVector)
     auto skBytes = seed + pubKeyBytes;
     auto skString = "test:" + base64::encode(std::as_bytes(std::span<const char>{skBytes.data(), skBytes.size()}));
 
-    auto sk = SecretKey(skString);
-    auto sig = sk.signDetached(message);
+    auto sk = SecretKey::parse(skString);
+    auto sig = sk->signDetached(message);
 
     ASSERT_EQ(sig.keyName, "test");
     ASSERT_EQ(sig.sig, expectedSig);
 
-    auto pk = sk.toPublicKey();
-    ASSERT_EQ(pk.key, pubKeyBytes);
-    ASSERT_TRUE(pk.verifyDetached(message, sig));
+    auto pk = sk->toPublicKey();
+    ASSERT_EQ(pk->key, pubKeyBytes);
+    ASSERT_TRUE(pk->verifyDetached(message, sig));
 }
 
 } // namespace nix
