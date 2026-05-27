@@ -291,11 +291,9 @@ printTree(const StorePath & path, const std::string & firstPad, const std::strin
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
     auto sorted = store->topoSortPaths(info->references);
-    reverse(sorted.begin(), sorted.end());
 
-    for (const auto & [last, i] : markLast(sorted)) {
+    for (const auto & [last, i] : markLast(sorted | std::views::reverse))
         printTree(i, tailPad + (last ? treeLast : treeConn), tailPad + (last ? treeNull : treeLine), done);
-    }
 }
 
 /* Perform various sorts of queries. */
