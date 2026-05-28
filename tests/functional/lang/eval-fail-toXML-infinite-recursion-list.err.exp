@@ -1,0 +1,9 @@
+error:
+       … while calling the 'toXML' builtin
+         at /pwd/lang/eval-fail-toXML-infinite-recursion-list.nix:4:1:
+            3| in
+            4| builtins.toXML xs
+             | ^
+            5|
+
+       error: infinite recursion encountered while converting Nix value to XML: the value at [0] is the same as the top-level value (only cycle-free Nix values can be converted to XML)

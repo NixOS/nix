@@ -1,0 +1,23 @@
+error:
+       … while calling the 'toJSON' builtin
+         at /pwd/lang/eval-fail-toJSON-deep-cycle.nix:7:1:
+            6| in
+            7| builtins.toJSON loop
+             | ^
+            8|
+
+       … while evaluating attribute 'next'
+         at /pwd/lang/eval-fail-toJSON-deep-cycle.nix:2:64:
+            1| let
+            2|   mk = depth: cyclePoint: if depth == 0 then cyclePoint else { next = mk (depth - 1) cyclePoint; };
+             |                                                                ^
+            3|
+
+       (9 duplicate frames omitted)
+
+       error: infinite recursion encountered while converting Nix value to JSON: the value at .next.next.next.next.next.next.next.next.next.next is the same as the top-level value (only cycle-free data can be represented in JSON)
+       at /pwd/lang/eval-fail-toJSON-deep-cycle.nix:2:64:
+            1| let
+            2|   mk = depth: cyclePoint: if depth == 0 then cyclePoint else { next = mk (depth - 1) cyclePoint; };
+             |                                                                ^
+            3|

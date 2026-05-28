@@ -174,6 +174,7 @@ sources = files(
   'print-ambiguous.cc',
   'print.cc',
   'search-path.cc',
+  'value-path.cc',
   'value-to-json.cc',
   'value-to-xml.cc',
   'value.cc',
