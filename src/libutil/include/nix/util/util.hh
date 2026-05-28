@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <set>
 #include <sstream>
 #include <bit>
 #include <optional>
@@ -88,7 +89,7 @@ std::string replaceStrings(std::string s, std::string_view from, std::string_vie
  * of the matches in `matches`.
  */
 std::string rewriteStrings(
-    std::string s, const StringMap & rewrites, std::vector<uint64_t> * matches = nullptr, uint64_t offsetShift = 0);
+    std::string s, const StringMap & rewrites, std::set<uint64_t> * matches = nullptr, uint64_t offsetShift = 0);
 
 /**
  * Parse a string into an integer.

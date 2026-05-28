@@ -86,7 +86,7 @@ std::string replaceStrings(std::string res, std::string_view from, std::string_v
 }
 
 std::string
-rewriteStrings(std::string s, const StringMap & rewrites, std::vector<uint64_t> * matches, uint64_t offsetShift)
+rewriteStrings(std::string s, const StringMap & rewrites, std::set<uint64_t> * matches, uint64_t offsetShift)
 {
     for (auto & i : rewrites) {
         if (i.first == i.second)
@@ -94,7 +94,7 @@ rewriteStrings(std::string s, const StringMap & rewrites, std::vector<uint64_t> 
         size_t j = 0;
         while ((j = s.find(i.first, j)) != s.npos) {
             if (matches)
-                matches->push_back(j + offsetShift);
+                matches->insert(j + offsetShift);
             s.replace(j, i.first.size(), i.second);
         }
     }
