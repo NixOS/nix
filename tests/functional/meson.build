@@ -128,6 +128,7 @@ suites = [
       'legacy-ssh-store.sh',
       'linux-sandbox.sh',
       'logging.sh',
+      'make-content-addressed.sh',
       'misc.sh',
       'multiple-outputs.sh',
       'nar-access.sh',

@@ -83,7 +83,12 @@ std::string trim(std::string_view s, std::string_view whitespace = " \n\r\t");
  */
 std::string replaceStrings(std::string s, std::string_view from, std::string_view to);
 
-std::string rewriteStrings(std::string s, const StringMap & rewrites);
+/**
+ * Replace all occurrences of the keys in `rewrites` with their corresponding values. Optionally returns the positions
+ * of the matches in `matches`.
+ */
+std::string rewriteStrings(
+    std::string s, const StringMap & rewrites, std::vector<uint64_t> * matches = nullptr, uint64_t offsetShift = 0);
 
 /**
  * Parse a string into an integer.
