@@ -36,6 +36,23 @@ warning_flags = [
   '-Werror=c99-designator',
 ]
 
+if meson.project_name() in [
+  'nix-util',
+  'nix-store',
+  'nix-util-c',
+  'nix-store-c',
+  'nix-expr',
+  'nix-expr-c',
+]
+  # Catch vtables with vague linkage. All vtables must have a "key" function to make
+  # sure they are emitted as strong symbols (as required by Itanium ABI). This is needed
+  # in certain cases of dynamic linking, where weak symbols are not always coalesced. Otherwise
+  # typeinfo symbols get duplicated and dynamic_cast/exception handling ends up broken on Darwin's
+  # libc++.
+  # Search for 'virtual void anchor' in the repo to see how this is done.
+  warning_flags += [ '-Werror=weak-vtables' ]
+endif
+
 add_project_arguments(
   cxx.get_supported_arguments(warning_flags),
   language : 'cpp',
