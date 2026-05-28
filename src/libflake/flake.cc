@@ -66,15 +66,9 @@ struct SourceAccessor;
 
 namespace flake {
 
-static void forceTrivialValue(EvalState & state, Value & value, const PosIdx pos)
-{
-    if (value.isThunk() && value.isTrivial())
-        state.forceValue(value, pos);
-}
-
 static void expectType(EvalState & state, ValueType type, Value & value, const PosIdx pos)
 {
-    forceTrivialValue(state, value, pos);
+    state.forceValue(value, pos);
     if (value.type() != type)
         throw Error("expected %s but got %s at %s", showType(type), showType(value.type()), state.positions[pos]);
 }
@@ -148,7 +142,7 @@ static FlakeInput parseFlakeInput(
     for (auto & attr : *value->attrs()) {
         try {
             if (attr.name == sUrl) {
-                forceTrivialValue(state, *attr.value, pos);
+                state.forceValue(*attr.value, pos);
                 if (attr.value->type() == nString)
                     url = attr.value->string_view();
                 else if (attr.value->type() == nPath) {
@@ -221,6 +215,7 @@ static std::pair<std::map<FlakeId, FlakeInput>, fetchers::Attrs> parseFlakeInput
     expectType(state, nAttrs, *value, pos);
 
     for (auto & inputAttr : *value->attrs()) {
+        state.forceValue(*inputAttr.value, pos);
         auto inputName = state.symbols[inputAttr.name];
         if (inputName == "self") {
             if (!allowSelf)
@@ -248,9 +243,8 @@ static Flake readFlake(
     auto flakeDir = rootDir / CanonPath(resolvedRef.subdir);
     auto flakePath = flakeDir / "flake.nix";
 
-    // NOTE evalFile forces vInfo to be an attrset because mustBeTrivial is true.
     Value vInfo;
-    state.evalFile(flakePath, vInfo, true);
+    state.evalFile(flakePath, vInfo);
 
     Flake flake{
         .originalRef = originalRef,
@@ -299,7 +293,7 @@ static Flake readFlake(
         expectType(state, nAttrs, *nixConfig->value, nixConfig->pos);
 
         for (auto & setting : *nixConfig->value->attrs()) {
-            forceTrivialValue(state, *setting.value, setting.pos);
+            state.forceValue(*setting.value, setting.pos);
             if (setting.value->type() == nString)
                 flake.config.settings.emplace(
                     state.symbols[setting.name], std::string(state.forceStringNoCtx(*setting.value, setting.pos, "")));
