@@ -17,7 +17,13 @@
 
 namespace nix {
 
+void CompressionError::anchor() {}
+
+void CompressionSink::anchor() {}
+
 static const int COMPRESSION_LEVEL_DEFAULT = -1;
+
+namespace {
 
 // Don't feed brotli too much at once.
 struct ChunkedCompressionSink : CompressionSink
@@ -246,6 +252,8 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
+} // namespace
+
 std::string decompress(const std::string & method, std::string_view in)
 {
     StringSink ssink;
@@ -267,6 +275,8 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
             decompressionSource->drainInto(nextSink);
         });
 }
+
+namespace {
 
 struct BrotliCompressionSink : ChunkedCompressionSink
 {
@@ -442,6 +452,8 @@ struct ZstdMultiFrameCompressionSink : CompressionSink
             emitFrame();
     }
 };
+
+} // namespace
 
 ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel, int level)
 {

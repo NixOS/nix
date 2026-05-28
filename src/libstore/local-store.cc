@@ -1325,6 +1325,8 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
     return {tmpDirFn, std::move(tmpDirFd)};
 }
 
+void PathInUse::anchor() {}
+
 void LocalStore::invalidatePathChecked(const StorePath & path)
 {
     retrySQLite<void>([&]() {

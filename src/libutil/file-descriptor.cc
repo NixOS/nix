@@ -15,6 +15,8 @@
 
 namespace nix {
 
+void EndOfFile::anchor() {}
+
 namespace {
 
 enum class PollDirection { In, Out };

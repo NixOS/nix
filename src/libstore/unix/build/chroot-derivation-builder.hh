@@ -7,6 +7,9 @@ namespace nix {
 
 struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
 {
+private:
+    void anchor() override;
+public:
     ChrootDerivationBuilder(
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}

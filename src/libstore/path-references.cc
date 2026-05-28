@@ -9,6 +9,8 @@
 
 namespace nix {
 
+void PathRefScanSink::anchor() {}
+
 PathRefScanSink::PathRefScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap)
     : RefScanSink(std::move(hashes))
     , backMap(std::move(backMap))

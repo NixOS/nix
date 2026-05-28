@@ -138,6 +138,7 @@ sources = [ config_priv_h ] + files(
   'bump-memory-resource.cc',
   'caching-source-accessor.cc',
   'canon-path.cc',
+  'checked-arithmetic.cc',
   'compression-algo.cc',
   'compression-settings.cc',
   'compression.cc',

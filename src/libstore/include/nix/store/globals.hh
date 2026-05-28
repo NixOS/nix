@@ -19,6 +19,10 @@ struct ProfileDirsOptions;
 
 struct LogFileSettings : public virtual Config
 {
+private:
+    void anchor() override;
+
+public:
     Setting<bool> keepLog{
         this,
         true,
@@ -45,6 +49,10 @@ struct LogFileSettings : public virtual Config
 
 struct NarInfoDiskCacheSettings : public virtual Config
 {
+private:
+    void anchor() override;
+
+public:
     Setting<unsigned int> ttlNegative{
         this,
         3600,
@@ -96,6 +104,9 @@ class Settings : public virtual Config,
                  private WorkerSettings,
                  private NarInfoDiskCacheSettings
 {
+private:
+    void anchor() override;
+public:
     StringSet getDefaultSystemFeatures();
 
     StringSet getDefaultExtraPlatforms();

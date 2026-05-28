@@ -37,6 +37,10 @@
 
 namespace nix {
 
+void LocalSettings::anchor() {}
+
+void GCSettings::anchor() {}
+
 static std::string gcSocketPath = "gc-socket/socket";
 static std::string gcRootsDir = "gcroots";
 

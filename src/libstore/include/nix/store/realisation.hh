@@ -163,6 +163,8 @@ struct RealisedPath
 
 class MissingRealisation final : public CloneableError<MissingRealisation, Error>
 {
+    void anchor() override;
+
 public:
     MissingRealisation(const StoreDirConfig & store, DrvOutput & outputId)
         : MissingRealisation(store, outputId.drvPath, outputId.outputName)

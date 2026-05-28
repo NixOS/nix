@@ -9,6 +9,8 @@
 
 namespace nix {
 
+void Interrupted::anchor() {}
+
 std::atomic<bool> unix::_isInterrupted = false;
 
 thread_local std::function<bool()> unix::interruptCheck;
@@ -40,6 +42,8 @@ struct InterruptCallbacks
     /* Used as a list, see InterruptCallbacks comment. */
     std::map<Token, fun<void()>> callbacks;
 };
+
+InterruptCallback::~InterruptCallback() {}
 
 /* Required to avoid static initialization order fiasco. This allows global
    objects to safely register callbacks. */
@@ -145,6 +149,8 @@ void unix::restoreSignals()
         throw SysError("restoring signals");
 }
 
+namespace {
+
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
@@ -166,6 +172,8 @@ struct InterruptCallbackImpl : InterruptCallback
         interruptCallbacks->callbacks.erase(token);
     }
 };
+
+} // namespace
 
 std::unique_ptr<InterruptCallback> createInterruptCallback(fun<void()> callback)
 {

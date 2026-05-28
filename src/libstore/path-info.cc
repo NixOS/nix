@@ -8,6 +8,10 @@
 
 namespace nix {
 
+void UnkeyedValidPathInfo::anchor() {}
+
+void ValidPathInfo::anchor() {}
+
 PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
 {
     switch (version) {

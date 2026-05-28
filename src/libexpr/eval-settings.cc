@@ -7,6 +7,8 @@
 
 namespace nix {
 
+void EvalSettings::anchor() {}
+
 void DeprecatedWarnSetting::assign(const bool & v)
 {
     value = v;

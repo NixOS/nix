@@ -6,6 +6,8 @@
 
 namespace nix {
 
+void UnknownCompressionMethod::anchor() {}
+
 CompressionAlgo parseCompressionAlgo(std::string_view method, bool suggestions)
 {
 #define NIX_COMPRESSION_ALGO_FROM_STRING(name, value) {name, CompressionAlgo::value},

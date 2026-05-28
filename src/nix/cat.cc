@@ -92,6 +92,8 @@ struct CmdCatNar : StoreCommand, MixCat
                 struct : CreateRegularFileSink, FdSink
                 {
                     void isExecutable() override {}
+
+                    void anchor() override {}
                 } crfSink;
 
                 crfSink.fd = INVALID_DESCRIPTOR;

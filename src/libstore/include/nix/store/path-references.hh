@@ -18,6 +18,8 @@ class PathRefScanSink : public RefScanSink
 
     PathRefScanSink(StringSet && hashes, std::map<std::string, StorePath> && backMap);
 
+    void anchor() override;
+
 public:
 
     static PathRefScanSink fromPaths(const StorePathSet & refs);

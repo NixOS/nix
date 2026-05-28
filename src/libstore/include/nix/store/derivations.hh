@@ -292,7 +292,7 @@ struct BasicDerivation
     BasicDerivation(const BasicDerivation &) = default;
     BasicDerivation & operator=(BasicDerivation &&) = default;
     BasicDerivation & operator=(const BasicDerivation &) = default;
-    virtual ~BasicDerivation() {};
+    virtual ~BasicDerivation();
 
     bool isBuiltin() const;
 
@@ -427,6 +427,11 @@ struct Derivation : BasicDerivation
     void fillInOutputPaths(Store & store);
 
     Derivation() = default;
+    Derivation(Derivation &&) = default;
+    Derivation(const Derivation &) = default;
+    Derivation & operator=(Derivation &&) = default;
+    Derivation & operator=(const Derivation &) = default;
+    ~Derivation() override;
 
     Derivation(const BasicDerivation & bd)
         : BasicDerivation(bd)

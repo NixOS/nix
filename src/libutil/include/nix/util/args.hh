@@ -462,6 +462,9 @@ struct Completion
  */
 class AddCompletions
 {
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
 public:
 
     /**

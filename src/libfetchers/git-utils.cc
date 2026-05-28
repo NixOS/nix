@@ -74,6 +74,8 @@ namespace nix {
 
 struct GitSourceAccessor;
 
+namespace {
+
 struct GitError final : public CloneableError<GitError, Error>
 {
     template<typename... Ts>
@@ -96,6 +98,8 @@ struct GitError final : public CloneableError<GitError, Error>
     {
     }
 };
+
+} // namespace
 
 typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
 typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
@@ -784,6 +788,9 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Opti
 
 struct GitSourceAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+public:
     struct State
     {
         ref<GitRepoImpl> repo;
@@ -1058,6 +1065,9 @@ struct GitSourceAccessor : SourceAccessor
 
 struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
 {
+private:
+    void anchor() override {};
+public:
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
@@ -1115,6 +1125,10 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
         return !isExportIgnored(path);
     }
 };
+
+void GitFileSystemObjectSink::anchor() {}
+
+namespace {
 
 struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 {
@@ -1410,6 +1424,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         return toHash(_state.lock()->root.oid.value());
     }
 };
+
+} // namespace
 
 ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, const GitAccessorOptions & options)
 {

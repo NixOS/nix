@@ -10,6 +10,8 @@ namespace nix {
 
 class RemoteFSAccessor : public SourceAccessor
 {
+    void anchor() override;
+
     ref<Store> store;
 
     /**

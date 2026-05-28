@@ -8,6 +8,10 @@ namespace nix {
 
 MakeError(InvalidDerivationOutputId, Error);
 
+void InvalidDerivationOutputId::anchor() {}
+
+void MissingRealisation::anchor() {}
+
 DrvOutput DrvOutput::parse(const StoreDirConfig & store, std::string_view s)
 {
     size_t n = s.rfind('^');

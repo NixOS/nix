@@ -2,8 +2,14 @@
 
 namespace nix {
 
+namespace {
+
 struct UnionSourceAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+
+public:
     std::vector<ref<SourceAccessor>> accessors;
 
     UnionSourceAccessor(std::vector<ref<SourceAccessor>> _accessors)
@@ -97,6 +103,8 @@ struct UnionSourceAccessor : SourceAccessor
         return {path, std::nullopt};
     }
 };
+
+} // namespace
 
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors)
 {

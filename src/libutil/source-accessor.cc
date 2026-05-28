@@ -3,6 +3,20 @@
 
 namespace nix {
 
+void SourceAccessorError::anchor() {}
+
+void FileNotFound::anchor() {}
+
+void NotASymlink::anchor() {}
+
+void NotADirectory::anchor() {}
+
+void NotARegularFile::anchor() {}
+
+void RestrictedPathError::anchor() {}
+
+void SymlinkNotAllowed::anchor() {}
+
 static std::atomic<size_t> nextNumber{0};
 
 bool SourceAccessor::Stat::isNotNARSerialisable()

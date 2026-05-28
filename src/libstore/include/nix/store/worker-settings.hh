@@ -25,6 +25,9 @@ struct MaxBuildJobsSetting : public BaseSetting<unsigned int>
 
 struct WorkerSettings : public virtual Config
 {
+private:
+    void anchor() override;
+
 protected:
     WorkerSettings() = default;
 

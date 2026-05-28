@@ -1,4 +1,5 @@
 #include "nix/util/util.hh"
+#include "nix/util/ref.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/signals.hh"
 
@@ -14,6 +15,10 @@
 #endif
 
 namespace nix {
+
+void FormatError::anchor() {}
+
+bad_ref_cast::~bad_ref_cast() {}
 
 void initLibUtil()
 {

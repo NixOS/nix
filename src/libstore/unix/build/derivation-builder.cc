@@ -73,14 +73,19 @@
 
 namespace nix {
 
-struct NotDeterministic final : CloneableError<NotDeterministic, BuildError>
+class NotDeterministic final : public CloneableError<NotDeterministic, BuildError>
 {
+    void anchor() override;
+
+public:
     NotDeterministic(auto &&... args)
         : CloneableError(BuildResult::Failure::NotDeterministic, args...)
     {
         isNonDeterministic = true;
     }
 };
+
+void NotDeterministic::anchor() {}
 
 void preserveDeathSignal(fun<void()> setCredentials)
 {
@@ -144,6 +149,8 @@ static void handleDiffHook(
         logError(ei);
     }
 }
+
+void DerivationBuilderImpl::anchor() {}
 
 const std::filesystem::path DerivationBuilderImpl::homeDir = "/homeless-shelter";
 

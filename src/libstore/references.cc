@@ -8,6 +8,12 @@
 
 namespace nix {
 
+void RefScanSink::anchor() {}
+
+void HashModuloSink::anchor() {}
+
+void RewritingSink::anchor() {}
+
 static constexpr auto refLength = StorePath::HashLen;
 
 static void search(std::string_view s, StringSet & hashes, StringSet & seen)

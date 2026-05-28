@@ -13,6 +13,9 @@ namespace detail {
  */
 class PosixSourceAccessorBase : virtual public SourceAccessor
 {
+private:
+    void anchor() override;
+
 protected:
     const bool trackLastModified = false;
 

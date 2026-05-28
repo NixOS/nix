@@ -23,6 +23,9 @@ class EvalBaseError : public CloneableError<EvalBaseError, Error>
 {
     template<class T>
     friend class EvalErrorBuilder;
+
+    void anchor() override;
+
 public:
     EvalState & state;
 
@@ -61,8 +64,11 @@ MakeError(InfiniteRecursionError, EvalError);
  * Inherits from EvalBaseError (not EvalError) because resource exhaustion
  * should not be cached.
  */
-struct StackOverflowError : public CloneableError<StackOverflowError, EvalBaseError>
+class StackOverflowError : public CloneableError<StackOverflowError, EvalBaseError>
 {
+    void anchor() override;
+
+public:
     StackOverflowError(EvalState & state)
         : CloneableError(state, "stack overflow; max-call-depth exceeded")
     {
@@ -79,8 +85,10 @@ MakeError(IFDError, EvalBaseError);
  */
 MakeError(RecoverableEvalError, EvalBaseError);
 
-struct InvalidPathError : public CloneableError<InvalidPathError, EvalError>
+class InvalidPathError : public CloneableError<InvalidPathError, EvalError>
 {
+    void anchor() override;
+
 public:
     StorePath path;
 

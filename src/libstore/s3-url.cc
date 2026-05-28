@@ -15,6 +15,8 @@ using namespace std::string_view_literals;
 
 namespace nix {
 
+void InvalidS3AddressingStyle::anchor() {}
+
 S3AddressingStyle parseS3AddressingStyle(std::string_view style)
 {
     if (style == "auto")

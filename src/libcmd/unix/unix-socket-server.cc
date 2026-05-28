@@ -21,6 +21,8 @@
 
 namespace nix::unix {
 
+void AbortServeSocket::anchor() {}
+
 PeerInfo getPeerInfo(Descriptor remote)
 {
     PeerInfo peer;

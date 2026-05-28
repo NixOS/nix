@@ -4,6 +4,10 @@
 
 namespace nix {
 
+void MemorySink::anchor() {}
+
+void MemorySourceAccessor::anchor() {}
+
 MemorySourceAccessor::File * MemorySourceAccessor::open(const CanonPath & path, std::optional<File> create)
 {
     bool hasRoot = root.has_value();

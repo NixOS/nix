@@ -26,6 +26,8 @@ create table if not exists Cache (
 
 struct CacheImpl : Cache
 {
+    void anchor() override;
+
     struct State
     {
         SQLite db;
@@ -155,6 +157,10 @@ struct CacheImpl : Cache
         return res && !res->expired ? res : std::nullopt;
     }
 };
+
+void Cache::anchor() {}
+
+void CacheImpl::anchor() {}
 
 ref<Cache> Settings::getCache() const
 {

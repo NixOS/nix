@@ -22,6 +22,9 @@ namespace nix {
 // FIXME: rename this to UnixDerivationBuilder or something like that.
 class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
 {
+private:
+    void anchor() override;
+
 protected:
 
     /**

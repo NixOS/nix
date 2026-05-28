@@ -45,6 +45,11 @@ MakeError(NotARegularFile, SourceAccessorError);
  */
 struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 {
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+     * dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor() = 0;
+public:
     const size_t number;
 
     std::string displayPrefix, displaySuffix;
@@ -248,8 +253,11 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
-struct SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
+class SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
 {
+    void anchor() override;
+
+public:
     CanonPath path;
 
     SymlinkNotAllowed(CanonPath path)

@@ -20,12 +20,15 @@ static std::string parsePublicHostKey(std::string_view host, std::string_view ss
 
 class InvalidSSHAuthority final : public CloneableError<InvalidSSHAuthority, Error>
 {
+    void anchor() override;
 public:
     InvalidSSHAuthority(const ParsedURL::Authority & authority, std::string_view reason)
         : CloneableError("invalid SSH authority: '%s': %s", authority.to_string(), reason)
     {
     }
 };
+
+void InvalidSSHAuthority::anchor() {}
 
 /**
  * Checks if the hostname/username are valid for use with ssh.

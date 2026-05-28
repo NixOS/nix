@@ -28,11 +28,15 @@
 
 namespace nix {
 
+void AwsAuthError::anchor() {}
+
 AwsAuthError::AwsAuthError(int errorCode)
     : CloneableError("AWS authentication error: '%s' (%d)", aws_error_str(errorCode), errorCode)
     , errorCode(errorCode)
 {
 }
+
+AwsCredentialProvider::~AwsCredentialProvider() {}
 
 namespace {
 
@@ -284,8 +288,6 @@ static AwsCredentials getCredentialsFromProvider(std::shared_ptr<Aws::Crt::Auth:
     return fut.get(); // This will throw if set_exception was called
 }
 
-} // anonymous namespace
-
 class AwsCredentialProviderImpl : public AwsCredentialProvider
 {
 public:
@@ -450,6 +452,8 @@ AwsCredentials AwsCredentialProviderImpl::getCredentialsRaw(const std::string & 
 
     return getCredentialsFromProvider(provider);
 }
+
+} // anonymous namespace
 
 ref<AwsCredentialProvider> makeAwsCredentialsProvider()
 {

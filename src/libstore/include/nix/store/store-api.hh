@@ -78,6 +78,9 @@ struct MissingPaths
  */
 struct StoreConfigBase : Config
 {
+private:
+    void anchor() override;
+
 protected:
 
     /**
@@ -230,9 +233,7 @@ public:
 struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
 private:
-    /* VTable anchor to avoid weak linkage of the vtable - it breaks
-       dynamic_cast across shared libraries on Darwin. */
-    virtual void anchor() = 0;
+    void anchor() override;
 
 public:
     using Params = StoreReference::Params;

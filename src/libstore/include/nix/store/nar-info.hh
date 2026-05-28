@@ -36,6 +36,10 @@ struct UnkeyedNarInfo : virtual UnkeyedValidPathInfo
  */
 struct NarInfo : ValidPathInfo, UnkeyedNarInfo
 {
+private:
+    void anchor() override;
+
+public:
     NarInfo() = delete;
 
     NarInfo(ValidPathInfo info)

@@ -7,7 +7,7 @@ extern "C" {
 nix_fetchers_settings * nix_fetchers_settings_new(nix_c_context * context)
 {
     try {
-        auto fetchersSettings = nix::make_ref<nix::fetchers::Settings>(nix::fetchers::Settings{});
+        auto fetchersSettings = nix::make_ref<nix::fetchers::Settings>();
         return new nix_fetchers_settings{
             .settings = fetchersSettings,
         };

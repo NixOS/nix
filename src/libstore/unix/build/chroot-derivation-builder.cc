@@ -2,6 +2,8 @@
 
 namespace nix {
 
+void ChrootDerivationBuilder::anchor() {}
+
 void ChrootDerivationBuilder::setBuildTmpDir()
 {
     /* If sandboxing is enabled, put the actual TMPDIR underneath

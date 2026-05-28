@@ -153,6 +153,8 @@ struct Settings : public Config
     ref<GitRepo> getTarballCache() const;
 
 private:
+    void anchor() override;
+
     mutable Sync<std::shared_ptr<Cache>> _cache;
 };
 

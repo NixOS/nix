@@ -15,6 +15,10 @@ namespace nix {
 
 struct ArchiveSettings : Config
 {
+private:
+    void anchor() override;
+public:
+
     Setting<bool> useCaseHack{
         this,
 #ifdef __APPLE__
@@ -114,6 +118,8 @@ void SourceAccessor::dumpPath(const CanonPath & path, Sink & sink, PathFilter & 
         sink << ")";
     }(*this, path, path, 0);
 }
+
+void ArchiveSettings::anchor() {}
 
 time_t dumpPathAndGetMtime(const std::filesystem::path & path, Sink & sink, PathFilter & filter)
 {
