@@ -17,6 +17,10 @@ namespace nix {
 
 using namespace std::literals::string_view_literals;
 
+BasicDerivation::~BasicDerivation() {}
+
+Derivation::~Derivation() {}
+
 std::optional<StorePath>
 DerivationOutput::path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const
 {

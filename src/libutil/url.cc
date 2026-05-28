@@ -12,6 +12,8 @@
 
 namespace nix {
 
+void BadURL::anchor() {}
+
 std::regex refRegex(refRegexS, std::regex::ECMAScript);
 std::regex revRegex(revRegexS, std::regex::ECMAScript);
 

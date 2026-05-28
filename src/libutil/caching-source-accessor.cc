@@ -4,12 +4,16 @@
 
 namespace nix {
 
+namespace {
+
 class CachingSourceAccessor : public SourceAccessor
 {
     ref<SourceAccessor> next;
 
     boost::concurrent_flat_map<CanonPath, Stat> lstatCache;
     boost::concurrent_flat_map<CanonPath, std::string> readLinkCache;
+
+    void anchor() override {};
 
 public:
     CachingSourceAccessor(ref<SourceAccessor> next_)
@@ -93,6 +97,8 @@ public:
         return next->getFingerprint(path);
     }
 };
+
+} // namespace
 
 ref<SourceAccessor> makeCachingSourceAccessor(ref<SourceAccessor> next)
 {

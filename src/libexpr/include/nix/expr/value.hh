@@ -448,6 +448,14 @@ struct ValueBase
             assert(this->ex);
         }
 
+        Failed(Failed &&) = delete;
+        Failed(const Failed &) = delete;
+        Failed & operator=(Failed &&) = delete;
+        Failed & operator=(const Failed &) = delete;
+
+        /* To appease Wweak-vtables. */
+        virtual ~Failed();
+
         [[noreturn]] void rethrow() const
         {
             try {

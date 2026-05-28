@@ -16,7 +16,15 @@
 namespace nix::checked {
 
 class DivideByZero : std::exception
-{};
+{
+public:
+    DivideByZero() = default;
+    DivideByZero(DivideByZero &&) = default;
+    DivideByZero(const DivideByZero &) = default;
+    DivideByZero & operator=(DivideByZero &&) = default;
+    DivideByZero & operator=(const DivideByZero &) = default;
+    virtual ~DivideByZero();
+};
 
 /**
  * Numeric value enforcing checked arithmetic. Performing mathematical operations on such values will return a Result

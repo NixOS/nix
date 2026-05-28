@@ -43,6 +43,10 @@ public:
 
 struct EvalSettings : Config
 {
+private:
+    void anchor() override;
+
+public:
     /**
      * Function used to interpret look path entries of a given scheme.
      *

@@ -32,6 +32,20 @@ using json = nlohmann::json;
 
 namespace nix {
 
+void StoreConfig::anchor() {}
+
+void InvalidPath::anchor() {}
+
+void Unsupported::anchor() {}
+
+void SubstituteGone::anchor() {}
+
+void SubstituterDisabled::anchor() {}
+
+void InvalidStoreReference::anchor() {}
+
+void StoreConfigBase::anchor() {}
+
 static std::string canonStoreDir(std::string path)
 {
     if (path.empty() || path[0] != '/')

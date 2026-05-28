@@ -123,4 +123,32 @@ template class EvalErrorBuilder<InvalidPathError>;
 template class EvalErrorBuilder<IFDError>;
 template class EvalErrorBuilder<RecoverableEvalError>;
 
+void EvalBaseError::anchor() {}
+
+void ParseError::anchor() {}
+
+void EvalError::anchor() {}
+
+void AssertionError::anchor() {}
+
+void ThrownError::anchor() {}
+
+void Abort::anchor() {}
+
+void TypeError::anchor() {}
+
+void UndefinedVarError::anchor() {}
+
+void MissingArgumentError::anchor() {}
+
+void InfiniteRecursionError::anchor() {}
+
+void StackOverflowError::anchor() {}
+
+void InvalidPathError::anchor() {}
+
+void IFDError::anchor() {}
+
+void RecoverableEvalError::anchor() {}
+
 } // namespace nix

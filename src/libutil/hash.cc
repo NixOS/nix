@@ -21,6 +21,12 @@
 
 namespace nix {
 
+void BadHash::anchor() {}
+
+void AbstractHashSink::anchor() {}
+
+void HashSink::anchor() {}
+
 const StringSet hashAlgorithms = {"blake3", "md5", "sha1", "sha256", "sha512"};
 
 const StringSet hashFormats = {"base64", "nix32", "base16", "sri"};

@@ -178,6 +178,8 @@ static bool isIncompleteInput(const ParseError & e)
     return e.msg().find("unexpected end of file") != std::string::npos;
 }
 
+void IncompleteReplExpr::anchor() {}
+
 static bool isFirstRepl = true;
 
 ReplExitStatus NixRepl::mainLoop()

@@ -5,8 +5,11 @@
 
 namespace nix {
 
-struct GlobalConfig : public AbstractConfig
+class GlobalConfig : public AbstractConfig
 {
+    void anchor() override;
+
+public:
     typedef std::vector<Config *> ConfigRegistrations;
 
     static ConfigRegistrations & configRegistrations();

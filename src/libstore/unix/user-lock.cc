@@ -11,6 +11,10 @@
 
 namespace nix {
 
+void AutoAllocateUidSettings::anchor() {}
+
+UserLock::~UserLock() {}
+
 #ifdef __linux__
 
 static std::vector<gid_t> get_group_list(const char * username, gid_t group_id)
@@ -34,6 +38,8 @@ static std::vector<gid_t> get_group_list(const char * username, gid_t group_id)
     return gids;
 }
 #endif
+
+namespace {
 
 struct SimpleUserLock : UserLock
 {
@@ -213,6 +219,8 @@ struct AutoUserLock : UserLock
         return nullptr;
     }
 };
+
+} // namespace
 
 std::unique_ptr<UserLock> acquireUserLock(
     const std::filesystem::path & stateDir, const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)

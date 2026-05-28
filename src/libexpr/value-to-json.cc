@@ -104,6 +104,8 @@ json printValueAsJSON(
     return out;
 }
 
+void JSONSerializationError::anchor() {}
+
 void printValueAsJSON(
     EvalState & state,
     bool strict,

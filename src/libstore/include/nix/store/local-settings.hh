@@ -39,6 +39,10 @@ void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append
 
 struct GCSettings : public virtual Config
 {
+private:
+    void anchor() override;
+
+public:
     Setting<off_t> reservedSize{
         this,
         8 * 1024 * 1024,
@@ -134,6 +138,10 @@ const uint32_t maxIdsPerBuild =
 
 struct AutoAllocateUidSettings : public virtual Config
 {
+private:
+    void anchor() override;
+
+public:
     Setting<uint32_t> startId{
         this,
 #ifdef __linux__
@@ -169,6 +177,10 @@ struct AutoAllocateUidSettings : public virtual Config
  */
 struct LocalSettings : public virtual Config, public GCSettings, public AutoAllocateUidSettings
 {
+private:
+    void anchor() override;
+
+public:
     /**
      * Get the GC settings.
      */

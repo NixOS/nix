@@ -10,8 +10,11 @@
 
 namespace nix {
 
-struct CompressionSink : BufferedSink, FinishSink
+class CompressionSink : public BufferedSink, public FinishSink
 {
+    void anchor() override;
+
+public:
     using BufferedSink::operator();
     using BufferedSink::writeUnbuffered;
     using FinishSink::finish;

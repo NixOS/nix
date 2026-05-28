@@ -7,6 +7,8 @@
 
 namespace nix {
 
+void BadCanonPath::anchor() {}
+
 const CanonPath CanonPath::root = CanonPath("/");
 
 static std::string absPathPure(std::string_view path)

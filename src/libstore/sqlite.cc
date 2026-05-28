@@ -33,6 +33,10 @@ SQLiteError::SQLiteError(
         path ? path : "(in-memory)");
 }
 
+void SQLiteError::anchor() {}
+
+void SQLiteBusy::anchor() {}
+
 [[noreturn]] void SQLiteError::throw_(sqlite3 * db, HintFmt && hf)
 {
     int err = sqlite3_errcode(db);

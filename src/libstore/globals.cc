@@ -44,6 +44,12 @@
 
 namespace nix {
 
+void Settings::anchor() {}
+
+void NarInfoDiskCacheSettings::anchor() {}
+
+void LogFileSettings::anchor() {}
+
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);

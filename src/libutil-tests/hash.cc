@@ -6,6 +6,8 @@
 
 namespace nix {
 
+namespace {
+
 class HashTest : public virtual CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "hash";
@@ -265,5 +267,7 @@ INSTANTIATE_TEST_SUITE_P(BLAKE3HashJSON, BLAKE3HashJsonTest, ([] {
                                      hashString(HashAlgorithm::BLAKE3, "asdf", mockXpSettings),
                                  });
                          }()));
+
+} // namespace
 
 } // namespace nix

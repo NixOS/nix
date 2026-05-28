@@ -5,6 +5,8 @@
 
 namespace nix {
 
+void NarInfo::anchor() {}
+
 NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
     : UnkeyedValidPathInfo(store, Hash::dummy)                                          // FIXME: hack
     , ValidPathInfo(StorePath::dummy, static_cast<const UnkeyedValidPathInfo &>(*this)) // FIXME: hack

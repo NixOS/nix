@@ -66,6 +66,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     return msg;
 }
 
+namespace {
+
 struct LogSink : Sink
 {
     Activity & act;
@@ -101,6 +103,8 @@ struct LogSink : Sink
         }
     }
 };
+
+} // namespace
 
 struct PostBuildHookState
 {

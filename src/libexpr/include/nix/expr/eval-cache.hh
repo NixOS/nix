@@ -16,6 +16,9 @@ class AttrCursor;
 
 struct CachedEvalError : CloneableError<CachedEvalError, EvalError>
 {
+private:
+    void anchor() override;
+public:
     const ref<AttrCursor> cursor;
     const Symbol attr;
 

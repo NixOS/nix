@@ -5,6 +5,10 @@
 
 namespace nix {
 
+void AttrPathNotFound::anchor() {}
+
+void NoPositionInfo::anchor() {}
+
 static Strings parseAttrPath(std::string_view s)
 {
     Strings res;

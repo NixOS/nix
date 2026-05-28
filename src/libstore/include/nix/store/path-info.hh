@@ -156,6 +156,11 @@ struct UnkeyedValidPathInfo
     virtual nlohmann::json
     toJSON(const StoreDirConfig * store, bool includeImpureInfo, PathInfoJsonFormat format) const;
     static UnkeyedValidPathInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
+
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
 };
 
 struct ValidPathInfo : virtual UnkeyedValidPathInfo
@@ -222,6 +227,9 @@ struct ValidPathInfo : virtual UnkeyedValidPathInfo
 
     static ValidPathInfo
     makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+
+private:
+    void anchor() override;
 };
 
 static_assert(std::is_move_assignable_v<ValidPathInfo>);

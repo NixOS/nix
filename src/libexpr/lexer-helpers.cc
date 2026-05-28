@@ -26,3 +26,5 @@ void nix::lexer::internal::adjustLoc(yyscan_t yyscanner, Parser::location_type *
     loc->beginOffset = loc->endOffset;
     loc->endOffset += len;
 }
+
+nix::Parser::~Parser() {}

@@ -66,6 +66,9 @@ create table if not exists LastPurge (
 
 struct NarInfoDiskCacheImpl : NarInfoDiskCache
 {
+private:
+    void anchor() override;
+public:
     /* How often to purge expired entries from the cache. */
     const int purgeInterval = 24 * 3600;
 
@@ -388,6 +391,10 @@ public:
         });
     }
 };
+
+void NarInfoDiskCache::anchor() {}
+
+void NarInfoDiskCacheImpl::anchor() {}
 
 ref<NarInfoDiskCache> NarInfoDiskCache::get(const Settings & settings, SQLiteSettings sqliteSettings)
 {

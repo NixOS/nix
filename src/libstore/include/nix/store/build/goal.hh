@@ -10,8 +10,11 @@
 
 namespace nix {
 
-struct TimedOut final : CloneableError<TimedOut, BuildError>
+class TimedOut final : public CloneableError<TimedOut, BuildError>
 {
+    void anchor() override;
+
+public:
     time_t maxDuration;
 
     TimedOut(time_t maxDuration);
@@ -74,6 +77,11 @@ enum struct JobCategory {
 
 struct Goal : public std::enable_shared_from_this<Goal>
 {
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
+public:
     /**
      * Event types for child process communication, delivered via coroutines.
      */
