@@ -1,3 +1,7 @@
+#include <openssl/evp.h>
+#include <openssl/err.h>
+#include <openssl/obj_mac.h>
+#include <openssl/x509.h>
 #include <sodium.h>
 
 #include "nix/util/signature/local-keys.hh"
@@ -7,172 +11,84 @@ namespace nix {
 
 namespace {
 
-/**
- * DER prefix for Ed25519 SubjectPublicKeyInfo (RFC 8410).
- * Used only for encoding.
- *
- *     SEQUENCE (42 bytes)
- *       SEQUENCE (5 bytes) -- AlgorithmIdentifier
- *         OID 1.3.101.112  -- id-Ed25519
- *       BIT STRING (33 bytes)
- *         0x00             -- no unused bits
- *         <32 bytes of public key>
- */
-constexpr std::array<unsigned char, 12> spkiPrefix = {
-    0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00};
-
-/**
- * DER prefix for Ed25519 PKCS#8 / OneAsymmetricKey (RFC 8410, RFC 5958).
- * Used only for encoding.
- *
- *     SEQUENCE (46 bytes)
- *       INTEGER 0          -- version
- *       SEQUENCE (5 bytes) -- AlgorithmIdentifier
- *         OID 1.3.101.112  -- id-Ed25519
- *       OCTET STRING (34 bytes)
- *         OCTET STRING (32 bytes) -- CurvePrivateKey
- *           <32 bytes of seed>
- */
-constexpr std::array<unsigned char, 16> pkcs8Prefix = {
-    0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20};
-
-/// The Ed25519 OID bytes: 1.3.101.112
-constexpr std::array<unsigned char, 3> ed25519OID = {0x2b, 0x65, 0x70};
-
-/**
- * Decode a DER OID value (the bytes after the tag and length) into
- * dotted-decimal notation, e.g. "1.2.840.113549.1.1.1".
- */
-std::string oidToString(const unsigned char * data, size_t len)
+std::string opensslError()
 {
-    if (len == 0)
-        return "?";
-    // First byte encodes first two components: value = 40*X + Y
-    std::string result = std::to_string(data[0] / 40) + '.' + std::to_string(data[0] % 40);
-    unsigned long component = 0;
-    for (size_t i = 1; i < len; i++) {
-        component = (component << 7) | (data[i] & 0x7f);
-        if (!(data[i] & 0x80)) {
-            result += '.';
-            result += std::to_string(component);
-            component = 0;
-        }
-    }
-    return result;
+    char buf[256];
+    ERR_error_string_n(ERR_get_error(), buf, sizeof(buf));
+    return buf;
 }
 
-/**
- * Minimal DER reader that tracks a position within a buffer.
- */
-struct DERReader
+std::string describeKeyAlgorithm(EVP_PKEY * pkey)
 {
-    const unsigned char * data;
-    size_t len;
-    size_t pos = 0;
+    int type = EVP_PKEY_base_id(pkey);
+    const char * name = OBJ_nid2sn(type);
+    return name ? name : fmt("unknown (NID %d)", type);
+}
 
-    size_t remaining() const
-    {
-        return len - pos;
-    }
+using EVP_PKEY_ptr = std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)>;
 
-    unsigned char readByte(std::string_view context)
-    {
-        if (pos >= len)
-            throw FormatError("unexpected end of %s", context);
-        return data[pos++];
-    }
-
-    /**
-     * Read a DER tag and length. Returns (tag, contentLength).
-     */
-    std::pair<unsigned char, size_t> readTagLength(std::string_view context)
-    {
-        auto tag = readByte(context);
-        auto len0 = readByte(context);
-        size_t contentLen;
-        if (len0 < 0x80) {
-            contentLen = len0;
-        } else {
-            // Long form: len0 & 0x7f = number of length bytes
-            size_t numBytes = len0 & 0x7f;
-            if (numBytes == 0 || numBytes > 4)
-                throw FormatError("unsupported DER length encoding in %s", context);
-            contentLen = 0;
-            for (size_t i = 0; i < numBytes; i++)
-                contentLen = (contentLen << 8) | readByte(context);
-        }
-        return {tag, contentLen};
-    }
-
-    /**
-     * Read a TLV and return just the content bytes as a string_view.
-     */
-    std::string_view readTLV(unsigned char expectedTag, std::string_view context)
-    {
-        auto [tag, contentLen] = readTagLength(context);
-        if (tag != expectedTag)
-            throw FormatError("expected DER tag 0x%02x in %s, got 0x%02x", expectedTag, context, tag);
-        if (pos + contentLen > len)
-            throw FormatError("truncated %s", context);
-        auto start = pos;
-        pos += contentLen;
-        return {(const char *) data + start, contentLen};
-    }
-};
-
-/**
- * Parse the AlgorithmIdentifier SEQUENCE and verify it contains the
- * Ed25519 OID. Throws a helpful error naming the actual OID if it
- * doesn't match.
- */
-void requireEd25519AlgId(DERReader & reader, std::string_view formatName)
+EVP_PKEY_ptr ownPkey(EVP_PKEY * raw)
 {
-    auto algIdContent = reader.readTLV(0x30, formatName);
-    DERReader algIdReader{(const unsigned char *) algIdContent.data(), algIdContent.size()};
-
-    auto oidContent = algIdReader.readTLV(0x06, formatName);
-
-    if (oidContent.size() != ed25519OID.size()
-        || !std::equal(ed25519OID.begin(), ed25519OID.end(), (const unsigned char *) oidContent.data())) {
-        throw FormatError(
-            "unsupported algorithm in %s: got OID %s, only Ed25519 (OID 1.3.101.112) is supported",
-            formatName,
-            oidToString((const unsigned char *) oidContent.data(), oidContent.size()));
-    }
+    return EVP_PKEY_ptr{raw, EVP_PKEY_free};
 }
 
 } // anonymous namespace
 
+PublicKey PublicKey::fromSPKI(std::string_view name, std::string_view der)
+{
+    auto ptr = (const unsigned char *) der.data();
+    auto pkey = ownPkey(d2i_PUBKEY(nullptr, &ptr, der.size()));
+    if (!pkey)
+        throw FormatError("invalid SPKI encoding: %s", opensslError());
+
+    if (EVP_PKEY_base_id(pkey.get()) != EVP_PKEY_ED25519)
+        throw FormatError(
+            "unsupported algorithm in SPKI: got %s, only Ed25519 is supported",
+            describeKeyAlgorithm(pkey.get()));
+
+    size_t keyLen = crypto_sign_PUBLICKEYBYTES;
+    std::string keyBytes(keyLen, '\0');
+    if (EVP_PKEY_get_raw_public_key(pkey.get(), (unsigned char *) keyBytes.data(), &keyLen) != 1)
+        throw FormatError("failed to extract Ed25519 public key: %s", opensslError());
+    keyBytes.resize(keyLen);
+
+    return PublicKey(name, std::move(keyBytes));
+}
+
+std::string PublicKey::toSPKI() const
+{
+    auto pkey = ownPkey(EVP_PKEY_new_raw_public_key(
+        EVP_PKEY_ED25519, nullptr, (const unsigned char *) key.data(), key.size()));
+    if (!pkey)
+        throw Error("failed to create Ed25519 public key: %s", opensslError());
+
+    int len = i2d_PUBKEY(pkey.get(), nullptr);
+    if (len <= 0)
+        throw Error("failed to encode SPKI: %s", opensslError());
+
+    std::string der(len, '\0');
+    auto out = (unsigned char *) der.data();
+    i2d_PUBKEY(pkey.get(), &out);
+    return der;
+}
+
 SecretKey SecretKey::fromPKCS8(std::string_view name, std::string_view der)
 {
-    DERReader reader{(const unsigned char *) der.data(), der.size()};
+    auto ptr = (const unsigned char *) der.data();
+    auto pkey = ownPkey(d2i_AutoPrivateKey(nullptr, &ptr, der.size()));
+    if (!pkey)
+        throw FormatError("invalid PKCS#8 encoding: %s", opensslError());
 
-    // Outer SEQUENCE
-    auto seqContent = reader.readTLV(0x30, "PKCS#8");
-    DERReader seqReader{(const unsigned char *) seqContent.data(), seqContent.size()};
-
-    // Version INTEGER (must be 0)
-    auto versionContent = seqReader.readTLV(0x02, "PKCS#8 version");
-    if (versionContent.size() != 1 || versionContent[0] != 0)
-        throw FormatError("unsupported PKCS#8 version");
-
-    // AlgorithmIdentifier
-    requireEd25519AlgId(seqReader, "PKCS#8");
-
-    // Outer OCTET STRING wrapping the key
-    auto outerOctetContent = seqReader.readTLV(0x04, "PKCS#8 private key");
-
-    // Inner OCTET STRING (CurvePrivateKey)
-    DERReader innerReader{(const unsigned char *) outerOctetContent.data(), outerOctetContent.size()};
-    auto seedContent = innerReader.readTLV(0x04, "PKCS#8 CurvePrivateKey");
-
-    if (seedContent.size() != crypto_sign_SEEDBYTES)
+    if (EVP_PKEY_base_id(pkey.get()) != EVP_PKEY_ED25519)
         throw FormatError(
-            "invalid Ed25519 seed length in PKCS#8: expected %d bytes, got %d",
-            crypto_sign_SEEDBYTES,
-            seedContent.size());
+            "unsupported algorithm in PKCS#8: got %s, only Ed25519 is supported",
+            describeKeyAlgorithm(pkey.get()));
 
-    auto seed = (const unsigned char *) seedContent.data();
+    size_t seedLen = crypto_sign_SEEDBYTES;
+    unsigned char seed[crypto_sign_SEEDBYTES];
+    if (EVP_PKEY_get_raw_private_key(pkey.get(), seed, &seedLen) != 1)
+        throw FormatError("failed to extract Ed25519 private key: %s", opensslError());
+
     unsigned char pk[crypto_sign_PUBLICKEYBYTES];
     unsigned char sk[crypto_sign_SECRETKEYBYTES];
     crypto_sign_seed_keypair(pk, sk, seed);
@@ -181,41 +97,26 @@ SecretKey SecretKey::fromPKCS8(std::string_view name, std::string_view der)
 
 std::string SecretKey::toPKCS8() const
 {
-    std::string der(pkcs8Prefix.begin(), pkcs8Prefix.end());
-    der.append(key, 0, crypto_sign_SEEDBYTES);
-    return der;
-}
+    // libsodium secret key is seed(32) || public_key(32); PKCS#8 wants just the seed
+    auto pkey = ownPkey(EVP_PKEY_new_raw_private_key(
+        EVP_PKEY_ED25519, nullptr, (const unsigned char *) key.data(), crypto_sign_SEEDBYTES));
+    if (!pkey)
+        throw Error("failed to create Ed25519 private key: %s", opensslError());
 
-PublicKey PublicKey::fromSPKI(std::string_view name, std::string_view der)
-{
-    DERReader reader{(const unsigned char *) der.data(), der.size()};
+    PKCS8_PRIV_KEY_INFO * p8 = EVP_PKEY2PKCS8(pkey.get());
+    if (!p8)
+        throw Error("failed to create PKCS#8 structure: %s", opensslError());
 
-    // Outer SEQUENCE
-    auto seqContent = reader.readTLV(0x30, "SPKI");
-    DERReader seqReader{(const unsigned char *) seqContent.data(), seqContent.size()};
+    int len = i2d_PKCS8_PRIV_KEY_INFO(p8, nullptr);
+    if (len <= 0) {
+        PKCS8_PRIV_KEY_INFO_free(p8);
+        throw Error("failed to encode PKCS#8: %s", opensslError());
+    }
 
-    // AlgorithmIdentifier
-    requireEd25519AlgId(seqReader, "SPKI");
-
-    // BIT STRING containing the public key
-    auto bitStringContent = seqReader.readTLV(0x03, "SPKI public key");
-    if (bitStringContent.empty() || bitStringContent[0] != 0x00)
-        throw FormatError("invalid BIT STRING padding in SPKI");
-
-    auto keyBytes = bitStringContent.substr(1);
-    if (keyBytes.size() != crypto_sign_PUBLICKEYBYTES)
-        throw FormatError(
-            "invalid Ed25519 public key length in SPKI: expected %d bytes, got %d",
-            crypto_sign_PUBLICKEYBYTES,
-            keyBytes.size());
-
-    return PublicKey(name, std::string(keyBytes));
-}
-
-std::string PublicKey::toSPKI() const
-{
-    std::string der(spkiPrefix.begin(), spkiPrefix.end());
-    der.append(key);
+    std::string der(len, '\0');
+    auto out = (unsigned char *) der.data();
+    i2d_PKCS8_PRIV_KEY_INFO(p8, &out);
+    PKCS8_PRIV_KEY_INFO_free(p8);
     return der;
 }
 
