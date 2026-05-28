@@ -2,9 +2,13 @@
 
 source common.sh
 
+requireDaemonNewerThan "2.35"
+
+TODO_NixOS
+
 enableFeatures "ca-derivations"
 
-clearStore
+restartDaemon
 
 # Build a floating output with a self-reference.
 outPath1=$(nix build --print-out-paths --no-link --impure --file ./make-content-addressed.nix --arg zeroSelfReference false)
