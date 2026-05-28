@@ -13,7 +13,7 @@ using namespace unix;
 
 std::atomic<bool> unix::_isInterrupted = false;
 
-thread_local std::function<bool()> unix::interruptCheck;
+[[gnu::tls_model("initial-exec")]] thread_local std::function<bool()> unix::interruptCheck;
 
 void unix::_interrupted()
 {

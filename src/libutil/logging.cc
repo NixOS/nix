@@ -24,7 +24,7 @@ LoggerSettings loggerSettings;
 
 static GlobalConfig::Register rLoggerSettings(&loggerSettings);
 
-static thread_local ActivityId curActivity = 0;
+[[gnu::tls_model("initial-exec")]] static thread_local ActivityId curActivity = 0;
 
 ActivityId getCurActivity()
 {
