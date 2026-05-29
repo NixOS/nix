@@ -43,6 +43,15 @@ mkdir -p "$NIX_LOG_DIR/drvs"
 mkdir "$NIX_STATE_DIR"
 mkdir "$NIX_CONF_DIR"
 
+# Use "whoami" on Linux to get the username inside the more strict sandbox, but
+# on other platforms (e.g. macOS) use "id -u" because "whoami" can fail (e.g.
+# with "auto-allocate-uids = true").
+if [[ "$(uname -s)" = "Linux" ]]; then
+  currentUser="$(whoami)"
+else
+  currentUser="$(id -u)"
+fi
+
 cat > "$NIX_CONF_DIR"/nix.conf <<EOF
 build-users-group =
 keep-derivations = false
@@ -53,7 +62,7 @@ substituters =
 flake-registry = $TEST_ROOT/registry.json
 show-trace = true
 include nix.conf.extra
-trusted-users = $(whoami)
+trusted-users = $currentUser
 EOF
 
 cat > "$NIX_CONF_DIR"/nix.conf.extra <<EOF
