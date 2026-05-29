@@ -78,3 +78,17 @@
     RapidCheck are required, which are available at
     <https://google.github.io/googletest/> and
     <https://github.com/emil-e/rapidcheck> respectively.
+
+  - blake3
+
+  - cmake
+
+  - https://github.com/santhosh-tekuri/jsonschema
+
+  - libarchive
+
+  - libgit
+
+  - perl-DBD-SQLite
+
+  - toml11
