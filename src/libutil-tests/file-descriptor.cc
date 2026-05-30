@@ -6,6 +6,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
 
+#include <chrono>
 #include <cstring>
 #include <random>
 #include <algorithm>
@@ -300,6 +301,88 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "abcdefgh");
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "");
+}
+
+TEST(ReadFull, ReadsExactlyRequestedBytes)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hello world", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    char buf[5];
+    readFull(pipe.readSide.get(), buf, 5);
+    EXPECT_EQ(std::string_view(buf, 5), "hello");
+
+    char buf2[6];
+    readFull(pipe.readSide.get(), buf2, 6);
+    EXPECT_EQ(std::string_view(buf2, 6), " world");
+}
+
+TEST(ReadFull, ThrowsOnEofBeforeFullRead)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hi", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    char buf[10];
+    EXPECT_THROW(readFull(pipe.readSide.get(), buf, 10), EndOfFile);
+}
+
+TEST(ReadFull, ZeroCountIsNoop)
+{
+    Pipe pipe;
+    pipe.create();
+    pipe.writeSide.close();
+
+    // count=0 must not read or throw, even on a closed pipe.
+    char buf[1] = {'X'};
+    readFull(pipe.readSide.get(), buf, 0);
+    EXPECT_EQ(buf[0], 'X');
+}
+
+TEST(ReadFull, HonoursInterruptFlag)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "no checkInterrupt on Windows readFull path";
+#endif
+    Pipe pipe;
+    pipe.create();
+    // No data written; readFull would block. The interrupt flag must
+    // make it throw before any read.
+    setInterrupted(true);
+    char buf[1];
+    EXPECT_THROW(readFull(pipe.readSide.get(), buf, 1), Interrupted);
+    setInterrupted(false);
+}
+
+TEST(ReadFull, AdvancesBufferAcrossShortReads)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "pipe-write semantics differ on Windows";
+#endif
+    // Force at least two reads by writing the second chunk only after the
+    // first read has consumed the pipe. Done in a thread so readFull sees
+    // a short read first, then blocks waiting for the rest.
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "AAAA", /*allowInterrupts=*/false);
+
+    std::thread writer([&]() {
+        // Small delay to ensure the reader has consumed the first chunk.
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        writeFull(pipe.writeSide.get(), "BBBB", /*allowInterrupts=*/false);
+        pipe.writeSide.close();
+    });
+
+    char buf[8] = {};
+    readFull(pipe.readSide.get(), buf, 8);
+    EXPECT_EQ(std::string_view(buf, 8), "AAAABBBB");
+    writer.join();
 }
 
 TEST(WriteFull, RespectsAllowInterrupts)
