@@ -50,6 +50,8 @@ void NarInfoDiskCacheSettings::anchor() {}
 
 void LogFileSettings::anchor() {}
 
+void AutoAllocateUidSettings::anchor() {}
+
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
