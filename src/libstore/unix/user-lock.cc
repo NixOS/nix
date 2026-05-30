@@ -11,8 +11,6 @@
 
 namespace nix {
 
-void AutoAllocateUidSettings::anchor() {}
-
 UserLock::~UserLock() {}
 
 #ifdef __linux__
