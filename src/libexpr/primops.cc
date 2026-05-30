@@ -4029,17 +4029,38 @@ static RegisterPrimOp primop_foldlStrict({
     .args = {"op", "nul", "list"},
     .doc = R"(
       Reduce a list by applying a binary operator, from left to right,
-      e.g. `foldl' op nul [x0 x1 x2 ...] = op (op (op nul x0) x1) x2)
-      ...`.
+      e.g.
+      ```nix
+      foldl' op nul [ x0 x1 x2 ]
+        =
+          let
+            strictly = f: a: builtins.seq a (f a);
+            y0 = op nul x0;
+            y1 = strictly op y0 x1;
+            y2 = strictly op y1 x2;
+          in
+            y2
+
+        # and, ignoring strictness/laziness
+        ==
+          op (op (op nul x0) x1) x2
+      ```
 
       For example, `foldl' (acc: elem: acc + elem) 0 [1 2 3]` evaluates
       to `6` and `foldl' (acc: elem: { "${elem}" = elem; } // acc) {}
       ["a" "b"]` evaluates to `{ a = "a"; b = "b"; }`.
 
       The first argument of `op` is the accumulator whereas the second
-      argument is the current element being processed. The return value
-      of each application of `op` is evaluated immediately, even for
-      intermediate values.
+      argument is the current element being processed.
+
+      The return value of each application of `op` is evaluated immediately,
+      even for intermediate values.
+      This way, `foldl'` can operate in constant stack space, allowing it to operate on large lists,
+      regardless of [max-call-depth](@docroot@/command-ref/conf-file.md#conf-max-call-depth).
+
+      Conventionally, a fold function without the `'` ("prime") preserves laziness,
+      but lacks these benefits.
+      See also [Nixpkgs `lib.foldl`](https://nixos.org/manual/nixpkgs/unstable/#function-library-lib.lists.foldl).
 
       # Time Complexity
 
