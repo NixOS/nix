@@ -88,6 +88,27 @@ bool mountAndPidNamespacesSupported()
 
 //////////////////////////////////////////////////////////////////////
 
+bool ensurePrivateMountNamespace()
+{
+    static std::once_flag done;
+    static bool ok = false;
+    std::call_once(done, []() {
+        if (unshare(CLONE_NEWNS) == -1) {
+            warn(
+                "could not unshare mount namespace (%s); "
+                "subsequent mount changes will land in the current namespace",
+                strerror(errno));
+            return;
+        }
+        if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
+            throw SysError("making mount namespace private after unshare");
+        ok = true;
+    });
+    return ok;
+}
+
+//////////////////////////////////////////////////////////////////////
+
 static AutoCloseFD fdSavedMountNamespace;
 static AutoCloseFD fdSavedRoot;
 

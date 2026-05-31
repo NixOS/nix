@@ -28,6 +28,19 @@ void restoreMountNamespace();
  */
 void tryUnshareFilesystem();
 
+/**
+ * Idempotent: place this process in a private mount namespace whose
+ * root is recursively MS_PRIVATE, so that subsequent mount-flag changes
+ * cannot propagate back to the host. The first call performs the work;
+ * later calls are cheap no-ops.
+ *
+ * Best-effort: if unshare() fails (e.g. restricted user namespace) the
+ * caller stays in its current namespace and the function returns false.
+ * Throws on the rarer case where unshare succeeds but the MS_PRIVATE
+ * remount of "/" fails.
+ */
+bool ensurePrivateMountNamespace();
+
 bool userNamespacesSupported();
 
 bool mountAndPidNamespacesSupported();

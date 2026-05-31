@@ -39,7 +39,6 @@
 
 #ifdef __linux__
 #  include "nix/util/linux-namespaces.hh"
-#  include <sys/mount.h>
 #endif
 
 #include "nix/util/strings.hh"
@@ -401,10 +400,7 @@ void mainWrapped(int argc, char ** argv)
     if (isRootUser()) {
         try {
             saveMountNamespace();
-            if (unshare(CLONE_NEWNS) == -1)
-                throw SysError("setting up a private mount namespace");
-            if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
-                throw SysError("making the mount namespace private");
+            ensurePrivateMountNamespace();
         } catch (Error & e) {
             warn("failed to set up a private mount namespace: %s", e.msg());
         }
