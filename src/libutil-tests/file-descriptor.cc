@@ -43,6 +43,48 @@ protected:
     }
 };
 
+TEST(DrainFD, BlockingReadsUntilEOF)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    auto got = drainFD(pipe.readSide.get());
+    EXPECT_EQ(got, "hello");
+}
+
+TEST(DrainFD, ExpectedSizeReadsExactly)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "0123456789", /*allowInterrupts=*/false);
+    // Don't close the write side: with .expected=true and a matching size,
+    // drainFD must return as soon as it has read the requested bytes.
+
+    auto got = drainFD(pipe.readSide.get(), {.size = 5, .expected = true});
+    EXPECT_EQ(got, "01234");
+
+    // The pipe is still open with five bytes remaining; a follow-up drain
+    // should pick them up.
+    pipe.writeSide.close();
+    auto got2 = drainFD(pipe.readSide.get());
+    EXPECT_EQ(got2, "56789");
+}
+
+TEST(DrainFD, ExpectedSizeThrowsOnEarlyEOF)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "abc", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    EXPECT_THROW(drainFD(pipe.readSide.get(), {.size = 10, .expected = true}), EndOfFile);
+}
+
 TEST(ReadLine, ReadsLinesFromPipe)
 {
     Pipe pipe;
