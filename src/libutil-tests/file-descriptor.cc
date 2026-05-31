@@ -303,6 +303,31 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "");
 }
 
+TEST(WriteLine, AppendsNewlineAndWrites)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeLine(pipe.writeSide.get(), "first");
+    writeLine(pipe.writeSide.get(), "second");
+    pipe.writeSide.close();
+
+    EXPECT_EQ(readLine(pipe.readSide.get()), "first");
+    EXPECT_EQ(readLine(pipe.readSide.get()), "second");
+}
+
+TEST(WriteLine, EmptyPayloadStillWritesNewline)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeLine(pipe.writeSide.get(), "");
+    pipe.writeSide.close();
+
+    // The empty payload + newline should produce a single empty line.
+    EXPECT_EQ(readLine(pipe.readSide.get()), "");
+}
+
 TEST(ReadFull, ReadsExactlyRequestedBytes)
 {
     Pipe pipe;
@@ -383,6 +408,16 @@ TEST(ReadFull, AdvancesBufferAcrossShortReads)
     readFull(pipe.readSide.get(), buf, 8);
     EXPECT_EQ(std::string_view(buf, 8), "AAAABBBB");
     writer.join();
+}
+
+TEST(WriteFull, EmptyStringIsNoop)
+{
+    Pipe pipe;
+    pipe.create();
+    pipe.writeSide.close();
+
+    // An empty payload must not even attempt to write; the loop never enters.
+    EXPECT_NO_THROW(writeFull(pipe.writeSide.get(), "", /*allowInterrupts=*/false));
 }
 
 TEST(WriteFull, RespectsAllowInterrupts)
