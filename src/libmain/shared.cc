@@ -66,8 +66,7 @@ void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)
         else
             printMsg(lvl, "these %d derivations will be built:", missing.willBuild.size());
         auto sorted = store->topoSortPaths(missing.willBuild);
-        reverse(sorted.begin(), sorted.end());
-        for (auto & i : sorted)
+        for (auto & i : sorted | std::views::reverse)
             printMsg(lvl, "  %s", store->printStorePath(i));
     }
 

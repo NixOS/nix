@@ -256,10 +256,10 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
                 });
             }
 
-            for (auto & ref : refs) {
+            for (const auto & [isLast, ref] : markLast(refs)) {
                 std::string hash(ref.second->path.hashPart());
 
-                bool last = all ? ref == *refs.rbegin() : true;
+                bool last = all ? isLast : true;
 
                 for (auto & hit : hits[hash]) {
                     bool first = hit == *hits[hash].begin();
