@@ -12,6 +12,92 @@
 
 namespace nix {
 
+TEST(AutoCloseFD, DestructorClosesFd)
+{
+    Pipe pipe;
+    pipe.create();
+    int rawFd = pipe.readSide.get();
+
+    // Move the fd into an inner scope; on exit, the destructor must close it.
+    {
+        AutoCloseFD owner(pipe.readSide.release());
+        ASSERT_EQ(owner.get(), rawFd);
+    }
+
+    // Confirm the kernel closed the fd: an explicit close() must now fail
+    // with EBADF, proving the destructor did the close (otherwise we'd
+    // succeed in closing a still-open fd).
+    int rc = ::close(rawFd);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(errno, EBADF);
+}
+
+TEST(AutoCloseFD, MoveAssignClosesPreviousFd)
+{
+    Pipe pipe1;
+    pipe1.create();
+    Pipe pipe2;
+    pipe2.create();
+
+    int prevFd = pipe1.readSide.get();
+    AutoCloseFD a(pipe1.readSide.release());
+    AutoCloseFD b(pipe2.readSide.release());
+
+    // Move-assign: a's previous fd must be closed, then b's fd moved into a.
+    a = std::move(b);
+
+    int rc = ::close(prevFd);
+    EXPECT_EQ(rc, -1);
+    EXPECT_EQ(errno, EBADF) << "operator= must close the previously-owned fd";
+
+    EXPECT_FALSE(b);
+}
+
+TEST(AutoCloseFD, ReleaseSurrendersOwnership)
+{
+    Pipe pipe;
+    pipe.create();
+    int rawFd = pipe.readSide.get();
+
+    Descriptor surrendered;
+    {
+        AutoCloseFD owner(pipe.readSide.release());
+        surrendered = owner.release();
+        EXPECT_EQ(surrendered, rawFd);
+        EXPECT_FALSE(owner) << "after release, the AutoCloseFD must look empty";
+    }
+    // Destructor must NOT have closed: the released fd is still usable.
+    int rc = ::close(surrendered);
+    EXPECT_EQ(rc, 0);
+}
+
+TEST(AutoCloseFD, BoolConversionReflectsFdValidity)
+{
+    AutoCloseFD empty;
+    EXPECT_FALSE(empty);
+
+    Pipe pipe;
+    pipe.create();
+    AutoCloseFD owner(pipe.readSide.release());
+    EXPECT_TRUE(owner);
+}
+
+TEST(Pipe, CloseClosesBothEnds)
+{
+    Pipe pipe;
+    pipe.create();
+    int r = pipe.readSide.get();
+    int w = pipe.writeSide.get();
+
+    pipe.close();
+
+    // Both raw fds must now be unusable.
+    EXPECT_EQ(::close(r), -1);
+    EXPECT_EQ(errno, EBADF);
+    EXPECT_EQ(::close(w), -1);
+    EXPECT_EQ(errno, EBADF);
+}
+
 TEST(ReadFile, ReadsFullContentsOfRegularFile)
 {
     // Build the file via a pipe so we don't depend on the filesystem; use
