@@ -23,6 +23,8 @@
 
 namespace nix {
 
+FreeBSDDerivationBuilder::~FreeBSDDerivationBuilder() {}
+
 namespace {
 
 struct PasswordEntry
