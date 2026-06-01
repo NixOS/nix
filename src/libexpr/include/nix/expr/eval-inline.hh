@@ -32,7 +32,7 @@ Value * EvalMemory::allocValue()
 #if NIX_USE_BOEHMGC
     /* Allocation cache for GC'd Value objects. Boehm GC is already a global resource, so thread_local is
        a natural solution. Multiple EvalState instances on the same thread will reuse the same cache. */
-    static thread_local std::shared_ptr<void *> valueAllocCache{
+    [[gnu::tls_model("initial-exec")]] static thread_local std::shared_ptr<void *> valueAllocCache{
         std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
 
     /* We use the boehm batch allocator to speed up allocations of Values (of which there are many).
@@ -70,7 +70,7 @@ Env & EvalMemory::allocEnv(size_t size)
     if (size == 1) {
         /* Allocation cache for size-1 Env objects. Boehm GC is already a global resource, so thread_local is
            a natural solution. Multiple EvalState instances on the same thread will reuse the same cache. */
-        static thread_local std::shared_ptr<void *> env1AllocCache{
+        [[gnu::tls_model("initial-exec")]] static thread_local std::shared_ptr<void *> env1AllocCache{
             std::allocate_shared<void *>(traceable_allocator<void *>(), nullptr)};
         /* see allocValue for explanations. */
         if (!*env1AllocCache) {
@@ -97,7 +97,7 @@ Env & EvalMemory::allocEnv(size_t size)
  * in p0 of pending/awaited thunks. We're not using std::thread::id
  * because it's not guaranteed to fit.
  */
-extern thread_local uint32_t myEvalThreadId;
+[[gnu::tls_model("initial-exec")]] extern thread_local uint32_t myEvalThreadId;
 
 template<std::size_t ptrSize>
 void ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>::force(

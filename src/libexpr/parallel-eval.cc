@@ -13,7 +13,7 @@ struct alignas(64) WaiterDomain
 
 static std::array<Sync<WaiterDomain>, 128> waiterDomains;
 
-thread_local bool Executor::amWorkerThread{false};
+[[gnu::tls_model("initial-exec")]] thread_local bool Executor::amWorkerThread{false};
 
 unsigned int Executor::getEvalCores(const EvalSettings & evalSettings)
 {
@@ -134,8 +134,9 @@ std::vector<std::future<void>> Executor::spawn(WorkItems && items)
         for (auto & item : items) {
             std::promise<void> promise;
             futures.push_back(promise.get_future());
-            thread_local std::random_device rd;
-            thread_local std::uniform_int_distribution<uint64_t> dist(0, 1ULL << 48);
+            [[gnu::tls_model("initial-exec")]] static thread_local std::random_device rd;
+            [[gnu::tls_model("initial-exec")]] static thread_local std::uniform_int_distribution<uint64_t> dist(
+                0, 1ULL << 48);
             auto key = (uint64_t(item.second) << 48) | dist(rd);
             state->queue.emplace(key, Item{.promise = std::move(promise), .work = std::move(item.first)});
         }
@@ -200,7 +201,7 @@ static Sync<WaiterDomain> & getWaiterDomain(detail::ValueBase & v)
 }
 
 static std::atomic<uint32_t> nextEvalThreadId{1};
-thread_local uint32_t myEvalThreadId(nextEvalThreadId++);
+[[gnu::tls_model("initial-exec")]] thread_local uint32_t myEvalThreadId(nextEvalThreadId++);
 
 template<>
 ValueStorage<sizeof(void *)>::PackedPointer

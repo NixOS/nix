@@ -255,7 +255,7 @@ EvalMemory::EvalMemory()
     assertGCInitialized();
 }
 
-thread_local EvalState::EvalContext EvalState::evalContext;
+[[gnu::tls_model("initial-exec")]] thread_local EvalState::EvalContext EvalState::evalContext;
 
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
@@ -1547,7 +1547,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-thread_local size_t EvalState::callDepth = 0;
+[[gnu::tls_model("initial-exec")]] thread_local size_t EvalState::callDepth = 0;
 
 void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
 {

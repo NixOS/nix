@@ -912,7 +912,7 @@ private:
      * setting to throw stack overflow hopefully before we run out of
      * system stack.
      */
-    thread_local static size_t callDepth;
+    [[gnu::tls_model("initial-exec")]] thread_local static size_t callDepth;
 
 public:
 
@@ -1147,7 +1147,7 @@ public:
         std::shared_ptr<const Provenance> provenance;
     };
 
-    thread_local static EvalContext evalContext;
+    [[gnu::tls_model("initial-exec")]] thread_local static EvalContext evalContext;
 
     /**
      * Create a work item that propagates the current evaluation context.
