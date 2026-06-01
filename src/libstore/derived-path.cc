@@ -234,7 +234,8 @@ nix::SingleDerivedPath::Opaque adl_serializer<nix::SingleDerivedPath::Opaque>::f
     return {json};
 }
 
-void adl_serializer<nix::SingleDerivedPath::Built>::to_json(json & json, const nix::SingleDerivedPath::Built & sdpb)
+void adl_serializer<nix::SingleDerivedPath::Built>::to_json(
+    json & json, const nix::SingleDerivedPath::Built & sdpb, const nix::ExperimentalFeatureSettings &)
 {
     json = {
         {"drvPath", *sdpb.drvPath},
@@ -242,7 +243,8 @@ void adl_serializer<nix::SingleDerivedPath::Built>::to_json(json & json, const n
     };
 }
 
-void adl_serializer<nix::DerivedPath::Built>::to_json(json & json, const nix::DerivedPath::Built & dbp)
+void adl_serializer<nix::DerivedPath::Built>::to_json(
+    json & json, const nix::DerivedPath::Built & dbp, const nix::ExperimentalFeatureSettings &)
 {
     json = {
         {"drvPath", *dbp.drvPath},
@@ -276,12 +278,14 @@ nix::DerivedPath::Built adl_serializer<nix::DerivedPath::Built>::from_json(
     };
 }
 
-void adl_serializer<nix::SingleDerivedPath>::to_json(json & json, const nix::SingleDerivedPath & sdp)
+void adl_serializer<nix::SingleDerivedPath>::to_json(
+    json & json, const nix::SingleDerivedPath & sdp, const nix::ExperimentalFeatureSettings &)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
 
-void adl_serializer<nix::DerivedPath>::to_json(json & json, const nix::DerivedPath & sdp)
+void adl_serializer<nix::DerivedPath>::to_json(
+    json & json, const nix::DerivedPath & sdp, const nix::ExperimentalFeatureSettings &)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }

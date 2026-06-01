@@ -6,7 +6,8 @@
 
 namespace nlohmann {
 
-void adl_serializer<nix::DerivationOutput>::to_json(json & res, const nix::DerivationOutput & o)
+void adl_serializer<nix::DerivationOutput>::to_json(
+    json & res, const nix::DerivationOutput & o, const nix::ExperimentalFeatureSettings &)
 {
     using namespace nix;
     res = nlohmann::json::object();
@@ -137,7 +138,7 @@ static void inputsToJson(json & res, const nix::derivation::FullInputs & inputs)
 
 template<typename Inputs>
 void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
-    json & res, const nix::derivation::Derivation<Inputs> & d)
+    json & res, const nix::derivation::Derivation<Inputs> & d, const nix::ExperimentalFeatureSettings &)
 {
     using namespace nix;
     res = nlohmann::json::object();

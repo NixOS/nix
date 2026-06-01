@@ -37,7 +37,10 @@
         static TYPE from_json(                                                                       \
             const json & json,                                                                       \
             const nix::ExperimentalFeatureSettings & xpSettings = nix::experimentalFeatureSettings); \
-        static void to_json(json & json, const TYPE & t);                                            \
+        static void to_json(                                                                         \
+            json & json,                                                                             \
+            const TYPE & t,                                                                          \
+            const nix::ExperimentalFeatureSettings & xpSettings = nix::experimentalFeatureSettings); \
     }
 
 #define JSON_IMPL_WITH_XP_FEATURES(TYPE)    \
