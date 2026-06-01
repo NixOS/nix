@@ -77,6 +77,7 @@ subdir('nix-meson-build-support/generate-header')
 nix_sources = [ config_priv_h ] + files(
   'add-to-store.cc',
   'app.cc',
+  'build-trace.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',
@@ -108,7 +109,6 @@ nix_sources = [ config_priv_h ] + files(
   'path-info.cc',
   'prefetch.cc',
   'profile.cc',
-  'realisation.cc',
   'registry.cc',
   'repl.cc',
   'run.cc',
