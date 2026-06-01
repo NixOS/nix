@@ -40,6 +40,9 @@
     {                                                                                                               \
         static TYPE                                                                                                 \
         from_json(const json & json, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings); \
-        static void to_json(json & json, const TYPE & t);                                                           \
+        static void to_json(                                                                                        \
+            json & json,                                                                                            \
+            const TYPE & t,                                                                                         \
+            const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);                          \
     };                                                                                                              \
     }

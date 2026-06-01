@@ -1433,7 +1433,8 @@ namespace nlohmann {
 
 using namespace nix;
 
-void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutput & o)
+void adl_serializer<DerivationOutput>::to_json(
+    json & res, const DerivationOutput & o, const ExperimentalFeatureSettings &)
 {
     res = nlohmann::json::object();
     std::visit(
@@ -1558,14 +1559,15 @@ static void basicDerivationToJson(json & res, const BasicDerivation & d)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
 }
 
-void adl_serializer<BasicDerivation>::to_json(json & res, const BasicDerivation & d)
+void adl_serializer<BasicDerivation>::to_json(
+    json & res, const BasicDerivation & d, const ExperimentalFeatureSettings &)
 {
     basicDerivationToJson(res, d);
 
     inputSrcsToJson(res["inputs"], d.inputSrcs);
 }
 
-void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
+void adl_serializer<Derivation>::to_json(json & res, const Derivation & d, const ExperimentalFeatureSettings &)
 {
     basicDerivationToJson(res, d);
 

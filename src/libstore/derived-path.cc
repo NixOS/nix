@@ -234,7 +234,8 @@ SingleDerivedPath::Opaque adl_serializer<SingleDerivedPath::Opaque>::from_json(c
     return SingleDerivedPath::Opaque{json};
 }
 
-void adl_serializer<SingleDerivedPath::Built>::to_json(json & json, const SingleDerivedPath::Built & sdpb)
+void adl_serializer<SingleDerivedPath::Built>::to_json(
+    json & json, const SingleDerivedPath::Built & sdpb, const ExperimentalFeatureSettings &)
 {
     json = {
         {"drvPath", *sdpb.drvPath},
@@ -242,7 +243,8 @@ void adl_serializer<SingleDerivedPath::Built>::to_json(json & json, const Single
     };
 }
 
-void adl_serializer<DerivedPath::Built>::to_json(json & json, const DerivedPath::Built & dbp)
+void adl_serializer<DerivedPath::Built>::to_json(
+    json & json, const DerivedPath::Built & dbp, const ExperimentalFeatureSettings &)
 {
     json = {
         {"drvPath", *dbp.drvPath},
@@ -274,12 +276,13 @@ adl_serializer<DerivedPath::Built>::from_json(const json & json0, const Experime
     };
 }
 
-void adl_serializer<SingleDerivedPath>::to_json(json & json, const SingleDerivedPath & sdp)
+void adl_serializer<SingleDerivedPath>::to_json(
+    json & json, const SingleDerivedPath & sdp, const ExperimentalFeatureSettings &)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
 
-void adl_serializer<DerivedPath>::to_json(json & json, const DerivedPath & sdp)
+void adl_serializer<DerivedPath>::to_json(json & json, const DerivedPath & sdp, const ExperimentalFeatureSettings &)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
