@@ -1148,9 +1148,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
             outputLock.setDeletion(true);
         }
     }
-
-    // In case `cleanup` ignored an `Interrupted` exception
-    checkInterrupt();
 }
 
 StorePath LocalStore::addToStoreFromDump(
