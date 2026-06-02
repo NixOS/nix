@@ -303,9 +303,8 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         int flags = 0;
         if (store.isInStore(target.native()))
             /* While we are at it, enforce invariants about store paths. Anything located at the "logical" store
-                location must be readonly (file permission canonicalisation enforces this on the host filesystem).
-                Also the store must never contain setuid binaries for the same reason. This is just defense-in-depth.
-                */
+               location must be readonly (file permission canonicalisation enforces this on the host filesystem).
+               Also the store must never contain setuid binaries for the same reason. This is just defense-in-depth. */
             flags = MNT_RDONLY | MNT_NOSUID;
 
         if (nmount(iov.data(), iov.size(), flags) < 0)
@@ -315,8 +314,8 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
     }
 
     /* Fixed-output derivations typically need to access the
-        network, so give them access to /etc/resolv.conf and so
-        on. */
+       network, so give them access to /etc/resolv.conf and so
+       on. */
     if (!derivationType.isSandboxed()) {
         // Only use nss functions to resolve hosts and
         // services. Don’t use it for anything else that may
@@ -325,8 +324,8 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         writeFile(chrootRootDir / "etc/nsswitch.conf", "hosts: files dns\nservices: files\n");
 
         /* N.B. it is realistic that these paths might not exist. It
-            happens when testing Nix building fixed-output derivations
-            within a pure derivation. */
+           happens when testing Nix building fixed-output derivations
+           within a pure derivation. */
         for (std::filesystem::path path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"}) {
             if (pathExists(path)) {
                 // This means if your network config changes during a FOD build,
@@ -466,7 +465,7 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 void ChrootFreeBSDDerivationBuilder::enterChroot()
 {
     /* Close all other file descriptors. This must happen before
-        jail_attach for FreeBSD. */
+       jail_attach for FreeBSD. */
     unix::closeExtraFDs();
 
     if (jail_attach(autoDelJail->jid) < 0) {
