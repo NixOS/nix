@@ -311,11 +311,8 @@ ref<const ValidPathInfo> BinaryCacheStore::addToStoreCommon(
 void BinaryCacheStore::addToStore(
     const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    if (!repair && isValidPath(info.path)) {
-        // FIXME: copyNAR -> null sink
-        narSource.drain();
+    if (!repair && isValidPath(info.path))
         return;
-    }
 
     addToStoreCommon(narSource, repair, checkSigs, {[&](HashResult nar) {
                          /* FIXME reinstate these, once we can correctly do hash modulo sink as
@@ -431,10 +428,7 @@ void BinaryCacheStore::addMultipleToStore(
                            lock held by LegacySSHStore::narFromPath(). */
                         auto source = std::move(source_);
 
-                        if (!repair && isValidPath(info.path)) {
-                            // FIXME: copyNAR -> null sink
-                            source->drain();
-                        } else {
+                        if (repair || !isValidPath(info.path)) {
                             MaintainCount<decltype(nrRunning)> mc(nrRunning);
                             showProgress();
                             auto narInfo = uploadData(*source, repair, [&](HashResult nar) {
