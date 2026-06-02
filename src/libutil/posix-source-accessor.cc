@@ -1,4 +1,4 @@
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
@@ -36,15 +36,53 @@ static SourceAccessor::Stat sourceAccessorStatFromPosixStat(const PosixStat & st
     };
 }
 
-void detail::PosixSourceAccessorBase::anchor() {}
-
 namespace {
+
+/**
+ * Common base helper class for deduplicating common code paths for tracking mtime.
+ */
+class PosixSourceAccessorBase : virtual public SourceAccessor
+{
+private:
+    void anchor() override;
+
+protected:
+    const bool trackLastModified = false;
+
+    /**
+     * The most recent mtime seen by lstat(). This is a hack to
+     * support dumpPathAndGetMtime(). Should remove this eventually.
+     */
+    time_t mtime = 0;
+
+    void maybeUpdateMtime(time_t seenMTime)
+    {
+        /* The contract is that trackLastModified implies that the caller uses the accessor
+           from a single thread. Thus this is not a CAS loop. */
+        if (trackLastModified)
+            mtime = std::max(mtime, seenMTime);
+    }
+
+    PosixSourceAccessorBase(bool trackLastModified)
+        : trackLastModified(trackLastModified)
+    {
+    }
+
+    virtual std::optional<time_t> getLastModified() override
+    {
+        if (trackLastModified)
+            return mtime;
+        return std::nullopt;
+    }
+};
+
+void PosixSourceAccessorBase::anchor() {}
 
 #ifndef _WIN32
 
 class PosixDirectorySourceAccessor;
 
-class PosixFileSourceAccessor : public detail::PosixSourceAccessorBase
+class PosixFileSourceAccessor : public PosixSourceAccessorBase
 {
     friend class PosixDirectorySourceAccessor;
 
@@ -146,7 +184,7 @@ static unsigned getGlobalDirFdCacheLimit()
     return std::min<rlim_t>(4096, lim.rlim_cur / 8);
 }
 
-class PosixDirectorySourceAccessor : public detail::PosixSourceAccessorBase
+class PosixDirectorySourceAccessor : public PosixSourceAccessorBase
 {
 public:
     static unsigned getGlobalFdLimit()
@@ -549,7 +587,7 @@ try {
  * A source accessor that uses the Windows filesystem.
  * @todo Should be moved into a separate file.
  */
-class WindowsSourceAccessor : public detail::PosixSourceAccessorBase
+class WindowsSourceAccessor : public PosixSourceAccessorBase
 {
     /**
      * Optional root path to prefix all operations into the native file

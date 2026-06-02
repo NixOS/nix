@@ -72,7 +72,6 @@ headers = [ config_pub_h ] + files(
   'pos-idx.hh',
   'pos-table.hh',
   'position.hh',
-  'posix-source-accessor.hh',
   'processes.hh',
   'ref.hh',
   'regex-combinators.hh',

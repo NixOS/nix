@@ -2,7 +2,7 @@
 #include "nix/store/local-settings.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/file-system.hh"
 
 #include <cstdlib>
