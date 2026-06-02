@@ -1010,6 +1010,86 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
+void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair)
+{
+    const LocalSettings & localSettings = config->getLocalSettings();
+
+    auto realPath = toRealPath(info.path);
+
+    deletePath(realPath);
+
+    /* While restoring the path from the NAR, compute the hash
+       of the NAR. */
+    HashSink hashSink(HashAlgorithm::SHA256);
+
+    TeeSource wrapperSource{source, hashSink};
+
+    restorePath(realPath, wrapperSource, localSettings.fsyncStorePaths);
+
+    auto hashResult = hashSink.finish();
+
+    if (hashResult.hash != info.narHash)
+        throw Error(
+            "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+            printStorePath(info.path),
+            info.narHash.to_string(HashFormat::SRI, true),
+            hashResult.hash.to_string(HashFormat::SRI, true));
+
+    if (hashResult.numBytesDigested != info.narSize)
+        throw Error(
+            "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+            printStorePath(info.path),
+            info.narSize,
+            hashResult.numBytesDigested);
+
+    if (info.ca) {
+        auto & specified = *info.ca;
+        auto actualHash = ({
+            auto accessor = getFSAccessor(false);
+            CanonPath path{info.path.to_string()};
+            Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
+            auto fim = specified.method.getFileIngestionMethod();
+            switch (fim) {
+            case FileIngestionMethod::Flat:
+            case FileIngestionMethod::NixArchive: {
+                HashModuloSink caSink{
+                    specified.hash.algo,
+                    std::string{info.path.hashPart()},
+                };
+                dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
+                h = caSink.finish().hash;
+                break;
+            }
+            case FileIngestionMethod::Git:
+                h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
+                break;
+            }
+            ContentAddress{
+                .method = specified.method,
+                .hash = std::move(h),
+            };
+        });
+        if (specified.hash != actualHash.hash) {
+            throw Error(
+                "ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                printStorePath(info.path),
+                specified.hash.to_string(HashFormat::Nix32, true),
+                actualHash.hash.to_string(HashFormat::Nix32, true));
+        }
+    }
+
+    autoGC();
+
+    canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)});
+
+    optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+    if (localSettings.fsyncStorePaths) {
+        recursiveSync(realPath);
+        syncParent(realPath);
+    }
+}
+
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
@@ -1033,78 +1113,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
             /* The path may have been created by another process in the meantime, so check again. */
             if (repair || !isValidPathUncached(info.path)) {
 
-                deletePath(realPath);
-
-                /* While restoring the path from the NAR, compute the hash
-                   of the NAR. */
-                HashSink hashSink(HashAlgorithm::SHA256);
-
-                TeeSource wrapperSource{source, hashSink};
-
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
-
-                auto hashResult = hashSink.finish();
-
-                if (hashResult.hash != info.narHash)
-                    throw Error(
-                        "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        info.narHash.to_string(HashFormat::SRI, true),
-                        hashResult.hash.to_string(HashFormat::SRI, true));
-
-                if (hashResult.numBytesDigested != info.narSize)
-                    throw Error(
-                        "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        info.narSize,
-                        hashResult.numBytesDigested);
-
-                if (info.ca) {
-                    auto & specified = *info.ca;
-                    auto actualHash = ({
-                        auto accessor = getFSAccessor(false);
-                        CanonPath path{info.path.to_string()};
-                        Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
-                        auto fim = specified.method.getFileIngestionMethod();
-                        switch (fim) {
-                        case FileIngestionMethod::Flat:
-                        case FileIngestionMethod::NixArchive: {
-                            HashModuloSink caSink{
-                                specified.hash.algo,
-                                std::string{info.path.hashPart()},
-                            };
-                            dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                            h = caSink.finish().hash;
-                            break;
-                        }
-                        case FileIngestionMethod::Git:
-                            h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
-                            break;
-                        }
-                        ContentAddress{
-                            .method = specified.method,
-                            .hash = std::move(h),
-                        };
-                    });
-                    if (specified.hash != actualHash.hash) {
-                        throw Error(
-                            "ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            specified.hash.to_string(HashFormat::Nix32, true),
-                            actualHash.hash.to_string(HashFormat::Nix32, true));
-                    }
-                }
-
-                autoGC();
-
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
-
-                optimisePath(realPath, repair); // FIXME: combine with hashPath()
-
-                if (config->getLocalSettings().fsyncStorePaths) {
-                    recursiveSync(realPath);
-                    syncParent(realPath);
-                }
+                doAddToStore(info, source, repair);
 
                 registerValidPath(info);
             } else
@@ -1129,8 +1138,6 @@ void LocalStore::addMultipleToStore(
     auto showProgress = [&, nrTotal = pathsToCopy.size()]() { act.progress(nrDone, nrTotal, nrRunning); };
 
     using PathWithSource = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
-
-    const LocalSettings & localSettings = config->getLocalSettings();
 
     /* Stage A: figure out which paths are not already valid, lock them,
        and re-check their validity under the lock.
@@ -1195,9 +1202,7 @@ void LocalStore::addMultipleToStore(
     /* Stage B: extract the NARs in parallel, in order of descending NAR
        size so that the largest (and typically slowest) NARs are started
        first. This does everything `addToStore` does except registering
-       the path as valid, which is deferred to stage C.
-
-       FIXME: this duplicates the body of `addToStore`. */
+       the paths as valid, which is deferred to stage C. */
     std::sort(toWrite.begin(), toWrite.end(), [](auto * a, auto * b) { return a->first.narSize > b->first.narSize; });
 
     ThreadPool pool;
@@ -1209,82 +1214,7 @@ void LocalStore::addMultipleToStore(
             MaintainCount<decltype(nrRunning)> mc(nrRunning);
             showProgress();
 
-            auto & info = item->first;
-            auto & source = *item->second;
-            auto realPath = toRealPath(info.path);
-
-            deletePath(realPath);
-
-            /* While restoring the path from the NAR, compute the hash
-               of the NAR. */
-            HashSink hashSink(HashAlgorithm::SHA256);
-
-            TeeSource wrapperSource{source, hashSink};
-
-            restorePath(realPath, wrapperSource, localSettings.fsyncStorePaths);
-
-            auto hashResult = hashSink.finish();
-
-            if (hashResult.hash != info.narHash)
-                throw Error(
-                    "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path),
-                    info.narHash.to_string(HashFormat::SRI, true),
-                    hashResult.hash.to_string(HashFormat::SRI, true));
-
-            if (hashResult.numBytesDigested != info.narSize)
-                throw Error(
-                    "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                    printStorePath(info.path),
-                    info.narSize,
-                    hashResult.numBytesDigested);
-
-            if (info.ca) {
-                auto & specified = *info.ca;
-                auto actualHash = ({
-                    auto accessor = getFSAccessor(false);
-                    CanonPath path{info.path.to_string()};
-                    Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
-                    auto fim = specified.method.getFileIngestionMethod();
-                    switch (fim) {
-                    case FileIngestionMethod::Flat:
-                    case FileIngestionMethod::NixArchive: {
-                        HashModuloSink caSink{
-                            specified.hash.algo,
-                            std::string{info.path.hashPart()},
-                        };
-                        dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                        h = caSink.finish().hash;
-                        break;
-                    }
-                    case FileIngestionMethod::Git:
-                        h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
-                        break;
-                    }
-                    ContentAddress{
-                        .method = specified.method,
-                        .hash = std::move(h),
-                    };
-                });
-                if (specified.hash != actualHash.hash) {
-                    throw Error(
-                        "ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        specified.hash.to_string(HashFormat::Nix32, true),
-                        actualHash.hash.to_string(HashFormat::Nix32, true));
-                }
-            }
-
-            autoGC();
-
-            canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)});
-
-            optimisePath(realPath, repair); // FIXME: combine with hashPath()
-
-            if (localSettings.fsyncStorePaths) {
-                recursiveSync(realPath);
-                syncParent(realPath);
-            }
+            doAddToStore(item->first, *item->second, repair);
 
             nrDone++;
             showProgress();

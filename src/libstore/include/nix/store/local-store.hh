@@ -302,6 +302,19 @@ public:
 
 private:
 
+    /**
+     * Restore the contents of `info` from `source` (a NAR) into the
+     * store, verifying the NAR hash/size and (if applicable) the
+     * content address, then canonicalise, optimise and optionally fsync
+     * the path.
+     *
+     * This does *not* acquire a lock on the path or register it as
+     * valid: the caller must already hold the path lock and is
+     * responsible for registering the path afterwards. Shared by
+     * `addToStore()` and `addMultipleToStore()`.
+     */
+    void doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair);
+
     void createTempRootsFile();
 
     /**
