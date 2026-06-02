@@ -17,6 +17,7 @@
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/provenance.hh"
@@ -1205,7 +1206,10 @@ void LocalStore::addMultipleToStore(
        the paths as valid, which is deferred to stage C. */
     std::sort(toWrite.begin(), toWrite.end(), [](auto * a, auto * b) { return a->first.narSize > b->first.narSize; });
 
-    ThreadPool pool;
+    /* Use enough threads to saturate both the local CPUs (for
+       decompression/hashing/optimising) and the incoming connections to
+       the source store (e.g. a binary cache). */
+    ThreadPool pool(std::max((size_t) std::thread::hardware_concurrency(), fileTransferSettings.httpConnections.get()));
 
     for (auto * item : toWrite) {
         pool.enqueue([&, item]() {
