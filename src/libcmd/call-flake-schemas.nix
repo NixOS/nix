@@ -12,7 +12,7 @@ let
 
   outputNames = builtins.attrNames flake.outputs;
 
-  schemas = flake.outputs.schemas or defaultSchemasFlake.schemas;
+  schemas = flake.outputs.schemas or defaultSchemasFlake.exportedSchemas;
 
 in
 
