@@ -8,6 +8,14 @@
 namespace nix {
 
 /**
+ * If outputSpec is a CAFixed output, check that the actual output described in
+ * info meets the requirements for a CAFixed output. Do nothing if outputSpec is
+ * not a CAFixed output.
+ */
+void checkCAFixedOutput(
+    StoreDirConfig & store, const StorePath & drvPath, const DerivationOutput & outputSpec, const ValidPathInfo & info);
+
+/**
  * Check that outputs meets the requirements specified by the
  * 'outputChecks' attribute (or the legacy
  * '{allowed,disallowed}{References,Requisites}' attributes).

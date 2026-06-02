@@ -16,6 +16,10 @@ struct Settings;
  */
 struct GitFileSystemObjectSink : ExtendedFileSystemObjectSink
 {
+private:
+    void anchor() override;
+
+public:
     /**
      * Flush builder and return a final Git hash.
      */

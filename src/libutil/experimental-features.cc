@@ -15,6 +15,8 @@ struct ExperimentalFeatureDetails
     std::string_view trackingUrl;
 };
 
+void MissingExperimentalFeature::anchor() {}
+
 /**
  * If two different PRs both add an experimental feature, and we just
  * used a number for this, we *woudln't* get merge conflict and the

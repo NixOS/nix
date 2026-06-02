@@ -35,6 +35,8 @@ namespace {
 
 class WholeStoreViewAccessor : public SourceAccessor
 {
+    void anchor() override {};
+
     using BaseName = std::string;
 
     /**

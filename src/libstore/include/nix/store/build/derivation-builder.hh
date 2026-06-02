@@ -17,11 +17,26 @@
 namespace nix {
 
 /**
+ * Rethrow the current exception as a subclass of `Error`.
+ */
+void rethrowExceptionAsError();
+
+/**
+ * Send the current exception to the parent in the format expected by
+ * `DerivationBuilderImpl::processSandboxSetupMessages()`.
+ */
+void handleChildException(bool sendException);
+
+/**
  * Denotes a build failure that stemmed from the builder exiting with a
  * failing exist status.
  */
 struct BuilderFailureError final : CloneableError<BuilderFailureError, BuildError>
 {
+private:
+    void anchor() override;
+
+public:
     int builderStatus;
 
     std::string extraMsgAfter;
@@ -109,7 +124,7 @@ struct DerivationBuilderParams
  */
 struct DerivationBuilderCallbacks
 {
-    virtual ~DerivationBuilderCallbacks() = default;
+    virtual ~DerivationBuilderCallbacks();
 
     /**
      * Open a log file and a pipe to it.
@@ -140,6 +155,10 @@ struct DerivationBuilderCallbacks
  */
 struct DerivationBuilder : RestrictionContext
 {
+private:
+    void anchor() override;
+
+public:
     DerivationBuilder() = default;
     virtual ~DerivationBuilder() = default;
 
@@ -215,7 +234,7 @@ using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBui
 
 #ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store, std::unique_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+    LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 
 /**
  * @param handler Must be chosen such that it supports the given
@@ -223,7 +242,7 @@ DerivationBuilderUnique makeDerivationBuilder(
  */
 DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);
 #endif

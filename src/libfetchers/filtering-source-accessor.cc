@@ -70,6 +70,9 @@ void FilteringSourceAccessor::checkAccess(const CanonPath & path)
 
 struct AllowListSourceAccessorImpl : AllowListSourceAccessor
 {
+private:
+    void anchor() override {};
+public:
     SharedSync<std::set<CanonPath>> allowedPrefixes;
     boost::concurrent_flat_set<CanonPath> allowedPaths;
 

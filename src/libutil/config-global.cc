@@ -4,6 +4,8 @@
 
 namespace nix {
 
+void GlobalConfig::anchor() {}
+
 GlobalConfig::ConfigRegistrations & GlobalConfig::configRegistrations()
 {
     static GlobalConfig::ConfigRegistrations configRegistrations;

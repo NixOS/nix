@@ -14,6 +14,8 @@
 
 namespace nix {
 
+void LoggerSettings::anchor() {}
+
 LoggerSettings loggerSettings;
 
 static GlobalConfig::Register rLoggerSettings(&loggerSettings);
@@ -35,6 +37,8 @@ void setCurActivity(const ActivityId activityId)
  * Avoids races in activity teardown.
  */
 Logger * logger = makeSimpleLogger(true).release();
+
+Logger::~Logger() {}
 
 void Logger::warn(const std::string & msg)
 {
@@ -60,6 +64,8 @@ std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
         return suspend();
     return {};
 }
+
+namespace {
 
 class SimpleLogger : public Logger
 {
@@ -150,6 +156,8 @@ public:
     }
 };
 
+} // namespace
+
 Verbosity verbosity = lvlInfo;
 
 static void writeFullLogging(Descriptor fd, std::string_view s)
@@ -212,6 +220,8 @@ void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
         json["file"] = nullptr;
     }
 }
+
+namespace {
 
 struct JSONLogger : Logger
 {
@@ -344,6 +354,8 @@ struct JSONLogger : Logger
         write(json);
     }
 };
+
+} // namespace
 
 std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {

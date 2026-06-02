@@ -26,6 +26,8 @@ static StorePath pathPartOfReq(const DerivedPath & req)
         req.raw());
 }
 
+void RestrictionContext::anchor() {}
+
 bool RestrictionContext::isAllowed(const DerivedPath & req)
 {
     return isAllowed(pathPartOfReq(req));

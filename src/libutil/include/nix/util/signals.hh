@@ -46,7 +46,7 @@ MakeError(Interrupted, BaseError);
 
 struct InterruptCallback
 {
-    virtual ~InterruptCallback() {};
+    virtual ~InterruptCallback();
 };
 
 /**

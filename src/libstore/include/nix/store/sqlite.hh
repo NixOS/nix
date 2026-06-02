@@ -166,12 +166,15 @@ struct SQLiteTxn
     ~SQLiteTxn();
 };
 
-struct SQLiteError : CloneableError<SQLiteError, Error>
+class SQLiteError : public CloneableError<SQLiteError, Error>
 {
     std::string path;
     std::string errMsg;
     int errNo, extendedErrNo, offset;
 
+    void anchor() override;
+
+public:
     template<typename... Args>
     [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args &... args)
     {

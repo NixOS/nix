@@ -8,6 +8,8 @@
 
 namespace nix {
 
+Value::Failed::~Failed() {}
+
 Value Value::vEmptyList = []() {
     Value res;
     res.setStorage(List{.size = 0, .elems = nullptr});

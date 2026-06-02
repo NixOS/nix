@@ -14,6 +14,8 @@ namespace nix {
 
 MakeError(UploadToHTTP, Error);
 
+void UploadToHTTP::anchor() {}
+
 StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 {
     static bool forceHttp = getEnv("_NIX_FORCE_HTTP") == "1";

@@ -430,6 +430,12 @@ LocalStore::~LocalStore()
         future.get();
     }
 
+    {
+        auto state(_state->lock());
+        if (state->gcThread.joinable())
+            state->gcThread.join();
+    }
+
     try {
         auto fdTempRoots(_fdTempRoots.lock());
         if (*fdTempRoots) {
@@ -1318,6 +1324,8 @@ std::pair<std::filesystem::path, AutoCloseFD> LocalStore::createTempDirInStore()
     } while (!pathExists(tmpDirFn) || !lockedByUs);
     return {tmpDirFn, std::move(tmpDirFd)};
 }
+
+void PathInUse::anchor() {}
 
 void LocalStore::invalidatePathChecked(const StorePath & path)
 {

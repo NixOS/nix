@@ -8,13 +8,13 @@ namespace nix {
 struct CmdRealisation : NixMultiCommand
 {
     CmdRealisation()
-        : NixMultiCommand("realisation", RegisterCommand::getCommandsFor({"realisation"}))
+        : NixMultiCommand("build-trace", RegisterCommand::getCommandsFor({"build-trace"}))
     {
     }
 
     std::string description() override
     {
-        return "manipulate a Nix realisation";
+        return "manipulate a Nix build trace";
     }
 
     Category category() override
@@ -23,19 +23,19 @@ struct CmdRealisation : NixMultiCommand
     }
 };
 
-static auto rCmdRealisation = registerCommand<CmdRealisation>("realisation");
+static auto rCmdRealisation = registerCommand<CmdRealisation>("build-trace");
 
 struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 {
     std::string description() override
     {
-        return "query information about one or several realisations";
+        return "query information about one or several build traces";
     }
 
     std::string doc() override
     {
         return
-#include "realisation/info.md"
+#include "build-trace/info.md"
             ;
     }
 
@@ -77,6 +77,6 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
     }
 };
 
-static auto rCmdRealisationInfo = registerCommand2<CmdRealisationInfo>({"realisation", "info"});
+static auto rCmdBuildTraceInfo = registerCommand2<CmdRealisationInfo>({"build-trace", "info"});
 
 } // namespace nix

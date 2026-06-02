@@ -10,11 +10,9 @@ std::map<StorePath, StorePath> makeContentAddressed(Store & srcStore, Store & ds
 
     auto paths = srcStore.topoSortPaths(closure);
 
-    std::reverse(paths.begin(), paths.end());
-
     std::map<StorePath, StorePath> remappings;
 
-    for (auto & path : paths) {
+    for (auto & path : paths | std::views::reverse) {
         auto pathS = srcStore.printStorePath(path);
         auto oldInfo = srcStore.queryPathInfo(path);
         std::string oldHashPart(path.hashPart());

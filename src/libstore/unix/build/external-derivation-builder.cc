@@ -1,4 +1,9 @@
+#include "derivation-builder-impl.hh"
+#include "nix/store/build/child.hh"
+
 namespace nix {
+
+namespace {
 
 struct ExternalDerivationBuilder : DerivationBuilderImpl
 {
@@ -6,10 +11,10 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     ExternalDerivationBuilder(
         LocalStore & store,
-        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         ExternalBuilder externalBuilder)
-        : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
+        : DerivationBuilderImpl(store, miscMethods, std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
@@ -106,14 +111,15 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     }
 };
 
+} // namespace
+
 DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler)
 {
-    return DerivationBuilderUnique(
-        new ExternalDerivationBuilder(store, std::move(miscMethods), std::move(params), handler));
+    return DerivationBuilderUnique(new ExternalDerivationBuilder(store, miscMethods, std::move(params), handler));
 }
 
 } // namespace nix

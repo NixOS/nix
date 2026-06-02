@@ -71,6 +71,10 @@ protected:
 
     struct Connection : RemoteStore::Connection
     {
+    private:
+        void anchor() override;
+
+    public:
         std::unique_ptr<SSHMaster::Connection> sshConn;
 
         void closeWrite() override
@@ -94,6 +98,10 @@ protected:
         */
     };
 };
+
+void RemoteStore::Connection::anchor() {}
+
+void SSHStore::Connection::anchor() {}
 
 void SSHStore::anchor() {}
 

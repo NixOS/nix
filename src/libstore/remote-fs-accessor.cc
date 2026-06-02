@@ -2,6 +2,8 @@
 
 namespace nix {
 
+void RemoteFSAccessor::anchor() {}
+
 RemoteFSAccessor::RemoteFSAccessor(ref<Store> store, bool requireValidPath, std::optional<AbsolutePath> cacheDir)
     : store(store)
     , narCache(cacheDir)

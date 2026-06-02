@@ -332,6 +332,11 @@ in
   withUnityBuild = true;
 
   /**
+    Whether to embed the public C API into nix-cli so plugins can resolve those symbols from the executable.
+  */
+  withPluginCAPI = !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isStatic);
+
+  /**
     A user-provided extension function to apply to each component derivation.
   */
   mesonComponentOverrides = finalAttrs: prevAttrs: { };
@@ -481,7 +486,6 @@ in
   */
   nix-cli = callPackage ../src/nix/package.nix {
     version = fineVersion;
-    withPluginCApi = !stdenv.hostPlatform.isWindows;
   };
 
   nix-functional-tests = callPackage ../tests/functional/package.nix {

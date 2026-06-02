@@ -4,6 +4,8 @@
 
 namespace nix {
 
+void Signer::anchor() {}
+
 LocalSigner::LocalSigner(SecretKey && privateKey)
     : privateKey(privateKey)
     , publicKey(privateKey.toPublicKey())

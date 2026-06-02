@@ -14,6 +14,8 @@
 
 namespace nix {
 
+void AddCompletions::anchor() {}
+
 void Args::addFlag(Flag && flag_)
 {
     auto flag = std::make_shared<Flag>(std::move(flag_));

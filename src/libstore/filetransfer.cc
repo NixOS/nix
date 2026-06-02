@@ -97,6 +97,8 @@ std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile
     return std::nullopt;
 }
 
+void FileTransferSettings::anchor() {}
+
 FileTransferSettings::FileTransferSettings()
 {
     std::optional<AbsolutePath> sslOverride =
@@ -113,6 +115,8 @@ FileTransferSettings::FileTransferSettings()
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
+
+FileTransfer::~FileTransfer() {}
 
 namespace {
 
@@ -1015,15 +1019,7 @@ struct curlFileTransfer : public FileTransfer
         workerThread = std::thread([&]() { workerThreadEntry(); });
     }
 
-    ~curlFileTransfer()
-    {
-        try {
-            stopWorkerThread();
-        } catch (...) {
-            ignoreExceptionInDestructor();
-        }
-        workerThread.join();
-    }
+    ~curlFileTransfer() override;
 
     void stopWorkerThread()
     {
@@ -1220,6 +1216,16 @@ struct curlFileTransfer : public FileTransfer
     }
 };
 
+curlFileTransfer::~curlFileTransfer()
+{
+    try {
+        stopWorkerThread();
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
+    workerThread.join();
+}
+
 ref<curlFileTransfer> makeCurlFileTransfer(const FileTransferSettings & settings = fileTransferSettings)
 {
     return make_ref<curlFileTransfer>(settings);
@@ -1332,7 +1338,7 @@ void FileTransfer::download(
         bool paused = false;
         std::exception_ptr exc;
         std::string data;
-        std::condition_variable avail, request;
+        std::condition_variable avail;
     };
 
     auto _state = std::make_shared<Sync<State>>();
@@ -1342,7 +1348,6 @@ void FileTransfer::download(
     Finally finally([&]() {
         auto state(_state->lock());
         state->quit = true;
-        state->request.notify_one();
     });
 
     request.dataCallback = [_state, uri = request.displayUri()](std::string_view data) -> PauseTransfer {
@@ -1388,7 +1393,6 @@ void FileTransfer::download(
                 state->exc = std::current_exception();
             }
             state->avail.notify_one();
-            state->request.notify_one();
         }});
 
     while (true) {
@@ -1422,8 +1426,6 @@ void FileTransfer::download(
             chunk = std::move(state->data);
             /* Reset state->data after the move, since we check data.empty() */
             state->data = "";
-
-            state->request.notify_one();
         }
 
         /* Flush the data to the sink and wake up the download thread
@@ -1433,6 +1435,8 @@ void FileTransfer::download(
         sink(chunk);
     }
 }
+
+void FileTransferError::anchor() {}
 
 template<typename... Args>
 FileTransferError::FileTransferError(

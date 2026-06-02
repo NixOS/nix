@@ -20,6 +20,50 @@
 
 namespace nix {
 
+void SerialisationError::anchor() {}
+
+void Sink::anchor() {}
+
+void BufferedSink::anchor() {}
+
+void FdSink::anchor() {}
+
+void StringSink::anchor() {}
+
+void TeeSink::anchor() {}
+
+void FinishSink::anchor() {}
+
+void LambdaSink::anchor() {}
+
+void NullSink::anchor() {}
+
+void FramedSink::anchor() {}
+
+void Source::anchor() {}
+
+void BufferedSource::anchor() {}
+
+void RestartableSource::anchor() {}
+
+void FdSource::anchor() {}
+
+void TeeSource::anchor() {}
+
+void StringSource::anchor() {}
+
+void LambdaSource::anchor() {}
+
+void FramedSource::anchor() {}
+
+void LengthSource::anchor() {}
+
+void EnsureRead::anchor() {}
+
+void ChainSource::anchor() {}
+
+void SizedSource::anchor() {}
+
 void BufferedSink::operator()(std::string_view data)
 {
     if (!buffer)

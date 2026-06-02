@@ -27,6 +27,10 @@ namespace nix {
  */
 class LazyFetcherAttr : public ExternalValueBase, public gc_cleanup
 {
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
     fetchers::LazyAttr lazy;
 
 public:
@@ -57,6 +61,8 @@ public:
         unreachable();
     }
 };
+
+void LazyFetcherAttr::anchor() {}
 
 /**
  * Initialize a `Value` from a resolved fetcher attribute.
@@ -545,59 +551,42 @@ static void fetch(
             .atPos(pos)
             .debugThrow();
 
-    // early exit if pinned and already in the store
-    if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
-        auto expectedPath = state.store->makeFixedOutputPath(
-            name,
-            FixedOutputInfo{
-                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
-                .hash = *expectedHash,
-                .references = {}});
-
-        // Try to get the path from the local store or substituters
-        try {
-            state.store->ensurePath(expectedPath);
-            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
-            state.allowAndSetStorePathString(expectedPath, v);
-            return;
-        } catch (Error & e) {
-            debug(
-                "substitution of '%s' failed, will try to download: %s",
-                state.store->printStorePath(expectedPath),
-                e.what());
-            // Fall through to download
+    if (unpack) {
+        auto attrs = fetchers::Attrs{
+            {"type", "tarball"},
+            {"url", *url},
+            {"name", name},
+        };
+        if (expectedHash) {
+            attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
+            // Mark as final to allow the tree to be substituted.
+            attrs.emplace("__final", Explicit<bool>{true});
         }
-    }
-
-    // Download the file/tarball if substitution failed or no hash was provided
-    auto storePath = unpack ? fetchToStore(
-                                  state.fetchSettings,
-                                  *state.store,
-                                  fetchers::downloadTarball(*state.store, state.fetchSettings, *url),
-                                  FetchMode::Copy,
-                                  name)
-                            : fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
-
-    if (expectedHash) {
-        auto hash = unpack ? state.store->queryPathInfo(storePath)->narHash
-                           : hashPath(
-                                 {state.store->requireStoreObjectAccessor(storePath)},
-                                 FileSerialisationMethod::Flat,
-                                 HashAlgorithm::SHA256)
-                                 .hash;
-        if (hash != *expectedHash) {
-            state
-                .error<EvalError>(
-                    "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
-                    *url,
-                    expectedHash->to_string(HashFormat::Nix32, true),
-                    hash.to_string(HashFormat::Nix32, true))
-                .withExitStatus(102)
-                .debugThrow();
+        auto input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
+        auto cachedInput =
+            state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+        auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
+        state.mkStorePathString(storePath, v);
+    } else {
+        auto storePath = fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
+        if (expectedHash) {
+            auto hash = hashPath(
+                            {state.store->requireStoreObjectAccessor(storePath)},
+                            FileSerialisationMethod::Flat,
+                            HashAlgorithm::SHA256)
+                            .hash;
+            if (hash != *expectedHash)
+                state
+                    .error<EvalError>(
+                        "hash mismatch in file downloaded from '%s':\n  specified: %s\n  got:       %s",
+                        *url,
+                        expectedHash->to_string(HashFormat::Nix32, true),
+                        hash.to_string(HashFormat::Nix32, true))
+                    .withExitStatus(102)
+                    .debugThrow();
         }
+        state.allowAndSetStorePathString(storePath, v);
     }
-
-    state.allowAndSetStorePathString(storePath, v);
 }
 
 static void prim_fetchurl(EvalState & state, const PosIdx pos, Value ** args, Value & v)

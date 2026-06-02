@@ -17,6 +17,8 @@ namespace nix {
 
 MakeError(UploadToS3, Error);
 
+void UploadToS3::anchor() {}
+
 static constexpr uint64_t AWS_MIN_PART_SIZE = 5 * 1024 * 1024;           // 5MiB
 static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
 static constexpr uint64_t AWS_MAX_PART_COUNT = 10000;

@@ -4,11 +4,17 @@
 
 namespace nix {
 
+void WorkerSettings::anchor() {}
+
 TimedOut::TimedOut(time_t maxDuration)
     : CloneableError(BuildResult::Failure::TimedOut, "timed out after %1% seconds", maxDuration)
     , maxDuration(maxDuration)
 {
 }
+
+void TimedOut::anchor() {}
+
+void Goal::anchor() {}
 
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;

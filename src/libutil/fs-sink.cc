@@ -14,6 +14,18 @@
 
 namespace nix {
 
+void FileSystemObjectSink::anchor() {}
+
+void ExtendedFileSystemObjectSink::anchor() {}
+
+void NullFileSystemObjectSink::anchor() {}
+
+void RegularFileSink::anchor() {}
+
+void RestoreSink::anchor() {}
+
+void CreateRegularFileSink::anchor() {}
+
 void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystemObjectSink & sink, const CanonPath & to)
 {
     auto stat = accessor.lstat(from);
@@ -54,6 +66,8 @@ void copyRecursive(SourceAccessor & accessor, const CanonPath & from, FileSystem
     }
 }
 
+namespace {
+
 struct RestoreSinkSettings : Config
 {
     Setting<bool> preallocateContents{
@@ -63,6 +77,8 @@ struct RestoreSinkSettings : Config
 static RestoreSinkSettings restoreSinkSettings;
 
 static GlobalConfig::Register r1(&restoreSinkSettings);
+
+} // namespace
 
 static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
 {
@@ -196,6 +212,8 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
     {
     }
 
+    void anchor() override;
+
     ~RestoreRegularFile()
     {
         /* Flush the sink before FdSink destructor has a chance to run and we've
@@ -219,6 +237,8 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
     void isExecutable() override;
     void preallocateContents(uint64_t size) override;
 };
+
+void RestoreRegularFile::anchor() {}
 
 void RestoreSink::createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func)
 {

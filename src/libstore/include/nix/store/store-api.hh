@@ -78,6 +78,9 @@ struct MissingPaths
  */
 struct StoreConfigBase : Config
 {
+private:
+    void anchor() override;
+
 protected:
 
     /**
@@ -230,9 +233,7 @@ public:
 struct StoreConfig : public StoreConfigBase, public StoreDirConfig
 {
 private:
-    /* VTable anchor to avoid weak linkage of the vtable - it breaks
-       dynamic_cast across shared libraries on Darwin. */
-    virtual void anchor() = 0;
+    void anchor() override;
 
 public:
     using Params = StoreReference::Params;
@@ -1139,7 +1140,8 @@ void copyClosure(
     const std::set<RealisedPath> & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    bool includeOutputs = false);
 
 void copyClosure(
     Store & srcStore,
@@ -1147,7 +1149,8 @@ void copyClosure(
     const StorePathSet & paths,
     RepairFlag repair = NoRepair,
     CheckSigsFlag checkSigs = CheckSigs,
-    SubstituteFlag substitute = NoSubstitute);
+    SubstituteFlag substitute = NoSubstitute,
+    bool includeOutputs = false);
 
 /**
  * Remove the temporary roots file for this process.  Any temporary

@@ -3,6 +3,8 @@
 
 namespace nix {
 
+void ExecError::anchor() {}
+
 Pid & Pid::operator=(Pid && other) noexcept
 {
     swap(*this, other);

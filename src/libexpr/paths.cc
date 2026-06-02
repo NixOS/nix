@@ -40,15 +40,15 @@ void EvalState::ensureLazyPathCopied(const StorePath & path)
         FetchMode::Copy,
         path.name());
 
-    /* Catch hash mismatches more loudly. This is more likely caused by unsound
-       caching of different accessor types that fetch the same repo with
-       the same git revision, but with different kinds of accessors (think
-       tarball-based fetchers vs local/remote git accessors). */
+    /* This can happen if the source gets modified by another process while we are evaluaing
+       from it. Alternatively, the caching might be unsound and fetcher cache is poisoned somehow.
+       See https://github.com/NixOS/nix/issues/14317. */
     if (storePath != path) {
-        panic(fmt(
-            "hashed store path computed by the evaluator ('%1%') does not match what was computed when copying to the store ('%2%'), this is a bug",
+        throw Error(
+            (unsigned int) 102,
+            "store path ('%1%') was hashed to avoid a full copy at first, but upon reading it again, the contents have changed ('%2%'), so we can not proceed. Make sure files do not change during evaluation",
             store->printStorePath(path),
-            store->printStorePath(storePath)));
+            store->printStorePath(storePath));
     }
 }
 

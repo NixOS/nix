@@ -37,9 +37,8 @@ static void exportPath(Store & store, const StorePath & path, Sink & sink)
 void exportPaths(Store & store, const StorePathSet & paths, Sink & sink)
 {
     auto sorted = store.topoSortPaths(paths);
-    std::reverse(sorted.begin(), sorted.end());
 
-    for (auto & path : sorted) {
+    for (auto & path : sorted | std::views::reverse) {
         sink << 1;
         exportPath(store, path, sink);
     }

@@ -7,6 +7,8 @@
 #include <string>
 #include <string_view>
 
+#include "nix/util/strings.hh"
+
 namespace nix {
 
 /**

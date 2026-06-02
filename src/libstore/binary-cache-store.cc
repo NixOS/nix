@@ -26,6 +26,8 @@ void BinaryCacheStoreConfig::anchor() {}
 
 void BinaryCacheStore::anchor() {}
 
+void NoSuchBinaryCacheFile::anchor() {}
+
 BinaryCacheStore::BinaryCacheStore(Config & config)
     : config{config}
 {

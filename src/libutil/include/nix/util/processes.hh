@@ -141,6 +141,8 @@ void runProgram2(const RunOptions & options);
 
 class ExecError final : public CloneableError<ExecError, Error>
 {
+    void anchor() override;
+
 public:
     int status;
 

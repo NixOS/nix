@@ -74,6 +74,8 @@ namespace nix {
 
 struct GitSourceAccessor;
 
+namespace {
+
 struct GitError final : public CloneableError<GitError, Error>
 {
     template<typename... Ts>
@@ -96,6 +98,8 @@ struct GitError final : public CloneableError<GitError, Error>
     {
     }
 };
+
+} // namespace
 
 typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
 typedef std::unique_ptr<git_tree_entry, Deleter<git_tree_entry_free>> TreeEntry;
@@ -784,6 +788,9 @@ ref<GitRepo> GitRepo::openRepo(const std::filesystem::path & path, GitRepo::Opti
 
 struct GitSourceAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+public:
     struct State
     {
         ref<GitRepoImpl> repo;
@@ -812,20 +819,16 @@ struct GitSourceAccessor : SourceAccessor
 
         if (state->lfsFetch) {
             if (state->lfsFetch->shouldFetch(path)) {
-                StringSink s;
                 try {
                     // FIXME: do we need to hold the state lock while
                     // doing this?
                     auto contents =
                         std::string((const char *) git_blob_rawcontent(blob.get()), git_blob_rawsize(blob.get()));
-                    state->lfsFetch->fetch(contents, path, s, [&s](uint64_t size) { s.s.reserve(size); });
+                    state->lfsFetch->fetch(contents, path, sink, sizeCallback);
                 } catch (Error & e) {
                     e.addTrace({}, "while smudging git-lfs file '%s'", path);
                     throw;
                 }
-                sizeCallback(s.s.size());
-                StringSource source{s.s};
-                source.drainInto(sink);
                 return;
             }
         }
@@ -1062,6 +1065,9 @@ struct GitSourceAccessor : SourceAccessor
 
 struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
 {
+private:
+    void anchor() override {};
+public:
     ref<GitRepoImpl> repo;
     std::optional<Hash> rev;
 
@@ -1119,6 +1125,10 @@ struct GitExportIgnoreSourceAccessor : CachingFilteringSourceAccessor
         return !isExportIgnored(path);
     }
 };
+
+void GitFileSystemObjectSink::anchor() {}
+
+namespace {
 
 struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
 {
@@ -1414,6 +1424,8 @@ struct GitFileSystemObjectSinkImpl : GitFileSystemObjectSink
         return toHash(_state.lock()->root.oid.value());
     }
 };
+
+} // namespace
 
 ref<GitSourceAccessor> GitRepoImpl::getRawAccessor(const Hash & rev, const GitAccessorOptions & options)
 {

@@ -66,6 +66,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     return msg;
 }
 
+namespace {
+
 struct LogSink : Sink
 {
     Activity & act;
@@ -101,6 +103,8 @@ struct LogSink : Sink
         }
     }
 };
+
+} // namespace
 
 struct PostBuildHookState
 {
@@ -986,12 +990,12 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             builder = localBuildCap.externalBuilder
                           ? makeExternalDerivationBuilder(
                                 localBuildCap.localStore,
-                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params),
                                 *localBuildCap.externalBuilder)
                           : makeDerivationBuilder(
                                 localBuildCap.localStore,
-                                std::make_unique<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params));
         }
 

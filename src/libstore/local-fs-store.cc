@@ -30,8 +30,14 @@ LocalFSStore::LocalFSStore(const Config & config)
 {
 }
 
+namespace {
+
 struct LocalStoreAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+
+public:
     ref<SourceAccessor> accessor;
     ref<LocalFSStore> store;
     bool requireValidPath;
@@ -123,6 +129,8 @@ struct LocalStoreAccessor : SourceAccessor
         return accessor->pathExists(path);
     }
 };
+
+} // namespace
 
 ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {

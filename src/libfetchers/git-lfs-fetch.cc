@@ -1,6 +1,8 @@
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/url.hh"
@@ -23,9 +25,7 @@ namespace nix::lfs {
 static void downloadToSink(
     const std::string & url,
     const std::optional<std::string> & authHeader,
-    // FIXME: passing a StringSink is superfluous, we may as well
-    // return a string. Or use an abstract Sink for streaming.
-    StringSink & sink,
+    Sink & sink,
     std::string sha256Expected,
     size_t sizeExpected)
 {
@@ -34,29 +34,25 @@ static void downloadToSink(
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
     request.headers = headers;
-    getFileTransfer()->download(std::move(request), sink);
 
-    auto sizeActual = sink.s.length();
-    if (sizeExpected != sizeActual)
-        throw Error("size mismatch while fetching %s: expected %d but got %d", url, sizeExpected, sizeActual);
+    HashSink hashSink(HashAlgorithm::SHA256);
+    TeeSink teeSink(hashSink, sink);
 
-    auto sha256Actual = hashString(HashAlgorithm::SHA256, sink.s).to_string(HashFormat::Base16, false);
+    getFileTransfer()->download(std::move(request), teeSink);
+
+    auto hashResult = hashSink.finish();
+
+    if (sizeExpected != hashResult.numBytesDigested)
+        throw Error(
+            "size mismatch while fetching %s: expected %d but got %d", url, sizeExpected, hashResult.numBytesDigested);
+
+    auto sha256Actual = hashResult.hash.to_string(HashFormat::Base16, false);
     if (sha256Actual != sha256Expected)
         throw Error(
             "hash mismatch while fetching %s: expected sha256:%s but got sha256:%s", url, sha256Expected, sha256Actual);
 }
 
-namespace {
-
-struct LfsApiInfo
-{
-    std::string endpoint;
-    std::optional<std::string> authHeader;
-};
-
-} // namespace
-
-static LfsApiInfo getLfsApi(const ParsedURL & url)
+LfsApiInfo getLfsApi(ParsedURL url)
 {
     assert(url.authority.has_value());
     if (url.scheme == "ssh") {
@@ -96,7 +92,41 @@ static LfsApiInfo getLfsApi(const ParsedURL & url)
         return {queryResp.at("href").get<std::string>(), authIt->get<std::string>()};
     }
 
-    return {url.to_string() + "/info/lfs", std::nullopt};
+    /**
+     * Try to mimic what git-lfs will do to plain remotes
+     * https://github.com/git-lfs/git-lfs/blob/main/docs/api/server-discovery.md
+     *
+     * Try to be smarter with remotes ending in a /, like
+     * `https://github.com/NixOS/nix/`. This should be
+     * `https://github.com/NixOS/nix.git/info/lfs`, not
+     * `https://github.com/NixOS/nix/.git/info/lfs`
+     */
+    bool hasDotGit = false;
+    for (auto it = url.path.rbegin(); it != url.path.rend(); ++it) {
+        if (it->empty())
+            continue;
+        if (!it->ends_with(".git"))
+            *it += ".git";
+        hasDotGit = true;
+        break;
+    }
+    if (!hasDotGit) {
+        if (url.path.size() > 1) // e.g. {"", ""} (single trailing slash)
+            url.path.back() = ".git";
+        else if (url.path.size() == 1) // {""}
+            url.path.push_back(".git");
+        else { // {}
+            url.path.push_back("");
+            url.path.push_back(".git");
+        }
+    }
+    if (url.path.back().empty())
+        url.path.back() = "info";
+    else
+        url.path.push_back("info");
+    url.path.push_back("lfs");
+
+    return {url.to_string(), std::nullopt};
 }
 
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
@@ -255,7 +285,7 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
 void Fetch::fetch(
     const std::string & content,
     const CanonPath & pointerFilePath,
-    StringSink & sink,
+    Sink & sink,
     std::function<void(uint64_t)> sizeCallback) const
 {
     debug("trying to fetch '%s' using git-lfs", pointerFilePath);
@@ -279,9 +309,13 @@ void Fetch::fetch(
     std::string key = hashString(HashAlgorithm::SHA256, pointerFilePath.rel()).to_string(HashFormat::Base16, false)
                       + "/" + pointer->oid;
     auto cachePath = cacheDir / key;
-    if (pathExists(cachePath)) {
+    AutoCloseFD cacheFile(openFileReadonly(cachePath, FinalSymlink::DontFollow));
+    if (cacheFile) {
         debug("using cache entry %s -> %s", key, PathFmt(cachePath));
-        sink(readFile(cachePath));
+        FdSource cacheSource(cacheFile.get());
+        auto size = getFileSize(cacheFile.get());
+        sizeCallback(size);
+        cacheSource.drainInto(sink, size);
         return;
     }
     debug("did not find cache entry for %s", key);
@@ -319,13 +353,23 @@ void Fetch::fetch(
                 pointer->size);
         }
 
-        sizeCallback(size);
-        downloadToSink(ourl, authHeader, sink, sha256, size);
-
         debug("creating cache entry %s -> %s", key, PathFmt(cachePath));
+
         if (!pathExists(cachePath.parent_path()))
             createDirs(cachePath.parent_path());
-        writeFile(cachePath, sink.s);
+        auto [tempFile, tempPath] = createTempFile(cachePath.parent_path(), {});
+        AutoDelete tempDeleter(tempPath);
+        FdSink tempSink(tempFile.get());
+        downloadToSink(ourl, authHeader, tempSink, sha256, size);
+        tempSink.flush();
+
+        std::filesystem::rename(tempPath, cachePath);
+        tempDeleter.cancel();
+
+        FdSource cacheSource(tempFile.get());
+        cacheSource.restart();
+        sizeCallback(size);
+        cacheSource.drainInto(sink, size);
 
         debug("%s fetched with git-lfs", pointerFilePath);
     } catch (const nlohmann::json::out_of_range & e) {

@@ -59,6 +59,8 @@ mkMesonLibrary (finalAttrs: {
     ./include/nix/store/meson.build
     ./linux/meson.build
     ./linux/include/nix/store/meson.build
+    ./darwin/meson.build
+    ./freebsd/meson.build
     ./unix/meson.build
     ./unix/include/nix/store/meson.build
     ./windows/meson.build

@@ -5,6 +5,8 @@
 
 namespace nix {
 
+void ExecutableLookupError::anchor() {}
+
 constexpr static const OsStringView path_var_separator{
     &ExecutablePath::separator,
     1,

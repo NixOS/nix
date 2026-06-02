@@ -4,6 +4,8 @@
 
 namespace nix {
 
+void BadNixStringContextElem::anchor() {}
+
 NixStringContextElem NixStringContextElem::parse(std::string_view s0, const ExperimentalFeatureSettings & xpSettings)
 {
     std::string_view s = s0;

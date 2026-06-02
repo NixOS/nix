@@ -282,6 +282,12 @@ nixComponents.callPackage (
       ++ map (transformFlag "libfetchers") (ignoreCrossFile nixComponents.nix-fetchers.mesonFlags)
       ++ map (transformFlag "libexpr") (ignoreCrossFile nixComponents.nix-expr.mesonFlags)
       ++ map (transformFlag "libcmd") (ignoreCrossFile nixComponents.nix-cmd.mesonFlags)
+      ++ map (transformFlag "libutil-c") (ignoreCrossFile nixComponents.nix-util-c.mesonFlags)
+      ++ map (transformFlag "libstore-c") (ignoreCrossFile nixComponents.nix-store-c.mesonFlags)
+      ++ map (transformFlag "libfetchers-c") (ignoreCrossFile nixComponents.nix-fetchers-c.mesonFlags)
+      ++ map (transformFlag "libexpr-c") (ignoreCrossFile nixComponents.nix-expr-c.mesonFlags)
+      ++ map (transformFlag "libflake-c") (ignoreCrossFile nixComponents.nix-flake-c.mesonFlags)
+      ++ map (transformFlag "libmain-c") (ignoreCrossFile nixComponents.nix-main-c.mesonFlags)
       ++ map (transformFlag "nix") (ignoreCrossFile nixComponents.nix-cli.mesonFlags);
 
       nativeBuildInputs =

@@ -38,9 +38,17 @@ struct Fetch
     void fetch(
         const std::string & content,
         const CanonPath & pointerFilePath,
-        StringSink & sink,
+        Sink & sink,
         std::function<void(uint64_t)> sizeCallback) const;
     std::vector<nlohmann::json> fetchUrls(const std::vector<Pointer> & pointers) const;
 };
+
+struct LfsApiInfo
+{
+    std::string endpoint;
+    std::optional<std::string> authHeader;
+};
+
+LfsApiInfo getLfsApi(ParsedURL url);
 
 } // namespace nix::lfs

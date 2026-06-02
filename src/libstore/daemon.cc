@@ -42,6 +42,8 @@ Sink & operator<<(Sink & sink, const Logger::Fields & fields)
     return sink;
 }
 
+namespace {
+
 /* Logger that forwards log messages to the client, *if* we're in a
    state where the protocol allows it (i.e., when canSendStderr is
    true). */
@@ -200,6 +202,8 @@ struct TunnelSource : BufferedSource
         return n;
     }
 };
+
+} // namespace
 
 struct ClientSettings
 {

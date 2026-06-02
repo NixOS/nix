@@ -36,6 +36,8 @@ static SourceAccessor::Stat sourceAccessorStatFromPosixStat(const PosixStat & st
     };
 }
 
+void detail::PosixSourceAccessorBase::anchor() {}
+
 namespace {
 
 #ifndef _WIN32

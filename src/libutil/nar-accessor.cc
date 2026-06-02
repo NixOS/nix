@@ -4,8 +4,14 @@
 
 namespace nix {
 
+namespace {
+
 struct NarAccessorImpl : NarAccessor
 {
+private:
+    void anchor() override {};
+
+public:
     NarListing root;
 
     std::function<void(uint64_t, uint64_t, Sink &)> getNarBytes;
@@ -134,6 +140,10 @@ struct NarAccessorImpl : NarAccessor
         return sym->target;
     }
 };
+
+} // namespace
+
+NarAccessor::~NarAccessor() {}
 
 ref<NarAccessor> makeNarAccessor(std::string && nar)
 {
