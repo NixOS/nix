@@ -53,14 +53,16 @@ protected:
      * The most recent mtime seen by lstat(). This is a hack to
      * support dumpPathAndGetMtime(). Should remove this eventually.
      */
-    time_t mtime = 0;
+    std::atomic<time_t> mtime = 0;
 
     void maybeUpdateMtime(time_t seenMTime)
     {
-        /* The contract is that trackLastModified implies that the caller uses the accessor
-           from a single thread. Thus this is not a CAS loop. */
-        if (trackLastModified)
-            mtime = std::max(mtime, seenMTime);
+        if (trackLastModified) {
+            /* Don't have https://en.cppreference.com/cpp/atomic/atomic/fetch_max yet, thus a CAS loop. */
+            time_t oldValue = mtime.load(std::memory_order_relaxed);
+            while (oldValue < seenMTime && !mtime.compare_exchange_weak(oldValue, seenMTime, std::memory_order_relaxed))
+                ;
+        }
     }
 
     PosixSourceAccessorBase(bool trackLastModified)
