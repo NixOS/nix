@@ -41,12 +41,9 @@
         what: isFlakeCheck: output:
         self.lib.mkChildren (builtins.mapAttrs (mkPackage isFlakeCheck what) output);
 
-      schemasSchema = {
+      schemasSchema = doc: {
         version = 1;
-        doc = ''
-          The `schemas` flake output is used to define and document flake outputs.
-          For the expected format, consult the Nix manual.
-        '';
+        inherit doc;
         inventory =
           output:
           self.lib.mkChildren (
@@ -462,27 +459,37 @@
           );
       };
 
-      # FIXME: distinguish between available and active schemas?
-      schemas.schemas = schemasSchema;
-      schemas.apps = appsSchema;
-      schemas.defaultApp = defaultAppSchema;
-      schemas.packages = packagesSchema;
-      schemas.defaultPackage = defaultPackageSchema;
-      schemas.legacyPackages = legacyPackagesSchema;
-      schemas.checks = checksSchema;
-      schemas.devShells = devShellsSchema;
-      schemas.devShell = devShellSchema;
-      schemas.formatter = formatterSchema;
-      schemas.templates = templatesSchema;
-      schemas.hydraJobs = hydraJobsSchema;
-      schemas.overlays = overlaysSchema;
-      schemas.nixosConfigurations = nixosConfigurationsSchema;
-      schemas.nixosModules = nixosModulesSchema;
-      schemas.homeConfigurations = homeConfigurationsSchema;
-      schemas.homeModules = homeModulesSchema;
-      schemas.darwinConfigurations = darwinConfigurationsSchema;
-      schemas.darwinModules = darwinModulesSchema;
-      schemas.ociImages = ociImagesSchema;
-      schemas.bundlers = bundlersSchema;
+      exportedSchemas = {
+        schemas = schemasSchema ''
+          The `schemas` flake output is used to define and document flake outputs.
+          For the expected format, consult the Nix manual.
+        '';
+        exportedSchemas = schemasSchema ''
+          The `exportedSchemas` flake output is used to define flake schemas that you
+          intend for other flakes to use.
+        '';
+        apps = appsSchema;
+        defaultApp = defaultAppSchema;
+        packages = packagesSchema;
+        defaultPackage = defaultPackageSchema;
+        legacyPackages = legacyPackagesSchema;
+        checks = checksSchema;
+        devShells = devShellsSchema;
+        devShell = devShellSchema;
+        formatter = formatterSchema;
+        templates = templatesSchema;
+        hydraJobs = hydraJobsSchema;
+        overlays = overlaysSchema;
+        nixosConfigurations = nixosConfigurationsSchema;
+        nixosModules = nixosModulesSchema;
+        homeConfigurations = homeConfigurationsSchema;
+        homeModules = homeModulesSchema;
+        darwinConfigurations = darwinConfigurationsSchema;
+        darwinModules = darwinModulesSchema;
+        ociImages = ociImagesSchema;
+        bundlers = bundlersSchema;
+      };
+
+      schemas = self.exportedSchemas;
     };
 }
