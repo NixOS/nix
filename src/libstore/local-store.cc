@@ -266,6 +266,22 @@ LocalStore::LocalStore(ref<const Config> config)
                            : "database schema needs migrating, but this cannot be done in read-only mode");
     }
 
+    auto acquireWriteLock = [&]() {
+        if (!lockFile(globalLock.get(), ltWrite, false)) {
+            printInfo("waiting for exclusive access to the Nix store...");
+            // We have acquired a shared lock; release it to prevent deadlocks.
+            // This can happen if someone else is trying to promote their read
+            // lock into a write lock.
+            lockFile(globalLock.get(), ltNone, false);
+            lockFile(globalLock.get(), ltWrite, true);
+        }
+    };
+
+    Finally releaseLock([&] {
+        if (globalLock)
+            lockFile(globalLock.get(), ltNone, false);
+    });
+
     if (curSchema > nixSchemaVersion)
         throw Error("current Nix store schema is version %1%, but I only support %2%", curSchema, nixSchemaVersion);
 
@@ -288,12 +304,7 @@ LocalStore::LocalStore(ref<const Config> config)
                 "which is no longer supported. To convert to the new format,\n"
                 "please upgrade Nix to version 1.11 first.");
 
-        if (!lockFile(globalLock.get(), ltWrite, false)) {
-            printInfo("waiting for exclusive access to the Nix store...");
-            lockFile(
-                globalLock.get(), ltNone, false); // We have acquired a shared lock; release it to prevent deadlocks
-            lockFile(globalLock.get(), ltWrite, true);
-        }
+        acquireWriteLock();
 
         /* Get the schema version again, because another process may
            have performed the upgrade already. */
@@ -329,10 +340,14 @@ LocalStore::LocalStore(ref<const Config> config)
         lockFile(globalLock.get(), ltRead, true);
     }
 
-    else
+    else {
+        if (!config->readOnly)
+            acquireWriteLock();
         openDB(*state, false);
+    }
 
-    upgradeDBSchema(*state);
+    if (!config->readOnly)
+        upgradeDBSchema(*state);
 
     /* Prepare SQL statements. */
     state->stmts->RegisterValidPath.create(
