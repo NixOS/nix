@@ -244,8 +244,8 @@ void LinuxDerivationBuilder::enterChroot()
     auto & localSettings = store.config->getLocalSettings();
 
     /* Set the NO_NEW_PRIVS before doing seccomp/landlock setup.
-        landlock_restrict_self requires either NO_NEW_PRIVS or CAP_SYS_ADMIN.
-        With user namespaces we do get CAP_SYS_ADMIN. */
+       landlock_restrict_self requires either NO_NEW_PRIVS or CAP_SYS_ADMIN.
+       With user namespaces we do get CAP_SYS_ADMIN. */
     if (!localSettings.allowNewPrivileges)
         if (::prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) == -1)
             throw SysError("failed to set PR_SET_NO_NEW_PRIVS");
@@ -259,7 +259,7 @@ void LinuxDerivationBuilder::enterChroot()
         if (e.errNo != EPERM)
             throw;
         /* If allowNewPrivileges is true and we don't have CAP_SYS_ADMIN
-            this code path might be hit. */
+           this code path might be hit. */
         warn("setting up landlock: %s", e.message());
     }
 #endif
@@ -293,8 +293,8 @@ void ChrootLinuxDerivationBuilder::prepareUser()
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
-            root cgroup of the service. Otherwise, it will return the
-            current cgroup. */
+           root cgroup of the service. Otherwise, it will return the
+           current cgroup. */
         auto cgroupFS = linux::getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
@@ -311,8 +311,8 @@ void ChrootLinuxDerivationBuilder::prepareUser()
         debug("using cgroup %s", PathFmt(*cgroup));
 
         /* When using a build user, record the cgroup we used for that
-            user so that if we got interrupted previously, we can kill
-            any left-over cgroup first. */
+           user so that if we got interrupted previously, we can kill
+           any left-over cgroup first. */
         if (buildUser) {
             auto cgroupsDir = std::filesystem::path{settings.nixStateDir} / "cgroups";
             createDirs(cgroupsDir);
@@ -357,35 +357,35 @@ void ChrootLinuxDerivationBuilder::startChild()
     /* Set up private namespaces for the build:
 
         - The PID namespace causes the build to start as PID 1.
-            Processes outside of the chroot are not visible to those
-            on the inside, but processes inside the chroot are
-            visible from the outside (though with different PIDs).
+          Processes outside of the chroot are not visible to those
+          on the inside, but processes inside the chroot are
+          visible from the outside (though with different PIDs).
 
         - The private mount namespace ensures that all the bind
-            mounts we do will only show up in this process and its
-            children, and will disappear automatically when we're
-            done.
+          mounts we do will only show up in this process and its
+          children, and will disappear automatically when we're
+          done.
 
         - The private network namespace ensures that the builder
-            cannot talk to the outside world (or vice versa).  It
-            only has a private loopback interface. (Fixed-output
-            derivations are not run in a private network namespace
-            to allow functions like fetchurl to work.)
+          cannot talk to the outside world (or vice versa).  It
+          only has a private loopback interface. (Fixed-output
+          derivations are not run in a private network namespace
+          to allow functions like fetchurl to work.)
 
         - The IPC namespace prevents the builder from communicating
-            with outside processes using SysV IPC mechanisms (shared
-            memory, message queues, semaphores).  It also ensures
-            that all IPC objects are destroyed when the builder
-            exits.
+          with outside processes using SysV IPC mechanisms (shared
+          memory, message queues, semaphores).  It also ensures
+          that all IPC objects are destroyed when the builder
+          exits.
 
         - The UTS namespace ensures that builders see a hostname of
-            localhost rather than the actual hostname.
+          localhost rather than the actual hostname.
 
-        We use a helper process to do the clone() to work around
-        clone() being broken in multi-threaded programs due to
-        at-fork handlers not being run. Note that we use
-        CLONE_PARENT to ensure that the real builder is parented to
-        us.
+       We use a helper process to do the clone() to work around
+       clone() being broken in multi-threaded programs due to
+       at-fork handlers not being run. Note that we use
+       CLONE_PARENT to ensure that the real builder is parented to
+       us.
     */
 
     userNamespaceSync.create();
@@ -399,13 +399,13 @@ void ChrootLinuxDerivationBuilder::startChild()
         sendPid.readSide.close();
 
         /* We need to open the slave early, before
-            CLONE_NEWUSER. Otherwise we get EPERM when running as
-            root. */
+           CLONE_NEWUSER. Otherwise we get EPERM when running as
+           root. */
         openSlave();
 
         try {
             /* Drop additional groups here because we can't do it
-                after we've created the new user namespace. */
+               after we've created the new user namespace. */
             if (setgroups(0, 0) == -1) {
                 if (errno != EPERM)
                     throw SysError("setgroups failed");
@@ -442,11 +442,11 @@ void ChrootLinuxDerivationBuilder::startChild()
     userNamespaceSync.readSide = -1;
 
     /* Make sure that we write *something* to the child in case of
-        an exception. Note that merely closing
-        `userNamespaceSync.writeSide` doesn't work in
-        multi-threaded Nix, since several child processes may have
-        inherited `writeSide` (and O_CLOEXEC doesn't help because
-        the children may not do an execve). */
+       an exception. Note that merely closing
+       `userNamespaceSync.writeSide` doesn't work in
+       multi-threaded Nix, since several child processes may have
+       inherited `writeSide` (and O_CLOEXEC doesn't help because
+       the children may not do an execve). */
     bool userNamespaceSyncDone = false;
     Finally cleanup([&]() {
         try {
@@ -465,8 +465,8 @@ void ChrootLinuxDerivationBuilder::startChild()
 
     if (usingUserNamespace) {
         /* Set the UID/GID mapping of the builder's user namespace
-            such that the sandbox user maps to the build user, or to
-            the calling user (if build users are disabled). */
+           such that the sandbox user maps to the build user, or to
+           the calling user (if build users are disabled). */
         uid_t hostUid = buildUser ? buildUser->getUID() : getuid();
         uid_t hostGid = buildUser ? buildUser->getGID() : getgid();
         uid_t nrIds = buildUser ? buildUser->getUIDCount() : 1;
@@ -485,7 +485,7 @@ void ChrootLinuxDerivationBuilder::startChild()
     }
 
     /* Now that we know the sandbox uid/gid, we can write
-        /etc/passwd and /etc/group. */
+       /etc/passwd and /etc/group. */
     writeFile(
         chrootRootDir / "etc" / "passwd",
         fmt("root:x:0:0:Nix build user:%3%:/noshell\n"
@@ -503,7 +503,7 @@ void ChrootLinuxDerivationBuilder::startChild()
             sandboxGid()));
 
     /* Save the mount- and user namespace of the child. We have to do this
-     *before* the child does a chroot. */
+     * *before* the child does a chroot. */
     auto sandboxPath = thisProcPath / "ns";
     sandboxMountNamespace = open((sandboxPath / "mnt").c_str(), O_RDONLY | O_CLOEXEC);
     if (sandboxMountNamespace.get() == -1)
@@ -557,29 +557,29 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         throw SysError("cannot set domain name");
 
     /* Make all filesystems private.  This is necessary
-        because subtrees may have been mounted as "shared"
-        (MS_SHARED).  (Systemd does this, for instance.)  Even
-        though we have a private mount namespace, mounting
-        filesystems on top of a shared subtree still propagates
-        outside of the namespace.  Making a subtree private is
-        local to the namespace, though, so setting MS_PRIVATE
-        does not affect the outside world. */
+       because subtrees may have been mounted as "shared"
+       (MS_SHARED).  (Systemd does this, for instance.)  Even
+       though we have a private mount namespace, mounting
+       filesystems on top of a shared subtree still propagates
+       outside of the namespace.  Making a subtree private is
+       local to the namespace, though, so setting MS_PRIVATE
+       does not affect the outside world. */
     if (mount(0, "/", 0, MS_PRIVATE | MS_REC, 0) == -1)
         throw SysError("unable to make '/' private");
 
     /* Bind-mount chroot directory to itself, to treat it as a
-        different filesystem from /, as needed for pivot_root. */
+       different filesystem from /, as needed for pivot_root. */
     if (mount(chrootRootDir.c_str(), chrootRootDir.c_str(), 0, MS_BIND, 0) == -1)
         throw SysError("unable to bind mount %1%", PathFmt(chrootRootDir));
 
     /* Bind-mount the sandbox's Nix store onto itself so that
-        we can mark it as a "shared" subtree, allowing bind
-        mounts made in *this* mount namespace to be propagated
-        into the child namespace created by the
-        unshare(CLONE_NEWNS) call below.
+       we can mark it as a "shared" subtree, allowing bind
+       mounts made in *this* mount namespace to be propagated
+       into the child namespace created by the
+       unshare(CLONE_NEWNS) call below.
 
-        Marking chrootRootDir as MS_SHARED causes pivot_root()
-        to fail with EINVAL. Don't know why. */
+       Marking chrootRootDir as MS_SHARED causes pivot_root()
+       to fail with EINVAL. Don't know why. */
     std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
 
     if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
@@ -589,7 +589,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         throw SysError("unable to make %s shared", PathFmt(chrootStoreDir));
 
     /* Set up a nearly empty /dev, unless the user asked to
-        bind-mount the host /dev. */
+       bind-mount the host /dev. */
     Strings ss;
     if (pathsInChroot.find("/dev") == pathsInChroot.end()) {
         createDirs(chrootRootDir / "dev" / "shm");
@@ -617,8 +617,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* Fixed-output derivations typically need to access the
-        network, so give them access to /etc/resolv.conf and so
-        on. */
+       network, so give them access to /etc/resolv.conf and so
+       on. */
     if (!derivationType.isSandboxed()) {
         // Only use nss functions to resolve hosts and
         // services. Don’t use it for anything else that may
@@ -627,8 +627,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         writeFile(chrootRootDir / "etc" / "nsswitch.conf", "hosts: files dns\nservices: files\n");
 
         /* N.B. it is realistic that these paths might not exist. It
-            happens when testing Nix building fixed-output derivations
-            within a pure derivation. */
+           happens when testing Nix building fixed-output derivations
+           within a pure derivation. */
         for (auto & path : {"/etc/resolv.conf", "/etc/services", "/etc/hosts"})
             if (pathExists(path))
                 ss.push_back(path);
@@ -648,8 +648,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* Bind-mount all the directories from the "host"
-        filesystem that we want in the chroot
-        environment. */
+       filesystem that we want in the chroot
+       environment. */
     for (auto & i : pathsInChroot) {
         if (i.second.source == "/proc")
             continue; // backwards compatibility
@@ -683,7 +683,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* Mount a new tmpfs on /dev/shm to ensure that whatever
-        the builder puts in /dev/shm is cleaned up automatically. */
+       the builder puts in /dev/shm is cleaned up automatically. */
     if (pathExists("/dev/shm")
         && mount(
                "none",
@@ -695,9 +695,9 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         throw SysError("mounting /dev/shm");
 
     /* Mount a new devpts on /dev/pts.  Note that this
-        requires the kernel to be compiled with
-        CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
-        if /dev/ptx/ptmx exists). */
+       requires the kernel to be compiled with
+       CONFIG_DEVPTS_MULTIPLE_INSTANCES=y (which is the case
+       if /dev/ptx/ptmx exists). */
     if (pathExists("/dev/pts/ptmx") && !pathExists(chrootRootDir / "dev" / "ptmx")
         && !pathsInChroot.count("/dev/pts")) {
         if (mount("none", (chrootRootDir / "dev" / "pts").c_str(), "devpts", 0, "newinstance,mode=0620") == 0) {
@@ -719,21 +719,21 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         chmod(chrootRootDir / "etc", 0555);
 
     /* Unshare this mount namespace. This is necessary because
-        pivot_root() below changes the root of the mount
-        namespace. This means that the call to setns() in
-        addDependency() would hide the host's filesystem,
-        making it impossible to bind-mount paths from the host
-        Nix store into the sandbox. Therefore, we save the
-        pre-pivot_root namespace in
-        sandboxMountNamespace. Since we made /nix/store a
-        shared subtree above, this allows addDependency() to
-        make paths appear in the sandbox. */
+       pivot_root() below changes the root of the mount
+       namespace. This means that the call to setns() in
+       addDependency() would hide the host's filesystem,
+       making it impossible to bind-mount paths from the host
+       Nix store into the sandbox. Therefore, we save the
+       pre-pivot_root namespace in
+       sandboxMountNamespace. Since we made /nix/store a
+       shared subtree above, this allows addDependency() to
+       make paths appear in the sandbox. */
     if (unshare(CLONE_NEWNS) == -1)
         throw SysError("unsharing mount namespace");
 
     /* Unshare the cgroup namespace. This means
-        /proc/self/cgroup will show the child's cgroup as '/'
-        rather than whatever it is in the parent. */
+       /proc/self/cgroup will show the child's cgroup as '/'
+       rather than whatever it is in the parent. */
     if (cgroup && unshare(CLONE_NEWCGROUP) == -1)
         throw SysError("unsharing cgroup namespace");
 
@@ -763,8 +763,8 @@ void ChrootLinuxDerivationBuilder::setUser()
 {
     preserveDeathSignal([this]() {
         /* Switch to the sandbox uid/gid in the user namespace,
-            which corresponds to the build user or calling user in
-            the parent namespace. */
+           which corresponds to the build user or calling user in
+           the parent namespace. */
         if (setgid(sandboxGid()) == -1)
             throw SysError("setgid failed");
         if (setuid(sandboxUid()) == -1)
@@ -799,9 +799,9 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
     auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
 
     /* Bind-mount the path into the sandbox. This requires
-        entering its mount namespace, which is not possible
-        in multithreaded programs. So we do this in a
-        child process.*/
+       entering its mount namespace, which is not possible
+       in multithreaded programs. So we do this in a
+       child process.*/
     Pid child(startProcess([&]() {
         if (usingUserNamespace && (setns(sandboxUserNamespace.get(), CLONE_NEWUSER) == -1))
             throw SysError("entering sandbox user namespace");

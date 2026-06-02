@@ -51,8 +51,8 @@ void DarwinDerivationBuilder::setUser()
         StringSet ancestry;
 
         /* We build the ancestry before adding all inputPaths to the store because we know they'll
-            all have the same parents (the store), and there might be lots of inputs. This isn't
-            particularly efficient... I doubt it'll be a bottleneck in practice */
+           all have the same parents (the store), and there might be lots of inputs. This isn't
+           particularly efficient... I doubt it'll be a bottleneck in practice */
         for (auto & i : pathsInChroot) {
             std::filesystem::path cur = i.first;
             while (cur != "/") {
@@ -62,7 +62,7 @@ void DarwinDerivationBuilder::setUser()
         }
 
         /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
-            path component this time, since it's typically /nix/store and we care about that. */
+           path component this time, since it's typically /nix/store and we care about that. */
         std::filesystem::path cur = store.storeDir;
         while (cur != "/") {
             ancestry.insert(cur.native());
@@ -100,9 +100,7 @@ void DarwinDerivationBuilder::setUser()
         sandboxProfile += ")\n";
 
         /* Our inputs (transitive dependencies and any impurities computed above)
-
-            without file-write* allowed, access() incorrectly returns EPERM
-            */
+           without file-write* allowed, access() incorrectly returns EPERM */
         sandboxProfile += "(allow file-read* file-write* process-exec\n";
 
         // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
@@ -153,8 +151,8 @@ void DarwinDerivationBuilder::setUser()
     debug(sandboxProfile);
 
     /* The tmpDir in scope points at the temporary build directory for our derivation. Some packages try different
-        mechanisms to find temporary directories, so we want to open up a broader place for them to put their files,
-        if needed. */
+       mechanisms to find temporary directories, so we want to open up a broader place for them to put their files,
+       if needed. */
     std::filesystem::path globalTmpDir = canonPath(defaultTempDir().native(), true);
 
     /* They don't like trailing slashes on subpath directives */
