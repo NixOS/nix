@@ -452,12 +452,28 @@ std::unique_ptr<Source> sinkToSource(fun<void(Sink &)> writer, fun<void()> eof)
             if (!hasCoro) {
                 coro =
                     coro_t::pull_type(boost::coroutines2::protected_fixedsize_stack(), [&](coro_t::push_type & yield) {
-                        LambdaSink sink([&](std::string_view data) {
-                            if (!data.empty()) {
+                        /* Feed the consumer in chunks, instead of on each write
+                           to avoid excessive context switching. parseDump does
+                           lots of small writes to the sink, which we should
+                           accumulate. */
+                        struct CoroBufferedSink : BufferedSink
+                        {
+                            coro_t::push_type & yield;
+
+                            void writeUnbuffered(std::string_view data) override
+                            {
                                 yield(data);
                             }
-                        });
+
+                            CoroBufferedSink(coro_t::push_type & yield)
+                                : yield(yield)
+                            {
+                            }
+                        };
+
+                        CoroBufferedSink sink(yield);
                         writer(sink);
+                        sink.flush();
                     });
             }
 
