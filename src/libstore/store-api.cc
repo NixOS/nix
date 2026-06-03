@@ -14,7 +14,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/git.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"

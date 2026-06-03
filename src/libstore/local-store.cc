@@ -13,7 +13,7 @@
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
