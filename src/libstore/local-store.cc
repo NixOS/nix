@@ -1011,6 +1011,23 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
+/* Check whether `path` exists and is owned by the current user. This is
+   used to decide whether to trust a previously-unpacked store path and
+   its `.unpacked` marker. Otherwise, if sandboxing is disabled, a build
+   user could plant files to trick us into registering an arbitrary
+   store path as valid. */
+static bool existsAndIsOwnedBySelf(const std::filesystem::path & path)
+{
+    auto st = maybeLstat(path);
+    if (!st)
+        return false;
+#ifndef _WIN32
+    if (st->st_uid != geteuid() || st->st_gid != getegid())
+        return false;
+#endif
+    return true;
+}
+
 void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair)
 {
     const LocalSettings & localSettings = config->getLocalSettings();
@@ -1129,7 +1146,9 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 void LocalStore::addMultipleToStore(
     PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
 {
-    uint64_t bytesExpected = 0;
+    /* Atomic because it's decremented from the worker threads below
+       (when a download is skipped). */
+    std::atomic<uint64_t> bytesExpected{0};
     for (auto & [info, _] : pathsToCopy)
         bytesExpected += info.narSize;
     act.setExpected(actCopyPath, bytesExpected);
@@ -1215,10 +1234,32 @@ void LocalStore::addMultipleToStore(
         pool.enqueue([&, item]() {
             checkInterrupt();
 
+            auto & info = item->first;
+
             MaintainCount<decltype(nrRunning)> mc(nrRunning);
             showProgress();
 
-            doAddToStore(item->first, *item->second, repair);
+            /* The existence of `<realPath>.unpacked` marks that the NAR
+               for this path was previously unpacked (see below). This allows
+               an interrupted `addMultipleToStore()` to reuse already-extracted
+               paths instead of re-fetching them.
+
+               Require both the marker and the unpacked path to be owned
+               by us, so that (when sandboxing is disabled) a build user
+               can't plant a fake marker to trick us into registering an
+               arbitrary path as valid. */
+            auto realPath = toRealPath(info.path);
+            auto unpackedMarker = realPath;
+            unpackedMarker += ".unpacked";
+
+            if (!repair && existsAndIsOwnedBySelf(unpackedMarker) && existsAndIsOwnedBySelf(realPath)) {
+                notice("reusing previously unpacked path at '%s'", printStorePath(info.path));
+                act.setExpected(actCopyPath, bytesExpected -= info.narSize);
+            } else {
+                doAddToStore(info, *item->second, repair);
+                /* The path has been unpacked, so mark it as such. */
+                writeFile(unpackedMarker, "");
+            }
 
             nrDone++;
             showProgress();
@@ -1234,6 +1275,13 @@ void LocalStore::addMultipleToStore(
         infos.insert_or_assign(item->first.path, item->first);
 
     registerValidPaths(infos);
+
+    /* Now that the paths are registered as valid, the .unpacked markers are no longer needed. */
+    for (auto * item : toWrite) {
+        auto unpackedMarker = toRealPath(item->first.path);
+        unpackedMarker += ".unpacked";
+        deletePath(unpackedMarker);
+    }
 
     outputLocks.setDeletion(true);
 }
