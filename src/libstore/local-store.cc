@@ -1022,7 +1022,7 @@ static bool existsAndIsOwnedBySelf(const std::filesystem::path & path)
     if (!st)
         return false;
 #ifndef _WIN32
-    if (st->st_uid != geteuid() || st->st_gid != getegid())
+    if (st->st_uid != geteuid())
         return false;
 #endif
     return true;
