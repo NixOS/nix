@@ -1247,7 +1247,11 @@ void LocalStore::addMultipleToStore(
                Require both the marker and the unpacked path to be owned
                by us, so that (when sandboxing is disabled) a build user
                can't plant a fake marker to trick us into registering an
-               arbitrary path as valid. */
+               arbitrary path as valid.
+
+               Note that GC will delete the marker before the path itself,
+               so if the marker and the path both exists, the contents of
+               the path are correct. */
             auto realPath = toRealPath(info.path);
             auto unpackedMarker = realPath;
             unpackedMarker += ".unpacked";

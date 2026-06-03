@@ -557,6 +557,18 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
         results.paths.insert(path);
 
+        /* If this path has a leftover `.unpacked` marker (from an
+           interrupted `addMultipleToStore()`), delete the marker
+           *before* the path itself. Deleting a directory is not atomic,
+           so if we were interrupted partway through, a marker left next
+           to a partially-deleted path would make `addMultipleToStore()`
+           reuse that corrupt path. */
+        {
+            auto marker = realPath;
+            marker += ".unpacked";
+            deletePath(marker);
+        }
+
         uint64_t bytesFreed;
         deleteStorePath(realPath, bytesFreed, isKnownPath);
 
