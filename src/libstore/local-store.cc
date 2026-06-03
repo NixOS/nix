@@ -1036,6 +1036,10 @@ void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, Repai
 
     deletePath(realPath);
 
+    /* Maybe free up some disk space (before writing the NAR) so that
+       restorePath() below doesn't fail with ENOSPC. */
+    autoGC();
+
     /* While restoring the path from the NAR, compute the hash
        of the NAR. */
     HashSink hashSink(HashAlgorithm::SHA256);
@@ -1095,8 +1099,6 @@ void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, Repai
                 actualHash.hash.to_string(HashFormat::Nix32, true));
         }
     }
-
-    autoGC();
 
     canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)});
 
