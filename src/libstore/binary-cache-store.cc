@@ -440,7 +440,8 @@ void BinaryCacheStore::addMultipleToStore(
                         auto & info = infosMap.at(n.path)->first;
                         if (!repair && isValidPath(info.path))
                             return;
-                        uploadNarInfo(narInfos_.lock()->at(n.path));
+                        auto narInfo = narInfos_.lock()->at(n.path);
+                        uploadNarInfo(narInfo);
                     },
                 },
                 node);
