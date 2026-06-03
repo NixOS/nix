@@ -50,6 +50,7 @@ void setLogFormat(const std::string & logFormatStr)
 void setLogFormat(const LogFormat & logFormat)
 {
     defaultLogFormat = logFormat;
+    logger->stop();
     logger = makeDefaultLogger().release();
 }
 
