@@ -563,11 +563,7 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
            so if we were interrupted partway through, a marker left next
            to a partially-deleted path would make `addMultipleToStore()`
            reuse that corrupt path. */
-        {
-            auto marker = realPath;
-            marker += ".unpacked";
-            deletePath(marker);
-        }
+        deletePath(unpackedMarkerFor(realPath));
 
         uint64_t bytesFreed;
         deleteStorePath(realPath, bytesFreed, isKnownPath);

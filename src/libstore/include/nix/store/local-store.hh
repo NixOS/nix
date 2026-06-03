@@ -315,6 +315,18 @@ private:
      */
     void doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair);
 
+    /**
+     * The path of the marker file (`<realPath>.unpacked`) used to record
+     * that the NAR for the store path at `realPath` has been unpacked
+     * completely and successfully. See `addMultipleToStore()`.
+     */
+    static std::filesystem::path unpackedMarkerFor(const std::filesystem::path & realPath)
+    {
+        auto marker = realPath;
+        marker += ".unpacked";
+        return marker;
+    }
+
     void createTempRootsFile();
 
     /**

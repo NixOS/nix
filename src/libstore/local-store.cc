@@ -1253,8 +1253,7 @@ void LocalStore::addMultipleToStore(
                so if the marker and the path both exists, the contents of
                the path are correct. */
             auto realPath = toRealPath(info.path);
-            auto unpackedMarker = realPath;
-            unpackedMarker += ".unpacked";
+            auto unpackedMarker = unpackedMarkerFor(realPath);
 
             if (!repair && existsAndIsOwnedBySelf(unpackedMarker) && existsAndIsOwnedBySelf(realPath)) {
                 notice("reusing previously unpacked path at '%s'", printStorePath(info.path));
@@ -1281,11 +1280,8 @@ void LocalStore::addMultipleToStore(
     registerValidPaths(infos);
 
     /* Now that the paths are registered as valid, the .unpacked markers are no longer needed. */
-    for (auto * item : toWrite) {
-        auto unpackedMarker = toRealPath(item->first.path);
-        unpackedMarker += ".unpacked";
-        deletePath(unpackedMarker);
-    }
+    for (auto * item : toWrite)
+        deletePath(unpackedMarkerFor(toRealPath(item->first.path)));
 
     outputLocks.setDeletion(true);
 }
