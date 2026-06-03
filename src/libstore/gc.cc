@@ -498,6 +498,19 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                         } catch (Error & e) {
                             debug("reading GC root from client: %s", e.msg());
                             break;
+                        } catch (...) {
+                            /* This is the top-level body of a std::thread, so
+                               any exception that escapes it calls
+                               std::terminate() and aborts the whole daemon
+                               (true whether the thread is later joined or
+                               detached). readLine() throws Interrupted, which
+                               derives from BaseError, not Error, when the
+                               interrupt flag is set -- e.g. when another client
+                               disconnects mid-operation while this GC runs --
+                               so the catch above does not catch it. Swallow it
+                               and drop this connection instead of crashing. */
+                            ignoreExceptionInDestructor();
+                            break;
                         }
                     }
                 });
