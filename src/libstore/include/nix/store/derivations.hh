@@ -329,10 +329,7 @@ struct DerivationT
     /**
      * Print a derivation (only meaningful for full Derivation).
      */
-    std::string unparse(
-        const StoreDirConfig & store,
-        bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
+    std::string unparse(const StoreDirConfig & store) const
         requires std::is_same_v<Inputs, FullInputs>;
 
     /**
@@ -476,8 +473,7 @@ struct DerivationT
 class Store;
 
 template<>
-std::string DerivationT<FullInputs>::unparse(
-    const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const;
+std::string DerivationT<FullInputs>::unparse(const StoreDirConfig & store) const;
 template<>
 bool DerivationT<FullInputs>::shouldResolve() const;
 template<>
@@ -595,7 +591,7 @@ struct DrvHashModulo
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
  */
-DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv);
 
 /**
  * If a derivation is input addressed and doesn't yet have its input

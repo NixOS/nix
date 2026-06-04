@@ -41,7 +41,7 @@ static void BM_UnparseRealDerivationFile(benchmark::State & state, const std::st
     auto drv = parseDerivation(*store, std::string(content), "test", xpSettings);
 
     for (auto _ : state) {
-        auto unparsed = drv.unparse(*store, /*maskOutputs=*/false);
+        auto unparsed = drv.unparse(*store);
         benchmark::DoNotOptimize(unparsed);
         assert(unparsed.size() == content.size());
     }
