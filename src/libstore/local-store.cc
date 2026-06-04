@@ -1283,7 +1283,7 @@ void LocalStore::addMultipleToStore(
 
     /* Now that the paths are registered as valid, the .unpacked markers are no longer needed. */
     for (auto * item : toWrite)
-        deletePath(unpackedMarkerFor(toRealPath(item->first.path)));
+        tryUnlink(unpackedMarkerFor(toRealPath(item->first.path)));
 
     outputLocks.setDeletion(true);
 }
