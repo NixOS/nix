@@ -109,6 +109,7 @@ nix_sources = [ config_priv_h ] + files(
   'path-info.cc',
   'prefetch.cc',
   'profile.cc',
+  'ps.cc',
   'registry.cc',
   'repl.cc',
   'run.cc',

@@ -174,4 +174,23 @@ CanonPath getRootCgroup()
     return rootCgroup;
 }
 
+std::set<pid_t> getPidsInCgroup(const std::filesystem::path & cgroup)
+{
+    if (!pathExists(cgroup))
+        return {};
+
+    auto procsFile = cgroup / "cgroup.procs";
+
+    std::set<pid_t> result;
+
+    for (auto & pidStr : tokenizeString<std::vector<std::string>>(readFile(procsFile))) {
+        if (auto o = string2Int<pid_t>(pidStr))
+            result.insert(*o);
+        else
+            throw Error("invalid PID '%s'", pidStr);
+    }
+
+    return result;
+}
+
 } // namespace nix::linux

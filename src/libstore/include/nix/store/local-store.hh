@@ -6,6 +6,7 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/indirect-root-store.hh"
+#include "nix/store/active-builds.hh"
 #include "nix/util/sync.hh"
 
 #include <chrono>
@@ -179,7 +180,10 @@ public:
 
 MakeError(PathInUse, Error);
 
-class LocalStore : public virtual IndirectRootStore, public virtual GcStore
+class LocalStore : public virtual IndirectRootStore,
+                   public virtual GcStore,
+                   public virtual TrackActiveBuildsStore,
+                   public virtual QueryActiveBuildsStore
 {
     void anchor() override;
 
@@ -521,6 +525,24 @@ private:
     friend struct DerivationGoal;
     /* Only used for createTempDirInStore. */
     friend class DerivationBuilderImpl;
+
+private:
+
+    std::filesystem::path activeBuildsDir;
+
+    struct ActiveBuildFile
+    {
+        AutoCloseFD fd;
+        AutoDelete del;
+    };
+
+    Sync<std::unordered_map<uint64_t, ActiveBuildFile>> activeBuilds;
+
+    std::vector<ActiveBuildInfo> queryActiveBuilds() override;
+
+    BuildHandle buildStarted(const ActiveBuild & build) override;
+
+    void buildFinished(const BuildHandle & handle) override;
 };
 
 } // namespace nix

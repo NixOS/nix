@@ -132,6 +132,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , schemaPath(dbDir / "schema")
     , tempRootsDir(config->stateDir.get() / "temproots")
     , fnTempRoots(tempRootsDir / std::to_string(getpid()))
+    , activeBuildsDir(config->stateDir.get() / "active-builds")
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -152,6 +153,7 @@ LocalStore::LocalStore(ref<const Config> config)
     const auto & localSettings = config->getLocalSettings();
     const auto & gcSettings = localSettings.getGCSettings();
     createDirs(gcRootsDir);
+    createDirs(activeBuildsDir);
 
     for (auto & perUserDir : {profilesDir / "per-user", gcRootsDir / "per-user"}) {
         createDirs(perUserDir);
