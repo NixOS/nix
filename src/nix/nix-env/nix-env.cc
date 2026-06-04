@@ -1096,7 +1096,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 continue;
 
             /* For table output. */
-            std::vector<std::string> columns;
+            TableRow columns;
 
             /* For XML output. */
             XMLAttrs attrs;
