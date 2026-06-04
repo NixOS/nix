@@ -45,6 +45,11 @@ void updateWindowSize();
 std::pair<unsigned short, unsigned short> getWindowSize();
 
 /**
+ * @return The number of columns of the terminal, or std::numeric_limits<unsigned int>::max() if unknown.
+ */
+unsigned int getWindowWidth();
+
+/**
  * Get the slave name of a pseudoterminal in a thread-safe manner.
  *
  * @param fd The file descriptor of the pseudoterminal master
