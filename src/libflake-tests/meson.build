@@ -66,3 +66,31 @@ test(
   },
   protocol : 'gtest',
 )
+
+# Build benchmarks if enabled
+if get_option('benchmarks')
+  gbenchmark = dependency('benchmark', required : true)
+
+  benchmark_sources = files(
+    'bench-main.cc',
+    'lock-flake-bench.cc',
+  )
+
+  # Note: deliberately excludes the gtest (main : true) and rapidcheck deps
+  # used by the test executable above; the benchmark provides its own main().
+  benchmark_exe = executable(
+    'nix-flake-benchmarks',
+    benchmark_sources,
+    dependencies : deps_private_subproject + deps_other + [
+      gbenchmark,
+    ],
+    include_directories : include_dirs,
+    link_args : linker_export_flags,
+    install : true,
+  )
+
+  benchmark(
+    'nix-flake-benchmarks',
+    benchmark_exe,
+  )
+endif
