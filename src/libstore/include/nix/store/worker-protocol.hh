@@ -135,6 +135,8 @@ struct WorkerProto
      */
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
+    static constexpr std::string_view featureQueryActiveBuilds = "queryActiveBuilds";
+
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
@@ -256,6 +258,7 @@ enum struct WorkerProto::Op : uint64_t {
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    QueryActiveBuilds = 48,
 };
 
 struct WorkerProto::ClientHandshakeInfo

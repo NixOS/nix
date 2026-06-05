@@ -10,6 +10,7 @@
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/active-builds.hh"
 
 namespace nix {
 
@@ -46,7 +47,10 @@ public:
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore
+struct RemoteStore : public virtual Store,
+                     public virtual GcStore,
+                     public virtual LogStore,
+                     public virtual QueryActiveBuildsStore
 {
 private:
     void anchor() override;
@@ -154,6 +158,8 @@ public:
     MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
+
+    std::vector<ActiveBuildInfo> queryActiveBuilds() override;
 
     std::optional<std::string> getVersion() override;
 

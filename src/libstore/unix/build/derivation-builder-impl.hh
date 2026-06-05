@@ -4,6 +4,7 @@
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/active-builds.hh"
 #include "nix/store/user-lock.hh"
 
 namespace nix {
@@ -31,6 +32,11 @@ protected:
      * The process ID of the builder.
      */
     Pid pid;
+
+    /**
+     * Handles to track active builds for `nix ps`.
+     */
+    std::optional<TrackActiveBuildsStore::BuildHandle> activeBuildHandle;
 
     LocalStore & store;
 
@@ -200,6 +206,11 @@ protected:
     {
         return acquireUserLock(settings.nixStateDir, localSettings, 1, false);
     }
+
+    /**
+     * Construct the `ActiveBuild` object for `ActiveBuildsTracker`.
+     */
+    virtual ActiveBuild getActiveBuild();
 
     /**
      * Return the paths that should be made available in the sandbox.

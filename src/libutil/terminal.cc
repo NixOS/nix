@@ -190,6 +190,14 @@ std::pair<unsigned short, unsigned short> getWindowSize()
     return *windowSize->lock();
 }
 
+unsigned int getWindowWidth()
+{
+    unsigned int width = getWindowSize().second;
+    if (width <= 0)
+        width = std::numeric_limits<unsigned int>::max();
+    return width;
+}
+
 #ifndef _WIN32
 std::string getPtsName(int fd)
 {

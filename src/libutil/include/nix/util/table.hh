@@ -2,10 +2,26 @@
 
 #include "nix/util/types.hh"
 
+#include <limits>
+
 namespace nix {
 
-typedef std::vector<std::vector<std::string>> Table;
+struct TableCell
+{
+    std::string content;
 
-void printTable(std::ostream & out, Table & table);
+    enum Alignment { Left, Right } alignment = Left;
+
+    TableCell(std::string content, Alignment alignment = Left)
+        : content(std::move(content))
+        , alignment(alignment)
+    {
+    }
+};
+
+using TableRow = std::vector<TableCell>;
+using Table = std::vector<TableRow>;
+
+void printTable(std::ostream & out, Table & table, unsigned int width = std::numeric_limits<unsigned int>::max());
 
 } // namespace nix

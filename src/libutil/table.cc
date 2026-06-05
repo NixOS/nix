@@ -1,4 +1,5 @@
 #include "nix/util/table.hh"
+#include "nix/util/terminal.hh"
 
 #include <algorithm>
 #include <cassert>
@@ -7,7 +8,7 @@
 
 namespace nix {
 
-void printTable(std::ostream & out, Table & table)
+void printTable(std::ostream & out, Table & table, unsigned int width)
 {
     auto nrColumns = table.size() > 0 ? table.front().size() : 0;
 
@@ -18,19 +19,31 @@ void printTable(std::ostream & out, Table & table)
         assert(i.size() == nrColumns);
         size_t column = 0;
         for (auto j = i.begin(); j != i.end(); ++j, ++column)
-            if (j->size() > widths[column])
-                widths[column] = j->size();
+            // TODO: take ANSI escapes into account when calculating width.
+            widths[column] = std::max(widths[column], j->content.size());
     }
 
     for (auto & i : table) {
         size_t column = 0;
+        std::string line;
         for (auto j = i.begin(); j != i.end(); ++j, ++column) {
-            std::string s = *j;
+            std::string s = j->content;
             replace(s.begin(), s.end(), '\n', ' ');
-            out << s;
-            if (column < nrColumns - 1)
-                out << std::string(widths[column] - s.size() + 2, ' ');
+
+            auto padding = std::string(widths[column] - s.size(), ' ');
+            if (j->alignment == TableCell::Right) {
+                line += padding;
+                line += s;
+            } else {
+                line += s;
+                if (column + 1 < nrColumns)
+                    line += padding;
+            }
+
+            if (column + 1 < nrColumns)
+                line += "  ";
         }
+        out << filterANSIEscapes(line, false, width);
         out << std::endl;
     }
 }
