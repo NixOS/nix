@@ -106,11 +106,11 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     friend struct CachedEvalError;
 
 public:
-    ref<EvalCache> root;
+    const ref<EvalCache> root;
 
 private:
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
-    Parent parent;
+    const Parent parent;
     RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
