@@ -8,12 +8,15 @@ every output type that you want to be supported. If a flake does not have a `sch
 
 A schema is an attribute set with the following attributes:
 
-| Attribute   | Description                                                                                     | Default |
-| :---------- | :---------------------------------------------------------------------------------------------- | :------ |
-| `version`   | Should be set to 1                                                                              |         |
-| `doc`       | A string containing documentation about the flake output type in Markdown format.               |         |
-| `allowIFD`  | Whether the evaluation of the output attributes of this flake can read from derivation outputs. | `true`  |
-| `inventory` | A function that returns the contents of the flake output (described [below](#inventory)).       |         |
+| Attribute         | Description                                                                                                                  | Default |
+| :---------------- | :----------------------------------------------------------------------------------------------------------------------------| :------ |
+| `version`         | Should be set to 1                                                                                                           |         |
+| `doc`             | A string containing documentation about the flake output type in Markdown format.                                            |         |
+| `allowIFD`        | Whether the evaluation of the output attributes of this flake can read from derivation outputs.                              | `true`  |
+| `inventory`       | A function that returns the contents of the flake output (described [below](#inventory)).                                    |         |
+| `roles`           | The roles supported by this flake output type (see [below](#roles)).                                                         |         |
+| `appendSystem`    | Whether the current system type is appended to the flake output attribute path, as in outputs like `packages`.               |         |
+| `defaultAttrPath` | A default flake output attribute path suffix. For example, `packages` will look for `default` if no attribute path is given. |         |
 
 # Inventory
 
@@ -41,6 +44,25 @@ Both leaf and non-leaf nodes can have the following attributes:
 | :----------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `forSystems` | A list of Nix system types (e.g. `["x86_64-linux"]`) supported by this node. This is used by tools to skip nodes that cannot be built on the user's system. Setting this on a non-leaf node allows all the children to be skipped, regardless of the `forSystems` attributes of the children. If this attribute is not set, the node is never skipped. |
 | `isLegacy`   | If set to true, this node is skipped unless the `--legacy` CLI flag is set. |
+
+# Roles
+
+Roles allow schemas to declare what commands operate on them. For instance, to have the `nix build` command build a flake output, the schema should declare:
+```nix
+roles.nix-build = { };
+```
+
+The following roles are used by various Nix commands:
+
+* `nix-build`: Used by `nix build`, `nix shell`, and `nix develop`.
+* `nix-bundler`: Denotes bundler functions used by `nix bundle`.
+* `nix-develop`: Used by `nix develop`.
+* `nix-fmt`: Used by `nix formatter`.
+* `nix-run`: Used by `nix run` and `nix bundle`.
+* `nix-search`: Denotes an output that will be searched by `nix search`.
+* `nix-template`: Used by `nix flake init` and `nix flake new`.
+
+Tools are free to define new roles. For instance, instead of hard-coding a flake output type like `nixosConfigurations`, `nixos-rebuild --flake` could use any flake output that implements a `nixos-configuration` role.
 
 # Example
 
