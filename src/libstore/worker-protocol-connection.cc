@@ -265,13 +265,20 @@ std::optional<UnkeyedValidPathInfo> WorkerProto::BasicClientConnection::queryPat
 }
 
 StorePathSet WorkerProto::BasicClientConnection::queryValidPaths(
-    const StoreDirConfig & store, bool * daemonException, const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+    const StoreDirConfig & store,
+    bool * daemonException,
+    const StorePathSet & paths,
+    SubstituteFlag maybeSubstitute,
+    AddTempRootsFlag maybeAddTempRoots)
 {
     assert((protoVersion >= WorkerProto::Version{.number = {1, 12}}));
     to << WorkerProto::Op::QueryValidPaths;
     WorkerProto::write(store, *this, paths);
     if (protoVersion >= WorkerProto::Version{.number = {1, 27}}) {
         to << maybeSubstitute;
+
+        if (protoVersion.features.contains(WorkerProto::featureQueryValidPathsAddTempRoots))
+            to << maybeAddTempRoots;
     }
     processStderr(daemonException);
     return WorkerProto::Serialise<StorePathSet>::read(store, *this);
