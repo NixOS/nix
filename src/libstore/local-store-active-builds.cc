@@ -209,7 +209,7 @@ std::vector<ActiveBuildInfo> LocalStore::queryActiveBuilds()
             // Open the file. If we can lock it, the build is not active.
             auto fd = openLockFile(path, false);
             if (!fd || lockFile(fd.get(), ltRead, false)) {
-                AutoDelete(path, false);
+                tryUnlink(path);
                 continue;
             }
 
