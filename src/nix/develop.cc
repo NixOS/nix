@@ -495,6 +495,11 @@ struct Common : InstallableCommand, MixProfile
             shellOutPath,
         };
     }
+
+    void preRun(ref<Store> store) override
+    {
+        fetchSettings.warnDirty = false;
+    }
 };
 
 struct CmdDevelop : Common, MixEnvironment
