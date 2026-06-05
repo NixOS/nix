@@ -172,3 +172,45 @@ EOF
   nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
   nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
 )
+
+# https://github.com/NixOS/nix/issues/14762
+# A relative 'path:' input nested under a flake that is itself kept from an
+# existing lock (the lazy "keep" path) must be resolved against that flake's
+# source tree, not its parent's. This only goes wrong at three levels:
+# top -> middle -> library, where 'library' has a relative 'subflake' input.
+n14762="$TEST_ROOT/issue-14762"
+rm -rf "$n14762"
+mkdir -p "$n14762/library/subflake" "$n14762/middle" "$n14762/top"
+
+cat > "$n14762/library/subflake/flake.nix" <<EOF
+{ outputs = _: { }; }
+EOF
+cat > "$n14762/library/flake.nix" <<EOF
+{
+  inputs.subflake.url = "path:./subflake";
+  outputs = _: { };
+}
+EOF
+cat > "$n14762/middle/flake.nix" <<EOF
+{
+  inputs.library.url = "path:$n14762/library";
+  outputs = _: { };
+}
+EOF
+cat > "$n14762/top/flake.nix" <<EOF
+{
+  inputs.middle.url = "path:$n14762/middle";
+  outputs = _: { };
+}
+EOF
+
+# These are plain 'path:' inputs with no fingerprint, so fetching them is
+# uncacheable (as on master); disable the test-only barf, like other tests do.
+
+# Establish the middle flake's lock first, so that when the top flake locks,
+# 'library' is taken from middle's lock via the lazy "keep" path.
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix flake lock "$n14762/middle"
+
+# Previously failed: "path '.../subflake/flake.nix' does not exist".
+_NIX_TEST_BARF_ON_UNCACHEABLE='' nix flake update --flake "$n14762/top"
+[[ -e "$n14762/top/flake.lock" ]]
