@@ -1100,25 +1100,65 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 
         sources.insert(storePath);
 
+        /* The source tree (flake directory) of the root flake. Relative
+           'path:' inputs are resolved against the source path of their parent
+           flake; lockFlake() records the root's source path in 'nodePaths'. */
+        auto rootSourcePath = flake.nodePaths.at(flake.lockFile.root);
+
         // FIXME: use graph output, handle cycles.
-        auto traverse = [&store, json = json, &sources, &getStorePath](
-                            this const auto & self, const flake::Node & node) -> nlohmann::json {
+        auto traverse = [this, &store, json = json, &sources, &getStorePath](
+                            this const auto & self,
+                            const flake::Node & node,
+                            const SourcePath & nodeSourcePath) -> nlohmann::json {
             nlohmann::json jsonObj2 = json ? nlohmann::json::object() : nlohmann::json(nullptr);
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input)) {
                     std::optional<StorePath> storePath;
                     const auto & lockedRef = (*inputNode)->lockedRef;
-                    if (!lockedRef.input.isRelative()) {
+                    /* The source tree of this input, used to resolve any
+                       relative inputs that it has in turn. */
+                    SourcePath inputSourcePath = nodeSourcePath;
+                    if (auto relativePath = lockedRef.input.isRelative()) {
+                        /* A relative 'path:' input is not independently
+                           fetchable: it only has meaning relative to its
+                           parent flake's source tree. Resolve it against the
+                           parent's source path (exactly as lockFlake() and
+                           callFlake() do) and copy that subtree to the store,
+                           instead of re-fetching the relative flakeref, which
+                           would trip the relative-path guard. See #12438. */
+                        inputSourcePath = SourcePath{
+                            nodeSourcePath.accessor, CanonPath(relativePath->string(), nodeSourcePath.path)};
+                        storePath = fetchToStore(
+                            fetchSettings,
+                            *store,
+                            inputSourcePath,
+                            dryRun ? FetchMode::DryRun : FetchMode::Copy,
+                            lockedRef.input.getName());
+                    } else {
                         storePath = getStorePath(lockedRef);
-                        sources.insert(*storePath);
+                        /* If this fetched input itself has relative inputs,
+                           resolve its source tree so they can be resolved
+                           against it in turn. Done lazily to avoid fetching
+                           (e.g. in --dry-run) inputs we don't need to. */
+                        auto hasRelativeInputs = [&] {
+                            for (auto & [_, childEdge] : (*inputNode)->inputs)
+                                if (auto childNode = std::get_if<0>(&childEdge))
+                                    if ((*childNode)->lockedRef.input.isRelative())
+                                        return true;
+                            return false;
+                        };
+                        if (hasRelativeInputs())
+                            inputSourcePath = SourcePath{
+                                lockedRef.input.getAccessor(fetchSettings, *store).first,
+                                lockedRef.subdir.empty() ? CanonPath::root : CanonPath(lockedRef.subdir)};
                     }
+                    sources.insert(*storePath);
                     if (json) {
                         auto & jsonObj3 = jsonObj2[inputName];
-                        if (storePath)
-                            jsonObj3["path"] = store->printStorePath(*storePath);
-                        jsonObj3["inputs"] = self(**inputNode);
+                        jsonObj3["path"] = store->printStorePath(*storePath);
+                        jsonObj3["inputs"] = self(**inputNode, inputSourcePath);
                     } else
-                        self(**inputNode);
+                        self(**inputNode, inputSourcePath);
                 }
             }
             return jsonObj2;
@@ -1127,11 +1167,11 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
         if (json) {
             nlohmann::json jsonRoot = {
                 {"path", store->printStorePath(storePath)},
-                {"inputs", traverse(*flake.lockFile.root)},
+                {"inputs", traverse(*flake.lockFile.root, rootSourcePath)},
             };
             printJSON(jsonRoot);
         } else {
-            traverse(*flake.lockFile.root);
+            traverse(*flake.lockFile.root, rootSourcePath);
         }
 
         if (!dryRun && dstUri) {

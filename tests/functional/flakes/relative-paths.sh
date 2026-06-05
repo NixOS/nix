@@ -86,10 +86,53 @@ json=$(nix flake archive --json "$rootFlake" --to "$TEST_ROOT/store2")
 [[ $(echo "$json" | jq .inputs.sub0.inputs) = {} ]]
 [[ -n $(echo "$json" | jq .path) ]]
 
+# The relative 'path:' input must be archived too (issue #12438): it gets a
+# store path and is actually copied to the destination store. No '?narHash='
+# workaround is involved.
+sub0Path=$(echo "$json" | jq -r .inputs.sub0.path)
+[[ -n "$sub0Path" && "$sub0Path" != null ]]
+[ -e "$TEST_ROOT/store2/nix/store/$(basename "$sub0Path")" ]
+echo "$json" | grepQuietInverse narHash
+
 nix flake prefetch --out-link "$TEST_ROOT/result" "$rootFlake"
 outPath=$(readlink "$TEST_ROOT/result")
 
 [ -e "$TEST_ROOT/store2/nix/store/$(basename "$outPath")" ]
+
+# Test `nix flake archive` with three levels of relative path nesting
+# (a -> b -> c, where c is a relative input of b). This is the multi-level
+# variant of the lost-parent-context bug; see issue #14762.
+archiveNest="$TEST_ROOT/archive-nested"
+rm -rf "$archiveNest"
+mkdir -p "$archiveNest/b/c"
+cat > "$archiveNest/flake.nix" <<EOF
+{
+  inputs.b.url = "path:./b";
+  outputs = _: { };
+}
+EOF
+cat > "$archiveNest/b/flake.nix" <<EOF
+{
+  inputs.c.url = "path:./c";
+  outputs = _: { };
+}
+EOF
+cat > "$archiveNest/b/c/flake.nix" <<EOF
+{ outputs = _: { }; }
+EOF
+initGitRepo "$archiveNest"
+git -C "$archiveNest" add .
+git -C "$archiveNest" commit -m "Initial commit"
+
+rm -rf "$TEST_ROOT/store3"
+json=$(nix flake archive --json "$archiveNest" --to "$TEST_ROOT/store3")
+bPath=$(echo "$json" | jq -r .inputs.b.path)
+cPath=$(echo "$json" | jq -r .inputs.b.inputs.c.path)
+[[ -n "$bPath" && "$bPath" != null ]]
+[[ -n "$cPath" && "$cPath" != null ]]
+[ -e "$TEST_ROOT/store3/nix/store/$(basename "$bPath")" ]
+[ -e "$TEST_ROOT/store3/nix/store/$(basename "$cPath")" ]
+echo "$json" | grepQuietInverse narHash
 
 # Test circular relative path flakes. FIXME: doesn't work at the moment.
 if false; then
