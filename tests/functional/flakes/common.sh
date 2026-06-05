@@ -97,7 +97,13 @@ writeIfdFlake() {
     cat > "$flakeDir/flake.nix" <<EOF
 {
   outputs = { self }: {
-    packages.$system.default = import ./ifd.nix;
+    packages.$system.default =
+      with import ./config.nix;
+      mkDerivation {
+        name = "top";
+        system = "$system";
+        ifd = import ./ifd.nix;
+      };
   };
 }
 EOF

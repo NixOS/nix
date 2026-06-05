@@ -55,9 +55,9 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             ;
     }
 
-    Strings getDefaultFlakeAttrPaths() override
+    StringSet getRoles() override
     {
-        return {"packages." + settings.thisSystem.get(), "legacyPackages." + settings.thisSystem.get()};
+        return {"nix-search"};
     }
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
@@ -186,7 +186,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             }
         };
 
-        for (auto & cursor : installable->getCursors(*state))
+        for (auto & cursor : installable->getCursors(*state, false))
             visit(*cursor, cursor->getAttrPath(), true);
 
         if (json)

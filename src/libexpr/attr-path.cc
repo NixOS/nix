@@ -44,6 +44,14 @@ AttrPath AttrPath::parse(EvalState & state, std::string_view s)
     return res;
 }
 
+AttrPath AttrPath::fromStrings(EvalState & state, const std::vector<std::string> & attrNames)
+{
+    AttrPath res;
+    for (auto & attrName : attrNames)
+        res.push_back(state.symbols.create(attrName));
+    return res;
+}
+
 std::string AttrPath::to_string(EvalState & state) const
 {
     return dropEmptyInitThenConcatStringsSep(".", state.symbols.resolve({*this}));

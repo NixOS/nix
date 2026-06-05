@@ -148,7 +148,16 @@ struct MixFlakeOptions : virtual Args, EvalCommand
     }
 };
 
-struct SourceExprCommand : virtual Args, MixFlakeOptions
+struct MixFlakeSchemas : virtual Args, virtual StoreCommand
+{
+    std::optional<std::string> defaultFlakeSchemas;
+
+    MixFlakeSchemas();
+
+    std::optional<FlakeRef> getDefaultFlakeSchemas();
+};
+
+struct SourceExprCommand : virtual Args, MixFlakeOptions, MixFlakeSchemas
 {
     std::optional<std::filesystem::path> file;
     std::optional<std::string> expr;
@@ -159,9 +168,13 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 
     ref<Installable> parseInstallable(ref<Store> store, const std::string & installable);
 
-    virtual Strings getDefaultFlakeAttrPaths();
-
-    virtual Strings getDefaultFlakeAttrPathPrefixes();
+    /**
+     * Return a set of "roles" that this command implements
+     * (e.g. `nix-build` or `nix-develop`). This is used by flake
+     * schemas to determine which flake outputs are used as default
+     * attrpath prefixes.
+     */
+    virtual StringSet getRoles();
 
     /**
      * Complete an installable from the given prefix.
@@ -388,8 +401,7 @@ void completeFlakeRefWithFragment(
     AddCompletions & completions,
     ref<EvalState> evalState,
     flake::LockFlags lockFlags,
-    Strings attrPathPrefixes,
-    const Strings & defaultFlakeAttrPaths,
+    const StringSet & roles,
     std::string_view prefix);
 
 std::string showVersions(const StringSet & versions);

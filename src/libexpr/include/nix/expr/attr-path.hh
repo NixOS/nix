@@ -25,6 +25,8 @@ struct AttrPath : std::vector<Symbol>
 
     static AttrPath parse(EvalState & state, std::string_view s);
 
+    static AttrPath fromStrings(EvalState & state, const std::vector<std::string> & attrNames);
+
     std::string to_string(EvalState & state) const;
 
     std::vector<SymbolStr> resolve(EvalState & state) const;

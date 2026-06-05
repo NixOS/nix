@@ -192,3 +192,20 @@ sed -i "$TEST_HOME/flake.nix" -e 's/devShells/devShells2/' # remove devShells
 [[ $(nix develop . -L --command sh -c "echo \$x") == "bar" ]]
 sed -i "$TEST_HOME/flake.nix" -e 's/devShell/devShell2/' # remove devShell
 [[ $(nix develop . -L --command sh -c "echo \$x") == "xyzzy" ]]
+
+# Check that legacyPackages is used, but only when specifying an explicit package.
+cat <<EOF >"$TEST_HOME/flake.nix"
+{
+  inputs.nixpkgs.url = "$TEST_HOME/nixpkgs";
+  outputs = {self, nixpkgs}: {
+    legacyPackages.$system.default = (import ./config.nix).mkDerivation {
+      name = "hello";
+      buildCommand = "set -x; mkdir \$out";
+      x = "foo";
+    };
+  };
+}
+EOF
+
+(! nix develop . -L --command sh -c "echo \$x")
+[[ $(nix develop .#default -L --command sh -c "echo \$x") == "foo" ]]

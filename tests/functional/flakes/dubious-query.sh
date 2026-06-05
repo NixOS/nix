@@ -17,7 +17,7 @@ expectStderr 0 nix --offline build --dry-run "git+file://$repoDir?bar#foo" \
 
 # Check that the anchor (#) is taken as a whole, not split, and throws an error.
 expectStderr 1 nix --offline build --dry-run "git+file://$repoDir#foo?bar" \
-  | grepQuiet "error: flake 'git+file://$repoDir' does not provide attribute 'packages.$system.foo?bar', 'legacyPackages.$system.foo?bar' or 'foo?bar'"
+  | grepQuiet "error: flake 'git+file://$repoDir' does not provide attribute 'packages.$system.foo?bar', 'defaultPackage.$system.foo?bar', 'legacyPackages.$system.foo?bar' or 'foo?bar'"
 
 # Check that a literal `?` in the query  doesn't print dubious query warning.
 expectStderr 0 nix --offline build --dry-run "git+file://$repoDir?#foo" \

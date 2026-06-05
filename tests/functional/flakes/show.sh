@@ -16,9 +16,9 @@ nix flake show --json > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-assert show_output.packages.someOtherSystem.default == {};
-assert show_output.packages.${builtins.currentSystem}.default.name == "simple";
-assert show_output.legacyPackages.${builtins.currentSystem} == {};
+assert show_output.inventory.packages.output.children.someOtherSystem.filtered;
+assert show_output.inventory.packages.output.children.${builtins.currentSystem}.children.default.derivation.name == "simple";
+assert show_output.inventory.legacyPackages.output.children.${builtins.currentSystem}.isLegacy;
 true
 '
 
@@ -28,8 +28,8 @@ nix flake show --json --all-systems > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-assert show_output.packages.someOtherSystem.default.name == "simple";
-assert show_output.legacyPackages.${builtins.currentSystem} == {};
+assert show_output.inventory.packages.output.children.someOtherSystem.children.default.derivation.name == "simple";
+assert show_output.inventory.legacyPackages.output.children.${builtins.currentSystem}.isLegacy;
 true
 '
 
@@ -39,34 +39,7 @@ nix flake show --json --legacy > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-assert show_output.legacyPackages.${builtins.currentSystem}.hello.name == "simple";
-true
-'
-
-# Test that attributes are only reported when they have actual content
-cat >flake.nix <<EOF
-{
-  description = "Bla bla";
-
-  outputs = inputs: rec {
-    apps.$system = { };
-    checks.$system = { };
-    devShells.$system = { };
-    legacyPackages.$system = { };
-    packages.$system = { };
-    packages.someOtherSystem = { };
-
-    formatter = { };
-    nixosConfigurations = { };
-    nixosModules = { };
-  };
-}
-EOF
-nix flake show --json --all-systems > show-output.json
-nix eval --impure --expr '
-let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
-in
-assert show_output == { };
+assert show_output.inventory.legacyPackages.output.children.${builtins.currentSystem}.children.hello.derivation.name == "simple";
 true
 '
 
@@ -87,8 +60,8 @@ nix flake show --json --legacy --all-systems > show-output.json
 nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
-assert show_output.legacyPackages.${builtins.currentSystem}.AAAAAASomeThingsFailToEvaluate == { };
-assert show_output.legacyPackages.${builtins.currentSystem}.simple.name == "simple";
+assert show_output.inventory.legacyPackages.output.children.${builtins.currentSystem}.children.AAAAAASomeThingsFailToEvaluate.failed;
+assert show_output.inventory.legacyPackages.output.children.${builtins.currentSystem}.children.simple.derivation.name == "simple";
 true
 '
 
@@ -98,35 +71,4 @@ popd
 writeIfdFlake "$flakeDir"
 pushd "$flakeDir"
 
-
-nix flake show --json > show-output.json
-# shellcheck disable=SC2016
-nix eval --impure --expr '
-let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
-in
-assert show_output.packages.${builtins.currentSystem}.default == { };
-true
-'
-
-
-# Test that nix keeps going even when packages.$SYSTEM contains not derivations
-cat >flake.nix <<EOF
-{
-  outputs = inputs: {
-    packages.$system = {
-      drv1 = import ./simple.nix;
-      not-a-derivation = 42;
-      drv2 = import ./simple.nix;
-    };
-  };
-}
-EOF
-nix flake show --json --all-systems > show-output.json
-# shellcheck disable=SC2016
-nix eval --impure --expr '
-let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
-in
-assert show_output.packages.${builtins.currentSystem}.not-a-derivation == {};
-true
-'
-
+[[ $(nix flake show --json | jq -r ".inventory.packages.output.children.\"$system\".children.default.derivation.name") = top ]]

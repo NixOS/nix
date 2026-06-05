@@ -71,6 +71,7 @@ config_priv_h = configure_file(
 )
 
 subdir('nix-meson-build-support/common')
+subdir('nix-meson-build-support/generate-header')
 
 sources = files(
   'built-path.cc',
@@ -78,6 +79,7 @@ sources = files(
   'command.cc',
   'common-eval-args.cc',
   'editor-for.cc',
+  'flake-schemas.cc',
   'get-build-log.cc',
   'installable-attr-path.cc',
   'installable-derived-path.cc',
@@ -96,6 +98,11 @@ if host_machine.system() != 'windows'
     'unix/unix-socket-server.cc',
   )
 endif
+
+sources += [
+  gen_header.process('call-flake-schemas.nix'),
+  gen_header.process('builtin-flake-schemas.nix'),
+]
 
 subdir('include/nix/cmd')
 
