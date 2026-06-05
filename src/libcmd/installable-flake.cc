@@ -9,6 +9,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/expr/get-drvs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/main/shared.hh"
@@ -248,11 +249,16 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
         }
 #endif
 
-        auto attr = outputs->findAlongAttrPath(attrPath);
-        if (attr)
-            res.push_back(ref(*attr));
-        else
-            suggestions += attr.getSuggestions();
+        try {
+            auto attr = outputs->findAlongAttrPath(attrPath);
+            if (attr)
+                res.push_back(ref(*attr));
+            else
+                suggestions += attr.getSuggestions();
+        } catch (TypeError & e) {
+            debug("error resolving attribute '%s': %s", attrPath.to_string(state), e.msg());
+            // Continue to next attribute path
+        }
     }
 
     if (res.size() == 0)

@@ -38,6 +38,7 @@ suites += {
     'substitution.sh',
     'shallow.sh',
     'get-flake.sh',
+    'type-error-fallback.sh',
     'provenance.sh',
     'search.sh',
   ],
