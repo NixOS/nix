@@ -9,12 +9,15 @@
 #include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
+#include "nix/util/thread-pool.hh"
+#include "nix/util/util.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/store/keys.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/provenance.hh"
@@ -1008,6 +1011,105 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
+/* Check whether `path` exists and is owned by the current user. This is
+   used to decide whether to trust a previously-unpacked store path and
+   its `.unpacked` marker. Otherwise, if sandboxing is disabled, a build
+   user could plant files to trick us into registering an arbitrary
+   store path as valid. */
+static bool existsAndIsOwnedBySelf(const std::filesystem::path & path)
+{
+    auto st = maybeLstat(path);
+    if (!st)
+        return false;
+#ifndef _WIN32
+    if (st->st_uid != geteuid())
+        return false;
+#endif
+    return true;
+}
+
+void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair)
+{
+    const LocalSettings & localSettings = config->getLocalSettings();
+
+    auto realPath = toRealPath(info.path);
+
+    deletePath(realPath);
+
+    /* Maybe free up some disk space (before writing the NAR) so that
+       restorePath() below doesn't fail with ENOSPC. */
+    autoGC();
+
+    /* While restoring the path from the NAR, compute the hash
+       of the NAR. */
+    HashSink hashSink(HashAlgorithm::SHA256);
+
+    TeeSource wrapperSource{source, hashSink};
+
+    restorePath(realPath, wrapperSource, localSettings.fsyncStorePaths);
+
+    auto hashResult = hashSink.finish();
+
+    if (hashResult.hash != info.narHash)
+        throw Error(
+            "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+            printStorePath(info.path),
+            info.narHash.to_string(HashFormat::SRI, true),
+            hashResult.hash.to_string(HashFormat::SRI, true));
+
+    if (hashResult.numBytesDigested != info.narSize)
+        throw Error(
+            "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+            printStorePath(info.path),
+            info.narSize,
+            hashResult.numBytesDigested);
+
+    if (info.ca) {
+        auto & specified = *info.ca;
+        auto actualHash = ({
+            auto accessor = getFSAccessor(false);
+            CanonPath path{info.path.to_string()};
+            Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
+            auto fim = specified.method.getFileIngestionMethod();
+            switch (fim) {
+            case FileIngestionMethod::Flat:
+            case FileIngestionMethod::NixArchive: {
+                HashModuloSink caSink{
+                    specified.hash.algo,
+                    std::string{info.path.hashPart()},
+                };
+                dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
+                h = caSink.finish().hash;
+                break;
+            }
+            case FileIngestionMethod::Git:
+                h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
+                break;
+            }
+            ContentAddress{
+                .method = specified.method,
+                .hash = std::move(h),
+            };
+        });
+        if (specified.hash != actualHash.hash) {
+            throw Error(
+                "ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+                printStorePath(info.path),
+                specified.hash.to_string(HashFormat::Nix32, true),
+                actualHash.hash.to_string(HashFormat::Nix32, true));
+        }
+    }
+
+    canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)});
+
+    optimisePath(realPath, repair); // FIXME: combine with hashPath()
+
+    if (localSettings.fsyncStorePaths) {
+        recursiveSync(realPath);
+        syncParent(realPath);
+    }
+}
+
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
@@ -1031,78 +1133,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
             /* The path may have been created by another process in the meantime, so check again. */
             if (repair || !isValidPathUncached(info.path)) {
 
-                deletePath(realPath);
-
-                /* While restoring the path from the NAR, compute the hash
-                   of the NAR. */
-                HashSink hashSink(HashAlgorithm::SHA256);
-
-                TeeSource wrapperSource{source, hashSink};
-
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
-
-                auto hashResult = hashSink.finish();
-
-                if (hashResult.hash != info.narHash)
-                    throw Error(
-                        "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        info.narHash.to_string(HashFormat::SRI, true),
-                        hashResult.hash.to_string(HashFormat::SRI, true));
-
-                if (hashResult.numBytesDigested != info.narSize)
-                    throw Error(
-                        "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                        printStorePath(info.path),
-                        info.narSize,
-                        hashResult.numBytesDigested);
-
-                if (info.ca) {
-                    auto & specified = *info.ca;
-                    auto actualHash = ({
-                        auto accessor = getFSAccessor(false);
-                        CanonPath path{info.path.to_string()};
-                        Hash h{HashAlgorithm::SHA256}; // throwaway def to appease C++
-                        auto fim = specified.method.getFileIngestionMethod();
-                        switch (fim) {
-                        case FileIngestionMethod::Flat:
-                        case FileIngestionMethod::NixArchive: {
-                            HashModuloSink caSink{
-                                specified.hash.algo,
-                                std::string{info.path.hashPart()},
-                            };
-                            dumpPath({accessor, path}, caSink, (FileSerialisationMethod) fim);
-                            h = caSink.finish().hash;
-                            break;
-                        }
-                        case FileIngestionMethod::Git:
-                            h = git::dumpHash(specified.hash.algo, {accessor, path}).hash;
-                            break;
-                        }
-                        ContentAddress{
-                            .method = specified.method,
-                            .hash = std::move(h),
-                        };
-                    });
-                    if (specified.hash != actualHash.hash) {
-                        throw Error(
-                            "ca hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-                            printStorePath(info.path),
-                            specified.hash.to_string(HashFormat::Nix32, true),
-                            actualHash.hash.to_string(HashFormat::Nix32, true));
-                    }
-                }
-
-                autoGC();
-
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
-
-                optimisePath(realPath, repair); // FIXME: combine with hashPath()
-
-                if (config->getLocalSettings().fsyncStorePaths) {
-                    recursiveSync(realPath);
-                    syncParent(realPath);
-                }
+                doAddToStore(info, source, repair);
 
                 registerValidPath(info);
             } else
@@ -1112,9 +1143,149 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
             outputLock.setDeletion(true);
         }
     }
+}
 
-    // In case `cleanup` ignored an `Interrupted` exception
-    checkInterrupt();
+void LocalStore::addMultipleToStore(
+    PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs)
+{
+    /* Atomic because it's decremented from the worker threads below
+       (when a download is skipped). */
+    std::atomic<uint64_t> bytesExpected{0};
+    for (auto & [info, _] : pathsToCopy)
+        bytesExpected += info.narSize;
+    act.setExpected(actCopyPath, bytesExpected);
+
+    std::atomic<size_t> nrDone{0};
+    std::atomic<uint64_t> nrRunning{0};
+    auto showProgress = [&, nrTotal = pathsToCopy.size()]() { act.progress(nrDone, nrTotal, nrRunning); };
+
+    using PathWithSource = std::pair<ValidPathInfo, std::unique_ptr<Source>>;
+
+    /* Stage A: figure out which paths are not already valid, lock them,
+       and re-check their validity under the lock.
+
+       `PathLocks::lockPaths()` acquires the locks in sorted order, so
+       all processes lock store paths in the same order and we cannot
+       deadlock against another process writing to the same store. All
+       locks are held until we've registered the paths as valid
+       (stage C). */
+    std::set<std::filesystem::path> pathsToLock;
+    std::vector<PathWithSource *> maybeToWrite;
+
+    for (auto & item : pathsToCopy) {
+        auto & info = item.first;
+
+        if (checkSigs && pathInfoIsUntrusted(info))
+            throw Error(
+                "cannot add path '%s' because it lacks a signature by a trusted key", printStorePath(info.path));
+
+        addTempRoot(info.path);
+
+        if (!repair && isValidPath(info.path)) {
+            nrDone++;
+            showProgress();
+            continue;
+        }
+
+        maybeToWrite.push_back(&item);
+
+        /* Lock the output path. But don't lock if we're being called
+           from a build hook (whose parent process already acquired a
+           lock on this path). */
+        if (!locksHeld.count(printStorePath(info.path)))
+            pathsToLock.insert(toRealPath(info.path));
+    }
+
+    if (maybeToWrite.empty())
+        return;
+
+    PathLocks outputLocks;
+    if (!pathsToLock.empty())
+        outputLocks.lockPaths(pathsToLock);
+
+    std::vector<PathWithSource *> toWrite;
+
+    for (auto * item : maybeToWrite) {
+        auto & info = item->first;
+
+        /* The path may have been created by another process in the meantime. */
+        if (!repair && isValidPathUncached(info.path)) {
+            // We may have a negative cache entry for this path, so get rid of it.
+            invalidatePathInfoCacheFor(info.path);
+            nrDone++;
+            showProgress();
+            continue;
+        }
+
+        info.ultimate = false;
+        toWrite.push_back(item);
+    }
+
+    /* Stage B: extract the NARs in parallel, in order of descending NAR
+       size so that the largest (and typically slowest) NARs are started
+       first. This does everything `addToStore` does except registering
+       the paths as valid, which is deferred to stage C. */
+    std::sort(toWrite.begin(), toWrite.end(), [](auto * a, auto * b) { return a->first.narSize > b->first.narSize; });
+
+    /* Use enough threads to saturate both the local CPUs (for
+       decompression/hashing/optimising) and the incoming connections to
+       the source store (e.g. a binary cache). */
+    ThreadPool pool(std::max((size_t) std::thread::hardware_concurrency(), fileTransferSettings.httpConnections.get()));
+
+    for (auto * item : toWrite) {
+        pool.enqueue([&, item]() {
+            checkInterrupt();
+
+            auto & info = item->first;
+
+            MaintainCount<decltype(nrRunning)> mc(nrRunning);
+            showProgress();
+
+            /* The existence of `<realPath>.unpacked` marks that the NAR
+               for this path was previously unpacked (see below). This allows
+               an interrupted `addMultipleToStore()` to reuse already-extracted
+               paths instead of re-fetching them.
+
+               Require both the marker and the unpacked path to be owned
+               by us, so that (when sandboxing is disabled) a build user
+               can't plant a fake marker to trick us into registering an
+               arbitrary path as valid.
+
+               Note that GC will delete the marker before the path itself,
+               so if the marker and the path both exists, the contents of
+               the path are correct. */
+            auto realPath = toRealPath(info.path);
+            auto unpackedMarker = unpackedMarkerFor(realPath);
+
+            if (!repair && existsAndIsOwnedBySelf(unpackedMarker) && existsAndIsOwnedBySelf(realPath)) {
+                notice("reusing previously unpacked path at '%s'", printStorePath(info.path));
+                act.setExpected(actCopyPath, bytesExpected -= info.narSize);
+            } else {
+                doAddToStore(info, *item->second, repair);
+                /* The path has been unpacked, so mark it as such. */
+                writeFile(unpackedMarker, "");
+            }
+
+            nrDone++;
+            showProgress();
+        });
+    }
+
+    pool.process();
+
+    /* Stage C: register all the newly added paths as valid in a single
+       transaction. */
+    ValidPathInfos infos;
+    for (auto * item : toWrite)
+        infos.insert_or_assign(item->first.path, item->first);
+
+    registerValidPaths(infos);
+
+    /* Now that the paths are registered as valid, the .unpacked markers are no longer needed. */
+    for (auto * item : toWrite)
+        tryUnlink(unpackedMarkerFor(toRealPath(item->first.path)));
+
+    outputLocks.setDeletion(true);
 }
 
 StorePath LocalStore::addToStoreFromDump(

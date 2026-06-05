@@ -285,6 +285,9 @@ public:
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    void
+    addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
+
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,
@@ -298,6 +301,31 @@ public:
     void addTempRoot(const StorePath & path) override;
 
 private:
+
+    /**
+     * Restore the contents of `info` from `source` (a NAR) into the
+     * store, verifying the NAR hash/size and (if applicable) the
+     * content address, then canonicalise, optimise and optionally fsync
+     * the path.
+     *
+     * This does *not* acquire a lock on the path or register it as
+     * valid: the caller must already hold the path lock and is
+     * responsible for registering the path afterwards. Shared by
+     * `addToStore()` and `addMultipleToStore()`.
+     */
+    void doAddToStore(const ValidPathInfo & info, Source & source, RepairFlag repair);
+
+    /**
+     * The path of the marker file (`<realPath>.unpacked`) used to record
+     * that the NAR for the store path at `realPath` has been unpacked
+     * completely and successfully. See `addMultipleToStore()`.
+     */
+    static std::filesystem::path unpackedMarkerFor(const std::filesystem::path & realPath)
+    {
+        auto marker = realPath;
+        marker += ".unpacked";
+        return marker;
+    }
 
     void createTempRootsFile();
 
