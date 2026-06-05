@@ -534,13 +534,18 @@ static void main_nix_build(int argc, char ** argv)
             return;
 
         if (shellDrv) {
+            // Only "out" needs to be realized here, so query partially rather than requiring every output.
             auto shellDrvOutputs = deepQueryPartialDerivationOutputMap(*store, shellDrv.value(), &*evalStore);
-            shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
+            auto & outPath = shellDrvOutputs.at("out");
+            if (!outPath)
+                throw MissingRealisation(*store, shellDrv.value(), "out");
+            shell = store->printStorePath(*outPath) + "/bin/bash";
         }
 
         if (drv.shouldResolve()) {
             auto resolvedDrv = drv.tryResolve(*store);
-            assert(resolvedDrv && "Successfully resolved the derivation");
+            if (!resolvedDrv)
+                throw Error("failed to resolve derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
             drv = *resolvedDrv;
         }
 
@@ -590,13 +595,21 @@ static void main_nix_build(int argc, char ** argv)
 
             fun<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure =
                 [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+                    // Only the depended-on outputs need realizing, so query partially rather than requiring every
+                    // output.
                     auto outputs = deepQueryPartialDerivationOutputMap(*store, inputDrv, &*evalStore);
                     for (auto & i : inputNode.value) {
-                        auto o = outputs.at(i);
+                        auto & o = outputs.at(i);
+                        if (!o)
+                            throw MissingRealisation(*store, inputDrv, i);
                         store->computeFSClosure(*o, inputs);
                     }
-                    for (const auto & [outputName, childNode] : inputNode.childMap)
-                        accumInputClosure(*outputs.at(outputName), childNode);
+                    for (const auto & [outputName, childNode] : inputNode.childMap) {
+                        auto & o = outputs.at(outputName);
+                        if (!o)
+                            throw MissingRealisation(*store, inputDrv, outputName);
+                        accumInputClosure(*o, childNode);
+                    }
                 };
 
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
@@ -726,7 +739,8 @@ static void main_nix_build(int argc, char ** argv)
                 drvPrefix += fmt("-%d", counter + 1);
 
             auto outPath = deepQueryPartialDerivationOutput(*store, drvPath, outputName, &*evalStore);
-            assert(outPath);
+            if (!outPath)
+                throw MissingRealisation(*store, drvPath, outputName);
             auto outputPath = *outPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
