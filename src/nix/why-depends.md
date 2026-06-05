@@ -55,7 +55,7 @@ Nix automatically determines potential runtime dependencies between
 store paths by scanning for the *hash parts* of store paths. For
 instance, if there exists a store path
 `/nix/store/q9mknq836i0kblq8g1hm9f3cv9qda0r9-glibc-2.31`, and a file
-inside another store path contains the string `9df65igw…`, then the
+inside another store path contains the string `q9mknq83…`, then the
 latter store path *refers* to the former, and thus might need it at
 runtime. Nix always maintains the existence of the transitive closure
 of a store path under the references relationship; it is therefore not
