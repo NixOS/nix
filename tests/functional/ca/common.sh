@@ -2,7 +2,7 @@
 source ../common.sh
 
 # Need backend to support revamped CA
-requireDaemonNewerThan "2.34.0pre20251217"
+requireDaemonNewerThan "2.35.0pre20260303"
 
 enableFeatures "ca-derivations"
 
