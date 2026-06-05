@@ -473,6 +473,7 @@ in
   nix-main-c = callPackage ../src/libmain-c/package.nix { };
 
   nix-cmd = callPackage ../src/libcmd/package.nix { };
+  nix-cmd-tests = callPackage ../src/libcmd-tests/package.nix { };
 
   nix-nswrapper = callPackage ../src/nswrapper/package.nix { };
 

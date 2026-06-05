@@ -62,6 +62,7 @@ if get_option('unit-tests')
   subproject('libexpr-test-support')
   subproject('libexpr-tests')
   subproject('libflake-tests')
+  subproject('libcmd-tests')
 endif
 subproject('nix-functional-tests')
 if get_option('json-schema-checks')
