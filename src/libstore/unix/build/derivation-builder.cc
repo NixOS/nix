@@ -13,7 +13,7 @@
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"

@@ -86,8 +86,6 @@ TEST_DO_PARSE(triple_dot, "...")
 
 #undef TEST_DO_PARSE
 
-#ifndef COVERAGE
-
 RC_GTEST_FIXTURE_PROP(StorePathTest, prop_regex_accept, (const StorePath & p))
 {
     RC_ASSERT(std::regex_match(std::string{p.name()}, nameRegex));
@@ -140,8 +138,6 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
     }
     RC_ASSERT(parsed == std::regex_match(std::string{name}, nameRegex));
 }
-
-#endif
 
 /* ----------------------------------------------------------------------------
  * JSON

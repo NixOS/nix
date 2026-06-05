@@ -268,13 +268,9 @@ INSTANTIATE_TEST_SUITE_P(
 
 #undef TEST_JSON
 
-#ifndef COVERAGE
-
 RC_GTEST_PROP(OutputsSpec, prop_round_rip, (const OutputsSpec & o))
 {
     RC_ASSERT(o == OutputsSpec::parse(o.to_string()));
 }
-
-#endif
 
 } // namespace nix

@@ -6,7 +6,7 @@
 #include "nix/util/archive.hh"
 #include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"

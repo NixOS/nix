@@ -4,7 +4,7 @@
 #include "nix/main/shared.hh"
 #include "nix/store/references.hh"
 #include "nix/util/git.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/cmd/misc-store-flags.hh"
 #include "man-pages.hh"
 #include "nix/util/fun.hh"

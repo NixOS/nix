@@ -786,7 +786,7 @@ struct GitInputScheme : InputScheme
                     "\n"
                     "To make it visible to Nix, run:\n"
                     "\n"
-                    "git -C %2% add \"%1%\"",
+                    "git -C %2% add -N \"%1%\"",
                     path.rel(),
                     PathFmt(repoPath));
             else
