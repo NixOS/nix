@@ -37,7 +37,7 @@ store as follows:
 * Otherwise, if `/nix/var/nix/daemon-socket/socket` exists, [connect
   to the Nix daemon listening on that socket](./local-daemon-store.md).
 
-* Otherwise, on Linux only, use the [local chroot store](./local-store.md#chroot)
+* Otherwise, on Linux only, use the [local chroot store](@docroot@/store/types/local-store.md#chroot)
   `~/.local/share/nix/root`, which will be created automatically if it
   does not exist.
 

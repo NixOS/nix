@@ -3,7 +3,7 @@ synopsis: "Improve daemon socket path logic for chroot stores"
 prs: [15429]
 ---
 
-The default daemon socket path now uses the per-store [`state`](@docroot@/store/types/local-store.md#store-setting-state) directory whenever one is defined, rather than always using the global [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR).
+The default daemon socket path now uses the per-store [`state`](@docroot@/store/types/local-store.md#store-local-store-state) directory whenever one is defined, rather than always using the global [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR).
 This means [local chroot stores](@docroot@/store/types/local-store.md#chroot) each get their own socket path automatically.
 
 Example:
