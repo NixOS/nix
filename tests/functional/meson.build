@@ -56,6 +56,8 @@ suites = [
       'nix-collect-garbage-d.sh',
       'remote-store.sh',
       'legacy-ssh-store.sh',
+      'legacy-ssh-store-add-to-store-should-pass.sh',
+      'legacy-ssh-store-add-to-store-should-fail.sh',
       'lang.sh',
       'lang-gc.sh',
       'characterisation-test-infra.sh',
