@@ -628,13 +628,13 @@ static void performOp(
         /*
          * Note: unlike wopEnsurePath, this operation reads a
          * derivation-to-be-realized from the client with
-         * readDerivation(Source,Store) rather than reading it from
+         * derivation::read(Source,Store) rather than reading it from
          * the local store with Store::readDerivation().  Since the
          * derivation-to-be-realized is not registered in the store
          * it cannot be trusted that its outPath was calculated
          * correctly.
          */
-        readDerivation(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
+        derivation::read(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 
