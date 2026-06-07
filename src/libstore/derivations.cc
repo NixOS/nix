@@ -104,8 +104,9 @@ bool isBuiltin(const BasicDerivation & drv)
     return drv.builder.substr(0, 8) == "builtin:";
 }
 
-template<typename InputsType>
-bool DerivationT<InputsType>::isBuiltin() const
+template<typename Inputs, typename Output>
+bool DerivationT<Inputs, Output>::isBuiltin() const
+    requires std::is_same_v<Output, DerivationOutput>
 {
     return builder.substr(0, 8) == "builtin:";
 }
@@ -854,8 +855,9 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
     return res;
 }
 
-template<typename InputsType>
-DerivationType DerivationT<InputsType>::type() const
+template<typename Inputs, typename Output>
+DerivationType DerivationT<Inputs, Output>::type() const
+    requires std::is_same_v<Output, DerivationOutput>
 {
     std::optional<HashAlgorithm> floatingHashAlgo;
     std::optional<DerivationType> ty;
@@ -1088,8 +1090,9 @@ static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig &
     return parseDerivationOutput(store, pathS, hashAlgo, hash, experimentalFeatureSettings);
 }
 
-template<typename InputsType>
-StringSet DerivationT<InputsType>::outputNames() const
+template<typename Inputs, typename Output>
+StringSet DerivationT<Inputs, Output>::outputNames() const
+    requires std::is_same_v<Output, DerivationOutput>
 {
     StringSet names;
     for (auto & i : outputs)
@@ -1097,8 +1100,9 @@ StringSet DerivationT<InputsType>::outputNames() const
     return names;
 }
 
-template<typename InputsType>
-DerivationOutputsAndOptPaths DerivationT<InputsType>::outputsAndOptPaths(const StoreDirConfig & store) const
+template<typename Inputs, typename Output>
+DerivationOutputsAndOptPaths DerivationT<Inputs, Output>::outputsAndOptPaths(const StoreDirConfig & store) const
+    requires std::is_same_v<Output, DerivationOutput>
 {
     DerivationOutputsAndOptPaths outsAndOptPaths;
     for (auto & [outputName, output] : outputs)
@@ -1107,8 +1111,8 @@ DerivationOutputsAndOptPaths DerivationT<InputsType>::outputsAndOptPaths(const S
     return outsAndOptPaths;
 }
 
-template<typename InputsType>
-std::string_view DerivationT<InputsType>::nameFromPath(const StorePath & drvPath)
+template<typename Inputs, typename Output>
+std::string_view DerivationT<Inputs, Output>::nameFromPath(const StorePath & drvPath)
 {
     drvPath.requireDerivation();
     auto nameWithSuffix = drvPath.name();
@@ -1199,8 +1203,9 @@ std::string hashPlaceholder(const OutputNameView outputName)
                  .to_string(HashFormat::Nix32, false);
 }
 
-template<typename InputsType>
-void DerivationT<InputsType>::applyRewrites(const StringMap & rewrites)
+template<typename Inputs, typename Output>
+void DerivationT<Inputs, Output>::applyRewrites(const StringMap & rewrites)
+    requires std::is_same_v<Output, DerivationOutput>
 {
     if (rewrites.empty())
         return;
@@ -1526,8 +1531,9 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     drv.type();
 }
 
-template<typename InputsType>
-void DerivationT<InputsType>::checkInvariants(Store & store, const StorePath & drvPath) const
+template<typename Inputs, typename Output>
+void DerivationT<Inputs, Output>::checkInvariants(Store & store, const StorePath & drvPath) const
+    requires std::is_same_v<Output, DerivationOutput>
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
@@ -1809,7 +1815,7 @@ adl_serializer<DerivationT<Inputs>>::from_json(const json & _json, const Experim
     return DerivationT<Inputs>{
         .outputs =
             [&] {
-                DerivationOutputs outputs;
+                DerivationOutputs<> outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(

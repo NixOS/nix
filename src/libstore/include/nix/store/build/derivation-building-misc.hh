@@ -10,10 +10,12 @@ namespace nix {
 
 class Store;
 
-template<typename Inputs>
+struct DerivationOutput;
+
+template<typename Inputs, typename Output>
 struct DerivationT;
 struct FullInputs;
-using Derivation = DerivationT<FullInputs>;
+using Derivation = DerivationT<FullInputs, DerivationOutput>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
@@ -56,6 +58,6 @@ struct InitialOutput
  * Format the known outputs of a derivation for use in error messages.
  */
 template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType> & drv);
+std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType, DerivationOutput> & drv);
 
 } // namespace nix

@@ -161,7 +161,7 @@ TEST_F(TryResolveTest, withInputs)
     auto placeholder1Dev = DownstreamPlaceholder::unknownCaOutput(dep1DrvPath, "dev").render();
     auto placeholder2Out = DownstreamPlaceholder::unknownCaOutput(dep2DrvPath, "out").render();
 
-    DerivationOutputs multiOutputs = {
+    DerivationOutputs<> multiOutputs = {
         {"out", caFloatingOutput()},
         {"dev", caFloatingOutput()},
     };
