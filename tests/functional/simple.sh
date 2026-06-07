@@ -26,7 +26,7 @@ nix-store --delete "$outPath"
 
 outPath="$(NIX_REMOTE='local?store=/foo&real='"$TEST_ROOT"'/real-store' nix-instantiate --readonly-mode hash-check.nix)"
 if test "$outPath" != "/foo/lfy1s6ca46rm5r6w4gg9hc0axiakjcnm-dependencies.drv"; then
-    echo "hashDerivationModulo appears broken, got $outPath"
+    echo "hashInputDerivationModulo appears broken, got $outPath"
     exit 1
 fi
 

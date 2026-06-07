@@ -609,15 +609,21 @@ struct DrvHashModulo
  * For regular derivations, it returns a single hash of the derivation
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
+ *
+ * When the derivation is itself or (transitively) depends on a
+ * content-addressing derivation without a content address fixed
+ * advanced (`CAFloating` or `Impure`), `DrvHashModulo::DeferredDrv` is
+ * returned indicating we cannot yet compute and input address, because
+ * we don't yet know what all the inputs are.
  */
-DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv);
+DrvHashModulo hashInputDerivationModulo(Store & store, const Derivation & drv);
 
 /**
  * If a derivation is input addressed and doesn't yet have its input
- * addressed (is deferred) try using `hashDerivationModulo`.
+ * addressed (is deferred) try using `hashInputDerivationModulo`.
  *
  * Does nothing if not deferred input-addressed, or
- * `hashDerivationModulo` indicates it is missing inputs' output paths
+ * `hashInputDerivationModulo` indicates it is missing inputs' output paths
  * and is not yet ready (and must stay deferred).
  */
 void resolveInputAddressed(Store & store, Derivation & drv);
@@ -633,7 +639,7 @@ struct DrvHashFct
 };
 
 /**
- * Memoisation of hashDerivationModulo().
+ * Memoisation of hashInputDerivationModulo().
  */
 typedef boost::concurrent_flat_map<StorePath, DrvHashModulo, DrvHashFct> DrvHashes;
 
