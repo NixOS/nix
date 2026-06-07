@@ -74,6 +74,21 @@ static inline void initGCReal()
 
     GC_set_oom_fn(oomHandler);
 
+    /* Funnel boehm warnings into debug logs. */
+    GC_set_warn_proc([](char * msg, GC_word word) noexcept {
+        std::array<char, 4096> buffer{};
+        auto res = snprintf(buffer.data(), buffer.size(), msg, word);
+        /* Ignore garbage. */
+        if (res < 0)
+            return;
+
+        try {
+            debug("%s", chomp(std::string_view(buffer.data(), std::min<size_t>(res, buffer.size() - 1))));
+        } catch (...) {
+            /* Swallow all errors. */
+        }
+    });
+
     /* Set the initial heap size to something fairly big (25% of
        physical RAM, up to a maximum of 384 MiB) so that in most cases
        we don't need to garbage collect at all.  (Collection has a
