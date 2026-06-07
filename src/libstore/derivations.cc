@@ -725,15 +725,25 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
                     printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::CAFixed & dof) {
+                    if constexpr (std::is_same_v<Inputs, HashModuloInputs>) {
+                        /* In content-addressed (fixed or floating)
+                           derivation cases, we will always use output
+                           hashes instead. There is no need to calculate
+                           the hash-modulo of the derivation itself. */
+                        panic("should not calculate \"derivation hash modulo\" of fixed ca derivation");
+                    }
                     s += ',';
-                    printUnquotedString(
-                        s, maskOutputs ? ""sv : store.printStorePath(dof.path(store, drv.name, i.first)));
+                    printUnquotedString(s, store.printStorePath(dof.path(store, drv.name, i.first)));
                     s += ',';
                     printUnquotedString(s, dof.ca.printMethodAlgo());
                     s += ',';
                     printUnquotedString(s, dof.ca.hash.to_string(HashFormat::Base16, false));
                 },
                 [&](const DerivationOutput::CAFloating & dof) {
+                    if constexpr (std::is_same_v<Inputs, HashModuloInputs>) {
+                        // See above
+                        panic("should not calculate \"derivation hash modulo\" of floating ca derivation");
+                    }
                     s += ',';
                     printUnquotedString(s, {});
                     s += ',';
@@ -750,6 +760,10 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
                     printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::Impure & doi) {
+                    if constexpr (std::is_same_v<Inputs, HashModuloInputs>) {
+                        // See above
+                        panic("should not calculate \"derivation hash modulo\" of impure ca derivation");
+                    }
                     // FIXME
                     s += ',';
                     printUnquotedString(s, {});
