@@ -179,16 +179,17 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     EnableExperimentalFeature enableCA{"ca-derivations"};
 
     // Create a CA floating output derivation
-    Derivation drv;
-    drv.name = "test-ca-drv";
-    drv.outputs = {
-        {
-            "out",
-            DerivationOutput{DerivationOutput::CAFloating{
-                .method = ContentAddressMethod::Raw::NixArchive,
-                .hashAlgo = HashAlgorithm::SHA256,
-            }},
+    Derivation drv{
+        .outputs{
+            {
+                "out",
+                DerivationOutput{DerivationOutput::CAFloating{
+                    .method = ContentAddressMethod::Raw::NixArchive,
+                    .hashAlgo = HashAlgorithm::SHA256,
+                }},
+            },
         },
+        .name = "test-ca-drv",
     };
 
     // Write the derivation to the destination store
@@ -317,19 +318,20 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
         });
 
     // Create the root CA floating derivation that depends on depDrv
-    Derivation rootDrv;
-    rootDrv.name = "root-drv";
-    rootDrv.outputs = {
-        {
-            "out",
-            DerivationOutput{DerivationOutput::CAFloating{
-                .method = ContentAddressMethod::Raw::NixArchive,
-                .hashAlgo = HashAlgorithm::SHA256,
-            }},
+    Derivation rootDrv{
+        .outputs{
+            {
+                "out",
+                DerivationOutput{DerivationOutput::CAFloating{
+                    .method = ContentAddressMethod::Raw::NixArchive,
+                    .hashAlgo = HashAlgorithm::SHA256,
+                }},
+            },
         },
+        // Add the dependency derivation as an input
+        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .name = "root-drv",
     };
-    // Add the dependency derivation as an input
-    rootDrv.inputs.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
 
     // Write the root derivation to the destination store
     auto rootDrvPath = dummyStore->writeDerivation(rootDrv);

@@ -1515,8 +1515,9 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             "passed to builtins.derivationStrict");
 
     /* Build the derivation expression by processing the attributes. */
-    Derivation drv;
-    drv.name = drvName;
+    Derivation drv{
+        .name = std::string{drvName},
+    };
 
     NixStringContext context;
 

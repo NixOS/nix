@@ -451,8 +451,9 @@ Derivation parseDerivation(
 {
     using namespace std::literals::string_view_literals;
 
-    Derivation drv;
-    drv.name = name;
+    Derivation drv{
+        .name = std::string{name},
+    };
 
     StringViewStream str{s};
     expect(str, 'D');

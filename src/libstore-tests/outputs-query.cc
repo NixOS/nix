@@ -43,12 +43,12 @@ protected:
      */
     Derivation makeLeafDrv(std::string name)
     {
-        Derivation drv;
-        drv.name = std::move(name);
-        drv.platform = "x86_64-linux";
-        drv.builder = "/bin/sh";
-        drv.outputs = {{"out", caFloatingOutput()}};
-        return drv;
+        return Derivation{
+            .outputs = {{"out", caFloatingOutput()}},
+            .platform = "x86_64-linux",
+            .builder = "/bin/sh",
+            .name = std::move(name),
+        };
     }
 };
 
