@@ -175,7 +175,7 @@ SQLiteStmt::Use::~Use()
     sqlite3_reset(stmt);
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator()(std::string_view value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::apply(std::string_view value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_text(stmt, curArg++, value.data(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -185,7 +185,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator()(std::string_view value, bool notNu
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator()(const unsigned char * data, size_t len, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::apply(const unsigned char * data, size_t len, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_blob(stmt, curArg++, data, len, SQLITE_TRANSIENT) != SQLITE_OK)
@@ -195,7 +195,7 @@ SQLiteStmt::Use & SQLiteStmt::Use::operator()(const unsigned char * data, size_t
     return *this;
 }
 
-SQLiteStmt::Use & SQLiteStmt::Use::operator()(int64_t value, bool notNull)
+SQLiteStmt::Use & SQLiteStmt::Use::apply(int64_t value, bool notNull)
 {
     if (notNull) {
         if (sqlite3_bind_int64(stmt, curArg++, value) != SQLITE_OK)

@@ -121,9 +121,9 @@ struct SQLiteStmt
         /**
          * Bind the next parameter.
          */
-        Use & operator()(std::string_view value, bool notNull = true);
-        Use & operator()(const unsigned char * data, size_t len, bool notNull = true);
-        Use & operator()(int64_t value, bool notNull = true);
+        Use & apply(std::string_view value, bool notNull = true);
+        Use & apply(const unsigned char * data, size_t len, bool notNull = true);
+        Use & apply(int64_t value, bool notNull = true);
         Use & bind(); // null
 
         int step();
