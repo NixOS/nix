@@ -695,14 +695,25 @@ std::string DerivationT<FullInputs>::unparse(
                     printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::CAFixed & dof) {
+                    if (maskOutputs) {
+                        /* In content-addressed (fixed or floating)
+                           derivation cases, we will always use output
+                           hashes instead. There is no need to calculate
+                           the hash-modulo of the derivation itself. */
+                        panic("should not calculate \"derivation hash modulo\" of fixed ca derivation");
+                    }
                     s += ',';
-                    printUnquotedString(s, maskOutputs ? ""sv : store.printStorePath(dof.path(store, name, i.first)));
+                    printUnquotedString(s, store.printStorePath(dof.path(store, name, i.first)));
                     s += ',';
                     printUnquotedString(s, dof.ca.printMethodAlgo());
                     s += ',';
                     printUnquotedString(s, dof.ca.hash.to_string(HashFormat::Base16, false));
                 },
                 [&](const DerivationOutput::CAFloating & dof) {
+                    if (maskOutputs) {
+                        // See above
+                        panic("should not calculate \"derivation hash modulo\" of floating ca derivation");
+                    }
                     s += ',';
                     printUnquotedString(s, {});
                     s += ',';
@@ -719,6 +730,10 @@ std::string DerivationT<FullInputs>::unparse(
                     printUnquotedString(s, {});
                 },
                 [&](const DerivationOutput::Impure & doi) {
+                    if (maskOutputs) {
+                        // See above
+                        panic("should not calculate \"derivation hash modulo\" of impure ca derivation");
+                    }
                     // FIXME
                     s += ',';
                     printUnquotedString(s, {});
