@@ -361,13 +361,13 @@ namespace derivation {
 
 template<typename Input>
 template<typename Inputs>
-StringSet Options<Input>::getRequiredSystemFeatures(const Derivation<Inputs> & drv) const
+StringSet Options<Input>::getRequiredSystemFeatures(const Derivation<Inputs, Output> & drv) const
 {
     // FIXME: cache this?
     StringSet res;
     for (auto & i : requiredSystemFeatures)
         res.insert(i);
-    if (!drv.type().hasKnownOutputPaths())
+    if (!type(drv).hasKnownOutputPaths())
         res.insert("ca-derivations");
     return res;
 }
@@ -380,7 +380,7 @@ bool Options<Input>::substitutesAllowed(const WorkerSettings & workerSettings) c
 
 template<typename Input>
 template<typename Inputs>
-bool Options<Input>::useUidRange(const Derivation<Inputs> & drv) const
+bool Options<Input>::useUidRange(const Derivation<Inputs, Output> & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }

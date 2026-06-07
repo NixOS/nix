@@ -59,7 +59,7 @@ void ChrootDerivationBuilder::prepareSandbox()
        rebuilding a path that is in settings.sandbox-paths
        (typically the dependencies of /bin/sh).  Throw them
        out. */
-    for (auto & i : drv.outputsAndOptPaths(store)) {
+    for (auto & i : outputsAndOptPaths(drv, store)) {
         /* If the name isn't known a priori (i.e. floating
            content-addressing derivation), the temporary location we use
            should be fresh.  Freshness means it is impossible that the path

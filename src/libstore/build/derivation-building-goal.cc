@@ -57,11 +57,12 @@ std::string DerivationBuildingGoal::key()
 }
 
 template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const derivation::Derivation<InputsType> & drv)
+std::string
+showKnownOutputs(const StoreDirConfig & store, const derivation::Derivation<InputsType, derivation::Output> & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
-    for (auto & i : drv.outputsAndOptPaths(store))
+    for (auto & i : outputsAndOptPaths(drv, store))
         if (i.second.second)
             expectedOutputPaths.insert(*i.second.second);
     if (!expectedOutputPaths.empty()) {
@@ -327,7 +328,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
            determinism. */
-        if (drv->type().isImpure()) {
+        if (type(*drv).isImpure()) {
             v.known = InitialOutputStatus{
                 .path = StorePath::random(outputPathName(drv->name, outputName)),
                 .status = PathStatus::Absent,
@@ -403,7 +404,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             /* FIXME: find some way to lock for scheduling for the other stores so
                a forking daemon with --store still won't farm out redundant builds.
                */
-            for (auto & i : drv->outputsAndOptPaths(worker.store)) {
+            for (auto & i : outputsAndOptPaths(*drv, worker.store)) {
                 if (i.second.second)
                     lockFiles.insert(localStore->toRealPath(*i.second.second));
                 else {
@@ -1286,7 +1287,7 @@ Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()
 {
-    assert(!drv->type().isImpure());
+    assert(!type(*drv).isImpure());
 
     for (auto * drvStore : {&worker.evalStore, &worker.store})
         if (drvStore->isValidPath(drvPath))
@@ -1303,7 +1304,7 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
 std::pair<bool, SingleDrvOutputs>
 DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs)
 {
-    if (drv->type().isImpure())
+    if (type(*drv).isImpure())
         return {false, {}};
 
     bool checkHash = buildMode == bmRepair;

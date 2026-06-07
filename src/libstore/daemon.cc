@@ -638,7 +638,7 @@ static void performOp(
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 
-        auto drvType = drv.type();
+        auto drvType = type(drv);
 
         /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to

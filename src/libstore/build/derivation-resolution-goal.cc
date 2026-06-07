@@ -56,10 +56,10 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
     for (const auto & [inputDrvPath, inputNode] : drv->inputs.drvs.map) {
         /* Ensure that pure, non-fixed-output derivations don't
            depend on impure derivations. */
-        if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
-            && !drv->type().isFixed()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !type(*drv).isImpure()
+            && !type(*drv).isFixed()) {
             auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
-            if (inputDrv.type().isImpure())
+            if (type(inputDrv).isImpure())
                 throw Error(
                     "pure derivation '%s' depends on impure derivation '%s'",
                     worker.store.printStorePath(drvPath),
