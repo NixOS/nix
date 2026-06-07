@@ -444,8 +444,9 @@ Derivation parseDerivation(
     std::string_view name,
     const ExperimentalFeatureSettings & xpSettings)
 {
-    Derivation drv;
-    drv.name = name;
+    Derivation drv{
+        .name = std::string{name},
+    };
 
     StringViewStream str{s};
     expect(str, 'D');
