@@ -34,7 +34,7 @@ jobs:
           # get the same uberhack that nix-shell has to support it.
           echo "NIX_PATH=nixpkgs=$NIXPKGS_PATH" >> "$GITHUB_ENV"
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@99214aa6889fcddfa57764031d71add364327e59 # v6.1.3
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
         with:
           role-to-assume: "arn:aws:iam::080433136561:role/nix-release"
           role-session-name: nix-release-oidc-${{ github.run_id }}
