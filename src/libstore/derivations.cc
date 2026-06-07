@@ -435,7 +435,7 @@ std::optional<Basic> tryResolve(
 
     resolved.applyRewrites(inputRewrites);
 
-    processDerivationOutputPaths</*maskOutputs=*/true>(store, resolved, resolved.name);
+    processDerivationOutputPaths</*fillIn=*/true>(store, resolved, resolved.name);
 
     return resolved;
 }
@@ -464,17 +464,15 @@ std::optional<Basic> tryResolve(
 template<bool fillIn>
 static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
 {
-    std::optional<DrvHashModulo> hashModulo_;
+    /* output optional is for whether we set it yet. Inner optional is
+       for whether the input-addressed derivation has an input address
+       now or is deferred --- can only calculate input address later. */
+    std::optional<std::optional<Hash>> hashModulo_;
 
-    auto hashModulo = [&]() -> const auto & {
+    auto hashModulo = [&]() -> const std::optional<Hash> & {
         if (!hashModulo_) {
             // somewhat expensive so we do lazily
-            // Note that we do *not* recur with `fillIn`
-            if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, Full>) {
-                hashModulo_ = hashDerivationModuloImpl</*maskOutputs=*/true>(store, drv);
-            } else {
-                hashModulo_ = hashDerivationModuloImpl</*maskOutputs=*/true>(store, unresolve(drv));
-            }
+            hashModulo_ = derivation::hashModulo(store, drv);
         }
         return *hashModulo_;
     };
@@ -514,68 +512,60 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             }
         };
         auto hash = [&]<typename Out>(const Out & outputVariant) {
-            std::visit(
-                overloaded{
-                    [&](const DrvHashModulo::DrvHash & drvHash) {
-                        auto outPath = store.makeOutputPath(outputName, drvHash, drvName);
+            auto & drvHash = hashModulo();
+            if (drvHash) {
+                auto outPath = store.makeOutputPath(outputName, *drvHash, drvName);
 
-                        if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
-                            if (outputVariant.path == outPath) {
-                                envHasRightPath(outPath);
-                                return; // Correct case
-                            }
-                            /* Error case, an explicitly wrong path is
-                               always an error. */
-                            throw Error(
-                                "derivation has incorrect output '%s', should be '%s'",
-                                store.printStorePath(outputVariant.path),
-                                store.printStorePath(outPath));
-                        } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
-                            if constexpr (fillIn) {
-                                /* Fill in output path for Deferred outputs */
-                                output = Output::InputAddressed{
-                                    .path = outPath,
-                                };
-                                /* A pre-existing incorrect env var for a
-                                   formerly-deferred output only warns, for
-                                   compatibility with derivations produced by
-                                   older versions of Nix. */
-                                envHasRightPath(outPath, /*isDeferred=*/true);
-                            } else {
-                                /* Validation mode: deferred outputs
-                                   should have been filled in */
-                                warn(
-                                    "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
-                                    store.printStorePath(outPath));
-                            }
-                        } else {
-                            /* Will never happen, based on where
-                               `hash` is called. */
-                            static_assert(false);
-                        }
-                    },
-                    [&](const DrvHashModulo::CaOutputHashes &) {
-                        /* Shouldn't happen as the original output is
-                           input-addressed (or deferred waiting to be). */
-                        assert(false);
-                    },
-                    [&](const DrvHashModulo::DeferredDrv &) {
-                        if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
-                            /* Error case, an explicitly wrong path is
-                               always an error. */
-                            throw Error(
-                                "derivation has incorrect output '%s', should be deferred",
-                                store.printStorePath(outputVariant.path));
-                        } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
-                            /* Correct: Deferred output with Deferred hash kind. */
-                        } else {
-                            /* Will never happen, based on where
-                               `hash` is called. */
-                            static_assert(false);
-                        }
-                    },
-                },
-                hashModulo().raw);
+                if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
+                    if (outputVariant.path == outPath) {
+                        envHasRightPath(outPath);
+                        return; // Correct case
+                    }
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be '%s'",
+                        store.printStorePath(outputVariant.path),
+                        store.printStorePath(outPath));
+                } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
+                    if constexpr (fillIn) {
+                        /* Fill in output path for Deferred outputs */
+                        output = Output::InputAddressed{
+                            .path = outPath,
+                        };
+                        /* A pre-existing incorrect env var for a
+                           formerly-deferred output only warns, for
+                           compatibility with derivations produced by
+                           older versions of Nix. */
+                        envHasRightPath(outPath, /*isDeferred=*/true);
+                    } else {
+                        /* Validation mode: deferred outputs
+                           should have been filled in */
+                        warn(
+                            "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
+                            store.printStorePath(outPath));
+                    }
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+            } else {
+                /* Deferred --- hash not yet known. */
+                if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be deferred",
+                        store.printStorePath(outputVariant.path));
+                } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
+                    /* Correct: Deferred output with Deferred hash kind. */
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+            }
         };
         std::visit(
             overloaded{

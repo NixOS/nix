@@ -9,7 +9,7 @@ int fuzzParseDerivationCommon(std::string_view s, std::string storeDir = "/nix/s
 
     try {
         StoreDirConfig config{storeDir};
-        auto drv = parseDerivation(config, std::string(s), "test");
+        auto drv = derivation::parse(config, std::string(s), "test");
 
 #if 0 /* This is broken now. See https://github.com/NixOS/nix/issues/16237. */
         for (const auto & [drvPath, _] : drv.inputs.drvs.map)

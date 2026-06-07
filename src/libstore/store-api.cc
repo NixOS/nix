@@ -1207,7 +1207,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
         if (contents.empty())
             throw FormatError("file is empty (possible filesystem corruption)");
 
-        return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
+        return derivation::parse(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.message());
     }
