@@ -13,8 +13,6 @@ template<typename Input>
 struct DerivationOptions;
 struct DerivationOutput;
 
-typedef std::map<std::string, DerivationOutput> DerivationOutputs;
-
 struct StructuredAttrs
 {
     static constexpr std::string_view envVarName{"__json"};
@@ -50,7 +48,7 @@ struct StructuredAttrs
         Store & store,
         const DerivationOptions<StorePath> & drvOptions,
         const StorePathSet & inputPaths,
-        const DerivationOutputs & outputs) const;
+        const std::map<std::string, DerivationOutput> & outputs) const;
 
     /**
      * As a convenience to bash scripts, write a shell file that
