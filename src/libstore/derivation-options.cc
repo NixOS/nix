@@ -359,7 +359,7 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 
 template<typename Input>
 template<typename Inputs>
-StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const
+StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs, DerivationOutput> & drv) const
 {
     // FIXME: cache this?
     StringSet res;
@@ -378,7 +378,7 @@ bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerS
 
 template<typename Input>
 template<typename Inputs>
-bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs> & drv) const
+bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs, DerivationOutput> & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
