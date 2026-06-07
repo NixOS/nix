@@ -48,10 +48,12 @@ struct ActiveBuildInfo : ActiveBuild
         UserInfo user;
         std::vector<std::string> argv;
         std::optional<std::chrono::microseconds> utime, stime, cutime, cstime;
+        std::optional<unsigned> mem;
     };
 
     // User/system CPU time for the entire cgroup, if available.
     std::optional<std::chrono::microseconds> utime, stime;
+    std::optional<unsigned> mem;
 
     std::vector<ProcessInfo> processes;
 };

@@ -1,5 +1,10 @@
 #include "nix/store/local-store.hh"
 #include "nix/util/json-utils.hh"
+#include "nix/util/strings.hh"
+#include "nix/util/util.hh"
+#include <fcntl.h>
+#include <filesystem>
+#include <fstream>
 #ifdef __linux__
 #  include "nix/util/cgroup.hh"
 #  include <regex>
@@ -64,6 +69,19 @@ static ActiveBuildInfo::ProcessInfo getProcessInfo(pid_t pid)
         if (auto cstime = string2Int<uint64_t>(remainingFields[14]))
             info.cstime = std::chrono::microseconds((*cstime * 1'000'000) / clkTck);
     }
+
+    std::ifstream smaps(fmt("/proc/%d/smaps_rollup", pid));
+    if (smaps.is_open()) {
+        std::string line;
+        info.mem = 0;
+        while (std::getline(smaps, line)) {
+            if (line.starts_with("Pss:") || line.starts_with("Private_Hugetlb:")
+                || line.starts_with("Shared_Hugetlb:")) {
+                *info.mem += *string2Int<unsigned>(tokenizeString<std::vector<std::string>>(line)[1]);
+            }
+        }
+    } else
+        info.mem = std::nullopt;
 
     return info;
 }
@@ -218,10 +236,14 @@ std::vector<ActiveBuildInfo> LocalStore::queryActiveBuilds()
 #if defined(__linux__) || defined(__APPLE__)
             /* Read process information. */
             try {
+                info.mem = 0;
 #  ifdef __linux__
                 if (info.cgroup) {
-                    for (auto pid : linux::getPidsInCgroup(*info.cgroup))
-                        info.processes.push_back(getProcessInfo(pid));
+                    for (auto pid : linux::getPidsInCgroup(*info.cgroup)) {
+                        auto pInfo = getProcessInfo(pid);
+                        info.processes.push_back(pInfo);
+                        *info.mem += pInfo.mem.value_or(0);
+                    }
 
                     /* Read CPU statistics from the cgroup. */
                     auto stats = linux::getCgroupStats(*info.cgroup);
@@ -230,8 +252,11 @@ std::vector<ActiveBuildInfo> LocalStore::queryActiveBuilds()
                 } else
 #  endif
                 {
-                    for (auto pid : getDescendantPids(info.mainPid))
-                        info.processes.push_back(getProcessInfo(pid));
+                    for (auto pid : getDescendantPids(info.mainPid)) {
+                        auto pInfo = getProcessInfo(pid);
+                        info.processes.push_back(pInfo);
+                        *info.mem += pInfo.mem.value_or(0);
+                    }
                 }
             } catch (...) {
                 ignoreExceptionExceptInterrupt();

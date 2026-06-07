@@ -54,7 +54,12 @@ struct CmdPs : MixJSON, StoreCommand
         Table table;
 
         /* Add column headers. */
-        table.push_back({{"USER"}, {"PID"}, {"CPU", TableCell::Alignment::Right}, {"DERIVATION/COMMAND"}});
+        table.push_back(
+            {{"USER"},
+             {"PID"},
+             {"CPU", TableCell::Alignment::Right},
+             {"MEM", TableCell::Alignment::Right},
+             {"DERIVATION/COMMAND"}});
 
         for (const auto & build : builds) {
             /* Calculate CPU time - use cgroup stats if available, otherwise sum process times. */
@@ -68,6 +73,18 @@ struct CmdPs : MixJSON, StoreCommand
                 return total;
             }();
 
+            unsigned mem = build.mem ? *build.mem : [&]() {
+                unsigned total{0};
+                for (const auto & process : build.processes)
+                    total += process.mem.value_or(0);
+                return total;
+            }();
+            mem = mem / 1024;
+            double memG = static_cast<double>(mem) / 1024.;
+            bool useG = false;
+            if (memG > 0.1)
+                useG = true;
+
             /* Add build summary row. */
             table.push_back(
                 {formatUser(build.mainUser),
@@ -76,6 +93,7 @@ struct CmdPs : MixJSON, StoreCommand
                       std::chrono::duration_cast<std::chrono::duration<float, std::chrono::seconds::period>>(cpuTime)
                           .count()),
                   TableCell::Alignment::Right},
+                 {useG ? fmt("%.1fG", memG) : fmt("%dM", mem), TableCell::Alignment::Right},
                  fmt(ANSI_BOLD "%s" ANSI_NORMAL " (wall=%ds)",
                      store->printStorePath(build.derivation),
                      time(nullptr) - build.startTime)});
@@ -84,6 +102,7 @@ struct CmdPs : MixJSON, StoreCommand
                 table.push_back(
                     {formatUser(build.mainUser),
                      std::to_string(build.mainPid),
+                     {"", TableCell::Alignment::Right},
                      {"", TableCell::Alignment::Right},
                      fmt("%s" ANSI_ITALIC "(no process info)" ANSI_NORMAL, treeLast)});
             } else {
@@ -121,6 +140,15 @@ struct CmdPs : MixJSON, StoreCommand
                             cpuInfo = fmt("%.1fs", totalSecs);
                         }
 
+                        unsigned mem = process->mem.value_or(0);
+                        mem = mem / 1024;
+                        double memG = static_cast<double>(mem) / 1024.;
+                        std::string memInfo;
+                        if (memG > 0.1)
+                            memInfo = fmt("%.1fG", memG);
+                        else
+                            memInfo = fmt("%dM", mem);
+
                         // Format argv with tree structure
                         auto argv = concatStringsSep(
                             " ", tokenizeString<std::vector<std::string>>(concatStringsSep(" ", process->argv)));
@@ -129,6 +157,7 @@ struct CmdPs : MixJSON, StoreCommand
                             {formatUser(process->user),
                              std::to_string(process->pid),
                              {cpuInfo, TableCell::Alignment::Right},
+                             {memInfo, TableCell::Alignment::Right},
                              fmt("%s%s%s", prefix, last ? treeLast : treeConn, argv)});
 
                         visit(children[process->pid], last ? prefix + treeNull : prefix + treeLine);
