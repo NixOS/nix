@@ -74,10 +74,8 @@ public:
 
     struct Cache
     {
-        int id;
         std::string storeDir;
-        bool wantMassQuery;
-        int priority;
+        CacheInfo info;
     };
 
     struct State
@@ -199,11 +197,12 @@ private:
             if (!queryCache.next())
                 return std::nullopt;
             auto cache = Cache{
-                .id = (int) queryCache.getInt(0),
                 .storeDir = queryCache.getStr(1),
-                .wantMassQuery = queryCache.getInt(2) != 0,
-                .priority = (int) queryCache.getInt(3),
-            };
+                .info = {
+                    .id = (int) queryCache.getInt(0),
+                    .wantMassQuery = queryCache.getInt(2) != 0,
+                    .priority = (int) queryCache.getInt(3),
+                }};
             state.caches.emplace(uri, cache);
         }
         return getCache(state, uri);
@@ -221,14 +220,9 @@ public:
             auto cache(queryCacheRaw(*state, uri));
 
             if (cache)
-                return cache->id;
+                return cache->info.id;
 
-            Cache ret{
-                .id = -1, // set below
-                .storeDir = storeDir,
-                .wantMassQuery = info.wantMassQuery,
-                .priority = info.priority,
-            };
+            Cache ret{.storeDir = storeDir, .info = info};
 
             {
                 auto r(state->insertCache.use()
@@ -240,13 +234,13 @@ public:
                 if (!r.next()) {
                     unreachable();
                 }
-                ret.id = (int) r.getInt(0);
+                ret.info.id = (int) r.getInt(0);
             }
 
             state->caches[uri] = ret;
 
             txn.commit();
-            return ret.id;
+            return ret.info.id;
         });
     }
 
@@ -257,7 +251,7 @@ public:
             auto cache(queryCacheRaw(*state, uri));
             if (!cache)
                 return std::nullopt;
-            return CacheInfo{.id = cache->id, .wantMassQuery = cache->wantMassQuery, .priority = cache->priority};
+            return cache->info;
         });
     }
 
@@ -273,7 +267,7 @@ public:
                 auto now = time(nullptr);
 
                 auto queryNAR(state->queryNAR.use()
-                                  .apply(cache.id)
+                                  .apply(cache.info.id)
                                   .apply(hashPart)
                                   .apply(now - settings.ttlNegative)
                                   .apply(now - settings.ttlPositive));
@@ -317,7 +311,7 @@ public:
                 auto now = time(nullptr);
 
                 auto queryRealisation(state->queryRealisation.use()
-                                          .apply(cache.id)
+                                          .apply(cache.info.id)
                                           .apply(id.drvPath.to_string())
                                           .apply(id.outputName)
                                           .apply(now - settings.ttlNegative)
@@ -361,7 +355,7 @@ public:
                 // assert(hashPart == storePathToHash(info->path));
 
                 state->insertNAR.use()
-                    .apply(cache.id)
+                    .apply(cache.info.id)
                     .apply(hashPart)
                     .apply(std::string(info->path.name()))
                     .apply(narInfo ? narInfo->url : "", narInfo != 0)
@@ -380,7 +374,7 @@ public:
                     .exec();
 
             } else {
-                state->insertMissingNAR.use().apply(cache.id).apply(hashPart).apply(time(nullptr)).exec();
+                state->insertMissingNAR.use().apply(cache.info.id).apply(hashPart).apply(time(nullptr)).exec();
             }
         });
     }
@@ -393,7 +387,7 @@ public:
             auto & cache(getCache(*state, uri));
 
             state->insertRealisation.use()
-                .apply(cache.id)
+                .apply(cache.info.id)
                 .apply(realisation.id.drvPath.to_string())
                 .apply(realisation.id.outputName)
                 .apply(realisation.outPath.to_string())
@@ -410,7 +404,7 @@ public:
 
             auto & cache(getCache(*state, uri));
             state->insertMissingRealisation.use()
-                .apply(cache.id)
+                .apply(cache.info.id)
                 .apply(id.drvPath.to_string())
                 .apply(id.outputName)
                 .apply(time(nullptr))
