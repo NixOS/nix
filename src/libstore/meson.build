@@ -303,6 +303,7 @@ sources = files(
   'common-ssh-store-config.cc',
   'content-address.cc',
   'daemon.cc',
+  'derivation-json.cc',
   'derivation-options.cc',
   'derivations.cc',
   'derived-path-map.cc',
