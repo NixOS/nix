@@ -802,7 +802,7 @@ template<bool maskOutputs>
 DrvHashModulo hashDerivationModuloImpl(Store & store, const Derivation & drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
-    if (drv.type().isFixed()) {
+    if (type(drv).isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
             auto & dof = std::get<DerivationOutput::CAFixed>(i.second.raw);
@@ -828,7 +828,7 @@ DrvHashModulo hashDerivationModuloImpl(Store & store, const Derivation & drv)
                     return true;
                 },
                 [](const derivation::Type::Impure &) { return true; }},
-            drv.type().raw)) {
+            type(drv).raw)) {
         return DrvHashModulo::DeferredDrv{};
     }
 

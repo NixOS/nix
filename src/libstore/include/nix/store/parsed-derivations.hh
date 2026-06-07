@@ -14,7 +14,6 @@ namespace derivation {
 template<typename Input>
 struct Options;
 struct Output;
-typedef std::map<std::string, Output> Outputs;
 } // namespace derivation
 
 struct StructuredAttrs
@@ -52,7 +51,7 @@ struct StructuredAttrs
         Store & store,
         const derivation::Options<StorePath> & drvOptions,
         const StorePathSet & inputPaths,
-        const derivation::Outputs & outputs) const;
+        const std::map<std::string, derivation::Output> & outputs) const;
 
     /**
      * As a convenience to bash scripts, write a shell file that

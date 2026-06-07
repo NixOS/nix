@@ -79,8 +79,8 @@ bool Type::isImpure() const
         raw);
 }
 
-template<typename InputsType>
-bool Derivation<InputsType>::isBuiltin() const
+template<typename Inputs, typename Out>
+bool Derivation<Inputs, Out>::isBuiltin() const
 {
     return builder.substr(0, 8) == "builtin:";
 }
@@ -160,8 +160,8 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 
 namespace derivation {
 
-template<typename InputsType>
-Type Derivation<InputsType>::type() const
+template<typename Inputs>
+Type type(const Derivation<Inputs, Output> & drv)
 {
     using namespace std::literals::string_view_literals;
 
@@ -178,7 +178,7 @@ Type Derivation<InputsType>::type() const
             throw Error("only one fixed output is allowed for now");
     };
 
-    for (auto & i : outputs) {
+    for (auto & i : drv.outputs) {
         std::visit(
             overloaded{
                 [&](const Output::InputAddressed &) {
@@ -224,12 +224,15 @@ Type Derivation<InputsType>::type() const
     return ty.value();
 }
 
+template Type type(const Basic & drv);
+template Type type(const Full & drv);
+
 } // namespace derivation
 
 namespace derivation {
 
-template<typename InputsType>
-StringSet Derivation<InputsType>::outputNames() const
+template<typename Inputs, typename Out>
+StringSet Derivation<Inputs, Out>::outputNames() const
 {
     StringSet names;
     for (auto & i : outputs)
@@ -237,18 +240,21 @@ StringSet Derivation<InputsType>::outputNames() const
     return names;
 }
 
-template<typename InputsType>
-OutputsAndOptPaths Derivation<InputsType>::outputsAndOptPaths(const StoreDirConfig & store) const
+template<typename Inputs>
+OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store)
 {
     OutputsAndOptPaths outsAndOptPaths;
-    for (auto & [outputName, output] : outputs)
+    for (auto & [outputName, output] : drv.outputs)
         outsAndOptPaths.insert(
-            std::make_pair(outputName, std::make_pair(output, output.path(store, name, outputName))));
+            std::make_pair(outputName, std::make_pair(output, output.path(store, drv.name, outputName))));
     return outsAndOptPaths;
 }
 
-template<typename InputsType>
-std::string_view Derivation<InputsType>::nameFromPath(const StorePath & drvPath)
+template OutputsAndOptPaths outputsAndOptPaths(const Basic & drv, const StoreDirConfig & store);
+template OutputsAndOptPaths outputsAndOptPaths(const Full & drv, const StoreDirConfig & store);
+
+template<typename Inputs, typename Out>
+std::string_view Derivation<Inputs, Out>::nameFromPath(const StorePath & drvPath)
 {
     drvPath.requireDerivation();
     auto nameWithSuffix = drvPath.name();
@@ -268,8 +274,8 @@ std::string hashPlaceholder(const OutputNameView outputName)
 
 namespace derivation {
 
-template<typename InputsType>
-void Derivation<InputsType>::applyRewrites(const StringMap & rewrites)
+template<typename Inputs, typename Out>
+void Derivation<Inputs, Out>::applyRewrites(const StringMap & rewrites)
 {
     if (rewrites.empty())
         return;
@@ -310,7 +316,7 @@ bool shouldResolve(const Full & drv)
     if (drv.inputs.drvs.map.empty())
         return false;
 
-    auto drvType = drv.type();
+    auto drvType = type(drv);
 
     bool typeNeedsResolve = std::visit(
         overloaded{
@@ -586,38 +592,40 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     /* Don't need the answer, but do this anyways to assert is proper
        combination. The code above is more general and naturally allows
        combinations that are currently prohibited. */
-    drv.type();
+    type(drv);
 }
 
-template<typename InputsType>
-void Derivation<InputsType>::checkInvariants(Store & store, const StorePath & drvPath) const
+template<typename Inputs>
+void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
     drvName = drvName.substr(0, drvName.size() - drvExtension.size());
 
-    if (drvName != name) {
-        throw Error("derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
+    if (drvName != drv.name) {
+        throw Error(
+            "derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), drv.name);
     }
 
     try {
-        checkInvariants(store);
+        checkInvariants(drv, store);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
         throw;
     }
 }
 
-template<>
-void Basic::checkInvariants(Store & store) const
+template void checkInvariants(const Basic & drv, Store & store, const StorePath & drvPath);
+template void checkInvariants(const Full & drv, Store & store, const StorePath & drvPath);
+
+void checkInvariants(const Basic & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, *this, name);
+    processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 
-template<>
-void Full::checkInvariants(Store & store) const
+void checkInvariants(const Full & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, *this, name);
+    processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 
 void fillInOutputPaths(Full & drv, Store & store)
@@ -632,7 +640,7 @@ Full parseJsonAndValidate(Store & store, const nlohmann::json & json)
     fillInOutputPaths(drv, store);
 
     try {
-        drv.checkInvariants(store);
+        checkInvariants(drv, store);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
         throw;

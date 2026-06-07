@@ -9,15 +9,16 @@ namespace nix {
 class Store;
 
 namespace derivation {
-template<typename Inputs>
+template<typename Inputs, typename Out>
 struct Derivation;
 struct FullInputs;
+struct Output;
 template<typename Input>
 struct Options;
 } // namespace derivation
 
-using Derivation = derivation::Derivation<derivation::FullInputs>;
-using BasicDerivation = derivation::Derivation<StorePathSet>;
+using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
+using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
 
 /**
  * Derivations claim to "just" specify their environment variables, but

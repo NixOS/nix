@@ -762,9 +762,9 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
            derivations).  Note that if this throws an error, then the
            DB transaction is rolled back, so the path validity
            registration above is undone. */
-        parsedDrv.checkInvariants(*this, info.path);
+        checkInvariants(parsedDrv, *this, info.path);
 
-        for (auto & i : parsedDrv.outputsAndOptPaths(*this)) {
+        for (auto & i : outputsAndOptPaths(parsedDrv, *this)) {
             /* Floating CA derivations have indeterminate output paths until
                they are built, so don't register anything in that case */
             if (i.second.second)

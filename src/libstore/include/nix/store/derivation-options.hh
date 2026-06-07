@@ -18,12 +18,13 @@ class Store;
 struct StoreDirConfig;
 
 namespace derivation {
-template<typename Inputs>
+template<typename Inputs, typename Out>
 struct Derivation;
 struct FullInputs;
+struct Output;
 } // namespace derivation
 
-using BasicDerivation = derivation::Derivation<StorePathSet>;
+using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
 
 struct StructuredAttrs;
 
@@ -193,7 +194,7 @@ struct Options
      * `DerivationOptions` instead.
      */
     template<typename Inputs>
-    StringSet getRequiredSystemFeatures(const Derivation<Inputs> & drv) const;
+    StringSet getRequiredSystemFeatures(const Derivation<Inputs, Output> & drv) const;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
@@ -201,7 +202,7 @@ struct Options
      * @param drv See note on `getRequiredSystemFeatures`
      */
     template<typename Inputs>
-    bool useUidRange(const Derivation<Inputs> & drv) const;
+    bool useUidRange(const Derivation<Inputs, Output> & drv) const;
 };
 
 extern template struct Options<StorePath>;
