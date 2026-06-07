@@ -210,7 +210,7 @@ private:
     }
 
 public:
-    int createCache(const std::string & uri, const std::string & storeDir, bool wantMassQuery, int priority) override
+    int createCache(const std::string & uri, const std::string & storeDir, const CacheInfo & info) override
     {
         return retrySQLite<int>([&]() {
             auto state(_state.lock());
@@ -226,8 +226,8 @@ public:
             Cache ret{
                 .id = -1, // set below
                 .storeDir = storeDir,
-                .wantMassQuery = wantMassQuery,
-                .priority = priority,
+                .wantMassQuery = info.wantMassQuery,
+                .priority = info.priority,
             };
 
             {
@@ -235,8 +235,8 @@ public:
                            .apply(uri)
                            .apply(time(nullptr))
                            .apply(storeDir)
-                           .apply(wantMassQuery)
-                           .apply(priority));
+                           .apply(info.wantMassQuery)
+                           .apply(info.priority));
                 if (!r.next()) {
                     unreachable();
                 }
