@@ -1,4 +1,5 @@
 #include "nix/cmd/built-path.hh"
+#include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/outputs-query.hh"
@@ -122,6 +123,52 @@ RealisedPath::Set BuiltPath::toRealisedPaths(Store & store) const
         },
         raw());
     return res;
+}
+
+SingleBuiltPath getBuiltPath(ref<Store> evalStore, ref<Store> store, const SingleDerivedPath & b)
+{
+    return std::visit(
+        overloaded{
+            [&](const SingleDerivedPath::Opaque & bo) -> SingleBuiltPath { return SingleBuiltPath::Opaque{bo.path}; },
+            [&](const SingleDerivedPath::Built & bfd) -> SingleBuiltPath {
+                auto drvPath = getBuiltPath(evalStore, store, *bfd.drvPath);
+                // Resolving this instead of `bfd` will yield the same result, but avoid duplicative work.
+                SingleDerivedPath::Built truncatedBfd{
+                    .drvPath = makeConstantStorePathRef(drvPath.outPath()),
+                    .output = bfd.output,
+                };
+                auto outputPath = resolveDerivedPath(*store, truncatedBfd, &*evalStore);
+                return SingleBuiltPath::Built{
+                    .drvPath = make_ref<SingleBuiltPath>(std::move(drvPath)),
+                    .output = {bfd.output, outputPath},
+                };
+            },
+        },
+        b.raw());
+}
+
+BuiltPath toBuiltPath(KeyedBuildResult & result, ref<Store> evalStore, ref<Store> store)
+{
+    auto success = result.tryGetSuccess();
+    assert(success);
+    return std::visit(
+        overloaded{
+            [&](const DerivedPath::Built & bfd) {
+                std::map<std::string, StorePath> outputs;
+                for (auto & [outputName, realisation] : success->builtOutputs)
+                    outputs.emplace(outputName, realisation.outPath);
+                BuiltPath bp = BuiltPath::Built{
+                    .drvPath = make_ref<SingleBuiltPath>(getBuiltPath(evalStore, store, *bfd.drvPath)),
+                    .outputs = outputs,
+                };
+                return bp;
+            },
+            [&](const DerivedPath::Opaque & bo) {
+                BuiltPath bp = BuiltPath::Opaque{bo.path};
+                return bp;
+            },
+        },
+        result.path.raw());
 }
 
 } // namespace nix

@@ -105,4 +105,10 @@ struct BuiltPath : _BuiltPathRaw
 
 typedef std::vector<BuiltPath> BuiltPaths;
 
+SingleBuiltPath getBuiltPath(ref<Store> evalStore, ref<Store> store, const SingleDerivedPath & b);
+
+struct KeyedBuildResult;
+
+BuiltPath toBuiltPath(KeyedBuildResult & result, ref<Store> evalStore, ref<Store> store);
+
 } // namespace nix
