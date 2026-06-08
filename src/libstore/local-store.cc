@@ -702,9 +702,10 @@ void LocalStore::registerDrvOutput(const Realisation & info)
             if (info.isCompatibleWith(*oldR)) {
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
-                state->stmts->UpdateRealisedOutput
-                    .use()(concatStringsSep(" ", Signature::toStrings(combinedSignatures)))(
-                        info.id.drvPath.to_string())(info.id.outputName)
+                state->stmts->UpdateRealisedOutput.use()
+                    .apply(concatStringsSep(" ", Signature::toStrings(combinedSignatures)))
+                    .apply(info.id.drvPath.to_string())
+                    .apply(info.id.outputName)
                     .exec();
             } else {
                 throw Error(
@@ -717,9 +718,11 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                     printStorePath(info.outPath));
             }
         } else {
-            state->stmts->RegisterRealisedOutput
-                .use()(info.id.drvPath.to_string())(info.id.outputName)(printStorePath(info.outPath))(
-                    concatStringsSep(" ", Signature::toStrings(info.signatures)))
+            state->stmts->RegisterRealisedOutput.use()
+                .apply(info.id.drvPath.to_string())
+                .apply(info.id.outputName)
+                .apply(printStorePath(info.outPath))
+                .apply(concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
     });
@@ -728,8 +731,9 @@ void LocalStore::registerDrvOutput(const Realisation & info)
 void LocalStore::cacheDrvOutputMapping(
     State & state, const uint64_t deriver, const std::string & outputName, const StorePath & output)
 {
-    retrySQLite<void>(
-        [&]() { state.stmts->AddDerivationOutput.use()(deriver)(outputName) (printStorePath(output)).exec(); });
+    retrySQLite<void>([&]() {
+        state.stmts->AddDerivationOutput.use().apply(deriver).apply(outputName).apply(printStorePath(output)).exec();
+    });
 }
 
 uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
@@ -739,13 +743,15 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
             "cannot add path '%s' to the Nix store because it claims to be content-addressed but isn't",
             printStorePath(info.path));
 
-    state.stmts->RegisterValidPath
-        .use()(printStorePath(info.path))(info.narHash.to_string(HashFormat::Base16, true))(
-            info.registrationTime == 0 ? time(nullptr) : info.registrationTime)(
-            info.deriver ? printStorePath(*info.deriver) : "",
-            (bool) info.deriver)(info.narSize, info.narSize != 0)(info.ultimate ? 1 : 0, info.ultimate)(
-            concatStringsSep(" ", Signature::toStrings(info.sigs)),
-            !info.sigs.empty())(renderContentAddress(info.ca), (bool) info.ca)
+    state.stmts->RegisterValidPath.use()
+        .apply(printStorePath(info.path))
+        .apply(info.narHash.to_string(HashFormat::Base16, true))
+        .apply(info.registrationTime == 0 ? time(nullptr) : info.registrationTime)
+        .apply(info.deriver ? printStorePath(*info.deriver) : "", (bool) info.deriver)
+        .apply(info.narSize, info.narSize != 0)
+        .apply(info.ultimate ? 1 : 0, info.ultimate)
+        .apply(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())
+        .apply(renderContentAddress(info.ca), (bool) info.ca)
         .exec();
     uint64_t id = state.db.getLastInsertedRowId();
 
@@ -792,7 +798,7 @@ void LocalStore::queryPathInfoUncached(
 std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & state, const StorePath & path)
 {
     /* Get the path info. */
-    auto useQueryPathInfo(state.stmts->QueryPathInfo.use()(printStorePath(path)));
+    auto useQueryPathInfo(state.stmts->QueryPathInfo.use().apply(printStorePath(path)));
 
     if (!useQueryPathInfo.next())
         return std::shared_ptr<ValidPathInfo>();
@@ -830,7 +836,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
         info->ca = ContentAddress::parseOpt(s);
 
     /* Get the references. */
-    auto useQueryReferences(state.stmts->QueryReferences.use()(info->id));
+    auto useQueryReferences(state.stmts->QueryReferences.use().apply(info->id));
 
     while (useQueryReferences.next())
         info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
@@ -841,17 +847,19 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 /* Update path info in the database. */
 void LocalStore::updatePathInfo(State & state, const ValidPathInfo & info)
 {
-    state.stmts->UpdatePathInfo
-        .use()(info.narSize, info.narSize != 0)(info.narHash.to_string(HashFormat::Base16, true))(
-            info.ultimate ? 1 : 0,
-            info.ultimate)(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())(
-            renderContentAddress(info.ca), (bool) info.ca)(printStorePath(info.path))
+    state.stmts->UpdatePathInfo.use()
+        .apply(info.narSize, info.narSize != 0)
+        .apply(info.narHash.to_string(HashFormat::Base16, true))
+        .apply(info.ultimate ? 1 : 0, info.ultimate)
+        .apply(concatStringsSep(" ", Signature::toStrings(info.sigs)), !info.sigs.empty())
+        .apply(renderContentAddress(info.ca), (bool) info.ca)
+        .apply(printStorePath(info.path))
         .exec();
 }
 
 uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 {
-    auto use(state.stmts->QueryPathInfo.use()(printStorePath(path)));
+    auto use(state.stmts->QueryPathInfo.use().apply(printStorePath(path)));
     if (!use.next())
         throw InvalidPath("path '%s' is not valid", printStorePath(path));
     return use.getInt(0);
@@ -859,7 +867,7 @@ uint64_t LocalStore::queryValidPathId(State & state, const StorePath & path)
 
 bool LocalStore::isValidPath_(State & state, const StorePath & path)
 {
-    return state.stmts->QueryPathInfo.use()(printStorePath(path)).next();
+    return state.stmts->QueryPathInfo.use().apply(printStorePath(path)).next();
 }
 
 bool LocalStore::isValidPathUncached(const StorePath & path)
@@ -890,7 +898,7 @@ StorePathSet LocalStore::queryAllValidPaths()
 
 void LocalStore::queryReferrers(State & state, const StorePath & path, StorePathSet & referrers)
 {
-    auto useQueryReferrers(state.stmts->QueryReferrers.use()(printStorePath(path)));
+    auto useQueryReferrers(state.stmts->QueryReferrers.use().apply(printStorePath(path)));
 
     while (useQueryReferrers.next())
         referrers.insert(parseStorePath(useQueryReferrers.getStr(0)));
@@ -906,7 +914,7 @@ StorePathSet LocalStore::queryValidDerivers(const StorePath & path)
     return retrySQLite<StorePathSet>([&]() {
         auto state(_state->lock());
 
-        auto useQueryValidDerivers(state->stmts->QueryValidDerivers.use()(printStorePath(path)));
+        auto useQueryValidDerivers(state->stmts->QueryValidDerivers.use().apply(printStorePath(path)));
 
         StorePathSet derivers;
         while (useQueryValidDerivers.next())
@@ -924,7 +932,7 @@ LocalStore::queryStaticPartialDerivationOutputMap(const StorePath & path)
         std::map<std::string, std::optional<StorePath>> outputs;
         uint64_t drvId;
         drvId = queryValidPathId(*state, path);
-        auto use(state->stmts->QueryDerivationOutputs.use()(drvId));
+        auto use(state->stmts->QueryDerivationOutputs.use().apply(drvId));
         while (use.next())
             outputs.insert_or_assign(use.getStr(0), parseStorePath(use.getStr(1)));
 
@@ -963,7 +971,7 @@ std::optional<StorePath> LocalStore::queryPathFromHashPart(const std::string & h
     return retrySQLite<std::optional<StorePath>>([&]() -> std::optional<StorePath> {
         auto state(_state->lock());
 
-        auto useQueryPathFromHashPart(state->stmts->QueryPathFromHashPart.use()(prefix));
+        auto useQueryPathFromHashPart(state->stmts->QueryPathFromHashPart.use().apply(prefix));
 
         if (!useQueryPathFromHashPart.next())
             return {};
@@ -1009,7 +1017,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
         for (auto & [_, i] : infos) {
             auto referrer = queryValidPathId(*state, i.path);
             for (auto & j : i.references)
-                state->stmts->AddReference.use()(referrer)(queryValidPathId(*state, j)).exec();
+                state->stmts->AddReference.use().apply(referrer).apply(queryValidPathId(*state, j)).exec();
         }
 
         /* Do a topological sort of the paths.  This will throw an
@@ -1043,7 +1051,7 @@ void LocalStore::invalidatePath(State & state, const StorePath & path)
 {
     debug("invalidating path '%s'", printStorePath(path));
 
-    state.stmts->InvalidatePath.use()(printStorePath(path)).exec();
+    state.stmts->InvalidatePath.use().apply(printStorePath(path)).exec();
 
     /* Note that the foreign key constraints on the Refs table take
        care of deleting the references entries for `path'. */
@@ -1609,7 +1617,8 @@ void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signa
 std::optional<std::pair<int64_t, UnkeyedRealisation>>
 LocalStore::queryRealisationCore_(LocalStore::State & state, const DrvOutput & id)
 {
-    auto useQueryRealisedOutput(state.stmts->QueryRealisedOutput.use()(id.drvPath.to_string())(id.outputName));
+    auto useQueryRealisedOutput(
+        state.stmts->QueryRealisedOutput.use().apply(id.drvPath.to_string()).apply(id.outputName));
     if (!useQueryRealisedOutput.next())
         return std::nullopt;
     auto realisationDbId = useQueryRealisedOutput.getInt(0);
