@@ -10,6 +10,12 @@ if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
     skipTest "not using the Nix daemon"
 fi
 
+# --secret-key-files not available in Nix 1.11. Exact version of introduction TBD.
+# TODO: skip or conditionalize individual test cases instead of skipping the whole file
+if ! isDaemonNewer "2.0"; then
+    skipTest "Daemon too old for this test"
+fi
+
 TODO_NixOS
 
 killDaemon

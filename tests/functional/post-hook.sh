@@ -2,6 +2,10 @@
 
 source common.sh
 
+# --post-build-hook not available in Nix 1.11. Exact version of introduction TBD.
+# TODO: skip or conditionalize individual test cases instead of skipping the whole file
+requireDaemonNewerThan "2.0"
+
 TODO_NixOS
 
 clearStore
