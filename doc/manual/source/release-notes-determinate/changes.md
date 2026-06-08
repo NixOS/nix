@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.0.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.1.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -202,3 +202,7 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 * Determinate Nix has a command `nix serve` that allows any store to be served as a binary cache. [DeterminateSystems/nix-src#428](https://github.com/DeterminateSystems/nix-src/pull/428)
 
 * Determinate Nix has experimental support for signing store paths using CNSA algorithms. [DeterminateSystems/nix-src#449](https://github.com/DeterminateSystems/nix-src/pull/449)
+
+<!-- Determinate Nix version 3.21.1 -->
+
+* Determinate Nix is built against Determinate Secure Packages. [DeterminateSystems/nix-src#288](https://github.com/DeterminateSystems/nix-src/pull/288)
