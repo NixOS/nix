@@ -36,7 +36,14 @@ in
           pkgC
           pkgs.coreutils
         ];
-        environment.systemPackages = [ pkgs.minio-client ];
+        environment.systemPackages = [
+          (pkgs.minio-client.overrideAttrs (o: {
+            meta = o.meta // {
+              # TODO: Switch to garage.
+              knownVulnerabilities = [ ];
+            };
+          }))
+        ];
         nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
         nix.extraOptions = ''
           experimental-features = nix-command
@@ -50,6 +57,12 @@ in
             MINIO_ROOT_PASSWORD=${secretKey}
             MINIO_DOMAIN=minio.local
           '';
+          package = pkgs.minio.overrideAttrs (o: {
+            meta = o.meta // {
+              # TODO: Switch to garage.
+              knownVulnerabilities = [ ];
+            };
+          });
         };
         networking.firewall.allowedTCPPorts = [ 9000 ];
         # Static hosts for virtual-hosted-style S3 tests.

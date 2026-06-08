@@ -53,7 +53,13 @@ scope: {
   };
 
   libblake3 = pkgs.libblake3.override {
-    useTBB = !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isStatic);
+    useTBB =
+      !(
+        stdenv.hostPlatform.isWindows
+        || stdenv.hostPlatform.isStatic
+        # Some tbb tests fail with libc++.
+        || (stdenv.cc.libcxx != null && stdenv.cc.libcxx.isLLVM)
+      );
   };
 
   libgit2 =

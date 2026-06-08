@@ -28,6 +28,12 @@
         ];
       };
 
+      # FIXME: Remove when https://github.com/NixOS/nixpkgs/pull/526816 is merged.
+      systemd.services.register-nix-paths.serviceConfig = {
+        User = config.nix.daemonUser;
+        Group = config.nix.daemonGroup;
+      };
+
       # The store setting `ignore-gc-delete-failure` isn't set by default,
       # but is needed since the daemon won't own the entire store.
       systemd.services.nix-daemon.environment.NIX_REMOTE =

@@ -10,7 +10,7 @@ the socket path is determined as follows:
 
 1. The [`NIX_DAEMON_SOCKET_PATH`] environment variable, if set.
 
-2. Otherwise, `daemon-socket/socket` within the [`state`](#store-setting-state) directory.
+2. Otherwise, `daemon-socket/socket` within the [`state`](#store-local-daemon-store-state) directory.
 
 [`NIX_DAEMON_SOCKET_PATH`]: @docroot@/command-ref/env-common.md#env-NIX_DAEMON_SOCKET_PATH
 
