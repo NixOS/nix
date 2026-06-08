@@ -1,6 +1,10 @@
 on:
   workflow_call:
     inputs:
+      flake:
+        required: false
+        default: "./packaging/secure-packages"
+        type: string
       system:
         required: true
         type: string
@@ -33,6 +37,10 @@ on:
         required: false
         default: false
         type: boolean
+      upload_artifacts:
+        required: false
+        default: true
+        type: boolean
     secrets:
       manual_netlify_auth_token:
         required: false
@@ -51,14 +59,14 @@ jobs:
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build .#packages.${{ inputs.system }}.default .#packages.${{ inputs.system }}.binaryTarball --no-link -L
-      - run: nix build .#packages.${{ inputs.system }}.binaryTarball --out-link tarball
-      - run: nix build .#^debug,out
+      - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.default .#packages.${{ inputs.system }}.binaryTarball --no-link -L
+      - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.binaryTarball --out-link tarball
+      - run: nix build ${{ inputs.flake }}#^debug,out
       - name: Upload debug info to Sentry
         run: ./maintainers/upload-debug-info-to-sentry.py --debug-dir ./result-debug ./result/bin/nix
         if: env.SENTRY_AUTH_TOKEN != ''
@@ -67,6 +75,7 @@ jobs:
           SENTRY_ORG: ${{ secrets.sentry_org }}
           SENTRY_PROJECT: ${{ secrets.sentry_project }}
       - uses: actions/upload-artifact@v6
+        if: inputs.upload_artifacts
         with:
           name: ${{ inputs.system }}
           path: ./tarball/*.xz
@@ -76,12 +85,12 @@ jobs:
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix build .#packages.${{ inputs.system }}.nix-cli-static --no-link -L
+      - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.nix-cli-static --no-link -L
 
   test:
     if: ${{ inputs.if && inputs.run_tests}}
@@ -89,12 +98,12 @@ jobs:
     strategy:
       fail-fast: false
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: nix flake check -L --system ${{ inputs.system }}
+      - run: nix flake check --keep-going ${{ inputs.flake }} -L --system ${{ inputs.system }}
 
   vm_tests_smoke:
     if: inputs.run_vm_tests && github.event_name != 'merge_group'
@@ -106,10 +115,10 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           nix build -L \
-            .#hydraJobs.tests.functional_user \
-            .#hydraJobs.tests.githubFlakes \
-            .#hydraJobs.tests.nix-docker \
-            .#hydraJobs.tests.tarballFlakes \
+            ${{ inputs.flake }}#hydraJobs.tests.functional_user \
+            ${{ inputs.flake }}#hydraJobs.tests.githubFlakes \
+            ${{ inputs.flake }}#hydraJobs.tests.nix-docker \
+            ${{ inputs.flake }}#hydraJobs.tests.tarballFlakes \
             ;
 
   vm_tests_all:
@@ -128,7 +137,7 @@ jobs:
                   .hydraJobs.tests
                   | with_entries(select(.value.type == "derivation"))
                   | keys[]
-                  | ".#hydraJobs.tests." + .')
+                  | "${{ inputs.flake }}#hydraJobs.tests." + .')
           }
 
           if ! cmd; then
@@ -203,7 +212,7 @@ jobs:
             mkdir -p "${NSC_CACHE_PATH}/nix/xdg-cache"
             export XDG_CACHE_HOME="${NSC_CACHE_PATH}/nix/xdg-cache"
           fi
-          nix build -L --out-link ./new-nix
+          nix build ${{ inputs.flake }} -L --out-link ./new-nix
           export PATH=$(pwd)/new-nix/bin:$PATH
           [[ $(type -p nix) = $(pwd)/new-nix/bin/nix ]]
 
@@ -235,7 +244,7 @@ jobs:
       - uses: DeterminateSystems/flakehub-cache-action@main
       - name: Build manual
         if: inputs.system == 'x86_64-linux'
-        run: nix build .#hydraJobs.manual
+        run: nix build ${{ inputs.flake }}#hydraJobs.manual
       - uses: nwtgck/actions-netlify@v3.0
         if: inputs.publish_manual && inputs.system == 'x86_64-linux'
         with:
