@@ -18,17 +18,6 @@ nix flake check "$flakeDir"
 
 cat > "$flakeDir"/flake.nix <<EOF
 {
-  outputs = { self }: {
-    overlay = finalll: prev: {
-    };
-  };
-}
-EOF
-
-(! nix flake check "$flakeDir")
-
-cat > "$flakeDir"/flake.nix <<EOF
-{
   outputs = { self, ... }: {
     overlays.x86_64-linux.foo = final: prev: {
     };
@@ -38,7 +27,7 @@ EOF
 
 # shellcheck disable=SC2015
 checkRes=$(nix flake check "$flakeDir" 2>&1 && fail "nix flake check --all-systems should have failed" || true)
-echo "$checkRes" | grepQuiet "error: overlay is not a function, but a set instead"
+echo "$checkRes" | grepQuiet "error: Overlay is not a function."
 
 cat > "$flakeDir"/flake.nix <<EOF
 {
@@ -126,7 +115,7 @@ EOF
 
 # shellcheck disable=SC2015
 checkRes=$(nix flake check --all-systems "$flakeDir" 2>&1 && fail "nix flake check --all-systems should have failed" || true)
-echo "$checkRes" | grepQuiet "unknown-attr"
+echo "$checkRes" | grepQuiet "Evaluation check.*apps.system-1.default.isValidApp.*failed"
 
 cat > "$flakeDir"/flake.nix <<EOF
 {
@@ -148,6 +137,10 @@ cat > "$flakeDir"/flake.nix <<EOF
       name = "simple";
       buildCommand = "mkdir \$out";
     };
+    packages.$system.bar = with import ./config.nix; mkDerivation {
+      name = "bad";
+      buildCommand = "exit 1";
+    };
   };
 }
 EOF
@@ -155,6 +148,11 @@ EOF
 cp "${config_nix}" "$flakeDir/"
 
 expectStderr 0 nix flake check "$flakeDir" | grepQuiet 'running 1 flake check'
+
+# FIXME: error code 100 doesn't get propagated from the daemon.
+if ! isTestOnNixOS && $NIX_REMOTE != daemon; then
+    expectStderr 100 nix flake check --build-all "$flakeDir" | grepQuiet 'Cannot build.*bad'
+fi
 
 cat > "$flakeDir"/flake.nix <<EOF
 {

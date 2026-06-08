@@ -418,21 +418,31 @@ void AttrCursor::fetchCachedValue()
         throw CachedEvalError(parent->first, parent->second);
 }
 
-AttrPath AttrCursor::getAttrPath() const
+AttrPath AttrCursor::getAttrPathRaw() const
 {
     if (parent) {
-        auto attrPath = parent->first->getAttrPath();
+        auto attrPath = parent->first->getAttrPathRaw();
         attrPath.push_back(parent->second);
         return attrPath;
     } else
         return {};
 }
 
-AttrPath AttrCursor::getAttrPath(Symbol name) const
+AttrPath AttrCursor::getAttrPath() const
 {
-    auto attrPath = getAttrPath();
+    return root->cleanupAttrPath(getAttrPathRaw());
+}
+
+AttrPath AttrCursor::getAttrPathRaw(Symbol name) const
+{
+    auto attrPath = getAttrPathRaw();
     attrPath.push_back(name);
     return attrPath;
+}
+
+AttrPath AttrCursor::getAttrPath(Symbol name) const
+{
+    return root->cleanupAttrPath(getAttrPathRaw(name));
 }
 
 std::string AttrCursor::getAttrPathStr() const

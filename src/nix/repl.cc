@@ -44,9 +44,9 @@ struct CmdRepl : RawInstallablesCommand
 
     std::vector<std::string> files;
 
-    Strings getDefaultFlakeAttrPaths() override
+    StringSet getRoles() override
     {
-        return {""};
+        return {"nix-repl"};
     }
 
     bool forceImpureByDefault() override

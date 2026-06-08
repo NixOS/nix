@@ -745,11 +745,11 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers,
                 this,
                 getEvalState(),
                 FlakeRef(element.source->originalRef),
-                "",
+                "." + element.source->attrPath, // absolute lookup
                 element.source->outputs,
-                Strings{element.source->attrPath},
-                Strings{},
-                lockFlags);
+                StringSet{},
+                lockFlags,
+                getDefaultFlakeSchemas());
 
             auto derivedPaths = installable->toDerivedPaths();
             if (derivedPaths.empty())
