@@ -13,6 +13,7 @@
   boost,
   boehmgc,
   nlohmann_json,
+  sqlite,
   toml11,
   libcpuid,
 
@@ -64,6 +65,7 @@ mkMesonLibrary (finalAttrs: {
   ];
 
   buildInputs = [
+    sqlite
     toml11
   ]
   ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
