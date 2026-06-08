@@ -11,7 +11,7 @@ struct CmdDerivation : NixMultiCommand
 
     std::string description() override
     {
-        return "Work with derivations, Nix's notion of a build plan.";
+        return "work with derivations";
     }
 
     Category category() override
