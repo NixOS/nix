@@ -8,7 +8,7 @@ namespace nix {
 struct CmdRealisation : NixMultiCommand
 {
     CmdRealisation()
-        : NixMultiCommand("build-trace", RegisterCommand::getCommandsFor({"build-trace"}))
+        : NixMultiCommand("build-trace", RegisterCommand::getCommandsFor({"store", "build-trace"}))
     {
     }
 
@@ -23,7 +23,7 @@ struct CmdRealisation : NixMultiCommand
     }
 };
 
-static auto rCmdRealisation = registerCommand<CmdRealisation>("build-trace");
+static auto rCmdRealisation = registerCommand2<CmdRealisation>({"store", "build-trace"});
 
 struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
 {
@@ -77,6 +77,6 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
     }
 };
 
-static auto rCmdBuildTraceInfo = registerCommand2<CmdRealisationInfo>({"build-trace", "info"});
+static auto rCmdBuildTraceInfo = registerCommand2<CmdRealisationInfo>({"store", "build-trace", "info"});
 
 } // namespace nix
