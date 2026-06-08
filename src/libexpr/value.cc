@@ -8,7 +8,7 @@
 
 namespace nix {
 
-Value::Failed::~Failed() {}
+Value::ExceptionRef::~ExceptionRef() {}
 
 Value Value::vEmptyList = []() {
     Value res;

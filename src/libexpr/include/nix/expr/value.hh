@@ -432,9 +432,35 @@ struct ValueBase
         Value * const * elems;
     };
 
-    struct Failed : gc_cleanup
+    /**
+     * Wrapper that stores a std::exception_ptr on the GC heap with a finaliser
+     * that runs the exception_ptr destructor (which is refcounted internally).
+     * This is not a part of the Failed structure to avoid cycles with finalisers,
+     * which Boehm warns about.
+     */
+    struct ExceptionRef : gc_cleanup
     {
+        ExceptionRef(std::exception_ptr ex)
+            : ex(std::move(ex))
+        {
+            assert(this->ex);
+        }
+
+        ExceptionRef(ExceptionRef &&) = delete;
+        ExceptionRef(const ExceptionRef &) = delete;
+        ExceptionRef & operator=(ExceptionRef &&) = delete;
+        ExceptionRef & operator=(const ExceptionRef &) = delete;
+
+        /* To appease -Wweak-vtables. */
+        virtual ~ExceptionRef();
+
         std::exception_ptr ex;
+    };
+
+    struct Failed : gc
+    {
+        ExceptionRef * exRef;
+
         /**
          * Optional value for recovering `RecoverableEvalError`
          * Must be set iff `ex` is an instance of `RecoverableEvalError`.
@@ -442,24 +468,15 @@ struct ValueBase
         Value * recoveryValue;
 
         Failed(std::exception_ptr ex, Value * recoveryValue)
-            : ex(ex)
+            : exRef(new /* ExceptionRef : gc_cleanup */ ExceptionRef(ex))
             , recoveryValue(recoveryValue)
         {
-            assert(this->ex);
         }
-
-        Failed(Failed &&) = delete;
-        Failed(const Failed &) = delete;
-        Failed & operator=(Failed &&) = delete;
-        Failed & operator=(const Failed &) = delete;
-
-        /* To appease Wweak-vtables. */
-        virtual ~Failed();
 
         [[noreturn]] void rethrow() const
         {
             try {
-                std::rethrow_exception(ex);
+                std::rethrow_exception(exRef->ex);
             } catch (BaseError & e) {
                 /* Rethrow the copy of the exception - not the original one.
                    Stack tracing mechanisms rely on being able to modify the exceptions
