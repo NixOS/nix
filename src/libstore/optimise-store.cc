@@ -291,8 +291,15 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     Activity act(*logger, actOptimiseStore);
 
-    auto paths = queryAllValidPaths();
-    InodeHash inodeHash = loadInodeHash();
+    auto paths = [&]() {
+        Activity act(*logger, lvlTalkative, actUnknown, "querying valid paths");
+        return queryAllValidPaths();
+    }();
+
+    InodeHash inodeHash = [&]() {
+        Activity act(*logger, lvlTalkative, actUnknown, "reading .links directory");
+        return loadInodeHash();
+    }();
 
     act.progress(0, paths.size());
 
