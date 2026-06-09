@@ -1,9 +1,12 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/thread-pool.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/util/file-system.hh"
+
+#include <boost/unordered/concurrent_flat_set.hpp>
 
 #include <cstdlib>
 #include <cstring>
@@ -291,24 +294,36 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
 {
     Activity act(*logger, actOptimiseStore);
 
-    auto paths = queryAllValidPaths();
-    InodeHash inodeHash = loadInodeHash();
+    auto paths = [&]() {
+        Activity act(*logger, lvlTalkative, actUnknown, "querying valid paths");
+        return queryAllValidPaths();
+    }();
+
+    InodeHash inodeHash = [&]() {
+        Activity act(*logger, lvlTalkative, actUnknown, "reading .links directory");
+        return loadInodeHash();
+    }();
 
     act.progress(0, paths.size());
 
-    uint64_t done = 0;
+    std::atomic<uint64_t> done = 0;
+
+    ThreadPool pool;
 
     for (auto & i : paths) {
-        addTempRoot(i);
-        if (!isValidPath(i))
-            continue; /* path was GC'ed, probably */
-        {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
-        }
-        done++;
-        act.progress(done, paths.size());
+        pool.enqueue([&, i]() {
+            addTempRoot(i);
+            if (!isValidPath(i))
+                return; /* path was GC'ed, probably */
+            {
+                Activity act2(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
+                optimisePath_(&act2, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
+            }
+            act.progress(++done, paths.size());
+        });
     }
+
+    pool.process();
 }
 
 void LocalStore::optimiseStore()
@@ -317,7 +332,7 @@ void LocalStore::optimiseStore()
 
     optimiseStore(stats);
 
-    printInfo("%s freed by hard-linking %d files", renderSize(stats.bytesFreed), stats.filesLinked);
+    printInfo("%s freed by hard-linking %d files", renderSize(stats.bytesFreed.load()), stats.filesLinked.load());
 }
 
 void LocalStore::optimisePath(const std::filesystem::path & path, RepairFlag repair)
