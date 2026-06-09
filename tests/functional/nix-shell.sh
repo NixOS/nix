@@ -88,7 +88,7 @@ sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.expr > "$TEST_ROOT"/shell.sh
 chmod a+rx "$TEST_ROOT"/shell.shebang.expr
 # Should fail due to expressions using relative path
  "$TEST_ROOT"/shell.shebang.expr bar && exit 1
-cp shell.nix "${config_nix}" "$TEST_ROOT"
+cp shell.nix "$TEST_ROOT"
 # Should succeed
 echo "cwd: $PWD"
 output=$("$TEST_ROOT"/shell.shebang.expr bar)
