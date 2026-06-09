@@ -6,8 +6,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/util/fmt.hh"
 
-using namespace nix;
-
+namespace nix {
 namespace {
 
 struct GetDerivationsEnv
@@ -16,7 +15,8 @@ struct GetDerivationsEnv
     fetchers::Settings fetchSettings{};
     bool readOnlyMode = true;
     EvalSettings evalSettings{readOnlyMode};
-    EvalState state;
+    std::shared_ptr<EvalState> statePtr;
+    EvalState & state;
 
     Bindings * autoArgs = nullptr;
     Value attrsValue;
@@ -27,7 +27,8 @@ struct GetDerivationsEnv
             settings.nixPath = {};
             return settings;
         }())
-        , state({}, store, fetchSettings, evalSettings, nullptr)
+        , statePtr(std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr))
+        , state(*statePtr)
     {
         autoArgs = state.buildBindings(0).finish();
 
@@ -62,3 +63,5 @@ static void BM_GetDerivationsAttrScan(benchmark::State & state)
 }
 
 BENCHMARK(BM_GetDerivationsAttrScan)->Arg(1'000)->Arg(5'000)->Arg(10'000);
+
+} // namespace nix

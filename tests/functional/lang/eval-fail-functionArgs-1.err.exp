@@ -1,0 +1,8 @@
+error:
+       … while calling the 'functionArgs' builtin
+         at /pwd/lang/eval-fail-functionArgs-1.nix:1:1:
+            1| builtins.functionArgs { }
+             | ^
+            2|
+
+       error: 'functionArgs' requires a function

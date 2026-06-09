@@ -1,0 +1,10 @@
+error:
+       … while calling the 'splitVersion' builtin
+         at /pwd/lang/eval-fail-splitVersion-1.nix:1:1:
+            1| builtins.splitVersion 1
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.splitVersion
+
+       error: expected a string but found an integer: 1

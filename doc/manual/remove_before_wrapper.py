@@ -22,7 +22,7 @@ def main():
     shutil.rmtree(output, ignore_errors=True)
     shutil.rmtree(output_temp, ignore_errors=True)
 
-    # Execute nix command with `--write-to` tempary output
+    # Execute nix command with `--write-to` temporary output
     nix_command_write_to = nix_command + ['--write-to', output_temp]
     subprocess.run(nix_command_write_to, check=True)
 

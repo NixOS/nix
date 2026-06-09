@@ -1,5 +1,4 @@
 #include <cstring>
-#include <fstream>
 #include <iostream>
 #include <filesystem>
 #include <regex>
@@ -17,6 +16,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/expr/eval.hh"
@@ -28,12 +28,14 @@
 #include "nix/util/users.hh"
 #include "nix/cmd/network-proxy.hh"
 #include "nix/cmd/compatibility-settings.hh"
+#include "nix/util/fun.hh"
 #include "man-pages.hh"
 
-using namespace nix;
 using namespace std::string_literals;
 
 extern char ** environ __attribute__((weak));
+
+namespace nix {
 
 /* Recreate the effect of the perl shellwords function, breaking up a
  * string into arguments like a shell word, including escapes
@@ -140,7 +142,7 @@ static void main_nix_build(int argc, char ** argv)
     auto myName = isNixShell ? "nix-shell" : "nix-build";
 
     auto inShebang = false;
-    std::string script;
+    std::filesystem::path script;
     std::vector<std::string> savedArgs;
 
     AutoDelete tmpDir(createTempDir("", myName));
@@ -200,9 +202,9 @@ static void main_nix_build(int argc, char ** argv)
     {
         using LegacyArgs::LegacyArgs;
 
-        void setBaseDir(Path baseDir)
+        void setBaseDir(std::filesystem::path baseDir)
         {
-            commandBaseDir = baseDir;
+            commandBaseDir = baseDir.string();
         }
     };
 
@@ -284,11 +286,15 @@ static void main_nix_build(int argc, char ** argv)
                     fmt("exec %1% %2% -e 'load(ARGV.shift)' -- %3% %4%",
                         execArgs,
                         interpreter,
-                        escapeShellArgAlways(script),
+                        escapeShellArgAlways(script.string()),
                         joined.view());
             } else {
                 envCommand =
-                    fmt("exec %1% %2% %3% %4%", execArgs, interpreter, escapeShellArgAlways(script), joined.view());
+                    fmt("exec %1% %2% %3% %4%",
+                        execArgs,
+                        interpreter,
+                        escapeShellArgAlways(script.string()),
+                        joined.view());
             }
         }
 
@@ -313,15 +319,15 @@ static void main_nix_build(int argc, char ** argv)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
     auto store = openStore();
-    auto evalStore = myArgs.evalStoreUrl ? openStore(*myArgs.evalStoreUrl) : store;
+    auto evalStore = myArgs.evalStoreUrl ? openStore(StoreReference{*myArgs.evalStoreUrl}) : store;
 
-    auto state = std::make_unique<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
+    auto state = std::make_shared<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
     state->repair = myArgs.repair;
     if (myArgs.repair)
         buildMode = bmRepair;
 
     if (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript) {
-        myArgs.setBaseDir(absPath(dirOf(script)));
+        myArgs.setBaseDir(absPath(script.parent_path()));
     }
     auto autoArgs = myArgs.getAutoArgs(*state);
 
@@ -373,17 +379,17 @@ static void main_nix_build(int argc, char ** argv)
         exprs = {state->parseStdin()};
     else
         for (auto i : remainingArgs) {
+            auto shebangBaseDir = absPath(script.parent_path());
             if (fromArgs) {
-                auto shebangBaseDir = absPath(dirOf(script));
                 exprs.push_back(state->parseExprFromString(
                     std::move(i),
                     (inShebang && compatibilitySettings.nixShellShebangArgumentsRelativeToScript)
-                        ? lookupFileArg(*state, shebangBaseDir)
+                        ? lookupFileArg(*state, shebangBaseDir.string())
                         : state->rootPath(".")));
             } else {
                 auto absolute = i;
                 try {
-                    absolute = canonPath(absPath(i), true);
+                    absolute = canonPath(absPath(std::filesystem::path{i}), true).string();
                 } catch (Error & e) {
                 };
                 auto [path, outputNames] = parsePathWithOutputs(absolute);
@@ -392,9 +398,10 @@ static void main_nix_build(int argc, char ** argv)
                 else {
                     /* If we're in a #! script, interpret filenames
                        relative to the script. */
-                    auto baseDir = inShebang && !packages ? absPath(i, absPath(dirOf(script))) : i;
+                    std::filesystem::path iPath{i};
+                    auto baseDir = inShebang && !packages ? absPath(iPath, &shebangBaseDir) : iPath;
 
-                    auto sourcePath = lookupFileArg(*state, baseDir);
+                    auto sourcePath = lookupFileArg(*state, baseDir.string());
                     auto resolvedPath = isNixShell ? resolveShellExprPath(sourcePath) : resolveExprPath(sourcePath);
 
                     exprs.push_back(state->parseExprFromFile(resolvedPath));
@@ -527,11 +534,11 @@ static void main_nix_build(int argc, char ** argv)
             return;
 
         if (shellDrv) {
-            auto shellDrvOutputs = store->queryPartialDerivationOutputMap(shellDrv.value(), &*evalStore);
+            auto shellDrvOutputs = deepQueryPartialDerivationOutputMap(*store, shellDrv.value(), &*evalStore);
             shell = store->printStorePath(shellDrvOutputs.at("out").value()) + "/bin/bash";
         }
 
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        if (drv.shouldResolve()) {
             auto resolvedDrv = drv.tryResolve(*store);
             assert(resolvedDrv && "Successfully resolved the derivation");
             drv = *resolvedDrv;
@@ -552,7 +559,10 @@ static void main_nix_build(int argc, char ** argv)
 
         env["NIX_BUILD_TOP"] = env["TMPDIR"] = env["TEMPDIR"] = env["TMP"] = env["TEMP"] = tmpDir.path().string();
         env["NIX_STORE"] = store->storeDir;
-        env["NIX_BUILD_CORES"] = fmt("%d", settings.buildCores ? settings.buildCores : settings.getDefaultCores());
+        env["NIX_BUILD_CORES"] =
+            fmt("%d",
+                settings.getLocalSettings().buildCores ? settings.getLocalSettings().buildCores
+                                                       : settings.getDefaultCores());
 
         DerivationOptions<StorePath> drvOptions;
         try {
@@ -567,7 +577,7 @@ static void main_nix_build(int argc, char ** argv)
         for (auto & var : drv.env)
             if (drvOptions.passAsFile.count(var.first)) {
                 auto fn = ".attr-" + std::to_string(fileNr++);
-                Path p = (tmpDir.path() / fn).string();
+                auto p = (tmpDir.path() / fn).string();
                 writeFile(p, var.second);
                 env[var.first + "Path"] = p;
             } else
@@ -578,18 +588,16 @@ static void main_nix_build(int argc, char ** argv)
         if (drv.structuredAttrs) {
             StorePathSet inputs;
 
-            std::function<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure;
-
-            accumInputClosure = [&](const StorePath & inputDrv,
-                                    const DerivedPathMap<StringSet>::ChildNode & inputNode) {
-                auto outputs = store->queryPartialDerivationOutputMap(inputDrv, &*evalStore);
-                for (auto & i : inputNode.value) {
-                    auto o = outputs.at(i);
-                    store->computeFSClosure(*o, inputs);
-                }
-                for (const auto & [outputName, childNode] : inputNode.childMap)
-                    accumInputClosure(*outputs.at(outputName), childNode);
-            };
+            fun<void(const StorePath &, const DerivedPathMap<StringSet>::ChildNode &)> accumInputClosure =
+                [&](const StorePath & inputDrv, const DerivedPathMap<StringSet>::ChildNode & inputNode) {
+                    auto outputs = deepQueryPartialDerivationOutputMap(*store, inputDrv, &*evalStore);
+                    for (auto & i : inputNode.value) {
+                        auto o = outputs.at(i);
+                        store->computeFSClosure(*o, inputs);
+                    }
+                    for (const auto & [outputName, childNode] : inputNode.childMap)
+                        accumInputClosure(*outputs.at(outputName), childNode);
+                };
 
             for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
                 accumInputClosure(inputDrv, inputNode);
@@ -646,7 +654,7 @@ static void main_nix_build(int argc, char ** argv)
                 escapeShellArgAlways(tmpDir.path().string()),
                 (pure ? "" : "p=$PATH; "),
                 (pure ? "" : "PATH=$PATH:$p; unset p; "),
-                escapeShellArgAlways(dirOf(*shell)),
+                escapeShellArgAlways(std::filesystem::path(*shell).parent_path().string()),
                 escapeShellArgAlways(*shell),
                 tzExport,
                 envCommand);
@@ -717,11 +725,9 @@ static void main_nix_build(int argc, char ** argv)
             if (counter)
                 drvPrefix += fmt("-%d", counter + 1);
 
-            auto builtOutputs = store->queryPartialDerivationOutputMap(drvPath, &*evalStore);
-
-            auto maybeOutputPath = builtOutputs.at(outputName);
-            assert(maybeOutputPath);
-            auto outputPath = *maybeOutputPath;
+            auto outPath = deepQueryPartialDerivationOutput(*store, drvPath, outputName, &*evalStore);
+            assert(outPath);
+            auto outputPath = *outPath;
 
             if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>()) {
                 std::string symlink = drvPrefix;
@@ -742,3 +748,5 @@ static void main_nix_build(int argc, char ** argv)
 
 static RegisterLegacyCommand r_nix_build("nix-build", main_nix_build);
 static RegisterLegacyCommand r_nix_shell("nix-shell", main_nix_build);
+
+} // namespace nix

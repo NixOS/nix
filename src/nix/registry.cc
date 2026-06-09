@@ -1,14 +1,11 @@
 #include "nix/cmd/command.hh"
-#include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
-#include "nix/flake/flake.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/registry.hh"
 
-using namespace nix;
-using namespace nix::flake;
+namespace nix {
 
 class RegistryCommand : virtual Args
 {
@@ -40,7 +37,7 @@ public:
         return registry;
     }
 
-    Path getRegistryPath()
+    std::filesystem::path getRegistryPath()
     {
         if (registry_path.empty()) {
             return fetchers::getUserRegistryPath().string();
@@ -118,7 +115,7 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
             extraAttrs["dir"] = toRef.subdir;
         registry->remove(fromRef.input);
         registry->add(fromRef.input, toRef.input, extraAttrs);
-        registry->write(getRegistryPath());
+        registry->write(getRegistryPath().string());
     }
 };
 
@@ -147,7 +144,7 @@ struct CmdRegistryRemove : RegistryCommand, Command
     {
         auto registry = getRegistry();
         registry->remove(parseFlakeRef(fetchSettings, url).input);
-        registry->write(getRegistryPath());
+        registry->write(getRegistryPath().string());
     }
 };
 
@@ -198,7 +195,7 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
             extraAttrs["dir"] = ref.subdir;
         registry->remove(ref.input);
         registry->add(ref.input, resolved, extraAttrs);
-        registry->write(getRegistryPath());
+        registry->write(getRegistryPath().string());
     }
 };
 
@@ -270,3 +267,5 @@ struct CmdRegistry : NixMultiCommand
 };
 
 static auto rCmdRegistry = registerCommand<CmdRegistry>("registry");
+
+} // namespace nix

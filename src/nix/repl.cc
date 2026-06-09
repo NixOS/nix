@@ -1,27 +1,26 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/util/config-global.hh"
-#include "nix/store/globals.hh"
-#include "nix/store/store-open.hh"
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-value.hh"
 #include "nix/cmd/repl.hh"
+#include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/environment-variables.hh"
 #include "self-exe.hh"
 
 namespace nix {
 
-void runNix(const std::string & program, const Strings & args, const std::optional<std::string> & input = {})
+void runNix(const std::string & program, OsStrings args)
 {
-    auto subprocessEnv = getEnv();
-    subprocessEnv["NIX_CONFIG"] = globalConfig.toKeyValue();
+    auto subprocessEnv = getEnvOs();
+    subprocessEnv[OS_STR("NIX_CONFIG")] = string_to_os_string(globalConfig.toKeyValue());
     // isInteractive avoid grabling interactive commands
     runProgram2(
         RunOptions{
             .program = getNixBin(program).string(),
-            .args = args,
+            .args = std::move(args),
             .environment = subprocessEnv,
-            .input = input,
             .isInteractive = true,
         });
 
@@ -99,7 +98,7 @@ struct CmdRepl : RawInstallablesCommand
             }
             return values;
         };
-        auto repl = AbstractNixRepl::create(lookupPath, openStore(), state, getValues, runNix);
+        auto repl = AbstractNixRepl::create(lookupPath, state, getValues, runNix);
         repl->autoArgs = getAutoArgs(*repl->state);
         repl->initEnv();
         repl->mainLoop();

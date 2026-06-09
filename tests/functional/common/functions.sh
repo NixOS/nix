@@ -101,7 +101,7 @@ killDaemon() {
       die "killDaemon: not supported when testing on NixOS. Is it really needed? If so add conditionals; e.g. if ! isTestOnNixOS; then ..."
     fi
 
-    # Don't fail trying to stop a non-existant daemon twice.
+    # Don't fail trying to stop a non-existent daemon twice.
     if [[ "${_NIX_TEST_DAEMON_PID-}" == '' ]]; then
         return
     fi
@@ -358,6 +358,27 @@ requiresUnprivilegedUserNamespaces() {
 execUnshare () {
   requiresUnprivilegedUserNamespaces
   exec unshare --mount --map-root-user "$SHELL" "$@"
+}
+
+initGitRepo() {
+    local repo="$1"
+    local extraArgs="${2-}"
+
+    # shellcheck disable=SC2086 # word splitting of extraArgs is intended
+    git -C "$repo" init $extraArgs
+    git -C "$repo" config user.email "foobar@example.com"
+    git -C "$repo" config user.name "Foobar"
+}
+
+createGitRepo() {
+    local repo="$1"
+    local extraArgs="${2-}"
+
+    rm -rf "$repo" "$repo".tmp
+    mkdir -p "$repo"
+
+    # shellcheck disable=SC2086 # word splitting of extraArgs is intended
+    initGitRepo "$repo" $extraArgs
 }
 
 fi # COMMON_FUNCTIONS_SH_SOURCED

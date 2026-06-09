@@ -2,9 +2,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include "nix/store/tests/path.hh"
-#include "nix/expr/tests/libexpr.hh"
 #include "nix/expr/tests/value/context.hh"
+#include "nix/store/store-dir-config.hh"
 
 namespace nix {
 
@@ -121,15 +120,11 @@ TEST(NixStringContextElemTest, built_built_xp)
         NixStringContextElem::parse("!foo!bar!g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv"), MissingExperimentalFeature);
 }
 
-#ifndef COVERAGE
-
 RC_GTEST_PROP(NixStringContextElemTest, prop_round_rip, (const NixStringContextElem & o))
 {
     ExperimentalFeatureSettings xpSettings;
     xpSettings.set("experimental-features", "dynamic-derivations");
     RC_ASSERT(o == NixStringContextElem::parse(o.to_string(), xpSettings));
 }
-
-#endif
 
 } // namespace nix

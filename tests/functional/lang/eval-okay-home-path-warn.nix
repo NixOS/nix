@@ -1,0 +1,1 @@
+builtins.isPath ~/foo

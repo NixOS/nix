@@ -1,0 +1,10 @@
+error:
+       … while calling the 'getAttr' builtin
+         at /pwd/lang/eval-fail-getAttr-1.nix:1:1:
+            1| builtins.getAttr [ ] [ ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.getAttr
+
+       error: expected a string but found a list: [ ]

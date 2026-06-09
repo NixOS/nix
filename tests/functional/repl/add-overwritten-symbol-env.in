@@ -1,0 +1,4 @@
+# COM: :a uses the newest version of a symbol
+:a { a = "1"; }
+:a { a = "2"; }
+"result: ${a}"

@@ -5,9 +5,9 @@
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
-
 using nlohmann::json;
+
+namespace nix {
 
 struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand, MixJSON
 {
@@ -30,7 +30,7 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
 
     void run(ref<Store> srcStore, StorePaths && storePaths) override
     {
-        auto dstStore = dstUri.empty() ? openStore() : openStore(dstUri);
+        auto dstStore = !dstUri ? openStore() : openStore(StoreReference{*dstUri});
 
         auto remappings =
             makeContentAddressed(*srcStore, *dstStore, StorePathSet(storePaths.begin(), storePaths.end()));
@@ -56,3 +56,5 @@ struct CmdMakeContentAddressed : virtual CopyCommand, virtual StorePathsCommand,
 };
 
 static auto rCmdMakeContentAddressed = registerCommand2<CmdMakeContentAddressed>({"store", "make-content-addressed"});
+
+} // namespace nix

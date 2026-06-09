@@ -1,10 +1,11 @@
-#include "nix/store/globals.hh"
 #include "nix/store/nar-info.hh"
-#include "nix/store/store-api.hh"
+#include "nix/store/store-dir-config.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/json-utils.hh"
 
 namespace nix {
+
+void NarInfo::anchor() {}
 
 NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std::string & whence)
     : UnkeyedValidPathInfo(store, Hash::dummy)                                          // FIXME: hack
@@ -78,7 +79,7 @@ NarInfo::NarInfo(const StoreDirConfig & store, const std::string & s, const std:
             if (value != "unknown-deriver")
                 deriver = StorePath(value);
         } else if (name == "Sig")
-            sigs.insert(value);
+            sigs.insert(Signature::parse(value));
         else if (name == "CA") {
             if (ca)
                 throw corrupt("extra CA");
@@ -111,9 +112,12 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
     res += "URL: " + url + "\n";
     assert(compression != "");
     res += "Compression: " + compression + "\n";
-    assert(fileHash && fileHash->algo == HashAlgorithm::SHA256);
-    res += "FileHash: " + fileHash->to_string(HashFormat::Nix32, true) + "\n";
-    res += "FileSize: " + std::to_string(fileSize) + "\n";
+    if (fileHash) {
+        assert(fileHash->algo == HashAlgorithm::SHA256);
+        res += "FileHash: " + fileHash->to_string(HashFormat::Nix32, true) + "\n";
+    }
+    if (fileSize)
+        res += "FileSize: " + std::to_string(fileSize) + "\n";
     assert(narHash.algo == HashAlgorithm::SHA256);
     res += "NarHash: " + narHash.to_string(HashFormat::Nix32, true) + "\n";
     res += "NarSize: " + std::to_string(narSize) + "\n";
@@ -124,7 +128,7 @@ std::string NarInfo::to_string(const StoreDirConfig & store) const
         res += "Deriver: " + std::string(deriver->to_string()) + "\n";
 
     for (const auto & sig : sigs)
-        res += "Sig: " + sig + "\n";
+        res += "Sig: " + sig.to_string() + "\n";
 
     if (ca)
         res += "CA: " + renderContentAddress(*ca) + "\n";

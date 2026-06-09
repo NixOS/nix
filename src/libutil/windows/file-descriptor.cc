@@ -2,8 +2,8 @@
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
-#include "nix/util/windows-error.hh"
-#include "nix/util/file-path.hh"
+
+#include <span>
 
 #include <fileapi.h>
 #include <error.h>
@@ -14,90 +14,66 @@
 
 namespace nix {
 
-using namespace nix::windows;
-
-std::string readFile(HANDLE handle)
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd)
 {
     LARGE_INTEGER li;
-    if (!GetFileSizeEx(handle, &li))
-        throw WinError("%s:%d statting file", __FILE__, __LINE__);
-
-    return drainFD(handle, true, li.QuadPart);
+    if (!GetFileSizeEx(fd, &li)) {
+        throw windows::WinError([&] { return HintFmt("getting size of file %s", PathFmt(descriptorToPath(fd))); });
+    }
+    return li.QuadPart;
 }
 
-void readFull(HANDLE handle, char * buf, size_t count)
+size_t read(Descriptor fd, std::span<std::byte> buffer)
 {
-    while (count) {
-        checkInterrupt();
-        DWORD res;
-        if (!ReadFile(handle, (char *) buf, count, &res, NULL))
-            throw WinError("%s:%d reading from file", __FILE__, __LINE__);
-        if (res == 0)
-            throw EndOfFile("unexpected end-of-file");
-        count -= res;
-        buf += res;
+    checkInterrupt(); // For consistency with unix, and its EINTR loop
+    DWORD n;
+    if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL)) {
+        auto lastError = GetLastError();
+        if (lastError == ERROR_BROKEN_PIPE)
+            n = 0; // Treat as EOF
+        else
+            throw windows::WinError(
+                lastError, "reading %1% bytes from %2%", buffer.size(), PathFmt(descriptorToPath(fd)));
     }
+    return static_cast<size_t>(n);
 }
 
-void writeFull(HANDLE handle, std::string_view s, bool allowInterrupts)
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
 {
-    while (!s.empty()) {
-        if (allowInterrupts)
-            checkInterrupt();
-        DWORD res;
-#if _WIN32_WINNT >= 0x0600
-        auto path = handleToPath(handle); // debug; do it before because handleToPath changes lasterror
-        if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
-            throw WinError("writing to file %1%:%2%", handle, path);
-        }
-#else
-        if (!WriteFile(handle, s.data(), s.size(), &res, NULL)) {
-            throw WinError("writing to file %1%", handle);
-        }
-#endif
-        if (res > 0)
-            s.remove_prefix(res);
+    checkInterrupt(); // For consistency with unix, and its EINTR loop
+    OVERLAPPED ov = {};
+    ov.Offset = static_cast<DWORD>(offset);
+    if constexpr (sizeof(offset) > 4) /* We don't build with 32 bit off_t, but let's be safe. */
+        ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
+    DWORD n;
+    if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov)) {
+        throw windows::WinError([&] {
+            return HintFmt(
+                "reading %1% bytes at offset %2% from %3%", buffer.size(), offset, PathFmt(descriptorToPath(fd)));
+        });
     }
+    return static_cast<size_t>(n);
 }
 
-std::string readLine(HANDLE handle, bool eofOk)
+size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterrupts)
 {
-    std::string s;
-    while (1) {
-        checkInterrupt();
-        char ch;
-        // FIXME: inefficient
-        DWORD rd;
-        if (!ReadFile(handle, &ch, 1, &rd, NULL)) {
-            throw WinError("reading a line");
-        } else if (rd == 0) {
-            if (eofOk)
-                return s;
-            else
-                throw EndOfFile("unexpected EOF reading a line");
-        } else {
-            if (ch == '\n')
-                return s;
-            s += ch;
-        }
+    if (allowInterrupts)
+        checkInterrupt(); // For consistency with unix
+    DWORD n;
+    if (!WriteFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, NULL)) {
+        throw windows::WinError(
+            [&] { return HintFmt("writing %1% bytes to %2%", buffer.size(), PathFmt(descriptorToPath(fd))); });
     }
+    return static_cast<size_t>(n);
 }
 
-void drainFD(HANDLE handle, Sink & sink /*, bool block*/)
+AutoCloseFD dupDescriptor(Descriptor fd)
 {
-    std::vector<unsigned char> buf(64 * 1024);
-    while (1) {
-        checkInterrupt();
-        DWORD rd;
-        if (!ReadFile(handle, buf.data(), buf.size(), &rd, NULL)) {
-            WinError winError("%s:%d reading from handle %p", __FILE__, __LINE__, handle);
-            if (winError.lastError == ERROR_BROKEN_PIPE)
-                break;
-            throw winError;
-        } else if (rd == 0)
-            break;
-        sink({(char *) buf.data(), (size_t) rd});
+    HANDLE newHandle;
+    if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &newHandle, 0, FALSE, DUPLICATE_SAME_ACCESS)) {
+        throw windows::WinError("duplicating handle");
     }
+    return AutoCloseFD{newHandle};
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -111,44 +87,13 @@ void Pipe::create()
 
     HANDLE hReadPipe, hWritePipe;
     if (!CreatePipe(&hReadPipe, &hWritePipe, &saAttr, 0))
-        throw WinError("CreatePipe");
+        throw windows::WinError("CreatePipe");
 
     readSide = hReadPipe;
     writeSide = hWritePipe;
 }
 
 //////////////////////////////////////////////////////////////////////
-
-#if _WIN32_WINNT >= 0x0600
-
-std::wstring windows::handleToFileName(HANDLE handle)
-{
-    std::vector<wchar_t> buf(0x100);
-    DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
-    if (dw == 0) {
-        if (handle == GetStdHandle(STD_INPUT_HANDLE))
-            return L"<stdin>";
-        if (handle == GetStdHandle(STD_OUTPUT_HANDLE))
-            return L"<stdout>";
-        if (handle == GetStdHandle(STD_ERROR_HANDLE))
-            return L"<stderr>";
-        return (boost::wformat(L"<unnnamed handle %X>") % handle).str();
-    }
-    if (dw > buf.size()) {
-        buf.resize(dw);
-        if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw - 1)
-            throw WinError("GetFinalPathNameByHandleW");
-        dw -= 1;
-    }
-    return std::wstring(buf.data(), dw);
-}
-
-Path windows::handleToPath(HANDLE handle)
-{
-    return os_string_to_string(handleToFileName(handle));
-}
-
-#endif
 
 off_t lseek(HANDLE h, off_t offset, int whence)
 {
@@ -179,6 +124,13 @@ off_t lseek(HANDLE h, off_t offset, int whence)
     }
 
     return newPos.QuadPart;
+}
+
+void syncDescriptor(Descriptor fd)
+{
+    if (!::FlushFileBuffers(fd)) {
+        throw windows::WinError([&] { return HintFmt("flushing file %s", PathFmt(descriptorToPath(fd))); });
+    }
 }
 
 } // namespace nix

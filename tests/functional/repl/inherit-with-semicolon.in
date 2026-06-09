@@ -1,0 +1,4 @@
+# COM: inherit with semicolon
+a = { z = 99; }
+inherit (a) z;
+z

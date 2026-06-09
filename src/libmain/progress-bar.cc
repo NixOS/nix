@@ -1,10 +1,12 @@
 #include "nix/main/progress-bar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/sync.hh"
-#include "nix/store/store-api.hh"
+#include "nix/util/signals.hh"
+#include "nix/store/path.hh"
+#include "nix/util/file-system.hh"
 #include "nix/store/names.hh"
+#include "nix/util/util.hh"
 
-#include <atomic>
 #include <map>
 #include <thread>
 #include <sstream>
@@ -13,17 +15,19 @@
 
 namespace nix {
 
+namespace {
+
 static std::string_view getS(const std::vector<Logger::Field> & fields, size_t n)
 {
-    assert(n < fields.size());
-    assert(fields[n].type == Logger::Field::tString);
+    if (n >= fields.size() || fields[n].type != Logger::Field::tString)
+        throw Error("could not get expected log field of type 'string' at index %d", n);
     return fields[n].s;
 }
 
 static uint64_t getI(const std::vector<Logger::Field> & fields, size_t n)
 {
-    assert(n < fields.size());
-    assert(fields[n].type == Logger::Field::tInt);
+    if (n >= fields.size() || fields[n].type != Logger::Field::tInt)
+        throw Error("could not get expected log field of type 'int' at index %d", n);
     return fields[n].i;
 }
 
@@ -34,10 +38,17 @@ static std::string_view storePathToName(std::string_view path)
     return i == std::string::npos ? base.substr(0, 0) : base.substr(i + 1);
 }
 
-class ProgressBar : public Logger
+static std::string_view storePathToNameWithoutDrvSuffix(std::string_view path)
+{
+    auto res = storePathToName(path);
+    if (hasSuffix(res, drvExtension))
+        res.remove_suffix(drvExtension.size());
+    return res;
+}
+
+class ProgressBar final : public Logger
 {
 private:
-
     struct ActInfo
     {
         std::string s, lastLine, phase;
@@ -94,11 +105,30 @@ private:
     bool printBuildLogs = false;
     bool isTTY;
 
+    std::unique_ptr<InterruptCallback> interruptCallback;
+
+    void hideCursorIfNeeded() const
+    {
+        if (isTTY)
+            writeToStderr("\e[?25l");
+    }
+
+    void unhideCursorIfNeeded() const
+    {
+        if (isTTY)
+            writeToStderr("\e[?25h");
+    }
+
 public:
 
     ProgressBar(bool isTTY)
         : isTTY(isTTY)
+        , interruptCallback(createInterruptCallback([&]() {
+            pause();
+            redraw("\rshutting down\e[K");
+        }))
     {
+        hideCursorIfNeeded();
         state_.lock()->active = isTTY;
         updateThread = std::thread([&]() {
             auto state(state_.lock());
@@ -124,7 +154,8 @@ public:
             auto state(state_.lock());
             if (state->active) {
                 state->active = false;
-                writeToStderr("\r\e[K");
+                clearProgressDisplay();
+                unhideCursorIfNeeded();
                 updateCV.notify_one();
                 quitCV.notify_one();
             }
@@ -142,8 +173,10 @@ public:
             return;
         }
 
-        if (state->active)
-            writeToStderr("\r\e[K");
+        if (state->active) {
+            clearProgressDisplay();
+            unhideCursorIfNeeded();
+        }
     }
 
     void resume() override
@@ -156,8 +189,10 @@ public:
             state->suspensions--;
         }
         if (state->suspensions == 0) {
-            if (state->active)
-                writeToStderr("\r\e[K");
+            if (state->active) {
+                clearProgressDisplay();
+                hideCursorIfNeeded();
+            }
             state->haveUpdate = true;
             updateCV.notify_one();
         }
@@ -189,6 +224,7 @@ public:
     void log(State & state, Verbosity lvl, std::string_view s)
     {
         if (state.active) {
+            invalidateRedrawCache();
             writeToStderr("\r\e[K" + filterANSIEscapes(s, !isTTY) + ANSI_NORMAL "\n");
             draw(state);
         } else {
@@ -216,9 +252,7 @@ public:
         state->activitiesByType[type].its.emplace(act, i);
 
         if (type == actBuild) {
-            std::string name(storePathToName(getS(fields, 0)));
-            if (hasSuffix(name, ".drv"))
-                name = name.substr(0, name.size() - 4);
+            auto name = storePathToNameWithoutDrvSuffix(getS(fields, 0));
             i->s = fmt("building " ANSI_BOLD "%s" ANSI_NORMAL, name);
             auto machineName = getS(fields, 1);
             if (machineName != "")
@@ -243,9 +277,7 @@ public:
         }
 
         if (type == actPostBuildHook) {
-            auto name = storePathToName(getS(fields, 0));
-            if (hasSuffix(name, ".drv"))
-                name = name.substr(0, name.size() - 4);
+            auto name = storePathToNameWithoutDrvSuffix(getS(fields, 0));
             i->s = fmt("post-build " ANSI_BOLD "%s" ANSI_NORMAL, name);
             i->name = DrvName(name).name;
         }
@@ -399,6 +431,17 @@ public:
             writeToStderr(newOutput);
             *lastOutput = std::move(newOutput);
         }
+    }
+
+    void invalidateRedrawCache()
+    {
+        *lastOutput_.lock() = "";
+    }
+
+    void clearProgressDisplay()
+    {
+        invalidateRedrawCache();
+        writeToStderr("\r\e[K");
     }
 
     std::chrono::milliseconds draw(State & state)
@@ -640,6 +683,7 @@ public:
     {
         auto state(state_.lock());
         if (state->active) {
+            invalidateRedrawCache();
             std::cerr << "\r\e[K";
             Logger::writeToStdout(s);
             draw(*state);
@@ -653,8 +697,11 @@ public:
         auto state(state_.lock());
         if (!state->active)
             return {};
+        invalidateRedrawCache();
         std::cerr << fmt("\r\e[K%s ", msg);
+        unhideCursorIfNeeded();
         auto s = trim(readLine(getStandardInput(), true));
+        hideCursorIfNeeded();
         if (s.size() != 1)
             return {};
         draw(*state);
@@ -666,6 +713,8 @@ public:
         this->printBuildLogs = printBuildLogs;
     }
 };
+
+} // namespace
 
 std::unique_ptr<Logger> makeProgressBar()
 {

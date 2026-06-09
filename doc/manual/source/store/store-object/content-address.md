@@ -63,9 +63,9 @@ That provisional store path is instead what is replaced with the sentinel value,
 > If, conversely, the data after this normalization process is still different, we'll compute a different content-address.
 > The method of preparing the provisional self-referenced data has *failed* to be deterministic in the sense of not *leaking* the choice of provisional store path --- a choice which is supposed to be arbitrary --- into the final store object.
 >
-> This property is informal because at this stage, we are just described store objects, which have no formal notion of their origin.
-> Without such a formal notion, there is nothing to formally accuse of being insufficiently deterministic.
-> Where we cover [derivations](@docroot@/store/derivation/index.md), we will have a chance to make this a formal property, not of content-addressed store objects themselves, but of derivations that *produce* content-addressed store objects.
+> This property is informal at this stage, because we are just describing store objects, which have no formal notion of their origin.
+> Without that, we cannot rigorously define what it would mean for the process to be insufficiently deterministic.
+> When we cover [derivations](@docroot@/store/derivation/index.md), we will be able to make this a formal property — not of content-addressed store objects themselves, but of the derivations that *produce* them.
 
 ### Name and Store Directory
 

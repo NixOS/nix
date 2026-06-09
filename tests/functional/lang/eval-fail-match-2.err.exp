@@ -1,0 +1,10 @@
+error:
+       … while calling the 'match' builtin
+         at /pwd/lang/eval-fail-match-2.nix:1:1:
+            1| builtins.match "foo" { }
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.match
+
+       error: expected a string but found a set: { }

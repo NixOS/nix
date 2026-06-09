@@ -1,27 +1,31 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/outputs-query.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/log-store.hh"
+#include "nix/store/local-store.hh"
 #include "nix/store/serve-protocol.hh"
 #include "nix/store/serve-protocol-connection.hh"
 #include "nix/main/shared.hh"
 #include "graphml.hh"
 #include "nix/cmd/legacy.hh"
-#include "nix/util/posix-source-accessor.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/export-import.hh"
+#include "nix/util/strings.hh"
+#include "nix/store/posix-fs-canonicalise.hh"
+#include "nix/util/error.hh"
+#include "nix/store/gc-store.hh"
 
 #include "man-pages.hh"
 
 #ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
-#  include "nix/store/local-store.hh"
 #  include "nix/util/monitor-fd.hh"
-#  include "nix/store/posix-fs-canonicalise.hh"
 #endif
 
 #include <iostream>
@@ -31,24 +35,20 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-#include "nix/store/build-result.hh"
 #include "nix/util/exit.hh"
 #include "nix/store/serve-protocol-impl.hh"
 
 namespace nix_store {
 
 using namespace nix;
-using std::cin;
-using std::cout;
 
 typedef void (*Operation)(Strings opFlags, Strings opArgs);
 
-static Path gcRoot;
+static std::filesystem::path gcRoot;
 static int rootNr = 0;
 static bool noOutput = false;
 static std::shared_ptr<Store> store;
 
-#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
 ref<LocalStore> ensureLocalStore()
 {
     auto store2 = std::dynamic_pointer_cast<LocalStore>(store);
@@ -56,7 +56,6 @@ ref<LocalStore> ensureLocalStore()
         throw Error("you don't have sufficient rights to use this command");
     return ref<LocalStore>(store2);
 }
-#endif
 
 static StorePath useDeriver(const StorePath & path)
 {
@@ -68,16 +67,17 @@ static StorePath useDeriver(const StorePath & path)
     return *info->deriver;
 }
 
-/* Realise the given path.  For a derivation that means build it; for
-   other paths it means ensure their validity. */
-static PathSet realisePath(StorePathWithOutputs path, bool build = true)
+/**
+ * Because we are downcasting first thing to a `LocalFSStore`, we know it is OK to return local paths.
+ */
+static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bool build = true)
 {
     auto store2 = std::dynamic_pointer_cast<LocalFSStore>(store);
 
     if (path.path.isDerivation()) {
         if (build)
             store->buildPaths({path.toDerivedPath()});
-        auto outputPaths = store->queryDerivationOutputMap(path.path);
+        auto outputPaths = deepQueryDerivationOutputMap(*store, path.path);
         Derivation drv = store->derivationFromPath(path.path);
         rootNr++;
 
@@ -86,19 +86,19 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             for (auto & i : drv.outputs)
                 path.outputs.insert(i.first);
 
-        PathSet outputs;
+        std::set<std::filesystem::path> outputs;
         for (auto & j : path.outputs) {
             /* Match outputs of a store path with outputs of the derivation that produces it. */
             DerivationOutputs::iterator i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'", store2->printStorePath(path.path), j);
             auto outPath = outputPaths.at(i->first);
-            auto retPath = store->printStorePath(outPath);
+            std::filesystem::path retPath = store->printStorePath(outPath);
             if (store2) {
                 if (gcRoot == "")
                     printGCWarning();
                 else {
-                    Path rootName = gcRoot;
+                    std::filesystem::path rootName = gcRoot;
                     if (rootNr > 1)
                         rootName += "-" + std::to_string(rootNr);
                     if (i->first != "out")
@@ -120,14 +120,14 @@ static PathSet realisePath(StorePathWithOutputs path, bool build = true)
             if (gcRoot == "")
                 printGCWarning();
             else {
-                Path rootName = gcRoot;
+                std::filesystem::path rootName = gcRoot;
                 rootNr++;
                 if (rootNr > 1)
                     rootName += "-" + std::to_string(rootNr);
                 return {store2->addPermRoot(path.path, rootName)};
             }
         }
-        return {store->printStorePath(path.path)};
+        return {std::filesystem::path{store->printStorePath(path.path)}};
     }
 }
 
@@ -180,7 +180,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
             auto paths2 = realisePath(i, false);
             if (!noOutput)
                 for (auto & j : paths2)
-                    cout << fmt("%1%\n", j);
+                    std::cout << fmt("%s\n", j.string());
         }
 }
 
@@ -191,8 +191,8 @@ static void opAdd(Strings opFlags, Strings opArgs)
         throw UsageError("unknown flag");
 
     for (auto & i : opArgs) {
-        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(i));
-        cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), sourcePath)));
+        auto sourcePath = makeFSSourceAccessor(absPath(i));
+        std::cout << fmt("%s\n", store->printStorePath(store->addToStore(std::string(baseNameOf(i)), sourcePath)));
     }
 }
 
@@ -215,7 +215,7 @@ static void opAddFixed(Strings opFlags, Strings opArgs)
     opArgs.pop_front();
 
     for (auto & i : opArgs) {
-        auto sourcePath = PosixSourceAccessor::createAtRoot(makeParentCanonical(i));
+        auto sourcePath = makeFSSourceAccessor(absPath(i));
         std::cout << fmt(
             "%s\n", store->printStorePath(store->addToStoreSlow(baseNameOf(i), sourcePath, method, hashAlgo).path));
     }
@@ -240,7 +240,7 @@ static void opPrintFixedPath(Strings opFlags, Strings opArgs)
     std::string hash = *i++;
     std::string name = *i++;
 
-    cout << fmt(
+    std::cout << fmt(
         "%s\n",
         store->printStorePath(store->makeFixedOutputPath(
             name,
@@ -278,11 +278,11 @@ static void
 printTree(const StorePath & path, const std::string & firstPad, const std::string & tailPad, StorePathSet & done)
 {
     if (!done.insert(path).second) {
-        cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
+        std::cout << fmt("%s%s [...]\n", firstPad, store->printStorePath(path));
         return;
     }
 
-    cout << fmt("%s%s\n", firstPad, store->printStorePath(path));
+    std::cout << fmt("%s%s\n", firstPad, store->printStorePath(path));
 
     auto info = store->queryPathInfo(path);
 
@@ -291,12 +291,9 @@ printTree(const StorePath & path, const std::string & firstPad, const std::strin
        input of B, then A is printed first.  This has the effect of
        flattening the tree, preventing deeply nested structures.  */
     auto sorted = store->topoSortPaths(info->references);
-    reverse(sorted.begin(), sorted.end());
 
-    for (const auto & [n, i] : enumerate(sorted)) {
-        bool last = n + 1 == sorted.size();
+    for (const auto & [last, i] : markLast(sorted | std::views::reverse))
         printTree(i, tailPad + (last ? treeLast : treeConn), tailPad + (last ? treeNull : treeLine), done);
-    }
 }
 
 /* Perform various sorts of queries. */
@@ -385,7 +382,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         for (auto & i : opArgs) {
             auto outputs = maybeUseOutputs(store->followLinksToStorePath(i), true, forceRealise);
             for (auto & outputPath : outputs)
-                cout << fmt("%1%\n", store->printStorePath(outputPath));
+                std::cout << fmt("%1%\n", store->printStorePath(outputPath));
         }
         break;
     }
@@ -414,14 +411,14 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
         auto sorted = store->topoSortPaths(paths);
         for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+            std::cout << fmt("%s\n", store->printStorePath(*i));
         break;
     }
 
     case qDeriver:
         for (auto & i : opArgs) {
             auto info = store->queryPathInfo(store->followLinksToStorePath(i));
-            cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
+            std::cout << fmt("%s\n", info->deriver ? store->printStorePath(*info->deriver) : "unknown-deriver");
         }
         break;
 
@@ -435,7 +432,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
         }
         auto sorted = store->topoSortPaths(result);
         for (StorePaths::reverse_iterator i = sorted.rbegin(); i != sorted.rend(); ++i)
-            cout << fmt("%s\n", store->printStorePath(*i));
+            std::cout << fmt("%s\n", store->printStorePath(*i));
         break;
     }
 
@@ -447,7 +444,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
             if (j == drv.env.end())
                 throw Error(
                     "derivation '%s' has no environment binding named '%s'", store->printStorePath(path), bindingName);
-            cout << fmt("%s\n", j->second);
+            std::cout << fmt("%s\n", j->second);
         }
         break;
 
@@ -458,9 +455,9 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 auto info = store->queryPathInfo(j);
                 if (query == qHash) {
                     assert(info->narHash.algo == HashAlgorithm::SHA256);
-                    cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
+                    std::cout << fmt("%s\n", info->narHash.to_string(HashFormat::Nix32, true));
                 } else if (query == qSize)
-                    cout << fmt("%d\n", info->narSize);
+                    std::cout << fmt("%d\n", info->narSize);
             }
         }
         break;
@@ -492,7 +489,7 @@ static void opQuery(Strings opFlags, Strings opArgs)
 
     case qResolve: {
         for (auto & i : opArgs)
-            cout << fmt("%s\n", store->printStorePath(store->followLinksToStorePath(i)));
+            std::cout << fmt("%s\n", store->printStorePath(store->followLinksToStorePath(i)));
         break;
     }
 
@@ -503,14 +500,15 @@ static void opQuery(Strings opFlags, Strings opArgs)
                 args.insert(p);
 
         StorePathSet referrers;
-        store->computeFSClosure(args, referrers, true, settings.gcKeepOutputs, settings.gcKeepDerivations);
+        auto & gcSettings = settings.getLocalSettings().getGCSettings();
+        store->computeFSClosure(args, referrers, true, gcSettings.keepOutputs, gcSettings.keepDerivations);
 
         auto & gcStore = require<GcStore>(*store);
         Roots roots = gcStore.findRoots(false);
         for (auto & [target, links] : roots)
             if (referrers.find(target) != referrers.end())
                 for (auto & link : links)
-                    cout << fmt("%1% -> %2%\n", link, gcStore.printStorePath(target));
+                    std::cout << fmt("%1% -> %2%\n", link, gcStore.printStorePath(target));
         break;
     }
 
@@ -526,25 +524,17 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     if (opArgs.size() != 1)
         throw UsageError("'--print-env' requires one derivation store path");
 
-    Path drvPath = opArgs.front();
-    Derivation drv = store->derivationFromPath(store->parseStorePath(drvPath));
+    StorePath drvPath = store->parseStorePath(opArgs.front());
+    Derivation drv = store->derivationFromPath(drvPath);
 
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
         logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
 
-    /* Also output the arguments.  This doesn't preserve whitespace in
-       arguments. */
-    cout << "export _args; _args='";
-    bool first = true;
-    for (auto & i : drv.args) {
-        if (!first)
-            cout << ' ';
-        first = false;
-        cout << escapeShellArgAlways(i);
-    }
-    cout << "'\n";
+    /* Also output the arguments. */
+    std::string argsStr = concatStringsSep(" ", drv.args);
+    std::cout << "export _args; _args=" << escapeShellArgAlways(argsStr) << "\n";
 }
 
 static void opReadLog(Strings opFlags, Strings opArgs)
@@ -571,10 +561,10 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
         throw UsageError("unknown flag");
     if (!opArgs.empty()) {
         for (auto & i : opArgs)
-            cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
+            std::cout << store->makeValidityRegistration({store->followLinksToStorePath(i)}, true, true);
     } else {
         for (auto & i : store->queryAllValidPaths())
-            cout << store->makeValidityRegistration({i}, true, true);
+            std::cout << store->makeValidityRegistration({i}, true, true);
     }
 }
 
@@ -590,17 +580,15 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
                                               std::numeric_limits<uint64_t>::max(),
                                           }}
                                         : std::nullopt;
-        auto info = decodeValidPathInfo(*store, cin, hashResultOpt);
+        auto info = decodeValidPathInfo(*store, std::cin, hashResultOpt);
         if (!info)
             break;
         if (!store->isValidPath(info->path) || reregister) {
             /* !!! races */
             if (canonicalise)
-#ifdef _WIN32 // TODO implement on Windows
-                throw UnimplementedError("file attribute canonicalisation Is not implemented on Windows");
-#else
-                canonicalisePathMetaData(store->printStorePath(info->path), {});
-#endif
+                canonicalisePathMetaData(
+                    store->printStorePath(info->path),
+                    {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
                     {store->requireStoreObjectAccessor(info->path, /*requireValidPath=*/false)},
@@ -613,9 +601,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-#ifndef _WIN32 // TODO reenable on Windows once we have `LocalStore` there
     ensureLocalStore()->registerValidPaths(infos);
-#endif
 }
 
 static void opLoadDB(Strings opFlags, Strings opArgs)
@@ -660,7 +646,7 @@ static void opCheckValidity(Strings opFlags, Strings opArgs)
         auto path = store->followLinksToStorePath(i);
         if (!store->isValidPath(path)) {
             if (printInvalid)
-                cout << fmt("%s\n", store->printStorePath(path));
+                std::cout << fmt("%s\n", store->printStorePath(path));
             else
                 throw Error("path '%s' is not valid", store->printStorePath(path));
         }
@@ -672,6 +658,7 @@ static void opGC(Strings opFlags, Strings opArgs)
     bool printRoots = false;
     GCOptions options;
     options.action = GCOptions::gcDeleteDead;
+    options.pathsToDelete = GCOptions::WholeStore{};
 
     GCResults results;
 
@@ -691,11 +678,15 @@ static void opGC(Strings opFlags, Strings opArgs)
     if (!opArgs.empty())
         throw UsageError("no arguments expected");
 
+    if (options.maxFreed != std::numeric_limits<uint64_t>::max()
+        && (options.action == GCOptions::gcReturnDead || options.action == GCOptions::gcReturnLive || printRoots))
+        throw UsageError("option --max-freed cannot be combined with --print-live, --print-dead, or --print-roots");
+
     auto & gcStore = require<GcStore>(*store);
 
     if (printRoots) {
         Roots roots = gcStore.findRoots(false);
-        std::set<std::pair<Path, StorePath>> roots2;
+        std::set<std::pair<std::filesystem::path, StorePath>> roots2;
         // Transpose and sort the roots.
         for (auto & [target, links] : roots)
             for (auto & link : links)
@@ -705,12 +696,14 @@ static void opGC(Strings opFlags, Strings opArgs)
     }
 
     else {
-        PrintFreed freed(options.action == GCOptions::gcDeleteDead, results);
+        Finally printer([&] {
+            if (options.action != GCOptions::gcDeleteDead)
+                for (auto & i : results.paths)
+                    std::cout << i << std::endl;
+            else
+                printFreed(false, results);
+        });
         gcStore.collectGarbage(options, results);
-
-        if (options.action != GCOptions::gcDeleteDead)
-            for (auto & i : results.paths)
-                cout << i << std::endl;
     }
 }
 
@@ -728,13 +721,17 @@ static void opDelete(Strings opFlags, Strings opArgs)
         else
             throw UsageError("unknown flag '%1%'", i);
 
+    StorePathSet paths;
     for (auto & i : opArgs)
-        options.pathsToDelete.insert(store->followLinksToStorePath(i));
+        paths.insert(store->followLinksToStorePath(i));
+    options.pathsToDelete = GCOptions::SpecificPaths{
+        .paths = std::move(paths),
+    };
 
     auto & gcStore = require<GcStore>(*store);
 
     GCResults results;
-    PrintFreed freed(true, results);
+    Finally printer([&] { printFreed(false, results); });
     gcStore.collectGarbage(options, results);
 }
 
@@ -791,7 +788,7 @@ static void opImport(Strings opFlags, Strings opArgs)
     auto paths = importPaths(*store, source, NoCheckSigs);
 
     for (auto & i : paths)
-        cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
+        std::cout << fmt("%s\n", store->printStorePath(i)) << std::flush;
 }
 
 /* Initialise the Nix databases. */
@@ -894,7 +891,7 @@ static void opServe(Strings opFlags, Strings opArgs)
     FdSink out(getStandardOutput());
 
     /* Exchange the greeting. */
-    ServeProto::Version clientVersion = ServeProto::BasicServerConnection::handshake(out, in, SERVE_PROTOCOL_VERSION);
+    ServeProto::Version clientVersion = ServeProto::BasicServerConnection::handshake(out, in, ServeProto::latest);
 
     ServeProto::ReadConn rconn{
         .from = in,
@@ -909,8 +906,8 @@ static void opServe(Strings opFlags, Strings opArgs)
         // FIXME: changing options here doesn't work if we're
         // building through the daemon.
         verbosity = lvlError;
-        settings.keepLog = false;
-        settings.useSubstitutes = false;
+        settings.getLogFileSettings().keepLog = false;
+        settings.getWorkerSettings().useSubstitutes = false;
 
         auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
 
@@ -919,11 +916,11 @@ static void opServe(Strings opFlags, Strings opArgs)
         // See how the serialization logic in
         // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
         // these conditions.
-        settings.maxSilentTime = options.maxSilentTime;
-        settings.buildTimeout = options.buildTimeout;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 2)
-            settings.maxLogSize = options.maxLogSize;
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 3) {
+        settings.getWorkerSettings().maxSilentTime = options.maxSilentTime;
+        settings.getWorkerSettings().buildTimeout = options.buildTimeout;
+        if (clientVersion >= ServeProto::Version{2, 2})
+            settings.getWorkerSettings().maxLogSize = options.maxLogSize;
+        if (clientVersion >= ServeProto::Version{2, 3}) {
             if (options.nrRepeats != 0) {
                 throw Error("client requested repeating builds, but this is not currently implemented");
             }
@@ -934,9 +931,9 @@ static void opServe(Strings opFlags, Strings opArgs)
             // checked that `nrRepeats` in fact is 0, so we can safely
             // ignore this without doing something other than what the
             // client asked for.
-            settings.runDiffHook = true;
+            settings.getLocalSettings().runDiffHook = true;
         }
-        if (GET_PROTOCOL_MINOR(clientVersion) >= 7) {
+        if (clientVersion >= ServeProto::Version{2, 7}) {
             settings.keepFailed = options.keepFailed;
         }
     };
@@ -1066,7 +1063,7 @@ static void opServe(Strings opFlags, Strings opArgs)
                 info.deriver = store->parseStorePath(deriver);
             info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
             in >> info.registrationTime >> info.narSize >> info.ultimate;
-            info.sigs = readStrings<StringSet>(in);
+            info.sigs = ServeProto::Serialise<std::set<Signature>>::read(*store, rconn);
             info.ca = ContentAddress::parseOpt(readString(in));
 
             if (info.narSize == 0)
@@ -1106,9 +1103,8 @@ static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 
     auto secretKey = SecretKey::generate(keyName);
 
-    writeFile(publicKeyFile, secretKey.toPublicKey().to_string());
-    umask(0077);
-    writeFile(secretKeyFile, secretKey.to_string());
+    writeFile(publicKeyFile, secretKey.toPublicKey().to_string(), 0666, FsSync::Yes);
+    writeFile(secretKeyFile, secretKey.to_string(), 0600, FsSync::Yes);
 }
 
 static void opVersion(Strings opFlags, Strings opArgs)

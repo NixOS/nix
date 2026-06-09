@@ -1,9 +1,6 @@
-#include <filesystem>
 #include <string>
-#include <sstream>
 
 #include "nix/util/strings-inline.hh"
-#include "nix/util/os-string.hh"
 #include "nix/util/error.hh"
 #include "nix/util/util.hh"
 

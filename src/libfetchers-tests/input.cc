@@ -1,8 +1,12 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/fetchers/fetch-settings.hh"
+#include "nix/util/tests/gmock-matchers.hh"
+#include "nix/util/url.hh"
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include <string>
 
@@ -57,5 +61,19 @@ INSTANTIATE_TEST_SUITE_P(
                 },
         }),
     [](const ::testing::TestParamInfo<InputFromAttrsTestCase> & info) { return info.param.description; });
+
+namespace fetchers {
+
+class GitHubInputTest : public ::testing::Test
+{};
+
+TEST_F(GitHubInputTest, throwOnInvalidURLParam)
+{
+    EXPECT_THAT(
+        []() { Input::fromURL(fetchers::Settings{}, "github:a/b?tag=foo"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("tag")));
+}
+
+} // namespace fetchers
 
 } // namespace nix

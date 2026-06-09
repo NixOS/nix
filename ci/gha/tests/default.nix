@@ -57,8 +57,6 @@ rec {
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
 
       mesonComponentOverrides = lib.composeManyExtensions componentOverrides;
-      # Unclear how to make Perl bindings work with a dynamically linked ASAN.
-      nix-perl-bindings = if withSanitizers then null else prev.nix-perl-bindings;
     }
   );
 
@@ -78,6 +76,7 @@ rec {
     installerScriptForGHA = hydraJobs.installerScriptForGHA.${system};
     installTests = hydraJobs.installTests.${system};
     nixpkgsLibTests = hydraJobs.tests.nixpkgsLibTests.${system};
+    filetransfer-retry-backoff = hydraJobs.tests.filetransfer-retry-backoff.${system};
     rl-next = pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
       LANG=C.UTF-8 ${pkgs.changelog-d}/bin/changelog-d ${../../../doc/manual/rl-next} >$out
     '';

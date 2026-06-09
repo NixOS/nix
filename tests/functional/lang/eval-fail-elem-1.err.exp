@@ -1,0 +1,10 @@
+error:
+       … while calling the 'elem' builtin
+         at /pwd/lang/eval-fail-elem-1.nix:1:1:
+            1| builtins.elem 1 "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.elem
+
+       error: expected a list but found a string: "foo"

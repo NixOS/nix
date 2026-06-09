@@ -172,7 +172,7 @@
         f"did not set lfs, yet lfs-enrolled file is {file_size_default}b (>= 1KiB), probably bad default value"
 
     with subtest("Use as flake input"):
-      # May seem reduntant, but this has minor differences compared to raw
+      # May seem redundant, but this has minor differences compared to raw
       # fetchGit which caused failures before
       with TemporaryDirectory() as tempdir:
         client.succeed(f"mkdir -p {tempdir}")

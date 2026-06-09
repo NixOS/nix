@@ -8,6 +8,12 @@ configdata_unix.set(
   description : 'Optionally used for changing the files and symlinks.',
 )
 
+configdata_unix.set(
+  'HAVE_F_GETPATH',
+  cxx.has_header_symbol('fcntl.h', 'F_GETPATH').to_int(),
+  description : 'Optionally used for getting the path of a file descriptor (macOS).',
+)
+
 # Check for each of these functions, and create a define like `#define
 # HAVE_CLOSE_RANGE 1`.
 check_funcs_unix = [
@@ -53,12 +59,13 @@ sources += files(
   'environment-variables.cc',
   'file-descriptor.cc',
   'file-path.cc',
+  'file-system-at.cc',
   'file-system.cc',
   'muxable-pipe.cc',
-  'os-string.cc',
   'processes.cc',
   'signals.cc',
   'users.cc',
+  'xdg-dirs.cc',
 )
 
 subdir('include/nix/util')

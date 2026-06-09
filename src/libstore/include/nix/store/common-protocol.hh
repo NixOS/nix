@@ -3,6 +3,8 @@
 
 #include "nix/util/serialise.hh"
 
+#include <variant>
+
 namespace nix {
 
 struct StoreDirConfig;
@@ -13,6 +15,9 @@ class StorePath;
 struct ContentAddress;
 struct DrvOutput;
 struct Realisation;
+struct Signature;
+enum struct BuildResultSuccessStatus : uint8_t;
+enum struct BuildResultFailureStatus : uint8_t;
 
 /**
  * Shared serializers between the worker protocol, serve protocol, and a
@@ -72,6 +77,8 @@ template<>
 DECLARE_COMMON_SERIALISER(DrvOutput);
 template<>
 DECLARE_COMMON_SERIALISER(Realisation);
+template<>
+DECLARE_COMMON_SERIALISER(Signature);
 
 #define COMMA_ ,
 template<typename T>
@@ -81,8 +88,8 @@ DECLARE_COMMON_SERIALISER(std::set<T COMMA_ Compare>);
 template<typename... Ts>
 DECLARE_COMMON_SERIALISER(std::tuple<Ts...>);
 
-template<typename K, typename V>
-DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V>);
+template<typename K, typename V, typename Compare>
+DECLARE_COMMON_SERIALISER(std::map<K COMMA_ V COMMA_ Compare>);
 #undef COMMA_
 
 /**
@@ -103,5 +110,15 @@ template<>
 DECLARE_COMMON_SERIALISER(std::optional<StorePath>);
 template<>
 DECLARE_COMMON_SERIALISER(std::optional<ContentAddress>);
+
+/**
+ * The success and failure codes never overlay in enum tag values in the wire formats
+ */
+using BuildResultStatus = std::variant<BuildResultSuccessStatus, BuildResultFailureStatus>;
+
+template<>
+DECLARE_COMMON_SERIALISER(BuildResultStatus);
+
+#undef COMMA_
 
 } // namespace nix

@@ -54,6 +54,14 @@ in
               echo 'foobar' > "$out/index.html"
             '';
           };
+
+          virtualHosts."auth" = {
+            basicAuth.alice = "s3cr3t";
+            root = pkgs.runCommand "nginx-root" { } ''
+              mkdir "$out"
+              echo 'authed' > "$out/index.html"
+            '';
+          };
         };
 
         security.pki.certificateFiles = [ "${goodCert}/cert.pem" ];
@@ -61,6 +69,7 @@ in
         networking.hosts."127.0.0.1" = [
           "good"
           "bad"
+          "auth"
         ];
 
         virtualisation.writableStore = true;
@@ -89,5 +98,16 @@ in
 
     # Fetching from a server with a trusted cert should work via environment variable override.
     machine.succeed("NIX_SSL_CERT_FILE=/tmp/cafile.pem nix build --no-substitute --expr 'import <nix/fetchurl.nix> { url = \"https://bad/index.html\"; hash = \"sha256-rsBwZF/lPuOzdjBZN2E08FjMM3JHyXit0Xi2zN+wAZ8=\"; }'")
+
+    # builtins.fetchurl should authenticate using userinfo from the URL.
+    out = machine.succeed("nix eval --raw --impure --no-substitute --expr 'builtins.readFile (builtins.fetchurl { url = \"http://alice:s3cr3t@auth/index.html\"; sha256 = \"sha256-67y3HalfTt2zfgMt7BwU5vkaGWcelFlR4jryIkA1dTo=\"; })'")
+    assert out == "authed\n", out
+
+    # On failure the transport-layer diagnostic must show the stripped URL,
+    # not the userinfo. (The eval trace still echoes the source expression;
+    # that is the user's own input, not a leak.)
+    err = machine.fail("nix eval --raw --impure --no-substitute --option tarball-ttl 0 --expr 'builtins.fetchurl { url = \"http://alice:wrong-secret@auth/index.html\"; sha256 = \"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"; }' 2>&1")
+    print(err)
+    assert "unable to download 'http://auth/index.html'" in err, err
   '';
 }

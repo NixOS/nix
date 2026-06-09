@@ -1,0 +1,10 @@
+error:
+       … while calling the 'hashString' builtin
+         at /pwd/lang/eval-fail-hashString-1.nix:1:1:
+            1| builtins.hashString 1 { }
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.hashString
+
+       error: expected a string but found an integer: 1

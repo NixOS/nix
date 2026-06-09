@@ -162,6 +162,7 @@ private:
     std::ostream & output;
     EvalState & state;
     PrintOptions options;
+    NixStringContext * context;
     std::optional<ValuesSeen> seen;
     size_t totalAttrsPrinted = 0;
     size_t totalListItemsPrinted = 0;
@@ -509,6 +510,17 @@ private:
         }
     }
 
+    void printFailed()
+    {
+        if (options.ansiColors)
+            output << ANSI_MAGENTA;
+        // Historically, a tried and then ignored value (e.g. through tryEval) was
+        // reverted to the original thunk.
+        output << "«thunk»";
+        if (options.ansiColors)
+            output << ANSI_NORMAL;
+    }
+
     void printExternal(Value & v)
     {
         v.external()->print(output);
@@ -566,9 +578,12 @@ private:
                 printBool(v);
                 break;
 
-            case nString:
+            case nString: {
                 printString(v);
+                if (context)
+                    copyContext(v, *context);
                 break;
+            }
 
             case nPath:
                 printPath(v);
@@ -588,6 +603,10 @@ private:
 
             case nFunction:
                 printFunction(v);
+                break;
+
+            case nFailed:
+                printFailed();
                 break;
 
             case nThunk:
@@ -617,10 +636,11 @@ private:
     }
 
 public:
-    Printer(std::ostream & output, EvalState & state, PrintOptions options)
+    Printer(std::ostream & output, EvalState & state, PrintOptions options, NixStringContext * context)
         : output(output)
         , state(state)
         , options(options)
+        , context(context)
     {
     }
 
@@ -641,14 +661,14 @@ public:
     }
 };
 
-void printValue(EvalState & state, std::ostream & output, Value & v, PrintOptions options)
+void printValue(EvalState & state, std::ostream & output, Value & v, PrintOptions options, NixStringContext * context)
 {
-    Printer(output, state, options).print(v);
+    Printer(output, state, options, context).print(v);
 }
 
 std::ostream & operator<<(std::ostream & output, const ValuePrinter & printer)
 {
-    printValue(printer.state, output, printer.value, printer.options);
+    printValue(printer.state, output, printer.value, printer.options, printer.context);
     return output;
 }
 

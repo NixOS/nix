@@ -9,13 +9,13 @@
 
 #include "nix/util/exit.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdVerify : StorePathsCommand
 {
     bool noContents = false;
     bool noTrust = false;
-    Strings substituterUris;
+    std::vector<StoreReference> substituterUris;
     size_t sigsNeeded = 0;
 
     CmdVerify()
@@ -37,7 +37,7 @@ struct CmdVerify : StorePathsCommand
             .shortName = 's',
             .description = "Use signatures from the specified store.",
             .labels = {"store-uri"},
-            .handler = {[&](std::string s) { substituterUris.push_back(s); }},
+            .handler = {[&](std::string s) { substituterUris.push_back(StoreReference::parse(s)); }},
         });
 
         addFlag({
@@ -65,7 +65,7 @@ struct CmdVerify : StorePathsCommand
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
-            substituters.push_back(openStore(s));
+            substituters.push_back(openStore(StoreReference{s}));
 
         auto publicKeys = getDefaultPublicKeys();
 
@@ -123,11 +123,11 @@ struct CmdVerify : StorePathsCommand
 
                     else {
 
-                        StringSet sigsSeen;
+                        std::set<Signature> sigsSeen;
                         size_t actualSigsNeeded = std::max(sigsNeeded, (size_t) 1);
                         size_t validSigs = 0;
 
-                        auto doSigs = [&](StringSet sigs) {
+                        auto doSigs = [&](std::set<Signature> sigs) {
                             for (const auto & sig : sigs) {
                                 if (!sigsSeen.insert(sig).second)
                                     continue;
@@ -186,3 +186,5 @@ struct CmdVerify : StorePathsCommand
 };
 
 static auto rCmdVerify = registerCommand2<CmdVerify>({"store", "verify"});
+
+} // namespace nix

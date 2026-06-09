@@ -88,11 +88,14 @@ protected:
 
 TEST_F(FSSourceAccessorTest, works)
 {
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
     {
         RestoreSink sink(false);
         sink.dstPath = tmpDir;
 #ifndef _WIN32
-        sink.dirFd = openDirectory(tmpDir);
+        sink.dirFd = openDirectory(tmpDir, FinalSymlink::Follow);
 #endif
         sink.createDirectory(CanonPath("subdir"));
         sink.createRegularFile(CanonPath("file1"), [](CreateRegularFileSink & crf) { crf("content1"); });
@@ -124,9 +127,7 @@ TEST_F(FSSourceAccessorTest, works)
     }
 
     {
-        auto accessor = makeFSSourceAccessor(tmpDir / "nonexistent");
-        EXPECT_FALSE(accessor->maybeLstat(CanonPath::root));
-        EXPECT_THROW(accessor->readFile(CanonPath::root), SystemError);
+        EXPECT_THROW(makeFSSourceAccessor(tmpDir / "nonexistent"), SystemError);
     }
 
     {
@@ -135,6 +136,65 @@ TEST_F(FSSourceAccessorTest, works)
         accessor->maybeLstat(CanonPath("file1"));
         EXPECT_GT(accessor->getLastModified(), 0);
     }
+}
+
+TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "fd-based accessor is Unix-only";
+#endif
+    auto accessor = makeFSSourceAccessor(tmpDir);
+
+    createDirs(tmpDir / "a" / "b");
+    writeFile(tmpDir / "a" / "b" / "f", "old");
+
+    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/f")));
+
+    deletePath(tmpDir / "a" / "b");
+    createDirs(tmpDir / "a" / "b");
+    writeFile(tmpDir / "a" / "b" / "g", "new");
+    createSymlink("g", tmpDir / "a" / "b" / "l");
+
+    accessor->invalidateCache();
+
+    EXPECT_FALSE(accessor->pathExists(CanonPath("a/b/f")));
+    EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/g")));
+    EXPECT_THAT(accessor, HasContents(CanonPath("a/b/g"), "new"));
+    EXPECT_THAT(accessor, HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
+    EXPECT_THAT(accessor, HasSymlink(CanonPath("a/b/l"), "g"));
+}
+
+/* ----------------------------------------------------------------------------
+ * RestoreSink non-directory at root (no dirFd)
+ * --------------------------------------------------------------------------*/
+
+TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
+{
+    auto filePath = tmpDir / "rootfile";
+    {
+        RestoreSink sink(false);
+        sink.dstPath = filePath;
+        // No dirFd set - this tests the !dirFd path
+        sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
+    }
+
+    EXPECT_THAT(makeFSSourceAccessor(filePath), HasContents(CanonPath::root, "root content"));
+}
+
+TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "symlinks have some problems under Wine";
+#endif
+    auto linkPath = tmpDir / "rootlink";
+    {
+        RestoreSink sink(false);
+        sink.dstPath = linkPath;
+        // No dirFd set - this tests the !dirFd path
+        sink.createSymlink(CanonPath::root, "symlink_target");
+    }
+
+    EXPECT_THAT(makeFSSourceAccessor(linkPath), HasSymlink(CanonPath::root, "symlink_target"));
 }
 
 } // namespace nix

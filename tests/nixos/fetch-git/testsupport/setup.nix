@@ -86,7 +86,7 @@ in
         "flakes"
       ];
     };
-    setupScript = '''';
+    setupScript = "";
     testScript = ''
       start_all();
 

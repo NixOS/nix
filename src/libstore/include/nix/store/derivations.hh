@@ -274,7 +274,10 @@ struct BasicDerivation
      */
     StorePathSet inputSrcs;
     std::string platform;
-    Path builder;
+    /**
+     * Probably should be an absolute path in the path format that `platform` uses
+     */
+    std::string builder;
     Strings args;
     /**
      * Must not contain the key `__json`, at least in order to serialize to ATerm.
@@ -289,7 +292,7 @@ struct BasicDerivation
     BasicDerivation(const BasicDerivation &) = default;
     BasicDerivation & operator=(BasicDerivation &&) = default;
     BasicDerivation & operator=(const BasicDerivation &) = default;
-    virtual ~BasicDerivation() {};
+    virtual ~BasicDerivation();
 
     bool isBuiltin() const;
 
@@ -341,6 +344,19 @@ struct Derivation : BasicDerivation
         DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const;
 
     /**
+     * Determine whether this derivation should be resolved before building.
+     *
+     * Resolution is needed when:
+     * - Input-addressed derivations are deferred (depend on CA derivations)
+     * - Content-addressed derivations have input drvs and are either:
+     *   - Floating (non-fixed), which must always be resolved
+     *   - Fixed, which can optionally be resolved when ca-derivations is enabled
+     * - Impure derivations always need resolution
+     * - Any input derivations have outputs from dynamic derivations
+     */
+    bool shouldResolve() const;
+
+    /**
      * Return the underlying basic derivation but with these changes:
      *
      * 1. Input drvs are emptied, but the outputs of them that were used
@@ -358,7 +374,7 @@ struct Derivation : BasicDerivation
      */
     std::optional<BasicDerivation> tryResolve(
         Store & store,
-        std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+        fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const;
 
     /**
@@ -411,6 +427,11 @@ struct Derivation : BasicDerivation
     void fillInOutputPaths(Store & store);
 
     Derivation() = default;
+    Derivation(Derivation &&) = default;
+    Derivation(const Derivation &) = default;
+    Derivation & operator=(Derivation &&) = default;
+    Derivation & operator=(const Derivation &) = default;
+    ~Derivation() override;
 
     Derivation(const BasicDerivation & bd)
         : BasicDerivation(bd)
@@ -453,9 +474,11 @@ struct Derivation : BasicDerivation
 class Store;
 
 /**
- * Write a derivation to the Nix store, and return its path.
+ * Compute the store path that would be used for a derivation without writing it.
+ *
+ * This is a pure computation based on the derivation content and store directory.
  */
-StorePath writeDerivation(Store & store, const Derivation & drv, RepairFlag repair = NoRepair, bool readOnly = false);
+StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
 
 /**
  * Read a derivation from a file.
@@ -489,34 +512,39 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName);
  * derivations (fixed-output or not) will have a different hash for each
  * output.
  */
-struct DrvHash
+struct DrvHashModulo
 {
     /**
-     * Map from output names to hashes
+     * Single hash for the derivation
+     *
+     * This is for an input-addressed derivation that doesn't
+     * transitively depend on any floating-CA derivations.
      */
-    std::map<std::string, Hash> hashes;
-
-    enum struct Kind : bool {
-        /**
-         * Statically determined derivations.
-         * This hash will be directly used to compute the output paths
-         */
-        Regular,
-
-        /**
-         * Floating-output derivations (and their reverse dependencies).
-         */
-        Deferred,
-    };
+    using DrvHash = Hash;
 
     /**
-     * The kind of derivation this is, simplified for just "derivation hash
-     * modulo" purposes.
+     * Known CA drv's output hashes, for fixed-output derivations whose
+     * output hashes are always known since they are fixed up-front.
      */
-    Kind kind;
-};
+    using CaOutputHashes = std::map<std::string, Hash>;
 
-void operator|=(DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
+    /**
+     * This derivation doesn't yet have known output hashes.
+     *
+     * Either because itself is floating CA, or it (transtively) depends
+     * on a floating CA derivation.
+     */
+    using DeferredDrv = std::monostate;
+
+    using Raw = std::variant<DrvHash, CaOutputHashes, DeferredDrv>;
+
+    Raw raw;
+
+    bool operator==(const DrvHashModulo &) const = default;
+    // auto operator <=> (const DrvHashModulo &) const = default;
+
+    MAKE_WRAPPER_CONSTRUCTOR(DrvHashModulo);
+};
 
 /**
  * Returns hashes with the details of fixed-output subderivations
@@ -542,15 +570,17 @@ void operator|=(DrvHash::Kind & self, const DrvHash::Kind & other) noexcept;
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
  */
-DrvHash hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
 
 /**
- * Return a map associating each output to a hash that uniquely identifies its
- * derivation (modulo the self-references).
+ * If a derivation is input addressed and doesn't yet have its input
+ * addressed (is deferred) try using `hashDerivationModulo`.
  *
- * \todo What is the Hash in this map?
+ * Does nothing if not deferred input-addressed, or
+ * `hashDerivationModulo` indicates it is missing inputs' output paths
+ * and is not yet ready (and must stay deferred).
  */
-std::map<std::string, Hash> staticOutputHashes(Store & store, const Derivation & drv);
+void resolveInputAddressed(Store & store, Derivation & drv);
 
 struct DrvHashFct
 {
@@ -565,7 +595,7 @@ struct DrvHashFct
 /**
  * Memoisation of hashDerivationModulo().
  */
-typedef boost::concurrent_flat_map<StorePath, DrvHash, DrvHashFct> DrvHashes;
+typedef boost::concurrent_flat_map<StorePath, DrvHashModulo, DrvHashFct> DrvHashes;
 
 // FIXME: global, though at least thread-safe.
 extern DrvHashes drvHashes;
@@ -595,4 +625,5 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 } // namespace nix
 
 JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
+JSON_IMPL_WITH_XP_FEATURES(nix::BasicDerivation)
 JSON_IMPL_WITH_XP_FEATURES(nix::Derivation)

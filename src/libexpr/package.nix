@@ -14,6 +14,7 @@
   boehmgc,
   nlohmann_json,
   toml11,
+  libcpuid,
 
   # Configuration Options
 
@@ -64,7 +65,8 @@ mkMesonLibrary (finalAttrs: {
 
   buildInputs = [
     toml11
-  ];
+  ]
+  ++ lib.optional stdenv.hostPlatform.isx86_64 libcpuid;
 
   propagatedBuildInputs = [
     nix-util

@@ -17,6 +17,12 @@ namespace nix {
  */
 struct RemoteStore::Connection : WorkerProto::BasicClientConnection, WorkerProto::ClientHandshakeInfo
 {
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
+
+public:
     /**
      * Time this connection was established.
      */
@@ -59,7 +65,7 @@ struct RemoteStore::ConnectionHandle
 
     void processStderr(Sink * sink = 0, Source * source = 0, bool flush = true, bool block = true);
 
-    void withFramedSink(std::function<void(Sink & sink)> fun);
+    void withFramedSink(fun<void(Sink & sink)> sendData);
 };
 
 } // namespace nix

@@ -38,6 +38,10 @@ namespace nix {
  */
 struct IndirectRootStore : public virtual LocalFSStore
 {
+private:
+    void anchor() override;
+
+public:
     inline static std::string operationName = "Indirect GC roots registration";
 
     /**
@@ -55,7 +59,7 @@ struct IndirectRootStore : public virtual LocalFSStore
      * The implementation of this method is concrete, but it delegates
      * to `addIndirectRoot()` which is abstract.
      */
-    Path addPermRoot(const StorePath & storePath, const Path & gcRoot) override final;
+    std::filesystem::path addPermRoot(const StorePath & storePath, const std::filesystem::path & gcRoot) override final;
 
     /**
      * Add an indirect root, which is a weak reference to the
@@ -66,10 +70,10 @@ struct IndirectRootStore : public virtual LocalFSStore
      *
      * The form this weak-reference takes is implementation-specific.
      */
-    virtual void addIndirectRoot(const Path & path) = 0;
+    virtual void addIndirectRoot(const std::filesystem::path & path) = 0;
 
 protected:
-    void makeSymlink(const Path & link, const Path & target);
+    void makeSymlink(const std::filesystem::path & link, const std::filesystem::path & target);
 };
 
 } // namespace nix

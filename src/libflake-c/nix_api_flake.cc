@@ -62,7 +62,7 @@ nix_err nix_flake_reference_parse_flags_set_base_directory(
 {
     nix_clear_err(context);
     try {
-        flags->baseDirectory.emplace(nix::Path{std::string(baseDirectory, baseDirectoryLen)});
+        flags->baseDirectory.emplace(std::string(baseDirectory, baseDirectoryLen));
         return NIX_OK;
     }
     NIXC_CATCH_ERRS

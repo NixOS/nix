@@ -1,3 +1,5 @@
+#pragma once
+
 #include "nix/fetchers/fetchers.hh"
 
 namespace nix::fetchers {

@@ -34,12 +34,17 @@ struct AwsCredentials
     }
 };
 
-class AwsAuthError : public Error
+class AwsAuthError final : public CloneableError<AwsAuthError, Error>
 {
+private:
+    void anchor() override;
+
+public:
     std::optional<int> errorCode;
 
 public:
-    using Error::Error;
+    using CloneableError::CloneableError;
+
     AwsAuthError(int errorCode);
 
     std::optional<int> getErrorCode() const
@@ -69,7 +74,7 @@ public:
         }
     }
 
-    virtual ~AwsCredentialProvider() {}
+    virtual ~AwsCredentialProvider();
 };
 
 /**

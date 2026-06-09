@@ -1,0 +1,20 @@
+error:
+       … while evaluating list element at index 0
+
+       … from call site
+         at /pwd/lang/eval-fail-genList-3.nix:1:19:
+            1| builtins.genList (x: x + "foo") 2
+             |                   ^
+            2|
+
+       … while calling anonymous lambda
+         at /pwd/lang/eval-fail-genList-3.nix:1:19:
+            1| builtins.genList (x: x + "foo") 2
+             |                   ^
+            2|
+
+       error: cannot add a string to an integer
+       at /pwd/lang/eval-fail-genList-3.nix:1:26:
+            1| builtins.genList (x: x + "foo") 2
+             |                          ^
+            2|

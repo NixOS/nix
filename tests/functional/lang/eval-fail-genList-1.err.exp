@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genList' builtin
+         at /pwd/lang/eval-fail-genList-1.nix:1:1:
+            1| builtins.genList 1 "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.genList
+
+       error: expected an integer but found a string: "foo"

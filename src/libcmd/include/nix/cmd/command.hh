@@ -5,6 +5,7 @@
 #include "nix/util/args.hh"
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/store/path.hh"
+#include "nix/store/store-reference.hh"
 #include "nix/flake/lockfile.hh"
 
 #include <optional>
@@ -41,27 +42,42 @@ struct NixMultiCommand : MultiCommand, virtual Command
 #pragma GCC diagnostic ignored "-Woverloaded-virtual"
 
 /**
+ * A command that requires a \ref StoreConfig store configuration.
+ */
+struct StoreConfigCommand : virtual Command
+{
+    StoreConfigCommand();
+    void run() override;
+
+    /**
+     * Return the default Nix store configuration.
+     */
+    ref<StoreConfig> getStoreConfig();
+
+    virtual ref<StoreConfig> createStoreConfig();
+    /**
+     * Main entry point, with a `StoreConfig` provided
+     */
+    virtual void run(ref<StoreConfig>) = 0;
+
+private:
+    std::shared_ptr<StoreConfig> _storeConfig;
+};
+
+/**
  * A command that requires a \ref Store "Nix store".
  */
-struct StoreCommand : virtual Command
+struct StoreCommand : virtual StoreConfigCommand
 {
     StoreCommand();
-    void run() override;
+    void run(ref<StoreConfig>) override;
 
     /**
      * Return the default Nix store.
      */
     ref<Store> getStore();
 
-    /**
-     * Return the destination Nix store.
-     */
-    virtual ref<Store> getDstStore()
-    {
-        return getStore();
-    }
-
-    virtual ref<Store> createStore();
+    ref<Store> createStore();
     /**
      * Main entry point, with a `Store` provided
      */
@@ -77,13 +93,13 @@ private:
  */
 struct CopyCommand : virtual StoreCommand
 {
-    std::string srcUri, dstUri;
+    std::optional<StoreReference> srcUri, dstUri;
 
     CopyCommand();
 
-    ref<Store> createStore() override;
+    ref<StoreConfig> createStoreConfig() override;
 
-    ref<Store> getDstStore() override;
+    ref<Store> getDstStore();
 };
 
 /**
@@ -284,11 +300,11 @@ struct StorePathCommand : public StorePathsCommand
  */
 struct RegisterCommand
 {
-    typedef std::map<std::vector<std::string>, std::function<ref<Command>()>> Commands;
+    typedef std::map<std::vector<std::string>, fun<ref<Command>()>> Commands;
 
     static Commands & commands();
 
-    RegisterCommand(std::vector<std::string> && name, std::function<ref<Command>()> command)
+    RegisterCommand(std::vector<std::string> && name, fun<ref<Command>()> command)
     {
         commands().emplace(name, command);
     }
@@ -315,11 +331,11 @@ struct MixProfile : virtual StoreCommand
     MixProfile();
 
     /* If 'profile' is set, make it point at 'storePath'. */
-    void updateProfile(const StorePath & storePath);
+    void updateProfile(Store & store, const StorePath & storePath);
 
     /* If 'profile' is set, make it point at the store path produced
        by 'buildables'. */
-    void updateProfile(const BuiltPaths & buildables);
+    void updateProfile(Store & store, const BuiltPaths & buildables);
 };
 
 struct MixDefaultProfile : MixProfile
@@ -391,13 +407,16 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
 struct MixOutLinkBase : virtual Args
 {
     /** Prefix for any output symlinks. Empty means do not write an output symlink. */
-    Path outLink;
+    std::optional<std::filesystem::path> outLink = std::nullopt;
 
-    MixOutLinkBase(const std::string & defaultOutLink)
+    MixOutLinkBase(const std::optional<std::filesystem::path> & defaultOutLink)
         : outLink(defaultOutLink)
     {
     }
 
+    /** underlying function */
+    void createOutLinksMaybe(const BuiltPaths & paths, ref<Store> & store);
+    /** smaller wrapper for convenience (historically this was the only one) */
     void createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store);
 };
 
@@ -419,9 +438,25 @@ struct MixOutLinkByDefault : MixOutLinkBase, virtual Args
         addFlag({
             .longName = "no-link",
             .description = "Do not create symlinks to the build results.",
-            .handler = {&outLink, Path("")},
+            .handler = {[&] { outLink = std::nullopt; }},
         });
     }
+};
+
+struct MixPrintOutPaths : virtual Args
+{
+    bool printOutputPaths = false;
+
+    MixPrintOutPaths()
+    {
+        addFlag({
+            .longName = "print-out-paths",
+            .description = "Print the resulting output paths",
+            .handler = {&printOutputPaths, true},
+        });
+    }
+
+    void printOutPathsMaybe(const BuiltPaths & paths, ref<Store> store);
 };
 
 } // namespace nix

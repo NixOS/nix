@@ -1,30 +1,44 @@
 #pragma once
 ///@file
 
-#include "nix/util/types.hh"
+#include "nix/util/json-impls.hh"
 
 #include <map>
 
 namespace nix {
 
 /**
- * Except where otherwise noted, Nix serializes keys and signatures in
- * the form:
+ * A cryptographic signature along with the name of the key that produced it.
  *
- * ```
- * <name>:<key/signature-in-Base64>
- * ```
+ * Serialized as `<key-name>:<signature-in-Base64>`.
  */
-struct BorrowedCryptoValue
+struct Signature
 {
-    std::string_view name;
-    std::string_view payload;
+    std::string keyName;
 
     /**
-     * This splits on the colon, the user can then separated decode the
-     * Base64 payload separately.
+     * The raw decoded signature bytes.
      */
-    static BorrowedCryptoValue parse(std::string_view);
+    std::string sig;
+
+    /**
+     * Parse a signature in the format `<key-name>:<signature-in-Base64>`.
+     */
+    static Signature parse(std::string_view);
+
+    /**
+     * Parse multiple signatures from a container of strings.
+     *
+     * Each string must be in the format `<key-name>:<signature-in-Base64>`.
+     */
+    template<typename Container>
+    static std::set<Signature> parseMany(const Container & sigStrs);
+
+    std::string to_string() const;
+
+    static Strings toStrings(const std::set<Signature> & sigs);
+
+    auto operator<=>(const Signature &) const = default;
 };
 
 struct Key
@@ -61,7 +75,7 @@ struct SecretKey : Key
     /**
      * Return a detached signature of the given string.
      */
-    std::string signDetached(std::string_view s) const;
+    Signature signDetached(std::string_view s) const;
 
     PublicKey toPublicKey() const;
 
@@ -82,16 +96,15 @@ struct PublicKey : Key
      * @return true iff `sig` and this key's names match, and `sig` is a
      * correct signature over `data` using the given public key.
      */
-    bool verifyDetached(std::string_view data, std::string_view sigs) const;
+    bool verifyDetached(std::string_view data, const Signature & sig) const;
 
     /**
      * @return true iff `sig` is a correct signature over `data` using the
      * given public key.
      *
-     * @param just the Base64 signature itself, not a colon-separated pair of a
-     * public key name and signature.
+     * @param sig the raw signature bytes (not Base64 encoded).
      */
-    bool verifyDetachedAnon(std::string_view data, std::string_view sigs) const;
+    bool verifyDetachedAnon(std::string_view data, const Signature & sig) const;
 
 private:
     PublicKey(std::string_view name, std::string && key)
@@ -110,6 +123,8 @@ typedef std::map<std::string, PublicKey> PublicKeys;
  * @return true iff ‘sig’ is a correct signature over ‘data’ using one
  * of the given public keys.
  */
-bool verifyDetached(std::string_view data, std::string_view sig, const PublicKeys & publicKeys);
+bool verifyDetached(std::string_view data, const Signature & sig, const PublicKeys & publicKeys);
 
 } // namespace nix
+
+JSON_IMPL(nix::Signature)

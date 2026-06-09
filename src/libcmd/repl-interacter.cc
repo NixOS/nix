@@ -18,11 +18,10 @@ extern "C" {
 }
 #endif
 
-#include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/util/file-system.hh"
-#include "nix/cmd/repl.hh"
+#include "nix/util/serialise.hh"
 #include "nix/util/environment-variables.hh"
 
 namespace nix {
@@ -40,8 +39,8 @@ void sigintHandler(int signo)
 static detail::ReplCompleterMixin * curRepl; // ugly
 
 #if !USE_READLINE
-static char * completionCallback(char * s, int * match)
-{
+static char * completionCallback(char * s, int * match) noexcept
+try {
     auto possible = curRepl->completePrefix(s);
     if (possible.size() == 1) {
         *match = 1;
@@ -73,10 +72,12 @@ static char * completionCallback(char * s, int * match)
 
     *match = 0;
     return nullptr;
+} catch (...) {
+    return nullptr;
 }
 
-static int listPossibleCallback(char * s, char *** avp)
-{
+static int listPossibleCallback(char * s, char *** avp) noexcept
+try {
     auto possible = curRepl->completePrefix(s);
 
     if (possible.size() > (std::numeric_limits<int>::max() / sizeof(char *)))
@@ -105,6 +106,9 @@ static int listPossibleCallback(char * s, char *** avp)
     *avp = vp;
 
     return ac;
+} catch (...) {
+    *avp = nullptr;
+    return 0;
 }
 #endif
 
@@ -113,14 +117,43 @@ ReadlineLikeInteracter::Guard ReadlineLikeInteracter::init(detail::ReplCompleter
     // Allow nix-repl specific settings in .inputrc
     rl_readline_name = "nix-repl";
     try {
-        createDirs(dirOf(historyFile));
+        createDirs(historyFile.parent_path());
     } catch (SystemError & e) {
         logWarning(e.info());
     }
 #if !USE_READLINE
-    el_hist_size = 1000;
+    /* editline's read_history uses a fixed 256-byte buffer (SCREEN_INC),
+       which silently splits lines longer than 255 characters into separate
+       history entries. Read the file ourselves to avoid the length limit. See:
+       https://github.com/troglobit/editline/blob/2e0504d31e6878208036a4dd91f44841dabb1ee7/src/editline.c#L1617-L1635
+
+       ::rl_initialize must be called before the subsequent calls to
+       ::add_history to ensure that the buffer has actually been allocated
+       (but before setting ::el_hist_size).
+       Best I can tell it's supposed to idempotent, e.g. ::readline calls it
+       unconditionally anyway. */
+
+    ::el_hist_size = 1000; /* FIXME: Why the arbitrary limit? */
+    ::rl_initialize();
+
+    auto fd = openFileReadonly(historyFile);
+    if (!fd) {
+        NativeSysError err("opening file %s", PathFmt(historyFile));
+        if (!err.is(std::errc::no_such_file_or_directory) && !err.is(std::errc::not_a_directory))
+            logWarning(err.info());
+    } else {
+        try {
+            FdSource source(fd.get());
+            while (true)
+                add_history(source.readLine().c_str());
+        } catch (EndOfFile &) {
+        } catch (SystemError & e) {
+            logWarning(e.info());
+        }
+    }
+#else
+    read_history(historyFile.string().c_str());
 #endif
-    read_history(historyFile.c_str());
     auto oldRepl = curRepl;
     curRepl = repl;
     Guard restoreRepl([oldRepl] { curRepl = oldRepl; });
@@ -203,7 +236,7 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
 
 ReadlineLikeInteracter::~ReadlineLikeInteracter()
 {
-    write_history(historyFile.c_str());
+    write_history(historyFile.string().c_str());
 }
 
 }; // namespace nix

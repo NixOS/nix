@@ -13,6 +13,8 @@ struct MountedSourceAccessor : SourceAccessor
      * there is no such mount point.
      */
     virtual std::shared_ptr<SourceAccessor> getMount(CanonPath mountPoint) = 0;
+
+    ~MountedSourceAccessor() override;
 };
 
 ref<MountedSourceAccessor> makeMountedSourceAccessor(std::map<CanonPath, ref<SourceAccessor>> mounts);

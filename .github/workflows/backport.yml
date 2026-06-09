@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: generate-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
@@ -26,7 +26,7 @@ jobs:
           # required to find all branches
           fetch-depth: 0
       - name: Create backport PRs
-        uses: korthout/backport-action@c656f5d5851037b2b38fb5db2691a03fa229e3b2 # v4.0.1
+        uses: korthout/backport-action@66065406958f46e82238fd59546f5a99e69e22aa # v4.5.2
         id: backport
         with:
           # Config README: https://github.com/korthout/backport-action#backport-action

@@ -6,14 +6,23 @@ It is broken up into multiple Meson packages, which are optionally combined in a
 There are no mandatory extra steps to the building process:
 generic Meson installation instructions like [this](https://mesonbuild.com/Quick-guide.html#using-meson-as-a-distro-packager) should work.
 
-The installation path can be specified by passing the `-Dprefix=prefix`
-to `configure`. The default installation directory is `/usr/local`. You
+```bash
+git clone https://github.com/NixOS/nix.git
+cd nix
+meson setup build
+cd build
+ninja
+(sudo) ninja install
+```
+
+The installation path can be specified by passing `-Dprefix=prefix`
+to `meson setup build`. The default installation directory is `/usr/local`. You
 can change this to any location you like. You must have write permission
 to the *prefix* path.
 
 Nix keeps its *store* (the place where packages are stored) in
 `/nix/store` by default. This can be changed using
-`-Dstore-dir=path`.
+`-Dlibstore:store-dir=path`.
 
 > **Warning**
 >

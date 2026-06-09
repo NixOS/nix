@@ -3,7 +3,6 @@
 
 #include "nix/expr/eval.hh"
 #include "nix/expr/tests/libexpr.hh"
-#include "nix/util/memory-source-accessor.hh"
 
 namespace nix {
 

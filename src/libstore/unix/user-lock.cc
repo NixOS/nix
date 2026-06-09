@@ -3,13 +3,15 @@
 #include <grp.h>
 
 #include "nix/store/user-lock.hh"
+#include "nix/store/local-settings.hh"
 #include "nix/util/file-system.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/util/users.hh"
 #include "nix/util/logging.hh"
 
 namespace nix {
+
+UserLock::~UserLock() {}
 
 #ifdef __linux__
 
@@ -34,6 +36,8 @@ static std::vector<gid_t> get_group_list(const char * username, gid_t group_id)
     return gids;
 }
 #endif
+
+namespace {
 
 struct SimpleUserLock : UserLock
 {
@@ -64,15 +68,15 @@ struct SimpleUserLock : UserLock
         return supplementaryGIDs;
     }
 
-    static std::unique_ptr<UserLock> acquire()
+    static std::unique_ptr<UserLock>
+    acquire(const std::filesystem::path & userPoolDir, const std::string & buildUsersGroup)
     {
-        assert(settings.buildUsersGroup != "");
-        createDirs(settings.nixStateDir + "/userpool");
+        assert(buildUsersGroup != "");
 
         /* Get the members of the build-users-group. */
-        struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
+        struct group * gr = getgrnam(buildUsersGroup.c_str());
         if (!gr)
-            throw Error("the group '%s' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+            throw Error("the group '%s' specified in 'build-users-group' does not exist", buildUsersGroup);
 
         /* Copy the result of getgrnam. */
         Strings users;
@@ -82,7 +86,7 @@ struct SimpleUserLock : UserLock
         }
 
         if (users.empty())
-            throw Error("the build users group '%s' has no members", settings.buildUsersGroup);
+            throw Error("the build users group '%s' has no members", buildUsersGroup);
 
         /* Find a user account that isn't currently in use for another
            build. */
@@ -91,13 +95,13 @@ struct SimpleUserLock : UserLock
 
             struct passwd * pw = getpwnam(i.c_str());
             if (!pw)
-                throw Error("the user '%s' in the group '%s' does not exist", i, settings.buildUsersGroup);
+                throw Error("the user '%s' in the group '%s' does not exist", i, buildUsersGroup);
 
-            auto fnUserLock = fmt("%s/userpool/%s", settings.nixStateDir, pw->pw_uid);
+            auto fnUserLock = userPoolDir / std::to_string(pw->pw_uid);
 
             AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
             if (!fd)
-                throw SysError("opening user lock '%s'", fnUserLock);
+                throw SysError("opening user lock %s", PathFmt(fnUserLock));
 
             if (lockFile(fd.get(), ltWrite, false)) {
                 auto lock = std::make_unique<SimpleUserLock>();
@@ -108,7 +112,7 @@ struct SimpleUserLock : UserLock
 
                 /* Sanity check... */
                 if (lock->uid == getuid() || lock->uid == geteuid())
-                    throw Error("the Nix user should not be a member of '%s'", settings.buildUsersGroup);
+                    throw Error("the Nix user should not be a member of '%s'", buildUsersGroup);
 
 #ifdef __linux__
                 /* Get the list of supplementary groups of this user. This is
@@ -158,36 +162,37 @@ struct AutoUserLock : UserLock
         return {};
     }
 
-    static std::unique_ptr<UserLock> acquire(uid_t nrIds, bool useUserNamespace)
+    static std::unique_ptr<UserLock> acquire(
+        const std::filesystem::path & userPoolDir,
+        const std::string & buildUsersGroup,
+        uid_t nrIds,
+        bool useUserNamespace,
+        const AutoAllocateUidSettings & uidSettings)
     {
 #if !defined(__linux__)
         useUserNamespace = false;
 #endif
 
         experimentalFeatureSettings.require(Xp::AutoAllocateUids);
-        assert(settings.startId > 0);
-        assert(settings.uidCount % maxIdsPerBuild == 0);
-        assert((uint64_t) settings.startId + (uint64_t) settings.uidCount <= std::numeric_limits<uid_t>::max());
+        assert(uidSettings.startId > 0);
+        assert(uidSettings.uidCount % maxIdsPerBuild == 0);
+        assert((uint64_t) uidSettings.startId + (uint64_t) uidSettings.uidCount <= std::numeric_limits<uid_t>::max());
         assert(nrIds <= maxIdsPerBuild);
 
-        createDirs(settings.nixStateDir + "/userpool2");
-
-        size_t nrSlots = settings.uidCount / maxIdsPerBuild;
+        size_t nrSlots = uidSettings.uidCount / maxIdsPerBuild;
 
         for (size_t i = 0; i < nrSlots; i++) {
             debug("trying user slot '%d'", i);
 
-            createDirs(settings.nixStateDir + "/userpool2");
-
-            auto fnUserLock = fmt("%s/userpool2/slot-%d", settings.nixStateDir, i);
+            auto fnUserLock = userPoolDir / fmt("slot-%d", i);
 
             AutoCloseFD fd = open(fnUserLock.c_str(), O_RDWR | O_CREAT | O_CLOEXEC, 0600);
             if (!fd)
-                throw SysError("opening user lock '%s'", fnUserLock);
+                throw SysError("opening user lock %s", PathFmt(fnUserLock));
 
             if (lockFile(fd.get(), ltWrite, false)) {
 
-                auto firstUid = settings.startId + i * maxIdsPerBuild;
+                auto firstUid = uidSettings.startId + i * maxIdsPerBuild;
 
                 auto pw = getpwuid(firstUid);
                 if (pw)
@@ -199,10 +204,9 @@ struct AutoUserLock : UserLock
                 if (useUserNamespace)
                     lock->firstGid = firstUid;
                 else {
-                    struct group * gr = getgrnam(settings.buildUsersGroup.get().c_str());
+                    struct group * gr = getgrnam(buildUsersGroup.c_str());
                     if (!gr)
-                        throw Error(
-                            "the group '%s' specified in 'build-users-group' does not exist", settings.buildUsersGroup);
+                        throw Error("the group '%s' specified in 'build-users-group' does not exist", buildUsersGroup);
                     lock->firstGid = gr->gr_gid;
                 }
                 lock->nrIds = nrIds;
@@ -214,21 +218,29 @@ struct AutoUserLock : UserLock
     }
 };
 
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace)
+} // namespace
+
+std::unique_ptr<UserLock> acquireUserLock(
+    const std::filesystem::path & stateDir, const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)
 {
-    if (settings.autoAllocateUids)
-        return AutoUserLock::acquire(nrIds, useUserNamespace);
-    else
-        return SimpleUserLock::acquire();
+    if (auto * uidSettings = localSettings.getAutoAllocateUidSettings()) {
+        auto userPoolDir = stateDir / "userpool2";
+        createDirs(userPoolDir);
+        return AutoUserLock::acquire(userPoolDir, localSettings.buildUsersGroup, nrIds, useUserNamespace, *uidSettings);
+    } else {
+        auto userPoolDir = stateDir / "userpool";
+        createDirs(userPoolDir);
+        return SimpleUserLock::acquire(userPoolDir, localSettings.buildUsersGroup);
+    }
 }
 
-bool useBuildUsers()
+bool useBuildUsers(const LocalSettings & localSettings)
 {
 #ifdef __linux__
-    static bool b = (settings.buildUsersGroup != "" || settings.autoAllocateUids) && isRootUser();
+    static bool b = (localSettings.buildUsersGroup != "" || localSettings.autoAllocateUids) && isRootUser();
     return b;
 #elif defined(__APPLE__) || defined(__FreeBSD__)
-    static bool b = settings.buildUsersGroup != "" && isRootUser();
+    static bool b = localSettings.buildUsersGroup != "" && isRootUser();
     return b;
 #else
     return false;

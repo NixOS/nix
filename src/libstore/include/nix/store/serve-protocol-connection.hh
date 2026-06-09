@@ -81,9 +81,9 @@ struct ServeProto::BasicClientConnection
      */
     BuildResult getBuildDerivationResponse(const StoreDirConfig & store);
 
-    void narFromPath(const StoreDirConfig & store, const StorePath & path, std::function<void(Source &)> fun);
+    void narFromPath(const StoreDirConfig & store, const StorePath & path, fun<void(Source &)> receiveNar);
 
-    void importPaths(const StoreDirConfig & store, std::function<void(Sink &)> fun);
+    void importPaths(const StoreDirConfig & store, fun<void(Sink &)> sendPaths);
 };
 
 struct ServeProto::BasicServerConnection

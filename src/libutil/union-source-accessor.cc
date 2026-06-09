@@ -2,8 +2,14 @@
 
 namespace nix {
 
+namespace {
+
 struct UnionSourceAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+
+public:
     std::vector<ref<SourceAccessor>> accessors;
 
     UnionSourceAccessor(std::vector<ref<SourceAccessor>> _accessors)
@@ -12,12 +18,14 @@ struct UnionSourceAccessor : SourceAccessor
         displayPrefix.clear();
     }
 
-    std::string readFile(const CanonPath & path) override
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
-            if (st)
-                return accessor->readFile(path);
+            if (st) {
+                accessor->readFile(path, sink, sizeCallback);
+                return;
+            }
         }
         throw FileNotFound("path '%s' does not exist", showPath(path));
     }
@@ -35,14 +43,18 @@ struct UnionSourceAccessor : SourceAccessor
     DirEntries readDirectory(const CanonPath & path) override
     {
         DirEntries result;
+        bool exists = false;
         for (auto & accessor : accessors) {
             auto st = accessor->maybeLstat(path);
             if (!st)
                 continue;
+            exists = true;
             for (auto & entry : accessor->readDirectory(path))
                 // Don't override entries from previous accessors.
                 result.insert(entry);
         }
+        if (!exists)
+            throw FileNotFound("path '%s' does not exist", showPath(path));
         return result;
     }
 
@@ -61,6 +73,12 @@ struct UnionSourceAccessor : SourceAccessor
         for (auto & accessor : accessors)
             return accessor->showPath(path);
         return SourceAccessor::showPath(path);
+    }
+
+    void invalidateCache() override
+    {
+        for (auto & accessor : accessors)
+            accessor->invalidateCache();
     }
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
@@ -85,6 +103,8 @@ struct UnionSourceAccessor : SourceAccessor
         return {path, std::nullopt};
     }
 };
+
+} // namespace
 
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors)
 {

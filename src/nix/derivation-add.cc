@@ -3,12 +3,13 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/globals.hh"
 #include <nlohmann/json.hpp>
 
-using namespace nix;
 using json = nlohmann::json;
+
+namespace nix {
 
 struct CmdAddDerivation : MixDryRun, StoreCommand
 {
@@ -35,12 +36,13 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
 
         auto drv = Derivation::parseJsonAndValidate(*store, json);
 
-        auto drvPath = writeDerivation(*store, drv, NoRepair, /* read only */ dryRun);
-
-        writeDerivation(*store, drv, NoRepair, dryRun);
+        auto drvPath =
+            (dryRun || settings.readOnlyMode) ? computeStorePath(*store, drv) : store->writeDerivation(drv, NoRepair);
 
         logger->cout("%s", store->printStorePath(drvPath));
     }
 };
 
 static auto rCmdAddDerivation = registerCommand2<CmdAddDerivation>({"derivation", "add"});
+
+} // namespace nix

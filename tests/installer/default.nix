@@ -44,7 +44,7 @@ let
 
   mockChannel =
     pkgs:
-    pkgs.runCommandNoCC "mock-channel" { } ''
+    pkgs.runCommand "mock-channel" { } ''
       mkdir nixexprs
       mkdir -p $out/channel
       echo -n 'someContent' > nixexprs/someFile
@@ -154,7 +154,7 @@ let
         image = image.image;
         postBoot = image.postBoot or "";
         installScript = installScripts.${testName}.script;
-        binaryTarball = binaryTarballs.${system};
+        binaryTarball = binaryTarballs.${image.system};
       }
       ''
         shopt -s nullglob

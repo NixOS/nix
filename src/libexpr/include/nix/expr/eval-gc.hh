@@ -33,6 +33,9 @@ using gc_allocator = std::allocator<T>;
 struct gc
 {};
 
+struct gc_cleanup
+{};
+
 #endif
 
 namespace nix {

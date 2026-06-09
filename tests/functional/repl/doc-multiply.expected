@@ -2,7 +2,8 @@ Nix <nix version>
 Type :? for help.
 
 nix-repl> :l doc-comments.nix
-Added <number omitted> variables.
+Added 13 variables.
+compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, multiply, nonStrict, strict, strictPost, strictPre, unambiguous
 
 nix-repl> :doc multiply
 Function `multiply`\

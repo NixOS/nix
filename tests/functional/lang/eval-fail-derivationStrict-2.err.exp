@@ -1,0 +1,10 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-2.nix:1:1:
+            1| builtins.derivationStrict { }
+             | ^
+            2|
+
+       … in the attrset passed as argument to builtins.derivationStrict
+
+       error: attribute 'name' missing

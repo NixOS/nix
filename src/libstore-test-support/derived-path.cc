@@ -1,6 +1,4 @@
-#include <regex>
-
-#include <exception> // Needed by rapidcheck on Darwin
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck.h>
 
 #include "nix/store/tests/derived-path.hh"

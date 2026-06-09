@@ -1,0 +1,10 @@
+error:
+       … while calling the 'partition' builtin
+         at /pwd/lang/eval-fail-partition-3.nix:1:1:
+            1| builtins.partition (_: 1) [ "foo" ]
+             | ^
+            2|
+
+       … while evaluating the return value of the partition function passed to builtins.partition
+
+       error: expected a Boolean but found an integer: 1

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'hashString' builtin
+         at /pwd/lang/eval-fail-hashString-3.nix:1:1:
+            1| builtins.hashString "sha256" { }
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.hashString
+
+       error: expected a string but found a set: { }

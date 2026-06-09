@@ -27,7 +27,7 @@ namespace nix {
  * Here, "data" is automatically unlocked when "data_" goes out of
  * scope.
  */
-template<class T, class M, class WL, class RL>
+template<class T, class M, class WL, class RL, class CV>
 class SyncBase
 {
 private:
@@ -47,6 +47,13 @@ public:
 
     SyncBase(T && data) noexcept
         : data(std::move(data))
+    {
+    }
+
+    template<typename... Ts>
+    SyncBase(Ts &&... args)
+        requires requires { T{std::forward<Ts>(args)...}; }
+        : data(std::forward<Ts>(args)...)
     {
     }
 
@@ -76,29 +83,35 @@ public:
 
         ~Lock() {}
 
-        void wait(std::condition_variable & cv)
+        void wait(CV & cv)
         {
             assert(s);
             cv.wait(lk);
         }
 
+        template<class Predicate>
+        void wait(CV & cv, Predicate pred)
+        {
+            assert(s);
+            cv.wait(lk, std::move(pred));
+        }
+
         template<class Rep, class Period>
-        std::cv_status wait_for(std::condition_variable & cv, const std::chrono::duration<Rep, Period> & duration)
+        std::cv_status wait_for(CV & cv, const std::chrono::duration<Rep, Period> & duration)
         {
             assert(s);
             return cv.wait_for(lk, duration);
         }
 
         template<class Rep, class Period, class Predicate>
-        bool wait_for(std::condition_variable & cv, const std::chrono::duration<Rep, Period> & duration, Predicate pred)
+        bool wait_for(CV & cv, const std::chrono::duration<Rep, Period> & duration, Predicate pred)
         {
             assert(s);
             return cv.wait_for(lk, duration, pred);
         }
 
         template<class Clock, class Duration>
-        std::cv_status
-        wait_until(std::condition_variable & cv, const std::chrono::time_point<Clock, Duration> & duration)
+        std::cv_status wait_until(CV & cv, const std::chrono::time_point<Clock, Duration> & duration)
         {
             assert(s);
             return cv.wait_until(lk, duration);
@@ -154,10 +167,15 @@ public:
 };
 
 template<class T>
-using Sync = SyncBase<T, std::mutex, std::unique_lock<std::mutex>, std::unique_lock<std::mutex>>;
+using Sync =
+    SyncBase<T, std::mutex, std::unique_lock<std::mutex>, std::unique_lock<std::mutex>, std::condition_variable>;
 
 template<class T>
-using SharedSync =
-    SyncBase<T, std::shared_mutex, std::unique_lock<std::shared_mutex>, std::shared_lock<std::shared_mutex>>;
+using SharedSync = SyncBase<
+    T,
+    std::shared_mutex,
+    std::unique_lock<std::shared_mutex>,
+    std::shared_lock<std::shared_mutex>,
+    std::condition_variable>;
 
 } // namespace nix

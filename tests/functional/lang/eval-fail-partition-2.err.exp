@@ -1,0 +1,10 @@
+error:
+       … while calling the 'partition' builtin
+         at /pwd/lang/eval-fail-partition-2.nix:1:1:
+            1| builtins.partition (_: 1) "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.partition
+
+       error: expected a list but found a string: "foo"

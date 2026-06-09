@@ -21,15 +21,15 @@ R""(
   ```console
   # nix build nixpkgs#hello nixpkgs#cowsay
   # ls -l result*
-  lrwxrwxrwx 1 … result -> /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
-  lrwxrwxrwx 1 … result-1 -> /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
+  lrwxrwxrwx 1 … result -> /nix/store/10l19qifk7hjjq47px8m2prqk1gv4isy-hello-2.10
+  lrwxrwxrwx 1 … result-1 -> /nix/store/frzgk3v1ycnarpfc2rkynravng27a86d-cowsay-3.03+dfsg2
   ```
 
 * Build GNU Hello and print the resulting store path.
 
   ```console
   # nix build nixpkgs#hello --print-out-paths
-  /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+  /nix/store/10l19qifk7hjjq47px8m2prqk1gv4isy-hello-2.10
   ```
 
 * Build a specific output:
@@ -37,19 +37,19 @@ R""(
   ```console
   # nix build nixpkgs#glibc.dev
   # ls -ld ./result-dev
-  lrwxrwxrwx 1 … ./result-dev -> /nix/store/dkm3gwl0xrx0wrw6zi5x3px3lpgjhlw4-glibc-2.32-dev
+  lrwxrwxrwx 1 … ./result-dev -> /nix/store/hb4lb9n3gv855llky72hrs4pglpxq70m-glibc-2.32-dev
   ```
 
 * Build all outputs:
 
   ```console
   # nix build "nixpkgs#openssl^*" --print-out-paths
-  /nix/store/gvad6v0cmq1qccmc4wphsazqbj0xzjsl-openssl-3.0.13-bin
-  /nix/store/a07jqdrc8afnk8r6f3lnhh4gvab7chk4-openssl-3.0.13-debug
-  /nix/store/yg75achq89wgqn2fi3gglgsd77kjpi03-openssl-3.0.13-dev
-  /nix/store/bvdcihi8c88fw31cg6gzzmpnwglpn1jv-openssl-3.0.13-doc
-  /nix/store/gjqcvq47cmxazxga0cirspm3jywkmvfv-openssl-3.0.13-man
-  /nix/store/7nmrrad8skxr47f9hfl3xc0pfqmwq51b-openssl-3.0.13
+  /nix/store/ah1slww3lfsj02w563wjf1xcz5fayj36-openssl-3.0.13-bin
+  /nix/store/vswlynn75s0bpba3vl6bi3wyzjym95yi-openssl-3.0.13-debug
+  /nix/store/z71nwwni9dcxdmd3v3a7j24v70c7v7z3-openssl-3.0.13-dev
+  /nix/store/iabzsa5c73p4f10zfmf5r2qsrn0hl4lk-openssl-3.0.13-doc
+  /nix/store/zqmfrpxvcll69a2lyawnpvp15zh421v2-openssl-3.0.13-man
+  /nix/store/l3nlzki957anyy7yb25qvwk6cqrnvb67-openssl-3.0.13
   ```
 
 * Build attribute `build.x86_64-linux` from (non-flake) Nix expression
@@ -89,7 +89,7 @@ R""(
   already exist:
 
   ```console
-  # nix build /nix/store/rkfrm0z6x6jmi7d3gsmma4j53h15mg33-cowsay-3.03+dfsg2
+  # nix build /nix/store/frzgk3v1ycnarpfc2rkynravng27a86d-cowsay-3.03+dfsg2
   ```
 
 # Description

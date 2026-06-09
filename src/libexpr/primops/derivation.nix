@@ -46,7 +46,7 @@ let
   outputToAttrListElement = outputName: {
     name = outputName;
     value = commonAttrs // {
-      outPath = builtins.getAttr outputName strict;
+      outPath = strict.${outputName};
       drvPath = strict.drvPath;
       type = "derivation";
       inherit outputName;

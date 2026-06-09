@@ -9,14 +9,16 @@
 
 namespace nix {
 
-class BadNixStringContextElem : public Error
+class BadNixStringContextElem final : public CloneableError<BadNixStringContextElem, Error>
 {
+    void anchor() override;
+
 public:
     std::string_view raw;
 
     template<typename... Args>
     BadNixStringContextElem(std::string_view raw_, const Args &... args)
-        : Error("")
+        : CloneableError("")
     {
         raw = raw_;
         auto hf = HintFmt(args...);
@@ -83,6 +85,14 @@ struct NixStringContextElem
     static NixStringContextElem
     parse(std::string_view s, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
     std::string to_string() const;
+
+    /**
+     * Render for use in error messages and other user-facing output.
+     *
+     * Uses store paths and `DerivedPath` syntax, unlike `to_string()`
+     * which uses the internal encoding.
+     */
+    std::string display(const StoreDirConfig & store) const;
 };
 
 /**

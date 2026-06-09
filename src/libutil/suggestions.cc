@@ -3,7 +3,6 @@
 #include "nix/util/terminal.hh"
 
 #include <algorithm>
-#include <sstream>
 
 namespace nix {
 

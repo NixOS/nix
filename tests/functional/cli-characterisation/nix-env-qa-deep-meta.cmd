@@ -1,0 +1,1 @@
+0 nix-env -f ./cli-characterisation/deep-meta.nix -qa --json --meta

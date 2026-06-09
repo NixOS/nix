@@ -1,0 +1,8 @@
+error:
+       … while calling the 'tail' builtin
+         at /pwd/lang/eval-fail-tail-2.nix:1:1:
+            1| builtins.tail [ ]
+             | ^
+            2|
+
+       error: 'builtins.tail' called on an empty list

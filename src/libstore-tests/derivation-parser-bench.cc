@@ -1,13 +1,12 @@
 #include <benchmark/benchmark.h>
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/experimental-features.hh"
 #include "nix/util/tests/test-data.hh"
 #include "nix/store/store-open.hh"
 #include <fstream>
 #include <sstream>
 
-using namespace nix;
+namespace nix {
 
 // Benchmark parsing real derivation files
 static void BM_ParseRealDerivationFile(benchmark::State & state, const std::string & filename)
@@ -54,3 +53,5 @@ BENCHMARK_CAPTURE(BM_ParseRealDerivationFile, hello, (getUnitTestData() / "deriv
 BENCHMARK_CAPTURE(BM_ParseRealDerivationFile, firefox, (getUnitTestData() / "derivation/firefox.drv").string());
 BENCHMARK_CAPTURE(BM_UnparseRealDerivationFile, hello, (getUnitTestData() / "derivation/hello.drv").string());
 BENCHMARK_CAPTURE(BM_UnparseRealDerivationFile, firefox, (getUnitTestData() / "derivation/firefox.drv").string());
+
+} // namespace nix

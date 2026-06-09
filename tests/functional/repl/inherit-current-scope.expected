@@ -1,0 +1,9 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> foo = 42
+
+nix-repl> inherit foo
+
+nix-repl> foo
+42

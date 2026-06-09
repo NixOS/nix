@@ -1,0 +1,8 @@
+error:
+       … while calling the 'substring' builtin
+         at /pwd/lang/eval-fail-substring-4.nix:1:1:
+            1| builtins.substring (-3) 3 "sometext"
+             | ^
+            2|
+
+       error: negative start position in 'substring'

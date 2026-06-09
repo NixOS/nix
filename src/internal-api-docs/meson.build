@@ -1,7 +1,7 @@
 project(
   'nix-internal-api-docs',
   version : files('.version'),
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -15,6 +15,7 @@ doxygen_cfg = configure_file(
     'OUTPUT_DIRECTORY' : meson.current_build_dir(),
     'BUILD_ROOT' : meson.build_root(),
     'src' : fs.parent(fs.parent(meson.project_source_root())) / 'src',
+    'WARNINGS' : meson.is_subproject() ? 'NO' : 'YES',
   },
 )
 

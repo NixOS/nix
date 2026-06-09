@@ -22,6 +22,8 @@ enum class PathInfoJsonFormat {
     V1 = 1,
     /// New format with structured hashes and store path base names
     V2 = 2,
+    /// New format with structured signatures
+    V3 = 3,
 };
 
 /**
@@ -102,7 +104,7 @@ struct UnkeyedValidPathInfo
      */
     bool ultimate = false;
 
-    StringSet sigs; // note: not necessarily verified
+    std::set<Signature> sigs;
 
     /**
      * If non-empty, an assertion that the path is content-addressed,
@@ -154,6 +156,11 @@ struct UnkeyedValidPathInfo
     virtual nlohmann::json
     toJSON(const StoreDirConfig * store, bool includeImpureInfo, PathInfoJsonFormat format) const;
     static UnkeyedValidPathInfo fromJSON(const StoreDirConfig * store, const nlohmann::json & json);
+
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
 };
 
 struct ValidPathInfo : virtual UnkeyedValidPathInfo
@@ -200,7 +207,7 @@ struct ValidPathInfo : virtual UnkeyedValidPathInfo
     /**
      * Verify a single signature.
      */
-    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const;
+    bool checkSignature(const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const;
 
     /**
      * References as store path basenames, including a self reference if it has one.
@@ -220,6 +227,9 @@ struct ValidPathInfo : virtual UnkeyedValidPathInfo
 
     static ValidPathInfo
     makeFromCA(const StoreDirConfig & store, std::string_view name, ContentAddressWithReferences && ca, Hash narHash);
+
+private:
+    void anchor() override;
 };
 
 static_assert(std::is_move_assignable_v<ValidPathInfo>);

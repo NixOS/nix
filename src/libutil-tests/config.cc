@@ -1,7 +1,5 @@
 #include "nix/util/configuration.hh"
-#include "nix/util/args.hh"
 
-#include <sstream>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
@@ -183,7 +181,7 @@ TEST(Config, toJSONOnEmptyConfig)
 
 TEST(Config, toJSONOnNonEmptyConfig)
 {
-    using nlohmann::literals::operator"" _json;
+    using nlohmann::literals::operator""_json;
     Config config;
     Setting<std::string> setting{
         &config,
@@ -209,7 +207,7 @@ TEST(Config, toJSONOnNonEmptyConfig)
 
 TEST(Config, toJSONOnNonEmptyConfigWithExperimentalSetting)
 {
-    using nlohmann::literals::operator"" _json;
+    using nlohmann::literals::operator""_json;
     Config config;
     Setting<std::string> setting{
         &config,

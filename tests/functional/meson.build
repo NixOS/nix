@@ -64,6 +64,7 @@ suites = [
       'gc-auto.sh',
       'user-envs.sh',
       'user-envs-migration.sh',
+      'cli-characterisation.sh',
       'binary-cache.sh',
       'multiple-outputs.sh',
       'nix-build.sh',
@@ -88,6 +89,7 @@ suites = [
       'hash-convert.sh',
       'hash-path.sh',
       'gc-non-blocking.sh',
+      'gc-closure.sh',
       'check.sh',
       'nix-shell.sh',
       'check-refs.sh',
@@ -114,6 +116,7 @@ suites = [
       'pure-eval.sh',
       'eval.sh',
       'short-path-literals.sh',
+      'absolute-path-literals.sh',
       'no-url-literals.sh',
       'repl.sh',
       'binary-cache-build-remote.sh',
@@ -160,6 +163,7 @@ suites = [
       'nix-profile.sh',
       'suggestions.sh',
       'store-info.sh',
+      'store-print-env.sh',
       'fetchClosure.sh',
       'completions.sh',
       'impure-derivations.sh',
@@ -175,6 +179,8 @@ suites = [
       'help.sh',
       'symlinks.sh',
       'external-builders.sh',
+      'delete-no-keep.sh',
+      'fixed-slow-vs-bad.sh',
     ],
     'workdir' : meson.current_source_dir(),
   },
@@ -202,11 +208,15 @@ nix_expr = dependency('nix-expr', required : false)
 if nix_expr.found() and get_option('default_library') != 'static'
   add_languages('cpp')
   subdir('plugins')
+  plugin_test_deps = [ libplugintest ]
+  if get_option('plugin-c-api') and not host_machine.system().startswith(
+    'windows',
+  )
+    plugin_test_deps += [ libplugintest_dlsym ]
+  endif
   suites += {
     'name' : 'plugins',
-    'deps' : [
-      libplugintest,
-    ],
+    'deps' : plugin_test_deps,
     'tests' : [
       'plugins.sh',
     ],

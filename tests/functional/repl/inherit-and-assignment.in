@@ -1,0 +1,4 @@
+# COM: mixed bindings: inherit and assignment
+x = { p = 10; }
+inherit (x) p; q = 20;
+p + q

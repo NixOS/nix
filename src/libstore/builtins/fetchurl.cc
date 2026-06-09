@@ -1,9 +1,9 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/filetransfer.hh"
 #include "nix/store/store-api.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -13,12 +13,13 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
     if (ctx.netrcData != "") {
-        settings.netrcFile = "netrc";
-        writeFile(settings.netrcFile, ctx.netrcData, 0600);
+        fileTransferSettings.netrcFile = ctx.tmpDirInSandbox / "netrc";
+        writeFile(fileTransferSettings.netrcFile.get(), ctx.netrcData, 0600);
     }
 
-    settings.caFile = "ca-certificates.crt";
-    writeFile(settings.caFile, ctx.caFileData, 0600);
+    auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";
+    fileTransferSettings.caFile = std::optional<AbsolutePath>{caFilePath};
+    writeFile(caFilePath, ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
     if (!out)
@@ -65,15 +66,14 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
         auto executable = ctx.drv.env.find("executable");
         if (executable != ctx.drv.env.end() && executable->second == "1") {
-            if (chmod(storePath.c_str(), 0755) == -1)
-                throw SysError("making '%1%' executable", storePath);
+            chmod(storePath, 0755);
         }
     };
 
     /* Try the hashed mirrors first. */
     auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
-        for (auto hashedMirror : settings.hashedMirrors.get())
+        for (auto hashedMirror : ctx.hashedMirrors)
             try {
                 if (!hasSuffix(hashedMirror, "/"))
                     hashedMirror += '/';

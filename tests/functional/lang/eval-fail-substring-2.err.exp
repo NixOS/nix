@@ -1,0 +1,10 @@
+error:
+       … while calling the 'substring' builtin
+         at /pwd/lang/eval-fail-substring-2.nix:1:1:
+            1| builtins.substring 3 "foo" true
+             | ^
+            2|
+
+       … while evaluating the second argument (the substring length) passed to builtins.substring
+
+       error: expected an integer but found a string: "foo"

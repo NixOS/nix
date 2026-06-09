@@ -3,6 +3,7 @@
 #include <filesystem>
 
 #include "nix/util/canon-path.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/hash.hh"
 #include "nix/util/ref.hh"
 
@@ -44,6 +45,11 @@ MakeError(NotARegularFile, SourceAccessorError);
  */
 struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
 {
+private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+     * dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor() = 0;
+public:
     const size_t number;
 
     std::string displayPrefix, displaySuffix;
@@ -62,7 +68,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * targets of symlinks should only occasionally be done, and only
      * with care.
      */
-    virtual std::string readFile(const CanonPath & path);
+    std::string readFile(const CanonPath & path);
 
     /**
      * Write the contents of a file as a sink. `sizeCallback` must be
@@ -75,8 +81,7 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * @note subclasses of `SourceAccessor` need to implement at least
      * one of the `readFile()` variants.
      */
-    virtual void
-    readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback = [](uint64_t size) {});
+    virtual void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback = [](uint64_t size) {});
 
     virtual bool pathExists(const CanonPath & path);
 
@@ -137,6 +142,22 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
      * @note Like `readFile`, this method should *not* follow symlinks.
      */
     virtual DirEntries readDirectory(const CanonPath & path) = 0;
+
+    /**
+     * Variation of readDirectory that receives a SourceAccessor possibly scoped to \ref dirPath.
+     * Primary meant for recursive traversal functions that would benefit from *at-style syscalls
+     * relative to a particular directory.
+     *
+     * @note Like `readFile`, this method should *not* follow symlinks.
+     * @param callback Caller-provided function invoked with a maximally deeply scoped SourceAccessor and the path that
+     * would have to be prepended to each path relative to dirPath to access a particular file with it.
+     */
+    virtual void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback)
+    {
+        callback(*this, dirPath);
+    }
 
     virtual std::string readLink(const CanonPath & path) = 0;
 
@@ -213,6 +234,12 @@ struct SourceAccessor : std::enable_shared_from_this<SourceAccessor>
     {
         return std::nullopt;
     }
+
+    /**
+     * Drop any cached state that could go stale across external filesystem
+     * mutation (e.g. cached directory fds).
+     */
+    virtual void invalidateCache() {}
 };
 
 /**
@@ -226,19 +253,22 @@ ref<SourceAccessor> makeEmptySourceAccessor();
  */
 MakeError(RestrictedPathError, Error);
 
-struct SymlinkNotAllowed : public Error
+class SymlinkNotAllowed final : public CloneableError<SymlinkNotAllowed, Error>
 {
+    void anchor() override;
+
+public:
     CanonPath path;
 
     SymlinkNotAllowed(CanonPath path)
-        : Error("relative path '%s' points to a symlink, which is not allowed", path.rel())
+        : CloneableError("relative path '%s' points to a symlink, which is not allowed", path.rel())
         , path(std::move(path))
     {
     }
 
     template<typename... Args>
     SymlinkNotAllowed(CanonPath path, const std::string & fs, Args &&... args)
-        : Error(fs, std::forward<Args>(args)...)
+        : CloneableError(fs, std::forward<Args>(args)...)
         , path(std::move(path))
     {
     }
@@ -254,13 +284,22 @@ ref<SourceAccessor> getFSSourceAccessor();
  * that it is not possible to escape `root` by appending `..` path
  * elements, and that absolute symlinks are resolved relative to
  * `root`.
+ *
+ * Symlinks in parents of `root` are resolved. Final symlink is not.
  */
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified = false);
+ref<SourceAccessor> makeFSSourceAccessor(
+    std::filesystem::path root, bool trackLastModified = false, FinalSymlink finalSymlink = FinalSymlink::DontFollow);
 
 /**
  * Construct an accessor that presents a "union" view of a vector of
  * underlying accessors. Earlier accessors take precedence over later.
  */
 ref<SourceAccessor> makeUnionSourceAccessor(std::vector<ref<SourceAccessor>> && accessors);
+
+/**
+ * Make a wrapper source accessor that caches positive lookup results.
+ * Useful for the evaluator which already assumes a mostly immutable view of the filesystem.
+ */
+ref<SourceAccessor> makeCachingSourceAccessor(ref<SourceAccessor> next);
 
 } // namespace nix

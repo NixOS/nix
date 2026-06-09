@@ -1,17 +1,59 @@
+#include "nix/store/store-dir-config.hh"
 #include "nix/util/serialise.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/common-protocol.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/path-info.hh"
+#include "nix/util/json-utils.hh"
+#include "nix/util/util.hh"
 
 #include <chrono>
+#include <cstdint>
 #include <nlohmann/json.hpp>
 
 namespace nix {
+
+const WorkerProto::Version WorkerProto::latest = {
+    .number =
+        {
+            .major = 1,
+            .minor = 38,
+        },
+    .features =
+        {
+            std::string{
+                WorkerProto::featureRealisationWithPath,
+            },
+            std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+        },
+};
+
+const WorkerProto::Version WorkerProto::minimum = {
+    .number =
+        {
+            .major = 1,
+            .minor = 18,
+        },
+};
+
+std::partial_ordering WorkerProto::Version::operator<=>(const WorkerProto::Version & other) const
+{
+    auto numCmp = number <=> other.number;
+    bool thisSubsetEq = std::includes(other.features.begin(), other.features.end(), features.begin(), features.end());
+    bool otherSubsetEq = std::includes(features.begin(), features.end(), other.features.begin(), other.features.end());
+
+    if (numCmp == 0 && thisSubsetEq && otherSubsetEq)
+        return std::partial_ordering::equivalent;
+    if (numCmp <= 0 && thisSubsetEq)
+        return std::partial_ordering::less;
+    if (numCmp >= 0 && otherSubsetEq)
+        return std::partial_ordering::greater;
+    return std::partial_ordering::unordered;
+}
 
 /* protocol-specific definitions */
 
@@ -152,7 +194,7 @@ void WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::write(
 DerivedPath WorkerProto::Serialise<DerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
 {
     auto s = readString(conn.from);
-    if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 30}}) {
         return DerivedPath::parseLegacy(store, s);
     } else {
         return parsePathWithOutputs(store, s).toDerivedPath();
@@ -162,7 +204,7 @@ DerivedPath WorkerProto::Serialise<DerivedPath>::read(const StoreDirConfig & sto
 void WorkerProto::Serialise<DerivedPath>::write(
     const StoreDirConfig & store, WorkerProto::WriteConn conn, const DerivedPath & req)
 {
-    if (GET_PROTOCOL_MINOR(conn.version) >= 30) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 30}}) {
         conn.to << req.to_string_legacy(store);
     } else {
         auto sOrDrvPath = StorePathWithOutputs::tryFromDerivedPath(req);
@@ -173,8 +215,8 @@ void WorkerProto::Serialise<DerivedPath>::write(
                     throw Error(
                         "trying to request '%s', but daemon protocol %d.%d is too old (< 1.29) to request a derivation file",
                         store.printStorePath(drvPath),
-                        GET_PROTOCOL_MAJOR(conn.version),
-                        GET_PROTOCOL_MINOR(conn.version));
+                        conn.version.number.major,
+                        conn.version.number.minor);
                 },
                 [&](std::monostate) {
                     throw Error(
@@ -207,31 +249,51 @@ BuildResult WorkerProto::Serialise<BuildResult>::read(const StoreDirConfig & sto
 {
     BuildResult res;
     BuildResult::Success success;
-    BuildResult::Failure failure;
 
-    auto rawStatus = readInt(conn.from);
-    conn.from >> failure.errorMsg;
+    // Temp variables for failure fields since BuildError uses methods
+    std::string errorMsg;
+    bool isNonDeterministic = false;
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
-        conn.from >> res.timesBuilt >> failure.isNonDeterministic >> res.startTime >> res.stopTime;
+    auto status = WorkerProto::Serialise<BuildResultStatus>::read(store, conn);
+    conn.from >> errorMsg;
+
+    if (conn.version >= WorkerProto::Version{.number = {1, 29}}) {
+        conn.from >> res.timesBuilt >> isNonDeterministic >> res.startTime >> res.stopTime;
     }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 37}}) {
         res.cpuUser = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
         res.cpuSystem = WorkerProto::Serialise<std::optional<std::chrono::microseconds>>::read(store, conn);
     }
-    if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-        auto builtOutputs = WorkerProto::Serialise<DrvOutputs>::read(store, conn);
-        for (auto && [output, realisation] : builtOutputs)
-            success.builtOutputs.insert_or_assign(std::move(output.outputName), std::move(realisation));
+
+    if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        success.builtOutputs = WorkerProto::Serialise<std::map<OutputName, UnkeyedRealisation>>::read(store, conn);
+    } else if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
+        for (auto && [output, realisation] : WorkerProto::Serialise<StringMap>::read(store, conn)) {
+            size_t n = output.find("!");
+            if (n == output.npos)
+                throw Error("Invalid derivation output id %s", output);
+            success.builtOutputs.insert_or_assign(
+                output.substr(n + 1),
+                UnkeyedRealisation{
+                    StorePath{getString(valueAt(getObject(nlohmann::json::parse(realisation)), "outPath"))}});
+        }
     }
 
-    if (BuildResult::Success::statusIs(rawStatus)) {
-        success.status = static_cast<BuildResult::Success::Status>(rawStatus);
-        res.inner = std::move(success);
-    } else {
-        failure.status = static_cast<BuildResult::Failure::Status>(rawStatus);
-        res.inner = std::move(failure);
-    }
+    res.inner = std::visit(
+        overloaded{
+            [&](BuildResult::Success::Status s) -> decltype(res.inner) {
+                success.status = s;
+                return std::move(success);
+            },
+            [&](BuildResult::Failure::Status s) -> decltype(res.inner) {
+                return BuildResult::Failure{{
+                    .status = s,
+                    .msg = HintFmt(std::move(errorMsg)),
+                    .isNonDeterministic = isNonDeterministic,
+                }};
+            },
+        },
+        status);
 
     return res;
 }
@@ -246,28 +308,42 @@ void WorkerProto::Serialise<BuildResult>::write(
        default value for the fields that don't exist in that case. */
     auto common = [&](std::string_view errorMsg, bool isNonDeterministic, const auto & builtOutputs) {
         conn.to << errorMsg;
-        if (GET_PROTOCOL_MINOR(conn.version) >= 29) {
+        if (conn.version >= WorkerProto::Version{.number = {1, 29}}) {
             conn.to << res.timesBuilt << isNonDeterministic << res.startTime << res.stopTime;
         }
-        if (GET_PROTOCOL_MINOR(conn.version) >= 37) {
+        if (conn.version >= WorkerProto::Version{.number = {1, 37}}) {
             WorkerProto::write(store, conn, res.cpuUser);
             WorkerProto::write(store, conn, res.cpuSystem);
         }
-        if (GET_PROTOCOL_MINOR(conn.version) >= 28) {
-            DrvOutputs builtOutputsFullKey;
-            for (auto & [output, realisation] : builtOutputs)
-                builtOutputsFullKey.insert_or_assign(realisation.id, realisation);
-            WorkerProto::write(store, conn, builtOutputsFullKey);
+
+        if (conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+            WorkerProto::write(store, conn, builtOutputs);
+        } else if (conn.version >= WorkerProto::Version{.number = {1, 28}}) {
+            // Old clients read `builtOutputs` as a `StringMap` keyed
+            // by `sha256:<hex>!<outputName>` with JSON-encoded
+            // realisations. The derivation hash no longer exists, but
+            // old clients only extract `outputName` and `outPath`, so
+            // a dummy hash suffices.
+            StringMap sm;
+            for (auto & [outputName, realisation] : builtOutputs) {
+                auto dummyId = Hash::dummy.to_string(HashFormat::Base16, true) + "!" + outputName;
+                nlohmann::json j;
+                j["id"] = dummyId;
+                j["outPath"] = realisation.outPath.to_string();
+                sm[dummyId] = j.dump();
+            }
+            WorkerProto::write(store, conn, sm);
         }
     };
+
     std::visit(
         overloaded{
             [&](const BuildResult::Failure & failure) {
-                conn.to << failure.status;
-                common(failure.errorMsg, failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
+                WorkerProto::write(store, conn, BuildResultStatus{failure.status});
+                common(failure.message(), failure.isNonDeterministic, decltype(BuildResult::Success::builtOutputs){});
             },
             [&](const BuildResult::Success & success) {
-                conn.to << success.status;
+                WorkerProto::write(store, conn, BuildResultStatus{success.status});
                 common(/*errorMsg=*/"", /*isNonDeterministic=*/false, success.builtOutputs);
             },
         },
@@ -298,9 +374,9 @@ UnkeyedValidPathInfo WorkerProto::Serialise<UnkeyedValidPathInfo>::read(const St
     info.deriver = std::move(deriver);
     info.references = WorkerProto::Serialise<StorePathSet>::read(store, conn);
     conn.from >> info.registrationTime >> info.narSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 16}}) {
         conn.from >> info.ultimate;
-        info.sigs = readStrings<StringSet>(conn.from);
+        info.sigs = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
     }
     return info;
@@ -313,8 +389,10 @@ void WorkerProto::Serialise<UnkeyedValidPathInfo>::write(
     conn.to << pathInfo.narHash.to_string(HashFormat::Base16, false);
     WorkerProto::write(store, conn, pathInfo.references);
     conn.to << pathInfo.registrationTime << pathInfo.narSize;
-    if (GET_PROTOCOL_MINOR(conn.version) >= 16) {
-        conn.to << pathInfo.ultimate << pathInfo.sigs << renderContentAddress(pathInfo.ca);
+    if (conn.version >= WorkerProto::Version{.number = {1, 16}}) {
+        conn.to << pathInfo.ultimate;
+        WorkerProto::write(store, conn, pathInfo.sigs);
+        conn.to << renderContentAddress(pathInfo.ca);
     }
 }
 
@@ -323,11 +401,11 @@ WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(const StoreDirCon
 {
     WorkerProto::ClientHandshakeInfo res;
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 33}}) {
         res.daemonNixVersion = readString(conn.from);
     }
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 35}}) {
         res.remoteTrustsUs = WorkerProto::Serialise<std::optional<TrustedFlag>>::read(store, conn);
     } else {
         // We don't know the answer; protocol to old.
@@ -340,14 +418,163 @@ WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(const StoreDirCon
 void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(
     const StoreDirConfig & store, WriteConn conn, const WorkerProto::ClientHandshakeInfo & info)
 {
-    if (GET_PROTOCOL_MINOR(conn.version) >= 33) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 33}}) {
         assert(info.daemonNixVersion);
         conn.to << *info.daemonNixVersion;
     }
 
-    if (GET_PROTOCOL_MINOR(conn.version) >= 35) {
+    if (conn.version >= WorkerProto::Version{.number = {1, 35}}) {
         WorkerProto::write(store, conn, info.remoteTrustsUs);
     }
+}
+
+UnkeyedRealisation WorkerProto::Serialise<UnkeyedRealisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to understand build trace",
+            WorkerProto::featureRealisationWithPath);
+    }
+
+    auto outPath = WorkerProto::Serialise<StorePath>::read(store, conn);
+    auto signatures = WorkerProto::Serialise<std::set<Signature>>::read(store, conn);
+
+    return UnkeyedRealisation{
+        .outPath = std::move(outPath),
+        .signatures = std::move(signatures),
+    };
+}
+
+void WorkerProto::Serialise<UnkeyedRealisation>::write(
+    const StoreDirConfig & store, WriteConn conn, const UnkeyedRealisation & info)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to understand build trace",
+            WorkerProto::featureRealisationWithPath);
+    }
+    WorkerProto::write(store, conn, info.outPath);
+    WorkerProto::write(store, conn, info.signatures);
+}
+
+std::optional<UnkeyedRealisation>
+WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        // Hack to improve compat
+        (void) WorkerProto::Serialise<std::string>::read(store, conn);
+        return std::nullopt;
+    } else {
+        auto temp = readNum<uint8_t>(conn.from);
+        switch (temp) {
+        case 0:
+            return std::nullopt;
+        case 1:
+            return WorkerProto::Serialise<UnkeyedRealisation>::read(store, conn);
+        default:
+            throw Error("Invalid optional build trace from remote");
+        }
+    }
+}
+
+void WorkerProto::Serialise<std::optional<UnkeyedRealisation>>::write(
+    const StoreDirConfig & store, WriteConn conn, const std::optional<UnkeyedRealisation> & info)
+{
+    if (!info) {
+        conn.to << uint8_t{0};
+    } else {
+        conn.to << uint8_t{1};
+        WorkerProto::write(store, conn, *info);
+    }
+}
+
+DrvOutput WorkerProto::Serialise<DrvOutput>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to support content-addressing derivations",
+            WorkerProto::featureRealisationWithPath);
+    }
+
+    auto drvPath = WorkerProto::Serialise<StorePath>::read(store, conn);
+    auto outputName = WorkerProto::Serialise<std::string>::read(store, conn);
+
+    return DrvOutput{
+        .drvPath = std::move(drvPath),
+        .outputName = std::move(outputName),
+    };
+}
+
+void WorkerProto::Serialise<DrvOutput>::write(const StoreDirConfig & store, WriteConn conn, const DrvOutput & info)
+{
+    if (!conn.version.features.contains(WorkerProto::featureRealisationWithPath)) {
+        throw Error(
+            "the daemon is missing the '%s' protocol feature, needed to support content-addressing derivations",
+            WorkerProto::featureRealisationWithPath);
+    }
+    WorkerProto::write(store, conn, info.drvPath);
+    WorkerProto::write(store, conn, info.outputName);
+}
+
+Realisation WorkerProto::Serialise<Realisation>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    auto id = WorkerProto::Serialise<DrvOutput>::read(store, conn);
+    auto unkeyed = WorkerProto::Serialise<UnkeyedRealisation>::read(store, conn);
+
+    return Realisation{
+        std::move(unkeyed),
+        std::move(id),
+    };
+}
+
+void WorkerProto::Serialise<Realisation>::write(const StoreDirConfig & store, WriteConn conn, const Realisation & info)
+{
+    WorkerProto::write(store, conn, info.id);
+    WorkerProto::write(store, conn, static_cast<const UnkeyedRealisation &>(info));
+}
+
+GCOptions::SpecificPaths
+WorkerProto::Serialise<GCOptions::SpecificPaths>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    GCOptions::SpecificPaths paths;
+    paths.paths = WorkerProto::Serialise<StorePathSet>::read(store, conn);
+    conn.from >> paths.deleteReferrers;
+    return paths;
+}
+
+void WorkerProto::Serialise<GCOptions::SpecificPaths>::write(
+    const StoreDirConfig & store, WriteConn conn, const GCOptions::SpecificPaths & paths)
+{
+    WorkerProto::write(store, conn, paths.paths);
+    conn.to << paths.deleteReferrers;
+}
+
+GCOptions::GCPaths WorkerProto::Serialise<GCOptions::GCPaths>::read(const StoreDirConfig & store, ReadConn conn)
+{
+    uint8_t wholeStore;
+    conn.from >> wholeStore;
+    switch (wholeStore) {
+    case 0:
+        return WorkerProto::Serialise<GCOptions::SpecificPaths>::read(store, conn);
+    case 1:
+        return GCOptions::WholeStore{};
+    default:
+        throw Error("Invalid whole store indicator from remote");
+    }
+}
+
+void WorkerProto::Serialise<GCOptions::GCPaths>::write(
+    const StoreDirConfig & store, WriteConn conn, const GCOptions::GCPaths & gcPaths)
+{
+    std::visit(
+        overloaded{
+            [&](const GCOptions::SpecificPaths paths) {
+                conn.to << uint8_t{0};
+                WorkerProto::write(store, conn, paths);
+            },
+            [&](const GCOptions::WholeStore & _) { conn.to << uint8_t{1}; },
+        },
+        gcPaths);
 }
 
 } // namespace nix

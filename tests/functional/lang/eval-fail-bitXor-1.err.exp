@@ -1,0 +1,10 @@
+error:
+       … while calling the 'bitXor' builtin
+         at /pwd/lang/eval-fail-bitXor-1.nix:1:1:
+            1| builtins.bitXor 1.1 2
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.bitXor
+
+       error: expected an integer but found a float: 1.1

@@ -1,0 +1,7 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = 1; b = 2;
+
+nix-repl> a + b
+3

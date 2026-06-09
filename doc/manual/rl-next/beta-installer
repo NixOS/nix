@@ -1,0 +1,29 @@
+---
+synopsis: "Rust nix-installer in beta"
+prs: []
+---
+
+The Rust-based rewrite of the Nix installer is now in beta.
+We'd love help testing it out!
+
+To test out the new installer, run:
+```
+curl -sSfL https://artifacts.nixos.org/nix-installer | sh -s -- install
+```
+
+This installer can be run even when you have an existing, script-based Nix installation without any adjustments.
+
+This new installer also comes with the ability to uninstall your Nix installation; run:
+```
+/nix/nix-installer uninstall
+```
+
+This will get rid of your entire Nix installation (even if you installed over an existing, script-based installation).
+
+This installer is a modified version of the [Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer) by Determinate Systems.
+Thanks to Determinate Systems for all the investment they've put into the installer.
+
+Source for the installer is in https://github.com/NixOS/nix-installer.
+Report any issues in that repo.
+
+For CI usage, a GitHub Action to install Nix using this installer is available at https://github.com/NixOS/nix-installer-action.

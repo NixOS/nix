@@ -11,20 +11,15 @@
 #include "nix/util/executable-path.hh"
 #include "nix/store/globals.hh"
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
-using namespace nix;
+namespace nix {
 
 namespace {
 
 std::string formatProtocol(unsigned int proto)
 {
     if (proto) {
-        auto major = GET_PROTOCOL_MAJOR(proto) >> 8;
-        auto minor = GET_PROTOCOL_MINOR(proto);
-        return fmt("%1%.%2%", major, minor);
+        auto version = WorkerProto::Version::Number::fromWire(proto);
+        return fmt("%1%.%2%", version.major, version.minor);
     }
     return "unknown";
 }
@@ -95,7 +90,9 @@ struct CmdConfigCheck : StoreCommand
                 dirs.insert(std::filesystem::canonical(candidate).parent_path());
         }
 
-        if (dirs.size() != 1) {
+        if (dirs.empty()) {
+            return checkFail("No nix-env found in PATH.");
+        } else if (dirs.size() > 1) {
             std::ostringstream ss;
             ss << "Multiple versions of nix found in PATH:\n";
             for (auto & dir : dirs)
@@ -151,9 +148,10 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkStoreProtocol(unsigned int storeProto)
     {
-        unsigned int clientProto = GET_PROTOCOL_MAJOR(SERVE_PROTOCOL_VERSION) == GET_PROTOCOL_MAJOR(storeProto)
-                                       ? SERVE_PROTOCOL_VERSION
-                                       : PROTOCOL_VERSION;
+        auto storeVersion = WorkerProto::Version::Number::fromWire(storeProto);
+        unsigned int clientProto = (storeVersion.major == ServeProto::latest.major)
+                                       ? ServeProto::latest.toWire()
+                                       : WorkerProto::latest.number.toWire();
 
         if (clientProto != storeProto) {
             std::ostringstream ss;
@@ -180,3 +178,5 @@ struct CmdConfigCheck : StoreCommand
 };
 
 static auto rCmdConfigCheck = registerCommand2<CmdConfigCheck>({"config", "check"});
+
+} // namespace nix

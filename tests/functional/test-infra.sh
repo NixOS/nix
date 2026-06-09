@@ -48,7 +48,7 @@ expectStderr 1 noisyFalse | grepQuiet NAY
 
 # `set -o pipefile` is enabled
 
-# shellcheck disable=SC2317# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 pipefailure () {
     # shellcheck disable=SC2216
     true | false | true
@@ -56,7 +56,7 @@ pipefailure () {
 expect 1 pipefailure
 unset pipefailure
 
-# shellcheck disable=SC2317
+# shellcheck disable=2329
 pipefailure () {
     # shellcheck disable=SC2216
     false | true | true
@@ -84,7 +84,7 @@ expect 1 useUnbound
 # ! alone unfortunately negates `set -e`, but it works in functions:
 # shellcheck disable=SC2251
 ! true
-# shellcheck disable=SC2317
+# shellcheck disable=SC2329
 funBang () {
     ! true
 }

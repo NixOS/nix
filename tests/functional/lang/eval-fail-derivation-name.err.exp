@@ -2,15 +2,8 @@ error:
        … while evaluating the attribute 'outPath'
          at «nix-internal»/derivation-internal.nix:<number>:<number>:
      <number>|     value = commonAttrs // {
-     <number>|       outPath = builtins.getAttr outputName strict;
+     <number>|       outPath = strict.${outputName};
              |       ^
-     <number>|       drvPath = strict.drvPath;
-
-       … while calling the 'getAttr' builtin
-         at «nix-internal»/derivation-internal.nix:<number>:<number>:
-     <number>|     value = commonAttrs // {
-     <number>|       outPath = builtins.getAttr outputName strict;
-             |                 ^
      <number>|       drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin

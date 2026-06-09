@@ -76,7 +76,7 @@ This operation is typically used to build [store derivation]s produced by
 
 ```console
 $ nix-store --realise $(nix-instantiate ./test.nix)
-/nix/store/31axcgrlbfsxzmfff1gyj1bf62hvkby2-aterm-2.3.1
+/nix/store/6gwmy5jcnwdlz6aqqhksz863f1l8xc2w-aterm-2.3.1
 ```
 
 This is essentially what [`nix-build`](@docroot@/command-ref/nix-build.md) does.

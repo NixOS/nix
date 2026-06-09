@@ -1,15 +1,12 @@
-# This is just a stub project to include all the others as subprojects
-# for development shell purposes
+# This is just a top-level project to include all the others as subprojects
+# for development shell purposes (when building via Nix) or for distro packaging purposes.
 
 project(
-  'nix-dev-shell',
+  'Nix',
   'cpp',
   version : files('.version'),
   subproject_dir : 'src',
-  default_options : [
-    'localstatedir=/nix/var',
-  ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
 )
 
 # Internal Libraries
@@ -21,18 +18,6 @@ subproject('libflake')
 subproject('libmain')
 subproject('libcmd')
 
-# Executables
-subproject('nix')
-
-# Docs
-if get_option('doc-gen')
-  subproject('internal-api-docs')
-  subproject('external-api-docs')
-  if meson.can_run_host_binaries()
-    subproject('nix-manual')
-  endif
-endif
-
 # External C wrapper libraries
 subproject('libutil-c')
 subproject('libstore-c')
@@ -41,11 +26,20 @@ subproject('libexpr-c')
 subproject('libflake-c')
 subproject('libmain-c')
 
-asan_enabled = 'address' in get_option('b_sanitize')
+# Executables
+subproject('nix')
 
-# Language Bindings
-if get_option('bindings') and not meson.is_cross_build() and not asan_enabled
-  subproject('perl')
+if host_machine.system() == 'linux'
+  subproject('nswrapper')
+endif
+
+# Docs
+if get_option('doc-gen')
+  subproject('internal-api-docs')
+  subproject('external-api-docs')
+  if meson.can_run_host_binaries()
+    subproject('nix-manual')
+  endif
 endif
 
 # Testing
@@ -59,7 +53,17 @@ if get_option('unit-tests')
   subproject('libexpr-tests')
   subproject('libflake-tests')
 endif
-subproject('nix-functional-tests')
+
+if get_option('functional-tests')
+  subproject('nix-functional-tests')
+endif
+
 if get_option('json-schema-checks')
   subproject('json-schema-checks')
 endif
+
+# Static Analysis
+# Build the custom clang-tidy plugin if LLVM is available.
+# required: false → gracefully skipped if dependency('LLVM') fails.
+clang_tidy_plugin_sp = subproject('clang-tidy-plugin', required : false)
+subdir('nix-meson-build-support/common/clang-tidy')

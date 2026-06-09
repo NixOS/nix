@@ -44,20 +44,6 @@ using StringPairs = StringMap;
  */
 using StringSet = std::set<std::string, std::less<>>;
 
-/**
- * Paths are just strings.
- */
-typedef std::string Path;
-typedef std::string_view PathView;
-typedef std::list<Path> Paths;
-
-/**
- * Alias to an ordered set of `Path`s. Uses transparent comparator.
- *
- * @see StringSet
- */
-using PathSet = std::set<Path, std::less<>>;
-
 typedef std::vector<std::pair<std::string, std::string>> Headers;
 
 /**

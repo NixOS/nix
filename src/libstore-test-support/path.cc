@@ -1,11 +1,7 @@
-#include <exception> // Needed by rapidcheck on Darwin
-#include <regex>
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 
 #include <rapidcheck/gen/Arbitrary.h>
 #include <rapidcheck.h>
-
-#include "nix/store/path-regex.hh"
-#include "nix/store/store-api.hh"
 
 #include "nix/util/tests/hash.hh"
 #include "nix/store/tests/path.hh"
@@ -20,7 +16,6 @@ void showValue(const StorePath & p, std::ostream & os)
 } // namespace nix
 
 namespace rc {
-using namespace nix;
 
 Gen<char> storePathChar()
 {
@@ -52,18 +47,19 @@ Gen<char> storePathChar()
         gen::inRange<uint8_t>(0, 10 + 2 * 26 + 6));
 }
 
-Gen<StorePathName> Arbitrary<StorePathName>::arbitrary()
+Gen<nix::StorePathName> Arbitrary<nix::StorePathName>::arbitrary()
 {
-    return gen::construct<StorePathName>(
+    return gen::construct<nix::StorePathName>(
         gen::suchThat(gen::container<std::string>(storePathChar()), [](const std::string & s) {
             return !(s == "" || s == "." || s == ".." || s.starts_with(".-") || s.starts_with("..-"));
         }));
 }
 
-Gen<StorePath> Arbitrary<StorePath>::arbitrary()
+Gen<StorePath> Arbitrary<nix::StorePath>::arbitrary()
 {
-    return gen::construct<StorePath>(
-        gen::arbitrary<Hash>(), gen::apply([](StorePathName n) { return n.name; }, gen::arbitrary<StorePathName>()));
+    return gen::construct<nix::StorePath>(
+        gen::arbitrary<nix::Hash>(),
+        gen::apply([](nix::StorePathName n) { return n.name; }, gen::arbitrary<nix::StorePathName>()));
 }
 
 } // namespace rc

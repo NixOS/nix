@@ -9,7 +9,7 @@ struct LevenshteinDistanceParam
     int distance;
 };
 
-class LevenshteinDistanceTest : public testing::TestWithParam<LevenshteinDistanceParam>
+class LevenshteinDistanceTest : public ::testing::TestWithParam<LevenshteinDistanceParam>
 {};
 
 TEST_P(LevenshteinDistanceTest, CorrectlyComputed)
@@ -23,7 +23,7 @@ TEST_P(LevenshteinDistanceTest, CorrectlyComputed)
 INSTANTIATE_TEST_SUITE_P(
     LevenshteinDistance,
     LevenshteinDistanceTest,
-    testing::Values(
+    ::testing::Values(
         LevenshteinDistanceParam{"foo", "foo", 0},
         LevenshteinDistanceParam{"foo", "", 3},
         LevenshteinDistanceParam{"", "", 0},

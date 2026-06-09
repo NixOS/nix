@@ -1,0 +1,10 @@
+error:
+       … while calling the 'sub' builtin
+         at /pwd/lang/eval-fail-sub-2.nix:1:1:
+            1| builtins.sub 1 "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument of the subtraction
+
+       error: expected an integer but found a string: "foo"

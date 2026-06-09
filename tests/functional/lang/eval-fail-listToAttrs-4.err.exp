@@ -1,0 +1,18 @@
+error:
+       … while calling the 'listToAttrs' builtin
+         at /pwd/lang/eval-fail-listToAttrs-4.nix:1:1:
+            1| builtins.listToAttrs [ { name = 1; } ]
+             | ^
+            2|
+
+       … while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs
+         at /pwd/lang/eval-fail-listToAttrs-4.nix:1:26:
+            1| builtins.listToAttrs [ { name = 1; } ]
+             |                          ^
+            2|
+
+       error: expected a string but found an integer: 1
+       at /pwd/lang/eval-fail-listToAttrs-4.nix:1:26:
+            1| builtins.listToAttrs [ { name = 1; } ]
+             |                          ^
+            2|

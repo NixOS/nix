@@ -1,7 +1,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/store/store-api.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdPathFromHashPart : StoreCommand
 {
@@ -37,3 +37,5 @@ struct CmdPathFromHashPart : StoreCommand
 };
 
 static auto rCmdPathFromHashPart = registerCommand2<CmdPathFromHashPart>({"store", "path-from-hash-part"});
+
+} // namespace nix

@@ -5,7 +5,6 @@
 #include "nix/store/path-with-outputs.hh"
 
 #include <cstring>
-#include <regex>
 
 namespace nix {
 
@@ -101,7 +100,7 @@ StorePath PackageInfo::queryOutPath() const
                 i->pos, *i->value, context, "while evaluating the output path of a derivation");
     }
     if (!outPath)
-        throw UnimplementedError("CA derivations are not yet supported");
+        throw Error("derivation does not have attribute 'outPath'");
     return *outPath;
 }
 
@@ -163,14 +162,14 @@ PackageInfo::Outputs PackageInfo::queryOutputs(bool withPaths, bool onlyOutputsT
         auto errMsg = Error("this derivation has bad 'meta.outputsToInstall'");
         /* ^ this shows during `nix-env -i` right under the bad derivation */
         if (!outTI->isList())
-            throw errMsg;
+            throw std::move(errMsg);
         Outputs result;
         for (auto elem : outTI->listView()) {
             if (elem->type() != nString)
-                throw errMsg;
+                throw std::move(errMsg);
             auto out = outputs.find(elem->string_view());
             if (out == outputs.end())
-                throw errMsg;
+                throw std::move(errMsg);
             result.insert(*out);
         }
         return result;

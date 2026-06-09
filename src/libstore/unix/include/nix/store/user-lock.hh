@@ -1,15 +1,18 @@
 #pragma once
 ///@file
 
+#include <filesystem>
 #include <memory>
 #include <vector>
 #include <sys/types.h>
 
 namespace nix {
 
+struct LocalSettings;
+
 struct UserLock
 {
-    virtual ~UserLock() {}
+    virtual ~UserLock();
 
     /**
      * Get the first and last UID.
@@ -36,8 +39,9 @@ struct UserLock
  * Acquire a user lock for a UID range of size `nrIds`. Note that this
  * may return nullptr if no user is available.
  */
-std::unique_ptr<UserLock> acquireUserLock(uid_t nrIds, bool useUserNamespace);
+std::unique_ptr<UserLock> acquireUserLock(
+    const std::filesystem::path & stateDir, const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace);
 
-bool useBuildUsers();
+bool useBuildUsers(const LocalSettings &);
 
 } // namespace nix

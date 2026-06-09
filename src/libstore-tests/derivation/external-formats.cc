@@ -15,6 +15,14 @@ TEST_F(DerivationTest, BadATerm_version)
         parseDerivation(*store, readFile(goldenMaster("bad-version.drv")), "whatever", mockXpSettings), FormatError);
 }
 
+TEST_F(DerivationTest, UnterminatedString)
+{
+    ASSERT_THROW(
+        parseDerivation(
+            *store, "Derive([(\"out\",\"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo", "bar", mockXpSettings),
+        FormatError);
+}
+
 TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
 {
     ASSERT_THROW(
@@ -23,17 +31,17 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
-#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                \
-    TEST_P(FIXTURE, from_json)                                          \
-    {                                                                   \
-        const auto & [name, expected] = GetParam();                     \
-        readJsonTest(Path{"output-"} + name, expected, mockXpSettings); \
-    }                                                                   \
-                                                                        \
-    TEST_P(FIXTURE, to_json)                                            \
-    {                                                                   \
-        const auto & [name, value] = GetParam();                        \
-        writeJsonTest("output-" + name, value);                         \
+#define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                       \
+    TEST_P(FIXTURE, from_json)                                                 \
+    {                                                                          \
+        const auto & [name, expected] = GetParam();                            \
+        readJsonTest(std::string{"output-"} + name, expected, mockXpSettings); \
+    }                                                                          \
+                                                                               \
+    TEST_P(FIXTURE, to_json)                                                   \
+    {                                                                          \
+        const auto & [name, value] = GetParam();                               \
+        writeJsonTest(std::string{"output-"} + name, value);                   \
     }
 
 struct DerivationOutputJsonTest : DerivationTest,
@@ -177,44 +185,41 @@ struct DerivationJsonAtermTest : DerivationTest,
 
 MAKE_TEST_P(DerivationJsonAtermTest);
 
-Derivation makeSimpleDrv()
-{
-    Derivation drv;
-    drv.name = "simple-derivation";
-    drv.inputSrcs = {
-        StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
-    };
-    drv.inputDrvs = {
-        .map =
-            {
-                {
-                    StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
-                    {
-                        .value =
-                            {
-                                "cat",
-                                "dog",
-                            },
-                    },
-                },
-            },
-    };
-    drv.platform = "wasm-sel4";
-    drv.builder = "foo";
-    drv.args = {
-        "bar",
-        "baz",
-    };
-    drv.env = StringPairs{
-        {
-            "BIG_BAD",
-            "WOLF",
-        },
-    };
-    return drv;
-}
-
-INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values(makeSimpleDrv()));
+INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values([]() {
+                             Derivation drv;
+                             drv.name = "simple-derivation";
+                             drv.inputSrcs = {
+                                 StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"),
+                             };
+                             drv.inputDrvs = {
+                                 .map =
+                                     {
+                                         {
+                                             StorePath("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"),
+                                             {
+                                                 .value =
+                                                     {
+                                                         "cat",
+                                                         "dog",
+                                                     },
+                                             },
+                                         },
+                                     },
+                             };
+                             drv.platform = "wasm-sel4";
+                             drv.builder = "foo";
+                             drv.args = {
+                                 "bar",
+                                 "baz",
+                             };
+                             drv.env = StringPairs{
+                                 {
+                                     "BIG_BAD",
+                                     "WOLF",
+                                 },
+                             };
+                             return drv;
+                         }()));
 
 struct DynDerivationJsonAtermTest : DynDerivationTest,
                                     JsonCharacterizationTest<Derivation>,

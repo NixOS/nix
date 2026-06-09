@@ -7,6 +7,35 @@
 
 namespace nix {
 
+void checkCAFixedOutput(
+    StoreDirConfig & store, const StorePath & drvPath, const DerivationOutput & outputSpec, const ValidPathInfo & info)
+{
+    if (const auto * dof = std::get_if<DerivationOutput::CAFixed>(&outputSpec.raw)) {
+        auto & wanted = dof->ca.hash;
+
+        /* Check wanted hash */
+        assert(info.ca);
+        auto & got = info.ca->hash;
+        if (wanted != got) {
+            throw BuildError(
+                BuildResult::Failure::HashMismatch,
+                "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
+                store.printStorePath(drvPath),
+                wanted.to_string(HashFormat::SRI, true),
+                got.to_string(HashFormat::SRI, true));
+        }
+        if (!info.references.empty()) {
+            auto numViolations = info.references.size();
+            throw BuildError(
+                BuildResult::Failure::HashMismatch,
+                "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
+                store.printStorePath(drvPath),
+                numViolations,
+                store.printStorePath(*info.references.begin()));
+        }
+    }
+}
+
 void checkOutputs(
     Store & store,
     const StorePath & drvPath,
@@ -14,9 +43,9 @@ void checkOutputs(
     const decltype(DerivationOptions<StorePath>::outputChecks) & outputChecks,
     const std::map<std::string, ValidPathInfo> & outputs)
 {
-    std::map<Path, const ValidPathInfo &> outputsByPath;
+    std::map<StorePath, const ValidPathInfo &> outputsByPath;
     for (auto & output : outputs)
-        outputsByPath.emplace(store.printStorePath(output.second.path), output.second);
+        outputsByPath.emplace(output.second.path, output.second);
 
     for (auto & pair : outputs) {
         // We can't use auto destructuring here because
@@ -27,32 +56,7 @@ void checkOutputs(
         auto * outputSpec = get(drvOutputs, outputName);
         assert(outputSpec);
 
-        if (const auto * dof = std::get_if<DerivationOutput::CAFixed>(&outputSpec->raw)) {
-            auto & wanted = dof->ca.hash;
-
-            /* Check wanted hash */
-            assert(info.ca);
-            auto & got = info.ca->hash;
-            if (wanted != got) {
-                /* Throw an error after registering the path as
-                   valid. */
-                throw BuildError(
-                    BuildResult::Failure::HashMismatch,
-                    "hash mismatch in fixed-output derivation '%s':\n  specified: %s\n     got:    %s",
-                    store.printStorePath(drvPath),
-                    wanted.to_string(HashFormat::SRI, true),
-                    got.to_string(HashFormat::SRI, true));
-            }
-            if (!info.references.empty()) {
-                auto numViolations = info.references.size();
-                throw BuildError(
-                    BuildResult::Failure::HashMismatch,
-                    "fixed-output derivations must not reference store paths: '%s' references %d distinct paths, e.g. '%s'",
-                    store.printStorePath(drvPath),
-                    numViolations,
-                    store.printStorePath(*info.references.begin()));
-            }
-        }
+        checkCAFixedOutput(store, drvPath, *outputSpec, info);
 
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely
@@ -69,7 +73,7 @@ void checkOutputs(
                 if (!pathsDone.insert(path).second)
                     continue;
 
-                auto i = outputsByPath.find(store.printStorePath(path));
+                auto i = outputsByPath.find(path);
                 if (i != outputsByPath.end()) {
                     closureSize += i->second.narSize;
                     for (auto & ref : i->second.references)
@@ -186,7 +190,8 @@ void checkOutputs(
         std::visit(
             overloaded{
                 [&](const DerivationOptions<StorePath>::OutputChecks & checks) { applyChecks(checks); },
-                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks> & checksPerOutput) {
+                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> &
+                        checksPerOutput) {
                     if (auto outputChecks = get(checksPerOutput, outputName))
 
                         applyChecks(*outputChecks);

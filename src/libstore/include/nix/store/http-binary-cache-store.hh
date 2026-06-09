@@ -14,27 +14,65 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
                                     virtual Store::Config,
                                     BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+private:
+    void anchor() override;
 
-    HttpBinaryCacheStoreConfig(
-        std::string_view scheme, std::string_view cacheUri, const Store::Config::Params & params);
+public:
+    HttpBinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , BinaryCacheStoreConfig(params)
+    {
+    }
+
+    HttpBinaryCacheStoreConfig(ParsedURL cacheUri, const Store::Config::Params & params);
 
     ParsedURL cacheUri;
 
-    const Setting<std::string> narinfoCompression{
-        this, "", "narinfo-compression", "Compression method for `.narinfo` files."};
+    Setting<std::optional<CompressionAlgo>> narinfoCompression{
+        this, std::nullopt, "narinfo-compression", "Compression method for `.narinfo` files."};
 
-    const Setting<std::string> lsCompression{this, "", "ls-compression", "Compression method for `.ls` files."};
+    Setting<std::optional<CompressionAlgo>> lsCompression{
+        this, std::nullopt, "ls-compression", "Compression method for `.ls` files."};
 
-    const Setting<std::string> logCompression{
+    Setting<std::optional<CompressionAlgo>> logCompression{
         this,
-        "",
+        std::nullopt,
         "log-compression",
         R"(
           Compression method for `log/*` files. It is recommended to
           use a compression method supported by most web browsers
           (e.g. `brotli`).
         )"};
+
+    Setting<std::optional<AbsolutePath>> tlsCert{
+        this, std::nullopt, "tls-certificate", "Path to an optional TLS client certificate in PEM format."};
+
+    Setting<std::optional<AbsolutePath>> tlsKey{
+        this, std::nullopt, "tls-private-key", "Path to an optional TLS client certificate private key in PEM format."};
+
+    Setting<uint32_t> retryDelayMs{
+        this,
+        0,
+        "retry-delay",
+        "Override [`filetransfer-retry-delay`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-delay) for requests to this store (milliseconds)."};
+
+    Setting<uint32_t> retryDelayRateLimitedMs{
+        this,
+        0,
+        "retry-delay-rate-limited",
+        "Override [`filetransfer-retry-delay-rate-limited`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-delay-rate-limited) for requests to this store (milliseconds)."};
+
+    Setting<uint32_t> retryMaxDelayMs{
+        this,
+        0,
+        "retry-max-delay",
+        "Override [`filetransfer-retry-max-delay`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-max-delay) for requests to this store (milliseconds)."};
+
+    Setting<uint32_t> retryAttempts{
+        this,
+        0,
+        "retry-attempts",
+        "Override [`filetransfer-retry-attempts`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-attempts) for requests to this store."};
 
     static const std::string name()
     {
@@ -45,6 +83,8 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
     static std::string doc();
 
+    ref<Store> openStore(ref<FileTransfer> fileTransfer) const;
+
     ref<Store> openStore() const override;
 
     StoreReference getReference() const override;
@@ -52,6 +92,8 @@ struct HttpBinaryCacheStoreConfig : std::enable_shared_from_this<HttpBinaryCache
 
 class HttpBinaryCacheStore : public virtual BinaryCacheStore
 {
+    void anchor() override;
+
     struct State
     {
         bool enabled = true;
@@ -60,19 +102,25 @@ class HttpBinaryCacheStore : public virtual BinaryCacheStore
 
     Sync<State> _state;
 
+protected:
+
+    ref<FileTransfer> fileTransfer;
+
 public:
 
     using Config = HttpBinaryCacheStoreConfig;
 
     ref<Config> config;
 
-    HttpBinaryCacheStore(ref<Config> config);
+    HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer> fileTransfer = getFileTransfer());
 
     void init() override;
 
+    StorePaths topoSortPaths(const StorePathSet & paths) override;
+
 protected:
 
-    std::optional<std::string> getCompressionMethod(const std::string & path);
+    std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
     void maybeDisable();
 

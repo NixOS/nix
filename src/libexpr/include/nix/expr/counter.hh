@@ -11,7 +11,7 @@ namespace nix {
  * variable is set. This is to prevent contention on these counters
  * when multi-threaded evaluation is enabled.
  */
-struct alignas(64) Counter
+struct alignas(std::hardware_destructive_interference_size) Counter
 {
     using value_type = uint64_t;
 

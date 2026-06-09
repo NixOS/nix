@@ -1,0 +1,9 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = { b = 1; c = 2; }
+
+nix-repl> inherit (a) b
+
+nix-repl> b
+1

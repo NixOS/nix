@@ -1,5 +1,4 @@
 #include "nix/util/args.hh"
-#include "nix/util/fs-sink.hh"
 #include <list>
 
 #include <gtest/gtest.h>
@@ -106,8 +105,6 @@ TEST(parseShebangContent, increasingQuotes)
     ASSERT_EQ(*i++, "```");
 }
 
-#ifndef COVERAGE
-
 // quick and dirty
 static inline std::string escape(std::string_view s_)
 {
@@ -164,7 +161,5 @@ RC_GTEST_PROP(parseShebangContent, prop_round_trip_two, (const std::string & one
     RC_ASSERT(*i++ == one);
     RC_ASSERT(*i++ == two);
 }
-
-#endif
 
 } // namespace nix

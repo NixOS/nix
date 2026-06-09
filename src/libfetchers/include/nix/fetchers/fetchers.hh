@@ -86,7 +86,7 @@ public:
      * Only for relative path flakes, i.e. 'path:./foo', returns the
      * relative path, i.e. './foo'.
      */
-    std::optional<std::string> isRelative() const;
+    std::optional<std::filesystem::path> isRelative() const;
 
     /**
      * Return whether this is a "final" input, meaning that fetching
@@ -263,7 +263,7 @@ struct InputScheme
         return false;
     }
 
-    virtual std::optional<std::string> isRelative(const Input & input) const
+    virtual std::optional<std::filesystem::path> isRelative(const Input & input) const
     {
         return std::nullopt;
     }

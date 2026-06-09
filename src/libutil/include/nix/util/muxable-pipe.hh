@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/fun.hh"
 #ifdef _WIN32
 #  include "nix/util/windows-async-pipe.hh"
 #endif
@@ -10,7 +11,6 @@
 #  include <poll.h>
 #else
 #  include <ioapiset.h>
-#  include "nix/util/windows-error.hh"
 #endif
 
 namespace nix {
@@ -75,8 +75,8 @@ struct MuxablePipePollState
      */
     void iterate(
         std::set<CommChannel> & channels,
-        std::function<void(Descriptor fd, std::string_view data)> handleRead,
-        std::function<void(Descriptor fd)> handleEOF);
+        fun<void(Descriptor fd, std::string_view data)> handleRead,
+        fun<void(Descriptor fd)> handleEOF);
 };
 
 } // namespace nix

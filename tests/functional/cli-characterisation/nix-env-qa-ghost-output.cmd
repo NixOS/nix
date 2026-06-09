@@ -1,0 +1,1 @@
+0 nix-env -f ./cli-characterisation/ghost-output.nix -qa --json --out-path

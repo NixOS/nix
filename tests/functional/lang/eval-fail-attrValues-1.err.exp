@@ -1,0 +1,10 @@
+error:
+       … while calling the 'attrValues' builtin
+         at /pwd/lang/eval-fail-attrValues-1.nix:1:1:
+            1| builtins.attrValues [ ]
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.attrValues
+
+       error: expected a set but found a list: [ ]

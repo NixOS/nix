@@ -1,0 +1,10 @@
+error:
+       … while calling the 'foldl'' builtin
+         at /pwd/lang/eval-fail-foldlPrime-2.nix:1:1:
+            1| builtins.foldl' (_: 1) "foo" true
+             | ^
+            2|
+
+       … while evaluating the third argument passed to builtins.foldlStrict
+
+       error: expected a list but found a Boolean: true

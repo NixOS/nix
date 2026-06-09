@@ -33,6 +33,12 @@ enum class SQLiteOpenMode {
     Immutable,
 };
 
+struct SQLiteSettings
+{
+    SQLiteOpenMode mode = SQLiteOpenMode::Normal;
+    bool useWAL;
+};
+
 /**
  * RAII wrapper to close a SQLite database automatically.
  */
@@ -42,7 +48,9 @@ struct SQLite
 
     SQLite() {}
 
-    SQLite(const std::filesystem::path & path, SQLiteOpenMode mode = SQLiteOpenMode::Normal);
+    using Settings = SQLiteSettings;
+
+    SQLite(const std::filesystem::path & path, Settings && settings);
     SQLite(const SQLite & from) = delete;
     SQLite & operator=(const SQLite & from) = delete;
 
@@ -113,9 +121,9 @@ struct SQLiteStmt
         /**
          * Bind the next parameter.
          */
-        Use & operator()(std::string_view value, bool notNull = true);
-        Use & operator()(const unsigned char * data, size_t len, bool notNull = true);
-        Use & operator()(int64_t value, bool notNull = true);
+        Use & apply(std::string_view value, bool notNull = true);
+        Use & apply(const unsigned char * data, size_t len, bool notNull = true);
+        Use & apply(int64_t value, bool notNull = true);
         Use & bind(); // null
 
         int step();
@@ -158,12 +166,15 @@ struct SQLiteTxn
     ~SQLiteTxn();
 };
 
-struct SQLiteError : Error
+class SQLiteError : public CloneableError<SQLiteError, Error>
 {
     std::string path;
     std::string errMsg;
     int errNo, extendedErrNo, offset;
 
+    void anchor() override;
+
+public:
     template<typename... Args>
     [[noreturn]] static void throw_(sqlite3 * db, const std::string & fs, const Args &... args)
     {
@@ -199,9 +210,9 @@ void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning);
  * database is busy.
  */
 template<typename T, typename F>
-T retrySQLite(F && fun)
+T retrySQLite(const F & fun)
 {
-    time_t nextWarning = time(0) + 1;
+    time_t nextWarning = time(nullptr) + 1;
 
     while (true) {
         try {

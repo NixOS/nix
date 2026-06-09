@@ -1,0 +1,10 @@
+error:
+       … while calling the 'storePath' builtin
+         at /pwd/lang/eval-fail-storePath-1.nix:1:1:
+            1| builtins.storePath true
+             | ^
+            2|
+
+       … while evaluating the first argument passed to 'builtins.storePath'
+
+       error: cannot coerce a Boolean to a string: true

@@ -1,0 +1,17 @@
+{
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "FOO": "bar"
+  },
+  "inputs": [],
+  "name": "no-inputs",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

@@ -1,0 +1,16 @@
+error:
+       … while evaluating the attribute 'foo'
+
+       … while calling anonymous lambda
+         at /pwd/lang/eval-fail-mapAttrs-4.nix:1:23:
+            1| builtins.mapAttrs (x: y: x + 1) { foo.bar = 1; }
+             |                       ^
+            2|
+
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail-mapAttrs-4.nix:1:30:
+            1| builtins.mapAttrs (x: y: x + 1) { foo.bar = 1; }
+             |                              ^
+            2|
+
+       error: cannot coerce an integer to a string: 1

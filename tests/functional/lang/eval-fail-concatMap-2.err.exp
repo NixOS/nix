@@ -1,0 +1,10 @@
+error:
+       … while calling the 'concatMap' builtin
+         at /pwd/lang/eval-fail-concatMap-2.nix:1:1:
+            1| builtins.concatMap (x: 1) "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.concatMap
+
+       error: expected a list but found a string: "foo"

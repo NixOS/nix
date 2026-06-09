@@ -1,0 +1,10 @@
+error:
+       … while calling the 'listToAttrs' builtin
+         at /pwd/lang/eval-fail-listToAttrs-2.nix:1:1:
+            1| builtins.listToAttrs [ 1 ]
+             | ^
+            2|
+
+       … while evaluating an element of the list passed to builtins.listToAttrs
+
+       error: expected a set but found an integer: 1

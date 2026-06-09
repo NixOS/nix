@@ -1,0 +1,10 @@
+error:
+       … while calling the 'mul' builtin
+         at /pwd/lang/eval-fail-mul-1.nix:1:1:
+            1| builtins.mul "foo" 1
+             | ^
+            2|
+
+       … while evaluating the first argument of the multiplication
+
+       error: expected an integer but found a string: "foo"

@@ -832,8 +832,8 @@ EOF
         # TODO: should probably alert the user if this is disabled?
         _sudo "to launch the Nix volume mounter" \
             launchctl bootstrap system "$NIX_VOLUME_MOUNTD_DEST" || true
-        # TODO: confirm whether kickstart is necessesary?
-        # I feel a little superstitous, but it can guard
+        # TODO: confirm whether kickstart is necessary?
+        # I feel a little superstitious, but it can guard
         # against multiple problems (doesn't start, old
         # version still running for some reason...)
         _sudo "to launch the Nix volume mounter" \

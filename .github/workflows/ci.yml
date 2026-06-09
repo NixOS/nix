@@ -125,17 +125,35 @@ jobs:
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: coverage-reports
         path: coverage-reports/
       if: ${{ matrix.instrumented }}
     - name: Upload installer tarball
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: installer-${{matrix.os}}
         path: out/*
       if: ${{ matrix.primary }}
+
+  windows_tests:
+    needs: basic-checks
+    name: windows unit tests
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+    - name: Run Windows unit tests
+      run: |
+        nix build --file ci/gha/tests/windows.nix unitTests.nix-util-tests -L
 
   installer_test:
     needs: [tests]
@@ -146,46 +164,43 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
-            experimental-installer: false
+            rust-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
-            experimental-installer: false
-          - scenario: on ubuntu (experimental)
+            rust-installer: false
+          - scenario: on ubuntu (rust)
             runs-on: ubuntu-24.04
             os: linux
-            experimental-installer: true
-          - scenario: on macos (experimental)
+            rust-installer: true
+          - scenario: on macos (rust)
             runs-on: macos-14
             os: darwin
-            experimental-installer: true
+            rust-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
     - uses: actions/checkout@v6
     - name: Download installer tarball
-      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         name: installer-${{matrix.os}}
         path: out
     - name: Looking up the installer tarball URL
       id: installer-tarball-url
-      run: |
-        echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-        TARBALL_PATH="$(find "$GITHUB_WORKSPACE/out" -name 'nix*.tar.xz' -print | head -n 1)"
-        echo "tarball-path=file://$TARBALL_PATH" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
-      if: ${{ !matrix.experimental-installer }}
+      run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
+    - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
+      if: ${{ !matrix.rust-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
         install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
-    - uses: ./.github/actions/install-nix-action
-      if: ${{ matrix.experimental-installer }}
-      with:
-        dogfood: false
-        experimental-installer: true
-        tarball_url: ${{ steps.installer-tarball-url.outputs.tarball-path }}
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run rust installer
+      if: ${{ matrix.rust-installer }}
+      run: |
+        chmod +x out/nix-installer
+        ./out/nix-installer install --no-confirm
+      env:
+        RUST_BACKTRACE: full
     - run: sudo apt install fish zsh
       if: matrix.os == 'linux'
     - run: brew install fish
@@ -196,6 +211,24 @@ jobs:
     - run: exec fish -c "nix-instantiate -E 'builtins.currentTime' --eval"
     - run: exec bash -c "nix-channel --add https://releases.nixos.org/nixos/unstable/nixos-23.05pre466020.60c1d71f2ba nixpkgs"
     - run: exec bash -c "nix-channel --update && nix-env -iA nixpkgs.hello && hello"
+
+  clang-tidy:
+    needs: basic-checks
+    runs-on: ubuntu-24.04
+    name: clang-tidy
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: ./.github/actions/install-nix-action
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
+        extra_nix_config: "sandbox = true"
+    - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+    - name: Run clang-tidy
+      run: nix build .#hydraJobs.clangTidy.x86_64-linux -L
+
 
   flake_regressions:
     needs: tests
@@ -214,7 +247,7 @@ jobs:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
       - name: Download installer tarball
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: installer-linux
           path: out
@@ -222,12 +255,14 @@ jobs:
         id: installer-tarball-url
         run: |
           echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-      - uses: cachix/install-nix-action@4e002c8ec80594ecd40e759629461e26c8abed15 # v31.9.0
+      - uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
           install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
           install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
       - name: Run flake regressions tests
-        run: MAX_FLAKES=25 flake-regressions/eval-all.sh
+        run: |
+          touch flake-regressions/tests/{0utkarsh/nixconfig,HariAmoor-professional/nixos-config}/disabled
+          MAX_FLAKES=25 flake-regressions/eval-all.sh
 
   profile_build:
     needs: tests

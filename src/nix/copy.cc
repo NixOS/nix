@@ -3,7 +3,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, MixNoCheckSigs
 {
@@ -63,7 +63,7 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, Mix
 
         copyPaths(*srcStore, *dstStore, stuffToCopy, NoRepair, checkSigs, substitute);
 
-        updateProfile(rootPaths);
+        updateProfile(*dstStore, rootPaths);
 
         if (outLink) {
             if (auto store2 = dstStore.dynamic_pointer_cast<LocalFSStore>())
@@ -75,3 +75,5 @@ struct CmdCopy : virtual CopyCommand, virtual BuiltPathsCommand, MixProfile, Mix
 };
 
 static auto rCmdCopy = registerCommand<CmdCopy>("copy");
+
+} // namespace nix

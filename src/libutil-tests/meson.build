@@ -8,7 +8,7 @@ project(
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -36,6 +36,15 @@ deps_private += gtest
 gmock = dependency('gmock')
 deps_private += gmock
 
+zstd = dependency('libzstd', version : '>= 1.4.0')
+deps_private += zstd
+
+if host_machine.system() == 'windows'
+  # Boost.ASIO needs this unconditionally.
+  socket = cxx.find_library('ws2_32')
+  deps_other += socket
+endif
+
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
 
@@ -51,6 +60,7 @@ sources = files(
   'archive.cc',
   'args.cc',
   'base-n.cc',
+  'bump-memory-resource.cc',
   'canon-path.cc',
   'checked-arithmetic.cc',
   'chunked-vector.cc',
@@ -60,13 +70,17 @@ sources = files(
   'executable-path.cc',
   'file-content-address.cc',
   'file-descriptor.cc',
+  'file-system-at.cc',
   'file-system.cc',
+  'fun.cc',
   'git.cc',
   'hash.cc',
   'hilite.cc',
   'json-utils.cc',
+  'local-keys.cc',
   'logging.cc',
   'lru-cache.cc',
+  'memo.cc',
   'memory-source-accessor.cc',
   'monitorfdhup.cc',
   'nar-listing.cc',
@@ -75,6 +89,8 @@ sources = files(
   'pool.cc',
   'position.cc',
   'processes.cc',
+  'ref.cc',
+  'serialise.cc',
   'sort.cc',
   'source-accessor.cc',
   'spawn.cc',
@@ -86,6 +102,10 @@ sources = files(
   'util.cc',
   'xml-writer.cc',
 )
+
+if host_machine.system() != 'windows'
+  subdir('unix')
+endif
 
 include_dirs = [ include_directories('.') ]
 
@@ -111,3 +131,27 @@ test(
   },
   protocol : 'gtest',
 )
+
+# Run the same tests again under `enosys -d openat2` to exercise the
+# iterative (non-openat2) fallback path on Linux.  `enosys` uses
+# seccomp to make `openat2` return `ENOSYS`, which the wrapper in
+# file-system-at.cc caches and falls back to the iterative impl.
+if host_machine.system() == 'linux'
+  enosys = find_program('enosys', required : false)
+  if enosys.found()
+    test(
+      meson.project_name() + '-without-new-syscalls',
+      enosys,
+      args : [
+        '--syscall', 'openat2',
+        '--syscall', 'fchmodat2',
+        '--',
+        this_exe,
+      ],
+      env : {
+        '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+      },
+      protocol : 'gtest',
+    )
+  endif
+endif

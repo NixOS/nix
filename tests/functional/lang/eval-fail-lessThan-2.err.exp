@@ -1,0 +1,8 @@
+error:
+       … while calling the 'lessThan' builtin
+         at /pwd/lang/eval-fail-lessThan-2.nix:1:1:
+            1| builtins.lessThan { } { }
+             | ^
+            2|
+
+       error: cannot compare a set with a set; values of that type are incomparable (values are { } and { })

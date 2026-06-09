@@ -1,6 +1,6 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
-#include <exception> // Needed by rapidcheck on Darwin
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <rapidcheck/gtest.h>
 
 #include "nix/store/tests/derived-path.hh"
@@ -17,8 +17,6 @@ class DerivedPathExpressionTest : public LibExprTest
 //
 // See https://github.com/emil-e/rapidcheck/blob/master/doc/gtest.md#rc_gtest_fixture_propfixture-name-args
 TEST_F(DerivedPathExpressionTest, force_init) {}
-
-#ifndef COVERAGE
 
 RC_GTEST_FIXTURE_PROP(DerivedPathExpressionTest, prop_opaque_path_round_trip, (const SingleDerivedPath::Opaque & o))
 {
@@ -60,7 +58,5 @@ RC_GTEST_FIXTURE_PROP(
     auto [d, _] = state.coerceToSingleDerivedPathUnchecked(noPos, *v, "", mockXpSettings);
     RC_ASSERT(SingleDerivedPath{b} == d);
 }
-
-#endif
 
 } /* namespace nix */

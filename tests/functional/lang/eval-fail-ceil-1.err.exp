@@ -1,0 +1,10 @@
+error:
+       … while calling the 'ceil' builtin
+         at /pwd/lang/eval-fail-ceil-1.nix:1:1:
+            1| builtins.ceil "foo"
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.ceil
+
+       error: expected a float but found a string: "foo"

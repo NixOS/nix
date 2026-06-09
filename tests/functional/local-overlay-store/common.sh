@@ -70,6 +70,7 @@ mountOverlayfs () {
     "$storeBRoot/nix/store" \
     || skipTest "overlayfs is not supported"
 
+  # shellcheck disable=SC2329
   cleanupOverlay () {
     # shellcheck disable=2317
     umount -n "$storeBRoot/nix/store"

@@ -75,21 +75,6 @@ let
       ];
     };
 
-  otherNixes.nix_2_3.setNixPackage =
-    { lib, pkgs, ... }:
-    {
-      imports = [ checkOverrideNixVersion ];
-      nix.package = lib.mkForce (
-        pkgs.nixVersions.nix_2_3.overrideAttrs (o: {
-          meta = o.meta // {
-            # This version shouldn't be used by end-users, but we run tests against
-            # it to ensure we don't break protocol compatibility.
-            knownVulnerabilities = [ ];
-          };
-        })
-      );
-    };
-
   otherNixes.nix_2_13.setNixPackage =
     { lib, pkgs, ... }:
     {
@@ -106,6 +91,14 @@ let
       );
     };
 
+  otherNixes.nix_2_18.setNixPackage =
+    { lib, pkgs, ... }:
+    {
+      imports = [ checkOverrideNixVersion ];
+      nix.package = lib.mkForce (
+        nixpkgs-23-11.legacyPackages.${pkgs.stdenv.hostPlatform.system}.nixVersions.nix_2_18
+      );
+    };
 in
 
 {
@@ -197,6 +190,8 @@ in
 
   functional_symlinked-home = runNixOSTest ./functional/symlinked-home.nix;
 
+  functional_unprivileged-daemon = runNixOSTest ./functional/unprivileged-daemon.nix;
+
   user-sandboxing = runNixOSTest ./user-sandboxing;
 
   s3-binary-cache-store = runNixOSTest ./s3-binary-cache-store.nix;
@@ -210,4 +205,23 @@ in
   fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
+
+  storeRemount = runNixOSTest ./store-remount.nix;
+
+  upgrade-nix = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    upgrade-nix.oldNix = nixComponents.nix-cli;
+  };
+
+  upgrade-nix_fromStable = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    name = lib.mkForce "upgrade-nix-from-stable";
+    upgrade-nix.oldNix = pkgs.nixVersions.stable;
+  };
+
+  upgrade-nix_fromLatest = runNixOSTest {
+    imports = [ ./upgrade-nix.nix ];
+    name = lib.mkForce "upgrade-nix-from-latest";
+    upgrade-nix.oldNix = pkgs.nixVersions.latest;
+  };
 }

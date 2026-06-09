@@ -38,7 +38,9 @@ static std::string doRenderMarkdownToTerminal(std::string_view markdown)
 #  endif
         .feat = LOWDOWN_COMMONMARK | LOWDOWN_FENCED | LOWDOWN_DEFLIST | LOWDOWN_TABLES,
         .oflags =
-#  if HAVE_LOWDOWN_1_4
+#  if HAVE_LOWDOWN_3
+            LOWDOWN_NORELLINK
+#  elif HAVE_LOWDOWN_1_4
             LOWDOWN_TERM_NORELLINK // To render full links while skipping relative ones
 #  else
             LOWDOWN_TERM_NOLINK

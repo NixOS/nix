@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/bad-drvpath.nix -qa --json --drv-path

@@ -11,21 +11,18 @@
         "fetch-tree"
       ];
 
-      networking.firewall.allowedTCPPorts = [ 5000 ];
+      networking.firewall.allowedTCPPorts = [ 80 ];
 
-      services.nix-serve = {
+      systemd.tmpfiles.rules = [ "d /var/cache/binary-cache 0755 root root -" ];
+
+      services.nginx = {
         enable = true;
-        secretKeyFile =
-          let
-            key = pkgs.writeTextFile {
-              name = "secret-key";
-              text = ''
-                substituter:SerxxAca5NEsYY0DwVo+subokk+OoHcD9m6JwuctzHgSQVfGHe6nCc+NReDjV3QdFYPMGix4FMg0+K/TM1B3aA==
-              '';
-            };
-          in
-          "${key}";
+        virtualHosts."substituter".root = "/var/cache/binary-cache";
       };
+
+      environment.etc."nix/secret-key".text = ''
+        substituter:SerxxAca5NEsYY0DwVo+subokk+OoHcD9m6JwuctzHgSQVfGHe6nCc+NReDjV3QdFYPMGix4FMg0+K/TM1B3aA==
+      '';
     };
 
   nodes.importer =
@@ -38,13 +35,12 @@
           "nix-command"
           "fetch-tree"
         ];
-        substituters = lib.mkForce [ "http://substituter:5000" ];
+        substituters = lib.mkForce [ "http://substituter" ];
         trusted-public-keys = lib.mkForce [ "substituter:EkFXxh3upwnPjUXg41d0HRWDzBoseBTINPiv0zNQd2g=" ];
       };
     };
 
-  testScript =
-    { nodes }: # python
+  testScript = # python
     ''
       import json
       import os
@@ -52,11 +48,11 @@
       start_all()
 
       substituter.wait_for_unit("multi-user.target")
+      importer.wait_for_unit("multi-user.target")
 
-      ##########################################
-      # Test 1: builtins.fetchurl with substitution
-      ##########################################
+      binary_cache = "file:///var/cache/binary-cache?secret-key=/etc/nix/secret-key"
 
+      # builtins.fetchurl is substituted
       missing_file = "/only-on-substituter.txt"
 
       substituter.succeed(f"echo 'this should only exist on the substituter' > {missing_file}")
@@ -74,11 +70,8 @@
 
       file_store_path = json.loads(file_store_path_json)
 
-      substituter.succeed(f"nix store sign --key-file ${nodes.substituter.services.nix-serve.secretKeyFile} {file_store_path}")
+      substituter.succeed(f"nix copy --to '{binary_cache}' {file_store_path}")
 
-      importer.wait_for_unit("multi-user.target")
-
-      print("Testing fetchurl with substitution...")
       importer.succeed(f"""
         nix-instantiate -vvvvv --eval --json --read-write-mode --expr '
           builtins.fetchurl {{
@@ -87,26 +80,19 @@
           }}
         '
       """)
-      print("✓ fetchurl substitution works!")
 
-      ##########################################
-      # Test 2: builtins.fetchTarball with substitution
-      ##########################################
-
+      # builtins.fetchTarball is substituted
       missing_tarball = "/only-on-substituter.tar.gz"
 
-      # Create a directory with some content
       substituter.succeed("""
         mkdir -p /tmp/test-tarball
         echo 'Hello from tarball!' > /tmp/test-tarball/hello.txt
         echo 'Another file' > /tmp/test-tarball/file2.txt
       """)
-
-      # Create a tarball
       substituter.succeed(f"tar czf {missing_tarball} -C /tmp test-tarball")
 
-      # For fetchTarball, we need to first fetch it without hash to get the store path,
-      # then compute the NAR hash of that path
+      # Fetch once without a hash to learn the store path, then derive the
+      # hashes the importer needs.
       tarball_store_path_json = substituter.succeed(f"""
         nix-instantiate --eval --json --read-write-mode --expr '
           builtins.fetchTarball {{
@@ -117,22 +103,14 @@
 
       tarball_store_path = json.loads(tarball_store_path_json)
 
-      # Get the NAR hash of the unpacked tarball in SRI format
       path_info_json = substituter.succeed(f"nix path-info --json-format 2 --json {tarball_store_path}").strip()
       path_info_dict = json.loads(path_info_json)["info"]
-      # narHash is already in SRI format
       tarball_hash_sri = path_info_dict[os.path.basename(tarball_store_path)]["narHash"]
-      print(f"Tarball NAR hash (SRI): {tarball_hash_sri}")
 
-      # Also get the old format hash for fetchTarball (which uses sha256 parameter)
       tarball_hash = substituter.succeed(f"nix-store --query --hash {tarball_store_path}").strip()
 
-      # Sign the tarball's store path
-      substituter.succeed(f"nix store sign --recursive --key-file ${nodes.substituter.services.nix-serve.secretKeyFile} {tarball_store_path}")
+      substituter.succeed(f"nix copy --to '{binary_cache}' {tarball_store_path}")
 
-      # Now try to fetch the same tarball on the importer
-      # The file doesn't exist locally, so it should be substituted
-      print("Testing fetchTarball with substitution...")
       result = importer.succeed(f"""
         nix-instantiate -vvvvv --eval --json --read-write-mode --expr '
           builtins.fetchTarball {{
@@ -143,23 +121,14 @@
       """)
 
       result_path = json.loads(result)
-      print(f"✓ fetchTarball substitution works! Result: {result_path}")
 
-      # Verify the content is correct
-      # fetchTarball strips the top-level directory if there's only one
       content = importer.succeed(f"cat {result_path}/hello.txt").strip()
       assert content == "Hello from tarball!", f"Content mismatch: {content}"
-      print("✓ fetchTarball content verified!")
 
-      ##########################################
-      # Test 3: Verify fetchTree does NOT substitute (preserves metadata)
-      ##########################################
-
-      print("Testing that fetchTree without __final does NOT use substitution...")
-
-      # fetchTree with just narHash (not __final) should try to download, which will fail
-      # since the file doesn't exist on the importer
-      exit_code = importer.fail(f"""
+      # fetchTree does NOT substitute non-final inputs: without __final it
+      # must perform the real fetch (to preserve metadata like lastModified),
+      # so it fails since the file only exists on the substituter.
+      output = importer.fail(f"""
         nix-instantiate --eval --json --read-write-mode --expr '
           builtins.fetchTree {{
             type = "tarball";
@@ -169,9 +138,6 @@
         ' 2>&1
       """)
 
-      # Should fail with "does not exist" since it tries to download instead of substituting
-      assert "does not exist" in exit_code or "Couldn't open file" in exit_code, f"Expected download failure, got: {exit_code}"
-      print("✓ fetchTree correctly does NOT substitute non-final inputs!")
-      print("  (This preserves metadata like lastModified from the actual fetch)")
+      assert "does not exist" in output or "Couldn't open file" in output, f"Expected download failure, got: {output}"
     '';
 }

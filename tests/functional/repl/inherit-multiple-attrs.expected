@@ -1,0 +1,9 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = { x = 10; y = 20; }
+
+nix-repl> inherit (a) x y
+
+nix-repl> x + y
+30

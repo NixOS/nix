@@ -32,17 +32,17 @@ public:
 
 class CaptureLogging
 {
-    std::unique_ptr<Logger> oldLogger;
+    Logger * oldLogger;
 public:
     CaptureLogging()
     {
-        oldLogger = std::move(logger);
-        logger = std::make_unique<CaptureLogger>();
+        oldLogger = logger;
+        logger = new CaptureLogger();
     }
 
     ~CaptureLogging()
     {
-        logger = std::move(oldLogger);
+        logger = oldLogger;
     }
 };
 
@@ -144,7 +144,7 @@ TEST_F(PrimOpTest, trace)
     CaptureLogging l;
     auto v = eval("builtins.trace \"test string 123\" 123");
     ASSERT_THAT(v, IsIntEq(123));
-    auto text = (dynamic_cast<CaptureLogger *>(logger.get()))->get();
+    auto text = (dynamic_cast<CaptureLogger *>(logger))->get();
     ASSERT_NE(text.find("test string 123"), std::string::npos);
 }
 
@@ -637,7 +637,7 @@ TEST_F(PrimOpTest, toStringLambdaThrows)
 }
 
 class ToStringPrimOpTest : public PrimOpTest,
-                           public testing::WithParamInterface<std::tuple<std::string, std::string_view>>
+                           public ::testing::WithParamInterface<std::tuple<std::string, std::string_view>>
 {};
 
 TEST_P(ToStringPrimOpTest, toString)
@@ -651,7 +651,7 @@ TEST_P(ToStringPrimOpTest, toString)
 INSTANTIATE_TEST_SUITE_P(
     toString,
     ToStringPrimOpTest,
-    testing::Values(
+    ::testing::Values(
         CASE(R"("foo")", "foo"),
         CASE(R"(1)", "1"),
         CASE(R"([1 2 3])", "1 2 3"),
@@ -756,7 +756,7 @@ TEST_F(PrimOpTest, langVersion)
 TEST_F(PrimOpTest, storeDir)
 {
     auto v = eval("builtins.storeDir");
-    ASSERT_THAT(v, IsStringEq(settings.nixStore));
+    ASSERT_THAT(v, IsStringEq(state.store->storeDir));
 }
 
 TEST_F(PrimOpTest, nixVersion)
@@ -799,7 +799,7 @@ TEST_F(PrimOpTest, splitVersion)
 }
 
 class CompareVersionsPrimOpTest : public PrimOpTest,
-                                  public testing::WithParamInterface<std::tuple<std::string, const int>>
+                                  public ::testing::WithParamInterface<std::tuple<std::string, const int>>
 {};
 
 TEST_P(CompareVersionsPrimOpTest, compareVersions)
@@ -813,7 +813,7 @@ TEST_P(CompareVersionsPrimOpTest, compareVersions)
 INSTANTIATE_TEST_SUITE_P(
     compareVersions,
     CompareVersionsPrimOpTest,
-    testing::Values(
+    ::testing::Values(
         // The first two are weird cases. Intuition tells they should
         // be the same but they aren't.
         CASE(1.0, 1.0.0, -1),
@@ -835,7 +835,7 @@ INSTANTIATE_TEST_SUITE_P(
 
 class ParseDrvNamePrimOpTest
     : public PrimOpTest,
-      public testing::WithParamInterface<std::tuple<std::string, std::string_view, std::string_view>>
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string_view, std::string_view>>
 {};
 
 TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
@@ -857,7 +857,7 @@ TEST_P(ParseDrvNamePrimOpTest, parseDrvName)
 INSTANTIATE_TEST_SUITE_P(
     parseDrvName,
     ParseDrvNamePrimOpTest,
-    testing::Values(
+    ::testing::Values(
         std::make_tuple("nix-0.12pre12876", "nix", "0.12pre12876"),
         std::make_tuple("a-b-c-1234pre5+git", "a-b-c", "1234pre5+git")));
 

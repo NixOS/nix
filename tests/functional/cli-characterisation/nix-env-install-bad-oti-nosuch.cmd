@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/bad-outputs-to-install-nosuch.nix -i bad-outputs-to-install-nosuch

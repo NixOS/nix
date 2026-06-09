@@ -2,19 +2,21 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/local-store.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
-#include "nix/store/outputs-spec.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/build/build-log.hh"
 
 namespace nix {
 
 using std::map;
 
 struct BuilderFailureError;
+struct ExternalBuilder;
 #ifndef _WIN32 // TODO enable build hook on Windows
 struct HookInstance;
 struct DerivationBuilder;
@@ -29,6 +31,8 @@ typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
  */
 struct DerivationBuildingGoal : public Goal
 {
+    friend class Worker;
+
     /**
      * @param storeDerivation Whether to store the derivation in
      * `worker.store`. This is useful for newly-resolved derivations. In this
@@ -39,99 +43,62 @@ struct DerivationBuildingGoal : public Goal
      * faithfully reconstruct the build history.
      */
     DerivationBuildingGoal(
-        const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode, bool storeDerivation);
+        const StorePath & drvPath,
+        ref<const Derivation> drv,
+        Worker & worker,
+        BuildMode buildMode,
+        bool storeDerivation);
     ~DerivationBuildingGoal();
 
 private:
 
     /** The path of the derivation. */
-    StorePath drvPath;
+    const StorePath drvPath;
 
     /**
      * The derivation stored at drvPath.
      */
-    std::unique_ptr<Derivation> drv;
+    const ref<const Derivation> drv;
 
     /**
      * The remainder is state held during the build.
      */
 
-    /**
-     * All input paths (that is, the union of FS closures of the
-     * immediate input paths).
-     */
-    StorePathSet inputPaths;
-
-    /**
-     * File descriptor for the log file.
-     */
-    AutoCloseFD fdLogFile;
-    std::shared_ptr<BufferedSink> logFileSink, logSink;
-
-    /**
-     * Number of bytes received from the builder's stdout/stderr.
-     */
-    unsigned long logSize;
-
-    /**
-     * The most recent log lines.
-     */
-    std::list<std::string> logTail;
-
-    std::string currentLogLine;
-    size_t currentLogLinePos = 0; // to handle carriage return
-
-    std::string currentHookLine;
-
-#ifndef _WIN32 // TODO enable build hook on Windows
-    /**
-     * The build hook.
-     */
-    std::unique_ptr<HookInstance> hook;
-
-    std::unique_ptr<DerivationBuilder> builder;
-#endif
-
-    BuildMode buildMode;
+    const BuildMode buildMode;
 
     std::unique_ptr<MaintainCount<uint64_t>> mcRunningBuilds;
 
-    std::unique_ptr<Activity> act;
-
-    std::map<ActivityId, Activity> builderActivities;
-
     std::string key() override;
+
+    struct LocalBuildCapability
+    {
+        LocalStore & localStore;
+        const ExternalBuilder * externalBuilder;
+    };
 
     /**
      * The states.
      */
     Co gaveUpOnSubstitution(bool storeDerivation);
-    Co tryToBuild();
+    Co tryToBuild(StorePathSet inputPaths);
+    Co buildWithHook(
+        StorePathSet inputPaths,
+        std::map<std::string, InitialOutput> initialOutputs,
+        DerivationOptions<StorePath> drvOptions,
+        PathLocks outputLocks);
+    Co buildLocally(
+        LocalBuildCapability localBuildCap,
+        StorePathSet inputPaths,
+        std::map<std::string, InitialOutput> initialOutputs,
+        DerivationOptions<StorePath> drvOptions,
+        PathLocks outputLocks);
 
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(
-        const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions);
+    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
 
-    /**
-     * Open a log file and a pipe to it.
-     */
-    Path openLogFile();
-
-    /**
-     * Close the log file.
-     */
-    void closeLogFile();
-
-    bool isReadDesc(Descriptor fd);
-
-    /**
-     * Process output from a child process.
-     */
-    Co processChildOutput(Descriptor fd, std::string_view data);
-
-    void flushLine();
+    Done doneFailureLogTooLong(BuildLog & buildLog);
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
@@ -148,16 +115,11 @@ private:
      */
     std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
 
-    /**
-     * Forcibly kill the child process, if any.
-     */
-    void killChild();
-
     Done doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs);
 
     Done doneFailure(BuildError ex);
 
-    BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg);
+    BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg, BuildLog & buildLog);
 
     JobCategory jobCategory() const override
     {

@@ -5,7 +5,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/store-open.hh"
 
-using namespace nix;
+namespace nix {
 
 static std::string mkDynamicAttrsExpr(size_t attrCount)
 {
@@ -37,7 +37,8 @@ static void BM_EvalDynamicAttrs(benchmark::State & state)
         EvalSettings evalSettings{readOnlyMode};
         evalSettings.nixPath = {};
 
-        EvalState st({}, store, fetchSettings, evalSettings, nullptr);
+        auto stPtr = std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr);
+        auto & st = *stPtr;
         Expr * expr = st.parseExprFromString(exprStr, st.rootPath(CanonPath::root));
 
         Value v;
@@ -53,3 +54,5 @@ static void BM_EvalDynamicAttrs(benchmark::State & state)
 }
 
 BENCHMARK(BM_EvalDynamicAttrs)->Arg(100)->Arg(500)->Arg(2'000);
+
+} // namespace nix

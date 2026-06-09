@@ -1,0 +1,22 @@
+error:
+       … while evaluating the attribute 'foo'
+
+       … from call site
+         at /pwd/lang/eval-fail-zipAttrsWith-4.nix:1:24:
+            1| builtins.zipAttrsWith (a: b: a + b) [
+             |                        ^
+            2|   { foo = 1; }
+
+       … while calling anonymous lambda
+         at /pwd/lang/eval-fail-zipAttrsWith-4.nix:1:27:
+            1| builtins.zipAttrsWith (a: b: a + b) [
+             |                           ^
+            2|   { foo = 1; }
+
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail-zipAttrsWith-4.nix:1:34:
+            1| builtins.zipAttrsWith (a: b: a + b) [
+             |                                  ^
+            2|   { foo = 1; }
+
+       error: cannot coerce a list to a string: [ 1 2 ]

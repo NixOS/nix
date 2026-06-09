@@ -36,8 +36,12 @@ triggerStaleFileHandle () {
     buildInStore "$storeB"
 }
 
-# Without remounting, we should encounter errors
-expectStderr 1 triggerStaleFileHandle | grepQuiet 'Stale file handle'
+# Without remounting, we should encounter errors.  However, this doesn't seem to
+# happen on Linux 6.19+ anymore.
+#
+# See https://github.com/NixOS/nixpkgs/issues/496466
+( expectStderr 1 triggerStaleFileHandle | grepQuiet 'Stale file handle' ) || \
+    skipTest "Couldn't trigger the error"
 
 # Configure remount-hook and reset OverlayFS
 storeB="$storeB&remount-hook=$PWD/remount.sh"

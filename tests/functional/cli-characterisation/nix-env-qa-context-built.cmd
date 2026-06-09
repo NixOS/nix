@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/context-built.nix -qa --json

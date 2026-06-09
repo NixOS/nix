@@ -8,7 +8,7 @@ project(
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -40,6 +40,8 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'access-tokens.cc',
+  'attrs.cc',
+  'git-lfs-fetch.cc',
   'git-utils.cc',
   'git.cc',
   'input.cc',
@@ -66,6 +68,8 @@ test(
   this_exe,
   env : {
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+    'HOME' : meson.current_build_dir() / 'test-home',
+    'NIX_STORE' : '',
   },
   protocol : 'gtest',
 )

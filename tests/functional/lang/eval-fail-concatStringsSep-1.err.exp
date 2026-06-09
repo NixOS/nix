@@ -1,0 +1,10 @@
+error:
+       … while calling the 'concatStringsSep' builtin
+         at /pwd/lang/eval-fail-concatStringsSep-1.nix:1:1:
+            1| builtins.concatStringsSep 1 { }
+             | ^
+            2|
+
+       … while evaluating the first argument (the separator string) passed to builtins.concatStringsSep
+
+       error: expected a string but found an integer: 1

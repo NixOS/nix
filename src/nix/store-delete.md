@@ -5,7 +5,19 @@ R""(
 * Delete a specific store path:
 
   ```console
-  # nix store delete /nix/store/yb5q57zxv6hgqql42d5r8b5k5mcq6kay-hello-2.10
+  # nix store delete /nix/store/fdhrijyv3670djsgprx596nn89iwlj2s-hello-2.10
+  ```
+
+* Garbage collect a closure:
+
+  ```console
+  # nix store delete --recursive --skip-alive nixpkgs#hello
+  ```
+
+* Garbage collect a closure including dead referrers of the closure:
+
+  ```console
+  # nix store delete --recursive --skip-alive --also-referrers nixpkgs#hello
   ```
 
 # Description

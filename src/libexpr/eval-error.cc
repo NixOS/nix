@@ -1,8 +1,15 @@
 #include "nix/expr/eval-error.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/value.hh"
+#include "nix/store/store-api.hh"
 
 namespace nix {
+
+InvalidPathError::InvalidPathError(EvalState & state, const StorePath & path)
+    : CloneableError(state, "path '%s' is not valid", state.store->printStorePath(path))
+    , path{path}
+{
+}
 
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withExitStatus(unsigned int exitStatus)
@@ -90,7 +97,7 @@ void EvalErrorBuilder<T>::debugThrow()
     auto error = std::move(this->error);
     delete this;
 
-    throw error;
+    throw std::move(error);
 }
 
 template<class T>
@@ -114,5 +121,34 @@ template class EvalErrorBuilder<InfiniteRecursionError>;
 template class EvalErrorBuilder<StackOverflowError>;
 template class EvalErrorBuilder<InvalidPathError>;
 template class EvalErrorBuilder<IFDError>;
+template class EvalErrorBuilder<RecoverableEvalError>;
+
+void EvalBaseError::anchor() {}
+
+void ParseError::anchor() {}
+
+void EvalError::anchor() {}
+
+void AssertionError::anchor() {}
+
+void ThrownError::anchor() {}
+
+void Abort::anchor() {}
+
+void TypeError::anchor() {}
+
+void UndefinedVarError::anchor() {}
+
+void MissingArgumentError::anchor() {}
+
+void InfiniteRecursionError::anchor() {}
+
+void StackOverflowError::anchor() {}
+
+void InvalidPathError::anchor() {}
+
+void IFDError::anchor() {}
+
+void RecoverableEvalError::anchor() {}
 
 } // namespace nix

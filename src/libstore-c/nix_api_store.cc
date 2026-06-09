@@ -9,6 +9,7 @@
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/store-reference.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/base-nix-32.hh"
@@ -47,14 +48,14 @@ Store * nix_store_open(nix_c_context * context, const char * uri, const char ***
         if (uri_str.empty())
             return new Store{nix::openStore()};
 
-        if (!params)
-            return new Store{nix::openStore(uri_str)};
+        auto storeRef = nix::StoreReference::parse(uri_str);
 
-        nix::Store::Config::Params params_map;
-        for (size_t i = 0; params[i] != nullptr; i++) {
-            params_map[params[i][0]] = params[i][1];
+        if (params) {
+            for (size_t i = 0; params[i] != nullptr; i++) {
+                storeRef.params[params[i][0]] = params[i][1];
+            }
         }
-        return new Store{nix::openStore(uri_str, params_map)};
+        return new Store{nix::openStore(std::move(storeRef))};
     }
     NIXC_CATCH_ERRS_NULL
 }
@@ -115,7 +116,7 @@ nix_err nix_store_real_path(
         context->last_err_code = NIX_OK;
     try {
         auto store2 = store->ptr.dynamic_pointer_cast<nix::LocalFSStore>();
-        auto res = store2 ? store2->toRealPath(path->path) : store->ptr->printStorePath(path->path);
+        auto res = store2 ? store2->toRealPath(path->path).string() : store->ptr->printStorePath(path->path);
         return call_nix_get_string_callback(res, callback, user_data);
     }
     NIXC_CATCH_ERRS
@@ -182,10 +183,8 @@ nix_err nix_store_realise(
         assert(results.size() == 1);
 
         // Check if any builds failed
-        for (auto & result : results) {
-            if (auto * failureP = result.tryGetFailure())
-                failureP->rethrow();
-        }
+        for (auto & result : results)
+            result.tryThrowBuildError();
 
         if (callback) {
             for (const auto & result : results) {
@@ -309,7 +308,12 @@ StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_deriv
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto ret = nix::writeDerivation(*store->ptr, derivation->drv, nix::NoRepair);
+        /* Quite dubious that users would want this to silently suceed
+           without actually writing the derivation if this setting is
+           set, but it was that way already, so we are doing this for
+           back-compat for now. */
+        auto ret = nix::settings.readOnlyMode ? nix::computeStorePath(*store->ptr, derivation->drv)
+                                              : store->ptr->writeDerivation(derivation->drv, nix::NoRepair);
 
         return new StorePath{ret};
     }
@@ -336,6 +340,44 @@ nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * 
         return new nix_derivation{store->ptr->derivationFromPath(path->path)};
     }
     NIXC_CATCH_ERRS_NULL
+}
+
+StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        std::optional<nix::StorePath> s = store->ptr->queryPathFromHashPart(hash);
+
+        if (!s.has_value()) {
+            return nullptr;
+        }
+
+        return new StorePath{std::move(s.value())};
+    }
+    NIXC_CATCH_ERRS_NULL
+}
+
+nix_err nix_store_copy_path(
+    nix_c_context * context, Store * srcStore, Store * dstStore, const StorePath * path, bool repair, bool checkSigs)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (srcStore == nullptr)
+            return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Source store is null");
+
+        if (dstStore == nullptr)
+            return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Destination store is null");
+
+        if (path == nullptr)
+            return nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Store path is null");
+
+        auto repairFlag = repair ? nix::RepairFlag::Repair : nix::RepairFlag::NoRepair;
+        auto checkSigsFlag = checkSigs ? nix::CheckSigsFlag::CheckSigs : nix::CheckSigsFlag::NoCheckSigs;
+        nix::copyStorePath(*srcStore->ptr, *dstStore->ptr, path->path, repairFlag, checkSigsFlag);
+    }
+    NIXC_CATCH_ERRS
 }
 
 } // extern "C"

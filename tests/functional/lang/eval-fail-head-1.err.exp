@@ -1,0 +1,10 @@
+error:
+       … while calling the 'head' builtin
+         at /pwd/lang/eval-fail-head-1.nix:1:1:
+            1| builtins.head 1
+             | ^
+            2|
+
+       … while evaluating the first argument passed to 'builtins.head'
+
+       error: expected a list but found an integer: 1

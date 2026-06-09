@@ -1,0 +1,26 @@
+{
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "__json": "{\"exportReferencesGraph\":{\"refs\":[\"/nix/store/f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out/foo\"]}}"
+  },
+  "inputs": [
+    "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"
+  ],
+  "name": "export-ref-subpath-sa",
+  "outputs": {
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "structuredAttrs": {
+    "exportReferencesGraph": {
+      "refs": [
+        "/nix/store/f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out/foo"
+      ]
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

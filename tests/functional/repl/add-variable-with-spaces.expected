@@ -1,0 +1,12 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :a { a = 1; b = 2; longerName = 3; "with spaces" = 4; }
+Added 4 variables.
+a, b, longerName, "with spaces"
+
+nix-repl> :reload
+
+nix-repl> :l ./attribute-set.nix
+Added 4 variables.
+a, b, longerName, "with spaces"

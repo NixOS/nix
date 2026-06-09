@@ -1,0 +1,8 @@
+error:
+       … while calling the 'foldl'' builtin
+         at /pwd/lang/eval-fail-foldlPrime-3.nix:1:1:
+            1| builtins.foldl' (_: 1) "foo" [ true ]
+             | ^
+            2|
+
+       error: attempt to call something which is not a function but an integer: 1

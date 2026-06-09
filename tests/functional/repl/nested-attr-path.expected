@@ -1,0 +1,7 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a.b.c = 1;
+
+nix-repl> a.b
+{ c = 1; }

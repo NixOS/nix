@@ -8,42 +8,55 @@
 
 #  include "nix/util/error.hh"
 #  include "nix/util/util.hh"
+#  include "nix/util/logging.hh"
 
 namespace nix {
 
-AutoRemoveJail::AutoRemoveJail()
-    : del{false}
+AutoRemoveJail::AutoRemoveJail(int jid)
+    : jid(jid)
 {
 }
 
-AutoRemoveJail::AutoRemoveJail(int jid)
-    : jid(jid)
-    , del(true)
+void AutoRemoveJail::remove()
 {
+    if (jid != INVALID_JAIL) {
+        if (jail_remove(jid) < 0) {
+            throw SysError("Failed to remove jail %1%", jid);
+        }
+    }
+    cancel();
+
+    bool failed = false;
+    for (auto & path : childrenMounts) {
+        int r = unmount(path.c_str(), 0);
+        if (r < 0 && errno == EBUSY) {
+            sleep(1);
+            r = unmount(path.c_str(), 0);
+        }
+        if (r < 0) {
+            warn("Failed to unmount path %1%", PathFmt(path));
+            failed = true;
+        }
+    }
+    childrenMounts.clear();
+
+    if (failed) {
+        throw SysError("Failed to unmount some jail paths");
+    }
 }
 
 AutoRemoveJail::~AutoRemoveJail()
 {
     try {
-        if (del) {
-            if (jail_remove(jid) < 0) {
-                throw SysError("Failed to remove jail %1%", jid);
-            }
-        }
+        remove();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
 }
 
-void AutoRemoveJail::cancel()
+void AutoRemoveJail::cancel() noexcept
 {
-    del = false;
-}
-
-void AutoRemoveJail::reset(int j)
-{
-    del = true;
-    jid = j;
+    jid = INVALID_JAIL;
 }
 
 //////////////////////////////////////////////////////////////////////

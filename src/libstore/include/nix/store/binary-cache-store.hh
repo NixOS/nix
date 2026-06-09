@@ -1,7 +1,7 @@
 #pragma once
 ///@file
 
-#include "nix/util/signature/local-keys.hh"
+#include "nix/util/compression-settings.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/log-store.hh"
 
@@ -16,15 +16,28 @@ class RemoteFSAccessor;
 
 struct BinaryCacheStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+private:
+    void anchor() override;
 
-    const Setting<std::string> compression{
-        this, "xz", "compression", "NAR compression method (`xz`, `bzip2`, `gzip`, `zstd`, or `none`)."};
+public:
+    BinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+    {
+    }
 
-    const Setting<bool> writeNARListing{
+    Setting<CompressionAlgo> compression{
+        this,
+        CompressionAlgo::xz,
+        "compression",
+        R"(
+          NAR compression method. One of: `xz`, `bzip2`, `gzip`, `zstd`, `none`, `br`, `compress`, `grzip`, `lrzip`, `lz4`, `lzip`, `lzma` or `lzop`.
+          To use a particular compression method Nix has to be built with a version of libarchive that natively supports that compression algorithm.
+        )"};
+
+    Setting<bool> writeNARListing{
         this, false, "write-nar-listing", "Whether to write a JSON file that lists the files in each NAR."};
 
-    const Setting<bool> writeDebugInfo{
+    Setting<bool> writeDebugInfo{
         this,
         false,
         "index-debug-info",
@@ -33,24 +46,29 @@ struct BinaryCacheStoreConfig : virtual StoreConfig
           fetch debug info on demand
         )"};
 
-    const Setting<Path> secretKeyFile{this, "", "secret-key", "Path to the secret key used to sign the binary cache."};
+    Setting<std::optional<AbsolutePath>> secretKeyFile{
+        this, std::nullopt, "secret-key", "Path to the secret key used to sign the binary cache."};
 
-    const Setting<std::string> secretKeyFiles{
+    Setting<std::string> secretKeyFiles{
         this, "", "secret-keys", "List of comma-separated paths to the secret keys used to sign the binary cache."};
 
-    const Setting<Path> localNarCache{
+    Setting<std::optional<AbsolutePath>> localNarCache{
         this,
-        "",
+        std::nullopt,
         "local-nar-cache",
         "Path to a local cache of NARs fetched from this binary cache, used by commands such as `nix store cat`."};
 
-    const Setting<bool> parallelCompression{
+    Setting<bool> parallelCompression{
         this,
         false,
         "parallel-compression",
-        "Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`."};
+        R"(
+          Enable multi-threaded compression of NARs. This is currently only available for `xz` and `zstd`.
 
-    const Setting<int> compressionLevel{
+          If not set explicitly, defaults to `true` when `compression` is `zstd` and `false` otherwise.
+        )"};
+
+    Setting<int> compressionLevel{
         this,
         -1,
         "compression-level",
@@ -78,14 +96,26 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
     Config & config;
 
 private:
+    void anchor() override;
+
     std::vector<std::unique_ptr<Signer>> signers;
 
 protected:
 
     /**
      * The prefix under which realisation infos will be stored
+     *
+     * @note The previous (still experimental, though) hash-keyed
+     * realisations were under "realisations". "build trace" is a better
+     * name anyways (issue #11895). This is call "v2" accordingly.
+     *
+     * While we're experimenting, we'll freely increase this version
+     * number. Old build traces will just be "abandoned" at the old URL.
+     * When we are done experimenting, we'll try lean more on versioning
+     * the build trace entries themselves than the entire directory, for
+     * a smoother migration path.
      */
-    constexpr const static std::string realisationsPrefix = "realisations";
+    constexpr const static std::string realisationsPrefix = "build-trace-v2";
 
     constexpr const static std::string cacheInfoFile = "nix-cache-info";
 
@@ -94,7 +124,7 @@ protected:
     /**
      * Compute the path to the given realisation
      *
-     * It's `${realisationsPrefix}/${drvOutput}.doi`.
+     * It's `${realisationsPrefix}/${drvPath}/${outputName}`.
      */
     std::string makeRealisationPath(const DrvOutput & id);
 
@@ -153,11 +183,25 @@ private:
 
     void writeNarInfo(ref<NarInfo> narInfo);
 
+    /**
+     * Upload the NAR for a path and everything else *except* the
+     * `.narinfo` file (i.e. the compressed NAR, an optional NAR
+     * listing, and optional debuginfo links), and construct the
+     * corresponding `NarInfo`. The returned `NarInfo` is neither signed
+     * nor published yet; call `uploadNarInfo()` to do that.
+     */
+    ref<NarInfo> uploadData(Source & narSource, RepairFlag repair, fun<ValidPathInfo(HashResult)> mkInfo);
+
+    /**
+     * Sign and publish the `.narinfo` file for a path whose NAR has
+     * already been uploaded by `uploadData()`. This is what establishes
+     * the closure invariant, so all of the path's references must
+     * already be valid in the store.
+     */
+    void uploadNarInfo(ref<NarInfo> narInfo);
+
     ref<const ValidPathInfo> addToStoreCommon(
-        Source & narSource,
-        RepairFlag repair,
-        CheckSigsFlag checkSigs,
-        std::function<ValidPathInfo(HashResult)> mkInfo);
+        Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs, fun<ValidPathInfo(HashResult)> mkInfo);
 
     /**
      * Same as `getFSAccessor`, but with a more preceise return type.
@@ -175,6 +219,9 @@ public:
 
     void
     addToStore(const ValidPathInfo & info, Source & narSource, RepairFlag repair, CheckSigsFlag checkSigs) override;
+
+    void
+    addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
     StorePath addToStoreFromDump(
         Source & dump,
@@ -205,7 +252,7 @@ public:
 
     std::shared_ptr<SourceAccessor> getFSAccessor(const StorePath &, bool requireValidPath = true) override;
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;
 

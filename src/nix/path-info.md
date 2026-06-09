@@ -6,7 +6,7 @@ R""(
 
   ```console
   # nix path-info nixpkgs#hello
-  /nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10
+  /nix/store/10l19qifk7hjjq47px8m2prqk1gv4isy-hello-2.10
   ```
 
 * Show the closure sizes of every path in the current NixOS system
@@ -14,8 +14,8 @@ R""(
 
   ```console
   # nix path-info --recursive --closure-size /run/current-system | sort -nk2
-  /nix/store/hl5xwp9kdrd1zkm0idm3kkby9q66z404-empty                                                96
-  /nix/store/27324qvqhnxj3rncazmxc4mwy79kz8ha-nameservers                                         112
+  /nix/store/zlnmjjbpv5pwwv911qp0grqi25y80wbs-empty                                                96
+  /nix/store/v40fjpq45135avrmnfm8klbvdhf0dcp7-nameservers                                         112
   …
   /nix/store/539jkw9a8dyry7clcv60gk6na816j7y8-etc                                          5783255504
   /nix/store/zqamz3cz4dbzfihki2mk7a63mbkxz9xq-nixos-system-machine-20.09.20201112.3090c65  5887562256
@@ -26,8 +26,8 @@ R""(
 
   ```console
   # nix path-info --recursive --size --closure-size --human-readable nixpkgs#rustc
-  /nix/store/01rrgsg5zk3cds0xgdsq40zpk6g51dz9-ncurses-6.2-dev      386.7 KiB   69.1 MiB
-  /nix/store/0q783wnvixpqz6dxjp16nw296avgczam-libpfm-4.11.0          5.9 MiB   37.4 MiB
+  /nix/store/klarszqikbvf6n70581w0381zb7rlzri-ncurses-6.2-dev      386.7 KiB   69.1 MiB
+  /nix/store/30rva1kafnr6fyf8y5xxlpnwixvdpv4w-libpfm-4.11.0          5.9 MiB   37.4 MiB
   …
   ```
 

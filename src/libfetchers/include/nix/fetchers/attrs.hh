@@ -3,6 +3,8 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/ref.hh"
+#include "nix/util/fun.hh"
 
 #include <variant>
 
@@ -12,7 +14,24 @@
 
 namespace nix::fetchers {
 
-typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
+/**
+ * The resolved (non-lazy) subset of attribute value types.
+ */
+using ResolvedAttr = std::variant<std::string, uint64_t, Explicit<bool>>;
+
+/**
+ * A deferred attribute computation.  Wrapping in `ref<>` gives
+ * pointer-identity equality/ordering, which is correct: two lazy
+ * attrs are equal iff they are the same computation.
+ */
+struct LazyAttrComputation
+{
+    fun<ResolvedAttr()> compute;
+};
+
+using LazyAttr = ref<LazyAttrComputation>;
+
+using Attr = std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>;
 
 /**
  * An `Attrs` can be thought of a JSON object restricted or simplified
@@ -20,6 +39,16 @@ typedef std::variant<std::string, uint64_t, Explicit<bool>> Attr;
  * and also not containing any `null`s.
  */
 typedef std::map<std::string, Attr> Attrs;
+
+/**
+ * Force a potentially lazy attribute to its resolved value.
+ */
+ResolvedAttr forceAttr(const Attr & attr);
+
+/**
+ * Retrieve an attr, but only if it's a LazyAttr.
+ */
+std::optional<LazyAttr> maybeGetLazyAttr(const Attrs & attrs, const std::string & name);
 
 Attrs jsonToAttrs(const nlohmann::json & json);
 

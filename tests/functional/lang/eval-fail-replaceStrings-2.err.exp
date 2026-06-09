@@ -1,0 +1,10 @@
+error:
+       … while calling the 'replaceStrings' builtin
+         at /pwd/lang/eval-fail-replaceStrings-2.nix:1:1:
+            1| builtins.replaceStrings [ ] 0 { }
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.replaceStrings
+
+       error: expected a list but found an integer: 0

@@ -1,0 +1,5 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :ll
+error: nothing has been loaded yet

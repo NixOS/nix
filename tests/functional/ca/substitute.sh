@@ -26,9 +26,10 @@ clearStore
 # this. Force the use of small-step resolutions only to allow not
 # mentioning it explicitly again. (#11896, #11928).
 buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0 transitivelyDependentCA dependentCA
-# Check that the thing we’ve just substituted has its realisation stored
-nix realisation info --file ./content-addressed.nix transitivelyDependentCA
+# Check that the thing we’ve just substituted has its build trace stored
+nix store build-trace info --file ./content-addressed.nix transitivelyDependentCA
 # Check that its dependencies have it too
+# Use the old command to make sure that the alias works
 nix realisation info --file ./content-addressed.nix dependentCA
 # nix realisation info --file ./content-addressed.nix rootCA --outputs out
 
@@ -36,29 +37,6 @@ if isDaemonNewer "2.13"; then
     pushToStore="../push-to-store.sh"
 else
     pushToStore="../push-to-store-old.sh"
-fi
-
-# Same thing, but
-# 1. With non-ca derivations
-# 2. Erasing the realisations on the remote store
-#
-# Even in that case, realising the derivations should still produce the right
-# realisations on the local store
-#
-# Regression test for #4725
-clearStore
-nix build --file ../simple.nix -L --no-link --post-build-hook "$pushToStore"
-clearStore
-rm -r "$REMOTE_STORE_DIR/realisations"
-nix build --file ../simple.nix -L --no-link --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
-# There's no easy way to check whether a realisation is present on the local
-# store − short of manually querying the db, but the build environment doesn't
-# have the sqlite binary − so we instead push things again, and check that the
-# realisations have correctly been pushed to the remote store
-nix copy --to "$REMOTE_STORE" --file ../simple.nix
-if [[ -z "$(ls "$REMOTE_STORE_DIR/realisations")" ]]; then
-    echo "Realisations not rebuilt"
-    exit 1
 fi
 
 # Test the local realisation disk cache
@@ -71,5 +49,5 @@ buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0
 # Try rebuilding, but remove the realisations from the remote cache to force
 # using the cachecache
 clearStore
-rm "$REMOTE_STORE_DIR"/realisations/*
+rm -r "$REMOTE_STORE_DIR"/build-trace-v2/*
 buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0

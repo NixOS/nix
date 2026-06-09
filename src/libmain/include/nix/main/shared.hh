@@ -13,21 +13,18 @@
 
 namespace nix {
 
-int handleExceptions(const std::string & programName, std::function<void()> fun);
-
 /**
  * Don't forget to call initPlugins() after settings are initialized!
  * @param loadConfig Whether to load configuration from `nix.conf`, `NIX_CONFIG`, etc. May be disabled for unit tests.
  */
 void initNix(bool loadConfig = true);
 
-void parseCmdLine(
-    int argc, char ** argv, std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+void parseCmdLine(int argc, char ** argv, fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
 void parseCmdLine(
     const std::string & programName,
     const Strings & args,
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+    fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
 void printVersion(const std::string & programName);
 
@@ -56,11 +53,10 @@ N getIntArg(const std::string & opt, Strings::iterator & i, const Strings::itera
 
 struct LegacyArgs : public MixCommonArgs, public RootArgs
 {
-    std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
+    fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg;
 
     LegacyArgs(
-        const std::string & programName,
-        std::function<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
+        const std::string & programName, fun<bool(Strings::iterator & arg, const Strings::iterator & end)> parseArg);
 
     bool processFlag(Strings::iterator & pos, Strings::iterator end) override;
 
@@ -91,19 +87,7 @@ extern volatile ::sig_atomic_t blockInt;
 
 struct GCResults;
 
-struct PrintFreed
-{
-    bool show;
-    const GCResults & results;
-
-    PrintFreed(bool show, const GCResults & results)
-        : show(show)
-        , results(results)
-    {
-    }
-
-    ~PrintFreed();
-};
+void printFreed(bool dryRun, const GCResults & results);
 
 #ifndef _WIN32
 /**
@@ -126,7 +110,7 @@ void detectStackOverflow();
  * limited stack space and a potentially a corrupted heap, all while the failed
  * thread is blocked indefinitely. All functions called must be reentrant.
  */
-extern std::function<void(siginfo_t * info, void * ctx)> stackOverflowHandler;
+extern fun<void(siginfo_t * info, void * ctx)> stackOverflowHandler;
 
 /**
  * The default, robust implementation of stackOverflowHandler.

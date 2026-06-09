@@ -1,0 +1,8 @@
+error:
+       … while evaluating the attribute 'foo'
+
+       error: attempt to call something which is not a function but an integer: 1
+       at /pwd/lang/eval-fail-zipAttrsWith-3.nix:1:24:
+            1| builtins.zipAttrsWith (_: 1) [ { foo = 1; } ]
+             |                        ^
+            2|

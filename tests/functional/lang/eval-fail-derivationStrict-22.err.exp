@@ -1,0 +1,18 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-22.nix:1:1:
+            1| builtins.derivationStrict {
+             | ^
+            2|   name = "foo";
+
+       … while evaluating derivation 'foo'
+         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-22.nix:2:3
+
+       … while evaluating attribute 'FOO' of derivation 'foo'
+         at /pwd/lang/eval-fail-derivationStrict-22.nix:6:3:
+            5|   outputs = "out";
+            6|   FOO = { };
+             |   ^
+            7| }
+
+       error: cannot coerce a set to a string: { }

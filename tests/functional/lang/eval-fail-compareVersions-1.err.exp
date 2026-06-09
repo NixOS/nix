@@ -1,0 +1,10 @@
+error:
+       … while calling the 'compareVersions' builtin
+         at /pwd/lang/eval-fail-compareVersions-1.nix:1:1:
+            1| builtins.compareVersions 1 { }
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.compareVersions
+
+       error: expected a string but found an integer: 1

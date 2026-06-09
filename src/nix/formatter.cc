@@ -2,14 +2,12 @@
 #include "nix/cmd/installable-flake.hh"
 #include "nix/cmd/installable-value.hh"
 #include "nix/expr/eval.hh"
-#include "nix/store/local-fs-store.hh"
-#include "nix/cmd/installable-derived-path.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/store/globals.hh"
 
 #include "run.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdFormatter : NixMultiCommand
 {
@@ -145,7 +143,7 @@ struct CmdFormatterBuild : MixFormatter, MixOutLinkByDefault
         auto buildables = unresolvedApp.build(evalStore, store);
         createOutLinksMaybe(buildables, store);
 
-        logger->cout("%s", app.program);
+        logger->cout("%s", app.program.string());
     };
 };
 
@@ -160,3 +158,5 @@ struct CmdFmt : CmdFormatterRun
 };
 
 static auto rFmt = registerCommand<CmdFmt>("fmt");
+
+} // namespace nix

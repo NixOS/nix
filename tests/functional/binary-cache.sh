@@ -15,6 +15,7 @@ nix-instantiate --store "file://$cacheDir" dependencies.nix
 clearStore
 clearCache
 outPath=$(nix-build dependencies.nix --no-out-link)
+depPath=$(nix-build dependencies.nix -A input0_drv --no-out-link)
 
 nix copy --to "file://$cacheDir" "$outPath"
 
@@ -38,8 +39,12 @@ nix log --substituters "file://$cacheDir" "$outPath" | grep FOO
 nix store copy-log --from "file://$cacheDir" "$(nix-store -qd "$outPath")"^'*'
 nix log "$outPath" | grep FOO
 
+# Test that plus sign in the URL path is handled correctly.
+cacheDir2="$TEST_ROOT/binary+cache"
+nix copy --to "file://$cacheDir2" "$outPath" && [[ -d "$cacheDir2" ]]
+
 basicDownloadTests() {
-    # No uploading tests bcause upload with force HTTP doesn't work.
+    # No uploading tests because upload with force HTTP doesn't work.
 
     # By default, a binary cache doesn't support "nix-env -qas", but does
     # support installation.
@@ -80,6 +85,19 @@ basicDownloadTests
 # Test HttpBinaryCacheStore.
 export _NIX_FORCE_HTTP=1
 basicDownloadTests
+
+
+# Test that multiple concurrent substitutions do only one download.
+clearStore
+nix-store --init # needed because concurrent creation of the store can give SQLite errors
+_NIX_TEST_CONCURRENT_SUBSTITUTION=1 nix-store -r "$depPath" --substituters "file://$cacheDir" --no-require-sigs -vvvv 2> "$TEST_ROOT/log1" &
+pid1="$!"
+_NIX_TEST_CONCURRENT_SUBSTITUTION=1 nix-store -r "$depPath" --substituters "file://$cacheDir" --no-require-sigs -vvvv 2> "$TEST_ROOT/log2" &
+pid2="$!"
+wait "$pid1"
+wait "$pid2"
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "copying path ") -eq 2 ]]
+[[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "downloading.*nar.xz") -eq 1 ]]
 
 
 # Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
@@ -258,7 +276,27 @@ nix copy --to "file://$cacheDir"?write-nar-listing=1 "$outPath"
 
 diff -u \
     <(jq -S < "$cacheDir/$(basename "$outPath" | cut -c1-32).ls") \
-    <(echo '{"version":1,"root":{"type":"directory","entries":{"bar":{"type":"regular","size":4,"narOffset":232},"link":{"type":"symlink","target":"xyzzy"}}}}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "version": 1,
+  "root": {
+    "type": "directory",
+    "entries": {
+      "bar": {
+        "type": "regular",
+        "executable": false,
+        "size": 4,
+        "narOffset": 232
+      },
+      "link": {
+        "type": "symlink",
+        "target": "xyzzy"
+      }
+    }
+  }
+}
+EOF
+    )
 
 
 # Test debug info index generation.
@@ -312,3 +350,24 @@ nix-store --delete "$outPath" "$docPath"
 # -vvv is the level that logs during the loop
 timeout 60 nix-build --no-out-link -E "$expr" --option substituters "file://$cacheDir" \
   --option trusted-binary-caches "file://$cacheDir"  --no-require-sigs
+
+
+# Test that the narinfo-cache-meta-ttl causes nix-cache-info to be cached,
+# and that --refresh overrides it.
+
+# Populate the metadata cache by querying store info over HTTP.
+_NIX_FORCE_HTTP=1 nix store info --store "file://$cacheDir"
+
+# Remove nix-cache-info from the binary cache.
+rm "$cacheDir/nix-cache-info"
+
+# nix store info should still work because the metadata is cached
+# (narinfo-cache-meta-ttl defaults to 7 days).
+_NIX_FORCE_HTTP=1 nix store info --store "file://$cacheDir"
+
+# But with --refresh, it should fail because nix-cache-info is gone
+# and the cached metadata TTL is overridden to 0.
+_NIX_FORCE_HTTP=1 expectStderr 1 nix store info --store "file://$cacheDir" --refresh | grepQuiet "uploading.*is not supported"
+
+# Remove --refresh and it should work again.
+_NIX_FORCE_HTTP=1 nix store info --store "file://$cacheDir"

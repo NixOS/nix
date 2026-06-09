@@ -64,7 +64,13 @@ my $evalInfo = decode_json(fetch($evalUrl, 'application/json'));
 #print Dumper($evalInfo);
 my $flakeUrl = $evalInfo->{flake};
 my $flakeInfo = decode_json(`nix flake metadata --json "$flakeUrl"` or die) if $flakeUrl;
-my $nixRev = ($flakeInfo ? $flakeInfo->{revision} : $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
+# Flake jobsets (`maintenance-X.Y`) expose the rev via the flake URL.
+# The release-artifacts jobset (`maintenance-X.Y-release`) is a legacy
+# jobset whose checkout is passed in as input `src`.
+my $nixRev = ($flakeInfo
+              ? $flakeInfo->{revision}
+              : $evalInfo->{jobsetevalinputs}->{src}->{revision}
+                // $evalInfo->{jobsetevalinputs}->{nix}->{revision}) or die;
 
 my $buildInfo = decode_json(fetch("$evalUrl/job/build.nix-everything.x86_64-linux", 'application/json'));
 #print Dumper($buildInfo);
@@ -279,6 +285,10 @@ unless ($opt->skip_s3) {
         downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
     };
     warn "$@" if $@;
+    eval {
+        downloadFile("binaryTarballCross.x86_64-linux.x86_64-unknown-freebsd", "1");
+    };
+    warn "$@" if $@;
     downloadFile("installerScript", "1");
 
     # Upload nix-fallback-paths.nix.
@@ -290,6 +300,7 @@ unless ($opt->skip_s3) {
         "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
         "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
         "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
+        "  x86_64-freebsd = \"" . getStorePath("buildCross.nix-everything.x86_64-unknown-freebsd.x86_64-linux") . "\";\n" .
         "}\n");
 
     for my $fn (glob "$tmpDir/*") {

@@ -214,8 +214,15 @@ struct LockFlags
     std::set<NonEmptyInputAttrPath> inputUpdates;
 };
 
+/*
+ * Compute an in-memory lock file for the specified top-level flake, and optionally write it to file, if the flake is
+ * writable.
+ */
 LockedFlake
 lockFlake(const Settings & settings, EvalState & state, const FlakeRef & flakeRef, const LockFlags & lockFlags);
+
+LockedFlake
+lockFlake(const Settings & settings, EvalState & state, const SourcePath & flakeDir, const LockFlags & lockFlags);
 
 void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
 
@@ -225,14 +232,6 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & v);
 ref<eval_cache::EvalCache> openEvalCache(EvalState & state, ref<const LockedFlake> lockedFlake);
 
 } // namespace flake
-
-void emitTreeAttrs(
-    EvalState & state,
-    const StorePath & storePath,
-    const fetchers::Input & input,
-    Value & v,
-    bool emptyRevFallback = false,
-    bool forceDirty = false);
 
 /**
  * An internal builtin similar to `fetchTree`, except that it

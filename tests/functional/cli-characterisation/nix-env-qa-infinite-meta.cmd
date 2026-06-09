@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/infinite-meta.nix -qa --json --meta

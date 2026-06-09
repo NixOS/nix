@@ -42,9 +42,9 @@ The *referrers closure* of a store object are the store objects that can reach t
 > - The references of a store object --- the set of store paths called the references --- is a field of a store object, and thus intrinsic by definition.
     Regardless of what store contains the store object in question, and what else that store may or may not contain, the references are the same.
 >
-> - The requisites of a store object are almost intrinsic --- some store paths due not precisely refer to a unique single store object.
+> - The requisites of a store object are almost intrinsic --- some store paths do not precisely refer to a unique single store object.
 > Exactly what store object is being referenced, and what in turn *its* references are, depends on the store in question.
->   Different stores that disagree.
+>   Different stores may disagree on what a given store path refers to.
 >
 > - The referrers of a store object are completely extrinsic, and depends solely on the store which contains that store object, not the store object itself.
 >   Other store objects which refer to the store object in question may be added or removed from the store.

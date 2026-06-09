@@ -5,6 +5,12 @@
 
 namespace nix::linux {
 
-void setPersonality(std::string_view system);
+struct PersonalityArgs
+{
+    std::string_view system;
+    bool impersonateLinux26;
+};
 
-}
+void setPersonality(PersonalityArgs args);
+
+} // namespace nix::linux

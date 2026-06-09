@@ -155,7 +155,7 @@ builtins.map
     ]
     [
       ''.*pypy.*''
-      ''/nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/bin/python3.12''
+      ''/nix/store/iqlzcyc1z7nv804n9wc5k5i0l180wnbs-python3-3.12.10/bin/python3.12''
     ]
     [
       ''(.*/)?\.\.(/.*)?''
@@ -199,19 +199,19 @@ builtins.map
     ]
     [
       ''.*-polly.*''
-      ''/nix/store/0yxfdnfxbzczjxhgdpac81jnas194wfj-gnu-install-dirs.patch''
+      ''/nix/store/21yv6cysn8axxjyh7dbsnnmbp9nprg9i-gnu-install-dirs.patch''
     ]
     [
       ''.*-polly.*''
-      ''/nix/store/jh2pda7psaasq85b2rrigmkjdbl8d0a1-llvm-lit-cfg-add-libs-to-dylib-path.patch''
+      ''/nix/store/96dqnv9v20fi7glzsah6qx5zypbkrwsh-llvm-lit-cfg-add-libs-to-dylib-path.patch''
     ]
     [
       ''.*-polly.*''
-      ''/nix/store/x868j4ih7wqiivf6wr9m4g424jav0hpq-gnu-install-dirs-polly.patch''
+      ''/nix/store/hjlgp59nhxjj2y8ghf7mmqgbirqarccy-gnu-install-dirs-polly.patch''
     ]
     [
       ''.*-polly.*''
-      ''/nix/store/gr73nf6sca9nyzl88x58y3qxrav04yhd-polly-lit-cfg-add-libs-to-dylib-path.patch''
+      ''/nix/store/ybagzhw2933fvgi95qgbyw6i4avahyzr-polly-lit-cfg-add-libs-to-dylib-path.patch''
     ]
     [
       ''(.*/)?\.\.(/.*)?''
@@ -367,7 +367,7 @@ builtins.map
     ]
     [
       ''.*pypy.*''
-      ''/nix/store/8w718rm43x7z73xhw9d6vh8s4snrq67h-python3-3.12.10/bin/python3.12''
+      ''/nix/store/iqlzcyc1z7nv804n9wc5k5i0l180wnbs-python3-3.12.10/bin/python3.12''
     ]
     [
       ''(.*)\.git''
@@ -453,11 +453,11 @@ builtins.map
     ]
     [
       ''.*llvm-tblgen.*''
-      ''-DLLVM_TABLEGEN:STRING=/nix/store/xp9hkw8nsw9p81d69yvcg1yr6f7vh71c-llvm-tblgen-18.1.8/bin/llvm-tblgen''
+      ''-DLLVM_TABLEGEN:STRING=/nix/store/sclapmhdj6i9h02y7s5a630kfy55v9h1-llvm-tblgen-18.1.8/bin/llvm-tblgen''
     ]
     [
       ''.*llvm-tblgen.*''
-      ''-DLLVM_TABLEGEN_EXE:STRING=/nix/store/xp9hkw8nsw9p81d69yvcg1yr6f7vh71c-llvm-tblgen-18.1.8/bin/llvm-tblgen''
+      ''-DLLVM_TABLEGEN_EXE:STRING=/nix/store/sclapmhdj6i9h02y7s5a630kfy55v9h1-llvm-tblgen-18.1.8/bin/llvm-tblgen''
     ]
     [
       ''(.+)-b(.+)''

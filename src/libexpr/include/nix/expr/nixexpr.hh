@@ -17,6 +17,7 @@
 #include "nix/expr/counter.hh"
 #include "nix/util/pos-table.hh"
 #include "nix/util/error.hh"
+#include "nix/util/bump-memory-resource.hh"
 
 namespace nix {
 
@@ -556,7 +557,7 @@ public:
                 std::numeric_limits<decltype(nFormals)>::max());
             if (pos)
                 err.atPos(positions[pos]);
-            throw err;
+            throw std::move(err);
         }
         std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);
     };
@@ -827,7 +828,10 @@ extern ExprBlackHole eBlackHole;
 
 class Exprs
 {
-    std::pmr::monotonic_buffer_resource buffer;
+    /* Thread-safe fallback resource, which might be a bit slower. */
+    std::pmr::synchronized_pool_resource fallbackResource;
+    BumpMemoryResource buffer{BumpMemoryResource::defaultReserveSize, &fallbackResource};
+
 public:
     std::pmr::polymorphic_allocator<char> alloc{&buffer};
 

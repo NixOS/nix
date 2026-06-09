@@ -1,0 +1,8 @@
+error:
+       … while calling the 'split' builtin
+         at /pwd/lang/eval-fail-split-3.nix:1:1:
+            1| builtins.split "f(o*o" "1foo2"
+             | ^
+            2|
+
+       error: invalid regular expression 'f(o*o'

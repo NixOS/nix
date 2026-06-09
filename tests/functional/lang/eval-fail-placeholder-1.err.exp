@@ -1,0 +1,10 @@
+error:
+       … while calling the 'placeholder' builtin
+         at /pwd/lang/eval-fail-placeholder-1.nix:1:1:
+            1| builtins.placeholder [ ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.placeholder
+
+       error: expected a string but found a list: [ ]

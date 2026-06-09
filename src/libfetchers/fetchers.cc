@@ -1,13 +1,17 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/fs-sink.hh"
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/url.hh"
-#include "nix/util/archive.hh"
+#include "nix/util/users.hh"
+#include "nix/store/pathlocks.hh"
+#include "nix/util/environment-variables.hh"
 
+#include <thread>
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
@@ -161,10 +165,9 @@ bool Input::isFinal() const
     return maybeGetBoolAttr(attrs, "__final").value_or(false);
 }
 
-std::optional<std::string> Input::isRelative() const
+std::optional<std::filesystem::path> Input::isRelative() const
 {
-    assert(scheme);
-    return scheme->isRelative(*this);
+    return scheme ? scheme->isRelative(*this) : std::nullopt;
 }
 
 Attrs Input::toAttrs() const
@@ -236,6 +239,9 @@ void Input::checkLocks(Input specified, Input & result)
         if (auto prevNarHash = specified.getNarHash())
             specified.attrs.insert_or_assign("narHash", prevNarHash->to_string(HashFormat::SRI, true));
 
+        if (auto narHash = result.getNarHash())
+            result.attrs.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
+
         for (auto & field : specified.attrs) {
             auto field2 = result.attrs.find(field.first);
             if (field2 != result.attrs.end() && field.second != field2->second)
@@ -269,23 +275,9 @@ void Input::checkLocks(Input specified, Input & result)
         }
     }
 
-    if (auto prevLastModified = specified.getLastModified()) {
-        if (result.getLastModified() != prevLastModified)
-            throw Error(
-                "'lastModified' attribute mismatch in input '%s', expected %d, got %d",
-                result.to_string(),
-                *prevLastModified,
-                result.getLastModified().value_or(-1));
-    }
-
     if (auto prevRev = specified.getRev()) {
         if (result.getRev() != prevRev)
             throw Error("'rev' attribute mismatch in input '%s', expected %s", result.to_string(), prevRev->gitRev());
-    }
-
-    if (auto prevRevCount = specified.getRevCount()) {
-        if (result.getRevCount() != prevRevCount)
-            throw Error("'revCount' attribute mismatch in input '%s', expected %d", result.to_string(), *prevRevCount);
     }
 }
 
@@ -327,6 +319,8 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
         try {
             auto storePath = computeStorePath(store);
 
+            store.addTempRoot(storePath);
+
             store.ensurePath(storePath);
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store.printStorePath(storePath));
@@ -339,9 +333,10 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
             // can reuse the existing nar instead of copying the unpacked
             // input back into the store on every evaluation.
             if (accessor->fingerprint) {
-                ContentAddressMethod method = ContentAddressMethod::Raw::NixArchive;
-                auto cacheKey = makeFetchToStoreCacheKey(getName(), *accessor->fingerprint, method, "/");
-                settings.getCache()->upsert(cacheKey, store, {}, storePath);
+                settings.getCache()->upsert(
+                    makeSourcePathToHashCacheKey(
+                        *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
+                    {{"hash", store.queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)}});
             }
 
             accessor->setPathDisplay("«" + to_string() + "»");
@@ -351,6 +346,21 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
+
+    /* Acquire a path lock on this input. Note that fetching the same input in parallel is supposed to be safe (it's up
+     * to the fetchers to guarantee this), so this is merely intended to avoid work duplication. Note that we don't need
+     * this when substituting the input. */
+    auto lockFilePath =
+        getCacheDir() / "fetcher-locks"
+        / hashString(HashAlgorithm::SHA256, attrsToJSON(toAttrs()).dump()).to_string(HashFormat::Base16, false);
+    createDirs(lockFilePath.parent_path());
+    PathLocks lock(
+        {lockFilePath.string()}, fmt("waiting for another Nix process to finish fetching input '%s'...", to_string()));
+    lock.setDeletion(true);
+
+    static auto inTest = getEnv("_NIX_TEST_CONCURRENT_FETCHES") == "1";
+    if (inTest)
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 
     auto [accessor, result] = scheme->getAccessor(settings, store, *this);
 
@@ -371,19 +381,20 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
 
 void Input::clone(const Settings & settings, Store & store, const std::filesystem::path & destDir) const
 {
-    assert(scheme);
+    if (!scheme)
+        throw Error("cannot clone unsupported input '%s'", attrsToJSON(attrs));
     scheme->clone(settings, store, *this, destDir);
 }
 
 std::optional<std::filesystem::path> Input::getSourcePath() const
 {
-    assert(scheme);
-    return scheme->getSourcePath(*this);
+    return scheme ? scheme->getSourcePath(*this) : std::nullopt;
 }
 
 void Input::putFile(const CanonPath & path, std::string_view contents, std::optional<std::string> commitMsg) const
 {
-    assert(scheme);
+    if (!scheme)
+        throw Error("unsupported input '%s' does not support modifying file '%s'", attrsToJSON(attrs), path);
     return scheme->putFile(*this, path, contents, commitMsg);
 }
 
@@ -489,11 +500,11 @@ void InputScheme::clone(
     const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir) const
 {
     if (std::filesystem::exists(destDir))
-        throw Error("cannot clone into existing path %s", destDir);
+        throw Error("cannot clone into existing path %s", PathFmt(destDir));
 
     auto [accessor, input2] = getAccessor(settings, store, input);
 
-    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), destDir));
+    Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 
     RestoreSink sink(/*startFsync=*/false);
     sink.dstPath = destDir;

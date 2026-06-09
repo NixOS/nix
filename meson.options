@@ -15,10 +15,10 @@ option(
 )
 
 option(
-  'bindings',
+  'functional-tests',
   type : 'boolean',
   value : true,
-  description : 'Build language bindings (e.g. Perl)',
+  description : 'Build functional (E2E) tests',
 )
 
 option(

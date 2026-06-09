@@ -1,0 +1,10 @@
+error:
+       … while calling the 'split' builtin
+         at /pwd/lang/eval-fail-split-1.nix:1:1:
+            1| builtins.split 1 { }
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.split
+
+       error: expected a string but found an integer: 1

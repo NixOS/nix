@@ -7,19 +7,23 @@ namespace nix {
  */
 struct LocalOverlayStoreConfig : virtual LocalStoreConfig
 {
+private:
+    void anchor() override;
+
+public:
     LocalOverlayStoreConfig(const StringMap & params)
-        : LocalOverlayStoreConfig("local-overlay", "", params)
+        : LocalOverlayStoreConfig("", params)
     {
     }
 
-    LocalOverlayStoreConfig(std::string_view scheme, PathView path, const Params & params)
-        : StoreConfig(params)
+    LocalOverlayStoreConfig(const std::filesystem::path & path, const Params & params)
+        : StoreConfig(params, FilePathType::Native)
         , LocalFSStoreConfig(path, params)
-        , LocalStoreConfig(scheme, path, params)
+        , LocalStoreConfig(path, params)
     {
     }
 
-    const Setting<std::string> lowerStoreUri{
+    Setting<std::string> lowerStoreUri{
         (StoreConfig *) this,
         "",
         "lower-store",
@@ -31,9 +35,9 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const PathSetting upperLayer{
+    const Setting<AbsolutePath> upperLayer{
         (StoreConfig *) this,
-        "",
+        "/upper-layer-must-be-set",
         "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.
@@ -53,9 +57,9 @@ struct LocalOverlayStoreConfig : virtual LocalStoreConfig
           default, but can be disabled if needed.
         )"};
 
-    const PathSetting remountHook{
+    const Setting<std::optional<AbsolutePath>> remountHook{
         (StoreConfig *) this,
-        "",
+        std::nullopt,
         "remount-hook",
         R"(
           Script or other executable to run when overlay filesystem needs remounting.
@@ -99,7 +103,7 @@ protected:
      * at that file path. It might be stored in the lower layer instead,
      * or it might not be part of this store at all.
      */
-    Path toUpperPath(const StorePath & path) const;
+    std::filesystem::path toUpperPath(const StorePath & path) const;
 
     friend struct LocalOverlayStore;
 };
@@ -119,6 +123,8 @@ struct LocalOverlayStore : virtual LocalStore
     LocalOverlayStore(ref<const Config>);
 
 private:
+    void anchor() override;
+
     /**
      * The store beneath us.
      *
@@ -184,7 +190,7 @@ private:
      * Check which layers the store object exists in to try to avoid
      * needing to remount.
      */
-    void deleteStorePath(const Path & path, uint64_t & bytesFreed) override;
+    void deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath) override;
 
     /**
      * Deduplicate by removing store objects from the upper layer that

@@ -1,8 +1,8 @@
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/tarfile.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/logging.hh"
+#include "nix/util/current-process.hh"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -12,9 +12,18 @@
 #include <brotli/decode.h>
 #include <brotli/encode.h>
 
+#include <zstd.h>
+#include <thread>
+
 namespace nix {
 
+void CompressionError::anchor() {}
+
+void CompressionSink::anchor() {}
+
 static const int COMPRESSION_LEVEL_DEFAULT = -1;
+
+namespace {
 
 // Don't feed brotli too much at once.
 struct ChunkedCompressionSink : CompressionSink
@@ -69,8 +78,11 @@ struct ArchiveDecompressionSource : Source
     }
 };
 
-/* These strings are a part of the public API in store parameters and such. Do not change!
-   Happens to match enum names. */
+/* Algorithms whose *compression* is handled by libarchive.  zstd is
+   intentionally absent: ZstdMultiFrameCompressionSink compresses it
+   directly so the output is split into independent frames; zstd
+   *decompression* is still handled by libarchive via
+   ArchiveDecompressionSource. */
 #define NIX_FOR_EACH_LA_ALGO(MACRO) \
     MACRO(bzip2)                    \
     MACRO(compress)                 \
@@ -81,8 +93,7 @@ struct ArchiveDecompressionSource : Source
     MACRO(lzip)                     \
     MACRO(lzma)                     \
     MACRO(lzop)                     \
-    MACRO(xz)                       \
-    MACRO(zstd)
+    MACRO(xz)
 
 struct ArchiveCompressionSink : CompressionSink
 {
@@ -101,6 +112,7 @@ struct ArchiveCompressionSink : CompressionSink
             switch (method) {
             case CompressionAlgo::none:
             case CompressionAlgo::brotli:
+            case CompressionAlgo::zstd:
                 unreachable();
 #define NIX_DEF_LA_ALGO_CASE(algo) \
     case CompressionAlgo::algo:    \
@@ -240,6 +252,8 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
     }
 };
 
+} // namespace
+
 std::string decompress(const std::string & method, std::string_view in)
 {
     StringSink ssink;
@@ -261,6 +275,8 @@ std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Si
             decompressionSource->drainInto(nextSink);
         });
 }
+
+namespace {
 
 struct BrotliCompressionSink : ChunkedCompressionSink
 {
@@ -319,37 +335,125 @@ struct BrotliCompressionSink : ChunkedCompressionSink
     }
 };
 
-/* Parses a *compression* method into the corresponding enum. This is only used
-   in the *compression* case and user interface. Content-Encoding should not use
-   these. */
-static CompressionAlgo parseNixCompressionAlgoString(std::string_view method)
+/**
+ * Zstd compression that cuts a new frame every `bytesPerFrame` of
+ * uncompressed input.  The result is a concatenation of independent
+ * frames, which any conformant zstd decoder (RFC 8878 §3.1) handles
+ * transparently — including libarchive's, which is what the nix
+ * substituter path uses for decompression.  Because each frame is
+ * independent and carries its decompressed size, a parallel decoder
+ * can split work across them.
+ *
+ * Frame size is fixed at 16 MiB of input.  zstd's window size is
+ * level-dependent (~2 MiB at the default level 3, up to 8 MiB at
+ * higher levels), so the ratio loss from not being able to reference
+ * across a frame boundary is small.  16 MiB gives ~700 frames for the
+ * biggest NARs, which is ample parallelism and lets a decoder start
+ * work before the whole blob is downloaded.
+ */
+struct ZstdMultiFrameCompressionSink : CompressionSink
 {
-    static const std::unordered_map<std::string_view, CompressionAlgo> lookupTable = {
-        {"none", CompressionAlgo::none},
-        {"br", CompressionAlgo::brotli},
-#define NIX_DEF_LA_ALGO_NAME(algo) {#algo, CompressionAlgo::algo},
-        NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_NAME)
-#undef NIX_DEF_LA_ALGO_NAME
-    };
+    Sink & nextSink;
+    std::unique_ptr<ZSTD_CCtx, decltype(&ZSTD_freeCCtx)> cctx{nullptr, ZSTD_freeCCtx};
+    std::vector<char> outbuf;
+    /**
+     * Input buffer for the current frame.  We accumulate a full
+     * frame's worth before compressing so we can set an exact
+     * `ZSTD_CCtx_setPledgedSrcSize` — that writes `Frame_Content_Size`
+     * into the frame header, allowing a parallel decoder to compute
+     * each frame's output offset up front.
+     */
+    std::vector<char> inbuf;
+    bool emittedAnyFrame = false;
+    static constexpr uint64_t bytesPerFrame = 16 * 1024 * 1024;
 
-    if (auto it = lookupTable.find(method); it != lookupTable.end())
-        return it->second;
+    ZstdMultiFrameCompressionSink(Sink & nextSink, bool parallel, int level)
+        : nextSink(nextSink)
+        , outbuf(ZSTD_CStreamOutSize())
+    {
+        inbuf.reserve(bytesPerFrame);
+        cctx.reset(ZSTD_createCCtx());
+        if (!cctx)
+            throw CompressionError("unable to initialise zstd encoder");
+        if (level != COMPRESSION_LEVEL_DEFAULT)
+            checkZstd(ZSTD_CCtx_setParameter(cctx.get(), ZSTD_c_compressionLevel, level));
+        if (parallel) {
+            unsigned ncpu = getMaxCPU();
+            if (ncpu == 0)
+                ncpu = std::thread::hardware_concurrency();
+            /* Cap nbWorkers: zstd's MT engine splits each frame into
+               per-worker jobs.  With 16 MiB frames, more than ~4
+               workers yields diminishing returns (< 4 MiB per worker)
+               and the thread synchronisation overhead can make
+               compression slower than single-threaded. */
+            if (ncpu > 4)
+                ncpu = 4;
+            if (ncpu > 1)
+                /* Don't checkZstd(): if libzstd was built without
+                   ZSTD_MULTITHREAD this returns an error, but per the
+                   zstd docs the parameter is simply ignored and
+                   compression falls back to single-threaded. */
+                ZSTD_CCtx_setParameter(cctx.get(), ZSTD_c_nbWorkers, ncpu);
+        }
+    }
 
-    static const StringSet allNames = [&]() {
-        StringSet res;
-        for (auto & [name, _] : lookupTable)
-            res.emplace(name);
-        return res;
-    }();
+    void checkZstd(size_t ret)
+    {
+        if (ZSTD_isError(ret))
+            throw CompressionError("zstd error: %s", ZSTD_getErrorName(ret));
+    }
 
-    throw UnknownCompressionMethod(
-        Suggestions::bestMatches(allNames, method), "unknown compression method '%s'", method);
-}
+    /**
+     * Compress all of `inbuf` as one complete frame, pledged at its
+     * exact size so `Frame_Content_Size` lands in the header.
+     */
+    void emitFrame()
+    {
+        checkZstd(ZSTD_CCtx_reset(cctx.get(), ZSTD_reset_session_only));
+        checkZstd(ZSTD_CCtx_setPledgedSrcSize(cctx.get(), inbuf.size()));
 
-ref<CompressionSink> makeCompressionSink(const std::string & method, Sink & nextSink, const bool parallel, int level)
-{
-    return makeCompressionSink(parseNixCompressionAlgoString(method), nextSink, parallel, level);
-}
+        ZSTD_inBuffer in = {inbuf.data(), inbuf.size(), 0};
+        for (;;) {
+            checkInterrupt();
+            ZSTD_outBuffer out = {outbuf.data(), outbuf.size(), 0};
+            size_t remaining = ZSTD_compressStream2(cctx.get(), &out, &in, ZSTD_e_end);
+            checkZstd(remaining);
+            if (out.pos > 0)
+                nextSink({outbuf.data(), out.pos});
+            if (remaining == 0)
+                break;
+        }
+        inbuf.clear();
+        emittedAnyFrame = true;
+    }
+
+    void writeUnbuffered(std::string_view data) override
+    {
+        while (!data.empty()) {
+            uint64_t room = bytesPerFrame - inbuf.size();
+            size_t n = (room < data.size()) ? room : data.size();
+
+            inbuf.insert(inbuf.end(), data.data(), data.data() + n);
+            data.remove_prefix(n);
+
+            if (inbuf.size() >= bytesPerFrame)
+                emitFrame();
+        }
+    }
+
+    void finish() override
+    {
+        flush();
+        /* Emit the trailing partial frame, or an empty frame if we
+           never wrote anything — the output must contain at least one
+           frame header to be valid zstd (otherwise the libarchive
+           decoder chokes on round-tripped empty input). */
+        if (!inbuf.empty() || !emittedAnyFrame)
+            emitFrame();
+    }
+};
+
+} // namespace
 
 ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink, const bool parallel, int level)
 {
@@ -358,6 +462,8 @@ ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink
         return make_ref<NoneSink>(nextSink);
     case CompressionAlgo::brotli:
         return make_ref<BrotliCompressionSink>(nextSink);
+    case CompressionAlgo::zstd:
+        return make_ref<ZstdMultiFrameCompressionSink>(nextSink, parallel, level);
         /* Everything else is supported via libarchive. */
 #define NIX_DEF_LA_ALGO_CASE(algo) case CompressionAlgo::algo:
         NIX_FOR_EACH_LA_ALGO(NIX_DEF_LA_ALGO_CASE)
@@ -367,11 +473,17 @@ ref<CompressionSink> makeCompressionSink(CompressionAlgo method, Sink & nextSink
     unreachable();
 }
 
-std::string compress(const std::string & method, std::string_view in, const bool parallel, int level)
+std::string compress(CompressionAlgo method, std::string_view in, const bool parallel, int level)
+{
+    StringSource source(in);
+    return compress(method, source, parallel, level);
+}
+
+std::string compress(CompressionAlgo method, Source & in, const bool parallel, int level)
 {
     StringSink ssink;
     auto sink = makeCompressionSink(method, ssink, parallel, level);
-    (*sink)(in);
+    in.drainInto(*sink);
     sink->finish();
     return std::move(ssink.s);
 }

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'hasAttr' builtin
+         at /pwd/lang/eval-fail-hasAttr-2.nix:1:1:
+            1| builtins.hasAttr "foo" [ ]
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.hasAttr
+
+       error: expected a set but found a list: [ ]

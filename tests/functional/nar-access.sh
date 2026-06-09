@@ -37,24 +37,120 @@ cp -r "$storePath" "$invalidPath"
 expect 1 nix store cat "$invalidPath/foo/baz"
 
 # Test --json.
+
+# Shallow listing of root (no --recursive)
 diff -u \
     <(nix nar ls --json "$narFile" / | jq -S) \
-    <(echo '{"type":"directory","entries":{"foo":{},"foo-x":{},"qux":{},"zyx":{}}}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "type": "directory",
+  "entries": {
+    "foo": {},
+    "foo-x": {},
+    "qux": {},
+    "zyx": {}
+  }
+}
+EOF
+    )
+
+# Recursive listing of /foo from NAR (includes narOffset)
 diff -u \
     <(nix nar ls --json -R "$narFile" /foo | jq -S) \
-    <(echo '{"type":"directory","entries":{"bar":{"type":"regular","size":0,"narOffset":368},"baz":{"type":"regular","size":0,"narOffset":552},"data":{"type":"regular","size":58,"narOffset":736}}}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "type": "directory",
+  "entries": {
+    "bar": {
+      "type": "regular",
+      "executable": false,
+      "size": 0,
+      "narOffset": 368
+    },
+    "baz": {
+      "type": "regular",
+      "executable": false,
+      "size": 0,
+      "narOffset": 552
+    },
+    "data": {
+      "type": "regular",
+      "executable": false,
+      "size": 58,
+      "narOffset": 736
+    }
+  }
+}
+EOF
+    )
+
+# Single file from NAR
 diff -u \
     <(nix nar ls --json -R "$narFile" /foo/bar | jq -S) \
-    <(echo '{"type":"regular","size":0,"narOffset":368}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "type": "regular",
+  "executable": false,
+  "size": 0,
+  "narOffset": 368
+}
+EOF
+    )
+
+# Shallow listing from store
 diff -u \
     <(nix store ls --json "$storePath" | jq -S) \
-    <(echo '{"type":"directory","entries":{"foo":{},"foo-x":{},"qux":{},"zyx":{}}}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "type": "directory",
+  "entries": {
+    "foo": {},
+    "foo-x": {},
+    "qux": {},
+    "zyx": {}
+  }
+}
+EOF
+    )
+
+# Recursive listing from store (no narOffset)
 diff -u \
     <(nix store ls --json -R "$storePath/foo" | jq -S) \
-    <(echo '{"type":"directory","entries":{"bar":{"type":"regular","size":0},"baz":{"type":"regular","size":0},"data":{"type":"regular","size":58}}}' | jq -S)
+    <(jq -S <<'EOF'
+{
+  "type": "directory",
+  "entries": {
+    "bar": {
+      "type": "regular",
+      "executable": false,
+      "size": 0
+    },
+    "baz": {
+      "type": "regular",
+      "executable": false,
+      "size": 0
+    },
+    "data": {
+      "type": "regular",
+      "executable": false,
+      "size": 58
+    }
+  }
+}
+EOF
+    )
+
+# Single file from store
 diff -u \
-    <(nix store ls --json -R "$storePath/foo/bar"| jq -S) \
-    <(echo '{"type":"regular","size":0}' | jq -S)
+    <(nix store ls --json -R "$storePath/foo/bar" | jq -S) \
+    <(jq -S <<'EOF'
+{
+  "type": "regular",
+  "executable": false,
+  "size": 0
+}
+EOF
+    )
 
 # Test missing files.
 expect 1 nix store ls --json -R "$storePath/xyzzy" 2>&1 | grep 'does not exist'

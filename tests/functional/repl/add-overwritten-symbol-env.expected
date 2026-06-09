@@ -1,0 +1,13 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :a { a = "1"; }
+Added 1 variables.
+a
+
+nix-repl> :a { a = "2"; }
+Added 1 variables.
+a
+
+nix-repl> "result: ${a}"
+"result: 2"

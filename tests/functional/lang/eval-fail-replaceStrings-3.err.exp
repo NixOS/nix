@@ -1,0 +1,8 @@
+error:
+       … while calling the 'replaceStrings' builtin
+         at /pwd/lang/eval-fail-replaceStrings-3.nix:1:1:
+            1| builtins.replaceStrings [ 0 ] [ ] { }
+             | ^
+            2|
+
+       error: 'from' and 'to' arguments passed to builtins.replaceStrings have different lengths

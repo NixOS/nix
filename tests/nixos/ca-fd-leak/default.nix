@@ -78,7 +78,7 @@ in
 
       # Build the smuggled derivation.
       # This will connect to the smuggler server and send it the file descriptor
-      machine.succeed(r"""
+      sender_output = machine.succeed(r"""
         nix-build -E '
           builtins.derivation {
             name = "smuggled";
@@ -89,9 +89,13 @@ in
             outputHash = builtins.hashString "sha256" "hello, world\n";
             builder = "${pkgs.busybox-sandbox-shell}/bin/sh";
             args = [ "-c" "echo \"hello, world\" > $out; ''${${sender}} ${socketName}" ];
-        }'
+        }' 2>&1
       """.strip())
 
+      # Landlock's LANDLOCK_SCOPE_ABSTRACT_UNIX_SOCKET prevents a sandboxed process
+      # from connecting to an abstract socket created in an unrelated landlock domain.
+      # There's no such flag for preventing inbound connections.
+      assert "connect: Operation not permitted" in sender_output
 
       # Tell the smuggler server that we're done
       machine.execute("echo done | ${pkgs.socat}/bin/socat - ABSTRACT-CONNECT:${socketName}")

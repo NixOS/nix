@@ -1,0 +1,10 @@
+error:
+       … while calling the 'concatStringsSep' builtin
+         at /pwd/lang/eval-fail-concatStringsSep-2.nix:1:1:
+            1| builtins.concatStringsSep "foo" { }
+             | ^
+            2|
+
+       … while evaluating the second argument (the list of strings to concat) passed to builtins.concatStringsSep
+
+       error: expected a list but found a set: { }

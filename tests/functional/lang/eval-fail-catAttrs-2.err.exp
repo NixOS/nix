@@ -1,0 +1,10 @@
+error:
+       … while calling the 'catAttrs' builtin
+         at /pwd/lang/eval-fail-catAttrs-2.nix:1:1:
+            1| builtins.catAttrs "foo" { }
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.catAttrs
+
+       error: expected a list but found a set: { }

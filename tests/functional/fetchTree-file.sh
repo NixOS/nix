@@ -76,12 +76,12 @@ EOF
     # For backwards compatibility, flake inputs that correspond to the
     # old 'tarball' fetcher should still have their type set to 'tarball'
     assert (nodes.tarball_default_unpack.locked.type == "tarball");
-    # Unless explicitely specified, the 'unpack' parameter shouldn’t appear here
+    # Unless explicitly specified, the 'unpack' parameter shouldn’t appear here
     # because that would break older Nix versions
     assert (!nodes.tarball_default_unpack.locked ? unpack);
     assert (nodes.tarball_default_unpack.locked.narHash == "$input_directory_hash");
 
-    # Explicitely passing the unpack parameter should enforce the desired behavior
+    # Explicitly passing the unpack parameter should enforce the desired behavior
     assert (nodes.no_ext_explicit_unpack.locked.narHash == nodes.tarball_default_unpack.locked.narHash);
     assert (nodes.tarball_explicit_no_unpack.locked.narHash == nodes.no_ext_default_no_unpack.locked.narHash);
 

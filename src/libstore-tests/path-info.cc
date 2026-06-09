@@ -14,7 +14,7 @@ class PathInfoTestV1 : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "path-info" / "json-1";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".json");
     }
@@ -24,7 +24,17 @@ class PathInfoTestV2 : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "path-info" / "json-2";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / (testStem + ".json");
+    }
+};
+
+class PathInfoTestV3 : public CharacterizationTest, public LibStoreTest
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "path-info" / "json-3";
+
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".json");
     }
@@ -66,7 +76,10 @@ static ValidPathInfo makeFullKeyed(const Store & store, bool includeImpureInfo)
         };
         info.registrationTime = 23423;
         info.ultimate = true;
-        info.sigs = {"asdf", "qwer"};
+        info.sigs = {
+            Signature{.keyName = "asdf", .sig = std::string(64, '\0')},
+            Signature{.keyName = "qwer", .sig = std::string(64, '\0')},
+        };
     }
     return info;
 }
@@ -126,6 +139,31 @@ static UnkeyedValidPathInfo makeFull(const Store & store, bool includeImpureInfo
     JSON_READ_TEST_V2(STEM, OBJ)      \
     JSON_WRITE_TEST_V2(STEM, OBJ, PURE)
 
+#define JSON_READ_TEST_V3(STEM, OBJ)                                                     \
+    TEST_F(PathInfoTestV3, PathInfo_##STEM##_from_json)                                  \
+    {                                                                                    \
+        readTest(#STEM, [&](const auto & encoded_) {                                     \
+            auto encoded = json::parse(encoded_);                                        \
+            UnkeyedValidPathInfo got = UnkeyedValidPathInfo::fromJSON(nullptr, encoded); \
+            auto expected = OBJ;                                                         \
+            ASSERT_EQ(got, expected);                                                    \
+        });                                                                              \
+    }
+
+#define JSON_WRITE_TEST_V3(STEM, OBJ, PURE)                                                           \
+    TEST_F(PathInfoTestV3, PathInfo_##STEM##_to_json)                                                 \
+    {                                                                                                 \
+        writeTest(                                                                                    \
+            #STEM,                                                                                    \
+            [&]() -> json { return OBJ.toJSON(nullptr, PURE, PathInfoJsonFormat::V3); },              \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }
+
+#define JSON_TEST_V3(STEM, OBJ, PURE) \
+    JSON_READ_TEST_V3(STEM, OBJ)      \
+    JSON_WRITE_TEST_V3(STEM, OBJ, PURE)
+
 JSON_TEST_V1(empty_pure, makeEmpty(), false)
 JSON_TEST_V1(empty_impure, makeEmpty(), true)
 JSON_TEST_V1(pure, makeFull(*store, false), false)
@@ -138,6 +176,23 @@ JSON_TEST_V2(empty_pure, makeEmpty(), false)
 JSON_TEST_V2(empty_impure, makeEmpty(), true)
 JSON_TEST_V2(pure, makeFull(*store, false), false)
 JSON_TEST_V2(impure, makeFull(*store, true), true)
+
+JSON_TEST_V3(empty_pure, makeEmpty(), false)
+JSON_TEST_V3(empty_impure, makeEmpty(), true)
+JSON_TEST_V3(pure, makeFull(*store, false), false)
+JSON_TEST_V3(impure, makeFull(*store, true), true)
+
+#undef JSON_TEST_V1
+#undef JSON_READ_TEST_V1
+#undef JSON_WRITE_TEST_V1
+
+#undef JSON_TEST_V2
+#undef JSON_READ_TEST_V2
+#undef JSON_WRITE_TEST_V2
+
+#undef JSON_TEST_V3
+#undef JSON_READ_TEST_V3
+#undef JSON_WRITE_TEST_V3
 
 TEST_F(PathInfoTestV2, PathInfo_full_shortRefs)
 {

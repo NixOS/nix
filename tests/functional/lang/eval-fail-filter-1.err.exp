@@ -1,0 +1,10 @@
+error:
+       … while calling the 'filter' builtin
+         at /pwd/lang/eval-fail-filter-1.nix:1:1:
+            1| builtins.filter 1 "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.filter
+
+       error: expected a list but found a string: "foo"

@@ -13,7 +13,7 @@ Given the method, the output's name (computed from the derivation name and outpu
 ## Fixed-output content-addressing {#fixed}
 
 In this case the content address of the *fixed* in advanced by the derivation itself.
-In other words, when the derivation has finished [building](@docroot@/store/building.md), and the provisional output' content-address is computed as part of the process to turn it into a *bona fide* store object, the calculated content address must much that given in the derivation, or the build of that derivation will be deemed a failure.
+In other words, when the derivation has finished [building](@docroot@/store/building.md), and the provisional output' content-address is computed as part of the process to turn it into a *bona fide* store object, the calculated content address must match that given in the derivation, or the build of that derivation will be deemed a failure.
 
 The output spec for an output with a fixed content addresses additionally contains:
 

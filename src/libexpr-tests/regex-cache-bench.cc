@@ -5,7 +5,7 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/store/store-open.hh"
 
-using namespace nix;
+namespace nix {
 
 static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
 {
@@ -27,7 +27,8 @@ static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
         EvalSettings evalSettings{readOnlyMode};
         evalSettings.nixPath = {};
 
-        EvalState st({}, store, fetchSettings, evalSettings, nullptr);
+        auto stPtr = std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr);
+        auto & st = *stPtr;
         Expr * expr = st.parseExprFromString(std::string(exprStr), st.rootPath(CanonPath::root));
 
         Value v;
@@ -43,3 +44,5 @@ static void BM_EvalManyBuiltinsMatchSameRegex(benchmark::State & state)
 }
 
 BENCHMARK(BM_EvalManyBuiltinsMatchSameRegex);
+
+} // namespace nix

@@ -140,7 +140,7 @@ If *attrpath* begins with `.` then no prefixes or defaults are attempted. This a
 
 ### Store path
 
-Example: `/nix/store/v5sv61sszx301i0x6xysaqzla09nksnd-hello-2.10`
+Example: `/nix/store/10l19qifk7hjjq47px8m2prqk1gv4isy-hello-2.10`
 
 These are paths inside the Nix store, or symlinks that resolve to a path in the Nix store.
 
@@ -196,7 +196,7 @@ operate are determined as follows:
   and likewise, using a store path to a "drv" file to specify the derivation:
 
   ```console
-  # nix build '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^dev,static'
+  # nix build '/nix/store/fpq78s2h8ffh66v2iy0q1838mhff06y8-glibc-2.33-78.drv^dev,static'
   …
   ```
 
@@ -219,17 +219,17 @@ operate are determined as follows:
 
   ```console
   # nix path-info --closure-size --eval-store auto --store https://cache.nixos.org 'nixpkgs#glibc^*'
-  /nix/store/g02b1lpbddhymmcjb923kf0l7s9nww58-glibc-2.33-123                 33208200
-  /nix/store/851dp95qqiisjifi639r0zzg5l465ny4-glibc-2.33-123-bin             36142896
-  /nix/store/kdgs3q6r7xdff1p7a9hnjr43xw2404z7-glibc-2.33-123-debug          155787312
-  /nix/store/n4xa8h6pbmqmwnq0mmsz08l38abb06zc-glibc-2.33-123-static          42488328
-  /nix/store/q6580lr01jpcsqs4r5arlh4ki2c1m9rv-glibc-2.33-123-dev             44200560
+  /nix/store/i2fn2mjgihz960bwa7ldab5ra5fhxznh-glibc-2.33-123                 33208200
+  /nix/store/n2wnn3i47w6dbylh64hdjzgd5rrprdn8-glibc-2.33-123-bin             36142896
+  /nix/store/v7dyz518sbkzl8x2a1sgk1lwsfd3d6gm-glibc-2.33-123-debug          155787312
+  /nix/store/z4hv6ybyinqw9a3dwyl5k66a91aggylj-glibc-2.33-123-static          42488328
+  /nix/store/lrjirf0j1rjnvif6amyp9pfcqr2km385-glibc-2.33-123-dev             44200560
   ```
 
   and likewise, using a store path to a "drv" file to specify the derivation:
 
   ```console
-  # nix path-info --closure-size '/nix/store/gzaflydcr6sb3567hap9q6srzx8ggdgg-glibc-2.33-78.drv^*'
+  # nix path-info --closure-size '/nix/store/fpq78s2h8ffh66v2iy0q1838mhff06y8-glibc-2.33-78.drv^*'
   …
   ```
 * If you didn't specify the desired outputs, but the derivation has an

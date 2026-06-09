@@ -1,0 +1,10 @@
+error:
+       … while calling the 'replaceStrings' builtin
+         at /pwd/lang/eval-fail-replaceStrings-5.nix:1:1:
+            1| builtins.replaceStrings [ "oo" ] [ true ] "foo"
+             | ^
+            2|
+
+       … while evaluating one of the replacement strings passed to builtins.replaceStrings
+
+       error: expected a string but found a Boolean: true

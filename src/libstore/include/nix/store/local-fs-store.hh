@@ -10,7 +10,10 @@ namespace nix {
 struct LocalFSStoreConfig : virtual StoreConfig
 {
 private:
-    static OptionalPathSetting makeRootDirSetting(LocalFSStoreConfig & self, std::optional<Path> defaultValue)
+    void anchor() override;
+
+    static Setting<std::optional<AbsolutePath>>
+    makeRootDirSetting(LocalFSStoreConfig & self, std::optional<AbsolutePath> defaultValue)
     {
         return {
             &self,
@@ -21,7 +24,10 @@ private:
     }
 
 public:
-    using StoreConfig::StoreConfig;
+    LocalFSStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Native)
+    {
+    }
 
     /**
      * Used to override the `root` settings. Can't be done via modifying
@@ -30,40 +36,52 @@ public:
      *
      * @todo Make this less error-prone with new store settings system.
      */
-    LocalFSStoreConfig(PathView path, const Params & params);
+    LocalFSStoreConfig(const std::filesystem::path & path, const Params & params);
 
-    OptionalPathSetting rootDir = makeRootDirSetting(*this, std::nullopt);
+    Setting<std::optional<AbsolutePath>> rootDir = makeRootDirSetting(*this, std::nullopt);
 
-private:
-
-    /**
-     * An indirection so that we don't need to refer to global settings
-     * in headers.
-     */
-    static Path getDefaultStateDir();
-
-    /**
-     * An indirection so that we don't need to refer to global settings
-     * in headers.
-     */
-    static Path getDefaultLogDir();
-
-public:
-
-    PathSetting stateDir{
+    Setting<AbsolutePath> stateDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/nix" : getDefaultStateDir(),
+        rootDir.get() ? *rootDir.get() / "nix" / "var" / "nix" : StoreConfig::getStateDir(),
         "state",
-        "Directory where Nix stores state."};
+        R"(
+          Directory where Nix stores state.
 
-    PathSetting logDir{
+          Defaults to [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR) when [`root`](#@store-slug@-root) is not set.
+        )",
+    };
+
+    Setting<AbsolutePath> logDir{
         this,
-        rootDir.get() ? *rootDir.get() + "/nix/var/log/nix" : getDefaultLogDir(),
+        rootDir.get() ? *rootDir.get() / "nix" / "var" / "log" / "nix" : StoreConfig::getLogDir(),
         "log",
-        "directory where Nix stores log files."};
+        R"(
+          Directory where Nix stores log files.
 
-    PathSetting realStoreDir{
-        this, rootDir.get() ? *rootDir.get() + "/nix/store" : storeDir, "real", "Physical path of the Nix store."};
+          Defaults to [`NIX_LOG_DIR`](@docroot@/command-ref/env-common.md#env-NIX_LOG_DIR) when [`root`](#@store-slug@-root) is not set.
+        )",
+    };
+
+    Setting<AbsolutePath> realStoreDir{
+        this,
+        rootDir.get() ? *rootDir.get() / "nix" / "store" : std::filesystem::path{storeDir},
+        "real",
+        R"(
+          Physical path of the Nix store.
+
+          Defaults to [`store`](#@store-slug@-store) when [`root`](#@store-slug@-root) is not set.
+        )",
+    };
+
+    const std::filesystem::path & getStateDir() const override
+    {
+        return stateDir.get();
+    }
+
+    const std::filesystem::path & getLogDir() const override
+    {
+        return logDir.get();
+    }
 };
 
 struct alignas(8) /* Work around ASAN failures on i686-linux. */
@@ -71,13 +89,17 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
                    virtual GcStore,
                    virtual LogStore
 {
+private:
+    void anchor() override;
+
+public:
     using Config = LocalFSStoreConfig;
 
     const Config & config;
 
     inline static std::string operationName = "Local Filesystem Store";
 
-    const static std::string drvsLogDir;
+    const static std::filesystem::path drvsLogDir;
 
     LocalFSStore(const Config & params);
 
@@ -93,27 +115,21 @@ struct alignas(8) /* Work around ASAN failures on i686-linux. */
      * @param gcRoot The location of the symlink.
      *
      * @param storePath The store object being rooted. The symlink will
-     * point to `toRealPath(store.printStorePath(storePath))`.
+     * point to `toRealPath(storePath)`.
      *
      * How the permanent GC root corresponding to this symlink is
      * managed is implementation-specific.
      */
-    virtual Path addPermRoot(const StorePath & storePath, const Path & gcRoot) = 0;
+    virtual std::filesystem::path addPermRoot(const StorePath & storePath, const std::filesystem::path & gcRoot) = 0;
 
-    virtual Path getRealStoreDir()
+    virtual std::filesystem::path getRealStoreDir()
     {
         return config.realStoreDir;
     }
 
-    Path toRealPath(const StorePath & storePath)
+    std::filesystem::path toRealPath(const StorePath & storePath)
     {
-        return toRealPath(printStorePath(storePath));
-    }
-
-    Path toRealPath(const Path & storePath)
-    {
-        assert(isInStore(storePath));
-        return getRealStoreDir() + "/" + std::string(storePath, storeDir.size() + 1);
+        return getRealStoreDir() / storePath.to_string();
     }
 
     std::optional<std::string> getBuildLogExact(const StorePath & path) override;

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'replaceStrings' builtin
+         at /pwd/lang/eval-fail-replaceStrings-4.nix:1:1:
+            1| builtins.replaceStrings [ 1 ] [ "new" ] { }
+             | ^
+            2|
+
+       … while evaluating one of the strings to replace passed to builtins.replaceStrings
+
+       error: expected a string but found an integer: 1

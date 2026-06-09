@@ -8,6 +8,10 @@
 
 namespace nix {
 
+void UnkeyedValidPathInfo::anchor() {}
+
+void ValidPathInfo::anchor() {}
+
 PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
 {
     switch (version) {
@@ -15,8 +19,10 @@ PathInfoJsonFormat parsePathInfoJsonFormat(uint64_t version)
         return PathInfoJsonFormat::V1;
     case 2:
         return PathInfoJsonFormat::V2;
+    case 3:
+        return PathInfoJsonFormat::V3;
     default:
-        throw Error("unsupported path info JSON format version %d; supported versions are 1 and 2", version);
+        throw Error("unsupported path info JSON format version %d; supported versions are 1, 2 and 3", version);
     }
 }
 
@@ -129,7 +135,7 @@ size_t ValidPathInfo::checkSignatures(const StoreDirConfig & store, const Public
 }
 
 bool ValidPathInfo::checkSignature(
-    const StoreDirConfig & store, const PublicKeys & publicKeys, const std::string & sig) const
+    const StoreDirConfig & store, const PublicKeys & publicKeys, const Signature & sig) const
 {
     return verifyDetached(fingerprint(store), sig, publicKeys);
 }
@@ -211,9 +217,13 @@ UnkeyedValidPathInfo::toJSON(const StoreDirConfig * store, bool includeImpureInf
 
         jsonObject["ultimate"] = ultimate;
 
-        auto & sigsObj = jsonObject["signatures"] = json::array();
-        for (auto & sig : sigs)
-            sigsObj.push_back(sig);
+        if (format == PathInfoJsonFormat::V3) {
+            jsonObject["signatures"] = sigs;
+        } else {
+            auto & sigsObj = jsonObject["signatures"] = json::array();
+            for (auto & sig : sigs)
+                sigsObj.push_back(sig.to_string());
+        }
     }
 
     return jsonObject;
@@ -287,7 +297,7 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
         res.ultimate = getBoolean(*rawUltimate);
 
     if (auto * rawSignatures = optionalValueAt(json, "signatures"))
-        res.sigs = getStringSet(*rawSignatures);
+        res.sigs = *rawSignatures;
 
     return res;
 }
@@ -315,7 +325,7 @@ UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json 
 
 void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
 {
-    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V2);
+    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V3);
 }
 
 ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)

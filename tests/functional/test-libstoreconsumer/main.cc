@@ -3,10 +3,10 @@
 #include "nix/store/build-result.hh"
 #include <iostream>
 
-using namespace nix;
-
 int main(int argc, char ** argv)
 {
+    using namespace nix;
+
     try {
         if (argc != 2) {
             std::cerr << "Usage: " << argv[0] << " store/path/to/something.drv\n";

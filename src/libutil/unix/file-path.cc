@@ -1,21 +1,10 @@
-#include <algorithm>
-#include <codecvt>
-#include <iostream>
-#include <locale>
-
 #include "nix/util/file-path.hh"
-#include "nix/util/util.hh"
 
 namespace nix {
 
-std::optional<std::filesystem::path> maybePath(PathView path)
+std::filesystem::path toOwnedPath(PathView path)
 {
-    return {path};
-}
-
-std::filesystem::path pathNG(PathView path)
-{
-    return path;
+    return {std::string{path}};
 }
 
 } // namespace nix

@@ -7,19 +7,31 @@
 
 namespace nix {
 
+/**
+ * Get the daemon socket path for the given store configuration.
+ *
+ * Returns `NIX_DAEMON_SOCKET_PATH` if set, otherwise
+ * `stateDir / "daemon-socket" / "socket"` where `stateDir` is from
+ * the config (for LocalFSStore) or global settings.
+ *
+ * @note This function accepts any `Store::Config`, not just
+ * `UDSRemoteStoreConfig`, because the daemon uses it to determine where
+ * to listen for connections (configuring the daemon) and where to
+ * connect to (configuring the client). The daemon may be serving any
+ * type of store --- `UDSRemoteStoreConfig` is for *client* stores, not
+ * for the server store.
+ */
+std::filesystem::path getDaemonSocketPath(const Store::Config & config);
+
 struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>,
                               virtual LocalFSStoreConfig,
                               virtual RemoteStoreConfig
 {
-    // TODO(fzakaria): Delete this constructor once moved over to the factory pattern
-    // outlined in https://github.com/NixOS/nix/issues/10766
-    using LocalFSStoreConfig::LocalFSStoreConfig;
-    using RemoteStoreConfig::RemoteStoreConfig;
+private:
+    void anchor() override;
 
-    /**
-     * @param authority is the socket path.
-     */
-    UDSRemoteStoreConfig(std::string_view scheme, std::string_view authority, const Params & params);
+public:
+    UDSRemoteStoreConfig(const std::filesystem::path & path, const Params & params);
 
     UDSRemoteStoreConfig(const Params & params);
 
@@ -33,10 +45,9 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
     /**
      * The path to the unix domain socket.
      *
-     * The default is `settings.nixDaemonSocketFile`, but we don't write
-     * that below, instead putting in the constructor.
+     * The default is given by `getDaemonSocketPath`.
      */
-    Path path;
+    std::filesystem::path path;
 
     static StringSet uriSchemes()
     {
@@ -50,6 +61,10 @@ struct UDSRemoteStoreConfig : std::enable_shared_from_this<UDSRemoteStoreConfig>
 
 struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
 {
+private:
+    void anchor() override;
+
+public:
     using Config = UDSRemoteStoreConfig;
 
     ref<const Config> config;
@@ -79,7 +94,7 @@ struct UDSRemoteStore : virtual IndirectRootStore, virtual RemoteStore
      * owned managed by the client's user account, and the server makes
      * the indirect symlink.
      */
-    void addIndirectRoot(const Path & path) override;
+    void addIndirectRoot(const std::filesystem::path & path) override;
 
 private:
 

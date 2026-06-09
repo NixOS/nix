@@ -1,0 +1,10 @@
+error:
+       … while calling the 'substring' builtin
+         at /pwd/lang/eval-fail-substring-3.nix:1:1:
+            1| builtins.substring 0 3 { }
+             | ^
+            2|
+
+       … while evaluating the third argument (the string) passed to builtins.substring
+
+       error: cannot coerce a set to a string: { }

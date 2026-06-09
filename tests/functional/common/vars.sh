@@ -64,6 +64,9 @@ unset XDG_CONFIG_HOME
 unset XDG_CONFIG_DIRS
 unset XDG_CACHE_HOME
 unset GIT_DIR
+# Isolate tests from host git config (signing, url rewrites, etc.)
+export GIT_CONFIG_SYSTEM=/dev/null
+export GIT_CONFIG_GLOBAL=/dev/null
 
 export IMPURE_VAR1=foo
 export IMPURE_VAR2=bar

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-1.nix:1:1:
+            1| builtins.derivationStrict ""
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.derivationStrict
+
+       error: expected a set but found a string: ""

@@ -1,0 +1,18 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-16.nix:1:1:
+            1| builtins.derivationStrict {
+             | ^
+            2|   name = "foo";
+
+       … while evaluating derivation 'foo'
+         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-16.nix:2:3
+
+       … while evaluating attribute '__contentAddressed' of derivation 'foo'
+         at /pwd/lang/eval-fail-derivationStrict-16.nix:6:3:
+            5|   outputs = "out";
+            6|   __contentAddressed = "true";
+             |   ^
+            7| }
+
+       error: expected a Boolean but found a string: "true"

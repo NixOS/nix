@@ -7,6 +7,7 @@
 #include <cstring>
 #include <memory>
 #include <memory_resource>
+#include <exception>
 #include <span>
 #include <string_view>
 #include <type_traits>
@@ -20,6 +21,10 @@
 
 #include <boost/unordered/unordered_flat_map_fwd.hpp>
 #include <nlohmann/json_fwd.hpp>
+
+#if defined(__x86_64__) && defined(__SSE2__)
+#  include <emmintrin.h>
+#endif
 
 namespace nix {
 
@@ -35,27 +40,32 @@ class BindingsBuilder;
  * about how this is mapped into the alignment bits to save significant memory.
  * This also restricts the number of internal types represented with distinct memory layouts.
  */
-typedef enum {
+enum InternalType {
     tUninitialized = 0,
     /* layout: Single/zero field payload */
     tInt = 1,
     tBool,
     tNull,
     tFloat,
+    tFailed,
     tExternal,
     tPrimOp,
     tAttrs,
     /* layout: Pair of pointers payload */
-    tListSmall,
+    tFirstPairOfPointers,
+    tListSmall = tFirstPairOfPointers,
     tPrimOpApp,
     tApp,
     tThunk,
     tLambda,
+    tLastPairOfPointers = tLambda,
     /* layout: Single untaggable field */
-    tListN,
+    tFirstSingleUntaggable,
+    tListN = tFirstSingleUntaggable,
     tString,
     tPath,
-} InternalType;
+    tNumberOfInternalTypes, // Must be last
+};
 
 /**
  * This type abstracts over all actual value types in the language,
@@ -64,6 +74,7 @@ typedef enum {
  */
 typedef enum {
     nThunk,
+    nFailed,
     nInt,
     nFloat,
     nBool,
@@ -134,7 +145,7 @@ public:
     virtual bool operator==(const ExternalValueBase & b) const noexcept;
 
     /**
-     * Print the value as JSON. Defaults to unconvertable, i.e. throws an error
+     * Print the value as JSON. Defaults to unconvertible, i.e. throws an error
      */
     virtual nlohmann::json
     printValueAsJSON(EvalState & state, bool strict, NixStringContext & context, bool copyToStore = true) const;
@@ -148,7 +159,7 @@ public:
         bool location,
         XMLWriter & doc,
         NixStringContext & context,
-        PathSet & drvsSeen,
+        StringSet & drvsSeen,
         const PosIdx pos) const;
 
     virtual ~ExternalValueBase() {};
@@ -420,6 +431,63 @@ struct ValueBase
         size_t size;
         Value * const * elems;
     };
+
+    /**
+     * Wrapper that stores a std::exception_ptr on the GC heap with a finaliser
+     * that runs the exception_ptr destructor (which is refcounted internally).
+     * This is not a part of the Failed structure to avoid cycles with finalisers,
+     * which Boehm warns about.
+     */
+    struct ExceptionRef : gc_cleanup
+    {
+        ExceptionRef(std::exception_ptr ex)
+            : ex(std::move(ex))
+        {
+            assert(this->ex);
+        }
+
+        ExceptionRef(ExceptionRef &&) = delete;
+        ExceptionRef(const ExceptionRef &) = delete;
+        ExceptionRef & operator=(ExceptionRef &&) = delete;
+        ExceptionRef & operator=(const ExceptionRef &) = delete;
+
+        /* To appease -Wweak-vtables. */
+        virtual ~ExceptionRef();
+
+        std::exception_ptr ex;
+    };
+
+    struct Failed : gc
+    {
+        ExceptionRef * exRef;
+
+        /**
+         * Optional value for recovering `RecoverableEvalError`
+         * Must be set iff `ex` is an instance of `RecoverableEvalError`.
+         */
+        Value * recoveryValue;
+
+        Failed(std::exception_ptr ex, Value * recoveryValue)
+            : exRef(new /* ExceptionRef : gc_cleanup */ ExceptionRef(ex))
+            , recoveryValue(recoveryValue)
+        {
+        }
+
+        [[noreturn]] void rethrow() const
+        {
+            try {
+                std::rethrow_exception(exRef->ex);
+            } catch (BaseError & e) {
+                /* Rethrow the copy of the exception - not the original one.
+                   Stack tracing mechanisms rely on being able to modify the exceptions
+                   they catch by reference. */
+                e.throwClone();
+            } catch (...) {
+                throw;
+            }
+            unreachable();
+        }
+    };
 };
 
 template<typename T>
@@ -446,6 +514,7 @@ struct PayloadTypeToInternalType
     MACRO(PrimOp *, primOp, tPrimOp)                                \
     MACRO(ValueBase::PrimOpApplicationThunk, primOpApp, tPrimOpApp) \
     MACRO(ExternalValueBase *, external, tExternal)                 \
+    MACRO(ValueBase::Failed *, failed, tFailed)                     \
     MACRO(NixFloat, fpoint, tFloat)
 
 #define NIX_VALUE_PAYLOAD_TYPE(T, FIELD_NAME, DISCRIMINATOR) \
@@ -517,6 +586,11 @@ protected:
     {
         return internalType;
     }
+
+    static bool isAtomic()
+    {
+        return false;
+    }
 };
 
 namespace detail {
@@ -533,8 +607,8 @@ inline constexpr bool useBitPackedValueStorage = (ptrSize == 8) && (__STDCPP_DEF
  * Packs discriminator bits into the pointer alignment niches.
  */
 template<std::size_t ptrSize>
-class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>>
-    : public detail::ValueBase
+class alignas(16)
+    ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedValueStorage<ptrSize>>> : public detail::ValueBase
 {
     /* Needs a dependent type name in order for member functions (and
      * potentially ill-formed bit casts) to be SFINAE'd out.
@@ -550,7 +624,11 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
 
     using PackedPointer = typename PackedPointerTypeStruct<ptrSize>::type;
     using Payload = std::array<PackedPointer, 2>;
-    Payload payload = {};
+#if defined(__x86_64__) && defined(__SSE2__)
+    __m128i payloadWords;
+#else
+    Payload payloadWords = {};
+#endif
 
     static constexpr int discriminatorBits = 3;
     static constexpr PackedPointer discriminatorMask = (PackedPointer(1) << discriminatorBits) - 1;
@@ -587,12 +665,60 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     enum PrimaryDiscriminator : int {
         pdUninitialized = 0,
         pdSingleDWord, //< layout: Single/zero field payload
-        /* The order of these enumations must be the same as in InternalType. */
+        /* The order of these enumerations must be the same as in InternalType. */
         pdListN, //< layout: Single untaggable field.
         pdString,
         pdPath,
         pdPairOfPointers, //< layout: Pair of pointers payload
     };
+
+#if defined(__x86_64__) && defined(__SSE2__)
+    /* Why do we even bother with hand-rolling these arch-specific intrinsics
+     * and don't use libatomic directly for 16 byte atomics? Here's why:
+     *  - https://gcc.gnu.org/legacy-ml/gcc/2018-02/msg00224.html
+     *  - https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84563
+     *
+     * Basically, we don't really ever want to go through libatomic. As is
+     * so happens on x86_64 with AVX, MOVDQA/MOVAPS instructions (16-byte aligned
+     * 128-bit loads and stores) are atomic [^]. Note that
+     * these instructions are not part of AVX but rather SSE2, which is x86_64-v1.
+     * They are just not guaranteed to be atomic without AVX.
+     *
+     * For more details see:
+     *  - [^] Intel® 64 and IA-32 Architectures Software Developer’s Manual (10.1.1 Guaranteed Atomic Operations).
+     *  - https://patchwork.sourceware.org/project/gcc/patch/YhxkfzGEEQ9KHbBC@tucnak/
+     *  - https://ibraheem.ca/posts/128-bit-atomics/
+     *  - https://rigtorp.se/isatomic/
+     */
+    [[gnu::always_inline]]
+    void updatePayload(Payload payload) noexcept
+    {
+        /* This intrinsic corresponds to MOVAPS. Note that Value (and thus the first member
+           payloadWords) is 16 bytes aligned. */
+        _mm_store_si128(&payloadWords, std::bit_cast<__m128i>(payload));
+    }
+
+    [[gnu::always_inline]]
+    Payload loadPayload() const noexcept
+    {
+        /* This intrinsic corresponds to MOVDQA. Note that Value (and thus the first member
+           payloadWords) is 16 bytes aligned. */
+        __m128i res = _mm_load_si128(&payloadWords);
+        return std::bit_cast<Payload>(res);
+    }
+#else
+    [[gnu::always_inline]]
+    void updatePayload(Payload payload) noexcept
+    {
+        payloadWords = payload;
+    }
+
+    [[gnu::always_inline]]
+    Payload loadPayload() const noexcept
+    {
+        return payloadWords;
+    }
+#endif
 
     template<typename T>
         requires std::is_pointer_v<T>
@@ -601,9 +727,9 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         return std::bit_cast<T>(val & ~discriminatorMask);
     }
 
-    PrimaryDiscriminator getPrimaryDiscriminator() const noexcept
+    PrimaryDiscriminator getPrimaryDiscriminator(PackedPointer firstDWord) const noexcept
     {
-        return static_cast<PrimaryDiscriminator>(payload[0] & discriminatorMask);
+        return static_cast<PrimaryDiscriminator>(firstDWord & discriminatorMask);
     }
 
     static void assertAligned(PackedPointer val) noexcept
@@ -614,26 +740,31 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
     template<InternalType type>
     void setSingleDWordPayload(PackedPointer untaggedVal) noexcept
     {
+        Payload payload;
         /* There's plenty of free upper bits in the first dword, which is
            used only for the discriminator. */
         payload[0] = static_cast<int>(pdSingleDWord) | (static_cast<int>(type) << discriminatorBits);
         payload[1] = untaggedVal;
+        updatePayload(payload);
     }
 
     template<PrimaryDiscriminator discriminator, typename T, typename U>
     void setUntaggablePayload(T * firstPtrField, U untaggableField) noexcept
     {
+        Payload payload;
         static_assert(discriminator >= pdListN && discriminator <= pdPath);
         auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
         assertAligned(firstFieldPayload);
         payload[0] = static_cast<int>(discriminator) | firstFieldPayload;
         payload[1] = std::bit_cast<PackedPointer>(untaggableField);
+        updatePayload(payload);
     }
 
     template<InternalType type, typename T, typename U>
     void setPairOfPointersPayload(T * firstPtrField, U * secondPtrField) noexcept
     {
-        static_assert(type >= tListSmall && type <= tLambda);
+        Payload payload;
+        static_assert(type >= tFirstPairOfPointers && type <= tLastPairOfPointers);
         {
             auto firstFieldPayload = std::bit_cast<PackedPointer>(firstPtrField);
             assertAligned(firstFieldPayload);
@@ -642,23 +773,60 @@ class alignas(16) ValueStorage<ptrSize, std::enable_if_t<detail::useBitPackedVal
         {
             auto secondFieldPayload = std::bit_cast<PackedPointer>(secondPtrField);
             assertAligned(secondFieldPayload);
-            payload[1] = (type - tListSmall) | secondFieldPayload;
+            payload[1] = (type - tFirstPairOfPointers) | secondFieldPayload;
         }
+        updatePayload(payload);
     }
 
     template<typename T, typename U>
         requires std::is_pointer_v<T> && std::is_pointer_v<U>
     void getPairOfPointersPayload(T & firstPtrField, U & secondPtrField) const noexcept
     {
+        Payload payload = loadPayload();
         firstPtrField = untagPointer<T>(payload[0]);
         secondPtrField = untagPointer<U>(payload[1]);
     }
 
+public:
+    ValueStorage()
+    {
+        updatePayload({});
+    }
+
+    ValueStorage(const ValueStorage & other)
+    {
+        updatePayload(other.loadPayload());
+    }
+
+    ValueStorage & operator=(const ValueStorage & other)
+    {
+        updatePayload(other.loadPayload());
+        return *this;
+    }
+
+    ValueStorage(ValueStorage && other) noexcept
+    {
+        updatePayload(other.loadPayload());
+        other.updatePayload({}); // Zero out rhs
+    }
+
+    ValueStorage & operator=(ValueStorage && other) noexcept
+    {
+        updatePayload(other.loadPayload());
+        other.updatePayload({}); // Zero out rhs
+        return *this;
+    }
+
+    ~ValueStorage() noexcept {}
+
 protected:
+    static bool isAtomic();
+
     /** Get internal type currently occupying the storage. */
     InternalType getInternalType() const noexcept
     {
-        switch (auto pd = getPrimaryDiscriminator()) {
+        Payload payload = loadPayload();
+        switch (auto pd = getPrimaryDiscriminator(payload[0])) {
         case pdUninitialized:
             /* Discriminator value of zero is used to distinguish uninitialized values. */
             return tUninitialized;
@@ -670,11 +838,11 @@ protected:
         case pdListN:
         case pdString:
         case pdPath:
-            return static_cast<InternalType>(tListN + (pd - pdListN));
+            return static_cast<InternalType>(tFirstSingleUntaggable + (pd - pdListN));
         case pdPairOfPointers:
-            return static_cast<InternalType>(tListSmall + (payload[1] & discriminatorMask));
+            return static_cast<InternalType>(tFirstPairOfPointers + (payload[1] & discriminatorMask));
         [[unlikely]] default:
-            unreachable();
+            nixUnreachableWhenHardened();
         }
     }
 
@@ -700,6 +868,7 @@ protected:
 
     void getStorage(NixInt & integer) const noexcept
     {
+        Payload payload = loadPayload();
         /* PackedPointerType -> int64_t here is well-formed, since the standard requires
            this conversion to follow 2's complement rules. This is just a no-op. */
         integer = NixInt(payload[1]);
@@ -707,6 +876,7 @@ protected:
 
     void getStorage(bool & boolean) const noexcept
     {
+        Payload payload = loadPayload();
         boolean = payload[1];
     }
 
@@ -714,40 +884,53 @@ protected:
 
     void getStorage(NixFloat & fpoint) const noexcept
     {
+        Payload payload = loadPayload();
         fpoint = std::bit_cast<NixFloat>(payload[1]);
     }
 
     void getStorage(ExternalValueBase *& external) const noexcept
     {
+        Payload payload = loadPayload();
         external = std::bit_cast<ExternalValueBase *>(payload[1]);
     }
 
     void getStorage(PrimOp *& primOp) const noexcept
     {
+        Payload payload = loadPayload();
         primOp = std::bit_cast<PrimOp *>(payload[1]);
     }
 
     void getStorage(Bindings *& attrs) const noexcept
     {
+        Payload payload = loadPayload();
         attrs = std::bit_cast<Bindings *>(payload[1]);
     }
 
     void getStorage(List & list) const noexcept
     {
+        Payload payload = loadPayload();
         list.elems = untagPointer<decltype(list.elems)>(payload[0]);
         list.size = payload[1];
     }
 
     void getStorage(StringWithContext & string) const noexcept
     {
+        Payload payload = loadPayload();
         string.context = untagPointer<decltype(string.context)>(payload[0]);
         string.str = std::bit_cast<const StringData *>(payload[1]);
     }
 
     void getStorage(Path & path) const noexcept
     {
+        Payload payload = loadPayload();
         path.accessor = untagPointer<decltype(path.accessor)>(payload[0]);
         path.path = std::bit_cast<const StringData *>(payload[1]);
+    }
+
+    void getStorage(Failed *& failed) const noexcept
+    {
+        Payload payload = loadPayload();
+        failed = std::bit_cast<Failed *>(payload[1]);
     }
 
     void setStorage(NixInt integer) noexcept
@@ -798,6 +981,11 @@ protected:
     void setStorage(Path path) noexcept
     {
         setUntaggablePayload<pdPath>(path.accessor, path.path);
+    }
+
+    void setStorage(Failed * failed) noexcept
+    {
+        setSingleDWordPayload<tFailed>(std::bit_cast<PackedPointer>(failed));
     }
 };
 
@@ -1027,7 +1215,7 @@ private:
     T getStorage() const noexcept
     {
         if (getInternalType() != detail::payloadTypeToInternalType<T>) [[unlikely]]
-            unreachable();
+            nixUnreachableWhenHardened();
         T out;
         ValueStorage::getStorage(out);
         return out;
@@ -1050,12 +1238,12 @@ public:
     inline bool isThunk() const
     {
         return isa<tThunk>();
-    };
+    }
 
     inline bool isApp() const
     {
         return isa<tApp>();
-    };
+    }
 
     inline bool isBlackhole() const;
 
@@ -1063,61 +1251,66 @@ public:
     inline bool isLambda() const
     {
         return isa<tLambda>();
-    };
+    }
 
     inline bool isPrimOp() const
     {
         return isa<tPrimOp>();
-    };
+    }
 
     inline bool isPrimOpApp() const
     {
         return isa<tPrimOpApp>();
-    };
+    }
+
+    inline bool isFailed() const
+    {
+        return isa<tFailed>();
+    }
 
     /**
      * Returns the normal type of a Value. This only returns nThunk if
      * the Value hasn't been forceValue'd
      *
-     * @param invalidIsThunk Instead of aborting an an invalid (probably
+     * @param invalidIsThunk Instead of UB an an invalid (probably
      * 0, so uninitialized) internal type, return `nThunk`.
      */
-    inline ValueType type(bool invalidIsThunk = false) const
+    template<bool invalidIsThunk = false>
+    inline ValueType type() const
     {
-        switch (getInternalType()) {
-        case tUninitialized:
-            break;
-        case tInt:
-            return nInt;
-        case tBool:
-            return nBool;
-        case tString:
-            return nString;
-        case tPath:
-            return nPath;
-        case tNull:
-            return nNull;
-        case tAttrs:
-            return nAttrs;
-        case tListSmall:
-        case tListN:
-            return nList;
-        case tLambda:
-        case tPrimOp:
-        case tPrimOpApp:
-            return nFunction;
-        case tExternal:
-            return nExternal;
-        case tFloat:
-            return nFloat;
-        case tThunk:
-        case tApp:
-            return nThunk;
+        /* Explicit lookup table. switch() might compile down (and it does at least with GCC 14)
+           to a jump table. Let's help the compiler a bit here. */
+        static constexpr auto table = [] {
+            std::array<ValueType, tNumberOfInternalTypes> t{};
+            t[tUninitialized] = nThunk;
+            t[tInt] = nInt;
+            t[tBool] = nBool;
+            t[tNull] = nNull;
+            t[tFloat] = nFloat;
+            t[tFailed] = nFailed;
+            t[tExternal] = nExternal;
+            t[tAttrs] = nAttrs;
+            t[tPrimOp] = nFunction;
+            t[tLambda] = nFunction;
+            t[tPrimOpApp] = nFunction;
+            t[tApp] = nThunk;
+            t[tThunk] = nThunk;
+            t[tListSmall] = nList;
+            t[tListN] = nList;
+            t[tString] = nString;
+            t[tPath] = nPath;
+            return t;
+        }();
+
+        auto it = getInternalType();
+        if (it == tUninitialized || it >= tNumberOfInternalTypes) [[unlikely]] {
+            if constexpr (invalidIsThunk)
+                return nThunk;
+            else
+                nixUnreachableWhenHardened();
         }
-        if (invalidIsThunk)
-            return nThunk;
-        else
-            unreachable();
+
+        return table[it];
     }
 
     /**
@@ -1230,6 +1423,11 @@ public:
     inline void mkFloat(NixFloat n) noexcept
     {
         setStorage(n);
+    }
+
+    inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
+    {
+        setStorage(new Value::Failed(e, recovery));
     }
 
     bool isList() const noexcept
@@ -1345,6 +1543,13 @@ public:
     SourceAccessor * pathAccessor() const noexcept
     {
         return getStorage<Path>().accessor;
+    }
+
+    Failed & failed() const noexcept
+    {
+        auto p = getStorage<Failed *>();
+        assert(p);
+        return *p;
     }
 };
 

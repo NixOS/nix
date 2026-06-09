@@ -8,7 +8,7 @@ project(
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -62,6 +62,7 @@ test(
     '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
     'NIX_CONFIG' : 'extra-experimental-features = flakes',
     'HOME' : meson.current_build_dir() / 'test-home',
+    'NIX_STORE' : '',
   },
   protocol : 'gtest',
 )

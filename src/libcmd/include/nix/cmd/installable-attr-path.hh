@@ -21,8 +21,6 @@
 #include <regex>
 #include <queue>
 
-#include <nlohmann/json.hpp>
-
 namespace nix {
 
 class InstallableAttrPath : public InstallableValue

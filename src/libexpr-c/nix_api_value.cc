@@ -1,7 +1,6 @@
 #include "nix/expr/attr-set.hh"
-#include "nix/util/configuration.hh"
+#include "nix/expr/eval-error.hh"
 #include "nix/expr/eval.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/path.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/value.hh"
@@ -12,7 +11,6 @@
 #include "nix_api_util_internal.h"
 #include "nix_api_store_internal.h"
 #include "nix_api_value.h"
-#include "nix/expr/value/context.hh"
 
 // Internal helper functions to check [in] and [out] `Value *` parameters
 static const nix::Value & check_value_not_null(const nix_value * value)
@@ -104,11 +102,17 @@ static void nix_c_primop_wrapper(
         nix_value * external_arg = new_nix_value(args[i], state.mem);
         external_args.push_back(external_arg);
     }
-    f(userdata, &ctx, (EvalState *) &state, external_args.data(), vTmpPtr);
+    EvalState wrapper{state};
+    f(userdata, &ctx, &wrapper, external_args.data(), vTmpPtr);
 
     if (ctx.last_err_code != NIX_OK) {
-        /* TODO: Throw different errors depending on the error code */
-        state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
+        if (ctx.last_err_code == NIX_ERR_RECOVERABLE) {
+            state.error<nix::RecoverableEvalError>("Recoverable error from custom function: %s", *ctx.last_err)
+                .atPos(pos)
+                .debugThrow();
+        } else {
+            state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
+        }
     }
 
     if (!vTmp.isValid()) {
@@ -153,7 +157,7 @@ PrimOp * nix_alloc_primop(
                     .args = {},
                     .arity = (size_t) arity,
                     .doc = doc,
-                    .fun = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
+                    .impl = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
         if (args)
             for (size_t i = 0; args[i]; i++)
                 p->args.emplace_back(*args);
@@ -194,6 +198,8 @@ ValueType nix_get_type(nix_c_context * context, const nix_value * value)
         switch (v.type()) {
         case nThunk:
             return NIX_TYPE_THUNK;
+        case nFailed:
+            return NIX_TYPE_FAILED;
         case nInt:
             return NIX_TYPE_INT;
         case nFloat:

@@ -1,0 +1,8 @@
+error:
+       … while calling the 'div' builtin
+         at /pwd/lang/eval-fail-div-3.nix:1:1:
+            1| builtins.div "foo" 0
+             | ^
+            2|
+
+       error: division by zero

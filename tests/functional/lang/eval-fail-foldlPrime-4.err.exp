@@ -1,0 +1,24 @@
+error:
+       … while calling the 'foldl'' builtin
+         at /pwd/lang/eval-fail-foldlPrime-4.nix:1:1:
+            1| builtins.foldl' (a: b: a && b) "foo" [ true ]
+             | ^
+            2|
+
+       … while calling anonymous lambda
+         at /pwd/lang/eval-fail-foldlPrime-4.nix:1:21:
+            1| builtins.foldl' (a: b: a && b) "foo" [ true ]
+             |                     ^
+            2|
+
+       … in the left operand of the AND (&&) operator
+         at /pwd/lang/eval-fail-foldlPrime-4.nix:1:26:
+            1| builtins.foldl' (a: b: a && b) "foo" [ true ]
+             |                          ^
+            2|
+
+       error: expected a Boolean but found a string: "foo"
+       at /pwd/lang/eval-fail-foldlPrime-4.nix:1:26:
+            1| builtins.foldl' (a: b: a && b) "foo" [ true ]
+             |                          ^
+            2|

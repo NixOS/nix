@@ -10,8 +10,10 @@
 
 namespace nix::eval_cache {
 
+void CachedEvalError::anchor() {}
+
 CachedEvalError::CachedEvalError(ref<AttrCursor> cursor, Symbol attr)
-    : EvalError(cursor->root->state, "cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
+    : CloneableError(cursor->root->state, "cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
     , cursor(cursor)
     , attr(attr)
 {
@@ -70,12 +72,12 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        auto cacheDir = std::filesystem::path(getCacheDir()) / "eval-cache-v6";
+        auto cacheDir = getCacheDir() / "eval-cache-v6";
         createDirs(cacheDir);
 
         auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
 
-        state->db = SQLite(dbPath);
+        state->db = SQLite(dbPath, {.useWAL = settings.useSQLiteWAL});
         state->db.isCache();
         state->db.exec(schema);
 
@@ -106,7 +108,7 @@ struct AttrDb
     }
 
     template<typename F>
-    AttrId doSQLite(F && fun)
+    AttrId doSQLite(const F & fun)
     {
         if (failed)
             return 0;
@@ -124,13 +126,23 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::FullAttrs) (0, false).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::FullAttrs)
+                .apply(0, false)
+                .exec();
 
             AttrId rowId = state->db.getLastInsertedRowId();
             assert(rowId);
 
             for (auto & attr : attrs)
-                state->insertAttribute.use()(rowId)(symbols[attr])(AttrType::Placeholder) (0, false).exec();
+                state->insertAttribute.use()
+                    .apply(rowId)
+                    .apply(symbols[attr])
+                    .apply(AttrType::Placeholder)
+                    .apply(0, false)
+                    .exec();
 
             return rowId;
         });
@@ -150,10 +162,20 @@ struct AttrDb
                     ctx.append(elem->view());
                     first = false;
                 }
-                state->insertAttributeWithContext.use()(key.first)(symbols[key.second])(AttrType::String) (s) (ctx)
+                state->insertAttributeWithContext.use()
+                    .apply(key.first)
+                    .apply(symbols[key.second])
+                    .apply(AttrType::String)
+                    .apply(s)
+                    .apply(ctx)
                     .exec();
             } else {
-                state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::String) (s).exec();
+                state->insertAttribute.use()
+                    .apply(key.first)
+                    .apply(symbols[key.second])
+                    .apply(AttrType::String)
+                    .apply(s)
+                    .exec();
             }
 
             return state->db.getLastInsertedRowId();
@@ -165,7 +187,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Bool) (b ? 1 : 0).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Bool)
+                .apply(b ? 1 : 0)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -176,7 +203,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Int) (n).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Int)
+                .apply(n)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -187,9 +219,11 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute
-                .use()(key.first)(symbols[key.second])(
-                    AttrType::ListOfStrings) (dropEmptyInitThenConcatStringsSep("\t", l))
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::ListOfStrings)
+                .apply(dropEmptyInitThenConcatStringsSep("\t", l))
                 .exec();
 
             return state->db.getLastInsertedRowId();
@@ -201,7 +235,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Placeholder) (0, false).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Placeholder)
+                .apply(0, false)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -212,7 +251,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Missing) (0, false).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Missing)
+                .apply(0, false)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -223,7 +267,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Misc) (0, false).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Misc)
+                .apply(0, false)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -234,7 +283,12 @@ struct AttrDb
         return doSQLite([&]() {
             auto state(_state->lock());
 
-            state->insertAttribute.use()(key.first)(symbols[key.second])(AttrType::Failed) (0, false).exec();
+            state->insertAttribute.use()
+                .apply(key.first)
+                .apply(symbols[key.second])
+                .apply(AttrType::Failed)
+                .apply(0, false)
+                .exec();
 
             return state->db.getLastInsertedRowId();
         });
@@ -244,7 +298,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        auto queryAttribute(state->queryAttribute.use()(key.first)(symbols[key.second]));
+        auto queryAttribute(state->queryAttribute.use().apply(key.first).apply(symbols[key.second]));
         if (!queryAttribute.next())
             return {};
 
@@ -257,7 +311,7 @@ struct AttrDb
         case AttrType::FullAttrs: {
             // FIXME: expensive, should separate this out.
             std::vector<Symbol> attrs;
-            auto queryAttributes(state->queryAttributes.use()(rowId));
+            auto queryAttributes(state->queryAttributes.use().apply(rowId));
             while (queryAttributes.next())
                 attrs.emplace_back(symbols.create(queryAttributes.getStr(0)));
             return {{rowId, attrs}};
@@ -563,6 +617,7 @@ string_t AttrCursor::getStringWithContext()
                             [&](const NixStringContextElem::Opaque & o) -> const StorePath & { return o.path; },
                         },
                         c.raw);
+                    root->state.store->addTempRoot(path);
                     if (!root->state.store->isValidPath(path)) {
                         valid = false;
                         break;
@@ -707,13 +762,16 @@ StorePath AttrCursor::forceDerivation()
     auto aDrvPath = getAttr(root->state.s.drvPath);
     auto drvPath = root->state.store->parseStorePath(aDrvPath->getString());
     drvPath.requireDerivation();
-    if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
-        /* The eval cache contains 'drvPath', but the actual path has
-           been garbage-collected. So force it to be regenerated. */
-        aDrvPath->forceValue();
-        if (!root->state.store->isValidPath(drvPath))
-            throw Error(
-                "don't know how to recreate store derivation '%s'!", root->state.store->printStorePath(drvPath));
+    if (!settings.readOnlyMode) {
+        root->state.store->addTempRoot(drvPath);
+        if (!root->state.store->isValidPath(drvPath)) {
+            /* The eval cache contains 'drvPath', but the actual path has
+               been garbage-collected. So force it to be regenerated. */
+            aDrvPath->forceValue();
+            if (!root->state.store->isValidPath(drvPath))
+                throw Error(
+                    "don't know how to recreate store derivation '%s'!", root->state.store->printStorePath(drvPath));
+        }
     }
     return drvPath;
 }

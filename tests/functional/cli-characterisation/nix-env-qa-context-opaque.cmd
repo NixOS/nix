@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/context-opaque.nix -qa --json

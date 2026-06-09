@@ -1,0 +1,10 @@
+error:
+       … while calling the 'groupBy' builtin
+         at /pwd/lang/eval-fail-groupBy-2.nix:1:1:
+            1| builtins.groupBy (_: 1) "foo"
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.groupBy
+
+       error: expected a list but found a string: "foo"

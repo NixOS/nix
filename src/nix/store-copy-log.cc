@@ -3,12 +3,8 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/log-store.hh"
-#include "nix/util/sync.hh"
-#include "nix/util/thread-pool.hh"
 
-#include <atomic>
-
-using namespace nix;
+namespace nix {
 
 struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 {
@@ -41,3 +37,5 @@ struct CmdCopyLog : virtual CopyCommand, virtual InstallablesCommand
 };
 
 static auto rCmdCopyLog = registerCommand2<CmdCopyLog>({"store", "copy-log"});
+
+} // namespace nix

@@ -259,6 +259,30 @@ nix_err nix_store_get_fs_closure(
  */
 nix_derivation * nix_store_drv_from_store_path(nix_c_context * context, Store * store, const StorePath * path);
 
+/**
+ * @brief Query the full store path given the hash part of a valid store
+ * path, or empty if no matching path is found.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store nix store reference
+ * @param[in] hash Hash part of path as a string
+ * @return Store path reference, NULL if no matching path is found.
+ */
+StorePath * nix_store_query_path_from_hash_part(nix_c_context * context, Store * store, const char * hash);
+
+/**
+ * @brief Copy a path from one store to another.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] srcStore nix source store reference
+ * @param[in] dstStore nix destination store reference
+ * @param[in] path The path to copy
+ * @param[in] repair Whether to repair the path
+ * @param[in] checkSigs Whether to check path signatures are trusted before copying
+ */
+nix_err nix_store_copy_path(
+    nix_c_context * context, Store * srcStore, Store * dstStore, const StorePath * path, bool repair, bool checkSigs);
+
 // cffi end
 #ifdef __cplusplus
 }

@@ -6,7 +6,7 @@ source simple-common.sh
 
 requireDaemonNewerThan 2.31pre20250724
 
-initRepo
+createGitRepo "$repo" "--object-format=$hashAlgo"
 
 # blob
 test0

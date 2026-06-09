@@ -1,0 +1,10 @@
+error:
+       … while calling the 'getAttr' builtin
+         at /pwd/lang/eval-fail-getAttr-3.nix:1:1:
+            1| builtins.getAttr "foo" { }
+             | ^
+            2|
+
+       … in the attribute set under consideration
+
+       error: attribute 'foo' missing

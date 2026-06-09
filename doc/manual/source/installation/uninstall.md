@@ -16,30 +16,29 @@ If you are on Linux with systemd:
    sudo systemctl daemon-reload
    ```
 
-Remove files created by Nix:
+2. Remove files created by Nix:
 
-```console
-sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
-```
+   ```console
+   sudo rm -rf /etc/nix /etc/profile.d/nix.sh /etc/tmpfiles.d/nix-daemon.conf /nix ~/.local/share/nix ~/.local/state/nix ~/.cache/nix ~/.nix-defexpr ~/.nix-profile ~/.nix-channels ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
+   ```
 
-Remove build users and their group:
+3. Remove build users and their group:
 
-```console
-for i in $(seq 1 32); do
-  sudo userdel nixbld$i
-done
-sudo groupdel nixbld
-```
+   ```console
+   for i in $(seq 1 32); do
+     sudo userdel nixbld$i
+   done
+   sudo groupdel nixbld
+   ```
 
-There may also be references to Nix in
+4. There may also be references to Nix in
+   - `/etc/bash.bashrc`
+   - `/etc/bashrc`
+   - `/etc/profile`
+   - `/etc/zsh/zshrc`
+   - `/etc/zshrc`
 
-- `/etc/bash.bashrc`
-- `/etc/bashrc`
-- `/etc/profile`
-- `/etc/zsh/zshrc`
-- `/etc/zshrc`
-
-which you may remove.
+   which you may remove.
 
 ### FreeBSD
 
@@ -54,7 +53,7 @@ which you may remove.
 2. Remove files created by Nix:
 
    ```console
-   sudo rm -rf /etc/nix /usr/local/etc/profile.d/nix.sh /nix ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
+   sudo rm -rf /etc/nix /usr/local/etc/profile.d/nix.sh /nix ~/.local/share/nix ~/.local/state/nix ~/.cache/nix ~/.nix-defexpr ~/.nix-profile ~/.nix-channels ~root/.nix-channels ~root/.nix-defexpr ~root/.nix-profile ~root/.cache/nix
    ```
 
 3. Remove build users and their group:
@@ -154,7 +153,7 @@ which you may remove.
 6. Remove the files Nix added to your system, except for the store:
 
    ```console
-   sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels
+   sudo rm -rf /etc/nix /var/root/.nix-profile /var/root/.nix-defexpr /var/root/.nix-channels ~/.nix-profile ~/.nix-defexpr ~/.nix-channels ~/.local/share/nix ~/.local/state/nix ~/.cache/nix
    ```
 
 
@@ -192,6 +191,6 @@ which you may remove.
 To remove a [single-user installation](./installing-binary.md#single-user-installation) of Nix, run:
 
 ```console
-rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile
+rm -rf /nix ~/.nix-channels ~/.nix-defexpr ~/.nix-profile ~/.local/share/nix ~/.local/state/nix ~/.cache/nix
 ```
 You might also want to manually remove references to Nix from your `~/.profile`.

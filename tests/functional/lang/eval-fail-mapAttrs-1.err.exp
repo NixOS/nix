@@ -1,0 +1,10 @@
+error:
+       … while calling the 'mapAttrs' builtin
+         at /pwd/lang/eval-fail-mapAttrs-1.nix:1:1:
+            1| builtins.mapAttrs [ ] [ ]
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.mapAttrs
+
+       error: expected a set but found a list: [ ]

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'toString' builtin
+         at /pwd/lang/eval-fail-toString-1.nix:1:1:
+            1| builtins.toString { a = 1; }
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.toString
+
+       error: cannot coerce a set to a string: { a = 1; }

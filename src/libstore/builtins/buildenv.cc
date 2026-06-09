@@ -10,6 +10,8 @@
 
 namespace nix {
 
+void BuildEnvFileConflictError::anchor() {}
+
 RegisterBuiltinBuilder::BuiltinBuilders & RegisterBuiltinBuilder::builtinBuilders()
 {
     static RegisterBuiltinBuilder::BuiltinBuilders builders;
@@ -20,22 +22,23 @@ namespace {
 
 struct State
 {
-    std::map<Path, int> priorities;
+    std::map<std::filesystem::path, int> priorities;
     unsigned long symlinks = 0;
 };
 
 } // namespace
 
 /* For each activated package, create symlinks */
-static void createLinks(State & state, const Path & srcDir, const Path & dstDir, int priority)
+static void
+createLinks(State & state, const std::filesystem::path & srcDir, const std::filesystem::path & dstDir, int priority)
 {
     DirectoryIterator srcFiles;
 
     try {
         srcFiles = DirectoryIterator{srcDir};
-    } catch (SysError & e) {
-        if (e.errNo == ENOTDIR) {
-            warn("not including '%s' in the user environment because it's not a directory", srcDir);
+    } catch (SystemError & e) {
+        if (e.is(std::errc::not_a_directory)) {
+            warn("not including %s in the user environment because it's not a directory", PathFmt(srcDir));
             return;
         }
         throw;
@@ -50,17 +53,12 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
         auto srcFile = (std::filesystem::path{srcDir} / name).string();
         auto dstFile = (std::filesystem::path{dstDir} / name).string();
 
-        struct stat srcSt;
-        try {
-            if (stat(srcFile.c_str(), &srcSt) == -1)
-                throw SysError("getting status of '%1%'", srcFile);
-        } catch (SysError & e) {
-            if (e.errNo == ENOENT || e.errNo == ENOTDIR) {
-                warn("skipping dangling symlink '%s'", dstFile);
-                continue;
-            }
-            throw;
+        auto srcStOpt = maybeStat(srcFile.c_str());
+        if (!srcStOpt) {
+            warn("skipping dangling symlink '%s'", dstFile);
+            continue;
         }
+        auto & srcSt = *srcStOpt;
 
         /* The files below are special-cased to that they don't show
          * up in user profiles, either because they are useless, or
@@ -83,9 +81,8 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                 } else if (S_ISLNK(dstSt.st_mode)) {
                     auto target = canonPath(dstFile, true);
                     if (!S_ISDIR(lstat(target).st_mode))
-                        throw Error("collision between '%1%' and non-directory '%2%'", srcFile, target);
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking '%1%'", dstFile);
+                        throw Error("collision between %1% and non-directory %2%", PathFmt(srcFile), PathFmt(target));
+                    unlink(dstFile);
                     if (mkdir(
                             dstFile.c_str()
 #ifndef _WIN32 // TODO abstract mkdir perms for Windows
@@ -112,8 +109,7 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
                         throw BuildEnvFileConflictError(readLink(dstFile), srcFile, priority);
                     if (prevPriority < priority)
                         continue;
-                    if (unlink(dstFile.c_str()) == -1)
-                        throw SysError("unlinking '%1%'", dstFile);
+                    unlink(dstFile);
                 } else if (S_ISDIR(dstSt.st_mode))
                     throw Error("collision between non-directory '%1%' and directory '%2%'", srcFile, dstFile);
             }
@@ -125,24 +121,24 @@ static void createLinks(State & state, const Path & srcDir, const Path & dstDir,
     }
 }
 
-void buildProfile(const Path & out, Packages && pkgs)
+void buildProfile(const std::filesystem::path & out, Packages && pkgs)
 {
     State state;
 
-    PathSet done, postponed;
+    std::set<std::filesystem::path> done, postponed;
 
-    auto addPkg = [&](const Path & pkgDir, int priority) {
+    auto addPkg = [&](const std::filesystem::path & pkgDir, int priority) {
         if (!done.insert(pkgDir).second)
             return;
         createLinks(state, pkgDir, out, priority);
 
         try {
             for (const auto & p : tokenizeString<std::vector<std::string>>(
-                     readFile(pkgDir + "/nix-support/propagated-user-env-packages"), " \n"))
+                     readFile(pkgDir / "nix-support" / "propagated-user-env-packages"), " \n"))
                 if (!done.count(p))
                     postponed.insert(p);
-        } catch (SysError & e) {
-            if (e.errNo != ENOENT && e.errNo != ENOTDIR)
+        } catch (SystemError & e) {
+            if (!e.is(std::errc::no_such_file_or_directory) && !e.is(std::errc::not_a_directory))
                 throw;
         }
     };
@@ -165,7 +161,7 @@ void buildProfile(const Path & out, Packages && pkgs)
      */
     auto priorityCounter = 1000;
     while (!postponed.empty()) {
-        PathSet pkgDirs;
+        std::set<std::filesystem::path> pkgDirs;
         postponed.swap(pkgDirs);
         for (const auto & pkgDir : pkgDirs)
             addPkg(pkgDir, priorityCounter++);

@@ -7,7 +7,6 @@ project(
     # TODO(Qyriad): increase the warning level
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
-    'localstatedir=/nix/var',
   ],
   meson_version : '>= 1.4',
   license : 'LGPL-2.1-or-later',
@@ -30,6 +29,23 @@ deps_private_maybe_subproject = [
 ]
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
+
+deps_plugin_c_apis = []
+if get_option('plugin-c-api')
+  deps_plugin_c_apis = [
+    dependency('nix-util-c-whole-archive'),
+    dependency('nix-store-c-whole-archive'),
+    dependency('nix-fetchers-c-whole-archive'),
+    dependency('nix-expr-c-whole-archive'),
+    dependency('nix-flake-c-whole-archive'),
+    dependency('nix-main-c-whole-archive'),
+  ]
+endif
+
+mimalloc = dependency('mimalloc', required : get_option('mimalloc'))
+if mimalloc.found()
+  deps_private += mimalloc
+endif
 
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
@@ -61,6 +77,7 @@ subdir('nix-meson-build-support/generate-header')
 nix_sources = [ config_priv_h ] + files(
   'add-to-store.cc',
   'app.cc',
+  'build-trace.cc',
   'build.cc',
   'bundle.cc',
   'cat.cc',
@@ -92,7 +109,6 @@ nix_sources = [ config_priv_h ] + files(
   'path-info.cc',
   'prefetch.cc',
   'profile.cc',
-  'realisation.cc',
   'registry.cc',
   'repl.cc',
   'run.cc',
@@ -113,6 +129,7 @@ nix_sources = [ config_priv_h ] + files(
 if host_machine.system() != 'windows'
   nix_sources += files(
     'unix/daemon.cc',
+    'unix/store-roots-daemon.cc',
   )
 endif
 
@@ -184,9 +201,10 @@ include_dirs = [ include_directories('.') ]
 this_exe = executable(
   meson.project_name(),
   sources,
-  dependencies : deps_private_subproject + deps_private + deps_other,
+  dependencies : deps_private_subproject + deps_private + deps_other + deps_plugin_c_apis,
   include_directories : include_dirs,
   link_args : linker_export_flags,
+  export_dynamic : get_option('plugin-c-api'),
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
@@ -256,11 +274,7 @@ custom_target(
 # TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 
-localstatedir = nix_store.get_variable(
-  'localstatedir',
-  default_value : get_option('localstatedir'),
-)
-assert(localstatedir == get_option('localstatedir'))
+localstatedir = nix_store.get_variable('localstatedir')
 store_dir = nix_store.get_variable('storedir')
 subdir('scripts')
 subdir('misc')

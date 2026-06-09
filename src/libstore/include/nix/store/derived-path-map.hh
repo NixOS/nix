@@ -93,6 +93,19 @@ struct DerivedPathMap
      * `ChildNode::value`.
      */
     ChildNode * findSlot(const SingleDerivedPath & k);
+
+    /**
+     * Find the node for `k` and invoke @ref callback on it, pruning empty
+     * ancestors afterwards.
+     *
+     * @param callback Invoked on the found node. Should return true if
+     * the node's value is still non-empty (i.e. the node should be kept).
+     * If it returns false and the node has no children, the node is erased
+     * and empty ancestors are pruned recursively.
+     *
+     * No-op if the node does not exist.
+     */
+    void removeSlot(const SingleDerivedPath & k, fun<bool(ChildNode &)> callback);
 };
 
 template<>

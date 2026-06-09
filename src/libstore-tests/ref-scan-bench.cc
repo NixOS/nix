@@ -6,7 +6,7 @@
 
 #include <random>
 
-using namespace nix;
+namespace nix {
 
 template<typename OIt>
 static void randomReference(std::mt19937 & urng, OIt outIter)
@@ -91,3 +91,5 @@ static void BM_RefScanSinkRandom(benchmark::State & state)
 }
 
 BENCHMARK(BM_RefScanSinkRandom)->Arg(10'000)->Arg(100'000)->Arg(1'000'000)->Arg(5'000'000)->Arg(10'000'000);
+
+} // namespace nix

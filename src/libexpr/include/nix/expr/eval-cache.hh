@@ -14,8 +14,11 @@ namespace nix::eval_cache {
 struct AttrDb;
 class AttrCursor;
 
-struct CachedEvalError : EvalError
+struct CachedEvalError : CloneableError<CachedEvalError, EvalError>
 {
+private:
+    void anchor() override;
+public:
     const ref<AttrCursor> cursor;
     const Symbol attr;
 
@@ -36,7 +39,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
 
     std::shared_ptr<AttrDb> db;
     EvalState & state;
-    typedef std::function<Value *()> RootLoader;
+    typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
     RootValue value;
 

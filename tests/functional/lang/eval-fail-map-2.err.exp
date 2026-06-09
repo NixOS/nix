@@ -1,0 +1,10 @@
+error:
+       … while calling the 'map' builtin
+         at /pwd/lang/eval-fail-map-2.nix:1:1:
+            1| builtins.map 1 [ 1 ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.map
+
+       error: expected a function but found an integer: 1

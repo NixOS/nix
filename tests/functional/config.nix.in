@@ -25,6 +25,7 @@ rec {
         eval "$buildCommand"
       '')];
       PATH = path;
+      outputs = args.outputs or [ "out" ];
     } // caArgs // removeAttrs args ["builder" "meta"])
     // { meta = args.meta or {}; };
 }

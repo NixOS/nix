@@ -1,0 +1,18 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-14.nix:1:1:
+            1| builtins.derivationStrict {
+             | ^
+            2|   name = "foo";
+
+       … while evaluating derivation 'foo'
+         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-14.nix:2:3
+
+       … while evaluating attribute 'outputs' of derivation 'foo'
+         at /pwd/lang/eval-fail-derivationStrict-14.nix:5:3:
+            4|   system = 1;
+            5|   outputs = [ "drvPath" ];
+             |   ^
+            6| }
+
+       error: invalid derivation output name 'drvPath'

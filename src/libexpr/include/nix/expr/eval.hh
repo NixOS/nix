@@ -27,6 +27,7 @@
 #include <map>
 #include <optional>
 #include <functional>
+#include <span>
 
 namespace nix {
 
@@ -120,7 +121,7 @@ struct PrimOp
     /**
      * Implementation of the primop.
      */
-    std::function<PrimOpFun> fun;
+    fun<PrimOpFun> impl;
 
     /**
      * Optional experimental for this to be gated on.
@@ -305,18 +306,6 @@ struct StaticEvalSymbols
 
 class EvalMemory
 {
-#if NIX_USE_BOEHMGC
-    /**
-     * Allocation cache for GC'd Value objects.
-     */
-    std::shared_ptr<void *> valueAllocCache;
-
-    /**
-     * Allocation cache for size-1 Env objects.
-     */
-    std::shared_ptr<void *> env1AllocCache;
-#endif
-
 public:
     struct Statistics
     {
@@ -407,6 +396,7 @@ public:
     const ref<MemorySourceAccessor> internalFS;
 
     const SourcePath derivationInternal;
+    const SourcePath importedDrvToDerivation;
 
     /**
      * Store used to materialise .drv files.
@@ -417,8 +407,6 @@ public:
      * Store used to build stuff.
      */
     const ref<Store> buildStore;
-
-    RootValue vImportedDrvToDerivation = nullptr;
 
     const ref<fetchers::InputCache> inputCache;
 
@@ -496,11 +484,19 @@ private:
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
      * Grouped by file.
      */
-    boost::unordered_flat_map<SourcePath, DocCommentMap> positionToDocComment;
+    const ref<boost::concurrent_flat_map<SourcePath, ref<DocCommentMap>>> positionToDocComment;
 
     LookupPath lookupPath;
 
-    boost::unordered_flat_map<std::string, std::optional<SourcePath>, StringViewHash, std::equal_to<>>
+    struct LookupPathResolvedState
+    {
+        SourcePath path;
+        const ref<boost::concurrent_flat_map<CanonPath, std::optional<SourcePath>>> resolvedPaths;
+    };
+
+    const ref<
+        boost::
+            concurrent_flat_map<std::string, std::shared_ptr<LookupPathResolvedState>, StringViewHash, std::equal_to<>>>
         lookupPathResolved;
 
     /**
@@ -548,7 +544,7 @@ public:
     /**
      * Variant which accepts relative paths too.
      */
-    SourcePath rootPath(PathView path);
+    SourcePath rootPath(std::string_view path);
 
     /**
      * Return a `SourcePath` that refers to `path` in the store.
@@ -565,7 +561,7 @@ public:
      * Only for restrict eval: pure eval just whitelist store paths,
      * never arbitrary paths.
      */
-    void allowPathLegacy(const Path & path);
+    void allowPathLegacy(const std::string & path);
 
     /**
      * Allow access to a store path. Note that this gets remapped to
@@ -603,6 +599,18 @@ public:
     parseExprFromString(std::string s, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv);
     Expr * parseExprFromString(std::string s, const SourcePath & basePath);
 
+    /**
+     * Parse REPL bindings from the specified string.
+     * Returns ExprAttrs with bindings to add to scope.
+     */
+    ExprAttrs *
+    parseReplBindings(std::string s, const SourcePath & basePath, const std::shared_ptr<StaticEnv> & staticEnv);
+    ExprAttrs * parseReplBindings(
+        std::string s,
+        std::string errorSource,
+        const SourcePath & basePath,
+        const std::shared_ptr<StaticEnv> & staticEnv);
+
     Expr * parseStdin();
 
     /**
@@ -625,9 +633,10 @@ public:
      *
      * If the specified search path element is a URI, download it.
      *
-     * If it is not found, return `std::nullopt`.
+     * If it is not found, return `nullptr`.
      */
-    std::optional<SourcePath> resolveLookupPathPath(const LookupPath::Path & elem, bool initAccessControl = false);
+    std::shared_ptr<LookupPathResolvedState>
+    resolveLookupPathPath(const LookupPath::Path & elem, bool initAccessControl = false);
 
     /**
      * Evaluate an expression to normal form
@@ -652,7 +661,27 @@ public:
      */
     inline void forceValue(Value & v, const PosIdx pos);
 
+private:
+
+    /**
+     * Internal support function for forceValue
+     *
+     * This code is factored out so that it's not in the heavily inlined hot path.
+     */
+    void handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, const PosIdx pos);
+
+    /**
+     * Internal support function for forceValue
+     *
+     * This code is factored out so that it's not in the heavily inlined hot path.
+     */
+    void handleEvalExceptionForApp(Value & v, const Value & savedApp);
+
+    void handleEvalFailed(Value & v, PosIdx pos);
+
     void tryFixupBlackHolePos(Value & v, PosIdx pos);
+
+public:
 
     /**
      * Force a value, then recursively force list elements and
@@ -707,6 +736,26 @@ public:
 
     std::optional<std::string> tryAttrsToString(
         const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
+
+    enum class CopyLazyPaths : bool {
+        PreserveLazy = false,
+        Copy = true,
+    };
+
+    /**
+     * For efficiency reasons, some store paths (as seen by the evaluator) in
+     * the storeFS at their content-addressed locations don't get copied to the
+     * store eagerly. This saves on needless I/O and possibly IPC if all the
+     * evaluator does is just evaluate nix expressions from those locations.
+     * This function copies such store objects to the store if they aren't already valid.
+     */
+    void ensureLazyPathCopied(const StorePath & path);
+
+    /**
+     * Ensure that all NixStringContextElem::Opaque context elements get fetched
+     * to the store.
+     */
+    void ensureLazyPathsCopied(const NixStringContext & context);
 
     /**
      * String coercion.
@@ -867,6 +916,13 @@ private:
         const SourcePath & basePath,
         const std::shared_ptr<StaticEnv> & staticEnv);
 
+    ExprAttrs * parseReplBindings(
+        char * text,
+        size_t length,
+        Pos::Origin origin,
+        const SourcePath & basePath,
+        const std::shared_ptr<StaticEnv> & staticEnv);
+
     /**
      * Current Nix call stack depth, used with `max-call-depth` setting to throw stack overflow hopefully before we run
      * out of system stack.
@@ -970,7 +1026,10 @@ public:
      */
     void mkSingleDerivedPathString(const SingleDerivedPath & p, Value & v);
 
-    void concatLists(Value & v, size_t nrLists, Value * const * lists, const PosIdx pos, std::string_view errorCtx);
+    /**
+     * @brief Concatenate values with an n-ary version of the `++` operator.
+     */
+    void concatLists(Value & v, std::span<Value * const> lists, const PosIdx pos, std::string_view errorCtx);
 
     /**
      * Print statistics, if enabled.
@@ -1001,6 +1060,17 @@ public:
      */
     [[nodiscard]] StringMap
     realiseContext(const NixStringContext & context, StorePathSet * maybePaths = nullptr, bool isIFD = true);
+
+    /**
+     * Coerce `v` to a path and realise it, i.e. build anything in the value's string context using `realiseContext()`.
+     * @param copyLazyPaths When encountering a lazy path (i.e. a string with Opaque context that's also "mounted" on
+     * the storeFS), fetch the store path to the store.
+     */
+    SourcePath realisePath(
+        const PosIdx pos,
+        Value & v,
+        std::optional<SymlinkResolution> resolveSymlinks = SymlinkResolution::Full,
+        CopyLazyPaths copyLazyPaths = CopyLazyPaths::PreserveLazy);
 
     /**
      * Realise the given string with context, and return the string with outputs instead of downstream output

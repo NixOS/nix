@@ -1,0 +1,10 @@
+error:
+       … while calling the 'substring' builtin
+         at /pwd/lang/eval-fail-substring-1.nix:1:1:
+            1| builtins.substring { } "foo" true
+             | ^
+            2|
+
+       … while evaluating the first argument (the start offset) passed to builtins.substring
+
+       error: expected an integer but found a set: { }

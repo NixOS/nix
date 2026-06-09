@@ -1,0 +1,24 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l file-a.nix
+Added 1 variables.
+fromA
+
+nix-repl> :l ./does-not-exist.nix
+error: path '/path/to/tests/functional/repl/does-not-exist.nix' does not exist
+
+nix-repl> :l file-b.nix
+Added 1 variables.
+fromB
+
+nix-repl> :r
+Loading "file-a.nix"...
+Added 1 variables.
+fromA
+Loading "file-b.nix"...
+Added 1 variables.
+fromB
+
+nix-repl> fromA + fromB
+3

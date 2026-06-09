@@ -50,8 +50,10 @@ struct FlakeRef
 
     /**
      * sub-path within the fetched input that represents this input
+     *
+     * @todo Should probably use `CanonPath` instead of `std::string`?
      */
-    Path subdir;
+    std::string subdir;
 
     bool operator==(const FlakeRef & other) const = default;
 
@@ -60,7 +62,7 @@ struct FlakeRef
         return std::tie(input, subdir) < std::tie(other.input, other.subdir);
     }
 
-    FlakeRef(fetchers::Input && input, const Path & subdir)
+    FlakeRef(fetchers::Input && input, const std::string & subdir)
         : input(std::move(input))
         , subdir(subdir)
     {

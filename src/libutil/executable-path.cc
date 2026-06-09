@@ -1,10 +1,11 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/executable-path.hh"
 #include "nix/util/strings-inline.hh"
-#include "nix/util/util.hh"
 #include "nix/util/file-path-impl.hh"
 
 namespace nix {
+
+void ExecutableLookupError::anchor() {}
 
 constexpr static const OsStringView path_var_separator{
     &ExecutablePath::separator,
@@ -21,16 +22,22 @@ ExecutablePath ExecutablePath::load()
 
 ExecutablePath ExecutablePath::parse(const OsString & path)
 {
+    ExecutablePath ret;
+    ret.parseAppend(path);
+    return ret;
+}
+
+void ExecutablePath::parseAppend(const OsString & path)
+{
     auto strings = path.empty() ? (std::list<OsString>{})
                                 : basicSplitString<std::list<OsString>, OsChar>(path, path_var_separator);
 
-    std::vector<std::filesystem::path> ret;
-    ret.reserve(strings.size());
+    directories.reserve(directories.size() + strings.size());
 
     std::transform(
         std::make_move_iterator(strings.begin()),
         std::make_move_iterator(strings.end()),
-        std::back_inserter(ret),
+        std::back_inserter(directories),
         [](OsString && str) {
             return std::filesystem::path{
                 str.empty()
@@ -45,13 +52,11 @@ ExecutablePath ExecutablePath::parse(const OsString & path)
                     : std::move(str),
             };
         });
-
-    return {ret};
 }
 
 OsString ExecutablePath::render() const
 {
-    std::vector<PathViewNG> path2;
+    std::vector<OsStringView> path2;
     path2.reserve(directories.size());
     for (auto & p : directories)
         path2.push_back(p.native());

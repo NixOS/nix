@@ -1,15 +1,12 @@
 #include "nix/store/profiles.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
-#include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/users.hh"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <errno.h>
-#include <stdio.h>
 
 namespace nix {
 
@@ -25,7 +22,7 @@ static std::optional<GenerationNumber> parseName(const std::string & profileName
     auto p = s.find("-link");
     if (p == std::string::npos)
         return {};
-    if (auto n = string2Int<unsigned int>(s.substr(0, p)))
+    if (auto n = string2Int<GenerationNumber>(s.substr(0, p)))
         return *n;
     else
         return {};
@@ -98,19 +95,10 @@ std::filesystem::path createGeneration(LocalFSStore & store, std::filesystem::pa
     return generation;
 }
 
-static void removeFile(const std::filesystem::path & path)
-{
-    try {
-        std::filesystem::remove(path);
-    } catch (std::filesystem::filesystem_error & e) {
-        throw SysError("removing file '%1%'", path);
-    }
-}
-
 void deleteGeneration(const std::filesystem::path & profile, GenerationNumber gen)
 {
     std::filesystem::path generation = makeName(profile, gen);
-    removeFile(generation);
+    unlinkIfExists(generation);
 }
 
 /**
@@ -141,7 +129,7 @@ void deleteGenerations(
     auto [gens, curGen] = findGenerations(profile);
 
     if (gensToDelete.count(*curGen))
-        throw Error("cannot delete current version of profile %1%'", profile);
+        throw Error("cannot delete current version of profile %1%", PathFmt(profile));
 
     for (auto & i : gens) {
         if (!gensToDelete.count(i.number))
@@ -234,7 +222,7 @@ time_t parseOlderThanTimeSpec(std::string_view timeSpec)
     if (timeSpec.empty() || timeSpec[timeSpec.size() - 1] != 'd')
         throw UsageError("invalid number of days specifier '%1%', expected something like '14d'", timeSpec);
 
-    time_t curTime = time(0);
+    time_t curTime = time(nullptr);
     auto strDays = timeSpec.substr(0, timeSpec.size() - 1);
     auto days = string2Int<int>(strDays);
 
@@ -282,7 +270,7 @@ void switchGeneration(const std::filesystem::path & profile, std::optional<Gener
 
 void lockProfile(PathLocks & lock, const std::filesystem::path & profile)
 {
-    lock.lockPaths({profile}, fmt("waiting for lock on profile '%1%'", profile));
+    lock.lockPaths({profile}, fmt("waiting for lock on profile %1%", PathFmt(profile)));
     lock.setDeletion(true);
 }
 
@@ -291,31 +279,30 @@ std::string optimisticLockProfile(const std::filesystem::path & profile)
     return pathExists(profile) ? readLink(profile).string() : "";
 }
 
-std::filesystem::path profilesDir()
+std::filesystem::path profilesDir(ProfileDirsOptions settings)
 {
-    auto profileRoot = isRootUser() ? rootProfilesDir() : std::filesystem::path{createNixStateDir()} / "profiles";
+    auto profileRoot = isRootUser() ? rootProfilesDir(settings) : createNixStateDir() / "profiles";
     createDirs(profileRoot);
     return profileRoot;
 }
 
-std::filesystem::path rootProfilesDir()
+std::filesystem::path rootProfilesDir(ProfileDirsOptions settings)
 {
-    return std::filesystem::path{settings.nixStateDir} / "profiles/per-user/root";
+    return settings.nixStateDir / "profiles/per-user/root";
 }
 
-std::filesystem::path getDefaultProfile()
+std::filesystem::path getDefaultProfile(ProfileDirsOptions settings)
 {
-    std::filesystem::path profileLink = settings.useXDGBaseDirectories
-                                            ? std::filesystem::path{createNixStateDir()} / "profile"
-                                            : std::filesystem::path{getHome()} / ".nix-profile";
+    std::filesystem::path profileLink =
+        settings.useXDGBaseDirectories ? createNixStateDir() / "profile" : getHome() / ".nix-profile";
     try {
-        auto profile = profilesDir() / "profile";
+        auto profile = profilesDir(settings) / "profile";
         if (!pathExists(profileLink)) {
             replaceSymlink(profile, profileLink);
         }
         // Backwards compatibility measure: Make root's profile available as
         // `.../default` as it's what NixOS and most of the init scripts expect
-        auto globalProfileLink = std::filesystem::path{settings.nixStateDir} / "profiles" / "default";
+        auto globalProfileLink = settings.nixStateDir / "profiles" / "default";
         if (isRootUser() && !pathExists(globalProfileLink)) {
             replaceSymlink(profile, globalProfileLink);
         }
@@ -323,19 +310,17 @@ std::filesystem::path getDefaultProfile()
         return absPath(readLink(profileLink), &linkDir);
     } catch (Error &) {
         return profileLink;
-    } catch (std::filesystem::filesystem_error &) {
-        return profileLink;
     }
 }
 
-std::filesystem::path defaultChannelsDir()
+std::filesystem::path defaultChannelsDir(ProfileDirsOptions settings)
 {
-    return profilesDir() / "channels";
+    return profilesDir(settings) / "channels";
 }
 
-std::filesystem::path rootChannelsDir()
+std::filesystem::path rootChannelsDir(ProfileDirsOptions settings)
 {
-    return rootProfilesDir() / "channels";
+    return rootProfilesDir(settings) / "channels";
 }
 
 } // namespace nix

@@ -1,0 +1,9 @@
+error:
+       … while calling the 'hashString' builtin
+         at /pwd/lang/eval-fail-hashString-2.nix:1:1:
+            1| builtins.hashString "foo" "content"
+             | ^
+            2|
+
+       error: unknown hash algorithm 'foo', expect 'blake3', 'md5', 'sha1', 'sha256', or 'sha512'
+Try 'nix-instantiate --help' for more information.

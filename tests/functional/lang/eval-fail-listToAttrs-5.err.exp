@@ -1,0 +1,10 @@
+error:
+       … while calling the 'listToAttrs' builtin
+         at /pwd/lang/eval-fail-listToAttrs-5.nix:1:1:
+            1| builtins.listToAttrs [ { name = "foo"; } ]
+             | ^
+            2|
+
+       … in a {name=...; value=...;} pair
+
+       error: attribute 'value' missing

@@ -7,63 +7,150 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
+#include "nix/store/outputs-query.hh"
 #include "nix/util/util.hh"
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/git.hh"
-#include "nix/util/posix-source-accessor.hh"
-// FIXME this should not be here, see TODO below on
-// `addMultipleToStore`.
-#include "nix/store/worker-protocol.hh"
+#include "nix/util/source-accessor.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
+
+#include "store-config-private.hh"
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
 
-#include "nix/util/strings.hh"
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
 
 using json = nlohmann::json;
 
 namespace nix {
 
-Path StoreConfigBase::getDefaultNixStoreDir()
+void StoreConfig::anchor() {}
+
+void InvalidPath::anchor() {}
+
+void Unsupported::anchor() {}
+
+void SubstituteGone::anchor() {}
+
+void SubstituterDisabled::anchor() {}
+
+void InvalidStoreReference::anchor() {}
+
+void StoreConfigBase::anchor() {}
+
+static std::string canonStoreDir(std::string path)
 {
-    return settings.nixStore;
+    if (path.empty() || path[0] != '/')
+        throw UsageError("store directory path \"%s\" is not an absolute path", path);
+    return CanonPath(std::move(path)).abs();
 }
 
-StoreConfig::StoreConfig(const Params & params)
-    : StoreConfigBase(params)
+static std::string canonStoreDir(std::filesystem::path path)
+{
+    if (!path.is_absolute())
+        throw UsageError("store directory path %s is not an absolute path", PathFmt(path));
+    return canonPath(std::move(path)).string();
+}
+
+StoreConfigBase::StoreDirSetting::StoreDirSetting(Config * options, FilePathType pathType)
+    : BaseSetting<std::string>(
+          [pathType]() -> std::string {
+              auto envOverrides = getEnvOsNonEmpty(OS_STR("NIX_STORE_DIR")).or_else([] {
+                  return getEnvOsNonEmpty(OS_STR("NIX_STORE"));
+              });
+
+              switch (pathType) {
+              case FilePathType::Unix:
+                  return canonStoreDir(envOverrides.transform([](const auto & s) { return os_string_to_string(s); })
+                                           .value_or(NIX_STORE_DIR));
+
+              case FilePathType::Native:
+                  return canonStoreDir(envOverrides.transform([](const auto & s) { return std::filesystem::path(s); })
+                                           .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+                                               return windows::known_folders::getProgramData() / "nix" / "store";
+#else
+                                               return std::filesystem::path{NIX_STORE_DIR};
+#endif
+                                           })
+                                           .value());
+              }
+              assert(false);
+          }(),
+          true,
+          "store",
+          R"(
+            Logical location of the Nix store, usually `/nix/store`.
+
+            Defaults to [`NIX_STORE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STORE_DIR) if unset.
+
+            Note that you can only copy store paths between stores if they have the same `store` setting.
+          )",
+          {})
+    , pathType(pathType)
+{
+    options->addSetting(this);
+}
+
+std::string StoreConfigBase::StoreDirSetting::parse(const std::string & str) const
+{
+    if (str.empty())
+        throw UsageError("setting '%s' is a path and paths cannot be empty", name);
+
+    switch (pathType) {
+    case FilePathType::Unix:
+        return canonStoreDir(str);
+    case FilePathType::Native:
+        return canonStoreDir(std::filesystem::path(str));
+    }
+    assert(false);
+}
+
+StoreConfigBase::StoreConfigBase(const StoreReference::Params & params, FilePathType pathType)
+    : Config(params)
+    , storeDir_{this, pathType}
+{
+}
+
+StoreConfig::StoreConfig(const Params & params, FilePathType pathType)
+    : StoreConfigBase(params, pathType)
     , StoreDirConfig{storeDir_}
 {
 }
 
-bool StoreDirConfig::isInStore(PathView path) const
+bool StoreDirConfig::isInStore(std::string_view path) const
 {
     return isInDir(path, storeDir);
 }
 
-std::pair<StorePath, Path> StoreDirConfig::toStorePath(PathView path) const
+std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view path) const
 {
     if (!isInStore(path))
         throw Error("path '%1%' is not in the Nix store", path);
     auto slash = path.find('/', storeDir.size() + 1);
-    if (slash == Path::npos)
-        return {parseStorePath(path), ""};
+    if (slash == std::string::npos)
+        return {parseStorePath(path), CanonPath::root};
     else
-        return {parseStorePath(path.substr(0, slash)), (Path) path.substr(slash)};
+        return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
 }
 
-Path Store::followLinksToStore(std::string_view _path) const
+std::filesystem::path Store::followLinksToStore(std::string_view _path) const
 {
-    Path path = absPath(std::string(_path));
+    auto path = absPath(std::string(_path));
 
     // Limit symlink follows to prevent infinite loops
     unsigned int followCount = 0;
     const unsigned int maxFollow = 1024;
 
-    while (!isInStore(path)) {
+    while (!isInStore(path.string())) {
         if (!std::filesystem::is_symlink(path))
             break;
 
@@ -71,17 +158,18 @@ Path Store::followLinksToStore(std::string_view _path) const
             throw Error("too many symbolic links encountered while resolving '%s'", _path);
 
         auto target = readLink(path);
-        path = absPath(target, dirOf(path));
+        auto parentPath = path.parent_path();
+        path = absPath(target, &parentPath);
     }
 
-    if (!isInStore(path))
-        throw BadStorePath("path '%1%' is not in the Nix store", path);
+    if (!isInStore(path.string()))
+        throw BadStorePath("path %1% is not in the Nix store", PathFmt(path));
     return path;
 }
 
 StorePath Store::followLinksToStorePath(std::string_view path) const
 {
-    return toStorePath(followLinksToStore(path)).first;
+    return toStorePath(followLinksToStore(path).string()).first;
 }
 
 StorePath Store::addToStore(
@@ -176,7 +264,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                     addToStore(info, *source, repair, checkSigs);
                 } catch (Error & e) {
                     nrFailed++;
-                    if (!settings.keepGoing)
+                    if (!settings.getWorkerSettings().keepGoing)
                         throw e;
                     printMsg(lvlError, "could not copy %s: %s", printStorePath(path), e.what());
                     showProgress();
@@ -187,23 +275,6 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
             nrDone++;
             showProgress();
         });
-}
-
-void Store::addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
-{
-    auto expected = readNum<uint64_t>(source);
-    for (uint64_t i = 0; i < expected; ++i) {
-        // FIXME we should not be using the worker protocol here, let
-        // alone the worker protocol with a hard-coded version!
-        auto info = WorkerProto::Serialise<ValidPathInfo>::read(
-            *this,
-            WorkerProto::ReadConn{
-                .from = source,
-                .version = 16,
-            });
-        info.ultimate = false;
-        addToStore(info, source, repair, checkSigs);
-    }
 }
 
 /*
@@ -333,10 +404,15 @@ StoreReference StoreConfig::getReference() const
     return {.variant = StoreReference::Auto{}};
 }
 
-bool Store::PathInfoCacheValue::isKnownNow()
+bool StoreConfig::getReadOnly() const
 {
-    std::chrono::duration ttl = didExist() ? std::chrono::seconds(settings.ttlPositiveNarInfoCache)
-                                           : std::chrono::seconds(settings.ttlNegativeNarInfoCache);
+    return settings.readOnlyMode;
+}
+
+bool Store::PathInfoCacheValue::isKnownNow(const NarInfoDiskCacheSettings & settings)
+{
+    std::chrono::duration ttl =
+        didExist() ? std::chrono::seconds(settings.ttlPositive) : std::chrono::seconds(settings.ttlNegative);
 
     return std::chrono::steady_clock::now() < time_point + ttl;
 }
@@ -356,6 +432,17 @@ std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivat
     return outputs;
 }
 
+std::optional<StorePath>
+Store::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
+{
+    auto drv = readInvalidDerivation(path);
+    auto outputs = drv.outputsAndOptPaths(*this);
+    auto it = outputs.find(outputName);
+    if (it == outputs.end())
+        throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
+    return it->second.second;
+}
+
 std::map<std::string, std::optional<StorePath>>
 Store::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore_)
 {
@@ -367,18 +454,7 @@ Store::queryPartialDerivationOutputMap(const StorePath & path, Store * evalStore
         return outputs;
 
     auto drv = evalStore.readInvalidDerivation(path);
-    auto drvHashes = staticOutputHashes(*this, drv);
-    for (auto & [outputName, hash] : drvHashes) {
-        auto realisation = queryRealisation(DrvOutput{hash, outputName});
-        if (realisation) {
-            outputs.insert_or_assign(outputName, realisation->outPath);
-        } else {
-            // queryStaticPartialDerivationOutputMap is not guaranteed
-            // to return std::nullopt for outputs which are not
-            // statically known.
-            outputs.insert({outputName, std::nullopt});
-        }
-    }
+    queryPartialDerivationOutputMapCA(*this, path, drv, outputs);
 
     return outputs;
 }
@@ -389,7 +465,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * ev
     OutputPathMap result;
     for (auto & [outName, optOutPath] : resp) {
         if (!optOutPath)
-            throw MissingRealisation(printStorePath(path), outName);
+            throw MissingRealisation(*this, path, outName);
         result.insert_or_assign(outName, *optOutPath);
     }
     return result;
@@ -397,7 +473,7 @@ OutputPathMap Store::queryDerivationOutputMap(const StorePath & path, Store * ev
 
 StorePathSet Store::queryDerivationOutputs(const StorePath & path)
 {
-    auto outputMap = this->queryDerivationOutputMap(path);
+    auto outputMap = nix::deepQueryDerivationOutputMap(*this, path);
     StorePathSet outputPaths;
     for (auto & i : outputMap) {
         outputPaths.emplace(std::move(i.second));
@@ -405,76 +481,44 @@ StorePathSet Store::queryDerivationOutputs(const StorePath & path)
     return outputPaths;
 }
 
-void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, SubstitutablePathInfos & infos)
+StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
 {
-    if (!settings.useSubstitutes)
-        return;
+    if (!settings.getWorkerSettings().useSubstitutes)
+        return StorePathSet();
 
-    for (auto & path : paths) {
-        std::optional<Error> lastStoresException = std::nullopt;
-        for (auto & sub : getDefaultSubstituters()) {
-            if (lastStoresException.has_value()) {
-                logError(lastStoresException->info());
-                lastStoresException.reset();
-            }
+    StorePathSet remaining;
+    for (auto & i : paths)
+        remaining.insert(i);
 
-            auto subPath(path.first);
+    StorePathSet res;
 
-            // Recompute store path so that we can use a different store root.
-            if (path.second) {
-                subPath = makeFixedOutputPathFromCA(
-                    path.first.name(), ContentAddressWithReferences::withoutRefs(*path.second));
-                if (sub->storeDir == storeDir)
-                    assert(subPath == path.first);
-                if (subPath != path.first)
-                    debug(
-                        "replaced path '%s' with '%s' for substituter '%s'",
-                        printStorePath(path.first),
-                        sub->printStorePath(subPath),
-                        sub->config.getHumanReadableURI());
-            } else if (sub->storeDir != storeDir)
-                continue;
+    for (auto & sub : getDefaultSubstituters()) {
+        if (remaining.empty())
+            break;
+        if (sub->storeDir != storeDir)
+            continue;
+        if (!sub->config.wantMassQuery)
+            continue;
 
-            debug(
-                "checking substituter '%s' for path '%s'",
-                sub->config.getHumanReadableURI(),
-                sub->printStorePath(subPath));
-            try {
-                auto info = sub->queryPathInfo(subPath);
+        auto valid = sub->queryValidPaths(remaining);
 
-                if (sub->storeDir != storeDir && !(info->isContentAddressed(*sub) && info->references.empty()))
-                    continue;
+        StorePathSet remaining2;
+        for (auto & path : remaining)
+            if (valid.count(path))
+                res.insert(path);
+            else
+                remaining2.insert(path);
 
-                auto narInfo = std::dynamic_pointer_cast<const NarInfo>(std::shared_ptr<const ValidPathInfo>(info));
-                infos.insert_or_assign(
-                    path.first,
-                    SubstitutablePathInfo{
-                        .deriver = info->deriver,
-                        .references = info->references,
-                        .downloadSize = narInfo ? narInfo->fileSize : 0,
-                        .narSize = info->narSize,
-                    });
-
-                break; /* We are done. */
-            } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
-            } catch (Error & e) {
-                lastStoresException = std::make_optional(std::move(e));
-            }
-        }
-        if (lastStoresException.has_value()) {
-            if (!settings.tryFallback) {
-                throw *lastStoresException;
-            } else
-                logError(lastStoresException->info());
-        }
+        std::swap(remaining, remaining2);
     }
+
+    return res;
 }
 
 bool Store::isValidPath(const StorePath & storePath)
 {
     auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
         stats.narInfoReadAverted++;
         return res->didExist();
     }
@@ -540,7 +584,7 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
     auto hashPart = std::string(storePath.hashPart());
 
     auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow()) {
+    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
         stats.narInfoReadAverted++;
         if (res->didExist())
             return std::make_optional(res->value);
@@ -610,6 +654,12 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
 void Store::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
+    if (!experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
+        /* then we should not be checking any experimental realisations
+           data structures. */
+        callback(nullptr);
+        return;
+    }
 
     try {
         if (diskCache) {
@@ -889,6 +939,9 @@ void copyStorePath(
         info = info2;
     }
 
+    if (getEnv("_NIX_TEST_CONCURRENT_SUBSTITUTION"))
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
     auto source = sinkToSource(
         [&](Sink & sink) {
             LambdaSink progressSink([&](std::string_view data) {
@@ -919,11 +972,16 @@ std::map<StorePath, StorePath> copyPaths(
     StorePathSet storePaths;
     std::vector<const Realisation *> realisations;
     for (auto & path : paths) {
-        storePaths.insert(path.path());
-        if (auto * realisation = std::get_if<Realisation>(&path.raw)) {
-            experimentalFeatureSettings.require(Xp::CaDerivations);
-            realisations.push_back(realisation);
-        }
+        std::visit(
+            overloaded{
+                [&](const Realisation & realisation) {
+                    experimentalFeatureSettings.require(Xp::CaDerivations);
+                    realisations.push_back(&realisation);
+                    storePaths.insert(realisation.outPath);
+                },
+                [&](const OpaquePath & op) { storePaths.insert(op.path); },
+            },
+            path.raw);
     }
 
     auto pathsMap = copyPaths(srcStore, dstStore, storePaths, repair, checkSigs, substitute);
@@ -960,12 +1018,15 @@ std::map<StorePath, StorePath> copyPaths(
         if (!valid.count(path))
             missing.insert(path);
 
+    /* Don't start an activity if there's no work to do. */
+    if (missing.empty())
+        return {};
+
     Activity act(*logger, lvlInfo, actCopyPaths, fmt("copying %d paths", missing.size()));
 
     // In the general case, `addMultipleToStore` requires a sorted list of
     // store paths to add, so sort them right now
     auto sortedMissing = srcStore.topoSortPaths(missing);
-    std::reverse(sortedMissing.begin(), sortedMissing.end());
 
     std::map<StorePath, StorePath> pathsMap;
     for (auto & path : storePaths)
@@ -991,7 +1052,7 @@ std::map<StorePath, StorePath> copyPaths(
         return storePathForDst;
     };
 
-    for (auto & missingPath : sortedMissing) {
+    for (auto & missingPath : sortedMissing | std::views::reverse) {
         auto info = srcStore.queryPathInfo(missingPath);
 
         auto storePathForDst = computeStorePathForDst(*info);
@@ -1037,20 +1098,19 @@ void copyClosure(
     const RealisedPath::Set & paths,
     RepairFlag repair,
     CheckSigsFlag checkSigs,
-    SubstituteFlag substitute)
+    SubstituteFlag substitute,
+    bool includeOutputs)
 {
     if (&srcStore == &dstStore)
         return;
 
     StorePathSet closure0;
     for (auto & path : paths) {
-        if (auto * opaquePath = std::get_if<OpaquePath>(&path.raw)) {
-            closure0.insert(opaquePath->path);
-        }
+        closure0.insert(path.path());
     }
 
     StorePathSet closure1;
-    srcStore.computeFSClosure(closure0, closure1);
+    srcStore.computeFSClosure(closure0, closure1, false, includeOutputs);
 
     RealisedPath::Set closure = paths;
     for (auto && path : closure1)
@@ -1065,13 +1125,14 @@ void copyClosure(
     const StorePathSet & storePaths,
     RepairFlag repair,
     CheckSigsFlag checkSigs,
-    SubstituteFlag substitute)
+    SubstituteFlag substitute,
+    bool includeOutputs)
 {
     if (&srcStore == &dstStore)
         return;
 
     StorePathSet closure;
-    srcStore.computeFSClosure(storePaths, closure);
+    srcStore.computeFSClosure(storePaths, closure, false, includeOutputs);
     copyPaths(srcStore, dstStore, closure, repair, checkSigs, substitute);
 }
 
@@ -1113,27 +1174,6 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
     return std::optional<ValidPathInfo>(std::move(info));
 }
 
-std::string StoreDirConfig::showPaths(const StorePathSet & paths) const
-{
-    std::string s;
-    for (auto & i : paths) {
-        if (s.size() != 0)
-            s += ", ";
-        s += "'" + printStorePath(i) + "'";
-    }
-    return s;
-}
-
-std::string showPaths(const std::set<std::filesystem::path> paths)
-{
-    return concatStringsSep(", ", quoteFSPaths(paths));
-}
-
-std::string showPaths(const PathSet & paths)
-{
-    return concatStringsSep(", ", quoteStrings(paths));
-}
-
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
     ensurePath(drvPath);
@@ -1143,10 +1183,16 @@ Derivation Store::derivationFromPath(const StorePath & drvPath)
 static Derivation readDerivationCommon(Store & store, const StorePath & drvPath, bool requireValidPath)
 {
     auto accessor = store.requireStoreObjectAccessor(drvPath, requireValidPath);
+    auto contents = accessor->readFile(CanonPath::root);
+
     try {
-        return parseDerivation(store, accessor->readFile(CanonPath::root), Derivation::nameFromPath(drvPath));
+        /* Special case for an empty file to show the user a better message */
+        if (contents.empty())
+            throw FormatError("file is empty (possible filesystem corruption)");
+
+        return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
-        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.msg());
+        throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.message());
     }
 }
 
@@ -1173,7 +1219,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
         if (resolvedDrv)
-            return ::nix::writeDerivation(*this, *resolvedDrv, NoRepair, true);
+            return nix::computeStorePath(*this, Derivation{*resolvedDrv});
     }
 
     return path;
@@ -1213,6 +1259,32 @@ void Store::signRealisation(Realisation & realisation)
         LocalSigner signer(std::move(secretKey));
         realisation.sign(realisation.id, signer);
     }
+}
+
+const std::filesystem::path & StoreConfig::getStateDir() const
+{
+    return settings.nixStateDir;
+}
+
+const std::filesystem::path & StoreConfig::getLogDir() const
+{
+    static std::filesystem::path logDir = [] {
+        return getEnvOsNonEmpty(OS_STR("NIX_LOG_DIR"))
+            .transform([](auto && s) { return std::filesystem::path(s); })
+            .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+#  ifdef NIX_LOG_DIR
+#    error "NIX_LOG_DIR should not be defined on Windows"
+#  endif
+                return windows::known_folders::getProgramData() / "nix" / "log";
+#else
+                return NIX_LOG_DIR;
+#endif
+            })
+            .transform([](auto && s) { return canonPath(s); })
+            .value();
+    }();
+    return logDir;
 }
 
 } // namespace nix

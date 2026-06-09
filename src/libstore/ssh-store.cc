@@ -2,7 +2,6 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/remote-store-connection.hh"
 #include "nix/util/source-accessor.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
@@ -11,12 +10,16 @@
 
 namespace nix {
 
-SSHStoreConfig::SSHStoreConfig(std::string_view scheme, std::string_view authority, const Params & params)
-    : Store::Config{params}
-    , RemoteStore::Config{params}
-    , CommonSSHStoreConfig{scheme, authority, params}
+SSHStoreConfig::SSHStoreConfig(const ParsedURL::Authority & authority, const Params & params)
+    : Store::Config{params, FilePathType::Unix}
+    , RemoteStore::Config{params, FilePathType::Unix}
+    , CommonSSHStoreConfig{authority, params}
 {
 }
+
+void SSHStoreConfig::anchor() {}
+
+void MountedSSHStoreConfig::anchor() {}
 
 std::string SSHStoreConfig::doc()
 {
@@ -40,6 +43,10 @@ StoreReference SSHStoreConfig::getReference() const
 struct alignas(8) /* Work around ASAN failures on i686-linux. */
     SSHStore : virtual RemoteStore
 {
+private:
+    void anchor() override;
+
+public:
     using Config = SSHStoreConfig;
 
     ref<const Config> config;
@@ -64,6 +71,10 @@ protected:
 
     struct Connection : RemoteStore::Connection
     {
+    private:
+        void anchor() override;
+
+    public:
         std::unique_ptr<SSHMaster::Connection> sshConn;
 
         void closeWrite() override
@@ -88,20 +99,26 @@ protected:
     };
 };
 
+void RemoteStore::Connection::anchor() {}
+
+void SSHStore::Connection::anchor() {}
+
+void SSHStore::anchor() {}
+
 MountedSSHStoreConfig::MountedSSHStoreConfig(StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
+    : StoreConfig(params, FilePathType::Native)
+    , RemoteStoreConfig(params, FilePathType::Native)
     , CommonSSHStoreConfig(params)
     , SSHStoreConfig(params)
     , LocalFSStoreConfig(params)
 {
 }
 
-MountedSSHStoreConfig::MountedSSHStoreConfig(std::string_view scheme, std::string_view host, StringMap params)
-    : StoreConfig(params)
-    , RemoteStoreConfig(params)
-    , CommonSSHStoreConfig(scheme, host, params)
-    , SSHStoreConfig(scheme, host, params)
+MountedSSHStoreConfig::MountedSSHStoreConfig(const ParsedURL::Authority & authority, StringMap params)
+    : StoreConfig(params, FilePathType::Native)
+    , RemoteStoreConfig(params, FilePathType::Native)
+    , CommonSSHStoreConfig(authority, params)
+    , SSHStoreConfig(authority, params)
     , LocalFSStoreConfig(params)
 {
 }
@@ -129,6 +146,10 @@ std::string MountedSSHStoreConfig::doc()
  */
 struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
 {
+private:
+    void anchor() override;
+
+public:
     using Config = MountedSSHStoreConfig;
 
     MountedSSHStore(ref<const Config> config)
@@ -177,16 +198,18 @@ struct MountedSSHStore : virtual SSHStore, virtual LocalFSStore
      * privilege escalation / symlinks in directories owned by the
      * originating requester that they cannot delete.
      */
-    Path addPermRoot(const StorePath & path, const Path & gcRoot) override
+    std::filesystem::path addPermRoot(const StorePath & path, const std::filesystem::path & gcRoot) override
     {
         auto conn(getConnection());
         conn->to << WorkerProto::Op::AddPermRoot;
         WorkerProto::write(*this, *conn, path);
-        WorkerProto::write(*this, *conn, gcRoot);
+        WorkerProto::write(*this, *conn, gcRoot.string());
         conn.processStderr();
         return readString(conn->from);
     }
 };
+
+void MountedSSHStore::anchor() {}
 
 ref<Store> SSHStore::Config::openStore() const
 {
@@ -208,7 +231,7 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         command.push_back(config->remoteStore.get());
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
-    conn->sshConn = master.startCommand(std::move(command));
+    conn->sshConn = master.startCommand(toOsStrings(std::move(command)));
     conn->to = FdSink(conn->sshConn->in.get());
     conn->from = FdSource(conn->sshConn->out.get());
     return conn;

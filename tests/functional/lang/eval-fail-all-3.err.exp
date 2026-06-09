@@ -1,0 +1,10 @@
+error:
+       … while calling the 'all' builtin
+         at /pwd/lang/eval-fail-all-3.nix:1:1:
+            1| builtins.all (_: 1) [ "foo" ]
+             | ^
+            2|
+
+       … while evaluating the return value of the function passed to builtins.all
+
+       error: expected a Boolean but found an integer: 1

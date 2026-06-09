@@ -24,7 +24,6 @@ enum struct ExperimentalFeature {
     NixCommand,
     GitHashing,
     RecursiveNix,
-    NoUrlLiterals,
     FetchClosure,
     AutoAllocateUids,
     Cgroups,
@@ -80,8 +79,10 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet &);
  * An experimental feature was required for some (experimental)
  * operation, but was not enabled.
  */
-class MissingExperimentalFeature : public Error
+class MissingExperimentalFeature final : public CloneableError<MissingExperimentalFeature, Error>
 {
+    void anchor() override;
+
 public:
     /**
      * The experimental feature that was required but not enabled.

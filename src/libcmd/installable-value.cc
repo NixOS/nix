@@ -54,8 +54,11 @@ InstallableValue::trySinglePathToDerivedPaths(Value & v, const PosIdx pos, std::
     }
 
     else if (v.type() == nString) {
+        auto path = state->coerceToSingleDerivedPath(pos, v, errorCtx);
+        if (auto o = std::get_if<SingleDerivedPath::Opaque>(&path.raw()))
+            state->ensureLazyPathCopied(o->path);
         return {{
-            .path = DerivedPath::fromSingle(state->coerceToSingleDerivedPath(pos, v, errorCtx)),
+            .path = DerivedPath::fromSingle(path),
             .info = make_ref<ExtraPathInfo>(),
         }};
     }

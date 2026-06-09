@@ -10,7 +10,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/mounted-source-accessor.hh"
 
-using namespace nix;
+namespace nix {
 
 struct CmdEnv : NixMultiCommand
 {
@@ -97,7 +97,7 @@ struct CmdShell : InstallablesCommand, MixEnvironment
             auto propPath = state->storeFS->resolveSymlinks(
                 CanonPath(store->printStorePath(path)) / "nix-support" / "propagated-user-env-packages");
             if (auto st = state->storeFS->maybeLstat(propPath); st && st->type == SourceAccessor::tRegular) {
-                for (auto & p : tokenizeString<Paths>(state->storeFS->readFile(propPath)))
+                for (auto & p : tokenizeString<Strings>(state->storeFS->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
         }
@@ -121,3 +121,5 @@ struct CmdShell : InstallablesCommand, MixEnvironment
 };
 
 static auto rCmdShell = registerCommand2<CmdShell>({"env", "shell"});
+
+} // namespace nix

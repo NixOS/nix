@@ -19,7 +19,7 @@ struct PathInputScheme : InputScheme
 
         Input input{};
         input.attrs.insert_or_assign("type", "path");
-        input.attrs.insert_or_assign("path", renderUrlPathEnsureLegal(url.path));
+        input.attrs.insert_or_assign("path", urlPathToPath(url.path).string());
 
         for (auto & [name, value] : url.query)
             if (name == "rev" || name == "narHash")
@@ -95,7 +95,7 @@ struct PathInputScheme : InputScheme
         query.erase("__final");
         return ParsedURL{
             .scheme = "path",
-            .path = splitString<std::vector<std::string>>(getStrAttr(input.attrs, "path"), "/"),
+            .path = pathToUrlPath(std::filesystem::path{getStrAttr(input.attrs, "path")}),
             .query = query,
         };
     }
@@ -114,10 +114,10 @@ struct PathInputScheme : InputScheme
         writeFile(getAbsPath(input) / path.rel(), contents);
     }
 
-    std::optional<std::string> isRelative(const Input & input) const override
+    std::optional<std::filesystem::path> isRelative(const Input & input) const override
     {
-        auto path = getStrAttr(input.attrs, "path");
-        if (isAbsolute(path))
+        std::filesystem::path path = getStrAttr(input.attrs, "path");
+        if (path.is_absolute())
             return std::nullopt;
         else
             return path;
@@ -130,9 +130,9 @@ struct PathInputScheme : InputScheme
 
     std::filesystem::path getAbsPath(const Input & input) const
     {
-        auto path = getStrAttr(input.attrs, "path");
+        std::filesystem::path path = getStrAttr(input.attrs, "path");
 
-        if (isAbsolute(path))
+        if (path.is_absolute())
             return canonPath(path);
 
         throw Error("cannot fetch input '%s' because it uses a relative path", input.to_string());
@@ -154,7 +154,7 @@ struct PathInputScheme : InputScheme
 
         time_t mtime = 0;
         if (!storePath || storePath->name() != "source" || !store.isValidPath(*storePath)) {
-            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", absPath));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("copying %s to the store", PathFmt(absPath)));
             // FIXME: try to substitute storePath.
             auto src = sinkToSource(
                 [&](Sink & sink) { mtime = dumpPathAndGetMtime(absPath.string(), sink, defaultPathFilter); });
@@ -165,15 +165,12 @@ struct PathInputScheme : InputScheme
 
         // To prevent `fetchToStore()` copying the path again to Nix
         // store, pre-create an entry in the fetcher cache.
-        auto info = store.queryPathInfo(*storePath);
-        accessor->fingerprint =
-            fmt("path:%s", store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
+        auto narHash = store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true);
+        accessor->fingerprint = fmt("path:%s", narHash);
         settings.getCache()->upsert(
-            makeFetchToStoreCacheKey(
-                input.getName(), *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, "/"),
-            store,
-            {},
-            *storePath);
+            makeSourcePathToHashCacheKey(
+                *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
+            {{"hash", narHash}});
 
         /* Trust the lastModified value supplied by the user, if
            any. It's not a "secure" attribute so we don't care. */

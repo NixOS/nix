@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/util/error.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/sync.hh"
 
 #include <queue>
@@ -31,7 +32,7 @@ public:
      *
      * \todo use std::packaged_task?
      */
-    typedef std::function<void()> work_t;
+    typedef fun<void()> work_t;
 
     /**
      * Enqueue a function to be executed by the thread pool.
@@ -86,10 +87,7 @@ private:
  * its dependencies have been processed.
  */
 template<typename T>
-void processGraph(
-    const std::set<T> & nodes,
-    std::function<std::set<T>(const T &)> getEdges,
-    std::function<void(const T &)> processNode)
+void processGraph(const std::set<T> & nodes, fun<std::set<T>(const T &)> getEdges, fun<void(const T &)> processNode)
 {
     struct Graph
     {

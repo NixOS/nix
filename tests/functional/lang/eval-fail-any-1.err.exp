@@ -1,0 +1,10 @@
+error:
+       … while calling the 'any' builtin
+         at /pwd/lang/eval-fail-any-1.nix:1:1:
+            1| builtins.any 1 "foo"
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.any
+
+       error: expected a function but found an integer: 1

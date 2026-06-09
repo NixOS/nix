@@ -7,6 +7,8 @@
 
 namespace nix {
 
+void BadCanonPath::anchor() {}
+
 const CanonPath CanonPath::root = CanonPath("/");
 
 static std::string absPathPure(std::string_view path)
@@ -21,6 +23,16 @@ static void ensureNoNullBytes(std::string_view s)
         auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
         throw BadCanonPath("path segment '%s' must not contain null (\\0) bytes", str);
     }
+}
+
+CanonPath CanonPath::fromFilename(std::string_view segment)
+{
+    auto res = CanonPath(segment);
+    /* Use existing canonicalisation logic for CanonPath to check that the segment
+       is already a valid filename. */
+    if (segment != res.rel() || std::ranges::distance(res) != 1)
+        throw BadCanonPath("invalid filename '%s'", segment);
+    return res;
 }
 
 CanonPath::CanonPath(std::string_view raw)

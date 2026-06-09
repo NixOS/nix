@@ -1,23 +1,20 @@
-#include "nix/util/fs-sink.hh"
-#include "nix/util/util.hh"
-#include "nix/util/types.hh"
+#include "nix/util/serialise.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/processes.hh"
-#include "nix/util/terminal.hh"
-#include "nix/util/strings.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-#include <numeric>
+using namespace std::string_view_literals;
 
 #ifdef _WIN32
 #  define FS_SEP L"\\"
-#  define FS_ROOT L"C:" FS_SEP // Need a mounted one, C drive is likely
+#  define FS_ROOT_NO_TRAILING_SLASH L"C:" // Need a mounted one, C drive is likely
+#  define FS_ROOT FS_ROOT_NO_TRAILING_SLASH FS_SEP
 #else
 #  define FS_SEP "/"
-#  define FS_ROOT FS_SEP
+#  define FS_ROOT_NO_TRAILING_SLASH FS_SEP
+#  define FS_ROOT FS_ROOT_NO_TRAILING_SLASH
 #endif
 
 #ifndef PATH_MAX
@@ -42,7 +39,7 @@ TEST(absPath, doesntChangeRoot)
 {
     auto p = absPath(std::filesystem::path{FS_ROOT});
 
-    ASSERT_EQ(p, FS_ROOT);
+    ASSERT_EQ(p, FS_ROOT_NO_TRAILING_SLASH);
 }
 
 TEST(absPath, turnsEmptyPathIntoCWD)
@@ -58,9 +55,10 @@ TEST(absPath, usesOptionalBasePathWhenGiven)
     OsChar _cwd[PATH_MAX + 1];
     OsChar * cwd = GET_CWD((OsChar *) &_cwd, PATH_MAX);
 
-    auto p = absPath(std::filesystem::path{""}.string(), std::filesystem::path{cwd}.string());
+    auto cwdPath = std::filesystem::path{cwd};
+    auto p = absPath("", &cwdPath);
 
-    ASSERT_EQ(p, std::filesystem::path{cwd}.string());
+    ASSERT_EQ(p, cwdPath);
 }
 
 TEST(absPath, isIdempotent)
@@ -113,33 +111,10 @@ TEST(canonPath, removesDots2)
 
 TEST(canonPath, requiresAbsolutePath)
 {
-    ASSERT_ANY_THROW(canonPath("."));
-    ASSERT_ANY_THROW(canonPath(".."));
-    ASSERT_ANY_THROW(canonPath("../"));
-    ASSERT_DEATH({ canonPath(""); }, "path != \"\"");
-}
-
-/* ----------------------------------------------------------------------------
- * dirOf
- * --------------------------------------------------------------------------*/
-
-TEST(dirOf, returnsEmptyStringForRoot)
-{
-    auto p = dirOf("/");
-
-    ASSERT_EQ(p, "/");
-}
-
-TEST(dirOf, returnsFirstPathComponent)
-{
-    auto p1 = dirOf("/dir/");
-    ASSERT_EQ(p1, "/dir");
-    auto p2 = dirOf("/dir");
-    ASSERT_EQ(p2, "/");
-    auto p3 = dirOf("/dir/..");
-    ASSERT_EQ(p3, "/dir");
-    auto p4 = dirOf("/dir/../");
-    ASSERT_EQ(p4, "/dir/..");
+    ASSERT_ANY_THROW(canonPath("."sv));
+    ASSERT_ANY_THROW(canonPath(".."sv));
+    ASSERT_ANY_THROW(canonPath("../"sv));
+    ASSERT_ANY_THROW(canonPath(""sv));
 }
 
 /* ----------------------------------------------------------------------------
@@ -194,20 +169,42 @@ TEST(baseNameOf, absoluteNothingSlashNothing)
 
 TEST(isInDir, trivialCase)
 {
-    auto p1 = isInDir("/foo/bar", "/foo");
-    ASSERT_EQ(p1, true);
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP "bar", FS_ROOT "foo"));
 }
 
 TEST(isInDir, notInDir)
 {
-    auto p1 = isInDir("/zes/foo/bar", "/foo");
-    ASSERT_EQ(p1, false);
+    EXPECT_FALSE(isInDir(FS_ROOT "zes" FS_SEP "foo" FS_SEP "bar", FS_ROOT "foo"));
 }
 
 TEST(isInDir, emptyDir)
 {
-    auto p1 = isInDir("/zes/foo/bar", "");
-    ASSERT_EQ(p1, false);
+    EXPECT_FALSE(isInDir(FS_ROOT "zes" FS_SEP "foo" FS_SEP "bar", ""));
+}
+
+TEST(isInDir, hiddenSubdirectory)
+{
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP ".ssh", FS_ROOT "foo"));
+}
+
+TEST(isInDir, ellipsisEntry)
+{
+    EXPECT_TRUE(isInDir(FS_ROOT "foo" FS_SEP "...", FS_ROOT "foo"));
+}
+
+TEST(isInDir, sameDir)
+{
+    EXPECT_FALSE(isInDir(FS_ROOT "foo", FS_ROOT "foo"));
+}
+
+TEST(isInDir, sameDirDot)
+{
+    EXPECT_FALSE(isInDir(FS_ROOT "foo" FS_SEP ".", FS_ROOT "foo"));
+}
+
+TEST(isInDir, dotDotPrefix)
+{
+    EXPECT_FALSE(isInDir(FS_ROOT "foo" FS_SEP ".." FS_SEP "bar", FS_ROOT "foo"));
 }
 
 /* ----------------------------------------------------------------------------
@@ -216,8 +213,8 @@ TEST(isInDir, emptyDir)
 
 TEST(isDirOrInDir, trueForSameDirectory)
 {
-    ASSERT_EQ(isDirOrInDir("/nix", "/nix"), true);
-    ASSERT_EQ(isDirOrInDir("/", "/"), true);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "nix", FS_ROOT "nix"), true);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT, FS_ROOT), true);
 }
 
 TEST(isDirOrInDir, trueForEmptyPaths)
@@ -227,17 +224,17 @@ TEST(isDirOrInDir, trueForEmptyPaths)
 
 TEST(isDirOrInDir, falseForDisjunctPaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo", "/bar"), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo", FS_ROOT "bar"), false);
 }
 
 TEST(isDirOrInDir, relativePaths)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo"), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo" FS_SEP "..", FS_ROOT "foo"), false);
 }
 
 TEST(isDirOrInDir, relativePathsTwice)
 {
-    ASSERT_EQ(isDirOrInDir("/foo/..", "/foo/."), false);
+    ASSERT_EQ(isDirOrInDir(FS_ROOT "foo" FS_SEP "..", FS_ROOT "foo" FS_SEP "."), false);
 }
 
 /* ----------------------------------------------------------------------------
@@ -260,25 +257,16 @@ TEST(pathExists, bogusPathDoesNotExist)
 }
 
 /* ----------------------------------------------------------------------------
- * makeParentCanonical
- * --------------------------------------------------------------------------*/
-
-TEST(makeParentCanonical, noParent)
-{
-    ASSERT_EQ(makeParentCanonical("file"), absPath(std::filesystem::path("file")));
-}
-
-TEST(makeParentCanonical, root)
-{
-    ASSERT_EQ(makeParentCanonical("/"), "/");
-}
-
-/* ----------------------------------------------------------------------------
  * chmodIfNeeded
  * --------------------------------------------------------------------------*/
 
 TEST(chmodIfNeeded, works)
 {
+#ifdef _WIN32
+    // Windows doesn't support Unix-style permission bits - lstat always
+    // returns the same mode regardless of what chmod sets.
+    GTEST_SKIP() << "Broken on Windows";
+#endif
     auto [autoClose_, tmpFile] = nix::createTempFile();
     auto deleteTmpFile = AutoDelete(tmpFile);
 
@@ -295,7 +283,7 @@ TEST(chmodIfNeeded, works)
 
 TEST(chmodIfNeeded, nonexistent)
 {
-    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SysError);
+    ASSERT_THROW(chmodIfNeeded("/schnitzel/darmstadt/pommes", 0755), SystemError);
 }
 
 /* ----------------------------------------------------------------------------
@@ -316,70 +304,8 @@ TEST(DirectoryIterator, works)
 
 TEST(DirectoryIterator, nonexistent)
 {
-    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SysError);
+    ASSERT_THROW(DirectoryIterator("/schnitzel/darmstadt/pommes"), SystemError);
 }
-
-/* ----------------------------------------------------------------------------
- * openFileEnsureBeneathNoSymlinks
- * --------------------------------------------------------------------------*/
-
-#ifndef _WIN32
-
-TEST(openFileEnsureBeneathNoSymlinks, works)
-{
-    std::filesystem::path tmpDir = nix::createTempDir();
-    nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
-    using namespace nix::unix;
-
-    {
-        RestoreSink sink(/*startFsync=*/false);
-        sink.dstPath = tmpDir;
-        sink.dirFd = openDirectory(tmpDir);
-        sink.createDirectory(CanonPath("a"));
-        sink.createDirectory(CanonPath("c"));
-        sink.createDirectory(CanonPath("c/d"));
-        sink.createRegularFile(CanonPath("c/d/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); });
-        sink.createSymlink(CanonPath("a/absolute_symlink"), tmpDir.string());
-        sink.createSymlink(CanonPath("a/relative_symlink"), "../.");
-        sink.createSymlink(CanonPath("a/broken_symlink"), "./nonexistent");
-        sink.createDirectory(CanonPath("a/b"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {
-            dirSink.createDirectory(CanonPath("d"));
-            dirSink.createSymlink(CanonPath("c"), "./d");
-        });
-        sink.createDirectory(CanonPath("a/b/c/e")); // FIXME: This still follows symlinks
-        ASSERT_THROW(
-            sink.createDirectory(
-                CanonPath("a/b/c/f"), [](FileSystemObjectSink & dirSink, const CanonPath & relPath) {}),
-            SymlinkNotAllowed);
-        ASSERT_THROW(
-            sink.createRegularFile(
-                CanonPath("a/b/c/regular"), [](CreateRegularFileSink & crf) { crf("some contents"); }),
-            SymlinkNotAllowed);
-    }
-
-    AutoCloseFD dirFd = openDirectory(tmpDir);
-
-    auto open = [&](std::string_view path, int flags, mode_t mode = 0) {
-        return openFileEnsureBeneathNoSymlinks(dirFd.get(), CanonPath(path), flags, mode);
-    };
-
-    EXPECT_THROW(open("a/absolute_symlink", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_THROW(open("a/relative_symlink", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_THROW(open("a/absolute_symlink/a", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_THROW(open("a/absolute_symlink/c/d", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_THROW(open("a/relative_symlink/c", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_THROW(open("a/b/c/d", O_RDONLY), SymlinkNotAllowed);
-    EXPECT_EQ(open("a/broken_symlink", O_CREAT | O_WRONLY | O_EXCL, 0666), INVALID_DESCRIPTOR);
-    /* Sanity check, no symlink shenanigans and behaves the same as regular openat with O_EXCL | O_CREAT. */
-    EXPECT_EQ(errno, EEXIST);
-    EXPECT_THROW(open("a/absolute_symlink/broken_symlink", O_CREAT | O_WRONLY | O_EXCL, 0666), SymlinkNotAllowed);
-    EXPECT_EQ(open("c/d/regular/a", O_RDONLY), INVALID_DESCRIPTOR);
-    EXPECT_EQ(open("c/d/regular", O_RDONLY | O_DIRECTORY), INVALID_DESCRIPTOR);
-    EXPECT_TRUE(AutoCloseFD{open("c/d/regular", O_RDONLY)});
-    EXPECT_TRUE(AutoCloseFD{open("a/regular", O_CREAT | O_WRONLY | O_EXCL, 0666)});
-}
-
-#endif
 
 /* ----------------------------------------------------------------------------
  * createAnonymousTempFile

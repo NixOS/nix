@@ -1,0 +1,33 @@
+"$schema": "http://json-schema.org/draft-07/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/signature-v2.json"
+title: Signature
+description: |
+  A cryptographic signature along with the name of the key that produced it.
+
+  This schema describes the JSON representation of signatures as used in various Nix JSON APIs.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+  ## Version History
+
+  - Version 1: Colon-separated string in the format `<key-name>:<signature-in-Base64>`
+
+  - Version 2: Structured object with `keyName` and `sig` fields
+
+type: object
+required:
+  - keyName
+  - sig
+properties:
+  keyName:
+    type: string
+    title: Key Name
+    description: The name of the key used to produce this signature
+  sig:
+    type: string
+    title: Signature Data
+    description: The raw signature bytes, Base64-encoded

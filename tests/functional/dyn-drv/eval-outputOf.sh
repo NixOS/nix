@@ -34,7 +34,7 @@ testStaticHello () {
              (assert a == b; null))'
 }
 
-# Test with a regular old input-addresed derivation
+# Test with a regular old input-addressed derivation
 #
 # `builtins.outputOf` works without ca-derivations and doesn't create a
 # placeholder but just returns the output path.

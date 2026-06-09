@@ -1,0 +1,1 @@
+1 nix-env -f ./cli-characterisation/not-a-drv.nix -qa --json

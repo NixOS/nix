@@ -15,6 +15,8 @@ struct ExperimentalFeatureDetails
     std::string_view trackingUrl;
 };
 
+void MissingExperimentalFeature::anchor() {}
+
 /**
  * If two different PRs both add an experimental feature, and we just
  * used a number for this, we *woudln't* get merge conflict and the
@@ -143,60 +145,18 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
             arbitrary substitutions. For example, running
 
             ```
-            nix-store -r /nix/store/kmwd1hq55akdb9sc7l3finr175dajlby-hello-2.10
+            nix-store -r /nix/store/lrs9qfm60jcgsk83qhyypj3m4jqsgdid-hello-2.10
             ```
 
             in the above `runCommand` script would be disallowed, as this could
             lead to derivations with hidden dependencies or breaking
             reproducibility by relying on the current state of the Nix store. An
             exception would be if
-            `/nix/store/kmwd1hq55akdb9sc7l3finr175dajlby-hello-2.10` were
+            `/nix/store/lrs9qfm60jcgsk83qhyypj3m4jqsgdid-hello-2.10` were
             already in the build inputs or built by a previous recursive Nix
             call.
         )",
         .trackingUrl = "https://github.com/NixOS/nix/milestone/47",
-    },
-    {
-        .tag = Xp::NoUrlLiterals,
-        .name = "no-url-literals",
-        .description = R"(
-            Disallow unquoted URLs as part of the Nix language syntax. The Nix
-            language allows for URL literals, like so:
-
-            ```
-            $ nix repl
-            Welcome to Nix 2.15.0. Type :? for help.
-
-            nix-repl> http://foo
-            "http://foo"
-            ```
-
-            But enabling this experimental feature will cause the Nix parser to
-            throw an error when encountering a URL literal:
-
-            ```
-            $ nix repl --extra-experimental-features 'no-url-literals'
-            Welcome to Nix 2.15.0. Type :? for help.
-
-            nix-repl> http://foo
-            error: URL literals are disabled
-
-            at «string»:1:1:
-
-            1| http://foo
-             | ^
-
-            ```
-
-            While this is currently an experimental feature, unquoted URLs are
-            being deprecated and their usage is discouraged.
-
-            The reason is that, as opposed to path literals, URLs have no
-            special properties that distinguish them from regular strings, URLs
-            containing parameters have to be quoted anyway, and unquoted URLs
-            may confuse external tooling.
-        )",
-        .trackingUrl = "https://github.com/NixOS/nix/milestone/44",
     },
     {
         .tag = Xp::FetchClosure,
@@ -311,7 +271,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enables support for external builders / sandbox providers.
         )",
-        .trackingUrl = "",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/62",
     },
     {
         .tag = Xp::BLAKE3Hashes,
@@ -319,7 +279,7 @@ constexpr std::array<ExperimentalFeatureDetails, numXpFeatures> xpFeatureDetails
         .description = R"(
             Enables support for BLAKE3 hashes.
         )",
-        .trackingUrl = "",
+        .trackingUrl = "https://github.com/NixOS/nix/milestone/60",
     },
 }};
 
@@ -378,7 +338,7 @@ std::set<ExperimentalFeature> parseFeatures(const StringSet & rawFeatures)
 }
 
 MissingExperimentalFeature::MissingExperimentalFeature(ExperimentalFeature feature, std::string reason)
-    : Error(
+    : CloneableError(
           "experimental Nix feature '%1%' is disabled%2%; add '--extra-experimental-features %1%' to enable it",
           showExperimentalFeature(feature),
           Uncolored(optionalBracket(" (", reason, ")")))

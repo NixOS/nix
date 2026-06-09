@@ -11,6 +11,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/ref.hh"
 
 namespace nix {
@@ -61,6 +62,8 @@ public:
      */
     virtual std::filesystem::path getCommandBaseDir() const;
 
+    virtual ~Args() = default;
+
 protected:
 
     /**
@@ -81,7 +84,7 @@ protected:
     struct Handler
     {
         std::function<void(std::vector<std::string>)> fun;
-        size_t arity;
+        size_t arity = 0;
 
         Handler() = default;
 
@@ -383,7 +386,7 @@ struct Command : virtual public Args
     }
 };
 
-using Commands = std::map<std::string, std::function<ref<Command>()>>;
+using Commands = std::map<std::string, fun<ref<Command>()>>;
 
 /**
  * An argument parser that supports multiple subcommands,
@@ -459,6 +462,9 @@ struct Completion
  */
 class AddCompletions
 {
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
 public:
 
     /**
@@ -481,6 +487,8 @@ public:
      * Add a single completion to the collection
      */
     virtual void add(std::string completion, std::string description = "") = 0;
+
+    virtual ~AddCompletions() = default;
 };
 
 Strings parseShebangContent(std::string_view s);

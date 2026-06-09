@@ -6,6 +6,7 @@
 #include "nix/store/path.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/types.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 class Store;
@@ -27,7 +28,7 @@ struct DownloadFileResult
 DownloadFileResult downloadFile(
     Store & store,
     const Settings & settings,
-    const std::string & url,
+    const VerbatimURL & url,
     const std::string & name,
     const Headers & headers = {});
 

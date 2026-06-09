@@ -2,15 +2,11 @@
 #include "nix/util/users.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/windows-error.hh"
 
-#ifdef _WIN32
-#  define WIN32_LEAN_AND_MEAN
-#  include <windows.h>
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 
 namespace nix {
-
-using namespace nix::windows;
 
 std::string getUserName()
 {
@@ -19,7 +15,7 @@ std::string getUserName()
     if (!GetUserNameA(nullptr, &size)) {
         auto lastError = GetLastError();
         if (lastError != ERROR_INSUFFICIENT_BUFFER)
-            throw WinError(lastError, "cannot figure out size of user name");
+            throw windows::WinError(lastError, "cannot figure out size of user name");
     }
 
     std::string name;
@@ -30,7 +26,7 @@ std::string getUserName()
 
     // Retrieve the username
     if (!GetUserNameA(&name[0], &size))
-        throw WinError("cannot figure out user name");
+        throw windows::WinError("cannot figure out user name");
 
     return name;
 }
@@ -38,9 +34,9 @@ std::string getUserName()
 std::filesystem::path getHome()
 {
     static std::filesystem::path homeDir = []() {
-        std::filesystem::path homeDir = getEnv("USERPROFILE").value_or("C:\\Users\\Default");
+        std::filesystem::path homeDir = getEnvOs(L"USERPROFILE").value_or(L"C:\\Users\\Default");
         assert(!homeDir.empty());
-        return canonPath(homeDir.string());
+        return std::filesystem::path{canonPath(homeDir.string())};
     }();
     return homeDir;
 }
@@ -51,4 +47,3 @@ bool isRootUser()
 }
 
 } // namespace nix
-#endif

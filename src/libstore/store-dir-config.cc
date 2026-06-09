@@ -8,6 +8,8 @@ namespace nix {
 
 StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
+    if (path.empty())
+        throw BadStorePath("empty path is not a valid store path");
     // On Windows, `/nix/store` is not a canonical path. More broadly it
     // is unclear whether this function should be using the native
     // notion of a canonical path at all. For example, it makes to
@@ -15,14 +17,14 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
     // Windows <-> Unix ssh-ing).
     auto p =
 #ifdef _WIN32
-        path
+        std::filesystem::path(path)
 #else
         canonPath(std::string(path))
 #endif
         ;
-    if (dirOf(p) != storeDir)
-        throw BadStorePath("path '%s' is not in the Nix store", p);
-    return StorePath(baseNameOf(p));
+    if (p.parent_path() != storeDir)
+        throw BadStorePath("path %s is not in the Nix store", PathFmt(p));
+    return StorePath(p.filename().string());
 }
 
 std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
@@ -39,7 +41,7 @@ bool StoreDirConfig::isStorePath(std::string_view path) const
     return (bool) maybeParseStorePath(path);
 }
 
-StorePathSet StoreDirConfig::parseStorePathSet(const PathSet & paths) const
+StorePathSet StoreDirConfig::parseStorePathSet(const StringSet & paths) const
 {
     StorePathSet res;
     for (auto & i : paths)
@@ -52,9 +54,9 @@ std::string StoreDirConfig::printStorePath(const StorePath & path) const
     return (storeDir + "/").append(path.to_string());
 }
 
-PathSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
+StringSet StoreDirConfig::printStorePathSet(const StorePathSet & paths) const
 {
-    PathSet res;
+    StringSet res;
     for (auto & i : paths)
         res.insert(printStorePath(i));
     return res;

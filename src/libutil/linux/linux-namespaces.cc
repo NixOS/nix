@@ -1,14 +1,10 @@
 #include "nix/util/linux-namespaces.hh"
-#include "nix/util/current-process.hh"
 #include "nix/util/util.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
-#include "nix/util/signals.hh"
 
 #include <mutex>
 #include <sys/resource.h>
-#include "nix/util/cgroup.hh"
 
 #include <sys/mount.h>
 
@@ -22,13 +18,13 @@ bool userNamespacesSupported()
             return false;
         }
 
-        Path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
+        std::filesystem::path maxUserNamespaces = "/proc/sys/user/max_user_namespaces";
         if (!pathExists(maxUserNamespaces) || trim(readFile(maxUserNamespaces)) == "0") {
             debug("user namespaces appear to be disabled; check '/proc/sys/user/max_user_namespaces'");
             return false;
         }
 
-        Path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
+        std::filesystem::path procSysKernelUnprivilegedUsernsClone = "/proc/sys/kernel/unprivileged_userns_clone";
         if (pathExists(procSysKernelUnprivilegedUsernsClone)
             && trim(readFile(procSysKernelUnprivilegedUsernsClone)) == "0") {
             debug("user namespaces appear to be disabled; check '/proc/sys/kernel/unprivileged_userns_clone'");
@@ -39,7 +35,10 @@ bool userNamespacesSupported()
             Pid pid = startProcess([&]() { _exit(0); }, {.cloneFlags = CLONE_NEWUSER});
 
             auto r = pid.wait();
-            assert(!r);
+            /* The assert is OK because if we cannot do CLONE_NEWUSER we will
+               throw above, and if the process does run, it must exit this way
+               (or something else is really wrong). */
+            assert(statusOk(r));
         } catch (SysError & e) {
             debug("user namespaces do not work on this system: %s", e.msg());
             return false;
@@ -72,8 +71,8 @@ bool mountAndPidNamespacesSupported()
                 },
                 {.cloneFlags = CLONE_NEWNS | CLONE_NEWPID | (userNamespacesSupported() ? CLONE_NEWUSER : 0)});
 
-            if (pid.wait()) {
-                debug("PID namespaces do not work on this system: cannot remount /proc");
+            if (auto status = pid.wait(); !statusOk(status)) {
+                debug("PID namespaces do not work on this system: cannot remount /proc: %s", statusToString(status));
                 return false;
             }
 
@@ -96,11 +95,11 @@ void saveMountNamespace()
 {
     static std::once_flag done;
     std::call_once(done, []() {
-        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY);
+        fdSavedMountNamespace = open("/proc/self/ns/mnt", O_RDONLY | O_CLOEXEC);
         if (!fdSavedMountNamespace)
             throw SysError("saving parent mount namespace");
 
-        fdSavedRoot = open("/proc/self/root", O_RDONLY);
+        fdSavedRoot = open("/proc/self/root", O_RDONLY | O_CLOEXEC);
     });
 }
 

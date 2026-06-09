@@ -19,27 +19,6 @@
 #  include <boost/unordered/concurrent_flat_map.hpp>
 #endif
 
-/**
- * @brief Allocate and initialize using self-reference
- *
- * This allows a brace initializer to reference the object being constructed.
- *
- * @warning Use with care, as the pointer points to an object that is not fully constructed yet.
- *
- * @tparam T Type to allocate
- * @tparam F A function type for `init`, taking a T* and returning the initializer for T
- * @param init Function that takes a T* and returns the initializer for T
- * @return Pointer to allocated and initialized object
- */
-template<typename T, typename F>
-static T * unsafe_new_with_self(F && init)
-{
-    // Allocate
-    void * p = ::operator new(sizeof(T), static_cast<std::align_val_t>(alignof(T)));
-    // Initialize with placement new
-    return new (p) T(init(static_cast<T *>(p)));
-}
-
 extern "C" {
 
 nix_err nix_libexpr_init(nix_c_context * context)
@@ -129,23 +108,20 @@ nix_eval_state_builder * nix_eval_state_builder_new(nix_c_context * context, Sto
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        return unsafe_new_with_self<nix_eval_state_builder>([&](auto * self) {
-            return nix_eval_state_builder{
-                .store = nix::ref<nix::Store>(store->ptr),
-                .settings = nix::EvalSettings{/* &bool */ self->readOnlyMode},
-                .fetchSettings = nix::fetchers::Settings{},
-                .readOnlyMode = true,
-            };
-        });
+        auto readOnly = nix::make_ref<bool>(true);
+        return new nix_eval_state_builder{
+            .store = nix::ref<nix::Store>(store->ptr),
+            .settings = nix::EvalSettings{/* &bool */ *readOnly},
+            .fetchSettings = nix::fetchers::Settings{},
+            .readOnlyMode = readOnly,
+        };
     }
     NIXC_CATCH_ERRS_NULL
 }
 
 void nix_eval_state_builder_free(nix_eval_state_builder * builder)
 {
-    if (builder)
-        builder->~nix_eval_state_builder();
-    operator delete(builder, static_cast<std::align_val_t>(alignof(nix_eval_state_builder)));
+    delete builder;
 }
 
 nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_builder * builder)
@@ -154,7 +130,7 @@ nix_err nix_eval_state_builder_load(nix_c_context * context, nix_eval_state_buil
         context->last_err_code = NIX_OK;
     try {
         // TODO: load in one go?
-        builder->settings.readOnlyMode = nix::settings.readOnlyMode;
+        builder->settings.readOnlyMode = &nix::settings.readOnlyMode;
         loadConfFile(builder->settings);
         loadConfFile(builder->fetchSettings);
     }
@@ -181,13 +157,13 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        return unsafe_new_with_self<EvalState>([&](auto * self) {
-            return EvalState{
-                .fetchSettings = std::move(builder->fetchSettings),
-                .settings = std::move(builder->settings),
-                .state = nix::EvalState(builder->lookupPath, builder->store, self->fetchSettings, self->settings),
-            };
-        });
+        auto fetchSettings = std::make_unique<nix::fetchers::Settings>(std::move(builder->fetchSettings));
+        auto settings = std::make_unique<nix::EvalSettings>(std::move(builder->settings));
+        auto ownedState =
+            std::make_shared<nix::EvalState>(builder->lookupPath, builder->store, *fetchSettings, *settings);
+        auto & stateRef = *ownedState;
+        void * p = ::operator new(sizeof(EvalState), static_cast<std::align_val_t>(alignof(EvalState)));
+        return new (p) EvalState{stateRef, std::move(fetchSettings), std::move(settings), std::move(ownedState)};
     }
     NIXC_CATCH_ERRS_NULL
 }

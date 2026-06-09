@@ -4,7 +4,6 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build/goal.hh"
-#include "nix/util/muxable-pipe.hh"
 #include <coroutine>
 #include <future>
 #include <source_location>
@@ -24,11 +23,6 @@ struct PathSubstitutionGoal : public Goal
     RepairFlag repair;
 
     /**
-     * Pipe for the substituter's standard output.
-     */
-    MuxablePipe outPipe;
-
-    /**
      * The substituter thread.
      */
     std::thread thr;
@@ -40,10 +34,6 @@ struct PathSubstitutionGoal : public Goal
      * Content address for recomputing store path
      */
     std::optional<ContentAddress> ca;
-
-    Done doneSuccess(BuildResult::Success::Status status);
-
-    Done doneFailure(ExitCode result, BuildResult::Failure::Status status, std::string errorMsg);
 
 public:
     PathSubstitutionGoal(

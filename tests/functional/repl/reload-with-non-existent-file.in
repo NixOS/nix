@@ -1,0 +1,5 @@
+:l file-a.nix
+:l ./does-not-exist.nix
+:l file-b.nix
+:r
+fromA + fromB

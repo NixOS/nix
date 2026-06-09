@@ -51,8 +51,7 @@ void adl_serializer<NarListing::Regular>::to_json(json & j, const NarListing::Re
 {
     if (r.contents.fileSize)
         j["size"] = *r.contents.fileSize;
-    if (r.executable)
-        j["executable"] = true;
+    j["executable"] = r.executable;
     if (r.contents.narOffset)
         j["narOffset"] = *r.contents.narOffset;
 }

@@ -3,7 +3,7 @@
 %define api.namespace { ::nix::parser }
 %define api.parser.class { BisonParser }
 %locations
-%define parse.error verbose
+%define parse.error detailed
 %defines
 /* %no-lines */
 %parse-param { void * scanner }
@@ -30,6 +30,7 @@
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
+#include "nix/expr/diagnose.hh"
 #include "nix/expr/parser-state.hh"
 
 #define YY_DECL                                    \
@@ -54,11 +55,38 @@
         }                                                               \
     while (0)
 
+// Forward declaration for flex scanner type.
+// lexer-tab.hh is large; avoid including it just for this type.
+// Asserted with static_assert in lexer.l.
+typedef void * yyscan_t;
+
 namespace nix {
 
 typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
 Expr * parseExprFromBuf(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    Exprs & exprs,
+    SymbolTable & symbols,
+    const EvalSettings & settings,
+    PosTable & positions,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS);
+
+/**
+ * Puts the lexer in REPL bindings mode before the first token. This causes
+ * the parser to accept REPL bindings (attribute definitions).
+ */
+void setReplBindingsMode(yyscan_t scanner);
+
+/**
+ * Parse REPL bindings from a buffer.
+ * Returns ExprAttrs with bindings to add to scope.
+ */
+ExprAttrs * parseReplBindingsFromBuf(
     char * text,
     size_t length,
     Pos::Origin origin,
@@ -140,18 +168,42 @@ static Expr * makeCall(Exprs & exprs, PosIdx pos, Expr * fn, Expr * arg) {
 %type <Expr *> path_start
 %type <ToBeStringyExpr> string_parts string_attr
 %type <StringToken> attr
-%token <StringToken> ID
-%token <StringToken> STR IND_STR
-%token <NixInt> INT_LIT
-%token <NixFloat> FLOAT_LIT
-%token <StringToken> PATH HPATH SPATH PATH_END
-%token <StringToken> URI
-%token IF THEN ELSE ASSERT WITH LET IN_KW REC INHERIT EQ NEQ AND OR IMPL OR_KW
-%token PIPE_FROM PIPE_INTO /* <| and |> */
-%token DOLLAR_CURLY /* == ${ */
-%token IND_STRING_OPEN IND_STRING_CLOSE
-%token ELLIPSIS
-
+%token <StringToken> ID "identifier"
+%token <StringToken> STR "string"
+%token <StringToken> IND_STR "indented string"
+%token <NixInt> INT_LIT "integer"
+%token <NixFloat> FLOAT_LIT "floating-point literal"
+%token <StringToken> PATH "path"
+%token <StringToken> HPATH "'~/…' path"
+%token <StringToken> SPATH "'<…>' path"
+%token <StringToken> PATH_END "end of path"
+%token <StringToken> URI "URI"
+%token IF "'if'"
+%token THEN "'then'"
+%token ELSE "'else'"
+%token ASSERT "'assert'"
+%token WITH "'with'"
+%token LET "'let'"
+%token IN_KW "'in'"
+%token REC "'rec'"
+%token INHERIT "'inherit'"
+%token EQ "'=='"
+%token NEQ "'!='"
+%token LEQ "'<='"
+%token GEQ "'>='"
+%token UPDATE "'//'"
+%token CONCAT "'++'"
+%token AND "'&&'"
+%token OR "'||'"
+%token IMPL "'->'"
+%token OR_KW "'or'"
+%token PIPE_FROM "'<|'"
+%token PIPE_INTO "'|>'"
+%token DOLLAR_CURLY "'${'"
+%token IND_STRING_OPEN "start of an indented string"
+%token IND_STRING_CLOSE "end of an indented string"
+%token ELLIPSIS "'...'"
+%token REPL_BINDINGS "start of REPL bindings"
 
 %right IMPL
 %left OR
@@ -172,6 +224,10 @@ start: expr {
   state->result = $1;
 
   // This parser does not use yynerrs; suppress the warning.
+  (void) yynerrs_;
+}
+| REPL_BINDINGS binds1 {
+  state->result = $2;
   (void) yynerrs_;
 };
 
@@ -314,12 +370,14 @@ expr_simple
            state->exprs.add<ExprString>(state->exprs.alloc, path)});
   }
   | URI {
-      static bool noURLLiterals = experimentalFeatureSettings.isEnabled(Xp::NoUrlLiterals);
-      if (noURLLiterals)
-          throw ParseError({
-              .msg = HintFmt("URL literals are disabled"),
+      diagnose(state->settings.lintUrlLiterals, [&](bool fatal) -> std::optional<ParseError> {
+          return ParseError({
+              .msg = HintFmt("URL literals are %s. Consider using a string literal \"%s\" instead",
+                  fatal ? "disallowed" : "discouraged",
+                  std::string_view($1.p, $1.l)),
               .pos = state->positions[CUR_POS]
           });
+      });
       $$ = state->exprs.add<ExprString>(state->exprs.alloc, $1);
   }
   | '(' expr ')' { $$ = $2; }
@@ -357,35 +415,56 @@ path_start
   : PATH {
     std::string_view literal({$1.p, $1.l});
 
-    /* check for short path literals */
-    if (state->settings.warnShortPathLiterals && literal.front() != '/' && literal.front() != '.') {
-        logWarning({
-            .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'. (" ANSI_BOLD "warn-short-path-literals" ANSI_NORMAL " = true)", literal, literal),
-            .pos = state->positions[CUR_POS]
+    if (literal.front() == '/') {
+        diagnose(state->settings.lintAbsolutePathLiterals, [&](bool) -> std::optional<ParseError> {
+            return ParseError({
+                .msg = HintFmt("absolute path literals are not portable. Consider replacing path literal '%s' by a string, relative path, or parameter", literal),
+                .pos = state->positions[CUR_POS]
+            });
         });
-    }
 
-    Path path(absPath(literal, state->basePath.path.abs()));
-    /* add back in the trailing '/' to the first segment */
-    if (literal.size() > 1 && literal.back() == '/')
-      path += '/';
-    $$ =
         /* Absolute paths are always interpreted relative to the
            root filesystem accessor, rather than the accessor of the
            current Nix expression. */
-        literal.front() == '/'
-        ? state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path)
-        : state->exprs.add<ExprPath>(state->exprs.alloc, state->basePath.accessor, path);
+        auto path = CanonPath(literal).abs();
+        /* add back in the trailing '/' to the first segment */
+        if (literal.size() > 1 && literal.back() == '/')
+          path += '/';
+        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
+    } else {
+        /* check for short path literals */
+        diagnose(state->settings.lintShortPathLiterals, [&](bool) -> std::optional<ParseError> {
+            if (literal.front() != '.')
+                return ParseError({
+                    .msg = HintFmt("relative path literal '%s' should be prefixed with '.' for clarity: './%s'", literal, literal),
+                    .pos = state->positions[CUR_POS]
+                });
+            return std::nullopt;
+        });
+
+        auto path = CanonPath(literal, state->basePath.path).abs();
+        /* add back in the trailing '/' to the first segment */
+        if (literal.size() > 1 && literal.back() == '/')
+          path += '/';
+        $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->basePath.accessor, path);
+    }
   }
   | HPATH {
+    std::string_view literal($1.p, $1.l);
     if (state->settings.pureEval) {
         throw Error(
             "the path '%s' can not be resolved in pure mode",
-            std::string_view($1.p, $1.l)
+            literal
         );
     }
-    Path path(getHome().string() + std::string($1.p + 1, $1.l - 1));
-    $$ = state->exprs.add<ExprPath>(state->exprs.alloc, ref<SourceAccessor>(state->rootFS), path);
+    diagnose(state->settings.lintAbsolutePathLiterals, [&](bool) -> std::optional<ParseError> {
+        return ParseError({
+            .msg = HintFmt("home path literals are not portable. Consider replacing path literal '%s' by a string, relative path, or parameter", literal),
+            .pos = state->positions[CUR_POS]
+        });
+    });
+    auto path(getHome().string() + std::string($1.p + 1, $1.l - 1));
+    $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
   }
   ;
 
@@ -552,6 +631,51 @@ Expr * parseExprFromBuf(
     parser.parse();
 
     return state.result;
+}
+
+ExprAttrs * parseReplBindingsFromBuf(
+    char * text,
+    size_t length,
+    Pos::Origin origin,
+    const SourcePath & basePath,
+    Exprs & exprs,
+    SymbolTable & symbols,
+    const EvalSettings & settings,
+    PosTable & positions,
+    DocCommentMap & docComments,
+    const ref<SourceAccessor> rootFS)
+{
+    yyscan_t scanner;
+    LexerState lexerState {
+        .positionToDocComment = docComments,
+        .positions = positions,
+        .origin = positions.addOrigin(origin, length),
+    };
+    ParserState state {
+        .lexerState = lexerState,
+        .exprs = exprs,
+        .symbols = symbols,
+        .positions = positions,
+        .basePath = basePath,
+        .origin = lexerState.origin,
+        .rootFS = rootFS,
+        .settings = settings,
+    };
+
+    yylex_init_extra(&lexerState, &scanner);
+    Finally _destroy([&] { yylex_destroy(scanner); });
+
+    yy_scan_buffer(text, length, scanner);
+    setReplBindingsMode(scanner);
+    Parser parser(scanner, &state);
+    parser.parse();
+
+    assert(state.result);
+    // state.result is Expr *, but the REPL_BINDINGS grammar rule
+    // always produces an ExprAttrs via the binds1 production.
+    auto bindings = dynamic_cast<ExprAttrs *>(state.result);
+    assert(bindings);
+    return bindings;
 }
 
 

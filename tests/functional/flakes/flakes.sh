@@ -69,7 +69,6 @@ nix flake metadata "$flake1Dir" | grepQuiet 'URL:.*flake1.*'
 # Test 'nix flake metadata --json'.
 json=$(nix flake metadata flake1 --json | jq .)
 [[ $(echo "$json" | jq -r .description) = 'Bla bla' ]]
-[[ -d $(echo "$json" | jq -r .path) ]]
 [[ $(echo "$json" | jq -r .lastModified) = $(git -C "$flake1Dir" log -n1 --format=%ct) ]]
 hash1=$(echo "$json" | jq -r .revision)
 [[ -n $(echo "$json" | jq -r .fingerprint) ]]
@@ -222,6 +221,12 @@ nix store gc
 nix registry list --flake-registry "file://$registry" --refresh | grepQuiet flake3
 mv "$registry.tmp" "$registry"
 
+# A symlinked registry file should work even when the symlink target is
+# an absolute path. The source accessor needs to be rooted at `/` for this.
+ln -sfn "$registry" "$TEST_ROOT/registry-symlink.json"
+nix registry list --flake-registry "$TEST_ROOT/registry-symlink.json" | grepQuiet flake1
+rm "$TEST_ROOT/registry-symlink.json"
+
 # Ensure that locking ignores the user registry.
 mkdir -p "$TEST_HOME/.config/nix"
 ln -sfn "$registry" "$TEST_HOME/.config/nix/registry.json"
@@ -330,7 +335,7 @@ cat > "$flake3Dir/flake.nix" <<EOF
 {
   inputs.flake2.inputs.flake1 = {
     type = "git";
-    url = file://$flake7Dir;
+    url = "file://$flake7Dir";
   };
 
   outputs = { self, flake2 }: {
@@ -344,7 +349,7 @@ nix flake lock "$flake3Dir"
 cat > "$flake3Dir/flake.nix" <<EOF
 {
   inputs.flake2.inputs.flake1.follows = "foo";
-  inputs.foo.url = git+file://$flake7Dir;
+  inputs.foo.url = "git+file://$flake7Dir";
 
   outputs = { self, flake2 }: {
   };

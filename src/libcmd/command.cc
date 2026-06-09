@@ -4,6 +4,7 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/cmd/markdown.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/derivations.hh"
@@ -63,6 +64,25 @@ void NixMultiCommand::run()
     command->second->run();
 }
 
+StoreConfigCommand::StoreConfigCommand() {}
+
+ref<StoreConfig> StoreConfigCommand::getStoreConfig()
+{
+    if (!_storeConfig)
+        _storeConfig = createStoreConfig();
+    return ref<StoreConfig>(_storeConfig);
+}
+
+ref<StoreConfig> StoreConfigCommand::createStoreConfig()
+{
+    return resolveStoreConfig(StoreReference{settings.storeUri.get()});
+}
+
+void StoreConfigCommand::run()
+{
+    run(getStoreConfig());
+}
+
 StoreCommand::StoreCommand() {}
 
 ref<Store> StoreCommand::getStore()
@@ -74,12 +94,20 @@ ref<Store> StoreCommand::getStore()
 
 ref<Store> StoreCommand::createStore()
 {
-    return openStore();
+    auto store = getStoreConfig()->openStore();
+    store->init();
+    return store;
 }
 
-void StoreCommand::run()
+void StoreCommand::run(ref<StoreConfig> storeConfig)
 {
-    run(getStore());
+    // We can either efficiently implement getStore/createStore with memoization,
+    // or use the StoreConfig passed in run.
+    // It's more efficient to memoize, especially since there are some direct users
+    // of getStore. The StoreConfig in both cases should be the same, though.
+    auto store = getStore();
+    assert(&*storeConfig == &store->config);
+    run(std::move(store));
 }
 
 CopyCommand::CopyCommand()
@@ -88,28 +116,28 @@ CopyCommand::CopyCommand()
         .longName = "from",
         .description = "URL of the source Nix store.",
         .labels = {"store-uri"},
-        .handler = {&srcUri},
+        .handler = {[this](std::string s) { srcUri = StoreReference::parse(s); }},
     });
 
     addFlag({
         .longName = "to",
         .description = "URL of the destination Nix store.",
         .labels = {"store-uri"},
-        .handler = {&dstUri},
+        .handler = {[this](std::string s) { dstUri = StoreReference::parse(s); }},
     });
 }
 
-ref<Store> CopyCommand::createStore()
+ref<StoreConfig> CopyCommand::createStoreConfig()
 {
-    return srcUri.empty() ? StoreCommand::createStore() : openStore(srcUri);
+    return !srcUri ? StoreCommand::createStoreConfig() : resolveStoreConfig(StoreReference{*srcUri});
 }
 
 ref<Store> CopyCommand::getDstStore()
 {
-    if (srcUri.empty() && dstUri.empty())
+    if (!srcUri && !dstUri)
         throw UsageError("you must pass '--from' and/or '--to'");
 
-    return dstUri.empty() ? openStore() : openStore(dstUri);
+    return !dstUri ? openStore() : openStore(StoreReference{*dstUri});
 }
 
 EvalCommand::EvalCommand()
@@ -131,7 +159,7 @@ EvalCommand::~EvalCommand()
 ref<Store> EvalCommand::getEvalStore()
 {
     if (!evalStore)
-        evalStore = evalStoreUrl ? openStore(*evalStoreUrl) : getStore();
+        evalStore = evalStoreUrl ? openStore(StoreReference{*evalStoreUrl}) : getStore();
     return ref<Store>(evalStore);
 }
 
@@ -257,18 +285,18 @@ MixProfile::MixProfile()
     });
 }
 
-void MixProfile::updateProfile(const StorePath & storePath)
+void MixProfile::updateProfile(Store & store_, const StorePath & storePath)
 {
     if (!profile)
         return;
-    auto store = getDstStore().dynamic_pointer_cast<LocalFSStore>();
+    auto * store = dynamic_cast<LocalFSStore *>(&store_);
     if (!store)
         throw Error("'--profile' is not supported for this Nix store");
     auto profile2 = absPath(*profile);
     switchLink(profile2, createGeneration(*store, profile2, storePath));
 }
 
-void MixProfile::updateProfile(const BuiltPaths & buildables)
+void MixProfile::updateProfile(Store & store, const BuiltPaths & buildables)
 {
     if (!profile)
         return;
@@ -292,13 +320,15 @@ void MixProfile::updateProfile(const BuiltPaths & buildables)
         throw UsageError(
             "'--profile' requires that the arguments produce a single store path, but there are %d", result.size());
 
-    updateProfile(result[0]);
+    updateProfile(store, result[0]);
 }
 
 MixDefaultProfile::MixDefaultProfile()
 {
-    profile = getDefaultProfile().string();
+    profile = getDefaultProfile(settings.getProfileDirsOptions()).string();
 }
+
+static constexpr auto environmentVariablesCategory = "Options that change environment variables";
 
 MixEnvironment::MixEnvironment()
     : ignoreEnvironment(false)
@@ -410,9 +440,34 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
 
 void MixOutLinkBase::createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store)
 {
-    if (outLink != "")
+    createOutLinksMaybe(toBuiltPaths(buildables), store);
+}
+
+void MixOutLinkBase::createOutLinksMaybe(const BuiltPaths & paths, ref<Store> & store)
+{
+    if (outLink)
         if (auto store2 = store.dynamic_pointer_cast<LocalFSStore>())
-            createOutLinks(outLink, toBuiltPaths(buildables), *store2);
+            createOutLinks(*outLink, paths, *store2);
+}
+
+void MixPrintOutPaths::printOutPathsMaybe(const BuiltPaths & paths, ref<Store> store)
+{
+    if (!printOutputPaths)
+        return;
+
+    logger->stop();
+    for (auto & path : paths) {
+        std::visit(
+            overloaded{
+                [&](const BuiltPath::Opaque & bo) { logger->cout(store->printStorePath(bo.path)); },
+                [&](const BuiltPath::Built & bfd) {
+                    for (auto & output : bfd.outputs) {
+                        logger->cout(store->printStorePath(output.second));
+                    }
+                },
+            },
+            path);
+    }
 }
 
 } // namespace nix

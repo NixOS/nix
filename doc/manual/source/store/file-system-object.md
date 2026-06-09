@@ -19,7 +19,7 @@ Every file system object is one of the following:
    In general, Nix does not assign any semantics to symbolic links.
    Certain operations however, may make additional assumptions and attempt to use the target to find another file system object.
 
-   > See [the Wikpedia article on symbolic links](https://en.m.wikipedia.org/wiki/Symbolic_link) for background information if you are unfamiliar with this Unix concept.
+   > See [the Wikipedia article on symbolic links](https://en.m.wikipedia.org/wiki/Symbolic_link) for background information if you are unfamiliar with this Unix concept.
 
 File system objects and their children form a tree.
 A bare file or symlink can be a root file system object.

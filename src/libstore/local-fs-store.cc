@@ -1,25 +1,16 @@
-#include "nix/util/archive.hh"
-#include "nix/util/posix-source-accessor.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
-#include "nix/store/globals.hh"
 #include "nix/util/compression.hh"
 #include "nix/store/derivations.hh"
 
 namespace nix {
 
-Path LocalFSStoreConfig::getDefaultStateDir()
-{
-    return settings.nixStateDir;
-}
+void LocalFSStoreConfig::anchor() {}
 
-Path LocalFSStoreConfig::getDefaultLogDir()
-{
-    return settings.nixLogDir;
-}
+void LocalFSStore::anchor() {}
 
-LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
-    : StoreConfig(params)
+LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, const Params & params)
+    : StoreConfig(params, FilePathType::Native)
     /* Default `?root` from `rootDir` if non set
      * NOTE: We would like to just do rootDir.set(...), which would take care of
      * all normalization and error checking for us. Unfortunately we cannot do
@@ -29,8 +20,7 @@ LocalFSStoreConfig::LocalFSStoreConfig(PathView rootDir, const Params & params)
      * manually repeat the same normalization logic.
      */
     , rootDir{makeRootDirSetting(
-          *this,
-          !rootDir.empty() && params.count("root") == 0 ? std::optional<Path>{canonPath(rootDir)} : std::nullopt)}
+          *this, !rootDir.empty() && params.count("root") == 0 ? std::optional{canonPath(rootDir)} : std::nullopt)}
 {
 }
 
@@ -40,13 +30,20 @@ LocalFSStore::LocalFSStore(const Config & config)
 {
 }
 
-struct LocalStoreAccessor : PosixSourceAccessor
+namespace {
+
+struct LocalStoreAccessor : SourceAccessor
 {
+private:
+    void anchor() override {};
+
+public:
+    ref<SourceAccessor> accessor;
     ref<LocalFSStore> store;
     bool requireValidPath;
 
     LocalStoreAccessor(ref<LocalFSStore> store, bool requireValidPath)
-        : PosixSourceAccessor(std::filesystem::path{store->config.realStoreDir.get()})
+        : accessor(makeFSSourceAccessor(std::filesystem::path{store->config.realStoreDir.get()}))
         , store(store)
         , requireValidPath(requireValidPath)
     {
@@ -67,27 +64,73 @@ struct LocalStoreAccessor : PosixSourceAccessor
             return Stat{.type = tDirectory};
 
         requireStoreObject(path);
-        return PosixSourceAccessor::maybeLstat(path);
+        return accessor->maybeLstat(path);
+    }
+
+    Stat lstat(const CanonPath & path) override
+    {
+        /* Also allow `path` to point to the entire store, which is
+           needed for resolving symlinks. */
+        if (path.isRoot())
+            return Stat{.type = tDirectory};
+
+        requireStoreObject(path);
+        return accessor->lstat(path);
     }
 
     DirEntries readDirectory(const CanonPath & path) override
     {
         requireStoreObject(path);
-        return PosixSourceAccessor::readDirectory(path);
+        return accessor->readDirectory(path);
     }
 
-    void readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback) override
+    void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override
+    {
+        requireStoreObject(dirPath);
+        return accessor->readDirectory(dirPath, std::move(callback));
+    }
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override
     {
         requireStoreObject(path);
-        return PosixSourceAccessor::readFile(path, sink, sizeCallback);
+        return accessor->readFile(path, sink, sizeCallback);
     }
 
     std::string readLink(const CanonPath & path) override
     {
         requireStoreObject(path);
-        return PosixSourceAccessor::readLink(path);
+        return accessor->readLink(path);
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        return accessor->showPath(path);
+    }
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        return accessor->getPhysicalPath(path);
+    }
+
+    std::pair<CanonPath, std::optional<std::string>> getFingerprint(const CanonPath & path) override
+    {
+        return accessor->getFingerprint(path);
+    }
+
+    std::optional<time_t> getLastModified() override
+    {
+        return accessor->getLastModified();
+    }
+
+    bool pathExists(const CanonPath & path) override
+    {
+        return accessor->pathExists(path);
     }
 };
+
+} // namespace
 
 ref<SourceAccessor> LocalFSStore::getFSAccessor(bool requireValidPath)
 {
@@ -109,10 +152,10 @@ std::shared_ptr<SourceAccessor> LocalFSStore::getFSAccessor(const StorePath & pa
         if (!pathExists(absPath))
             return nullptr;
     }
-    return std::make_shared<PosixSourceAccessor>(std::move(absPath));
+    return makeFSSourceAccessor(std::move(absPath));
 }
 
-const std::string LocalFSStore::drvsLogDir = "drvs";
+const std::filesystem::path LocalFSStore::drvsLogDir = "drvs";
 
 std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path)
 {
@@ -120,10 +163,10 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
     for (int j = 0; j < 2; j++) {
 
-        Path logPath =
-            j == 0 ? fmt("%s/%s/%s/%s", config.logDir.get(), drvsLogDir, baseName.substr(0, 2), baseName.substr(2))
-                   : fmt("%s/%s/%s", config.logDir.get(), drvsLogDir, baseName);
-        Path logBz2Path = logPath + ".bz2";
+        auto logPath = config.logDir.get()
+                       / (j == 0 ? drvsLogDir / baseName.substr(0, 2) / baseName.substr(2) : drvsLogDir / baseName);
+        auto logBz2Path = logPath;
+        logBz2Path += ".bz2";
 
         if (pathExists(logPath))
             return readFile(logPath);

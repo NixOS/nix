@@ -1,0 +1,1 @@
+builtins.hashString "foo" "content"

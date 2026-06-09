@@ -1,0 +1,10 @@
+error:
+       … while calling the 'bitOr' builtin
+         at /pwd/lang/eval-fail-bitOr-2.nix:1:1:
+            1| builtins.bitOr 1 2.2
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.bitOr
+
+       error: expected an integer but found a float: 2.2

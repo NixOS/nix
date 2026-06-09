@@ -19,14 +19,14 @@ cp "$TEST_ROOT/got" "$TEST_ROOT/expected"
   (( "$badDiff" == 0 ))
 )
 
-# matches empty, non-existant file is the same as empty file
+# matches empty, non-existent file is the same as empty file
 echo -n > "$TEST_ROOT/got"
 (
   diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/does-not-exist"
   (( "$badDiff" == 0 ))
 )
 
-# doesn't matches non-empty, non-existant file is the same as empty file
+# doesn't matches non-empty, non-existent file is the same as empty file
 echo Hi! > "$TEST_ROOT/got"
 (
   diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/does-not-exist"
@@ -64,7 +64,7 @@ echo Bye! > "$TEST_ROOT/expected"
   (( "$badDiff" == 0 ))
 )
 
-# _NIX_TEST_ACCEPT matches empty, non-existant file not created
+# _NIX_TEST_ACCEPT matches empty, non-existent file not created
 echo -n > "$TEST_ROOT/got"
 (
   _NIX_TEST_ACCEPT=1 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/does-not-exists"

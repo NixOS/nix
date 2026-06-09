@@ -1,0 +1,2 @@
+:a builtins.foldl' (x: y: x // y) {} (map (x: { ${builtins.toString x} = x; }) (builtins.genList (x: x) 23))
+:ll

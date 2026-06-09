@@ -68,7 +68,7 @@ testRepl () {
     echo "$replOutput" | grepInverse "error: Cannot run 'nix-shell'"
 
     expectStderr 1 nix repl "${testDir}/simple.nix" \
-      | grepQuiet -s "error: path '$testDir/simple.nix' is not a flake"
+      | grepQuiet -s "error: path \"$testDir/simple.nix\" is not a flake"
 }
 
 # Simple test, try building a drv
@@ -120,25 +120,6 @@ testReplResponseNoRegex () {
     testReplResponseGeneral --fixed-strings "$@"
 }
 
-# :a uses the newest version of a symbol
-#
-# shellcheck disable=SC2016
-testReplResponse '
-:a { a = "1"; }
-:a { a = "2"; }
-"result: ${a}"
-' "result: 2"
-
-# check dollar escaping https://github.com/NixOS/nix/issues/4909
-# note the escaped \,
-#    \\
-# because the second argument is a regex
-#
-# shellcheck disable=SC2016
-testReplResponseNoRegex '
-"$" + "{hi}"
-' '"\${hi}"'
-
 testReplResponse '
 drvPath
 ' '".*-simple.drv"' \
@@ -164,33 +145,7 @@ foo + baz
 ' "3" \
     ./flake ./flake\#bar --experimental-features 'flakes'
 
-testReplResponse $'
-:a { a = 1; b = 2; longerName = 3; "with spaces" = 4; }
-' 'Added 4 variables.
-a, b, longerName, "with spaces"
-'
-
-cat <<EOF > attribute-set.nix
-{
-    a = 1;
-    b = 2;
-    longerName = 3;
-    "with spaces" = 4;
-}
-EOF
-testReplResponse '
-:l ./attribute-set.nix
-' 'Added 4 variables.
-a, b, longerName, "with spaces"
-'
-
-testReplResponseNoRegex $'
-:a builtins.foldl\' (x: y: x // y) {} (map (x: { ${builtins.toString x} = x; }) (builtins.genList (x: x) 23))
-' 'Added 23 variables.
-"0", "1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "21", "22", "3", "4", "5", "6"
-... and 3 more; view with :ll'
-
-# Test the `:reload` mechansim with flakes:
+# Test the `:reload` mechanism with flakes:
 # - Eval `./flake#changingThing`
 # - Modify the flake
 # - Re-eval it
@@ -223,99 +178,56 @@ exec 3>&- # Close fifo
 wait $repl_pid # Wait for process to finish
 grep -q "afterChange" repl_output
 
-# Test recursive printing and formatting
-# Normal output should print attributes in lexicographical order non-recursively
-testReplResponseNoRegex '
-{ a = { b = 2; }; l = [ 1 2 3 ]; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
-' \
-'{
-  a = { ... };
-  l = [ ... ];
-  n = 1234;
-  s = "string";
-  x = { ... };
-}
-'
+# Regression: `:reload` on a flake loaded from a *git* work tree must pick up
+# uncommitted changes. Guards against the per-process workdir-info cache
+# pinning the tree to the rev seen on first load.
+if [[ $(type -p git) ]]; then
+    createGitRepo gitflake
+    cat > gitflake/flake.nix <<EOF
+{ outputs = { self }: { changingThing = "beforeChange"; }; }
+EOF
+    git -C gitflake add flake.nix
+    git -C gitflake commit -m init
 
-# Same for lists, but order is preserved
-testReplResponseNoRegex '
-[ 42 1 "thingy" ({ a = 1; }) ([ 1 2 3 ]) ]
-' \
-'[
-  42
-  1
-  "thingy"
-  { ... }
-  [ ... ]
-]
-'
+    rm -f repl_fifo repl_output
+    mkfifo repl_fifo
+    touch repl_output
+    nix repl ./gitflake --experimental-features 'flakes' < repl_fifo >> repl_output 2>&1 &
+    repl_pid=$!
+    exec 3>repl_fifo
+    echo "changingThing" >&3
+    for _ in $(seq 1 1000); do
+        grep -q "beforeChange" repl_output && break
+        sleep 0.1
+    done
+    grep -q "beforeChange" repl_output || fail "git flake didn't load"
+    sed -i 's/beforeChange/afterChange/' gitflake/flake.nix
+    echo ":reload" >&3
+    echo "changingThing" >&3
+    echo "exit" >&3
+    exec 3>&-
+    wait $repl_pid
+    grep -q "afterChange" repl_output || fail ":reload didn't pick up git work tree change"
+fi
 
-# Same for let expressions
+# Regression: a failed `:lf` must not be remembered for `:reload`,
+# and an error in one loaded file must not drop later ones from the reload list.
 testReplResponseNoRegex '
-let x = { y = { a = 1; }; inherit x; }; in x
-' \
-'{
-  x = «repeated»;
-  y = { ... };
-}
-'
-
-# The :p command should recursively print sets, but prevent infinite recursion
-testReplResponseNoRegex '
-:p { a = { b = 2; }; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
-' \
-'{
-  a = { b = 2; };
-  n = 1234;
-  s = "string";
-  x = {
-    y = {
-      z = {
-        y = «repeated»;
-      };
-    };
-  };
-}
-'
-
-# Same for lists
-testReplResponseNoRegex '
-:p [ 42 1 "thingy" (rec { a = 1; b = { inherit a; inherit b; }; }) ([ 1 2 3 ]) ]
-' \
-'[
-  42
-  1
-  "thingy"
-  {
-    a = 1;
-    b = {
-      a = 1;
-      b = «repeated»;
-    };
-  }
-  [
-    1
-    2
-    3
-  ]
-]
-'
-
-# Same for let expressions
-testReplResponseNoRegex '
-:p let x = { y = { a = 1; }; inherit x; }; in x
-' \
-'{
-  x = «repeated»;
-  y = { a = 1; };
-}
-'
+:lf ./does-not-exist-flake
+:lf ./flake
+:r
+foo
+' '1' \
+    --experimental-features 'flakes'
 
 # Don't prompt for more input when getting unexpected EOF in imported files.
 testReplResponse "
 import $testDir/lang/parse-fail-eof-pos.nix
 " \
 '.*error: syntax error, unexpected end of file.*'
+
+EDITOR='cat' nix repl <<< ':e derivation' 2>&1 | grepQuiet 'derivationStrict'
+EDITOR='cat' nix repl <<< ':e <nix/fetchurl.nix>' 2>&1 | grepQuiet 'builtin:fetchurl'
 
 # TODO: move init to characterisation/framework.sh
 badDiff=0
@@ -361,8 +273,6 @@ runRepl () {
       -e "s@$testDir@/path/to/tests/functional@g" \
       -e "s@$testDirNoUnderscores@/path/to/tests/functional@g" \
       -e "s@$nixVersion@<nix version>@g" \
-      -e "/Added [0-9]* variables/{s@ [0-9]* @ <number omitted> @;n;d}" \
-      -e '/\.\.\. and [0-9]* more; view with :ll/d' \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
     ;
 }
@@ -377,7 +287,10 @@ for test in $(cd "$testDir/repl"; echo *.in); do
       read -r -a flags < "$testDir/repl/$test.flags"
     fi
 
-    (cd "$testDir/repl"; set +x; runRepl "${flags[@]}" 2>&1) < "$in" > "$actual" || {
+    # Allow putting comments (lines starting with `# COM:`) in the test for
+    # documentation purposes. Regular comments are not skipped, since those are
+    # also interpreted by the repl.
+    (cd "$testDir/repl"; set +x; runRepl "${flags[@]}" 2>&1) < <(grep -Ev '^[[:space:]]*#[[:space:]]*COM:' "$in") > "$actual" || {
         echo "FAIL: $test (exit code $?)" >&2
         badExitCode=1
     }

@@ -1,5 +1,3 @@
-#include <regex>
-
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/strings.hh"

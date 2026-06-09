@@ -1,0 +1,10 @@
+error:
+       … while calling the 'removeAttrs' builtin
+         at /pwd/lang/eval-fail-removeAttrs-1.nix:1:1:
+            1| builtins.removeAttrs "" ""
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.removeAttrs
+
+       error: expected a set but found a string: ""

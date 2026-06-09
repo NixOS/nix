@@ -1,0 +1,10 @@
+error:
+       … while calling the 'stringLength' builtin
+         at /pwd/lang/eval-fail-stringLength-1.nix:1:1:
+            1| builtins.stringLength { }
+             | ^
+            2|
+
+       … while evaluating the argument passed to builtins.stringLength
+
+       error: cannot coerce a set to a string: { }

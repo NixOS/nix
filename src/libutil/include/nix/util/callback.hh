@@ -5,6 +5,8 @@
 #include <future>
 #include <functional>
 
+#include "nix/util/fun.hh"
+
 namespace nix {
 
 /**
@@ -15,12 +17,12 @@ namespace nix {
 template<typename T>
 class Callback
 {
-    std::function<void(std::future<T>)> fun;
+    nix::fun<void(std::future<T>)> fun;
     std::atomic_flag done = ATOMIC_FLAG_INIT;
 
 public:
 
-    Callback(std::function<void(std::future<T>)> fun)
+    Callback(nix::fun<void(std::future<T>)> fun)
         : fun(fun)
     {
     }

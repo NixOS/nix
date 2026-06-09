@@ -13,10 +13,11 @@ namespace nix {
 struct BuiltinBuilderContext
 {
     const BasicDerivation & drv;
-    std::map<std::string, Path> outputs;
+    std::map<std::string, std::string> outputs;
     std::string netrcData;
     std::string caFileData;
-    Path tmpDirInSandbox;
+    Strings hashedMirrors;
+    std::filesystem::path tmpDirInSandbox;
 
 #if NIX_WITH_AWS_AUTH
     /**
@@ -27,7 +28,7 @@ struct BuiltinBuilderContext
 #endif
 };
 
-using BuiltinBuilder = std::function<void(const BuiltinBuilderContext &)>;
+using BuiltinBuilder = fun<void(const BuiltinBuilderContext &)>;
 
 struct RegisterBuiltinBuilder
 {
@@ -35,9 +36,9 @@ struct RegisterBuiltinBuilder
 
     static BuiltinBuilders & builtinBuilders();
 
-    RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && fun)
+    RegisterBuiltinBuilder(const std::string & name, BuiltinBuilder && builder)
     {
-        builtinBuilders().insert_or_assign(name, std::move(fun));
+        builtinBuilders().insert_or_assign(name, std::move(builder));
     }
 };
 

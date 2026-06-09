@@ -2,10 +2,13 @@
 
 namespace nix {
 
-struct TeeLogger : Logger
+namespace {
+
+class TeeLogger final : public Logger
 {
     std::vector<std::unique_ptr<Logger>> loggers;
 
+public:
     TeeLogger(std::vector<std::unique_ptr<Logger>> && loggers)
         : loggers(std::move(loggers))
     {
@@ -93,6 +96,8 @@ struct TeeLogger : Logger
             logger->setPrintBuildLogs(printBuildLogs);
     }
 };
+
+} // namespace
 
 std::unique_ptr<Logger>
 makeTeeLogger(std::unique_ptr<Logger> mainLogger, std::vector<std::unique_ptr<Logger>> && extraLoggers)

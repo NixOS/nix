@@ -153,7 +153,7 @@ nix flake lock "$flakeFollowsA"
 
 [[ $(nix eval --json "$flakeFollowsA"#e) = 123 ]]
 
-# Non-existant follows should print a warning.
+# Non-existent follows should print a warning.
 cat >"$flakeFollowsA"/flake.nix <<EOF
 {
     description = "Flake A";

@@ -1,0 +1,11 @@
+# COM: Test recursive printing and formatting
+# COM: Normal output should print attributes in lexicographical order non-recursively
+{ a = { b = 2; }; l = [ 1 2 3 ]; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
+# COM: Same for lists, but order is preserved
+[ 42 1 "thingy" ({ a = 1; }) ([ 1 2 3 ]) ]
+# COM: Same for let expressions
+let x = { y = { a = 1; }; inherit x; }; in x
+# COM: The :p command should recursively print sets, but prevent infinite recursion
+:p { a = { b = 2; }; s = "string"; n = 1234; x = rec { y = { z = { inherit y; }; }; }; }
+# COM: Same for lists
+:p [ 42 1 "thingy" (rec { a = 1; b = { inherit a; inherit b; }; }) ([ 1 2 3 ]) ]

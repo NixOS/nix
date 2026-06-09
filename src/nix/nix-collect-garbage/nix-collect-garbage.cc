@@ -1,5 +1,6 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/error.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-cast.hh"
 #include "nix/store/gc-store.hh"
@@ -9,14 +10,9 @@
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
 
-#include <iostream>
 #include <cerrno>
 
-namespace nix::fs {
-using namespace std::filesystem;
-}
-
-using namespace nix;
+namespace nix {
 
 std::string deleteOlderThan;
 bool dryRun = false;
@@ -41,9 +37,9 @@ void removeOldGenerations(std::filesystem::path dir)
         if (type == std::filesystem::file_type::symlink && canWrite) {
             std::string link;
             try {
-                link = readLink(path);
-            } catch (std::filesystem::filesystem_error & e) {
-                if (e.code() == std::errc::no_such_file_or_directory)
+                link = readLink(path).string();
+            } catch (SystemError & e) {
+                if (e.is(std::errc::no_such_file_or_directory))
                     continue;
                 throw;
             }
@@ -87,28 +83,32 @@ static int main_nix_collect_garbage(int argc, char ** argv)
             return true;
         });
 
+        if (options.maxFreed != std::numeric_limits<uint64_t>::max() && dryRun)
+            throw UsageError("options --max-freed and --dry-run cannot be combined");
+
         if (removeOld) {
+            auto profilesDirOpts = settings.getProfileDirsOptions();
             std::set<std::filesystem::path> dirsToClean = {
-                profilesDir(),
+                profilesDir(profilesDirOpts),
                 std::filesystem::path{settings.nixStateDir} / "profiles",
-                getDefaultProfile().parent_path(),
+                getDefaultProfile(profilesDirOpts).parent_path(),
             };
             for (auto & dir : dirsToClean)
                 removeOldGenerations(dir);
         }
 
-        // Run the actual garbage collector.
-        if (!dryRun) {
-            auto store = openStore();
-            auto & gcStore = require<GcStore>(*store);
-            options.action = GCOptions::gcDeleteDead;
-            GCResults results;
-            PrintFreed freed(true, results);
-            gcStore.collectGarbage(options, results);
-        }
+        auto store = openStore();
+        auto & gcStore = require<GcStore>(*store);
+        options.action = dryRun ? GCOptions::gcReturnDead : GCOptions::gcDeleteDead;
+        options.pathsToDelete = GCOptions::WholeStore{};
+        GCResults results;
+        Finally printer([&] { printFreed(dryRun, results); });
+        gcStore.collectGarbage(options, results);
 
         return 0;
     }
 }
 
 static RegisterLegacyCommand r_nix_collect_garbage("nix-collect-garbage", main_nix_collect_garbage);
+
+} // namespace nix

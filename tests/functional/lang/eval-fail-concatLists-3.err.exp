@@ -1,0 +1,10 @@
+error:
+       … while calling the 'concatLists' builtin
+         at /pwd/lang/eval-fail-concatLists-3.nix:1:1:
+            1| builtins.concatLists [
+             | ^
+            2|   [ 1 ]
+
+       … while evaluating a value of the list passed to builtins.concatLists
+
+       error: expected a list but found a string: "foo"

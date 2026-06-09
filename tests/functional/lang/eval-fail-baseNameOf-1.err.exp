@@ -1,0 +1,10 @@
+error:
+       … while calling the 'baseNameOf' builtin
+         at /pwd/lang/eval-fail-baseNameOf-1.nix:1:1:
+            1| builtins.baseNameOf [ ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.baseNameOf
+
+       error: cannot coerce a list to a string: [ ]

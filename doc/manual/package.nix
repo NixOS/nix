@@ -1,5 +1,6 @@
 {
   lib,
+  stdenv,
   callPackage,
   mkMesonDerivation,
   runCommand,
@@ -93,10 +94,11 @@ mkMesonDerivation (finalAttrs: {
     mdbook
     json-schema-for-humans
   ]
-  ++ lib.optionals (!officialRelease && buildHtmlManual) [
+  ++ lib.optionals (!officialRelease && buildHtmlManual && !stdenv.hostPlatform.isi686) [
     # When not an official release, we likely have changelog entries that have
     # yet to be rendered.
     # When released, these are rendered into a committed file to save a dependency.
+    # Broken on i686.
     changelog-d
   ];
 
@@ -142,6 +144,21 @@ mkMesonDerivation (finalAttrs: {
               # Exclude undocumented builtins
               ".*/language/builtins\\.html#builtins-addErrorContext"
               ".*/language/builtins\\.html#builtins-appendContext"
+              # `print.html` aggregates content from all pages, including
+              # the JSON schema pages and builtins pages excluded above,
+              # so it inherits the same broken fragment links.
+              ".*/print\\.html#algorithm"
+              ".*/print\\.html#root"
+              ".*/print\\.html#builtins-addErrorContext"
+              ".*/print\\.html#builtins-appendContext"
+              ".*/print\\.html#derivations_pattern1_structuredAttrs_additionalProperties"
+              ".*/print\\.html#structuredAttrs_additionalProperties"
+            ];
+            # `404.html` uses `<base href="/">` so that absolute links
+            # work on the deployed site. Lychee cannot resolve `/` against
+            # a local file path, so skip the file entirely.
+            exclude_path = [
+              ".*/404\\.html"
             ];
           };
         };

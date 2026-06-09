@@ -8,7 +8,7 @@
 
 - Derivation JSON format now uses store path basenames only [#13570](https://github.com/NixOS/nix/issues/13570) [#13980](https://github.com/NixOS/nix/pull/13980)
 
-  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell) has shown that the use of the store directory in JSON formats is an impediment to systematic JSON formats, because it requires the serializer/deserializer to take an extra paramater (the store directory).
+  Experience with many JSON frameworks (e.g. nlohmann/json in C++, Serde in Rust, and Aeson in Haskell) has shown that the use of the store directory in JSON formats is an impediment to systematic JSON formats, because it requires the serializer/deserializer to take an extra parameter (the store directory).
 
   We ultimately want to rectify this issue with all JSON formats to the extent allowed by our stability promises. To start with, we are changing the JSON format for derivations because the `nix derivation` commands are — in addition to being formally unstable — less widely used than other unstable commands.
 

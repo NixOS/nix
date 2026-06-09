@@ -63,7 +63,7 @@ Nix 0.8 has the following improvements:
     can query all paths that directly or indirectly use a certain Glibc:
 
         $ nix-store -q --referrers-closure \
-            /nix/store/8lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
+            /nix/store/1a6mdrjz4wn7b9sfmcw5ggbk1mi281mh-glibc-2.3.4
 
   - The concept of fixed-output derivations has been formalised.
     Previously, functions such as `fetchurl` in Nixpkgs used a hack

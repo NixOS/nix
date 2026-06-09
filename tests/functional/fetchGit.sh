@@ -12,11 +12,9 @@ repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf "$repo" "${repo}"-tmp "$TEST_HOME"/.cache/nix "$TEST_ROOT"/worktree "$TEST_ROOT"/minimal
+rm -rf "${repo}"-tmp "$TEST_HOME"/.cache/nix "$TEST_ROOT"/worktree "$TEST_ROOT"/minimal
 
-git init "$repo"
-git -C "$repo" config user.email "foobar@example.com"
-git -C "$repo" config user.name "Foobar"
+createGitRepo "$repo"
 
 echo utrecht > "$repo"/hello
 touch "$repo"/.gitignore
@@ -33,15 +31,15 @@ rev2=$(git -C "$repo" rev-parse HEAD)
 git -C "$repo" tag -a tag2 -m tag2
 
 # Check whether fetching in read-only mode works.
-nix-instantiate --eval -E "builtins.readFile ((builtins.fetchGit file://$TEST_ROOT/worktree) + \"/hello\") == \"utrecht\\n\""
+nix-instantiate --eval -E "builtins.readFile ((builtins.fetchGit \"file://$TEST_ROOT/worktree\") + \"/hello\") == \"utrecht\\n\""
 
 # Fetch a worktree.
 unset _NIX_FORCE_HTTP
-expectStderr 0 nix eval -vvvv --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath" | grepQuiet "copying '$TEST_ROOT/worktree/' to the store"
-path0=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$TEST_ROOT/worktree).outPath")
-path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = file://$TEST_ROOT/worktree; }).outPath")
+expectStderr 0 nix eval -vvvv --impure --raw --expr "(builtins.fetchGit \"file://$TEST_ROOT/worktree\").outPath" | grepQuiet "copying '$TEST_ROOT/worktree' to the store"
+path0=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$TEST_ROOT/worktree\").outPath")
+path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/worktree\"; }).outPath")
 [[ $path0 = "$path0_" ]]
-path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree git+file://$TEST_ROOT/worktree).outPath")
+path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree \"git+file://$TEST_ROOT/worktree\").outPath")
 [[ $path0 = "$path0_" ]]
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 "$path0"/hello) = "hello" ]]
@@ -50,7 +48,7 @@ export _NIX_FORCE_HTTP=1
 rm -rf "$TEST_HOME"/.cache/nix
 
 # Fetch the default branch.
-path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 [[ $(cat "$path"/hello) = world ]]
 
 # Fetch again. This should be cached.
@@ -58,18 +56,18 @@ path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath"
 # the reason being that the lookup on the cache uses the ref-file `/refs/heads/master`
 # which does not exist after packing.
 mv "$repo" "${repo}"-tmp
-path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path2=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 [[ $path = "$path2" ]]
 
-[[ $(nix eval --impure --expr "(builtins.fetchGit file://$repo).revCount") = 2 ]]
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).rev") = "$rev2" ]]
-[[ $(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).shortRev") = "${rev2:0:7}" ]]
+[[ $(nix eval --impure --expr "(builtins.fetchGit \"file://$repo\").revCount") = 2 ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").rev") = "$rev2" ]]
+[[ $(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").shortRev") = "${rev2:0:7}" ]]
 
 # Fetching with a explicit hash should succeed.
-path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev2\"; }).outPath")
 [[ $path = "$path2" ]]
 
-path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev1\"; }).outPath")
+path2=$(nix eval --refresh --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev1\"; }).outPath")
 [[ $(cat "$path2"/hello) = utrecht ]]
 
 mv "${repo}"-tmp "$repo"
@@ -77,7 +75,7 @@ mv "${repo}"-tmp "$repo"
 # Fetch when the cache has packed-refs
 # Regression test of #8822
 git -C "$TEST_HOME"/.cache/nix/gitv3/*/ pack-refs --all
-path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # Fetch a rev from another branch
 git -C "$repo" checkout -b devtest
@@ -86,20 +84,20 @@ git -C "$repo" add differentbranch
 git -C "$repo" commit -m 'Test2'
 git -C "$repo" checkout master
 devrev=$(git -C "$repo" rev-parse devtest)
-nix eval --raw --expr "builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; }"
+nix eval --raw --expr "builtins.fetchGit { url = \"file://$repo\"; rev = \"$devrev\"; }"
 
-[[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = file://$repo; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
+[[ $(nix eval --raw --expr "builtins.readFile (builtins.fetchGit { url = \"file://$repo\"; rev = \"$devrev\"; allRefs = true; } + \"/differentbranch\")") = 'different file' ]]
 
 # In pure eval mode, fetchGit without a revision should fail.
-[[ $(nix eval --impure --raw --expr "builtins.readFile (fetchGit file://$repo + \"/hello\")") = world ]]
-(! nix eval --raw --expr "builtins.readFile (fetchGit file://$repo + \"/hello\")")
+[[ $(nix eval --impure --raw --expr "builtins.readFile (fetchGit \"file://$repo\" + \"/hello\")") = world ]]
+(! nix eval --raw --expr "builtins.readFile (fetchGit \"file://$repo\" + \"/hello\")")
 
 # Fetch using an explicit revision hash.
-path2=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev2\"; }).outPath")
+path2=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev2\"; }).outPath")
 [[ $path = "$path2" ]]
 
 # In pure eval mode, fetchGit with a revision should succeed.
-[[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = file://$repo; rev = \"$rev2\"; } + \"/hello\")") = world ]]
+[[ $(nix eval --raw --expr "builtins.readFile (fetchGit { url = \"file://$repo\"; rev = \"$rev2\"; } + \"/hello\")") = world ]]
 
 # But without a hash, it fails.
 expectStderr 1 nix eval --expr 'builtins.fetchGit "file:///foo"' | grepQuiet "'fetchGit' doesn't fetch unlocked input"
@@ -138,7 +136,7 @@ path3=$(nix eval --raw --expr "(builtins.fetchGit { url = $repo; rev = \"$rev2\"
 # Committing should not affect the store path.
 git -C "$repo" commit -m 'Bla3' -a
 
-path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path4=$(nix eval --impure --refresh --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 [[ $path2 = "$path4" ]]
 
 [[ $(nix eval --impure --expr "builtins.hasAttr \"rev\" (builtins.fetchGit $repo)") == "true" ]]
@@ -164,14 +162,14 @@ rev3=$(git -C "$repo" rev-parse HEAD)
 nix eval --tarball-ttl 3600 --expr "builtins.fetchGit { url = $repo; rev = \"$rev3\"; }" >/dev/null
 
 # Update 'path' to reflect latest master
-path=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # Check behavior when non-master branch is used
 git -C "$repo" checkout "$rev2" -b dev
 echo dev > "$repo"/hello
 
 # File URI uses dirty tree unless specified otherwise
-path2=$(nix eval --impure --raw --expr "(builtins.fetchGit file://$repo).outPath")
+path2=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 [ "$(cat "$path2"/hello)" = dev ]
 
 # Using local path with branch other than 'master' should work when clean or dirty
@@ -213,8 +211,7 @@ path5=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = $repo; ref = 
 
 # Fetching from a repo with only a specific revision and no branches should
 # not fall back to copying files and record correct revision information. See: #5302
-mkdir "$TEST_ROOT"/minimal
-git -C "$TEST_ROOT"/minimal init
+createGitRepo "$TEST_ROOT"/minimal
 git -C "$TEST_ROOT"/minimal fetch "$repo" "$rev2"
 git -C "$TEST_ROOT"/minimal checkout "$rev2"
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = "$rev2" ]]
@@ -257,7 +254,7 @@ echo "/exported-wonky export-ignore=wonk" >> "$repo"/.gitattributes
 git -C "$repo" add not-exported-file exported-wonky .gitattributes
 git -C "$repo" commit -m 'Bla6'
 rev5=$(git -C "$repo" rev-parse HEAD)
-path12=$(nix eval --raw --expr "(builtins.fetchGit { url = file://$repo; rev = \"$rev5\"; }).outPath")
+path12=$(nix eval --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev5\"; }).outPath")
 [[ ! -e $path12/not-exported-file ]]
 [[ -e $path12/exported-wonky ]]
 
@@ -267,7 +264,7 @@ rm -rf "$TEST_HOME"/.cache/nix
 (! nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
 
 # should succeed for a repo without commits
-git init "$repo"
+initGitRepo "$repo"
 git -C "$repo" add hello # need to add at least one file to cause the root of the repo to be visible
 # shellcheck disable=SC2034
 path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").outPath")
@@ -275,9 +272,7 @@ path10=$(nix eval --impure --raw --expr "(builtins.fetchGit \"file://$repo\").ou
 # should succeed for a path with a space
 # regression test for #7707
 repo="$TEST_ROOT/a b"
-git init "$repo"
-git -C "$repo" config user.email "foobar@example.com"
-git -C "$repo" config user.name "Foobar"
+createGitRepo "$repo"
 
 echo utrecht > "$repo/hello"
 touch "$repo/.gitignore"
@@ -289,7 +284,7 @@ path11=$(nix eval --impure --raw --expr "(builtins.fetchGit ./.).outPath")
 
 # Test a workdir with no commits.
 empty="$TEST_ROOT/empty"
-git init "$empty"
+createGitRepo "$empty"
 
 emptyAttrs="{ lastModified = 0; lastModifiedDate = \"19700101000000\"; narHash = \"sha256-pQpattmS9VmO3ZIQUFn66az8GSmB4IvYhTTCFn6SUmo=\"; rev = \"0000000000000000000000000000000000000000\"; revCount = 0; shortRev = \"0000000\"; submodules = false; }"
 result=$(nix eval --impure --expr "builtins.removeAttrs (builtins.fetchGit $empty) [\"outPath\"]")

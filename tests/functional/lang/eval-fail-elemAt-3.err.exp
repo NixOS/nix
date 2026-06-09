@@ -1,0 +1,8 @@
+error:
+       … while calling the 'elemAt' builtin
+         at /pwd/lang/eval-fail-elemAt-3.nix:1:1:
+            1| builtins.elemAt [ "foo" ] 3
+             | ^
+            2|
+
+       error: 'builtins.elemAt' called with index 3 on a list of size 1

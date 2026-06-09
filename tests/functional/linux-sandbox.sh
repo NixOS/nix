@@ -41,7 +41,7 @@ nix-sandbox-build dependencies.nix --check
 # Test that sandboxed builds with --check and -K can move .check directory to store
 nix-sandbox-build check.nix -A nondeterministic
 
-# `100 + 4` means non-determinstic, see doc/manual/source/command-ref/status-build-failure.md
+# `100 + 4` means non-deterministic, see doc/manual/source/command-ref/status-build-failure.md
 expectStderr 104 nix-sandbox-build check.nix -A nondeterministic --check -K > "$TEST_ROOT"/log
 grepQuietInverse 'error: renaming' "$TEST_ROOT"/log
 grepQuiet 'may not be deterministic' "$TEST_ROOT"/log

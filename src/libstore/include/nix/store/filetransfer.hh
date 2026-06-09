@@ -1,6 +1,8 @@
 #pragma once
 ///@file
 
+#include <optional>
+#include <cstdint>
 #include <string>
 #include <future>
 
@@ -19,8 +21,17 @@
 
 namespace nix {
 
-struct FileTransferSettings : Config
+const std::filesystem::path & nixConfDir();
+
+class FileTransferSettings : public Config
 {
+    static std::optional<std::filesystem::path> getDefaultSSLCertFile();
+
+    void anchor() override;
+
+public:
+    FileTransferSettings();
+
     Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
     Setting<std::string> userAgentSuffix{
@@ -65,8 +76,63 @@ struct FileTransferSettings : Config
           timeout's duration.
         )"};
 
-    Setting<unsigned int> tries{
-        this, 5, "download-attempts", "The number of times Nix attempts to download a file before giving up."};
+    Setting<uint32_t> tries{
+        this,
+        5,
+        "filetransfer-retry-attempts",
+        R"(
+          The number of times Nix attempts a file transfer (download
+          or upload) before giving up. Retries apply to transient
+          failures: connection-level errors, HTTP 408, 429, and most
+          5xx responses. Authentication failures (401/403/407),
+          404/410, and other 4xx responses are not retried.
+        )",
+        {"download-attempts"}};
+
+    Setting<uint32_t> retryDelayMs{
+        this,
+        100,
+        "filetransfer-retry-delay",
+        R"(
+          Initial delay in milliseconds before retrying a failed file transfer
+          (download or upload). The delay doubles with each subsequent attempt
+          (exponential backoff) and is subject to random jitter (see
+          `filetransfer-retry-jitter`).
+        )"};
+
+    Setting<uint32_t> retryDelayRateLimitedMs{
+        this,
+        5000,
+        "filetransfer-retry-delay-rate-limited",
+        R"(
+          Initial delay in milliseconds before retrying a file transfer that
+          failed with a rate-limit response (HTTP 429 or 503). The delay doubles
+          with each subsequent attempt.
+
+          Servers may send a `Retry-After` header specifying a longer delay;
+          when present, Nix respects the larger of the two values.
+        )"};
+
+    Setting<uint32_t> retryMaxDelayMs{
+        this,
+        60000,
+        "filetransfer-retry-max-delay",
+        R"(
+          Ceiling on the exponential backoff delay in milliseconds. This does not
+          cap server-provided `Retry-After` values, which are honored as-is.
+        )"};
+
+    Setting<bool> retryJitter{
+        this,
+        true,
+        "filetransfer-retry-jitter",
+        R"(
+          Whether to apply random jitter to retry delays. When enabled, each
+          retry waits for a random duration between 0 and the computed delay
+          ("full jitter"), which spreads out retry storms from many clients.
+
+          Disable for deterministic retry timing (primarily useful for tests).
+        )"};
 
     Setting<size_t> downloadBufferSize{
         this,
@@ -77,11 +143,67 @@ struct FileTransferSettings : Config
           not processed quickly enough to exceed the size of this buffer, downloads may stall.
           The default is 1048576 (1 MiB).
         )"};
+
+    Setting<unsigned int> downloadSpeed{
+        this,
+        0,
+        "download-speed",
+        R"(
+          Specify the maximum transfer rate in kilobytes per second you want
+          Nix to use for downloads.
+        )"};
+
+    Setting<AbsolutePath> netrcFile{
+        this,
+        nixConfDir() / "netrc",
+        "netrc-file",
+        R"(
+          If set to an absolute path to a `netrc` file, Nix uses the HTTP
+          authentication credentials in this file when trying to download from
+          a remote host through HTTP or HTTPS. Defaults to
+          `$NIX_CONF_DIR/netrc`.
+
+          The `netrc` file consists of a list of accounts in the following
+          format:
+
+              machine my-machine
+              login my-username
+              password my-password
+
+          For the exact syntax, see [the `curl`
+          documentation](https://ec.haxx.se/usingcurl-netrc.html).
+
+          > **Note**
+          >
+          > This must be an absolute path, and `~` is not resolved. For
+          > example, `~/.netrc` won't resolve to your home directory's
+          > `.netrc`.
+        )"};
+
+    Setting<std::optional<AbsolutePath>> caFile{
+        this,
+        getDefaultSSLCertFile(),
+        "ssl-cert-file",
+        R"(
+          The path of a file containing CA certificates used to
+          authenticate `https://` downloads. Nix by default uses
+          the first of the following files that exists:
+
+          1. `/etc/ssl/certs/ca-certificates.crt`
+          2. `/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt`
+
+          The path can be overridden by the following environment
+          variables, in order of precedence:
+
+          1. `NIX_SSL_CERT_FILE`
+          2. `SSL_CERT_FILE`
+        )",
+        {},
+        // Don't document the machine-specific default value
+        false};
 };
 
 extern FileTransferSettings fileTransferSettings;
-
-extern const unsigned int RETRY_TIME_MS_DEFAULT;
 
 /**
  * HTTP methods supported by FileTransfer.
@@ -116,10 +238,28 @@ struct FileTransferRequest
     Headers headers;
     std::string expectedETag;
     HttpMethod method = HttpMethod::Get;
-    size_t tries = fileTransferSettings.tries;
-    unsigned int baseRetryTimeMs = RETRY_TIME_MS_DEFAULT;
     ActivityId parentAct;
     bool decompress = true;
+
+    /**
+     * Per-request retry overrides. When set, these take precedence over the
+     * global `FileTransferSettings`. Typically populated from a store's URL
+     * parameters (e.g. `s3://bucket?retry-attempts=8`).
+     */
+    std::optional<uint32_t> retryDelayMs;
+    std::optional<uint32_t> retryDelayRateLimitedMs;
+    std::optional<uint32_t> retryMaxDelayMs;
+    std::optional<uint32_t> retryAttempts;
+
+    /**
+     * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsCert;
+
+    /**
+     * Optional path to the client private key in "PEM" format. Only used for TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> tlsKey;
 
     struct UploadData
     {
@@ -167,6 +307,14 @@ struct FileTransferRequest
         , parentAct(getCurActivity())
     {
     }
+
+    /**
+     * `uri` with any userinfo (`user:password@`) stripped, for use in
+     * progress, warning and error messages so credentials embedded in
+     * the URL don't leak into logs. Returns `uri` verbatim if it can't
+     * be parsed.
+     */
+    std::string displayUri() const;
 
     /**
      * Returns the method description for logging purposes.
@@ -262,16 +410,16 @@ public:
      */
     struct ItemHandle
     {
-        std::reference_wrapper<Item> item;
+        std::weak_ptr<Item> item;
         friend struct FileTransfer;
 
-        ItemHandle(Item & item)
+        explicit ItemHandle(std::weak_ptr<Item> item)
             : item(item)
         {
         }
     };
 
-    virtual ~FileTransfer() {}
+    virtual ~FileTransfer();
 
     /**
      * Enqueue a data transfer request, returning a future to the result of
@@ -310,7 +458,7 @@ public:
     void
     download(FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback = {});
 
-    enum Error { NotFound, Forbidden, Misc, Transient, Interrupted };
+    enum Error { NotFound, Unauthorized, Forbidden, Misc, Transient, Interrupted };
 };
 
 /**
@@ -326,10 +474,13 @@ ref<FileTransfer> getFileTransfer();
  *
  * Prefer getFileTransfer() to this; see its docs for why.
  */
-ref<FileTransfer> makeFileTransfer();
+ref<FileTransfer> makeFileTransfer(const FileTransferSettings & settings = fileTransferSettings);
 
-class FileTransferError : public Error
+class FileTransferError final : public CloneableError<FileTransferError, Error>
 {
+private:
+    void anchor() override;
+
 public:
     FileTransfer::Error error;
     /// intentionally optional

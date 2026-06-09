@@ -24,11 +24,6 @@ struct WorkerProto::BasicConnection
     WorkerProto::Version protoVersion;
 
     /**
-     * The set of features that both sides support.
-     */
-    FeatureSet features;
-
-    /**
      * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
      * factored out serve protocol serializers with a
      * `LegacySSHStore::Connection`.
@@ -87,13 +82,11 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
      * @param from Taken by reference to allow for various error
      * handling mechanisms.
      *
-     * @param localVersion Our version which is sent over.
-     *
-     * @param supportedFeatures The protocol features that we support.
+     * @param localVersion Our version (number + supported features)
+     * which is sent over.
      */
     // FIXME: this should probably be a constructor.
-    static std::tuple<Version, FeatureSet> handshake(
-        BufferedSink & to, Source & from, WorkerProto::Version localVersion, const FeatureSet & supportedFeatures);
+    static Version handshake(BufferedSink & to, Source & from, const Version & localVersion);
 
     /**
      * After calling handshake, must call this to exchange some basic
@@ -126,10 +119,7 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
     BuildResult getBuildDerivationResponse(const StoreDirConfig & store, bool * daemonException);
 
     void narFromPath(
-        const StoreDirConfig & store,
-        bool * daemonException,
-        const StorePath & path,
-        std::function<void(Source &)> fun);
+        const StoreDirConfig & store, bool * daemonException, const StorePath & path, fun<void(Source &)> receiveNar);
 };
 
 struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
@@ -146,13 +136,11 @@ struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
      * @param from Taken by reference to allow for various error
      * handling mechanisms.
      *
-     * @param localVersion Our version which is sent over.
-     *
-     * @param supportedFeatures The protocol features that we support.
+     * @param localVersion Our version (number + supported features)
+     * which is sent over.
      */
     // FIXME: this should probably be a constructor.
-    static std::tuple<Version, FeatureSet> handshake(
-        BufferedSink & to, Source & from, WorkerProto::Version localVersion, const FeatureSet & supportedFeatures);
+    static Version handshake(BufferedSink & to, Source & from, const Version & localVersion);
 
     /**
      * After calling handshake, must call this to exchange some basic

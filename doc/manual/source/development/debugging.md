@@ -26,7 +26,6 @@ or GCC. This is useful when debugging memory corruption issues.
 ```console
 [nix-shell]$ export mesonBuildType=debugoptimized
 [nix-shell]$ appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Disable Boehm
-[nix-shell]$ appendToVar mesonFlags "-Dbindings=false" # Disable nix-perl
 [nix-shell]$ appendToVar mesonFlags "-Db_sanitize=address,undefined"
 ```
 

@@ -1,0 +1,10 @@
+error:
+       … while calling the 'floor' builtin
+         at /pwd/lang/eval-fail-floor-1.nix:1:1:
+            1| builtins.floor "foo"
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.floor
+
+       error: expected a float but found a string: "foo"

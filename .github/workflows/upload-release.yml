@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       eval_id:
-        description: "Hydra evaluation ID"
+        description: "Hydra evaluation ID (from the maintenance-X.Y-release jobset)"
         required: true
         type: number
       is_latest:
@@ -34,18 +34,29 @@ jobs:
           # get the same uberhack that nix-shell has to support it.
           echo "NIX_PATH=nixpkgs=$NIXPKGS_PATH" >> "$GITHUB_ENV"
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5.1.1
+        uses: aws-actions/configure-aws-credentials@e7f100cf4c008499ea8adda475de1042d6975c7b # v6.2.0
         with:
           role-to-assume: "arn:aws:iam::080433136561:role/nix-release"
           role-session-name: nix-release-oidc-${{ github.run_id }}
           aws-region: eu-west-1
+      - name: Disable containerd image store
+        run: |
+          # Docker 28+ defaults to the containerd image store, which
+          # pushes layers uncompressed instead of gzip. OCI clients
+          # that only support gzip (e.g. go-containerregistry) fail
+          # with "gzip: invalid header". Disabling the containerd
+          # snapshotter restores the classic storage driver, which
+          # preserves gzip-compressed layers through the
+          # `docker load` / `docker push` pipeline.
+          echo '{"features":{"containerd-snapshotter":false}}' | sudo tee /etc/docker/daemon.json > /dev/null
+          sudo systemctl restart docker
       - name: Login to Docker Hub
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2 # v4.0.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}

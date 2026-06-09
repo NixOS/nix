@@ -1,4 +1,5 @@
 #include "nix/util/error.hh"
+#include "nix/util/file-path-impl.hh"
 #include "nix/util/split.hh"
 #include "nix/util/url.hh"
 #include "nix/store/store-reference.hh"
@@ -6,6 +7,7 @@
 #include "nix/util/util.hh"
 
 #include <boost/url/ipv6_address.hpp>
+#include <nlohmann/json.hpp>
 
 namespace nix {
 
@@ -16,7 +18,7 @@ static bool isNonUriPath(const std::string & spec)
         spec.find("://") == std::string::npos
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
-        && spec.find("/") != std::string::npos;
+        && OsPathTrait<char>::findPathSep(spec) != std::string::npos;
 }
 
 std::string StoreReference::render(bool withParams) const
@@ -110,7 +112,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                 .variant =
                     Specified{
                         .scheme = "local",
-                        .authority = absPath(baseURI),
+                        .authority = encodeUrlPath(pathToUrlPath(absPath(std::filesystem::path{baseURI}))),
                     },
                 .params = std::move(params),
             };
@@ -184,3 +186,19 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
 }
 
 } // namespace nix
+
+namespace nlohmann {
+
+using namespace nix;
+
+StoreReference adl_serializer<StoreReference>::from_json(const json & json)
+{
+    return StoreReference::parse(json.get<std::string>());
+}
+
+void adl_serializer<StoreReference>::to_json(json & json, const StoreReference & ref)
+{
+    json = ref.render();
+}
+
+} // namespace nlohmann

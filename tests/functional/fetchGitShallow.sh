@@ -6,9 +6,7 @@ source common.sh
 requireGit
 
 # Create a test repo with multiple commits for all our tests
-git init "$TEST_ROOT/shallow-parent"
-git -C "$TEST_ROOT/shallow-parent" config user.email "foobar@example.com"
-git -C "$TEST_ROOT/shallow-parent" config user.name "Foobar"
+createGitRepo "$TEST_ROOT/shallow-parent"
 
 # Add several commits to have history
 echo "{ outputs = _: {}; }" > "$TEST_ROOT/shallow-parent/flake.nix"
@@ -31,9 +29,11 @@ git -C "$TEST_ROOT/shallow-parent" commit -m "Branch commit"
 # Make a shallow clone (depth=1)
 git clone --depth 1 "file://$TEST_ROOT/shallow-parent" "$TEST_ROOT/shallow-clone"
 
-# Test 1: Fetching a shallow repo shouldn't work by default, because we can't
-# return a revCount.
-(! nix eval --impure --raw --expr "(builtins.fetchGit { url = \"$TEST_ROOT/shallow-clone\"; ref = \"dev\"; }).outPath")
+# Test 1: Fetching a shallow repo succeeds for outPath because revCount is lazy.
+path1=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"$TEST_ROOT/shallow-clone\"; ref = \"dev\"; }).outPath")
+[[ -d "$path1" ]]
+# But accessing revCount on a shallow clone fails.
+(! nix eval --impure --expr "(builtins.fetchGit { url = \"$TEST_ROOT/shallow-clone\"; ref = \"dev\"; }).revCount" 2>/dev/null)
 
 # Test 2: But you can request a shallow clone, which won't return a revCount.
 path=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; url = \"file://$TEST_ROOT/shallow-clone\"; ref = \"dev\"; shallow = true; }).outPath")
@@ -65,3 +65,32 @@ fi
 # Verify that we can shallow fetch the worktree
 git -C "$TEST_ROOT/shallow-worktree" rev-list --count HEAD >/dev/null
 nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$TEST_ROOT/shallow-worktree\"; shallow = true; }).rev"
+
+# Test 5: nix build --dry-run on a shallow clone must not force revCount.
+# The flake fingerprint must not eagerly evaluate revCount, because that
+# would fail (or produce wrong results) on shallow clones.
+# Nor should it generate a complete lock file that serializes the root node.
+# We remove the parent repo to ensure that a future improvement that
+# tries to fetch missing history can't paper over the issue.
+createGitRepo "$TEST_ROOT/shallow-build-parent"
+echo "" > "$TEST_ROOT/shallow-build-parent/file.txt"
+git -C "$TEST_ROOT/shallow-build-parent" add file.txt
+git -C "$TEST_ROOT/shallow-build-parent" commit -m "first"
+cat > "$TEST_ROOT/shallow-build-parent/flake.nix" <<EOF
+{
+  outputs = { self }: {
+    packages.$system.default =
+      derivation {
+        name = "test";
+        system = "$system";
+        builder = "/bin/sh";
+        args = [ "-c" "echo ok > \\\$out" ];
+      };
+  };
+}
+EOF
+git -C "$TEST_ROOT/shallow-build-parent" add flake.nix
+git -C "$TEST_ROOT/shallow-build-parent" commit -m "add flake"
+git clone --depth 1 "file://$TEST_ROOT/shallow-build-parent" "$TEST_ROOT/shallow-build-clone"
+rm -rf "$TEST_ROOT/shallow-build-parent"
+nix build --dry-run "git+file://$TEST_ROOT/shallow-build-clone"

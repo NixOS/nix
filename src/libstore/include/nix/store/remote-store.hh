@@ -23,12 +23,19 @@ class RemoteFSAccessor;
 
 struct RemoteStoreConfig : virtual StoreConfig
 {
-    using StoreConfig::StoreConfig;
+private:
+    void anchor() override;
 
-    const Setting<int> maxConnections{
+public:
+    RemoteStoreConfig(const Params & params, FilePathType pathType)
+        : StoreConfig(params, pathType)
+    {
+    }
+
+    Setting<int> maxConnections{
         this, 1, "max-connections", "Maximum number of concurrent connections to the Nix daemon."};
 
-    const Setting<unsigned int> maxConnectionAge{
+    Setting<unsigned int> maxConnectionAge{
         this,
         std::numeric_limits<unsigned int>::max(),
         "max-connection-age",
@@ -41,6 +48,10 @@ struct RemoteStoreConfig : virtual StoreConfig
  */
 struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore
 {
+private:
+    void anchor() override;
+
+public:
     using Config = RemoteStoreConfig;
 
     const Config & config;
@@ -97,8 +108,6 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
 
     void addToStore(const ValidPathInfo & info, Source & nar, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
-    void addMultipleToStore(Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
-
     void
     addMultipleToStore(PathsSource && pathsToCopy, Activity & act, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
@@ -140,7 +149,7 @@ struct RemoteStore : public virtual Store, public virtual GcStore, public virtua
         unsupported("repairPath");
     }
 
-    void addSignatures(const StorePath & storePath, const StringSet & sigs) override;
+    void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
     MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 

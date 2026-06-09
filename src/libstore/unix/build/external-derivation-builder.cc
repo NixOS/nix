@@ -1,4 +1,9 @@
+#include "derivation-builder-impl.hh"
+#include "nix/store/build/child.hh"
+
 namespace nix {
+
+namespace {
 
 struct ExternalDerivationBuilder : DerivationBuilderImpl
 {
@@ -6,10 +11,10 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
 
     ExternalDerivationBuilder(
         LocalStore & store,
-        std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         ExternalBuilder externalBuilder)
-        : DerivationBuilderImpl(store, std::move(miscMethods), std::move(params))
+        : DerivationBuilderImpl(store, miscMethods, std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
@@ -88,7 +93,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 args.insert(args.end(), jsonFile);
 
                 if (chdir(tmpDir.c_str()) == -1)
-                    throw SysError("changing into %1%", tmpDir);
+                    throw SysError("changing into %1%", PathFmt(tmpDir));
 
                 chownToBuilder(topTmpDir);
 
@@ -97,7 +102,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
                 debug("executing external builder: %s", concatStringsSep(" ", args));
                 execv(externalBuilder.program.c_str(), stringsToCharPtrs(args).data());
 
-                throw SysError("executing %s", externalBuilder.program);
+                throw SysError("executing %s", PathFmt(externalBuilder.program));
             } catch (...) {
                 handleChildException(true);
                 _exit(1);
@@ -106,13 +111,15 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
     }
 };
 
-std::unique_ptr<DerivationBuilder> makeExternalDerivationBuilder(
+} // namespace
+
+DerivationBuilderUnique makeExternalDerivationBuilder(
     LocalStore & store,
-    std::unique_ptr<DerivationBuilderCallbacks> miscMethods,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler)
 {
-    return std::make_unique<ExternalDerivationBuilder>(store, std::move(miscMethods), std::move(params), handler);
+    return DerivationBuilderUnique(new ExternalDerivationBuilder(store, miscMethods, std::move(params), handler));
 }
 
 } // namespace nix

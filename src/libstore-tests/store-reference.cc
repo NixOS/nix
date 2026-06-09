@@ -15,7 +15,7 @@ class StoreReferenceTest : public CharacterizationTest, public LibStoreTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "store-reference";
 
-    std::filesystem::path goldenMaster(PathView testStem) const override
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
     {
         return unitTestData / (testStem + ".txt");
     }
@@ -85,6 +85,20 @@ static StoreReference localExample_2{
         },
 };
 
+#ifdef _WIN32
+static StoreReference localExample_windows{
+    .variant =
+        StoreReference::Specified{
+            .scheme = "local",
+            .authority = "/C:/foo/bar/baz",
+        },
+    .params =
+        {
+            {"trusted", "true"},
+        },
+};
+#endif
+
 static StoreReference localExample_3{
     .variant =
         StoreReference::Specified{
@@ -108,7 +122,11 @@ URI_TEST_READ(local_3_no_percent, localExample_3)
 
 URI_TEST_READ(local_shorthand_1, localExample_1)
 
-URI_TEST_READ(local_shorthand_2, localExample_2)
+#ifndef _WIN32
+URI_TEST_READ(local_shorthand_path_unix, localExample_2)
+#else
+URI_TEST_READ(local_shorthand_path_windows, localExample_windows)
+#endif
 
 URI_TEST(
     local_shorthand_3,

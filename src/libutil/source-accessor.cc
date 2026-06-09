@@ -3,6 +3,20 @@
 
 namespace nix {
 
+void SourceAccessorError::anchor() {}
+
+void FileNotFound::anchor() {}
+
+void NotASymlink::anchor() {}
+
+void NotADirectory::anchor() {}
+
+void NotARegularFile::anchor() {}
+
+void RestrictedPathError::anchor() {}
+
+void SymlinkNotAllowed::anchor() {}
+
 static std::atomic<size_t> nextNumber{0};
 
 bool SourceAccessor::Stat::isNotNARSerialisable()
@@ -49,12 +63,15 @@ std::string SourceAccessor::readFile(const CanonPath & path)
 {
     StringSink sink;
     std::optional<uint64_t> size;
-    readFile(path, sink, [&](uint64_t _size) { size = _size; });
+    readFile(path, sink, [&](uint64_t _size) {
+        size = _size;
+        sink.s.reserve(_size);
+    });
     assert(size && *size == sink.s.size());
     return std::move(sink.s);
 }
 
-void SourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void SourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     auto s = readFile(path);
     sizeCallback(s.size());
@@ -112,7 +129,7 @@ CanonPath SourceAccessor::resolveSymlinks(const CanonPath & path, SymlinkResolut
                     if (!linksAllowed--)
                         throw Error("infinite symlink recursion in path '%s'", showPath(path));
                     auto target = readLink(res);
-                    if (isAbsolute(target)) {
+                    if (std::filesystem::path(target).is_absolute()) {
                         res = CanonPath::root;
                     } else {
                         res.pop();

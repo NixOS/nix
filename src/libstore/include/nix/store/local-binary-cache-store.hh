@@ -1,3 +1,6 @@
+#pragma once
+/// @file
+
 #include "nix/store/binary-cache-store.hh"
 
 namespace nix {
@@ -6,15 +9,23 @@ struct LocalBinaryCacheStoreConfig : std::enable_shared_from_this<LocalBinaryCac
                                      virtual Store::Config,
                                      BinaryCacheStoreConfig
 {
-    using BinaryCacheStoreConfig::BinaryCacheStoreConfig;
+private:
+    void anchor() override;
+
+public:
+    LocalBinaryCacheStoreConfig(const Params & params)
+        : StoreConfig(params, FilePathType::Unix)
+        , BinaryCacheStoreConfig(params)
+    {
+    }
 
     /**
      * @param binaryCacheDir `file://` is a short-hand for `file:///`
      * for now.
      */
-    LocalBinaryCacheStoreConfig(std::string_view scheme, PathView binaryCacheDir, const Params & params);
+    LocalBinaryCacheStoreConfig(const std::filesystem::path & binaryCacheDir, const Params & params);
 
-    Path binaryCacheDir;
+    std::filesystem::path binaryCacheDir;
 
     static const std::string name()
     {

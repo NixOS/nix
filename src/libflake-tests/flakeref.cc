@@ -283,4 +283,18 @@ TEST(to_string, doesntReencodeUrl)
     ASSERT_EQ(unparsed, expected);
 }
 
+TEST(parseFlakeRef, malformedGithubUrlDoesNotCrash)
+{
+    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+
+    fetchers::Settings fetchSettings;
+
+    // Using ref= instead of rev= with a github: URL should produce an
+    // error, not an assertion failure in renderAuthorityAndPath
+    // (https://github.com/NixOS/nix/issues/15196).
+    EXPECT_THROW(
+        parseFlakeRef(fetchSettings, "github:nixos/nixpkgs/nixpkgs.git?ref=aead170c1a49253ebfa5027010dfd89a77b73ca4"),
+        Error);
+}
+
 } // namespace nix

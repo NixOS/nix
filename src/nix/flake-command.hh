@@ -6,8 +6,6 @@
 
 namespace nix {
 
-using namespace nix::flake;
-
 class FlakeCommand : virtual Args, public MixFlakeOptions
 {
 protected:
@@ -19,7 +17,7 @@ public:
 
     FlakeRef getFlakeRef();
 
-    LockedFlake lockFlake();
+    flake::LockedFlake lockFlake();
 
     std::vector<FlakeRef> getFlakeRefsForCompletion() override;
 };

@@ -5,16 +5,20 @@
 
   unixtools,
   darwin,
+  freebsd,
 
   nix-util,
   boost,
   curl,
+  aws-c-common,
   aws-crt-cpp,
   libseccomp,
   nlohmann_json,
   sqlite,
+  cmake, # for resolving aws-crt-cpp dep
 
   busybox-sandbox-shell ? null,
+  pkgsStatic,
 
   # Configuration Options
 
@@ -22,9 +26,18 @@
 
   embeddedSandboxShell ? stdenv.hostPlatform.isStatic,
 
+  withSandboxShell ? stdenv.hostPlatform.isLinux || stdenv.hostPlatform.isFreeBSD,
+  sandboxShell ?
+    if stdenv.hostPlatform.isLinux then
+      "${busybox-sandbox-shell}/bin/busybox"
+    else if stdenv.hostPlatform.isFreeBSD then
+      "${pkgsStatic.bash}/bin/bash"
+    else
+      null,
+
   withAWS ?
     # Default is this way because there have been issues building this dependency
-    stdenv.hostPlatform == stdenv.buildPlatform && (stdenv.isLinux || stdenv.isDarwin),
+    (lib.meta.availableOn stdenv.hostPlatform aws-c-common),
 }:
 
 let
@@ -46,6 +59,8 @@ mkMesonLibrary (finalAttrs: {
     ./include/nix/store/meson.build
     ./linux/meson.build
     ./linux/include/nix/store/meson.build
+    ./darwin/meson.build
+    ./freebsd/meson.build
     ./unix/meson.build
     ./unix/include/nix/store/meson.build
     ./windows/meson.build
@@ -56,7 +71,8 @@ mkMesonLibrary (finalAttrs: {
     (fileset.fileFilter (file: file.hasExt "sql") ./.)
   ];
 
-  nativeBuildInputs = lib.optional embeddedSandboxShell unixtools.hexdump;
+  nativeBuildInputs =
+    lib.optional withAWS cmake ++ lib.optional embeddedSandboxShell unixtools.hexdump;
 
   buildInputs = [
     boost
@@ -64,6 +80,7 @@ mkMesonLibrary (finalAttrs: {
     sqlite
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
+  ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
   ++ lib.optional withAWS aws-crt-cpp;
 
   propagatedBuildInputs = [
@@ -76,8 +93,8 @@ mkMesonLibrary (finalAttrs: {
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
     (lib.mesonEnable "s3-aws-auth" withAWS)
   ]
-  ++ lib.optionals stdenv.hostPlatform.isLinux [
-    (lib.mesonOption "sandbox-shell" "${busybox-sandbox-shell}/bin/busybox")
+  ++ lib.optionals withSandboxShell [
+    (lib.mesonOption "sandbox-shell" sandboxShell)
   ];
 
   meta = {

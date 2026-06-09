@@ -1,0 +1,33 @@
+{
+  "args": [],
+  "builder": "/bin/bash",
+  "env": {
+    "DEP1_DEV": "/nix/store/j1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-dev",
+    "DEP1_OUT": "prefix-/nix/store/f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out-suffix",
+    "DEP2": "/nix/store/i1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2-out"
+  },
+  "inputs": [
+    "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out",
+    "i1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2-out",
+    "j1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-dev"
+  ],
+  "name": "with-inputs",
+  "outputs": {
+    "dev": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    },
+    "out": {
+      "hashAlgo": "sha256",
+      "method": "nar"
+    }
+  },
+  "structuredAttrs": {
+    "dep1out": "/nix/store/f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-out",
+    "nested": {
+      "dep2": "before /nix/store/i1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep2-out after"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

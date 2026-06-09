@@ -1,0 +1,8 @@
+error:
+       … while calling the 'head' builtin
+         at /pwd/lang/eval-fail-head-2.nix:1:1:
+            1| builtins.head [ ]
+             | ^
+            2|
+
+       error: 'builtins.head' called on an empty list

@@ -26,7 +26,7 @@ TODO_NixOS # following line fails.
 
 # `nix develop` is a slightly special way of dealing with environment vars, it parses
 # these from a shell-file exported from a derivation. This is to test especially `outputs`
-# (which is an associative array in thsi case) being fine.
+# (which is an associative array in this case) being fine.
 # shellcheck disable=SC2016
 nix develop -f structured-attrs-shell.nix -c bash -c 'test -n "$out"'
 
@@ -51,15 +51,17 @@ expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "
 hacky=$(nix-instantiate --expr "$hackyExpr")
 nix derivation show "$hacky" | jq --exit-status '.derivations."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'
 
-# Test warning for non-object exportReferencesGraph in structured attrs
-# shellcheck disable=SC2016
-expectStderr 0 nix-build --expr '
-  with import ./config.nix;
-  mkDerivation {
-    name = "export-graph-non-object";
-    __structuredAttrs = true;
-    exportReferencesGraph = [ "foo" "bar" ];
-    builder = "/bin/sh";
-    args = ["-c" "echo foo > ${builtins.placeholder "out"}"];
-  }
-' | grepQuiet "warning:.*exportReferencesGraph.*not a JSON object"
+if isDaemonNewer "2.34pre"; then
+    # Test warning for non-object exportReferencesGraph in structured attrs
+    # shellcheck disable=SC2016
+    expectStderr 0 nix-build --no-out-link --expr '
+    with import ./config.nix;
+    mkDerivation {
+        name = "export-graph-non-object";
+        __structuredAttrs = true;
+        exportReferencesGraph = [ "foo" "bar" ];
+        builder = "/bin/sh";
+        args = ["-c" "echo foo > ${builtins.placeholder "out"}"];
+    }
+    ' | grepQuiet "warning:.*exportReferencesGraph.*not a JSON object"
+fi

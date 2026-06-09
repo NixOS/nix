@@ -1,9 +1,16 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/signals.hh"
 
 #include <cstring>
+
+#ifndef _WIN32
+#  include <fcntl.h>
+#  include <stdlib.h>
+#endif
 
 namespace nix {
 
@@ -111,6 +118,55 @@ TEST(ReadLine, LineWithNullBytes)
             "b",
             3));
 }
+
+#ifndef _WIN32
+TEST(ReadLine, TreatsEioAsEof)
+{
+    // Open a pty master. When the slave side is closed (or never opened),
+    // reading from the master returns EIO, which readLine should treat as EOF.
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    ASSERT_NE(master, -1);
+    ASSERT_EQ(grantpt(master), 0);
+    ASSERT_EQ(unlockpt(master), 0);
+
+    // Open and immediately close the slave to trigger EIO on the master.
+    int slave = open(ptsname(master), O_RDWR | O_NOCTTY | O_CLOEXEC);
+    ASSERT_NE(slave, -1);
+    close(slave);
+
+    // With eofOk=true, readLine should return empty string (treating EIO as EOF).
+    EXPECT_EQ(readLine(master, /*eofOk=*/true), "");
+
+    // With eofOk=false, readLine should throw EndOfFile.
+    EXPECT_THROW(readLine(master), EndOfFile);
+
+    close(master);
+}
+
+// macOS (BSD) discards buffered pty data on slave close and returns normal
+// EOF (0) instead of EIO, so partial data never reaches the master.
+#  ifdef __linux__
+TEST(ReadLine, PartialLineBeforeEio)
+{
+    int master = posix_openpt(O_RDWR | O_NOCTTY);
+    ASSERT_NE(master, -1);
+    ASSERT_EQ(grantpt(master), 0);
+    ASSERT_EQ(unlockpt(master), 0);
+
+    int slave = open(ptsname(master), O_RDWR | O_NOCTTY | O_CLOEXEC);
+    ASSERT_NE(slave, -1);
+
+    // Write a partial line (no terminator) from the slave, then close it.
+    ASSERT_EQ(::write(slave, "partial", 7), 7);
+    close(slave);
+
+    // readLine should return the partial data when eofOk=true.
+    EXPECT_EQ(readLine(master, /*eofOk=*/true), "partial");
+
+    close(master);
+}
+#  endif
+#endif
 
 TEST(BufferedSourceReadLine, ReadsLinesFromPipe)
 {
@@ -240,6 +296,30 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "abcdefgh");
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "");
+}
+
+TEST(WriteFull, RespectsAllowInterrupts)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
+    Pipe pipe;
+    pipe.create();
+
+    setInterrupted(true);
+
+    // Must not throw Interrupted even though the interrupt flag is set.
+    EXPECT_NO_THROW(writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/false));
+
+    // Must throw Interrupted when allowInterrupts is true.
+    EXPECT_THROW(writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/true), Interrupted);
+
+    setInterrupted(false);
+    pipe.writeSide.close();
+
+    // Verify the data from the first write was actually written.
+    FdSource source(pipe.readSide.get());
+    EXPECT_EQ(source.readLine(/*eofOk=*/true), "hello");
 }
 
 } // namespace nix

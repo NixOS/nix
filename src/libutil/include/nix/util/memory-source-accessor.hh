@@ -108,6 +108,10 @@ VariantT<RegularContents, recur>::operator<=>(const VariantT<RegularContents, re
  */
 struct MemorySourceAccessor : virtual SourceAccessor
 {
+private:
+    void anchor() override;
+
+public:
     using File = fso::VariantT<std::string, true>;
 
     std::optional<File> root;
@@ -119,7 +123,9 @@ struct MemorySourceAccessor : virtual SourceAccessor
         return root < other.root;
     }
 
-    std::string readFile(const CanonPath & path) override;
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+    using SourceAccessor::readFile;
+
     bool pathExists(const CanonPath & path) override;
     std::optional<Stat> maybeLstat(const CanonPath & path) override;
     DirEntries readDirectory(const CanonPath & path) override;
@@ -146,6 +152,10 @@ struct MemorySourceAccessor : virtual SourceAccessor
  */
 struct MemorySink : FileSystemObjectSink
 {
+private:
+    void anchor() override;
+
+public:
     MemorySourceAccessor & dst;
 
     MemorySink(MemorySourceAccessor & dst)
@@ -155,7 +165,7 @@ struct MemorySink : FileSystemObjectSink
 
     void createDirectory(const CanonPath & path) override;
 
-    void createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)>) override;
+    void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const CanonPath & path, const std::string & target) override;
 };

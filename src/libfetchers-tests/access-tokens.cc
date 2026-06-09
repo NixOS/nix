@@ -3,8 +3,6 @@
 
 #include "nix/fetchers/fetchers.hh"
 #include "nix/fetchers/fetch-settings.hh"
-#include "nix/util/json-utils.hh"
-#include "nix/util/tests/characterization.hh"
 
 namespace nix::fetchers {
 

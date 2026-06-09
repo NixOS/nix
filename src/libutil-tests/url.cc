@@ -63,6 +63,50 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "owner", "repo.git"},
                 },
         },
+        // SCP-like URL, no user (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "github.com:owner/repo.git",
+            .expected = "ssh://github.com/owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                        },
+                    .path = {"", "owner", "repo.git"},
+                },
+        },
+        // SCP-like URL, no user, absolute path (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "github.com:/owner/repo.git",
+            .expected = "ssh://github.com/owner/repo.git",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "github.com",
+                        },
+                    .path = {"", "owner", "repo.git"},
+                },
+        },
+        // SCP-like URL (rewritten to ssh://)
+        FixGitURLParam{
+            .input = "user@server.com:/path/to/repo",
+            .expected = "ssh://user@server.com/path/to/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "server.com",
+                            .user = "user",
+                        },
+                    .path = {"", "path", "to", "repo"},
+                },
+        },
+#ifndef _WIN32
         // Absolute path (becomes file:)
         FixGitURLParam{
             .input = "/home/me/repo",
@@ -74,9 +118,20 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "home", "me", "repo"},
                 },
         },
+#else
+        // Absolute path (becomes file:) (Windows)
+        FixGitURLParam{
+            .input = "C:\\home\\me\\repo",
+            .expected = "file:///C:/home/me/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "home", "me", "repo"},
+                },
+        },
+#endif
         // Already file: scheme
-        // NOTE: Git/SCP treat this as a `<hostname>:<path>`, so we are
-        // failing to "fix up" this case.
         FixGitURLParam{
             .input = "file:/var/repos/x",
             .expected = "file:/var/repos/x",
@@ -87,10 +142,68 @@ INSTANTIATE_TEST_SUITE_P(
                     .path = {"", "var", "repos", "x"},
                 },
         },
+        // git+file scheme
+        FixGitURLParam{
+            .input = "git+file:///var/repos/x",
+            .expected = "file:///var/repos/x",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "var", "repos", "x"},
+                },
+        },
+#ifndef _WIN32
+        // absolute path with a space
+        FixGitURLParam{
+            .input = "/repos/git repo",
+            .expected = "file:///repos/git%20repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "repos", "git repo"},
+                },
+        },
+        // quoted path
+        FixGitURLParam{
+            .input = "/repos/\"git repo\"",
+            .expected = "file:///repos/%22git%20repo%22",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "repos", "\"git repo\""},
+                },
+        },
+#else
+        // absolute path with a space (Windows)
+        FixGitURLParam{
+            .input = "C:\\repos\\git repo",
+            .expected = "file:///C:/repos/git%20repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "repos", "git repo"},
+                },
+        },
+        // quoted path (Windows)
+        FixGitURLParam{
+            .input = "C:\\repos\\\"git repo\"",
+            .expected = "file:///C:/repos/%22git%20repo%22",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "repos", "\"git repo\""},
+                },
+        },
+#endif
         // IPV6 test case
         FixGitURLParam{
             .input = "user@[2001:db8:1::2]:/home/file",
-            .expected = "ssh://user@[2001:db8:1::2]//home/file",
+            .expected = "ssh://user@[2001:db8:1::2]/home/file",
             .parsed =
                 ParsedURL{
                     .scheme = "ssh",
@@ -100,7 +213,139 @@ INSTANTIATE_TEST_SUITE_P(
                             .host = "2001:db8:1::2",
                             .user = "user",
                         },
-                    .path = {"", "", "home", "file"},
+                    .path = {"", "home", "file"},
+                },
+        },
+        // https://github.com/NixOS/nix/issues/14867
+        // Verify input doesn't trigger an assert.
+        // Intent is git@github, but gets parsed as git scheme with a relative path
+        FixGitURLParam{
+            .input = "git:github.com:nixos/nixpkgs",
+            .expected = "git:github.com:nixos/nixpkgs",
+            .parsed =
+                ParsedURL{
+                    .scheme = "git",
+                    .authority = std::nullopt,
+                    .path = {"github.com:nixos", "nixpkgs"},
+                },
+        },
+        // https://github.com/NixOS/nix/issues/14867#issuecomment-3699499232
+        // Verify input doesn't trigger an assert.
+        // The authority should have a "//" prefix, but instead gets parsed as a path component
+        FixGitURLParam{
+            .input = "git+https:/codeberg.org/forgejo/forgejo",
+            .expected = "https:/codeberg.org/forgejo/forgejo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority = std::nullopt,
+                    .path = {"", "codeberg.org", "forgejo", "forgejo"},
+                },
+        },
+        FixGitURLParam{
+            .input = "user%20@[::1]:repo/path",
+            .expected = "ssh://user%2520@[::1]/repo/path",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = ParsedURL::Authority::HostType::IPv6,
+                            .host = "::1",
+                            .user = "user%20",
+                        },
+                    .path = {"", "repo", "path"},
+                },
+        },
+        // IPv6 SCP-like. Looks like a port but is actually a path.
+        FixGitURLParam{
+            .input = "[2a02:8071:8192:c100:311d:192d:81ac:11ea]:12345",
+            .expected = "ssh://[2a02:8071:8192:c100:311d:192d:81ac:11ea]/12345",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = ParsedURL::Authority::HostType::IPv6,
+                            .host = "2a02:8071:8192:c100:311d:192d:81ac:11ea",
+                            .user = std::nullopt,
+                        },
+                    .path = {"", "12345"},
+                },
+        },
+#ifndef _WIN32
+        // Treats percent as a literal and not pct-encoding.
+        FixGitURLParam{
+            .input = "/a/b/%20",
+            .expected = "file:///a/b/%2520",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "a", "b", "%20"},
+                },
+        },
+#else
+        // Treats percent as a literal and not pct-encoding (Windows).
+        FixGitURLParam{
+            .input = "C:\\a\\b\\%20",
+            .expected = "file:///C:/a/b/%2520",
+            .parsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "a", "b", "%20"},
+                },
+        },
+#endif
+        // Brackets in hostname (not IPv6). SSH's valid_hostname() accepts
+        // brackets, so these are legal SSH aliases, even if they are not legal
+        // DNS domains.
+        FixGitURLParam{
+            .input = "host[1]:repo",
+            .expected = "ssh://host%5B1%5D/repo",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "host[1]",
+                        },
+                    .path = {"", "repo"},
+                },
+        },
+        // Leading `[` with `@[` later: git prefers `@[` (see host_end()
+        // in connect.c), so `[user]` is the username and `[::1]` is IPv6.
+        FixGitURLParam{
+            .input = "[user]@[::1]:path",
+            .expected = "ssh://%5Buser%5D@[::1]/path",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "::1",
+                            .user = "[user]",
+                        },
+                    .path = {"", "path"},
+                },
+        },
+        // Colon in the path part, not the host. Git splits at the first
+        // `:`, so `notuser` is the host and the rest is path.
+        // $ GIT_TRACE=1 git ls-remote 'notuser:notpass@notjusthost:restofpath'
+        // → ssh notuser 'git-upload-pack notpass@notjusthost:restofpath'
+        FixGitURLParam{
+            .input = "notuser:notpass@notjusthost:restofpath",
+            .expected = "ssh://notuser/notpass@notjusthost:restofpath",
+            .parsed =
+                ParsedURL{
+                    .scheme = "ssh",
+                    .authority =
+                        ParsedURL::Authority{
+                            .host = "notuser",
+                        },
+                    .path = {"", "notpass@notjusthost:restofpath"},
                 },
         }));
 
@@ -112,22 +357,16 @@ TEST_P(FixGitURLTestSuite, parsesVariedGitUrls)
     EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, scpLikeNoUserParsesPoorly)
+// This is an idempotence-like condition: every SCP URL has a corresponding bona fide URL that will parse correctly.
+TEST_P(FixGitURLTestSuite, parsedNormalized)
 {
-    // SCP-like URL (no user)
-
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
-    EXPECT_EQ(
-        fixGitURL("github.com:owner/repo.git"),
-        (ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = {"github.com:owner", "repo.git"},
-        }));
+    auto & p = GetParam();
+    const auto actual = fixGitURL(p.expected);
+    EXPECT_EQ(actual, p.parsed);
+    EXPECT_EQ(actual.to_string(), p.expected);
 }
 
-TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
+TEST(FixGitURLTestSuite, rejectFileURLWithAuthority)
 {
     /* From the underlying `parseURL` validations. */
     EXPECT_THAT(
@@ -136,37 +375,120 @@ TEST(FixGitURLTestSuite, properlyRejectFileURLWithAuthority)
             testing::HasSubstrIgnoreANSIMatcher("file:// URL 'file://var/repos/x' has unexpected authority 'var'")));
 }
 
-TEST(FixGitURLTestSuite, scpLikePathLeadingSlashParsesPoorly)
+TEST(FixGitURLTestSuite, rejectRelativePath)
 {
-    // SCP-like URL (no user)
-
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
-    EXPECT_EQ(
-        fixGitURL("github.com:/owner/repo.git"),
-        (ParsedURL{
-            .scheme = "file",
-            .authority = ParsedURL::Authority{},
-            .path = {"github.com:", "owner", "repo.git"},
-        }));
+    /* From the underlying `parseURL` validations. */
+    EXPECT_THAT(
+        []() { fixGitURL("relative/repo"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("doesn't have a scheme")));
 }
 
-TEST(FixGitURLTestSuite, relativePathParsesPoorly)
+TEST(FixGitURLTestSuite, rejectEmptyPathGitScp)
 {
-    // Relative path (becomes file:// absolute)
+    /* Reject SCP-style URLs with no path component. */
+    EXPECT_THAT(
+        []() { fixGitURL("host:"); },
+        ::testing::ThrowsMessage<BadURL>(
+            testing::HasSubstrIgnoreANSIMatcher("SCP-style Git URL 'host:' has an empty path")));
+}
 
-    // Cannot "to_string" this because has illegal path not starting
-    // with `/`.
-    EXPECT_EQ(
-        fixGitURL("relative/repo"),
-        (ParsedURL{
-            .scheme = "file",
-            .authority =
-                ParsedURL::Authority{
-                    .hostType = ParsedURL::Authority::HostType::Name,
-                    .host = "",
-                },
-            .path = {"relative", "repo"}}));
+TEST(FixGitURLTestSuite, rejectMalformedBracketedURLs)
+{
+    /* Brackets not in host position go through the colon-based path,
+       consistent with git (which also finds the first colon). These
+       are garbage parses, but SSH's `valid_hostname()` accepts brackets
+       so they can't be rejected outright. */
+
+    /* First colon is inside brackets → schemeOrHost = "user[2001". */
+    auto parsed1 = fixGitURL("user[2001:db8:1::2]:/home/@file");
+    EXPECT_EQ(parsed1.scheme, "ssh");
+    EXPECT_EQ(parsed1.authority->host, "user[2001");
+
+    /* First colon is before brackets → schemeOrHost = "user". */
+    auto parsed2 = fixGitURL("user:[2001:db8:1::2]:/home/@file");
+    EXPECT_EQ(parsed2.scheme, "ssh");
+    EXPECT_EQ(parsed2.authority->host, "user");
+
+    /* `user:@[...]` has `@[` so enters the IPv6 bracket path.
+       The bracket regex matches on `[2001:db8:1::2]:/home/file`,
+       and everything before `@[` becomes the username (`user:`). */
+    auto parsed3 = fixGitURL("user:@[2001:db8:1::2]:/home/file");
+    EXPECT_EQ(parsed3.scheme, "ssh");
+    EXPECT_EQ(parsed3.authority->host, "2001:db8:1::2");
+    EXPECT_EQ(parsed3.authority->user, "user:");
+}
+
+TEST(FixGitURLTestSuite, mismatchedBrackets)
+{
+    /* Missing `]`: git's `host_end()` falls back to `end = host` and
+       finds the first `:` as separator. We do the same — fall through
+       to the colon-based path.
+       $ GIT_TRACE=1 git ls-remote 'user@[host:path'
+       → ssh 'user@[host' 'git-upload-pack path' */
+    auto parsed1 = fixGitURL("user@[host:path");
+    EXPECT_EQ(parsed1.scheme, "ssh");
+    EXPECT_EQ(parsed1.authority->user, "user");
+    EXPECT_EQ(parsed1.authority->host, "[host");
+
+    /* Leading `[` with no `]`: same fallback to colon-based path.
+       $ GIT_TRACE=1 git ls-remote '[:path'
+       → ssh '[' 'git-upload-pack path' */
+    auto parsed2 = fixGitURL("[:path");
+    EXPECT_EQ(parsed2.scheme, "ssh");
+    EXPECT_EQ(parsed2.authority->host, "[");
+
+    /* `]` present but not followed by `:` — not SCP-style, let
+       parseURL handle it. */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[::1]/path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+
+    /* Nested `[` inside brackets: `[[]:path` has `]` at position 2
+       followed by `:`. Parsed as bracketed host `[[]`, but `[` is
+       not valid IPv6. Git also parses this way (strips brackets,
+       gets host `[`, SSH rejects).
+       $ GIT_TRACE=1 git ls-remote '[[]:path'
+       → ssh '[' 'git-upload-pack path' */
+    EXPECT_THAT(
+        []() { fixGitURL("[[]:path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid IPv6 address")));
+}
+
+TEST(FixGitURLTestSuite, slashBeforeColonIsNotScp)
+{
+    /* A slash before the first colon means it's not SCP — consistent
+       with git's `url_is_local_not_ssh()`. */
+    EXPECT_THAT(
+        []() { fixGitURL("x@foo/bar:baz"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("doesn't have a scheme")));
+}
+
+TEST(FixGitURLTestSuite, noColonIsNotScp)
+{
+    /* No `:` at all means not SCP — consistent with git's
+       `url_is_local_not_ssh()` in `connect.c`.
+       $ GIT_TRACE=1 git ls-remote 'user@[host]'
+       → git-upload-pack ']'  (treated as local, not SCP)
+       $ GIT_TRACE=1 git ls-remote 'user@[host]/path'
+       → git-upload-pack ']/path'  (treated as local, not SCP) */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[host]"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+    EXPECT_THAT(
+        []() { fixGitURL("user@[host]/path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
+}
+
+TEST(FixGitURLTestSuite, gitBugDiscardedCharsBetweenBracketAndColon)
+{
+    /* Git's `host_end()` returns `end` past `]`, then `strchr(end, ':')`
+       finds `:` anywhere after — silently discarding characters between
+       `]` and `:`. This is a git bug; we refuse to parse as SCP.
+       $ GIT_TRACE=1 git ls-remote 'user@[::1]foo:path'
+       → ssh user@::1 'git-upload-pack path'  (git discards `foo`) */
+    EXPECT_THAT(
+        []() { fixGitURL("user@[::1]foo:path"); },
+        ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("is not a valid URL")));
 }
 
 struct ParseURLSuccessCase
@@ -187,7 +509,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "http",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -198,7 +524,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -209,7 +539,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
                     .fragment = "hello",
@@ -220,7 +554,11 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "file+https",
-                    .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
                     .path = {"", "video.mp4"},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -231,7 +569,12 @@ INSTANTIATE_TEST_SUITE_P(
             .expected =
                 ParsedURL{
                     .scheme = "http",
-                    .authority = Authority{.hostType = HostType::IPv4, .host = "127.0.0.1", .port = 8080},
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv4,
+                            .host = "127.0.0.1",
+                            .port = 8080,
+                        },
                     .path = {"", "file.tar.gz"},
                     .query = (StringMap) {{"download", "fast"}, {"when", "now"}},
                     .fragment = "hello",
@@ -244,7 +587,10 @@ INSTANTIATE_TEST_SUITE_P(
                     .scheme = "http",
                     .authority =
                         Authority{
-                            .hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c\%enp0s25",
+                            .port = 8080,
+                        },
                     .path = {""},
                     .query = (StringMap) {},
                     .fragment = "",
@@ -296,7 +642,11 @@ TEST(parseURL, parsesSimpleHttpUrlWithComplexFragment)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .authority =
+            Authority{
+                .hostType = HostType::Name,
+                .host = "www.example.org",
+            },
         .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"field", "value"}},
         .fragment = "?foo=bar#",
@@ -503,7 +853,11 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
 
     ParsedURL expected{
         .scheme = "http",
-        .authority = Authority{.hostType = HostType::Name, .host = "www.example.org"},
+        .authority =
+            Authority{
+                .hostType = HostType::Name,
+                .host = "www.example.org",
+            },
         .path = {"", "file.tar.gz"},
         .query = (StringMap) {{"foo", "bar"}},
         .fragment = "",
@@ -517,203 +871,296 @@ TEST(parseURL, parsesHttpUrlWithEmptyPort)
  * parseURLRelative
  * --------------------------------------------------------------------------*/
 
-TEST(parseURLRelative, resolvesRelativePath)
+struct ParseURLRelativeParam
 {
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
+    std::string_view base;
+    std::string_view relative;
+    ParsedURL expected;
+    std::string description;
+};
+
+class ParseURLRelativeTestSuite : public ::testing::TestWithParam<ParseURLRelativeParam>
+{};
+
+TEST_P(ParseURLRelativeTestSuite, resolve)
+{
+    auto & p = GetParam();
+    auto base = parseURL(p.base);
+    auto parsed = parseURLRelative(p.relative, base);
+    EXPECT_EQ(parsed, p.expected);
 }
 
-TEST(parseURLRelative, baseUrlIpv6AddressWithoutZoneId)
-{
-    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c]/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesRelativePathIpv6AddressWithZoneId)
-{
-    ParsedURL base = parseURL("http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html");
-    auto parsed = parseURLRelative("subdir/file2.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = Authority{.hostType = HostType::IPv6, .host = "fe80::818c:da4d:8975:415c\%enp0s25", .port = 8080},
-        .path = {"", "dir", "subdir", "file2.txt"},
-        .query = {},
-        .fragment = "",
-    };
-
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesRelativePathWithDot)
-{
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("./subdir/file.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "dir", "subdir", "file.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesParentDirectory)
-{
-    ParsedURL base = parseURL("http://example.org:234/dir/page.html");
-    auto parsed = parseURLRelative("../up.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
-        .path = {"", "up.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, resolvesParentDirectoryNotTrickedByEscapedSlash)
-{
-    ParsedURL base = parseURL("http://example.org:234/dir\%2Ffirst-trick/another-dir\%2Fsecond-trick/page.html");
-    auto parsed = parseURLRelative("../up.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org", .port = 234},
-        .path = {"", "dir/first-trick", "up.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, replacesPathWithAbsoluteRelative)
-{
-    ParsedURL base = parseURL("http://example.org/dir/page.html");
-    auto parsed = parseURLRelative("/rooted.txt", base);
-    ParsedURL expected{
-        .scheme = "http",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "example.org"},
-        .path = {"", "rooted.txt"},
-        .query = {},
-        .fragment = "",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, keepsQueryAndFragmentFromRelative)
-{
-    // But discard query params on base URL
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?z=3");
-    auto parsed = parseURLRelative("other.html?x=1&y=2#frag", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "other.html"},
-        .query = {{"x", "1"}, {"y", "2"}},
-        .fragment = "frag",
-    };
-    ASSERT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, absOverride)
-{
-    ParsedURL base = parseURL("http://example.org/path/page.html");
-    std::string_view abs = "https://127.0.0.1.org/secure";
-    auto parsed = parseURLRelative(abs, base);
-    auto parsedAbs = parseURL(abs);
-    ASSERT_EQ(parsed, parsedAbs);
-}
-
-TEST(parseURLRelative, absOverrideWithZoneId)
-{
-    ParsedURL base = parseURL("http://example.org/path/page.html");
-    std::string_view abs = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar";
-    auto parsed = parseURLRelative(abs, base);
-    auto parsedAbs = parseURL(abs);
-    ASSERT_EQ(parsed, parsedAbs);
-}
-
-TEST(parseURLRelative, bothWithoutAuthority)
-{
-    ParsedURL base = parseURL("mailto:mail-base@bar.baz?bcc=alice@asdf.com");
-    std::string_view over = "mailto:mail-override@foo.bar?subject=url-testing";
-    auto parsed = parseURLRelative(over, base);
-    auto parsedOverride = parseURL(over);
-    ASSERT_EQ(parsed, parsedOverride);
-}
-
-TEST(parseURLRelative, emptyRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"a b", "5 6"}, {"x y", "34"}},
-        .fragment = "",
-    };
-    EXPECT_EQ(base.fragment, "frag");
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, fragmentRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("#frag2", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"a b", "5 6"}, {"x y", "34"}},
-        .fragment = "frag2",
-    };
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, queryRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"asdf qwer", "1 2 3"}},
-        .fragment = "",
-    };
-    EXPECT_EQ(parsed, expected);
-}
-
-TEST(parseURLRelative, queryFragmentRelative)
-{
-    ParsedURL base = parseURL("https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag");
-    auto parsed = parseURLRelative("?asdf\%20qwer=1\%202\%203#frag2", base);
-    ParsedURL expected{
-        .scheme = "https",
-        .authority = ParsedURL::Authority{.hostType = HostType::Name, .host = "www.example.org"},
-        .path = {"", "path", "index.html"},
-        .query = {{"asdf qwer", "1 2 3"}},
-        .fragment = "frag2",
-    };
-    EXPECT_EQ(parsed, expected);
-}
+INSTANTIATE_TEST_SUITE_P(
+    parseURLRelative,
+    ParseURLRelativeTestSuite,
+    ::testing::Values(
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "resolvesRelativePath",
+        },
+        ParseURLRelativeParam{
+            .base = "http://[fe80::818c:da4d:8975:415c]/dir/page.html",
+            .relative = "subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "baseUrlIpv6AddressWithoutZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "http://[fe80::818c:da4d:8975:415c\%25enp0s25]:8080/dir/page.html",
+            .relative = "subdir/file2.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c%enp0s25",
+                            .port = 8080,
+                        },
+                    .path = {"", "dir", "subdir", "file2.txt"},
+                },
+            .description = "resolvesRelativePathIpv6AddressWithZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "./subdir/file.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "dir", "subdir", "file.txt"},
+                },
+            .description = "resolvesRelativePathWithDot",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org:234/dir/page.html",
+            .relative = "../up.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                            .port = 234,
+                        },
+                    .path = {"", "up.txt"},
+                },
+            .description = "resolvesParentDirectory",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org:234/dir\%2Ffirst-trick/another-dir\%2Fsecond-trick/page.html",
+            .relative = "../up.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                            .port = 234,
+                        },
+                    .path = {"", "dir/first-trick", "up.txt"},
+                },
+            .description = "resolvesParentDirectoryNotTrickedByEscapedSlash",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/dir/page.html",
+            .relative = "/rooted.txt",
+            .expected =
+                ParsedURL{
+                    .scheme = "http",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "example.org",
+                        },
+                    .path = {"", "rooted.txt"},
+                },
+            .description = "replacesPathWithAbsoluteRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?z=3",
+            .relative = "other.html?x=1&y=2#frag",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "other.html"},
+                    .query = {{"x", "1"}, {"y", "2"}},
+                    .fragment = "frag",
+                },
+            .description = "keepsQueryAndFragmentFromRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/path/page.html",
+            .relative = "https://127.0.0.1.org/secure",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "127.0.0.1.org",
+                        },
+                    .path = {"", "secure"},
+                },
+            .description = "absOverride",
+        },
+        ParseURLRelativeParam{
+            .base = "http://example.org/path/page.html",
+            .relative = "https://[fe80::818c:da4d:8975:415c\%25enp0s25]/secure?foo=bar",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::IPv6,
+                            .host = "fe80::818c:da4d:8975:415c%enp0s25",
+                        },
+                    .path = {"", "secure"},
+                    .query = {{"foo", "bar"}},
+                },
+            .description = "absOverrideWithZoneId",
+        },
+        ParseURLRelativeParam{
+            .base = "mailto:mail-base@bar.baz?bcc=alice@asdf.com",
+            .relative = "mailto:mail-override@foo.bar?subject=url-testing",
+            .expected =
+                ParsedURL{
+                    .scheme = "mailto",
+                    .path = {"mail-override@foo.bar"},
+                    .query = {{"subject", "url-testing"}},
+                },
+            .description = "bothWithoutAuthority",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"a b", "5 6"}, {"x y", "34"}},
+                },
+            .description = "emptyRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "#frag2",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"a b", "5 6"}, {"x y", "34"}},
+                    .fragment = "frag2",
+                },
+            .description = "fragmentRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "#",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"a b", "5 6"}, {"x y", "34"}},
+                    .fragment = "",
+                },
+            .description = "emptyFragmentRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {},
+                },
+            .description = "emptyQueryRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?asdf\%20qwer=1\%202\%203",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"asdf qwer", "1 2 3"}},
+                },
+            .description = "queryRelative",
+        },
+        ParseURLRelativeParam{
+            .base = "https://www.example.org/path/index.html?a\%20b=5\%206&x\%20y=34#frag",
+            .relative = "?asdf\%20qwer=1\%202\%203#frag2",
+            .expected =
+                ParsedURL{
+                    .scheme = "https",
+                    .authority =
+                        Authority{
+                            .hostType = HostType::Name,
+                            .host = "www.example.org",
+                        },
+                    .path = {"", "path", "index.html"},
+                    .query = {{"asdf qwer", "1 2 3"}},
+                    .fragment = "frag2",
+                },
+            .description = "queryFragmentRelative",
+        }),
+    [](const auto & info) { return info.param.description; });
 
 /* ----------------------------------------------------------------------------
  * decodeQuery
@@ -974,5 +1421,109 @@ TEST(nix, isValidSchemeName)
     ASSERT_FALSE(isValidSchemeName("http\n"));
     ASSERT_FALSE(isValidSchemeName("http "));
 }
+
+/* ----------------------------------------------------------------------------
+ * pathToUrlPath / urlPathToPath
+ * --------------------------------------------------------------------------*/
+
+struct UrlPathTestCase
+{
+    std::string_view urlString;
+    ParsedURL urlParsed;
+    std::filesystem::path path;
+    std::string description;
+};
+
+class UrlPathTest : public ::testing::TestWithParam<UrlPathTestCase>
+{};
+
+TEST_P(UrlPathTest, pathToUrlPath)
+{
+    const auto & testCase = GetParam();
+    auto urlPath = pathToUrlPath(testCase.path);
+    EXPECT_EQ(urlPath, testCase.urlParsed.path);
+}
+
+TEST_P(UrlPathTest, urlPathToPath)
+{
+    const auto & testCase = GetParam();
+    auto path = urlPathToPath(testCase.urlParsed.path);
+    EXPECT_EQ(path, testCase.path);
+}
+
+TEST_P(UrlPathTest, urlToString)
+{
+    const auto & testCase = GetParam();
+    EXPECT_EQ(testCase.urlParsed.to_string(), testCase.urlString);
+}
+
+TEST_P(UrlPathTest, stringToUrl)
+{
+    const auto & testCase = GetParam();
+    auto parsed = parseURL(std::string{testCase.urlString});
+    EXPECT_EQ(parsed, testCase.urlParsed);
+}
+
+#ifndef _WIN32
+
+INSTANTIATE_TEST_SUITE_P(
+    Unix,
+    UrlPathTest,
+    ::testing::Values(
+        UrlPathTestCase{
+            .urlString = "file:///foo/bar/baz",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "foo", "bar", "baz"},
+                },
+            .path = "/foo/bar/baz",
+            .description = "absolute_path",
+        },
+        UrlPathTestCase{
+            .urlString = "file:///",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", ""},
+                },
+            .path = "/",
+            .description = "root_path",
+        }),
+    [](const auto & info) { return info.param.description; });
+
+#else // _WIN32
+
+INSTANTIATE_TEST_SUITE_P(
+    Windows,
+    UrlPathTest,
+    ::testing::Values(
+        UrlPathTestCase{
+            .urlString = "file:///C:/foo/bar/baz",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", "foo", "bar", "baz"},
+                },
+            .path = L"C:\\foo\\bar\\baz",
+            .description = "absolute_path",
+        },
+        UrlPathTestCase{
+            .urlString = "file:///C:/",
+            .urlParsed =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = ParsedURL::Authority{},
+                    .path = {"", "C:", ""},
+                },
+            .path = L"C:\\",
+            .description = "drive_root",
+        }),
+    [](const auto & info) { return info.param.description; });
+
+#endif // _WIN32
 
 } // namespace nix

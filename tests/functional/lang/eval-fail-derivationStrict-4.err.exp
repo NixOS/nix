@@ -1,0 +1,11 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-4.nix:1:1:
+            1| builtins.derivationStrict { name = "foo"; }
+             | ^
+            2|
+
+       … while evaluating derivation 'foo'
+         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-4.nix:1:29
+
+       error: required attribute 'builder' missing

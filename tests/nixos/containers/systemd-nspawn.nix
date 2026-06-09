@@ -56,6 +56,8 @@ runCommand "test"
     mkdir -p $root $root/etc
 
     export > $root/.env
+    # Somehow systemd silently dies without this directory.
+    mkdir $root/usr
 
     # Make /run a tmpfs to shut up a systemd warning.
     mkdir /run

@@ -27,6 +27,8 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
     size_t fileCount;
     std::string fileName;
     auto entries = DirectoryIterator{out};
+    if (entries == DirectoryIterator{})
+        throw Error("channel tarball '%s' is empty", src);
     fileName = entries->path().string();
     fileCount = std::distance(entries.begin(), entries.end());
 
@@ -36,8 +38,8 @@ static void builtinUnpackChannel(const BuiltinBuilderContext & ctx)
     auto target = out / channelName;
     try {
         std::filesystem::rename(fileName, target);
-    } catch (std::filesystem::filesystem_error &) {
-        throw SysError("failed to rename %1% to %2%", fileName, target.string());
+    } catch (std::filesystem::filesystem_error & e) {
+        throw SystemError(e.code(), "failed to rename %1% to %2%", fileName, target.string());
     }
 }
 

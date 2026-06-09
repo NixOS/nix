@@ -1,0 +1,10 @@
+error:
+       … while calling the 'getEnv' builtin
+         at /pwd/lang/eval-fail-getEnv-1.nix:1:1:
+            1| builtins.getEnv [ ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.getEnv
+
+       error: expected a string but found a list: [ ]

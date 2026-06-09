@@ -2,7 +2,6 @@
 ///@file
 
 #include <cstdint>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <variant>
 
@@ -10,10 +9,10 @@
 #include "nix/util/json-impls.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/downstream-placeholder.hh"
+#include "nix/store/worker-settings.hh"
 
 namespace nix {
 
-class Store;
 struct StoreDirConfig;
 struct BasicDerivation;
 struct StructuredAttrs;
@@ -85,12 +84,12 @@ struct DerivationOptions
      * Either one set of checks for all outputs, or separate checks
      * per-output.
      */
-    std::variant<OutputChecks, std::map<std::string, OutputChecks>> outputChecks = OutputChecks{};
+    std::variant<OutputChecks, std::map<std::string, OutputChecks, std::less<>>> outputChecks = OutputChecks{};
 
     /**
      * Whether to avoid scanning for references for a given output.
      */
-    std::map<std::string, bool> unsafeDiscardReferences;
+    std::map<std::string, bool, std::less<>> unsafeDiscardReferences;
 
     /**
      * In non-structured mode, all bindings specified in the derivation
@@ -123,7 +122,7 @@ struct DerivationOptions
      * attributes give to the builder. The set of paths in the original JSON
      * is replaced with a list of `PathInfo` in JSON format.
      */
-    std::map<std::string, std::set<Input>> exportReferencesGraph;
+    std::map<std::string, std::set<Input>, std::less<>> exportReferencesGraph;
 
     /**
      * env: __sandboxProfile
@@ -183,17 +182,7 @@ struct DerivationOptions
      */
     StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
 
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    bool canBuildLocally(Store & localStore, const BasicDerivation & drv) const;
-
-    /**
-     * @param drv See note on `getRequiredSystemFeatures`
-     */
-    bool willBuildLocally(Store & localStore, const BasicDerivation & drv) const;
-
-    bool substitutesAllowed() const;
+    bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
@@ -238,7 +227,7 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
  */
 std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,
-    std::function<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
 
 }; // namespace nix

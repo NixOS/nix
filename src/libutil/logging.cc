@@ -4,7 +4,6 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/util.hh"
 #include "nix/util/config-global.hh"
-#include "nix/util/source-path.hh"
 #include "nix/util/position.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/unix-domain-socket.hh"
@@ -12,9 +11,10 @@
 #include <atomic>
 #include <sstream>
 #include <nlohmann/json.hpp>
-#include <iostream>
 
 namespace nix {
+
+void LoggerSettings::anchor() {}
 
 LoggerSettings loggerSettings;
 
@@ -32,7 +32,13 @@ void setCurActivity(const ActivityId activityId)
     curActivity = activityId;
 }
 
-std::unique_ptr<Logger> logger = makeSimpleLogger(true);
+/**
+ * This is a raw pointer to allow it to leak.
+ * Avoids races in activity teardown.
+ */
+Logger * logger = makeSimpleLogger(true).release();
+
+Logger::~Logger() {}
 
 void Logger::warn(const std::string & msg)
 {
@@ -58,6 +64,8 @@ std::optional<Logger::Suspension> Logger::suspendIf(bool cond)
         return suspend();
     return {};
 }
+
+namespace {
 
 class SimpleLogger : public Logger
 {
@@ -148,18 +156,25 @@ public:
     }
 };
 
+} // namespace
+
 Verbosity verbosity = lvlInfo;
+
+static void writeFullLogging(Descriptor fd, std::string_view s)
+{
+    try {
+        writeFull(fd, s, false);
+    } catch (SystemError & e) {
+        /* Ignore failing logging writes.  We need to ignore write
+           errors to ensure that cleanup code that writes logs runs
+           to completion if the other side of the logging fd has
+           been closed unexpectedly. */
+    }
+}
 
 void writeToStderr(std::string_view s)
 {
-    try {
-        writeFull(getStandardError(), s, false);
-    } catch (SystemError & e) {
-        /* Ignore failing writes to stderr.  We need to ignore write
-           errors to ensure that cleanup code that logs to stderr runs
-           to completion if the other side of stderr has been closed
-           unexpectedly. */
-    }
+    writeFullLogging(getStandardError(), s);
 }
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs)
@@ -206,6 +221,8 @@ void to_json(nlohmann::json & json, std::shared_ptr<const Pos> pos)
     }
 }
 
+namespace {
+
 struct JSONLogger : Logger
 {
     Descriptor fd;
@@ -245,15 +262,15 @@ struct JSONLogger : Logger
 
     void write(const nlohmann::json & json)
     {
-        auto line =
-            (includeNixPrefix ? "@nix " : "") + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace);
+        auto line = (includeNixPrefix ? "@nix " : "")
+                    + json.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace) + "\n";
 
         /* Acquire a lock to prevent log messages from clobbering each
            other. */
         try {
             auto state(_state.lock());
             if (state->enabled)
-                writeLine(fd, line);
+                writeFullLogging(fd, line);
         } catch (...) {
             bool enabled = false;
             std::swap(_state.lock()->enabled, enabled);
@@ -338,6 +355,8 @@ struct JSONLogger : Logger
     }
 };
 
+} // namespace
+
 std::unique_ptr<Logger> makeJSONLogger(Descriptor fd, bool includeNixPrefix)
 {
     return std::make_unique<JSONLogger>(fd, includeNixPrefix);
@@ -356,11 +375,17 @@ std::unique_ptr<Logger> makeJSONLogger(const std::filesystem::path & path, bool 
         }
     };
 
-    AutoCloseFD fd = std::filesystem::is_socket(path)
-                         ? connect(path)
-                         : toDescriptor(open(path.string().c_str(), O_CREAT | O_APPEND | O_WRONLY, 0644));
+    AutoCloseFD fd = std::filesystem::is_socket(path) ? connect(path)
+                                                      : toDescriptor(open(
+                                                            path.string().c_str(),
+                                                            O_CREAT | O_APPEND | O_WRONLY
+#ifndef _WIN32
+                                                                | O_CLOEXEC
+#endif
+                                                            ,
+                                                            0644));
     if (!fd)
-        throw SysError("opening log file %1%", path);
+        throw SysError("opening log file %1%", PathFmt(path));
 
     return std::make_unique<JSONFileLogger>(std::move(fd), includeNixPrefix);
 }
@@ -372,7 +397,7 @@ void applyJSONLogger()
             std::vector<std::unique_ptr<Logger>> loggers;
             loggers.push_back(makeJSONLogger(*opt, false));
             try {
-                logger = makeTeeLogger(std::move(logger), std::move(loggers));
+                logger = makeTeeLogger(std::unique_ptr<Logger>(logger), std::move(loggers)).release();
             } catch (...) {
                 // `logger` is now gone so give up.
                 abort();

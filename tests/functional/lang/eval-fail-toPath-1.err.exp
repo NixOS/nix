@@ -1,0 +1,10 @@
+error:
+       … while calling the 'toPath' builtin
+         at /pwd/lang/eval-fail-toPath-1.nix:1:1:
+            1| builtins.toPath [ ]
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.toPath
+
+       error: cannot coerce a list to a string: [ ]

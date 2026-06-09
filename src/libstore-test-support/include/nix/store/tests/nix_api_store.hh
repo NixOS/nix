@@ -22,13 +22,10 @@ public:
     };
 
     ~nix_api_store_test_base() override
-    {
-        if (exists(std::filesystem::path{nixDir})) {
-            for (auto & path : std::filesystem::recursive_directory_iterator(nixDir)) {
-                std::filesystem::permissions(path, std::filesystem::perms::owner_all);
-            }
-            std::filesystem::remove_all(nixDir);
-        }
+    try {
+        nix::deletePath(nixDir);
+    } catch (...) {
+        nix::ignoreExceptionInDestructor();
     }
 
     std::string nixDir;
@@ -50,8 +47,7 @@ protected:
 #else
         // resolve any symlinks in i.e. on macOS /tmp -> /private/tmp
         // because this is not allowed for a nix store.
-        auto tmpl =
-            nix::absPath(std::filesystem::path(nix::defaultTempDir()) / "tests_nix-store.XXXXXX", std::nullopt, true);
+        auto tmpl = nix::absPath(nix::defaultTempDir() / "tests_nix-store.XXXXXX", nullptr, true);
         nixDir = mkdtemp((char *) tmpl.c_str());
 #endif
 
@@ -80,23 +76,23 @@ class nix_api_store_test : public nix_api_store_test_base
 {
 public:
     nix_api_store_test()
-        : nix_api_store_test_base{}
+        : nix_api_store_test_base{} {};
+
+    void SetUp() override
     {
-        init_local_store();
-    };
+#ifdef _WIN32
+        GTEST_SKIP() << "Wine does not support symlinks needed for local store gcroots";
+#endif
+        store = open_local_store();
+    }
 
     ~nix_api_store_test() override
     {
-        nix_store_free(store);
+        if (store)
+            nix_store_free(store);
     }
 
-    Store * store;
-
-protected:
-    void init_local_store()
-    {
-        store = open_local_store();
-    }
+    Store * store = nullptr;
 };
 
 } // namespace nixC

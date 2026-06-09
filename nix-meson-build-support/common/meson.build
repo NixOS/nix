@@ -14,7 +14,7 @@ if host_machine.system() == 'cygwin'
   )
 endif
 
-add_project_arguments(
+warning_flags = [
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
   '-Werror=switch',
@@ -22,9 +22,39 @@ add_project_arguments(
   '-Werror=undef',
   '-Werror=unused-result',
   '-Werror=sign-compare',
+  '-Werror=return-type',
+  '-Werror=non-virtual-dtor',
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
   '-Wno-deprecated-declarations',
+  '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
+  '-Wno-subobject-linkage', # GCC doesn't like unity builds.
+  # Catch brace elision bugs: when WorkerProto::Version changed from `unsigned int`
+  # to `struct { unsigned int major; uint8_t minor; }`, `.version = 16` silently
+  # became `.version = {16, 0}` instead of failing, breaking protocol compatibility
+  # in a subtle way
+  '-Werror=c99-designator',
+]
+
+if meson.project_name() in [
+  'nix-util',
+  'nix-store',
+  'nix-util-c',
+  'nix-store-c',
+  'nix-expr',
+  'nix-expr-c',
+]
+  # Catch vtables with vague linkage. All vtables must have a "key" function to make
+  # sure they are emitted as strong symbols (as required by Itanium ABI). This is needed
+  # in certain cases of dynamic linking, where weak symbols are not always coalesced. Otherwise
+  # typeinfo symbols get duplicated and dynamic_cast/exception handling ends up broken on Darwin's
+  # libc++.
+  # Search for 'virtual void anchor' in the repo to see how this is done.
+  warning_flags += [ '-Werror=weak-vtables' ]
+endif
+
+add_project_arguments(
+  cxx.get_supported_arguments(warning_flags),
   language : 'cpp',
 )
 
@@ -67,3 +97,6 @@ nix_soversion = meson.project_version().split('+')[0].split('pre')[0]
 
 subdir('assert-fail')
 subdir('asan-options')
+if not meson.is_subproject()
+  subdir('clang-tidy')
+endif

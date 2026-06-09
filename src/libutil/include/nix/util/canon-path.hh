@@ -62,7 +62,7 @@ public:
     struct unchecked_t
     {};
 
-    CanonPath(unchecked_t _, std::string path)
+    constexpr CanonPath(unchecked_t _, std::string path)
         : path(std::move(path))
     {
     }
@@ -73,6 +73,12 @@ public:
     CanonPath(const std::vector<std::string> & elems);
 
     static const CanonPath root;
+
+    /**
+     * Construct a CanonPath from a single path segment. The segment
+     * must not contain any slashes and must not be `.` or `..`.
+     */
+    static CanonPath fromFilename(std::string_view segment);
 
     /**
      * If `raw` starts with a slash, return

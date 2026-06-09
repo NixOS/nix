@@ -2,15 +2,8 @@ error:
        … while evaluating the attribute 'outPath'
          at «nix-internal»/derivation-internal.nix:50:7:
            49|     value = commonAttrs // {
-           50|       outPath = builtins.getAttr outputName strict;
+           50|       outPath = strict.${outputName};
              |       ^
-           51|       drvPath = strict.drvPath;
-
-       … while calling the 'getAttr' builtin
-         at «nix-internal»/derivation-internal.nix:50:17:
-           49|     value = commonAttrs // {
-           50|       outPath = builtins.getAttr outputName strict;
-             |                 ^
            51|       drvPath = strict.drvPath;
 
        … while calling the 'derivationStrict' builtin
@@ -37,7 +30,7 @@ error:
              |                                                                       ^
            13|     in
 
-       (9994 duplicate frames omitted)
+       (9995 duplicate frames omitted)
 
        … while evaluating attribute 'head'
          at /pwd/lang/eval-fail-derivation-structuredAttrs-stack-overflow.nix:12:66:

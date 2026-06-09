@@ -114,9 +114,9 @@ Here is an example of how this file might look like after installing `hello` fro
   };
   name = "hello-2.12.1";
   out = {
-    outPath = "/nix/store/260q5867crm1xjs4khgqpl6vr9kywql1-hello-2.12.1";
+    outPath = "/nix/store/src1vzij2z0slnakrsbpqpk20389z0k6-hello-2.12.1";
   };
-  outPath = "/nix/store/260q5867crm1xjs4khgqpl6vr9kywql1-hello-2.12.1";
+  outPath = "/nix/store/src1vzij2z0slnakrsbpqpk20389z0k6-hello-2.12.1";
   outputs = [ "out" ];
   system = "x86_64-linux";
   type = "derivation";

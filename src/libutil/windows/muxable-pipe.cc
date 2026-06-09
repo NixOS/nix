@@ -1,10 +1,8 @@
-#ifdef _WIN32
-#  include <ioapiset.h>
-#  include "nix/util/windows-error.hh"
+#include <ioapiset.h>
 
-#  include "nix/util/logging.hh"
-#  include "nix/util/util.hh"
-#  include "nix/util/muxable-pipe.hh"
+#include "nix/util/logging.hh"
+#include "nix/util/util.hh"
+#include "nix/util/muxable-pipe.hh"
 
 namespace nix {
 
@@ -14,9 +12,9 @@ void MuxablePipePollState::poll(HANDLE ioport, std::optional<unsigned int> timeo
        (countof(oentries)) statuses in one API call. */
     if (!GetQueuedCompletionStatusEx(
             ioport, oentries, sizeof(oentries) / sizeof(*oentries), &removed, timeout ? *timeout : INFINITE, false)) {
-        windows::WinError winError("GetQueuedCompletionStatusEx");
-        if (winError.lastError != WAIT_TIMEOUT)
-            throw winError;
+        auto lastError = GetLastError();
+        if (lastError != WAIT_TIMEOUT)
+            throw windows::WinError(lastError, "GetQueuedCompletionStatusEx");
         assert(removed == 0);
     } else {
         assert(0 < removed && removed <= sizeof(oentries) / sizeof(*oentries));
@@ -25,8 +23,8 @@ void MuxablePipePollState::poll(HANDLE ioport, std::optional<unsigned int> timeo
 
 void MuxablePipePollState::iterate(
     std::set<MuxablePipePollState::CommChannel> & channels,
-    std::function<void(Descriptor fd, std::string_view data)> handleRead,
-    std::function<void(Descriptor fd)> handleEOF)
+    fun<void(Descriptor fd, std::string_view data)> handleRead,
+    fun<void(Descriptor fd)> handleEOF)
 {
     auto p = channels.begin();
     while (p != channels.end()) {
@@ -53,12 +51,12 @@ void MuxablePipePollState::iterate(
                         // here is possible (but not obligatory) to call
                         // `handleRead` and repeat ReadFile immediately
                     } else {
-                        windows::WinError winError("ReadFile(%s, ..)", (*p)->readSide.get());
-                        if (winError.lastError == ERROR_BROKEN_PIPE) {
+                        auto lastError = GetLastError();
+                        if (lastError == ERROR_BROKEN_PIPE) {
                             handleEOF((*p)->readSide.get());
                             nextp = channels.erase(p); // no need to maintain `channels` ?
-                        } else if (winError.lastError != ERROR_IO_PENDING)
-                            throw winError;
+                        } else if (lastError != ERROR_IO_PENDING)
+                            throw windows::WinError(lastError, "ReadFile(%s, ..)", (*p)->readSide.get());
                     }
                 }
                 break;
@@ -69,4 +67,3 @@ void MuxablePipePollState::iterate(
 }
 
 } // namespace nix
-#endif

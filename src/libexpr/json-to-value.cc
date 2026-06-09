@@ -3,12 +3,13 @@
 #include "nix/expr/eval.hh"
 
 #include <limits>
-#include <variant>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
 
 namespace nix {
+
+namespace {
 
 // for more information, refer to
 // https://github.com/nlohmann/json/blob/master/include/nlohmann/detail/input/json_sax.hpp
@@ -201,6 +202,8 @@ public:
     }
 };
 
+} // namespace
+
 void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
 {
     JSONSax parser(state, v);
@@ -208,5 +211,7 @@ void parseJSON(EvalState & state, const std::string_view & s_, Value & v)
     if (!res)
         throw JSONParseError("Invalid JSON Value");
 }
+
+void JSONParseError::anchor() {}
 
 } // namespace nix

@@ -8,9 +8,29 @@
   nix-main,
   nix-cmd,
 
+  nix-expr-c,
+  nix-fetchers-c,
+  nix-flake-c,
+  nix-main-c,
+  nix-store-c,
+  nix-util-c,
+
+  mimalloc,
+
   # Configuration Options
 
   version,
+
+  # Whether to link against mimalloc for malloc override.
+  # Significantly improves evaluation performance on allocation-heavy
+  # workloads (~10-15% on large evaluations).
+  # mimalloc is disabled on FreeBSD due to a crash in nixpkgs 25.11.
+  # Once the nixpkgs flake is updated, mimalloc can be enabled again.
+  withMimalloc ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isFreeBSD,
+
+  # Whether to embed the public C API into the `nix` executable so plugins can
+  # resolve those symbols without linking Nix libraries directly.
+  withPluginCApi ? !stdenv.hostPlatform.isWindows && !stdenv.hostPlatform.isStatic,
 }:
 
 let
@@ -69,15 +89,30 @@ mkMesonExecutable (finalAttrs: {
     nix-expr
     nix-main
     nix-cmd
-  ];
+  ]
+  ++ lib.optionals withPluginCApi [
+    nix-expr-c
+    nix-fetchers-c
+    nix-flake-c
+    nix-main-c
+    nix-store-c
+    nix-util-c
+  ]
+  ++ lib.optional withMimalloc mimalloc;
 
   mesonFlags = [
+    (lib.mesonEnable "mimalloc" withMimalloc)
+    (lib.mesonBool "plugin-c-api" withPluginCApi)
   ];
 
   postInstall = lib.optionalString stdenv.hostPlatform.isStatic ''
     mkdir -p $out/nix-support
     echo "file binary-dist $out/bin/nix" >> $out/nix-support/hydra-build-products
   '';
+
+  passthru = {
+    exportsPluginCApi = withPluginCApi;
+  };
 
   meta = {
     mainProgram = "nix";

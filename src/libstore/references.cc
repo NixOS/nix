@@ -3,12 +3,16 @@
 #include "nix/util/hash.hh"
 #include "nix/util/base-nix-32.hh"
 
-#include <map>
 #include <cstdlib>
-#include <mutex>
 #include <algorithm>
 
 namespace nix {
+
+void RefScanSink::anchor() {}
+
+void HashModuloSink::anchor() {}
+
+void RewritingSink::anchor() {}
 
 static constexpr auto refLength = StorePath::HashLen;
 

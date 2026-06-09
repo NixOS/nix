@@ -1,0 +1,10 @@
+error:
+       … while calling the 'concatStringsSep' builtin
+         at /pwd/lang/eval-fail-concatStringsSep-3.nix:1:1:
+            1| builtins.concatStringsSep "foo" [
+             | ^
+            2|   1
+
+       … while evaluating one element of the list of strings to concat passed to builtins.concatStringsSep
+
+       error: cannot coerce an integer to a string: 1

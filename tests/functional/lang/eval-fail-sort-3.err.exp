@@ -1,0 +1,8 @@
+error:
+       … while calling the 'sort' builtin
+         at /pwd/lang/eval-fail-sort-3.nix:1:1:
+            1| builtins.sort (_: 1) [
+             | ^
+            2|   "foo"
+
+       error: attempt to call something which is not a function but an integer: 1

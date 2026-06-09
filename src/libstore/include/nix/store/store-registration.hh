@@ -14,6 +14,7 @@
  */
 
 #include "nix/store/store-api.hh"
+#include "nix/util/url.hh"
 
 namespace nix {
 
@@ -39,8 +40,7 @@ struct StoreFactory
      * The `authorityPath` parameter is `<authority>/<path>`, or really
      * whatever comes after `<scheme>://` and before `?<query-params>`.
      */
-    std::function<ref<StoreConfig>(
-        std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
+    fun<ref<StoreConfig>(std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
         parseConfig;
 
     /**
@@ -48,7 +48,7 @@ struct StoreFactory
      * because it means we cannot require fields to be manually
      * specified so easily.
      */
-    std::function<ref<StoreConfig>()> getConfig;
+    fun<ref<StoreConfig>()> getConfig;
 };
 
 struct Implementations
@@ -65,7 +65,19 @@ struct Implementations
             .uriSchemes = TConfig::uriSchemes(),
             .experimentalFeature = TConfig::experimentalFeature(),
             .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
-                return make_ref<TConfig>(scheme, uri, params);
+                if constexpr (std::is_constructible_v<TConfig, std::filesystem::path, StoreConfig::Params>) {
+                    auto path =
+                        uri.empty()
+                            ? std::filesystem::path{}
+                            : canonPath(urlPathToPath(splitString<std::vector<std::string>>(percentDecode(uri), "/")));
+                    return make_ref<TConfig>(std::move(path), params);
+                } else if constexpr (std::is_constructible_v<TConfig, ParsedURL, StoreConfig::Params>) {
+                    return make_ref<TConfig>(parseURL(concatStrings(scheme, "://", uri)), params);
+                } else if constexpr (std::is_constructible_v<TConfig, ParsedURL::Authority, StoreConfig::Params>) {
+                    return make_ref<TConfig>(ParsedURL::Authority::parse(uri), params);
+                } else {
+                    return make_ref<TConfig>(scheme, uri, params);
+                }
             }),
             .getConfig = ([]() -> ref<StoreConfig> { return make_ref<TConfig>(Store::Config::Params{}); }),
         };

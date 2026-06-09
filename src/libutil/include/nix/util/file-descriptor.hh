@@ -1,8 +1,17 @@
 #pragma once
-///@file
+/**
+ * @file
+ *
+ * @brief File descriptor operations for almost arbitrary file
+ * descriptors.
+ *
+ * More specialized file-system-specific operations are in
+ * @ref file-system-at.hh.
+ */
 
 #include "nix/util/canon-path.hh"
 #include "nix/util/error.hh"
+#include "nix/util/os-string.hh"
 
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
@@ -48,24 +57,69 @@ static inline Descriptor toDescriptor(int fd)
 }
 
 /**
- * Convert a POSIX file descriptor to a native `Descriptor` in read-only
- * mode.
- *
- * This is a no-op except on Windows.
- */
-static inline int fromDescriptorReadOnly(Descriptor fd)
-{
-#ifdef _WIN32
-    return _open_osfhandle(reinterpret_cast<intptr_t>(fd), _O_RDONLY);
-#else
-    return fd;
-#endif
-}
-
-/**
  * Read the contents of a resource into a string.
  */
 std::string readFile(Descriptor fd);
+
+/**
+ * Platform-specific read into a buffer.
+ *
+ * Thin wrapper around ::read (Unix) or ReadFile (Windows).
+ * Handles EINTR on Unix. Treats ERROR_BROKEN_PIPE as EOF on Windows.
+ *
+ * @param fd The file descriptor to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t read(Descriptor fd, std::span<std::byte> buffer);
+
+/**
+ * Platform-specific write from a buffer.
+ *
+ * Thin wrapper around ::write (Unix) or WriteFile (Windows).
+ * Handles EINTR on Unix.
+ *
+ * @param fd The file descriptor to write to
+ * @param buffer The buffer to write from
+ * @return The number of bytes actually written
+ * @throws SystemError on failure
+ */
+size_t write(Descriptor fd, std::span<const std::byte> buffer, bool allowInterrupts);
+
+/**
+ * Get the size of a file.
+ *
+ * Thin wrapper around fstat (Unix) or GetFileSizeEx (Windows).
+ *
+ * @param fd The file descriptor
+ * @return The file size
+ * @throws SystemError on failure
+ */
+std::make_unsigned_t<off_t> getFileSize(Descriptor fd);
+
+/**
+ * Platform-specific positioned read into a buffer.
+ *
+ * Thin wrapper around pread (Unix) or ReadFile with OVERLAPPED (Windows).
+ * Does NOT handle EINTR on Unix - caller must catch and retry if needed.
+ *
+ * @param fd The file descriptor to read from (must be seekable)
+ * @param offset The offset to read from
+ * @param buffer The buffer to read into
+ * @return The number of bytes actually read (0 indicates EOF)
+ * @throws SystemError on failure
+ */
+size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer);
+
+/**
+ * Read \ref nbytes starting at \ref offset from a seekable file into a sink.
+ *
+ * @throws SystemError if fd is not seekable or any operation fails
+ * @throws Interrupted if the operation was interrupted
+ * @throws EndOfFile if an EOF was reached before reading \ref nbytes
+ */
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink);
 
 /**
  * Wrappers around read()/write() that read/write exactly the
@@ -81,10 +135,11 @@ void writeFull(Descriptor fd, std::string_view s, bool allowInterrupts = true);
  *
  * @param fd The file descriptor to read from
  * @param eofOk If true, return an unterminated line if EOF is reached. (e.g. the empty string)
+ * @param terminator The chartacter that ends the line
  *
  * @return A line of text ending in `\n`, or a string without `\n` if `eofOk` is true and EOF is reached.
  */
-std::string readLine(Descriptor fd, bool eofOk = false);
+std::string readLine(Descriptor fd, bool eofOk = false, char terminator = '\n');
 
 /**
  * Write a line to a file descriptor.
@@ -92,21 +147,68 @@ std::string readLine(Descriptor fd, bool eofOk = false);
 void writeLine(Descriptor fd, std::string s);
 
 /**
- * Read a file descriptor until EOF occurs.
+ * Perform a blocking fsync operation on a file descriptor.
  */
-std::string drainFD(Descriptor fd, bool block = true, const size_t reserveSize = 0);
+void syncDescriptor(Descriptor fd);
 
 /**
- * The Windows version is always blocking.
+ * Options for draining a file descriptor to a sink.
  */
-void drainFD(
-    Descriptor fd,
-    Sink & sink
+struct DrainFdSinkOpts
+{
+    /**
+     * If provided, read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     */
+    std::optional<std::make_unsigned_t<off_t>> expectedSize = {};
+
 #ifndef _WIN32
-    ,
-    bool block = true
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
 #endif
-);
+};
+
+/**
+ * Options for draining a file descriptor to a string.
+ */
+struct DrainFdOpts
+{
+    /**
+     * If expected=true: read exactly this many bytes (throws EndOfFile if EOF occurs before reading all bytes).
+     * If expected=false: size hint for string allocation.
+     */
+    std::make_unsigned_t<off_t> size = 0;
+
+    /**
+     * If true, size is exact expected size. If false, size is just a reservation hint.
+     */
+    bool expected = false;
+
+#ifndef _WIN32
+    /**
+     * Whether to block on read.
+     */
+    bool block = true;
+#endif
+};
+
+/**
+ * Read a file descriptor until EOF occurs.
+ *
+ * @param fd The file descriptor to drain
+ * @param opts Options for the drain operation
+ */
+std::string drainFD(Descriptor fd, DrainFdOpts opts = {});
+
+/**
+ * Read a file descriptor until EOF occurs, writing to a sink.
+ *
+ * @param fd The file descriptor to drain
+ * @param sink The sink to write data to
+ * @param opts Options for the drain operation
+ */
+void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts = {});
 
 /**
  * Get [Standard Input](https://en.wikipedia.org/wiki/Standard_streams#Standard_input_(stdin))
@@ -160,6 +262,7 @@ public:
     AutoCloseFD(AutoCloseFD && fd) noexcept;
     ~AutoCloseFD();
     AutoCloseFD & operator=(const AutoCloseFD & fd) = delete;
+    // NOLINTNEXTLINE(performance-noexcept-move-constructor) - technically can throw because of close()
     AutoCloseFD & operator=(AutoCloseFD && fd);
     Descriptor get() const;
     explicit operator bool() const;
@@ -169,7 +272,11 @@ public:
     /**
      * Perform a blocking fsync operation.
      */
-    void fsync() const;
+    void fsync() const
+    {
+        if (fd != INVALID_DESCRIPTOR)
+            nix::syncDescriptor(fd);
+    }
 
     /**
      * Asynchronously flush to disk without blocking, if available on
@@ -179,11 +286,25 @@ public:
     void startFsync() const;
 };
 
+/**
+ * Duplicate a file descriptor.
+ *
+ * Returns a new file descriptor that refers to the same open file
+ * description as the original.
+ */
+AutoCloseFD dupDescriptor(Descriptor fd);
+
 class Pipe
 {
 public:
     AutoCloseFD readSide, writeSide;
-    void create();
+
+    void create(
+#ifndef _WIN32
+        bool nonBlocking = false
+#endif
+    );
+
     void close();
 };
 
@@ -201,61 +322,26 @@ void closeExtraFDs();
  */
 void closeOnExec(Descriptor fd);
 
-} // namespace unix
-#endif
-
-#ifdef __linux__
-namespace linux {
-
 /**
- * Wrapper around Linux's openat2 syscall introduced in Linux 5.6.
- *
- * @see https://man7.org/linux/man-pages/man2/openat2.2.html
- * @see https://man7.org/linux/man-pages/man2/open_how.2type.html
-v*
- * @param flags O_* flags
- * @param mode Mode for O_{CREAT,TMPFILE}
- * @param resolve RESOLVE_* flags
- *
- * @return nullopt if openat2 is not supported by the kernel.
+ * A useful primitive for asynchronous poll() loops to notify about some work
+ * completing that gets polled alongside other file descriptors.
  */
-std::optional<Descriptor> openat2(Descriptor dirFd, const char * path, uint64_t flags, uint64_t mode, uint64_t resolve);
+struct SelfPipe
+{
+    Pipe pipe;
 
-} // namespace linux
-#endif
+    void create();
 
-#if defined(_WIN32) && _WIN32_WINNT >= 0x0600
-namespace windows {
+    /**
+     * Write some data to the pipe in a non-blocking manner.
+     */
+    void notify();
 
-Path handleToPath(Descriptor handle);
-std::wstring handleToFileName(Descriptor handle);
-
-} // namespace windows
-#endif
-
-#ifndef _WIN32
-namespace unix {
-
-/**
- * Safe(r) function to open \param path file relative to \param dirFd, while
- * disallowing escaping from a directory and resolving any symlinks in the
- * process.
- *
- * @note When not on Linux or when openat2 is not available this is implemented
- * via openat single path component traversal. Uses RESOLVE_BENEATH with openat2
- * or O_RESOLVE_BENEATH.
- *
- * @note Since this is Unix-only path is specified as CanonPath, which models
- * Unix-style paths and ensures that there are no .. or . components.
- *
- * @param flags O_* flags
- * @param mode Mode for O_{CREAT,TMPFILE}
- *
- * @pre path.isRoot() is false
- *
- * @throws SymlinkNotAllowed if any path components
- */
-Descriptor openFileEnsureBeneathNoSymlinks(Descriptor dirFd, const CanonPath & path, int flags, mode_t mode = 0);
+    /**
+     * Drain all data from the pipe.
+     */
+    void drain();
+};
 
 } // namespace unix
 #endif

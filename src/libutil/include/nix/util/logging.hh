@@ -5,6 +5,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
+#include "nix/util/fun.hh"
 
 #include <filesystem>
 
@@ -43,8 +44,11 @@ typedef enum {
 
 typedef uint64_t ActivityId;
 
-struct LoggerSettings : Config
+class LoggerSettings : public Config
 {
+    void anchor() override;
+
+public:
     Setting<bool> showTrace{
         this,
         false,
@@ -54,7 +58,7 @@ struct LoggerSettings : Config
           expression evaluation errors.
         )"};
 
-    Setting<std::optional<std::filesystem::path>> jsonLogPath{
+    Setting<std::optional<AbsolutePath>> jsonLogPath{
         this,
         {},
         "json-log-path",
@@ -104,7 +108,7 @@ public:
 
     typedef std::vector<Field> Fields;
 
-    virtual ~Logger() {}
+    virtual ~Logger();
 
     virtual void stop() {};
 
@@ -113,7 +117,7 @@ public:
      */
     struct Suspension
     {
-        Finally<std::function<void()>> _finalize;
+        Finally<fun<void()>> _finalize;
     };
 
     Suspension suspend();
@@ -254,7 +258,7 @@ struct PushActivity
     }
 };
 
-extern std::unique_ptr<Logger> logger;
+extern Logger * logger;
 
 std::unique_ptr<Logger> makeSimpleLogger(bool printBuildLogs = true);
 

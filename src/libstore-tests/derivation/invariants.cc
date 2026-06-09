@@ -6,8 +6,6 @@
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/util/tests/json-characterization.hh"
 
-#include "derivation/test-support.hh"
-
 namespace nix {
 
 class FillInOutputPathsTest : public LibStoreTest, public JsonCharacterizationTest<Derivation>
@@ -51,7 +49,7 @@ protected:
         depDrv.fillInOutputPaths(*store);
 
         // Write the dependency to the store
-        return writeDerivation(*store, depDrv, NoRepair);
+        return store->writeDerivation(depDrv, NoRepair);
     }
 
 public:

@@ -1,0 +1,4 @@
+error:
+       … while evaluating the 'name' attribute of a derivation
+
+       error: the string '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-x' is not allowed to refer to a store path (such as '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-x')

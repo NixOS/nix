@@ -1,6 +1,7 @@
 #include "nix/store/s3-binary-cache-store.hh"
 #include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/compression.hh"
 #include "nix/util/error.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
@@ -15,6 +16,8 @@
 namespace nix {
 
 MakeError(UploadToS3, Error);
+
+void UploadToS3::anchor() {}
 
 static constexpr uint64_t AWS_MIN_PART_SIZE = 5 * 1024 * 1024;           // 5MiB
 static constexpr uint64_t AWS_MAX_PART_SIZE = 5ULL * 1024 * 1024 * 1024; // 5GiB
@@ -138,6 +141,20 @@ void S3BinaryCacheStore::upsertFile(
         if (auto storageClass = s3Config->storageClass.get()) {
             uploadHeaders.emplace_back("x-amz-storage-class", *storageClass);
         }
+
+        {
+            HashSink hashSink(HashAlgorithm::MD5);
+            src.drainInto(hashSink);
+            auto [hash, gotLength] = hashSink.finish();
+            /* Use this opportunity to check that the upload size matches what we expect. */
+            if (gotLength != size)
+                throw Error("unexpected size for upload '%s', expected %d, got: %d", path, size, gotLength);
+            /* The Base64 encoded 128-bit MD5 digest of the message (without the headers) according to RFC 1864:
+               https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html */
+            uploadHeaders.push_back({"Content-MD5", hash.to_string(HashFormat::Base64, /*includeAlgo=*/false)});
+            src.restart(); /* Seek to the beginning. */
+        }
+
         if (s3Config->multipartUpload && size > s3Config->multipartThreshold) {
             uploadMultipart(path, src, size, mimeType, std::move(uploadHeaders));
         } else {
@@ -147,16 +164,18 @@ void S3BinaryCacheStore::upsertFile(
 
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
-            CompressedSource compressed(source, *compressionMethod);
-            Headers headers = {{"Content-Encoding", *compressionMethod}};
-            doUpload(compressed, compressed.size(), std::move(headers));
+            StringSource compressed(compress(*compressionMethod, source));
+            /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
+             */
+            Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
+            doUpload(compressed, compressed.s.size(), std::move(headers));
         } else {
             doUpload(source, sizeHint, std::nullopt);
         }
     } catch (FileTransferError & e) {
         UploadToS3 err(e.message());
         err.addTrace({}, "while uploading to S3 binary cache at '%s'", config->cacheUri.to_string());
-        throw err;
+        throw std::move(err);
     }
 }
 
@@ -305,7 +324,7 @@ std::string S3BinaryCacheStore::createMultipartUpload(
         std::move(headers->begin(), headers->end(), std::back_inserter(req.headers));
     }
 
-    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+    auto result = fileTransfer->enqueueFileTransfer(req).get();
 
     std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
     std::smatch match;
@@ -336,7 +355,7 @@ S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, 
     req.data = {payload};
     req.mimeType = "application/octet-stream";
 
-    auto result = getFileTransfer()->enqueueFileTransfer(req).get();
+    auto result = fileTransfer->enqueueFileTransfer(req).get();
 
     if (result.etag.empty()) {
         throw Error("S3 UploadPart response missing ETag for part %d", partNumber);
@@ -357,7 +376,7 @@ void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_
         req.uri = VerbatimURL(url);
         req.method = HttpMethod::Delete;
 
-        getFileTransfer()->enqueueFileTransfer(req).get();
+        fileTransfer->enqueueFileTransfer(req).get();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
@@ -390,7 +409,7 @@ void S3BinaryCacheStore::completeMultipartUpload(
     req.data = {payload};
     req.mimeType = "text/xml";
 
-    getFileTransfer()->enqueueFileTransfer(req).get();
+    fileTransfer->enqueueFileTransfer(req).get();
 
     debug("S3 multipart upload completed: %d parts uploaded for '%s'", partEtags.size(), key);
 }
@@ -400,10 +419,9 @@ StringSet S3BinaryCacheStoreConfig::uriSchemes()
     return {"s3"};
 }
 
-S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
-    , HttpBinaryCacheStoreConfig(scheme, _cacheUri, params)
+S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(ParsedURL cacheUri_, const Params & params)
+    : StoreConfig(params, FilePathType::Unix)
+    , HttpBinaryCacheStoreConfig(std::move(cacheUri_), params)
 {
     assert(cacheUri.query.empty());
     assert(cacheUri.scheme == "s3");
@@ -437,6 +455,12 @@ S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(
             renderSize(multipartThreshold.get()),
             renderSize(multipartChunkSize.get()));
     }
+}
+
+S3BinaryCacheStoreConfig::S3BinaryCacheStoreConfig(std::string_view bucketName, const Params & params)
+    : S3BinaryCacheStoreConfig(
+          ParsedURL{.scheme = "s3", .authority = ParsedURL::Authority{.host = std::string(bucketName)}}, params)
+{
 }
 
 std::string S3BinaryCacheStoreConfig::getHumanReadableURI() const

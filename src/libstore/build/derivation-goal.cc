@@ -2,33 +2,23 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
-#ifndef _WIN32 // TODO enable build hook on Windows
-#  include "nix/store/build/hook-instance.hh"
-#  include "nix/store/build/derivation-builder.hh"
-#endif
-#include "nix/util/processes.hh"
-#include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
-#include "nix/util/compression.hh"
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh" // Don't remove is actually needed
-#include "nix/store/globals.hh"
+#include "nix/store/outputs-query.hh"
 
-#include <fstream>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
 
-#include "nix/util/strings.hh"
-
 namespace nix {
 
 DerivationGoal::DerivationGoal(
     const StorePath & drvPath,
-    const Derivation & drv,
+    ref<const Derivation> drv,
     const OutputName & wantedOutput,
     Worker & worker,
     BuildMode buildMode,
@@ -36,13 +26,7 @@ DerivationGoal::DerivationGoal(
     : Goal(worker, haveDerivation(storeDerivation))
     , drvPath(drvPath)
     , wantedOutput(wantedOutput)
-    , drv{std::make_unique<Derivation>(drv)}
-    , outputHash{[&] {
-        auto outputHashes = staticOutputHashes(worker.evalStore, drv);
-        if (auto * mOutputHash = get(outputHashes, wantedOutput))
-            return *mOutputHash;
-        throw Error("derivation '%s' does not have output '%s'", worker.store.printStorePath(drvPath), wantedOutput);
-    }()}
+    , drv{std::move(drv)}
     , buildMode(buildMode)
 {
 
@@ -100,14 +84,16 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
-        if (settings.useSubstitutes && drvOptions.substitutesAllowed()) {
+        if (worker.settings.useSubstitutes && drvOptions.substitutesAllowed(worker.settings)) {
             if (!checkResult) {
-                DrvOutput id{outputHash, wantedOutput};
+                DrvOutput id{drvPath, wantedOutput};
                 auto g = worker.makeDrvOutputSubstitutionGoal(id);
                 waitees.insert(g);
                 co_await await(std::move(waitees));
 
                 if (nrFailed == 0) {
+                    // optimization depending on moved containers being empty afterwards
+                    // NOLINTNEXTLINE(bugprone-use-after-move)
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
                     co_await await(std::move(waitees));
 
@@ -127,13 +113,15 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             }
         }
 
+        // optimization depending on moved containers being empty afterwards
+        // NOLINTNEXTLINE(bugprone-use-after-move)
         co_await await(std::move(waitees));
 
         trace("all outputs substituted (maybe)");
 
         assert(!drv->type().isImpure());
 
-        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !settings.tryFallback) {
+        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !worker.settings.tryFallback) {
             co_return doneFailure(BuildError(
                 BuildResult::Failure::TransientFailure,
                 "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
@@ -160,11 +148,9 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                 worker.store.printStorePath(drvPath));
     }
 
-    auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, *drv, buildMode);
-    {
-        Goals waitees{resolutionGoal};
-        co_await await(std::move(waitees));
-    }
+    auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, drv, buildMode);
+    co_await await({resolutionGoal});
+
     if (nrFailed != 0) {
         co_return doneFailure({BuildResult::Failure::DependencyFailed, "Build failed due to failed dependency"});
     }
@@ -172,8 +158,13 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     if (resolutionGoal->resolvedDrv) {
         auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
 
-        auto resolvedDrvGoal =
-            worker.makeDerivationGoal(pathResolved, drvResolved, wantedOutput, buildMode, /*storeDerivation=*/true);
+        auto resolvedDrvGoal = worker.makeDerivationGoal(
+            pathResolved,
+            make_ref<const Derivation>(drvResolved),
+            wantedOutput,
+            buildMode,
+            /*storeDerivation=*/true);
+
         {
             Goals waitees{resolvedDrvGoal};
             co_await await(std::move(waitees));
@@ -186,12 +177,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         // No `std::visit` for coroutines yet
         if (auto * successP = resolvedResult.tryGetSuccess()) {
             auto & success = *successP;
-            auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-            auto resolvedHashes = staticOutputHashes(worker.store, drvResolved);
-
-            auto outputHash = get(outputHashes, wantedOutput);
-            auto resolvedHash = get(resolvedHashes, wantedOutput);
-            if ((!outputHash) || (!resolvedHash))
+            if (!drv->outputs.contains(wantedOutput))
                 throw Error(
                     "derivation '%s' doesn't have expected output '%s' (derivation-goal.cc/resolve)",
                     worker.store.printStorePath(drvPath),
@@ -200,7 +186,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             auto realisation = [&] {
                 auto take1 = get(success.builtOutputs, wantedOutput);
                 if (take1)
-                    return static_cast<UnkeyedRealisation>(*take1);
+                    return *take1;
 
                 /* The above `get` should work. But stateful tracking of
                    outputs in resolvedResult, this can get out of sync with the
@@ -208,7 +194,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                    check the store directly if it fails. */
                 auto take2 = worker.evalStore.queryRealisation(
                     DrvOutput{
-                        .drvHash = *resolvedHash,
+                        .drvPath = pathResolved,
                         .outputName = wantedOutput,
                     });
                 if (take2)
@@ -219,18 +205,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     worker.store.printStorePath(pathResolved),
                     wantedOutput);
             }();
-
-            if (!drv->type().isImpure()) {
-                Realisation newRealisation{
-                    realisation,
-                    {
-                        .drvHash = *outputHash,
-                        .outputName = wantedOutput,
-                    }};
-                newRealisation.signatures.clear();
-                worker.store.signRealisation(newRealisation);
-                worker.store.registerDrvOutput(newRealisation);
-            }
 
             auto status = success.status;
             if (status == BuildResult::Success::AlreadyValid)
@@ -247,18 +221,17 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             assert(false);
     }
 
+    /* We don't need it any more and don't want to hold on to it while suspended. */
+    resolutionGoal.reset();
+
     /* Give up on substitution for the output we want, actually build this derivation */
 
-    auto g = worker.makeDerivationBuildingGoal(drvPath, *drv, buildMode, storeDerivation);
+    auto g = worker.makeDerivationBuildingGoal(drvPath, drv, buildMode, storeDerivation);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
-    g->preserveException = true;
+    g->preserveFailure = true;
 
-    {
-        Goals waitees;
-        waitees.insert(g);
-        co_await await(std::move(waitees));
-    }
+    co_await await({g});
 
     trace("outer build done");
 
@@ -270,16 +243,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             /* In checking mode, the builder will not register any outputs.
                So we want to make sure the ones that we wanted to check are
                properly there. */
-            success.builtOutputs = {{
-                wantedOutput,
-                {
-                    assertPathValidity(),
-                    {
-                        .drvHash = outputHash,
-                        .outputName = wantedOutput,
-                    },
-                },
-            }};
+            success.builtOutputs = {{wantedOutput, assertPathValidity()}};
         } else {
             /* Otherwise the builder will give us info for out output, but
                also for other outputs. Filter down to just our output so as
@@ -298,21 +262,12 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             if (success.builtOutputs.count(wantedOutput) == 0) {
                 debug(
                     "BUG! wanted output '%s' not in builtOutputs, working around by adding it manually", wantedOutput);
-                success.builtOutputs = {{
-                    wantedOutput,
-                    {
-                        assertPathValidity(),
-                        {
-                            .drvHash = outputHash,
-                            .outputName = wantedOutput,
-                        },
-                    },
-                }};
+                success.builtOutputs = {{wantedOutput, assertPathValidity()}};
             }
         }
     }
 
-    co_return amDone(g->exitCode, g->ex);
+    co_return amDone(g->exitCode);
 }
 
 Goal::Co DerivationGoal::repairClosure()
@@ -328,7 +283,7 @@ Goal::Co DerivationGoal::repairClosure()
     auto outputs = [&] {
         for (auto * drvStore : {&worker.evalStore, &worker.store})
             if (drvStore->isValidPath(drvPath))
-                return worker.store.queryDerivationOutputMap(drvPath, drvStore);
+                return deepQueryDerivationOutputMap(worker.store, drvPath, drvStore);
 
         OutputPathMap res;
         for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
@@ -404,7 +359,7 @@ std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPa
     if (drv->type().isImpure())
         return std::nullopt;
 
-    auto drvOutput = DrvOutput{outputHash, wantedOutput};
+    auto drvOutput = DrvOutput{drvPath, wantedOutput};
 
     std::optional<UnkeyedRealisation> mRealisation;
 
@@ -444,7 +399,7 @@ std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPa
                 Realisation{
                     *mRealisation,
                     {
-                        .drvHash = outputHash,
+                        .drvPath = drvPath,
                         .outputName = wantedOutput,
                     },
                 });
@@ -465,20 +420,6 @@ UnkeyedRealisation DerivationGoal::assertPathValidity()
 
 Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = {{
-            wantedOutput,
-            {
-                std::move(builtOutput),
-                DrvOutput{
-                    .drvHash = outputHash,
-                    .outputName = wantedOutput,
-                },
-            },
-        }},
-    };
-
     mcExpectedBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -486,28 +427,24 @@ Goal::Done DerivationGoal::doneSuccess(BuildResult::Success::Status status, Unke
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = {{wantedOutput, std::move(builtOutput)}},
+        });
 }
 
 Goal::Done DerivationGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcExpectedBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix

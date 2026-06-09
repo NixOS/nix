@@ -1,0 +1,10 @@
+error:
+       … while calling the 'parseDrvName' builtin
+         at /pwd/lang/eval-fail-parseDrvName-1.nix:1:1:
+            1| builtins.parseDrvName 1
+             | ^
+            2|
+
+       … while evaluating the first argument passed to builtins.parseDrvName
+
+       error: expected a string but found an integer: 1

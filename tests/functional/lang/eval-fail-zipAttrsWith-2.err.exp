@@ -1,0 +1,10 @@
+error:
+       … while calling the 'zipAttrsWith' builtin
+         at /pwd/lang/eval-fail-zipAttrsWith-2.nix:1:1:
+            1| builtins.zipAttrsWith (_: 1) [ 1 ]
+             | ^
+            2|
+
+       … while evaluating a value of the list passed as second argument to builtins.zipAttrsWith
+
+       error: expected a set but found an integer: 1

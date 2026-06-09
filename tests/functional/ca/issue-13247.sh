@@ -42,7 +42,7 @@ buildViaSubstitute () {
     nix build -f issue-13247.nix "$1" --no-link --max-jobs 0 --substituters "$cache" --no-require-sigs --offline --substitute
 }
 
-# Substitue just the first output
+# Substitute just the first output
 buildViaSubstitute use-a-more-outputs^first
 
 # Should only fetch the output we asked for
@@ -52,10 +52,10 @@ buildViaSubstitute use-a-more-outputs^first
 
 delete
 
-# Failure with 2.28 encountered in CI
-requireDaemonNewerThan "2.29"
+# Failure with 2.33 encountered in CI
+requireDaemonNewerThan "2.34pre"
 
-# Substitue just the first output
+# Substitute just the first output
 #
 # This derivation is the same after normalization, so we should get
 # early cut-off, and thus a chance to download just the output we want

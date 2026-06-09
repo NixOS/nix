@@ -32,6 +32,8 @@ writeSimpleFlake() {
     baseName = builtins.baseNameOf ./.;
 
     root = ./.;
+
+    number = 123;
   };
 }
 EOF
@@ -112,25 +114,4 @@ writeTrivialFlake() {
   };
 }
 EOF
-}
-
-initGitRepo() {
-    local repo="$1"
-    local extraArgs="${2-}"
-
-    # shellcheck disable=SC2086 # word splitting of extraArgs is intended
-    git -C "$repo" init $extraArgs
-    git -C "$repo" config user.email "foobar@example.com"
-    git -C "$repo" config user.name "Foobar"
-}
-
-createGitRepo() {
-    local repo="$1"
-    local extraArgs="${2-}"
-
-    rm -rf "$repo" "$repo".tmp
-    mkdir -p "$repo"
-
-    # shellcheck disable=SC2086 # word splitting of extraArgs is intended
-    initGitRepo "$repo" $extraArgs
 }

@@ -8,7 +8,7 @@ project(
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 1.1',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -16,7 +16,8 @@ cxx = meson.get_compiler('cpp')
 
 subdir('nix-meson-build-support/deps-lists')
 
-configdata = configuration_data()
+configdata_pub = configuration_data()
+configdata_priv = configuration_data()
 
 deps_private_maybe_subproject = []
 deps_public_maybe_subproject = []
@@ -34,8 +35,14 @@ check_funcs = [
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec[0].underscorify().to_upper()
   define_value = cxx.has_function(funcspec[0]).to_int()
-  configdata.set(define_name, define_value, description : funcspec[1])
+  configdata_priv.set(define_name, define_value, description : funcspec[1])
 endforeach
+
+configdata_pub.set(
+  'NIX_UBSAN_ENABLED',
+  ('undefined' in get_option('b_sanitize')).to_int(),
+  description : 'Whether nix has been built with UBSan enabled',
+)
 
 subdir('nix-meson-build-support/libatomic')
 
@@ -94,6 +101,10 @@ brotli = [
 ]
 deps_private += brotli
 
+# Direct libzstd linkage for ZstdMultiFrameCompressionSink.
+zstd = dependency('libzstd', version : '>= 1.4.0')
+deps_private += zstd
+
 cpuid_required = get_option('cpuid')
 if host_machine.cpu_family() != 'x86_64' and cpuid_required.enabled()
   warning('Force-enabling seccomp on non-x86_64 does not make sense')
@@ -104,7 +115,7 @@ cpuid = dependency(
   version : '>= 0.7.0',
   required : cpuid_required,
 )
-configdata.set('HAVE_LIBCPUID', cpuid.found().to_int())
+configdata_priv.set('HAVE_LIBCPUID', cpuid.found().to_int())
 deps_private += cpuid
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
@@ -113,7 +124,7 @@ deps_public += nlohmann_json
 cxx = meson.get_compiler('cpp')
 
 config_priv_h = configure_file(
-  configuration : configdata,
+  configuration : configdata_priv,
   output : 'util-config-private.hh',
 )
 
@@ -124,7 +135,12 @@ sources = [ config_priv_h ] + files(
   'args.cc',
   'base-n.cc',
   'base-nix-32.cc',
+  'bump-memory-resource.cc',
+  'caching-source-accessor.cc',
   'canon-path.cc',
+  'checked-arithmetic.cc',
+  'compression-algo.cc',
+  'compression-settings.cc',
   'compression.cc',
   'compute-levels.cc',
   'config-global.cc',
@@ -149,9 +165,12 @@ sources = [ config_priv_h ] + files(
   'memory-source-accessor/json.cc',
   'mounted-source-accessor.cc',
   'nar-accessor.cc',
+  'nar-cache.cc',
+  'nar-listing.cc',
   'pos-table.cc',
   'position.cc',
   'posix-source-accessor.cc',
+  'processes.cc',
   'serialise.cc',
   'signature/local-keys.cc',
   'signature/signer.cc',

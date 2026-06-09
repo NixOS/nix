@@ -1,0 +1,18 @@
+error:
+       … while calling the 'derivationStrict' builtin
+         at /pwd/lang/eval-fail-derivationStrict-8.nix:1:1:
+            1| builtins.derivationStrict {
+             | ^
+            2|   name = "foo";
+
+       … while evaluating derivation 'foo'
+         whose name attribute is located at /pwd/lang/eval-fail-derivationStrict-8.nix:2:3
+
+       … while evaluating attribute 'outputHashMode' of derivation 'foo'
+         at /pwd/lang/eval-fail-derivationStrict-8.nix:4:3:
+            3|   builder = 1;
+            4|   outputHashMode = "custom";
+             |   ^
+            5| }
+
+       error: invalid value 'custom' for 'outputHashMode' attribute

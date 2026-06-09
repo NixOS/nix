@@ -1,0 +1,4 @@
+# COM: inherit multiple attributes
+a = { x = 10; y = 20; }
+inherit (a) x y
+x + y

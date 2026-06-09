@@ -1,0 +1,13 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = { x = 1; }
+
+nix-repl> inherit (a) y
+
+nix-repl> y
+error: attribute 'y' missing
+       at «string»:1:13:
+            1| inherit (a) y
+             |             ^
+       Did you mean x?

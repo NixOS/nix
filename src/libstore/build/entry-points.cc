@@ -2,7 +2,6 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
-#include "nix/store/local-store.hh"
 #include "nix/util/strings.hh"
 
 namespace nix {
@@ -18,13 +17,13 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
     worker.run(goals);
 
     StringSet failed;
-    std::optional<Error> ex;
+    BuildResult::Failure * failure = nullptr;
     for (auto & i : goals) {
-        if (i->ex) {
-            if (ex)
-                logError(i->ex->info());
+        if (auto * f = i->buildResult.tryGetFailure()) {
+            if (failure)
+                logError(f->info());
             else
-                ex = std::move(i->ex);
+                failure = f;
         }
         if (i->exitCode != Goal::ecSuccess) {
             if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
@@ -34,13 +33,14 @@ void Store::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMod
         }
     }
 
-    if (failed.size() == 1 && ex) {
-        ex->withExitStatus(worker.failingExitStatus());
-        throw std::move(*ex);
+    if (failed.size() == 1 && failure) {
+        failure->withExitStatus(worker.exitStatusFlags.failingExitStatus());
+        throw *failure;
     } else if (!failed.empty()) {
-        if (ex)
-            logError(ex->info());
-        throw Error(worker.failingExitStatus(), "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
+        auto exitStatus = worker.exitStatusFlags.failingExitStatus();
+        if (failure)
+            logError(failure->info());
+        throw Error(exitStatus, "build of %s failed", concatStringsSep(", ", quoteStrings(failed)));
     }
 }
 
@@ -63,12 +63,18 @@ std::vector<KeyedBuildResult> Store::buildPathsWithResults(
     std::vector<KeyedBuildResult> results;
     results.reserve(state.size());
 
-    for (auto & [req, goalPtr] : state)
+    for (auto & [req, goalPtr] : state) {
+        /* Goals that were never started or were cancelled have exitCode
+           ecBusy and a default buildResult with empty errorMsg. Skip them
+           to avoid reporting spurious failures with empty messages. */
+        if (goalPtr->exitCode == Goal::ecBusy)
+            continue;
         results.emplace_back(
             KeyedBuildResult{
                 goalPtr->buildResult,
                 /* .path = */ req,
             });
+    }
 
     return results;
 }
@@ -82,10 +88,11 @@ BuildResult Store::buildDerivation(const StorePath & drvPath, const BasicDerivat
         worker.run(Goals{goal});
         return goal->buildResult;
     } catch (Error & e) {
-        return BuildResult{.inner{BuildResult::Failure{
-            .status = BuildResult::Failure::MiscFailure,
-            .errorMsg = e.msg(),
-        }}};
+        return BuildResult{
+            .inner = BuildResult::Failure{{
+                .status = BuildResult::Failure::MiscFailure,
+                .msg = e.msg(),
+            }}};
     };
 }
 
@@ -102,12 +109,9 @@ void Store::ensurePath(const StorePath & path)
     worker.run(goals);
 
     if (goal->exitCode != Goal::ecSuccess) {
-        if (goal->ex) {
-            goal->ex->withExitStatus(worker.failingExitStatus());
-            throw std::move(*goal->ex);
-        } else
-            throw Error(
-                worker.failingExitStatus(), "path '%s' does not exist and cannot be created", printStorePath(path));
+        auto exitStatus = worker.exitStatusFlags.failingExitStatus();
+        goal->buildResult.tryThrowBuildError(exitStatus);
+        throw Error(exitStatus, "path '%s' does not exist and cannot be created", printStorePath(path));
     }
 }
 
@@ -134,7 +138,7 @@ void Store::repairPath(const StorePath & path)
                 bmRepair));
             worker.run(goals);
         } else
-            throw Error(worker.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
+            throw Error(worker.exitStatusFlags.failingExitStatus(), "cannot repair path '%s'", printStorePath(path));
     }
 }
 

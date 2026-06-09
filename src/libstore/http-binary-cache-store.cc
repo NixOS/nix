@@ -2,12 +2,19 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/nar-info-disk-cache.hh"
+#include "nix/store/sqlite.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/closure.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/store/globals.hh"
+#include "nix/util/compression.hh"
+#include "nix/util/topo-sort.hh"
 
 namespace nix {
 
 MakeError(UploadToHTTP, Error);
+
+void UploadToHTTP::anchor() {}
 
 StringSet HttpBinaryCacheStoreConfig::uriSchemes()
 {
@@ -18,15 +25,17 @@ StringSet HttpBinaryCacheStoreConfig::uriSchemes()
     return ret;
 }
 
-HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(
-    std::string_view scheme, std::string_view _cacheUri, const Params & params)
-    : StoreConfig(params)
+void HttpBinaryCacheStoreConfig::anchor() {}
+
+void HttpBinaryCacheStore::anchor() {}
+
+HttpBinaryCacheStoreConfig::HttpBinaryCacheStoreConfig(ParsedURL _cacheUri, const Params & params)
+    : StoreConfig(params, FilePathType::Unix)
     , BinaryCacheStoreConfig(params)
-    , cacheUri(parseURL(
-          std::string{scheme} + "://"
-          + (!_cacheUri.empty() ? _cacheUri
-                                : throw UsageError("`%s` Store requires a non-empty authority in Store URL", scheme))))
+    , cacheUri(std::move(_cacheUri))
 {
+    if (!uriSchemes().contains("file") && (!cacheUri.authority || cacheUri.authority->host.empty()))
+        throw UsageError("`%s` Store requires a non-empty authority in Store URL", cacheUri.scheme);
     while (!cacheUri.path.empty() && cacheUri.path.back() == "")
         cacheUri.path.pop_back();
 }
@@ -50,12 +59,13 @@ std::string HttpBinaryCacheStoreConfig::doc()
         ;
 }
 
-HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config)
+HttpBinaryCacheStore::HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer> fileTransfer)
     : Store{*config} // TODO it will actually mutate the configuration
     , BinaryCacheStore{*config}
+    , fileTransfer{fileTransfer}
     , config{config}
 {
-    diskCache = getNarInfoDiskCache();
+    diskCache = NarInfoDiskCache::get(settings.getNarInfoDiskCacheSettings(), {.useWAL = settings.useSQLiteWAL});
 }
 
 void HttpBinaryCacheStore::init()
@@ -78,13 +88,53 @@ void HttpBinaryCacheStore::init()
     }
 }
 
-std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
+StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
 {
-    if (hasSuffix(path, ".narinfo") && !config->narinfoCompression.get().empty())
+    std::unordered_map<StorePath, ref<const ValidPathInfo>> pathInfos;
+    StorePathSet referencesClosureSet;
+
+    /* Traverse the references closure that is also present in the starting set
+       in an asynchronous manner. */
+    computeClosure<StorePath>(
+        paths,
+        referencesClosureSet,
+        [this, &paths, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
+            StorePathSet res;
+            auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+
+            for (auto & ref : info->references)
+                /* Don't traverse into items that don't exist in our starting set. */
+                if (ref != path && paths.count(ref))
+                    res.insert(ref);
+
+            /* Fill the map. */
+            pathInfos.emplace(path, info);
+
+            co_return res;
+        });
+
+    auto result = topoSort(paths, [&](const StorePath & path) { return pathInfos.at(path)->references; });
+
+    return std::visit(
+        overloaded{
+            [&](const Cycle<StorePath> & cycle) -> StorePaths {
+                throw Error(
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(cycle.path),
+                    printStorePath(cycle.parent));
+            },
+            [](const auto & sorted) { return sorted; }},
+        result);
+}
+
+std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
+{
+    if (hasSuffix(path, ".narinfo") && config->narinfoCompression.get())
         return config->narinfoCompression;
-    else if (hasSuffix(path, ".ls") && !config->lsCompression.get().empty())
+    else if (hasSuffix(path, ".ls") && config->lsCompression.get())
         return config->lsCompression;
-    else if (hasPrefix(path, "log/") && !config->logCompression.get().empty())
+    else if (hasPrefix(path, "log/") && config->logCompression.get())
         return config->logCompression;
     else
         return std::nullopt;
@@ -93,7 +143,7 @@ std::optional<std::string> HttpBinaryCacheStore::getCompressionMethod(const std:
 void HttpBinaryCacheStore::maybeDisable()
 {
     auto state(_state.lock());
-    if (state->enabled && settings.tryFallback) {
+    if (state->enabled && settings.getWorkerSettings().tryFallback) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
         state->enabled = false;
@@ -121,7 +171,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
     try {
         FileTransferRequest request(makeRequest(path));
         request.method = HttpMethod::Head;
-        getFileTransfer()->download(request);
+        fileTransfer->download(request);
         return true;
     } catch (FileTransferError & e) {
         /* S3 buckets return 403 if a file doesn't exist and the
@@ -151,7 +201,7 @@ void HttpBinaryCacheStore::upload(
     req.data = {sizeHint, source};
     req.mimeType = mimeType;
 
-    getFileTransfer()->upload(req);
+    fileTransfer->upload(req);
 }
 
 void HttpBinaryCacheStore::upsertFile(
@@ -159,16 +209,18 @@ void HttpBinaryCacheStore::upsertFile(
 {
     try {
         if (auto compressionMethod = getCompressionMethod(path)) {
-            CompressedSource compressed(source, *compressionMethod);
-            Headers headers = {{"Content-Encoding", *compressionMethod}};
-            upload(path, compressed, compressed.size(), mimeType, std::move(headers));
+            StringSource compressed(compress(*compressionMethod, source));
+            /* TODO: Validate that this is a valid content encoding. We probably shouldn't set non-standard values here.
+             */
+            Headers headers = {{"Content-Encoding", showCompressionAlgo(*compressionMethod)}};
+            upload(path, compressed, compressed.s.size(), mimeType, std::move(headers));
         } else {
             upload(path, source, sizeHint, mimeType, std::nullopt);
         }
     } catch (FileTransferError & e) {
         UploadToHTTP err(e.message());
         err.addTrace({}, "while uploading to HTTP binary cache at '%s'", config->cacheUri.to_string());
-        throw err;
+        throw std::move(err);
     }
 }
 
@@ -182,7 +234,7 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
     /* path is not a path, but a full relative or absolute
        URL, e.g. we've seen in the wild NARINFO files have a URL
        field which is
-       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=zphkqn2wg8mnvbkixnl2aadkbn0rcnfj`
+       `nar/15f99rdaf26k39knmzry4xd0d97wp6yfpnfk1z9avakis7ipb9yg.nar?hash=wvx0nans273vb7b0cjlplsmr2z905hwd`
        (note the query param) and that gets passed here. */
     auto result = parseURLRelative(path, cacheUriWithTrailingSlash);
 
@@ -193,7 +245,35 @@ FileTransferRequest HttpBinaryCacheStore::makeRequest(std::string_view path)
         result.query = config->cacheUri.query;
     }
 
-    return FileTransferRequest(result);
+    FileTransferRequest request(result);
+
+    /* Only use the specified SSL certificate and private key if the resolved URL names the same
+       authority and uses the same protocol. */
+    if (result.scheme == config->cacheUri.scheme && result.authority == config->cacheUri.authority) {
+        if (const auto & cert = config->tlsCert.get()) {
+            debug("using TLS client certificate %s for '%s'", PathFmt(*cert), request.uri);
+            request.tlsCert = *cert;
+        }
+
+        if (const auto & key = config->tlsKey.get()) {
+            debug("using TLS client key '%s' for '%s'", PathFmt(*key), request.uri);
+            request.tlsKey = *key;
+        }
+    }
+
+    // Propagate per-substituter retry overrides to the transfer request.
+    // Only set when the user actually specified the URL parameter; otherwise
+    // the transfer falls back to the global FileTransferSettings.
+    auto propagate = [](auto & setting, auto & dest) {
+        if (setting.isOverridden())
+            dest = setting.get();
+    };
+    propagate(config->retryDelayMs, request.retryDelayMs);
+    propagate(config->retryDelayRateLimitedMs, request.retryDelayRateLimitedMs);
+    propagate(config->retryMaxDelayMs, request.retryMaxDelayMs);
+    propagate(config->retryAttempts, request.retryAttempts);
+
+    return request;
 }
 
 void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
@@ -201,7 +281,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
     checkEnabled();
     auto request(makeRequest(path));
     try {
-        getFileTransfer()->download(std::move(request), sink);
+        fileTransfer->download(std::move(request), sink);
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             throw NoSuchBinaryCacheFile(
@@ -220,19 +300,19 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
 
         auto request(makeRequest(path));
 
-        getFileTransfer()->enqueueFileTransfer(request, {[callbackPtr, this](std::future<FileTransferResult> result) {
-                                                   try {
-                                                       (*callbackPtr)(std::move(result.get().data));
-                                                   } catch (FileTransferError & e) {
-                                                       if (e.error == FileTransfer::NotFound
-                                                           || e.error == FileTransfer::Forbidden)
-                                                           return (*callbackPtr)({});
-                                                       maybeDisable();
-                                                       callbackPtr->rethrow();
-                                                   } catch (...) {
-                                                       callbackPtr->rethrow();
-                                                   }
-                                               }});
+        fileTransfer->enqueueFileTransfer(request, {[callbackPtr, this](std::future<FileTransferResult> result) {
+                                              try {
+                                                  (*callbackPtr)(std::move(result.get().data));
+                                              } catch (FileTransferError & e) {
+                                                  if (e.error == FileTransfer::NotFound
+                                                      || e.error == FileTransfer::Forbidden)
+                                                      return (*callbackPtr)({});
+                                                  maybeDisable();
+                                                  callbackPtr->rethrow();
+                                              } catch (...) {
+                                                  callbackPtr->rethrow();
+                                              }
+                                          }});
 
     } catch (...) {
         callbackPtr->rethrow();
@@ -243,7 +323,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
 std::optional<std::string> HttpBinaryCacheStore::getNixCacheInfo()
 {
     try {
-        auto result = getFileTransfer()->download(makeRequest(cacheInfoFile));
+        auto result = fileTransfer->download(makeRequest(cacheInfoFile));
         return result.data;
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound)
@@ -266,11 +346,17 @@ std::optional<TrustedFlag> HttpBinaryCacheStore::isTrustedClient()
     return std::nullopt;
 }
 
-ref<Store> HttpBinaryCacheStore::Config::openStore() const
+ref<Store> HttpBinaryCacheStore::Config::openStore(ref<FileTransfer> fileTransfer) const
 {
     return make_ref<HttpBinaryCacheStore>(
         ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())});
+            std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
+        fileTransfer);
+}
+
+ref<Store> HttpBinaryCacheStoreConfig::openStore() const
+{
+    return openStore(getFileTransfer());
 }
 
 static RegisterStoreImplementation<HttpBinaryCacheStore::Config> regHttpBinaryCacheStore;

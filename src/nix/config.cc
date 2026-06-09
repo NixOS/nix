@@ -1,12 +1,10 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
-#include "nix/main/shared.hh"
-#include "nix/store/store-api.hh"
 #include "nix/util/config-global.hh"
 
 #include <nlohmann/json.hpp>
 
-using namespace nix;
+namespace nix {
 
 struct CmdConfig : NixMultiCommand
 {
@@ -81,3 +79,5 @@ struct CmdConfigShow : Command, MixJSON
 
 static auto rCmdConfig = registerCommand<CmdConfig>("config");
 static auto rShowConfig = registerCommand2<CmdConfigShow>({"config", "show"});
+
+} // namespace nix

@@ -1,8 +1,8 @@
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/fetchers/tarball.hh"
+#include "nix/store/filetransfer.hh"
 #include "nix/util/users.hh"
-#include "nix/store/globals.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 
@@ -92,7 +92,7 @@ void Registry::remove(const Input & input)
 
 static std::filesystem::path getSystemRegistryPath()
 {
-    return settings.nixConfDir / "registry.json";
+    return nixConfDir() / "registry.json";
 }
 
 static std::shared_ptr<Registry> getSystemRegistry(const Settings & settings)
@@ -147,13 +147,14 @@ static std::shared_ptr<Registry> getGlobalRegistry(const Settings & settings, St
         return Registry::read(
             settings,
             [&] -> SourcePath {
-                if (!isAbsolute(path)) {
+                std::filesystem::path fsPath{path};
+                if (!fsPath.is_absolute()) {
                     auto storePath = downloadFile(store, settings, path, "flake-registry.json").storePath;
                     if (auto store2 = dynamic_cast<LocalFSStore *>(&store))
                         store2->addPermRoot(storePath, (getCacheDir() / "flake-registry.json").string());
                     return {store.requireStoreObjectAccessor(storePath)};
                 } else {
-                    return SourcePath{getFSSourceAccessor(), CanonPath{path}}.resolveSymlinks();
+                    return SourcePath{getFSSourceAccessor(), CanonPath{fsPath.string()}}.resolveSymlinks();
                 }
             }(),
             Registry::Global);

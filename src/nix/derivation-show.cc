@@ -4,12 +4,12 @@
 #include "nix/cmd/command.hh"
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
-#include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
 #include <nlohmann/json.hpp>
 
-using namespace nix;
 using json = nlohmann::json;
+
+namespace nix {
 
 struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 {
@@ -69,3 +69,5 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 };
 
 static auto rCmdShowDerivation = registerCommand2<CmdShowDerivation>({"derivation", "show"});
+
+} // namespace nix

@@ -1,0 +1,1 @@
+0 nix-env -f ./cli-characterisation/sample-package-set.nix -qa -P --description -a

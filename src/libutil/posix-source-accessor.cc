@@ -1,35 +1,648 @@
-#include "nix/util/posix-source-accessor.hh"
-#include "nix/util/source-path.hh"
-#include "nix/util/signals.hh"
+#include "nix/util/source-accessor.hh"
+#include "nix/util/file-system-at.hh"
+#include "nix/util/lru-cache.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/memory-source-accessor.hh"
+#include "nix/util/signals.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
+#include <atomic>
+
+#ifndef _WIN32
+#  include <sys/resource.h>
+#endif
+
 namespace nix {
 
-PosixSourceAccessor::PosixSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
-    : root(std::move(argRoot))
-    , trackLastModified(trackLastModified)
+static SourceAccessor::Stat sourceAccessorStatFromPosixStat(const PosixStat & st)
+{
+    using enum SourceAccessor::Type;
+    return SourceAccessor::Stat{
+        .type = S_ISREG(st.st_mode)   ? tRegular
+                : S_ISDIR(st.st_mode) ? tDirectory
+                : S_ISLNK(st.st_mode) ? tSymlink
+                : S_ISCHR(st.st_mode) ? tChar
+                : S_ISBLK(st.st_mode) ? tBlock
+                :
+#ifdef S_ISSOCK
+                S_ISSOCK(st.st_mode) ? tSocket
+                :
+#endif
+                S_ISFIFO(st.st_mode) ? tFifo
+                                     : tUnknown,
+        .fileSize = S_ISREG(st.st_mode) ? std::optional<uint64_t>(st.st_size) : std::nullopt,
+        .isExecutable = S_ISREG(st.st_mode) && st.st_mode & S_IXUSR,
+    };
+}
+
+namespace {
+
+/**
+ * Common base helper class for deduplicating common code paths for tracking mtime.
+ */
+class PosixSourceAccessorBase : virtual public SourceAccessor
+{
+private:
+    void anchor() override;
+
+protected:
+    const bool trackLastModified = false;
+
+    /**
+     * The most recent mtime seen by lstat(). This is a hack to
+     * support dumpPathAndGetMtime(). Should remove this eventually.
+     */
+    std::atomic<time_t> mtime = 0;
+
+    void maybeUpdateMtime(time_t seenMTime)
+    {
+        if (trackLastModified) {
+            /* Don't have https://en.cppreference.com/cpp/atomic/atomic/fetch_max yet, thus a CAS loop. */
+            time_t oldValue = mtime.load(std::memory_order_relaxed);
+            while (oldValue < seenMTime && !mtime.compare_exchange_weak(oldValue, seenMTime, std::memory_order_relaxed))
+                ;
+        }
+    }
+
+    PosixSourceAccessorBase(bool trackLastModified)
+        : trackLastModified(trackLastModified)
+    {
+    }
+
+    virtual std::optional<time_t> getLastModified() override
+    {
+        if (trackLastModified)
+            return mtime;
+        return std::nullopt;
+    }
+};
+
+void PosixSourceAccessorBase::anchor() {}
+
+#ifndef _WIN32
+
+class PosixDirectorySourceAccessor;
+
+class PosixFileSourceAccessor : public PosixSourceAccessorBase
+{
+    friend class PosixDirectorySourceAccessor;
+
+    AutoCloseFD fd;
+    std::filesystem::path fsPath;
+    /**
+     * Stat is memoised once opened. This does mean that modifying the same file
+     * while we are reading is busted, but caching it might be considered an
+     * improvement. Since we have a file descriptor for a regular file it can't
+     * be swapped out for another file type. Thus, we are only really caching
+     * the file size and mtime, which shouldn't change. Providing a consistent
+     * size value here is also fine. If the file becomes smaller than we expect
+     * then readFile will barf with an EOF exception. If it becomes larger then
+     * we are just going to silently ignore the extra bytes.
+     */
+    PosixStat st;
+
+public:
+    PosixFileSourceAccessor(AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, const PosixStat & st_)
+        : PosixSourceAccessorBase(trackLastModified)
+        , fd(std::move(fd))
+        , fsPath(std::move(path))
+        , st(st_)
+    {
+        assert(S_ISREG(st.st_mode));
+        assert(fsPath.is_absolute()); /* Only used for error messages, but still nice to enforce this invariant. */
+        setPathDisplay(fsPath.generic_string());
+        maybeUpdateMtime(st.st_mtime);
+    }
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+
+    bool pathExists(const CanonPath & path) override;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return fsPath;
+        return std::nullopt; /* Definitely doesn't exist. */
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return displayPrefix; /* No trailing slash. */
+        return displayPrefix + path.abs();
+    }
+};
+
+void PosixFileSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
+{
+    if (!path.isRoot()) /* We are the parent and also a regular file. */
+        throw NotADirectory("reading file '%1%': %2%", showPath(path), "Not a directory");
+
+    auto size = st.st_size;
+    sizeCallback(size);
+    /* The most important invariant we care about here is writing exactly size
+       bytes to the sink. copyFdRange should throw an EndOfFile if we fail to read
+       `size` bytes. */
+    copyFdRange(fd.get(), /*offset=*/0, size, sink);
+}
+
+bool PosixFileSourceAccessor::pathExists(const CanonPath & path)
+{
+    return path.isRoot();
+}
+
+std::optional<SourceAccessor::Stat> PosixFileSourceAccessor::maybeLstat(const CanonPath & path)
+{
+    if (!path.isRoot())
+        return std::nullopt;
+    return sourceAccessorStatFromPosixStat(st);
+}
+
+SourceAccessor::DirEntries PosixFileSourceAccessor::readDirectory(const CanonPath & path)
+{
+    throw NotADirectory("reading directory '%1%': %2%", showPath(path), "Not a directory");
+}
+
+std::string PosixFileSourceAccessor::readLink(const CanonPath & path)
+{
+    if (!path.isRoot())
+        throw NotADirectory("reading symlink '%1%': %2%", showPath(path), "Not a directory");
+    throw NotASymlink("path '%1%' is not a symlink", showPath(path));
+}
+
+static unsigned getGlobalDirFdCacheLimit()
+{
+    ::rlimit lim{};
+    if (::getrlimit(RLIMIT_NOFILE, &lim) == -1)
+        throw SysError("querying RLIMIT_NOFILE");
+    /* Some sane upper bound in case we have a huge rlimit. */
+    return std::min<rlim_t>(4096, lim.rlim_cur / 8);
+}
+
+class PosixDirectorySourceAccessor : public PosixSourceAccessorBase
+{
+public:
+    static unsigned getGlobalFdLimit()
+    {
+        static auto res = getGlobalDirFdCacheLimit();
+        return res;
+    }
+
+    static void registerAccessor(ref<PosixDirectorySourceAccessor> accessor)
+    {
+        auto reg = globalDirFdCacheRegistry.lock();
+        std::erase_if(*reg, [](auto & maybeAccessor) { return maybeAccessor.expired(); });
+        reg->push_back(accessor.get_ptr());
+    }
+
+private:
+    AutoCloseFD dirFd;
+    std::filesystem::path fsPath;
+
+    std::shared_ptr<Sync<LRUCache<CanonPath, ref<AutoCloseFD>>>> dirFdCache;
+
+    static inline std::atomic<unsigned> globalDirFdCount = 0;
+
+    static inline Sync<std::list<std::weak_ptr<PosixDirectorySourceAccessor>>> globalDirFdCacheRegistry;
+
+    static void maybeEvictFromGlobalCaches()
+    {
+        if (globalDirFdCount.load(std::memory_order_relaxed) < getGlobalFdLimit())
+            return;
+
+        auto registry(globalDirFdCacheRegistry.lock());
+        for (auto it = registry->begin(); it != registry->end();) {
+            if (globalDirFdCount.load(std::memory_order_relaxed) < getGlobalFdLimit())
+                break;
+
+            auto accessor = it->lock();
+            if (!accessor) {
+                it = registry->erase(it);
+                continue;
+            }
+
+            /* TODO: Would be nicer if we could evict a portion of the utilised
+               cache to avoid cold-start issues. Should be fine for now. */
+            if (accessor->dirFdCache) {
+                auto cache = accessor->dirFdCache->lock();
+                globalDirFdCount.fetch_sub(cache->size(), std::memory_order_relaxed);
+                cache->clear();
+            }
+
+            ++it;
+        }
+    }
+
+    void insertIntoDirFdCache(const CanonPath & key, ref<AutoCloseFD> fd)
+    {
+        assert(dirFdCache);
+        auto cache = dirFdCache->lock();
+        auto before = cache->size();
+        cache->upsert(key, std::move(fd));
+        globalDirFdCount.fetch_add(cache->size() - before, std::memory_order_relaxed);
+    }
+
+    /**
+     * Helper for opening the parent directory used for other FD-relative operations down the line.
+     * Also caches the resulting dirFd. Throws FileNotFound if some intermediate directory or the parent
+     * doesn't exist.
+     */
+    std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParentAndUpsert(const CanonPath & path, bool ignoreMissing);
+
+    /**
+     * Get the parent directory of path. The second pair element might be an owning file descriptor
+     * if path.parent().isRoot() is false.
+     */
+    std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParent(const CanonPath & path);
+
+    std::function<void(AutoCloseFD, CanonPath)> makeDirFdCallback();
+
+    AutoCloseFD openSubdirectory(const CanonPath & path);
+
+public:
+    PosixDirectorySourceAccessor(
+        AutoCloseFD fd, std::filesystem::path path, bool trackLastModified, unsigned dirFdCacheSize)
+        : PosixSourceAccessorBase(trackLastModified)
+        , dirFd(std::move(fd))
+        , fsPath(std::move(path))
+    {
+        assert(fsPath.is_absolute()); /* Only used for error messages, but still nice to enforce this invariant. */
+        setPathDisplay(fsPath.generic_string());
+
+        if (dirFdCacheSize)
+            dirFdCache = std::make_shared<Sync<LRUCache<CanonPath, ref<AutoCloseFD>>>>(dirFdCacheSize);
+    }
+
+    PosixDirectorySourceAccessor(PosixDirectorySourceAccessor &&) = delete;
+    PosixDirectorySourceAccessor(const PosixDirectorySourceAccessor &) = delete;
+    PosixDirectorySourceAccessor & operator=(PosixDirectorySourceAccessor &&) = delete;
+    PosixDirectorySourceAccessor & operator=(const PosixDirectorySourceAccessor &) = delete;
+
+    ~PosixDirectorySourceAccessor()
+    {
+        invalidateCache();
+    }
+
+    void invalidateCache() override
+    {
+        if (dirFdCache) {
+            auto cache = dirFdCache->lock();
+            globalDirFdCount.fetch_sub(cache->size(), std::memory_order_relaxed);
+            cache->clear();
+        }
+    }
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    void readDirectory(
+        const CanonPath & dirPath,
+        std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return fsPath;
+        return std::filesystem::path(fsPath) / path.rel(); /* RHS *must* be a relative path. */
+    }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return displayPrefix; /* No trailing slash. */
+        if (displayPrefix.ends_with('/'))
+            return displayPrefix + path.rel();
+        return displayPrefix + path.abs();
+    }
+};
+
+std::function<void(AutoCloseFD, CanonPath)> PosixDirectorySourceAccessor::makeDirFdCallback()
+{
+    if (!dirFdCache)
+        return nullptr;
+
+    return [this](AutoCloseFD fd, CanonPath key) {
+        assert(fd);
+        insertIntoDirFdCache(std::move(key), make_ref<AutoCloseFD>(std::move(fd)));
+    };
+}
+
+std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor::openParent(const CanonPath & path)
+{
+    assert(!path.isRoot());
+    auto parent = path.parent().value();
+    if (parent.isRoot())
+        return {dirFd.get(), nullptr};
+
+    maybeEvictFromGlobalCaches();
+
+    std::shared_ptr<AutoCloseFD> intermediateParentFd;
+    CanonPath anchor = CanonPath::root;
+
+    if (dirFdCache) {
+        auto cache = dirFdCache->lock();
+        auto p = parent;
+        while (true) {
+            if (auto intermediateDirFdHit = cache->get(p)) {
+                if (p == parent)
+                    return {(*intermediateDirFdHit)->get(), *intermediateDirFdHit};
+                intermediateParentFd = intermediateDirFdHit->get_ptr();
+                anchor = p;
+                break;
+            }
+            if (p.isRoot())
+                break;
+            p.pop();
+        }
+    }
+
+    Descriptor startFd = intermediateParentFd ? intermediateParentFd->get() : dirFd.get();
+    CanonPath relPath = intermediateParentFd ? parent.removePrefix(anchor) : parent;
+
+    std::function<void(AutoCloseFD, CanonPath)> cb;
+    if (auto base = makeDirFdCallback()) {
+        if (intermediateParentFd) {
+            cb = [base = std::move(base), prefix = anchor](AutoCloseFD fd, CanonPath relKey) {
+                base(std::move(fd), prefix / relKey);
+            };
+        } else {
+            cb = std::move(base);
+        }
+    }
+
+    try {
+        AutoCloseFD parentFdOwning =
+            openFileEnsureBeneathNoSymlinks(startFd, relPath, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, std::move(cb));
+        return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
+    } catch (SymlinkNotAllowed & e) {
+        /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */
+        throw SymlinkNotAllowed(anchor / e.path, "path '%s' (or its ancestor) is a symlink", showPath(anchor / e.path));
+    }
+}
+
+std::pair<Descriptor, std::shared_ptr<AutoCloseFD>>
+PosixDirectorySourceAccessor::openParentAndUpsert(const CanonPath & path, bool ignoreMissing)
+{
+    auto [parentFd, parentFdOwning] = openParent(path);
+    if (parentFd == INVALID_DESCRIPTOR) {
+        if (errno == ENOENT || errno == ENOTDIR) /* Intermediate component might not exist. */ {
+            if (ignoreMissing)
+                return {INVALID_DESCRIPTOR, {}};
+            else
+                throw FileNotFound("path '%s' does not exist", showPath(path));
+        }
+        throw SysError("opening directory '%1%'", showPath(path.parent().value()));
+    }
+
+    if (dirFdCache && parentFdOwning) {
+        assert(*parentFdOwning);
+        insertIntoDirFdCache(path.parent().value(), ref<AutoCloseFD>(parentFdOwning));
+    }
+
+    return {parentFd, parentFdOwning};
+}
+
+std::optional<SourceAccessor::Stat> PosixDirectorySourceAccessor::maybeLstat(const CanonPath & path)
+{
+    PosixStat st;
+
+    if (path.isRoot()) {
+        /* Must never fail - we already have the file descriptor for the directory. */
+        st = nix::fstat(dirFd.get());
+    } else {
+        auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/true);
+        if (parentFd == INVALID_DESCRIPTOR)
+            return std::nullopt;
+
+        /* We know that CanonPath returns a NUL-terminated string_view, so the use of ->data() here is safe. */
+        if (::fstatat(parentFd, path.baseName()->data(), &st, AT_SYMLINK_NOFOLLOW) == -1) {
+            if (errno == ENOENT)
+                return std::nullopt;
+            throw SysError("getting status of '%1%'", showPath(path));
+        }
+    }
+
+    maybeUpdateMtime(st.st_mtime);
+    return sourceAccessorStatFromPosixStat(st);
+}
+
+void PosixDirectorySourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
+{
+    if (path.isRoot())
+        throw NotARegularFile("'%s' is not a regular file", showPath(path));
+
+    /* TODO: We can do better when we have openat2. */
+    auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
+    AutoCloseFD fileFd;
+
+    try {
+        fileFd = openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_RDONLY | O_CLOEXEC);
+    } catch (SymlinkNotAllowed & e) {
+        auto parent = path.parent().value();
+        throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+    }
+
+    if (!fileFd) {
+        if (errno == ENOENT)
+            throw FileNotFound("file '%s' does not exist", showPath(path));
+        throw SysError("opening '%s'", showPath(path));
+    }
+
+    auto st = nix::fstat(fileFd.get());
+    if (!S_ISREG(st.st_mode))
+        throw NotARegularFile("file '%s' is not a regular file", showPath(path));
+    PosixFileSourceAccessor fileAccessor(std::move(fileFd), fsPath / path.rel(), trackLastModified, st);
+    maybeUpdateMtime(st.st_mtime);
+    fileAccessor.readFile(CanonPath::root, sink, sizeCallback);
+}
+
+AutoCloseFD PosixDirectorySourceAccessor::openSubdirectory(const CanonPath & path)
+{
+    AutoCloseFD dirFdOwning;
+
+    if (path.isRoot()) {
+        /* Get a fresh file descriptor for thread-safety. */
+        dirFdOwning = ::openat(dirFd.get(), ".", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+        if (!dirFdOwning)
+            throw SysError("opening directory '%s'", showPath(path));
+    } else {
+        /* TODO: We can do better when we have openat2. */
+        auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
+
+        try {
+            dirFdOwning =
+                openFileEnsureBeneathNoSymlinks(parentFd, path.baseName().value(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+        } catch (SymlinkNotAllowed & e) {
+            auto parent = path.parent().value();
+            throw SymlinkNotAllowed(parent / e.path, "path '%s' is a symlink", showPath(parent / e.path));
+        }
+
+        if (!dirFdOwning) {
+            if (errno == ENOTDIR)
+                throw NotADirectory("'%s' is not a directory", showPath(path));
+            throw SysError("opening directory '%s'", showPath(path));
+        }
+    }
+
+    return dirFdOwning;
+}
+
+SourceAccessor::DirEntries PosixDirectorySourceAccessor::readDirectory(const CanonPath & path)
+try {
+    AutoCloseFD dirFdOwning = openSubdirectory(path);
+    AutoCloseDir dir(::fdopendir(dirFdOwning.get()));
+    if (!dir)
+        throw SysError("reading directory '%s'", showPath(path));
+    dirFdOwning.release();
+
+    DirEntries entries;
+    const ::dirent * dirent = nullptr;
+
+    while (errno = 0, dirent = ::readdir(dir.get())) {
+        checkInterrupt();
+        std::string_view name(dirent->d_name);
+        if (name == "." || name == "..")
+            continue;
+
+        std::optional<Type> type;
+        switch (dirent->d_type) {
+        case DT_REG:
+            type = tRegular;
+            break;
+        case DT_DIR:
+            type = tDirectory;
+            break;
+        case DT_LNK:
+            type = tSymlink;
+            break;
+        case DT_CHR:
+            type = tChar;
+            break;
+        case DT_BLK:
+            type = tBlock;
+            break;
+        case DT_FIFO:
+            type = tFifo;
+            break;
+        case DT_SOCK:
+            type = tSocket;
+            break;
+        default:
+            type = std::nullopt;
+            break;
+        }
+        entries.emplace(name, type);
+    }
+
+    if (errno)
+        throw SysError("reading directory '%1%'", showPath(path));
+
+    return entries;
+} catch (SymlinkNotAllowed & e) {
+    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+void PosixDirectorySourceAccessor::readDirectory(
+    const CanonPath & dirPath,
+    std::function<void(SourceAccessor & subdirAccessor, const CanonPath & subdirRelPath)> callback)
+{
+    auto fd = openSubdirectory(dirPath);
+    PosixDirectorySourceAccessor accessor{
+        std::move(fd), fsPath / dirPath.rel(), trackLastModified, /*dirFdCacheSize=*/0};
+    callback(accessor, CanonPath::root);
+    PosixSourceAccessorBase::maybeUpdateMtime(accessor.mtime);
+}
+
+std::string PosixDirectorySourceAccessor::readLink(const CanonPath & path)
+try {
+    if (path.isRoot())
+        throw NotASymlink("file '%s' is not a symlink", showPath(path));
+
+    auto [parentFd, parentFdOwning] = openParentAndUpsert(path, /*ignoreMissing=*/false);
+
+    try {
+        return readLinkAt(parentFd, CanonPath(path.baseName().value()));
+    } catch (SysError & e) {
+        if (e.errNo == EINVAL)
+            throw NotASymlink("file '%s' is not a symlink", showPath(path));
+        throw;
+    }
+} catch (SymlinkNotAllowed & e) {
+    throw SymlinkNotAllowed(e.path, "path '%s' is a symlink", showPath(e.path));
+}
+
+#else
+
+/**
+ * A source accessor that uses the Windows filesystem.
+ * @todo Should be moved into a separate file.
+ */
+class WindowsSourceAccessor : public PosixSourceAccessorBase
+{
+    /**
+     * Optional root path to prefix all operations into the native file
+     * system. This allows prepending funny things like `C:\` that
+     * `CanonPath` intentionally doesn't support.
+     */
+    const std::filesystem::path root;
+
+public:
+
+    WindowsSourceAccessor();
+    WindowsSourceAccessor(std::filesystem::path && root, bool trackLastModified = false);
+
+    void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback) override;
+
+    using SourceAccessor::readFile;
+
+    bool pathExists(const CanonPath & path) override;
+
+    std::optional<Stat> maybeLstat(const CanonPath & path) override;
+
+    DirEntries readDirectory(const CanonPath & path) override;
+
+    std::string readLink(const CanonPath & path) override;
+
+    std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override;
+
+private:
+
+    /**
+     * Throw an error if `path` or any of its ancestors are symlinks.
+     */
+    void assertNoSymlinks(CanonPath path);
+
+    std::optional<PosixStat> cachedLstat(const CanonPath & path);
+
+    std::filesystem::path makeAbsPath(const CanonPath & path);
+};
+
+WindowsSourceAccessor::WindowsSourceAccessor(std::filesystem::path && argRoot, bool trackLastModified)
+    : PosixSourceAccessorBase(trackLastModified)
+    , root(std::move(argRoot))
 {
     assert(root.empty() || root.is_absolute());
     displayPrefix = root.string();
 }
 
-PosixSourceAccessor::PosixSourceAccessor()
-    : PosixSourceAccessor(std::filesystem::path{})
+WindowsSourceAccessor::WindowsSourceAccessor()
+    : WindowsSourceAccessor(std::filesystem::path{})
 {
 }
 
-SourcePath PosixSourceAccessor::createAtRoot(const std::filesystem::path & path, bool trackLastModified)
-{
-    std::filesystem::path path2 = absPath(path);
-    return {
-        make_ref<PosixSourceAccessor>(path2.root_path(), trackLastModified),
-        CanonPath{path2.relative_path().string()},
-    };
-}
-
-std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
+std::filesystem::path WindowsSourceAccessor::makeAbsPath(const CanonPath & path)
 {
     return root.empty()    ? (std::filesystem::path{path.abs()})
            : path.isRoot() ? /* Don't append a slash for the root of the accessor, since
@@ -39,62 +652,41 @@ std::filesystem::path PosixSourceAccessor::makeAbsPath(const CanonPath & path)
                            : root / path.rel();
 }
 
-void PosixSourceAccessor::readFile(const CanonPath & path, Sink & sink, std::function<void(uint64_t)> sizeCallback)
+void WindowsSourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
 {
     assertNoSymlinks(path);
 
     auto ap = makeAbsPath(path);
 
-    AutoCloseFD fd = toDescriptor(open(
-        ap.string().c_str(),
-        O_RDONLY
-#ifndef _WIN32
-            | O_NOFOLLOW | O_CLOEXEC
-#endif
-        ));
+    AutoCloseFD fd = toDescriptor(open(ap.string().c_str(), O_RDONLY));
     if (!fd)
         throw SysError("opening file '%1%'", ap.string());
 
-    struct stat st;
-    if (fstat(fromDescriptorReadOnly(fd.get()), &st) == -1)
-        throw SysError("statting file");
+    auto size = getFileSize(fd.get());
 
-    sizeCallback(st.st_size);
-
-    off_t left = st.st_size;
-
-    std::array<unsigned char, 64 * 1024> buf;
-    while (left) {
-        checkInterrupt();
-        ssize_t rd = read(fromDescriptorReadOnly(fd.get()), buf.data(), (size_t) std::min(left, (off_t) buf.size()));
-        if (rd == -1) {
-            if (errno != EINTR)
-                throw SysError("reading from file '%s'", showPath(path));
-        } else if (rd == 0)
-            throw SysError("unexpected end-of-file reading '%s'", showPath(path));
-        else {
-            assert(rd <= left);
-            sink({(char *) buf.data(), (size_t) rd});
-            left -= rd;
-        }
-    }
+    sizeCallback(size);
+    FdSource source(fd.get());
+    /* The most important invariant we care about here is writing exactly size
+       bytes to the sink. drainInto should throw an EndOfFile if we fail to read
+       `size` bytes. */
+    source.drainInto(sink, size);
 }
 
-bool PosixSourceAccessor::pathExists(const CanonPath & path)
+bool WindowsSourceAccessor::pathExists(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
     return nix::pathExists(makeAbsPath(path).string());
 }
 
-std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & path)
-{
-    using Cache = boost::concurrent_flat_map<Path, std::optional<struct stat>>;
-    static Cache cache;
+using Cache = boost::concurrent_flat_map<std::string, std::optional<PosixStat>>;
+static Cache cache;
 
-    // Note: we convert std::filesystem::path to Path because the
+std::optional<PosixStat> WindowsSourceAccessor::cachedLstat(const CanonPath & path)
+{
+    // Note: we convert std::filesystem::path to std::string because the
     // former is not hashable on libc++.
-    Path absPath = makeAbsPath(path).string();
+    std::string absPath = makeAbsPath(path).string();
 
     if (auto res = getConcurrent(cache, absPath))
         return *res;
@@ -108,7 +700,7 @@ std::optional<struct stat> PosixSourceAccessor::cachedLstat(const CanonPath & pa
     return st;
 }
 
-std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonPath & path)
+std::optional<SourceAccessor::Stat> WindowsSourceAccessor::maybeLstat(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
@@ -116,30 +708,11 @@ std::optional<SourceAccessor::Stat> PosixSourceAccessor::maybeLstat(const CanonP
     if (!st)
         return std::nullopt;
 
-    /* The contract is that trackLastModified implies that the caller uses the accessor
-       from a single thread. Thus this is not a CAS loop. */
-    if (trackLastModified)
-        mtime = std::max(mtime, st->st_mtime);
-
-    return Stat{
-        .type = S_ISREG(st->st_mode)   ? tRegular
-                : S_ISDIR(st->st_mode) ? tDirectory
-                : S_ISLNK(st->st_mode) ? tSymlink
-                : S_ISCHR(st->st_mode) ? tChar
-                : S_ISBLK(st->st_mode) ? tBlock
-                :
-#ifdef S_ISSOCK
-                S_ISSOCK(st->st_mode) ? tSocket
-                :
-#endif
-                S_ISFIFO(st->st_mode) ? tFifo
-                                      : tUnknown,
-        .fileSize = S_ISREG(st->st_mode) ? std::optional<uint64_t>(st->st_size) : std::nullopt,
-        .isExecutable = S_ISREG(st->st_mode) && st->st_mode & S_IXUSR,
-    };
+    PosixSourceAccessorBase::maybeUpdateMtime(st->st_mtime);
+    return sourceAccessorStatFromPosixStat(*st);
 }
 
-SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & path)
+SourceAccessor::DirEntries WindowsSourceAccessor::readDirectory(const CanonPath & path)
 {
     assertNoSymlinks(path);
     DirEntries res;
@@ -183,7 +756,7 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
                 if (e.code() == std::errc::permission_denied || e.code() == std::errc::operation_not_permitted)
                     return std::nullopt;
                 else
-                    throw;
+                    throw SystemError(e.code(), "getting status of '%s'", PathFmt(entry.path()));
             }
         }();
         res.emplace(entry.path().filename().string(), type);
@@ -191,19 +764,19 @@ SourceAccessor::DirEntries PosixSourceAccessor::readDirectory(const CanonPath & 
     return res;
 }
 
-std::string PosixSourceAccessor::readLink(const CanonPath & path)
+std::string WindowsSourceAccessor::readLink(const CanonPath & path)
 {
     if (auto parent = path.parent())
         assertNoSymlinks(*parent);
-    return nix::readLink(makeAbsPath(path).string());
+    return nix::readLink(makeAbsPath(path)).string();
 }
 
-std::optional<std::filesystem::path> PosixSourceAccessor::getPhysicalPath(const CanonPath & path)
+std::optional<std::filesystem::path> WindowsSourceAccessor::getPhysicalPath(const CanonPath & path)
 {
     return makeAbsPath(path);
 }
 
-void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
+void WindowsSourceAccessor::assertNoSymlinks(CanonPath path)
 {
     while (!path.isRoot()) {
         auto st = cachedLstat(path);
@@ -213,14 +786,104 @@ void PosixSourceAccessor::assertNoSymlinks(CanonPath path)
     }
 }
 
+#endif
+
+} // namespace
+
 ref<SourceAccessor> getFSSourceAccessor()
 {
-    static auto rootFS = make_ref<PosixSourceAccessor>();
+    static auto rootFS = makeFSSourceAccessor("/", /*trackLastModified=*/false);
     return rootFS;
 }
 
-ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified)
+ref<SourceAccessor> makeFSSourceAccessor(std::filesystem::path root, bool trackLastModified, FinalSymlink finalSymlink)
 {
-    return make_ref<PosixSourceAccessor>(std::move(root), trackLastModified);
+#ifndef _WIN32
+    assert(root.is_absolute());
+    AutoCloseFD fd = openFileReadonly(root, finalSymlink);
+
+    if (!fd) {
+        if (finalSymlink == FinalSymlink::Follow || errno != NIX_ERR_OPEN_SYMLINK)
+            throw NativeSysError("opening file %1%", PathFmt(root));
+
+        /* A helper class that holds the symlink destination in memory. */
+        class SymlinkSourceAccessor : public MemorySourceAccessor
+        {
+            bool trackLastModified;
+            std::time_t mtime;
+            std::filesystem::path fsPath;
+
+        public:
+            SymlinkSourceAccessor(
+                std::string target, std::filesystem::path fsPath_, bool trackLastModified, std::time_t mtime)
+                : trackLastModified(trackLastModified)
+                , mtime(mtime)
+                , fsPath(std::move(fsPath_))
+            {
+                MemorySink sink{*this};
+                sink.createSymlink(CanonPath::root, target);
+                displayPrefix = fsPath.native();
+            }
+
+            std::optional<std::time_t> getLastModified() override
+            {
+                return trackLastModified ? std::optional{mtime} : std::nullopt;
+            }
+
+            std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
+            {
+                if (path.isRoot())
+                    return fsPath;
+                return fsPath / path.rel(); /* RHS must be a relative path. */
+            }
+
+            std::string showPath(const CanonPath & path) override
+            {
+                /* When rendering the file itself omit the trailing slash. */
+                return path.isRoot() ? displayPrefix : SourceAccessor::showPath(path);
+            }
+        };
+
+        assert(root.has_parent_path());
+        assert(root.has_filename());
+
+        /* This branch is taken either if the final component is a symlink
+           or we hit a symlink loop. If that's the latter this will also
+           throw. This can be done with O_PATH descriptor for the symlink
+           itself, but it's not portable. Note that file must have a parent directory
+           (it's required to be absolute and root directories can't fail with ELOOP). */
+
+        auto parentFd = openDirectory(root.parent_path(), FinalSymlink::Follow);
+        std::time_t mtime = 0;
+        if (!parentFd)
+            throw SysError("opening %1%", PathFmt(root));
+
+        auto relPath = CanonPath::fromFilename(root.filename().native());
+        if (trackLastModified) {
+            auto st = fstatat(parentFd.get(), root.filename());
+            mtime = st.st_mtime;
+        }
+
+        auto linkTarget = readLinkAt(parentFd.get(), relPath);
+        return make_ref<SymlinkSourceAccessor>(std::move(linkTarget), std::move(root), trackLastModified, mtime);
+    }
+
+    auto st = nix::fstat(fd.get());
+    if (S_ISREG(st.st_mode))
+        return make_ref<PosixFileSourceAccessor>(std::move(fd), std::move(root), trackLastModified, st);
+
+    else if (S_ISDIR(st.st_mode)) {
+        auto res = make_ref<PosixDirectorySourceAccessor>(
+            std::move(fd), std::move(root), trackLastModified, PosixDirectorySourceAccessor::getGlobalFdLimit() / 8);
+        PosixDirectorySourceAccessor::registerAccessor(res);
+        return res;
+    }
+
+    else
+        throw Error("file %1% has an unsupported type", PathFmt(root));
+#else
+    return make_ref<WindowsSourceAccessor>(std::move(root), trackLastModified);
+#endif
 }
+
 } // namespace nix

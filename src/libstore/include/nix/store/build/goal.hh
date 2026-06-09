@@ -10,8 +10,11 @@
 
 namespace nix {
 
-struct TimedOut : BuildError
+class TimedOut final : public CloneableError<TimedOut, BuildError>
 {
+    void anchor() override;
+
+public:
     time_t maxDuration;
 
     TimedOut(time_t maxDuration);
@@ -75,10 +78,58 @@ enum struct JobCategory {
 struct Goal : public std::enable_shared_from_this<Goal>
 {
 private:
+    /* VTable anchor to avoid weak linkage of the vtable - it breaks
+       dynamic_cast across shared libraries on Darwin. */
+    virtual void anchor();
+public:
+    /**
+     * Event types for child process communication, delivered via coroutines.
+     */
+    struct ChildOutput
+    {
+        Descriptor fd;
+        std::string data;
+    };
+
+    struct ChildEOF
+    {
+        Descriptor fd;
+    };
+
+    using ChildEvent = std::variant<ChildOutput, ChildEOF, std::unique_ptr<TimedOut>>;
+
+private:
+    class ChildEvents
+    {
+        /**
+         * Structured queue of child events:
+         * - outputs: stream of data from child
+         * - eof: optional end-of-stream marker
+         * - timeout: optional timeout that flushes/overrides other events
+         */
+        std::queue<ChildOutput> childOutputs;
+        std::optional<ChildEOF> childEOF;
+        std::unique_ptr<TimedOut> childTimeout;
+
+    public:
+        void pushChildEvent(ChildOutput event);
+        void pushChildEvent(ChildEOF event);
+        void pushChildEvent(TimedOut event);
+        bool hasChildEvent() const;
+        ChildEvent popChildEvent();
+    };
+
     /**
      * Goals that this goal is waiting for.
      */
     Goals waitees;
+
+    /**
+     * Memoised result of key().
+     */
+    std::optional<std::string> cachedKey;
+
+    ChildEvents childEvents;
 
 public:
     typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
@@ -148,22 +199,6 @@ public:
     };
 
     /**
-     * Event types for child process communication, delivered via coroutines.
-     */
-    struct ChildOutput
-    {
-        Descriptor fd;
-        std::string data;
-    };
-
-    struct ChildEOF
-    {
-        Descriptor fd;
-    };
-
-    using ChildEvent = std::variant<ChildOutput, ChildEOF, TimedOut>;
-
-    /**
      * Tag type for `co_await`-ing child events.
      * Returns a `ChildEvent` when resumed.
      */
@@ -228,8 +263,10 @@ public:
 
         explicit Co(handle_type handle)
             : handle(handle) {};
-        void operator=(Co &&);
-        Co(Co && rhs);
+        Co & operator=(Co &&) noexcept;
+        Co(Co && rhs) noexcept;
+        Co & operator=(const Co &) = delete;
+        Co(const Co & rhs) = delete;
         ~Co();
 
         bool await_ready()
@@ -251,6 +288,12 @@ public:
          */
         std::coroutine_handle<> await_suspend(handle_type handle);
         void await_resume() {};
+    };
+
+    template<typename T>
+    struct AsyncCallback
+    {
+        fun<void(Callback<T>)> fn;
     };
 
     /**
@@ -307,28 +350,6 @@ public:
          * destructed coroutine by accident
          */
         bool alive = true;
-
-        class
-        {
-            /**
-             * Structured queue of child events:
-             * - outputs: stream of data from child
-             * - eof: optional end-of-stream marker
-             * - timeout: optional timeout that flushes/overrides other events
-             */
-            std::queue<ChildOutput> childOutputs;
-            std::optional<ChildEOF> childEOF;
-            std::optional<TimedOut> childTimeout;
-
-        public:
-
-            void pushChildEvent(ChildOutput event);
-            void pushChildEvent(ChildEOF event);
-            void pushChildEvent(TimedOut event);
-            bool hasChildEvent() const;
-            ChildEvent popChildEvent();
-
-        } childEvents;
 
         /**
          * The awaiter used by @ref final_suspend.
@@ -423,6 +444,9 @@ public:
             return static_cast<Co &&>(co);
         }
 
+        template<typename T>
+        auto await_transform(AsyncCallback<T> && acb);
+
         /**
          * Awaiter for @ref Suspend. Always suspends, but asserts
          * there are no pending child events (those should be
@@ -434,7 +458,7 @@ public:
 
             bool await_ready()
             {
-                assert(!promise.childEvents.hasChildEvent());
+                assert(!promise.goal->childEvents.hasChildEvent());
                 return false;
             }
 
@@ -462,7 +486,7 @@ public:
 
             bool await_ready()
             {
-                return handle && handle.promise().childEvents.hasChildEvent();
+                return handle && handle.promise().goal->childEvents.hasChildEvent();
             }
 
             void await_suspend(handle_type h)
@@ -473,7 +497,7 @@ public:
             ChildEvent await_resume()
             {
                 assert(handle);
-                return handle.promise().childEvents.popChildEvent();
+                return handle.promise().goal->childEvents.popChildEvent();
             }
         };
 
@@ -500,14 +524,32 @@ protected:
      * Signals that the goal is done.
      * `co_return` the result. If you're not inside a coroutine, you can ignore
      * the return value safely.
+     *
+     * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
+     * `buildResult` is set correctly.
      */
-    Done amDone(ExitCode result, std::optional<Error> ex = {});
+    Done amDone(ExitCode result);
+
+    /**
+     * Signals successful completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     */
+    Done doneSuccess(BuildResult::Success success);
+
+    /**
+     * Signals failed completion of the goal.
+     * Sets `buildResult` and calls `amDone`.
+     *
+     * @param result The exit code (ecFailed or ecNoSubstituters)
+     * @param failure The failure details including status and error message
+     */
+    Done doneFailure(ExitCode result, BuildResult::Failure failure);
 
 public:
     virtual void cleanup() {}
 
     /**
-     * Hack to say that this goal should not log `ex`, but instead keep
+     * Hack to say that this goal should not log the failure, but instead keep
      * it around. Set by a waitee which sees itself as the designated
      * continuation of this goal, responsible for reporting its
      * successes or failures.
@@ -515,12 +557,7 @@ public:
      * @todo this is yet another not-nice hack in the goal system that
      * we ought to get rid of. See #11927
      */
-    bool preserveException = false;
-
-    /**
-     * Exception containing an error message, if any.
-     */
-    std::optional<Error> ex;
+    bool preserveFailure = false;
 
     Goal(Worker & worker, Co init)
         : worker(worker)
@@ -579,6 +616,17 @@ public:
     virtual std::string key() = 0;
 
     /**
+     * Memoising variant of key(). We really don't want to pay the overhead of
+     * allocating strings just to compare Goals.
+     */
+    std::string_view keyCached() &
+    {
+        if (cachedKey)
+            return *cachedKey;
+        return *(cachedKey = key());
+    }
+
+    /**
      * @brief Hint for the scheduler, which concurrency limit applies.
      * @see JobCategory
      */
@@ -587,7 +635,19 @@ public:
 protected:
     Co await(Goals waitees);
 
+    /**
+     * Awaiting on the resulting coroutine yields the goal for several seconds.
+     * Used for retrying goals blocked on acquiring lockfiles.
+     */
     Co waitForAWhile();
+
+    /**
+     * Awaiting on the resulting coroutine yields the goal until it is
+     * explicitly woken up via Worker::wakeUp. Wakeup can be queued from another
+     * thread via Worker::Waker.
+     */
+    Co waitUntilWoken();
+
     Co waitForBuildSlot();
     Co yield();
 };

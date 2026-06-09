@@ -187,6 +187,6 @@ static RegisterPrimOp primop_fromTOML(
 
       returns the value `{ s = "a"; table = { y = 2; }; x = 1; }`.
     )",
-     .fun = prim_fromTOML});
+     .impl = prim_fromTOML});
 
 } // namespace nix

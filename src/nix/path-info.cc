@@ -5,13 +5,13 @@
 #include "nix/store/nar-info.hh"
 
 #include <algorithm>
-#include <array>
 
 #include <nlohmann/json.hpp>
 
 #include "nix/util/strings.hh"
 
-using namespace nix;
+namespace nix {
+
 using nlohmann::json;
 
 /**
@@ -227,7 +227,7 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
                     if (info->ca)
                         ss.push_back("ca:" + renderContentAddress(*info->ca));
                     for (auto & sig : info->sigs)
-                        ss.push_back(sig);
+                        ss.push_back(sig.to_string());
                     str << concatStringsSep(" ", ss);
                 }
 
@@ -238,3 +238,5 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
 };
 
 static auto rCmdPathInfo = registerCommand<CmdPathInfo>("path-info");
+
+} // namespace nix

@@ -1,10 +1,33 @@
 #include "nix/util/users.hh"
+#include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/profiles.hh"
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 
 namespace nix {
+
+void EvalSettings::anchor() {}
+
+void DeprecatedWarnSetting::assign(const bool & v)
+{
+    value = v;
+    warn("'%s' is deprecated, use '%s = %s' instead", name, targetName, v ? "warn" : "ignore");
+    if (!target.overridden)
+        target = v ? Diagnose::Warn : Diagnose::Ignore;
+}
+
+void DeprecatedWarnSetting::appendOrSet(bool newValue, bool append)
+{
+    assert(!append);
+    assign(newValue);
+}
+
+void DeprecatedWarnSetting::override(const bool & v)
+{
+    overridden = true;
+    assign(v);
+}
 
 /* Very hacky way to parse $NIX_PATH, which is colon-separated, but
    can contain URLs (e.g. "nixpkgs=https://bla...:foo=https://"). */
@@ -49,7 +72,7 @@ Strings EvalSettings::parseNixPath(const std::string & s)
 }
 
 EvalSettings::EvalSettings(bool & readOnlyMode, EvalSettings::LookupPathHooks lookupPathHooks)
-    : readOnlyMode{readOnlyMode}
+    : readOnlyMode{&readOnlyMode}
     , lookupPathHooks{lookupPathHooks}
 {
     auto var = getEnv("NIX_ABORT_ON_WARN");
@@ -70,9 +93,10 @@ Strings EvalSettings::getDefaultNixPath()
         }
     };
 
-    add(std::filesystem::path{getNixDefExpr()} / "channels");
-    add(rootChannelsDir() / "nixpkgs", "nixpkgs");
-    add(rootChannelsDir());
+    add(getNixDefExpr() / "channels");
+    auto profilesDirOpts = settings.getProfileDirsOptions();
+    add(rootChannelsDir(profilesDirOpts) / "nixpkgs", "nixpkgs");
+    add(rootChannelsDir(profilesDirOpts));
 
     return res;
 }

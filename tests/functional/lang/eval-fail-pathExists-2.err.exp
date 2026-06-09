@@ -1,0 +1,10 @@
+error:
+       … while calling the 'pathExists' builtin
+         at /pwd/lang/eval-fail-pathExists-2.nix:1:1:
+            1| builtins.pathExists "zorglub"
+             | ^
+            2|
+
+       … while realising the context of a path
+
+       error: string 'zorglub' doesn't represent an absolute path

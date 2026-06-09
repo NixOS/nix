@@ -1,0 +1,1 @@
+1 nix-instantiate ./cli-characterisation/no-drvpath.nix

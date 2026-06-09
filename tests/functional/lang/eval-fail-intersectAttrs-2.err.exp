@@ -1,0 +1,10 @@
+error:
+       … while calling the 'intersectAttrs' builtin
+         at /pwd/lang/eval-fail-intersectAttrs-2.nix:1:1:
+            1| builtins.intersectAttrs { } [ ]
+             | ^
+            2|
+
+       … while evaluating the second argument passed to builtins.intersectAttrs
+
+       error: expected a set but found a list: [ ]

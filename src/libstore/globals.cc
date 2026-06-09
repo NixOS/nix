@@ -1,11 +1,14 @@
 #include "nix/store/globals.hh"
+#include "nix/store/profiles.hh"
+#include "nix/util/config-impl.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/current-process.hh"
-#include "nix/util/archive.hh"
+#include "nix/util/executable-path.hh"
 #include "nix/util/args.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
-#include "nix/util/signals.hh"
+#include "nix/util/executable-path.hh"
+#include "nix/store/filetransfer.hh"
 
 #include <algorithm>
 #include <map>
@@ -29,52 +32,50 @@
 #  include "nix/util/processes.hh"
 #endif
 
-#include "nix/util/config-impl.hh"
-
 #ifdef __APPLE__
 #  include <sys/sysctl.h>
+#endif
+
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
 #endif
 
 #include "store-config-private.hh"
 
 namespace nix {
 
-/* The default location of the daemon socket, relative to nixStateDir.
-   The socket is in a directory to allow you to control access to the
-   Nix daemon by setting the mode/ownership of the directory
-   appropriately.  (This wouldn't work on the socket itself since it
-   must be deleted and recreated on startup.) */
-#define DEFAULT_SOCKET_PATH "/daemon-socket/socket"
+void Settings::anchor() {}
+
+void NarInfoDiskCacheSettings::anchor() {}
+
+void LogFileSettings::anchor() {}
+
+void AutoAllocateUidSettings::anchor() {}
 
 Settings settings;
 
 static GlobalConfig::Register rSettings(&settings);
 
 Settings::Settings()
-    : nixPrefix(NIX_PREFIX)
-    , nixStore(
-#ifndef _WIN32
-          // On Windows `/nix/store` is not a canonical path, but we dont'
-          // want to deal with that yet.
-          canonPath
+    : nixStateDir(getEnvOsNonEmpty(OS_STR("NIX_STATE_DIR"))
+                      .transform([](auto && s) { return std::filesystem::path(s); })
+                      .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+#  ifdef NIX_STATE_DIR
+#    error "NIX_STATE_DIR should not be defined on Windows"
+#  endif
+                          return windows::known_folders::getProgramData() / "nix" / "state";
+#else
+                          return NIX_STATE_DIR;
 #endif
-          (getEnvNonEmpty("NIX_STORE_DIR").value_or(getEnvNonEmpty("NIX_STORE").value_or(NIX_STORE_DIR))))
-    , nixDataDir(canonPath(getEnvNonEmpty("NIX_DATA_DIR").value_or(NIX_DATA_DIR)))
-    , nixLogDir(canonPath(getEnvNonEmpty("NIX_LOG_DIR").value_or(NIX_LOG_DIR)))
-    , nixStateDir(canonPath(getEnvNonEmpty("NIX_STATE_DIR").value_or(NIX_STATE_DIR)))
-    , nixConfDir(canonPath(getEnvNonEmpty("NIX_CONF_DIR").value_or(NIX_CONF_DIR)))
-    , nixUserConfFiles(getUserConfigFiles())
-    , nixDaemonSocketFile(
-          canonPath(getEnvNonEmpty("NIX_DAEMON_SOCKET_PATH").value_or(nixStateDir + DEFAULT_SOCKET_PATH)))
+                      })
+                      .transform([](auto && s) { return canonPath(s); })
+                      .value())
 {
 #ifndef _WIN32
     buildUsersGroup = isRootUser() ? "nixbld" : "";
 #endif
     allowSymlinkedStore = getEnv("NIX_IGNORE_SYMLINK_STORE") == "1";
-
-    auto sslOverride = getEnv("NIX_SSL_CERT_FILE").value_or(getEnv("SSL_CERT_FILE").value_or(""));
-    if (sslOverride != "")
-        caFile = sslOverride;
 
     /* Backwards compatibility. */
     auto s = getEnv("NIX_REMOTE_SYSTEMS");
@@ -102,29 +103,29 @@ Settings::Settings()
          }) {
         sandboxPaths.get().insert_or_assign(std::string{p}, ChrootPath{.source = std::string{p}});
     }
-    allowedImpureHostPrefixes = tokenizeString<StringSet>("/System/Library /usr/lib /dev /bin/sh");
+    allowedImpureHostPrefixes = std::set<std::filesystem::path>{"/System/Library", "/usr/lib", "/dev", "/bin/sh"};
 #endif
 }
 
 void loadConfFile(AbstractConfig & config)
 {
-    auto applyConfigFile = [&](const Path & path) {
+    auto applyConfigFile = [&](const std::filesystem::path & path) {
         try {
             std::string contents = readFile(path);
-            config.applyConfig(contents, path);
+            config.applyConfig(contents, path.string());
         } catch (SystemError &) {
         }
     };
 
-    applyConfigFile((settings.nixConfDir / "nix.conf").string());
+    applyConfigFile(nixConfFile());
 
     /* We only want to send overrides to the daemon, i.e. stuff from
        ~/.nix/nix.conf or the command line. */
     config.resetOverridden();
 
-    auto files = settings.nixUserConfFiles;
+    auto files = nixUserConfFiles();
     for (auto file = files.rbegin(); file != files.rend(); file++) {
-        applyConfigFile(*file);
+        applyConfigFile(file->string());
     }
 
     auto nixConfEnv = getEnv("NIX_CONFIG");
@@ -133,20 +134,48 @@ void loadConfFile(AbstractConfig & config)
     }
 }
 
-std::vector<Path> getUserConfigFiles()
+/**
+ * On Windows, NIX_CONF_DIR (and other directories like NIX_STATE_DIR, NIX_LOG_DIR)
+ * are not defined at compile time, so we determine paths at runtime using the
+ * Windows known folders API (FOLDERID_ProgramData). This allows Nix to work
+ * correctly regardless of which drive Windows is installed on.
+ */
+const std::filesystem::path & nixConfDir()
 {
-    // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
-    auto nixConfFiles = getEnv("NIX_USER_CONF_FILES");
-    if (nixConfFiles.has_value()) {
-        return tokenizeString<std::vector<std::string>>(nixConfFiles.value(), ":");
-    }
+    static const std::filesystem::path dir = getEnvOsNonEmpty(OS_STR("NIX_CONF_DIR"))
+                                                 .transform([](auto && s) { return std::filesystem::path(s); })
+                                                 .or_else([]() -> std::optional<std::filesystem::path> {
+#ifdef _WIN32
+#  ifdef NIX_CONF_DIR
+#    error "NIX_CONF_DIR should not be defined on Windows"
+#  endif
+                                                     return windows::known_folders::getProgramData() / "nix" / "conf";
+#else
+                                                     return NIX_CONF_DIR;
+#endif
+                                                 })
+                                                 .transform([](auto && s) { return canonPath(s); })
+                                                 .value();
+    return dir;
+}
 
-    // Use the paths specified by the XDG spec
-    std::vector<Path> files;
-    auto dirs = getConfigDirs();
-    for (auto & dir : dirs) {
-        files.insert(files.end(), (dir / "nix.conf").string());
-    }
+const std::vector<std::filesystem::path> & nixUserConfFiles()
+{
+    static const std::vector<std::filesystem::path> files = [] {
+        // Use the paths specified in NIX_USER_CONF_FILES if it has been defined
+        auto nixConfFiles = getEnvOs(OS_STR("NIX_USER_CONF_FILES"));
+        if (nixConfFiles.has_value()) {
+            return ExecutablePath::parse(*nixConfFiles).directories;
+        }
+
+        // Use the paths specified by the XDG spec
+        std::vector<std::filesystem::path> files;
+        auto dirs = getConfigDirs();
+        for (auto & dir : dirs) {
+            files.insert(files.end(), dir / "nix.conf");
+        }
+        return files;
+    }();
     return files;
 }
 
@@ -249,22 +278,21 @@ bool Settings::isWSL1()
 #endif
 }
 
-Path Settings::getDefaultSSLCertFile()
-{
-    for (auto & fn :
-         {"/etc/ssl/certs/ca-certificates.crt", "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt"})
-        if (pathAccessible(fn))
-            return fn;
-    return "";
-}
-
-const ExternalBuilder * Settings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
+const ExternalBuilder * LocalSettings::findExternalDerivationBuilderIfSupported(const Derivation & drv)
 {
     if (auto it = std::ranges::find_if(
             externalBuilders.get(), [&](const auto & handler) { return handler.systems.contains(drv.platform); });
         it != externalBuilders.get().end())
         return &*it;
     return nullptr;
+}
+
+ProfileDirsOptions Settings::getProfileDirsOptions() const
+{
+    return {
+        .nixStateDir = nixStateDir,
+        .useXDGBaseDirectories = useXDGBaseDirectories,
+    };
 }
 
 std::string nixVersion = PACKAGE_VERSION;
@@ -400,17 +428,17 @@ unsigned int MaxBuildJobsSetting::parse(const std::string & str) const
 }
 
 template<>
-Settings::ExternalBuilders BaseSetting<Settings::ExternalBuilders>::parse(const std::string & str) const
+LocalSettings::ExternalBuilders BaseSetting<LocalSettings::ExternalBuilders>::parse(const std::string & str) const
 {
     try {
-        return nlohmann::json::parse(str).template get<Settings::ExternalBuilders>();
+        return nlohmann::json::parse(str).template get<LocalSettings::ExternalBuilders>();
     } catch (std::exception & e) {
         throw UsageError("parsing setting '%s': %s", name, e.what());
     }
 }
 
 template<>
-std::string BaseSetting<Settings::ExternalBuilders>::to_string() const
+std::string BaseSetting<LocalSettings::ExternalBuilders>::to_string() const
 {
     return nlohmann::json(value).dump();
 }
@@ -422,6 +450,88 @@ void BaseSetting<PathsInChroot>::appendOrSet(PathsInChroot newValue, bool append
         value.clear();
     value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
 }
+
+template<>
+struct BaseSetting<std::vector<StoreReference>>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+struct BaseSetting<std::set<StoreReference>>::trait
+{
+    static constexpr bool appendable = true;
+};
+
+template<>
+StoreReference BaseSetting<StoreReference>::parse(const std::string & str) const
+{
+    return StoreReference::parse(str);
+}
+
+template<>
+std::string BaseSetting<StoreReference>::to_string() const
+{
+    return value.render();
+}
+
+template<>
+std::vector<StoreReference> BaseSetting<std::vector<StoreReference>>::parse(const std::string & str) const
+{
+    std::vector<StoreReference> res;
+    for (const auto & s : tokenizeString<Strings>(str))
+        res.push_back(StoreReference::parse(s));
+    return res;
+}
+
+template<>
+std::string BaseSetting<std::vector<StoreReference>>::to_string() const
+{
+    Strings ss;
+    for (const auto & ref : value)
+        ss.push_back(ref.render());
+    return concatStringsSep(" ", ss);
+}
+
+template<>
+void BaseSetting<std::vector<StoreReference>>::appendOrSet(std::vector<StoreReference> newValue, bool append)
+{
+    if (append)
+        value.insert(value.end(), std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+    else
+        value = std::move(newValue);
+}
+
+template<>
+std::set<StoreReference> BaseSetting<std::set<StoreReference>>::parse(const std::string & str) const
+{
+    std::set<StoreReference> res;
+    for (const auto & s : tokenizeString<Strings>(str))
+        res.insert(StoreReference::parse(s));
+    return res;
+}
+
+template<>
+std::string BaseSetting<std::set<StoreReference>>::to_string() const
+{
+    Strings ss;
+    for (const auto & ref : value)
+        ss.push_back(ref.render());
+    return concatStringsSep(" ", ss);
+}
+
+template<>
+void BaseSetting<std::set<StoreReference>>::appendOrSet(std::set<StoreReference> newValue, bool append)
+{
+    if (append)
+        value.insert(std::make_move_iterator(newValue.begin()), std::make_move_iterator(newValue.end()));
+    else
+        value = std::move(newValue);
+}
+
+template class BaseSetting<StoreReference>;
+template class BaseSetting<std::vector<StoreReference>>;
+template class BaseSetting<std::set<StoreReference>>;
 
 static void preloadNSS()
 {

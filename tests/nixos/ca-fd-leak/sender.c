@@ -62,6 +62,6 @@ int main(int argc, char ** argv)
     int buf;
 
     // Wait for the server to close the socket, implying that it has
-    // received the commmand.
+    // received the command.
     recv(sock, (void *) &buf, sizeof(int), 0);
 }

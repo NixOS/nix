@@ -4,7 +4,9 @@
 #  include "nix/store/build/hook-instance.hh"
 #  include "nix/store/build/derivation-builder.hh"
 #endif
+#include "nix/util/fun.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
@@ -12,9 +14,11 @@
 #include "nix/store/common-protocol.hh"
 #include "nix/store/common-protocol-impl.hh"
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
+#include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
 
-#include <fstream>
+#include <algorithm>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -26,10 +30,10 @@
 namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
-    const StorePath & drvPath, const Derivation & drv, Worker & worker, BuildMode buildMode, bool storeDerivation)
+    const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode, bool storeDerivation)
     : Goal(worker, gaveUpOnSubstitution(storeDerivation))
     , drvPath(drvPath)
-    , drv{std::make_unique<Derivation>(drv)}
+    , drv{std::move(drv)}
     , buildMode(buildMode)
 {
     name = fmt("building derivation '%s'", worker.store.printStorePath(drvPath));
@@ -40,35 +44,11 @@ DerivationBuildingGoal::DerivationBuildingGoal(
     worker.store.addTempRoot(this->drvPath);
 }
 
-DerivationBuildingGoal::~DerivationBuildingGoal()
-{
-    /* Careful: we should never ever throw an exception from a
-       destructor. */
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder)
-        builder.reset();
-#endif
-    try {
-        closeLogFile();
-    } catch (...) {
-        ignoreExceptionInDestructor();
-    }
-}
+DerivationBuildingGoal::~DerivationBuildingGoal() = default;
 
 std::string DerivationBuildingGoal::key()
 {
     return "dd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
-}
-
-void DerivationBuildingGoal::killChild()
-{
-#ifndef _WIN32 // TODO enable build hook on Windows
-    hook.reset();
-#endif
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    if (builder && builder->killChild())
-        worker.childTerminated(this);
-#endif
 }
 
 std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)
@@ -86,8 +66,81 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     return msg;
 }
 
-static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths);
+namespace {
+
+struct LogSink : Sink
+{
+    Activity & act;
+    std::string currentLine;
+
+    LogSink(Activity & act)
+        : act(act)
+    {
+    }
+
+    void operator()(std::string_view data) override
+    {
+        for (auto c : data) {
+            if (c == '\n') {
+                flushLine();
+            } else {
+                currentLine += c;
+            }
+        }
+    }
+
+    void flushLine()
+    {
+        act.result(resPostBuildLogLine, currentLine);
+        currentLine.clear();
+    }
+
+    ~LogSink()
+    {
+        if (currentLine != "") {
+            currentLine += '\n';
+            flushLine();
+        }
+    }
+};
+
+} // namespace
+
+struct PostBuildHookState
+{
+    const std::string hook;
+    Activity act;
+    std::unique_ptr<LogSink> sink;
+    std::unique_ptr<Pipe> out;
+    Pid pid;
+
+    PostBuildHookState(Logger & logger, const std::string hook, const std::string drvPath)
+        : hook(hook)
+        , act(logger,
+              lvlTalkative,
+              actPostBuildHook,
+              fmt("running post-build-hook '%s'", hook),
+              Logger::Fields{drvPath})
+        , out(std::make_unique<Pipe>())
+    {
+        out->create();
+        sink = std::make_unique<LogSink>(act);
+    }
+
+    void complete()
+    {
+        if (int ret = pid.wait()) {
+            throw Error("program \"%s\" %s", hook, statusToString(ret));
+        }
+    }
+};
+
+static std::unique_ptr<PostBuildHookState> runPostBuildHook(
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths);
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
@@ -111,7 +164,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     for (auto & i : drv->inputSrcs) {
         if (worker.store.isValidPath(i))
             continue;
-        if (!settings.useSubstitutes)
+        if (!worker.settings.useSubstitutes)
             throw Error(
                 "dependency '%s' of '%s' does not exist, and substitution is disabled",
                 worker.store.printStorePath(i),
@@ -143,8 +196,10 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
         assert(drv->inputDrvs.map.empty());
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
-        writeDerivation(worker.store, *drv);
+        worker.store.writeDerivation(*drv);
     }
+
+    StorePathSet inputPaths;
 
     {
         /* If we get this far, we know no dynamic drvs inputs */
@@ -158,7 +213,7 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
                 auto outMap = [&] {
                     for (auto * drvStore : {&worker.evalStore, &worker.store})
                         if (drvStore->isValidPath(depDrvPath))
-                            return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
                     assert(false);
                 }();
 
@@ -179,16 +234,107 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
     /* Second, the input sources. */
     worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
 
-    debug("added input paths %s", worker.store.showPaths(inputPaths));
+    debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
+              return "'" + worker.store.printStorePath(p) + "'";
+          }));
 
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-    co_return tryToBuild();
+    co_return tryToBuild(std::move(inputPaths));
 }
 
-Goal::Co DerivationBuildingGoal::tryToBuild()
+/**
+ * RAII wrapper for build log file.
+ * Constructor opens the log file, destructor closes it.
+ */
+struct LogFile
+{
+    AutoCloseFD fd;
+    std::shared_ptr<BufferedSink> fileSink, sink;
+
+    LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings);
+    ~LogFile();
+};
+
+struct LocalBuildRejection
+{
+    bool maxJobsZero = false;
+
+    struct NoLocalStore
+    {};
+
+    /**
+     * We have a local store, but we don't have an external derivation builder (which is fine), if we did, it'd be
+     * fine because we would not care about platforms and features then. Since we don't, we either have the wrong
+     * platform, or we are missing some system features.
+     */
+    struct WrongLocalStore
+    {
+        template<typename T>
+        struct Pair
+        {
+            T derivation;
+            T localStore;
+        };
+
+        std::optional<Pair<std::string>> badPlatform;
+        std::optional<Pair<StringSet>> missingFeatures;
+    };
+
+    std::variant<NoLocalStore, WrongLocalStore> rejection;
+};
+
+static BuildError reject(const LocalBuildRejection & rejection, std::string_view thingCannotBuild)
+{
+    if (std::get_if<LocalBuildRejection::NoLocalStore>(&rejection.rejection))
+        return BuildError(
+            BuildResult::Failure::InputRejected,
+            "Unable to build with a primary store that isn't a local store; "
+            "either pass a different '--store' or enable remote builds.\n\n"
+            "For more information check 'man nix.conf' and search for '/machines'.");
+
+    auto & wrongStore = std::get<LocalBuildRejection::WrongLocalStore>(rejection.rejection);
+
+    std::string msg = fmt("Cannot build '%s'.", Magenta(thingCannotBuild));
+
+    if (rejection.maxJobsZero)
+        msg += "\nReason: " ANSI_RED "local builds are disabled" ANSI_NORMAL
+               " (max-jobs = 0)"
+               "\nHint: set 'max-jobs' to a non-zero value to enable local builds, "
+               "or configure remote builders via 'builders'";
+
+    if (wrongStore.badPlatform)
+        msg +=
+            fmt("\nReason: " ANSI_RED "platform mismatch" ANSI_NORMAL
+                "\nRequired system: '%s'"
+                "\nCurrent system: '%s'",
+                Magenta(wrongStore.badPlatform->derivation),
+                Magenta(wrongStore.badPlatform->localStore));
+
+    if (wrongStore.missingFeatures)
+        msg +=
+            fmt("\nReason: " ANSI_RED "missing system features" ANSI_NORMAL
+                "\nRequired features: {%s}"
+                "\nAvailable features: {%s}",
+                concatStringsSep(", ", wrongStore.missingFeatures->derivation),
+                concatStringsSep<StringSet>(", ", wrongStore.missingFeatures->localStore));
+
+    if (wrongStore.badPlatform || wrongStore.missingFeatures) {
+        // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their
+        // hardware - we should tell them to run the command to install Rosetta
+        if (wrongStore.badPlatform && wrongStore.badPlatform->derivation == "x86_64-darwin"
+            && wrongStore.badPlatform->localStore == "aarch64-darwin")
+            msg +=
+                fmt("\nNote: run `%s` to run programs for x86_64-darwin",
+                    Magenta("/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
+    }
+
+    return BuildError(BuildResult::Failure::InputRejected, std::move(msg));
+}
+
+Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
     auto drvOptions = [&] {
         DerivationOptions<SingleDerivedPath> temp;
@@ -228,9 +374,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
        given this information by the downstream goal, that cannot happen
        anymore if the downstream goal only cares about one output, but
        we care about all outputs. */
-    auto outputHashes = staticOutputHashes(worker.evalStore, *drv);
-    for (auto & [outputName, outputHash] : outputHashes) {
-        InitialOutput v{.outputHash = outputHash};
+    for (auto & [outputName, _] : drv->outputs) {
+        InitialOutput v;
 
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
@@ -249,56 +394,57 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     }
     checkPathValidity(initialOutputs);
 
-    auto started = [&]() {
-        auto msg =
-            fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
-                : buildMode == bmCheck ? "checking outputs of '%s'"
-                                       : "building '%s'",
-                worker.store.printStorePath(drvPath));
-#ifndef _WIN32 // TODO enable build hook on Windows
-        if (hook)
-            msg += fmt(" on '%s'", hook->machineName);
-#endif
-        act = std::make_unique<Activity>(
-            *logger,
-            lvlInfo,
-            actBuild,
-            msg,
-            Logger::Fields{
-                worker.store.printStorePath(drvPath),
-#ifndef _WIN32 // TODO enable build hook on Windows
-                hook ? hook->machineName :
-#endif
-                     "",
-                1,
-                1});
-        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
-        worker.updateProgress();
-    };
+    auto localBuildResult = [&]() -> std::variant<LocalBuildCapability, LocalBuildRejection> {
+        bool maxJobsZero = worker.settings.maxBuildJobs.get() == 0;
 
-    /**
-     * Activity that denotes waiting for a lock.
-     */
-    std::unique_ptr<Activity> actLock;
+        auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+        if (!localStoreP)
+            return LocalBuildRejection{.maxJobsZero = maxJobsZero, .rejection = LocalBuildRejection::NoLocalStore{}};
 
-    /**
-     * Locks on (fixed) output paths.
-     */
-    PathLocks outputLocks;
+        /**
+         * Now that we've decided we can't / won't do a remote build, check
+         * that we can in fact build locally. First see if there is an
+         * external builder for a "semi-local build". If there is, prefer to
+         * use that. If there is not, then check if we can do a "true" local
+         * build.
+         */
+        auto * ext = settings.getLocalSettings().findExternalDerivationBuilderIfSupported(*drv);
 
-    bool useHook;
+        if (ext)
+            return LocalBuildCapability{*localStoreP, ext};
 
-    const ExternalBuilder * externalBuilder = nullptr;
+        using WrongLocalStore = LocalBuildRejection::WrongLocalStore;
 
-    while (true) {
+        WrongLocalStore wrongStore;
+
+        if (drv->platform != settings.thisSystem.get() && !settings.extraPlatforms.get().count(drv->platform)
+            && !drv->isBuiltin())
+            wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
+
+        {
+            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto & available = worker.store.config.systemFeatures.get();
+            if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
+                wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
+        }
+
+        if (maxJobsZero || wrongStore.badPlatform || wrongStore.missingFeatures)
+            return LocalBuildRejection{.maxJobsZero = maxJobsZero, .rejection = std::move(wrongStore)};
+
+        return LocalBuildCapability{*localStoreP, ext};
+    }();
+
+    auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co {
         trace("trying to build");
 
-        /* Obtain locks on all output paths, if the paths are known a priori.
-
-           The locks are automatically released when we exit this function or Nix
-           crashes.  If we can't acquire the lock, then continue; hopefully some
-           other goal can start a build, and if not, the main loop will sleep a few
-           seconds and then retry this goal. */
+        /**
+         * Output paths to acquire locks on, if known a priori.
+         *
+         * The locks are automatically released when the caller's `PathLocks` goes
+         * out of scope, including on exception unwinding.  If we can't acquire the lock, then
+         * continue; hopefully some other goal can start a build, and if not, the
+         * main loop will sleep a few seconds and then retry this goal.
+         */
         std::set<std::filesystem::path> lockFiles;
         /* FIXME: Should lock something like the drv itself so we don't build same
            CA drv concurrently */
@@ -313,14 +459,21 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             for (auto & i : drv->outputsAndOptPaths(worker.store)) {
                 if (i.second.second)
                     lockFiles.insert(localStore->toRealPath(*i.second.second));
-                else
-                    lockFiles.insert(localStore->toRealPath(drvPath) + "." + i.first);
+                else {
+                    auto lockPath = localStore->toRealPath(drvPath);
+                    lockPath += "." + i.first;
+                    lockFiles.insert(std::move(lockPath));
+                }
             }
         }
 
         if (!outputLocks.lockPaths(lockFiles, "", false)) {
             Activity act(
-                *logger, lvlWarn, actBuildWaiting, fmt("waiting for lock on %s", Magenta(showPaths(lockFiles))));
+                *logger,
+                lvlWarn,
+                actBuildWaiting,
+                fmt("waiting for lock on %s",
+                    Magenta(concatMapStringsSep(", ", lockFiles, [](auto & p) { return "'" + p.string() + "'"; }))));
 
             /* Wait then try locking again, repeat until success (returned
                boolean is true). */
@@ -342,7 +495,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
             outputLocks.setDeletion(true);
             outputLocks.unlock();
-            co_return doneSuccess(BuildResult::Success::AlreadyValid, std::move(validOutputs));
+            done = true;
+            co_return Return{};
         }
 
         /* If any of the outputs already exist but are not valid, delete
@@ -357,206 +511,400 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             }
         }
 
-        /* Don't do a remote build if the derivation has the attribute
-           `preferLocalBuild' set.  Also, check and repair modes are only
-           supported for local builds. */
-        bool buildLocally = (buildMode != bmNormal || drvOptions.willBuildLocally(worker.store, *drv))
-                            && settings.maxBuildJobs.get() != 0;
+        co_return Return{};
+    };
 
-        if (buildLocally) {
-            useHook = false;
-        } else {
-            switch (tryBuildHook(initialOutputs, drvOptions)) {
+    auto tryHookLoop = [&](bool & valid) -> Goal::Co {
+        {
+            PathLocks outputLocks;
+            co_await acquireResources(valid, outputLocks);
+            if (valid)
+                co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+
+            switch (tryBuildHook(drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
-                useHook = true;
-                break;
+                valid = true;
+                co_return buildWithHook(
+                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            case rpDecline:
+                // We should do it ourselves.
+                co_return Return{};
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
-                if (!actLock)
-                    actLock = std::make_unique<Activity>(
-                        *logger,
-                        lvlWarn,
-                        actBuildWaiting,
-                        fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
-                outputLocks.unlock();
-                co_await waitForAWhile();
-                continue;
-            case rpDecline:
-                /* We should do it ourselves.
-
-                   Now that we've decided we can't / won't do a remote build, check
-                   that we can in fact build locally. First see if there is an
-                   external builder for a "semi-local build". If there is, prefer to
-                   use that. If there is not, then check if we can do a "true" local
-                   build. */
-
-                externalBuilder = settings.findExternalDerivationBuilderIfSupported(*drv);
-
-                if (!externalBuilder && !drvOptions.canBuildLocally(worker.store, *drv)) {
-                    auto msg =
-                        fmt("Cannot build '%s'.\n"
-                            "Reason: " ANSI_RED "required system or feature not available" ANSI_NORMAL
-                            "\n"
-                            "Required system: '%s' with features {%s}\n"
-                            "Current system: '%s' with features {%s}",
-                            Magenta(worker.store.printStorePath(drvPath)),
-                            Magenta(drv->platform),
-                            concatStringsSep(", ", drvOptions.getRequiredSystemFeatures(*drv)),
-                            Magenta(settings.thisSystem),
-                            concatStringsSep<StringSet>(", ", worker.store.Store::config.systemFeatures));
-
-                    // since aarch64-darwin has Rosetta 2, this user can actually run x86_64-darwin on their hardware -
-                    // we should tell them to run the command to install Darwin 2
-                    if (drv->platform == "x86_64-darwin" && settings.thisSystem == "aarch64-darwin")
-                        msg += fmt(
-                            "\nNote: run `%s` to run programs for x86_64-darwin",
-                            Magenta(
-                                "/usr/sbin/softwareupdate --install-rosetta && launchctl stop org.nixos.nix-daemon"));
-
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
-                    builder.reset();
-#endif
-                    outputLocks.unlock();
-                    worker.permanentFailure = true;
-                    co_return doneFailure({BuildResult::Failure::InputRejected, std::move(msg)});
-                }
-                useHook = false;
                 break;
             }
         }
-        break;
+
+        PathLocks outputLocks;
+        {
+            // First attempt was postponed. Retry in a loop with an activity
+            // that lives until accept or decline.
+            Activity act(
+                *logger,
+                lvlWarn,
+                actBuildWaiting,
+                fmt("waiting for a machine to build '%s'", Magenta(worker.store.printStorePath(drvPath))));
+
+            while (true) {
+                co_await waitForAWhile();
+                co_await acquireResources(valid, outputLocks);
+                if (valid)
+                    break;
+
+                switch (tryBuildHook(drvOptions)) {
+                case rpAccept:
+                    /* Yes, it has started doing so.  Wait until we get
+                       EOF from the hook. */
+                    break;
+                case rpPostpone:
+                    /* Not now; wait until at least one child finishes or
+                       the wake-up timeout expires. */
+                    outputLocks.unlock();
+                    continue;
+                case rpDecline:
+                    // We should do it ourselves.
+                    co_return Return{};
+                }
+
+                break;
+            }
+        }
+
+        if (valid) {
+            co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+        } else {
+            co_return buildWithHook(
+                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+        }
+    };
+
+    auto tryBuildLocally = [&](bool & valid) -> Goal::Co {
+        if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
+            PathLocks outputLocks;
+            co_await acquireResources(valid, outputLocks);
+            if (valid)
+                co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+
+            valid = true;
+            co_return buildLocally(
+                *cap, std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+        }
+
+        co_return Return{};
+    };
+
+    if (buildMode != bmNormal) {
+        // Check and repair modes operate on the state of this store specifically,
+        // so they must always build locally.
+        bool valid = false;
+        co_await tryBuildLocally(valid);
+        if (valid)
+            co_return Return{};
+    } else if (drvOptions.preferLocalBuild) {
+        // Local is preferred, so try it first. If it's not available, fall back to the hook.
+        {
+            bool valid = false;
+            co_await tryBuildLocally(valid);
+            if (valid)
+                co_return Return{};
+        }
+        {
+            bool valid = false;
+            co_await tryHookLoop(valid);
+            if (valid)
+                co_return Return{};
+        }
+    } else {
+        // Default preference is a remote build: they tend to be faster and preserve local
+        // resources for other tasks. Fall back to local if no remote is available.
+        {
+            bool valid = false;
+            co_await tryHookLoop(valid);
+            if (valid)
+                co_return Return{};
+        }
+        {
+            bool valid = false;
+            co_await tryBuildLocally(valid);
+            if (valid)
+                co_return Return{};
+        }
     }
 
-    actLock.reset();
+    std::string storePath = worker.store.printStorePath(drvPath);
+    auto * rejection = std::get_if<LocalBuildRejection>(&localBuildResult);
+    assert(rejection);
+    co_return doneFailure(reject(*rejection, storePath));
+}
 
-    if (useHook) {
-        buildResult.startTime = time(0); // inexact
-        started();
+Goal::Co DerivationBuildingGoal::buildWithHook(
+    StorePathSet inputPaths,
+    std::map<std::string, InitialOutput> initialOutputs,
+    DerivationOptions<StorePath> drvOptions,
+    PathLocks outputLocks)
+{
+#ifdef _WIN32 // TODO enable build hook on Windows
+    unreachable();
+#else
+    std::unique_ptr<HookInstance> hook = std::move(worker.hook);
 
+    /* Set up callback so childTerminated is called if the hook is
+       destroyed (e.g., during failure cascades). */
+    hook->onKillChild = [this]() { worker.childTerminated(this, JobCategory::Build); };
+
+    try {
+        hook->machineName = readLine(hook->fromHook.readSide.get());
+    } catch (Error & e) {
+        e.addTrace({}, "while reading the machine name from the build hook");
+        throw;
+    }
+
+    CommonProto::WriteConn conn{hook->sink};
+
+    /* Tell the hook all the inputs that have to be copied to the
+       remote system. */
+    CommonProto::write(worker.store, conn, inputPaths);
+
+    /* Tell the hooks the missing outputs that have to be copied back
+       from the remote system. */
+    {
+        StringSet missingOutputs;
+        for (auto & [outputName, status] : initialOutputs) {
+            // XXX: Does this include known CA outputs?
+            if (buildMode != bmCheck && status.known && status.known->isValid())
+                continue;
+            missingOutputs.insert(outputName);
+        }
+        CommonProto::write(worker.store, conn, missingOutputs);
+    }
+
+    hook->sink = FdSink();
+    hook->toHook.writeSide.close();
+
+    /* Create the log file and pipe. */
+    std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+
+    std::set<MuxablePipePollState::CommChannel> fds;
+    fds.insert(hook->fromHook.readSide.get());
+    fds.insert(hook->builderOut.readSide.get());
+    worker.childStarted(shared_from_this(), fds, false, false);
+
+    buildResult.startTime = time(nullptr); // inexact
+
+    auto msg =
+        fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
+            : buildMode == bmCheck ? "checking outputs of '%s'"
+                                   : "building '%s'",
+            worker.store.printStorePath(drvPath));
+    msg += fmt(" on '%s'", hook->machineName);
+
+    std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
+        worker.settings.logLines,
+        std::make_unique<Activity>(
+            *logger,
+            lvlInfo,
+            actBuild,
+            msg,
+            Logger::Fields{worker.store.printStorePath(drvPath), hook->machineName, 1, 1}));
+    mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+    worker.updateProgress();
+
+    std::string currentHookLine;
+    uint64_t logSize = 0;
+
+    while (true) {
+        auto event = co_await WaitForChildEvent{};
+        if (auto * output = std::get_if<ChildOutput>(&event)) {
+            auto & fd = output->fd;
+            auto & data = output->data;
+            if (fd == hook->builderOut.readSide.get()) {
+                logSize += data.size();
+                if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
+                    hook.reset();
+                    co_return doneFailureLogTooLong(*buildLog);
+                }
+                (*buildLog)(data);
+                if (logFile->sink)
+                    (*logFile->sink)(data);
+            } else if (fd == hook->fromHook.readSide.get()) {
+                for (auto c : data)
+                    if (c == '\n') {
+                        auto json = parseJSONMessage(currentHookLine, "the derivation builder");
+                        if (json) {
+                            auto s = handleJSONLogMessage(
+                                *json, worker.act, hook->activities, "the derivation builder", true);
+                            // ensure that logs from a builder using `ssh-ng://` as protocol
+                            // are also available to `nix log`.
+                            if (s && logFile->sink) {
+                                const auto type = (*json)["type"];
+                                const auto fields = (*json)["fields"];
+                                if (type == resBuildLogLine) {
+                                    (*logFile->sink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
+                                } else if (type == resSetPhase && !fields.is_null()) {
+                                    const auto phase = fields[0];
+                                    if (!phase.is_null()) {
+                                        // nixpkgs' stdenv produces lines in the log to signal
+                                        // phase changes.
+                                        // We want to get the same lines in case of remote builds.
+                                        // The format is:
+                                        //   @nix { "action": "setPhase", "phase": "$curPhase" }
+                                        const auto logLine =
+                                            nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
+                                        (*logFile->sink)(
+                                            "@nix "
+                                            + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
+                                            + "\n");
+                                    }
+                                }
+                            }
+                        }
+                        currentHookLine.clear();
+                    } else
+                        currentHookLine += c;
+            }
+        } else if (std::get_if<ChildEOF>(&event)) {
+            buildLog->flush();
+            break;
+        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
+            hook.reset();
+            co_return doneFailure(std::move(**timeout));
+        }
+    }
+
+    trace("hook build done");
+
+    /* Since we got an EOF on the logger pipe, the builder is presumed
+       to have terminated.  In fact, the builder could also have
+       simply have closed its end of the pipe, so just to be sure,
+       kill it. */
+    int status = hook->pid.kill();
+
+    debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
+
+    buildResult.timesBuilt++;
+    buildResult.stopTime = time(nullptr);
+
+    /* So the child is gone now. */
+    worker.childTerminated(this);
+
+    /* Close the read side of the logger pipe. */
+    hook->builderOut.readSide.close();
+    hook->fromHook.readSide.close();
+
+    /* Close the log file. */
+    logFile.reset();
+
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+        auto e = fixupBuilderFailureErrorMessage({BuildResult::Failure::MiscFailure, status, ""}, *buildLog);
+
+        outputLocks.unlock();
+
+        /* TODO (once again) support fine-grained error codes, see issue #12641. */
+
+        co_return doneFailure(std::move(e));
+    }
+
+    /* Compute the FS closure of the outputs and register them as
+       being valid. */
+    auto builtOutputs =
+        /* When using a build hook, the build hook can register the output
+           as valid (by doing `nix-store --import').  If so we don't have
+           to do anything here.
+
+           We can only early return when the outputs are known a priori. For
+           floating content-addressing derivations this isn't the case.
+
+           Aborts if any output is not valid or corrupt, and otherwise
+           returns a 'SingleDrvOutputs' structure containing all outputs.
+         */
+        [&] {
+            auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
+            if (!allValid)
+                throw Error("some outputs are unexpectedly invalid");
+            return validOutputs;
+        }();
+
+    StorePathSet outputPaths;
+    for (auto & [_, output] : builtOutputs)
+        outputPaths.insert(output.outPath);
+
+    if (worker.settings.postBuildHook.get() != "") {
+        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+        worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
         while (true) {
             auto event = co_await WaitForChildEvent{};
             if (auto * output = std::get_if<ChildOutput>(&event)) {
-                co_await processChildOutput(output->fd, output->data);
+                (*hookState->sink)(output->data);
             } else if (std::get_if<ChildEOF>(&event)) {
-                if (!currentLogLine.empty())
-                    flushLine();
+                hookState->complete();
+                worker.childTerminated(this);
                 break;
-            } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-                killChild();
-                co_return doneFailure(std::move(*timeout));
             }
         }
-
-#ifndef _WIN32
-        assert(hook);
-#endif
-
-        trace("hook build done");
-
-        /* Since we got an EOF on the logger pipe, the builder is presumed
-           to have terminated.  In fact, the builder could also have
-           simply have closed its end of the pipe, so just to be sure,
-           kill it. */
-        int status =
-#ifndef _WIN32 // TODO enable build hook on Windows
-            hook->pid.kill();
-#else
-            0;
-#endif
-
-        debug("build hook for '%s' finished", worker.store.printStorePath(drvPath));
-
-        buildResult.timesBuilt++;
-        buildResult.stopTime = time(0);
-
-        /* So the child is gone now. */
-        worker.childTerminated(this);
-
-        /* Close the read side of the logger pipe. */
-#ifndef _WIN32 // TODO enable build hook on Windows
-        hook->builderOut.readSide.close();
-        hook->fromHook.readSide.close();
-#endif
-
-        /* Close the log file. */
-        closeLogFile();
-
-        /* Check the exit status. */
-        if (!statusOk(status)) {
-            auto e = fixupBuilderFailureErrorMessage({BuildResult::Failure::MiscFailure, status, ""});
-
-            outputLocks.unlock();
-
-            /* TODO (once again) support fine-grained error codes, see issue #12641. */
-
-            co_return doneFailure(std::move(e));
-        }
-
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        auto builtOutputs =
-            /* When using a build hook, the build hook can register the output
-               as valid (by doing `nix-store --import').  If so we don't have
-               to do anything here.
-
-               We can only early return when the outputs are known a priori. For
-               floating content-addressing derivations this isn't the case.
-
-               Aborts if any output is not valid or corrupt, and otherwise
-               returns a 'SingleDrvOutputs' structure containing all outputs.
-             */
-            [&] {
-                auto [allValid, validOutputs] = checkPathValidity(initialOutputs);
-                if (!allValid)
-                    throw Error("some outputs are unexpectedly invalid");
-                return validOutputs;
-            }();
-
-        StorePathSet outputPaths;
-        for (auto & [_, output] : builtOutputs)
-            outputPaths.insert(output.outPath);
-        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
-
-        /* It is now safe to delete the lock files, since all future
-           lockers will see that the output paths are valid; they will
-           not create new lock files with the same names as the old
-           (unlinked) lock files. */
-        outputLocks.setDeletion(true);
-        outputLocks.unlock();
-
-        co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
     }
 
+    /* It is now safe to delete the lock files, since all future
+       lockers will see that the output paths are valid; they will
+       not create new lock files with the same names as the old
+       (unlinked) lock files. */
+    outputLocks.setDeletion(true);
+    outputLocks.unlock();
+
+    co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
+#endif
+}
+
+Goal::Co DerivationBuildingGoal::buildLocally(
+    LocalBuildCapability localBuildCap,
+    StorePathSet inputPaths,
+    std::map<std::string, InitialOutput> initialOutputs,
+    DerivationOptions<StorePath> drvOptions,
+    PathLocks outputLocks)
+{
     co_await yield();
-
-    if (!dynamic_cast<LocalStore *>(&worker.store)) {
-        throw Error(
-            R"(
-            Unable to build with a primary store that isn't a local store;
-            either pass a different '--store' or enable remote builds.
-
-            For more information check 'man nix.conf' and search for '/machines'.
-            )");
-    }
 
 #ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
     throw UnimplementedError("building derivations is not yet implemented on Windows");
 #else
-    assert(!hook);
+    std::unique_ptr<BuildLog> buildLog;
+    std::unique_ptr<LogFile> logFile;
 
+    auto openLogFile = [&]() {
+        logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
+    };
+
+    auto closeLogFile = [&]() { logFile.reset(); };
+
+    auto started = [&]() {
+        auto msg =
+            fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
+                : buildMode == bmCheck ? "checking outputs of '%s'"
+                                       : "building '%s'",
+                worker.store.printStorePath(drvPath));
+        buildLog = std::make_unique<BuildLog>(
+            worker.settings.logLines,
+            std::make_unique<Activity>(
+                *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
+        mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
+        worker.updateProgress();
+    };
+
+    std::unique_ptr<Activity> actLock;
+    DerivationBuilderUnique builder;
     Descriptor builderOut;
 
     // Will continue here while waiting for a build user below
     while (true) {
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= settings.maxBuildJobs) {
+        if (curBuilds >= worker.settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild();
+            co_return tryToBuild(std::move(inputPaths));
         }
 
         if (!builder) {
@@ -567,10 +915,14 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             struct DerivationBuildingGoalCallbacks : DerivationBuilderCallbacks
             {
                 DerivationBuildingGoal & goal;
+                fun<void()> openLogFileFn;
+                fun<void()> closeLogFileFn;
 
                 DerivationBuildingGoalCallbacks(
-                    DerivationBuildingGoal & goal, std::unique_ptr<DerivationBuilder> & builder)
+                    DerivationBuildingGoal & goal, fun<void()> openLogFileFn, fun<void()> closeLogFileFn)
                     : goal{goal}
+                    , openLogFileFn{std::move(openLogFileFn)}
+                    , closeLogFileFn{std::move(closeLogFileFn)}
                 {
                 }
 
@@ -578,24 +930,22 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
                 void childTerminated() override
                 {
-                    goal.worker.childTerminated(&goal);
+                    goal.worker.childTerminated(&goal, JobCategory::Build);
                 }
 
-                std::filesystem::path openLogFile() override
+                void openLogFile() override
                 {
-                    return goal.openLogFile();
+                    openLogFileFn();
                 }
 
                 void closeLogFile() override
                 {
-                    goal.closeLogFile();
+                    closeLogFileFn();
                 }
             };
 
-            auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
-            assert(localStoreP);
-
-            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot = settings.sandboxPaths.get();
+            decltype(DerivationBuilderParams::defaultPathsInChroot) defaultPathsInChroot =
+                localBuildCap.localStore.config->getLocalSettings().sandboxPaths.get();
             DesugaredEnv desugaredEnv;
 
             /* Add the closure of store paths to the chroot. */
@@ -607,7 +957,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                             worker.store.toStorePath(i.second.source.string()).first, closure);
                 } catch (InvalidPath & e) {
                 } catch (Error & e) {
-                    e.addTrace({}, "while processing sandbox path '%s'", i.second.source);
+                    e.addTrace({}, "while processing sandbox path %s", PathFmt(i.second.source));
                     throw;
                 }
             for (auto & i : closure) {
@@ -619,7 +969,6 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
                 desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
-                worker.permanentFailure = true;
                 co_return doneFailure(std::move(e));
             }
 
@@ -638,15 +987,16 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
-            builder = externalBuilder ? makeExternalDerivationBuilder(
-                                            *localStoreP,
-                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
-                                            std::move(params),
-                                            *externalBuilder)
-                                      : makeDerivationBuilder(
-                                            *localStoreP,
-                                            std::make_unique<DerivationBuildingGoalCallbacks>(*this, builder),
-                                            std::move(params));
+            builder = localBuildCap.externalBuilder
+                          ? makeExternalDerivationBuilder(
+                                localBuildCap.localStore,
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::move(params),
+                                *localBuildCap.externalBuilder)
+                          : makeDerivationBuilder(
+                                localBuildCap.localStore,
+                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                                std::move(params));
         }
 
         if (auto builderOutOpt = builder->startBuild()) {
@@ -671,17 +1021,27 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 
     started();
 
+    uint64_t logSize = 0;
+
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
-            co_await processChildOutput(output->fd, output->data);
+            if (output->fd == builder->builderOut.get()) {
+                logSize += output->data.size();
+                if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
+                    builder->killChild();
+                    co_return doneFailureLogTooLong(*buildLog);
+                }
+                (*buildLog)(output->data);
+                if (logFile->sink)
+                    (*logFile->sink)(output->data);
+            }
         } else if (std::get_if<ChildEOF>(&event)) {
-            if (!currentLogLine.empty())
-                flushLine();
+            buildLog->flush();
             break;
-        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
-            killChild();
-            co_return doneFailure(std::move(*timeout));
+        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
+            builder->killChild();
+            co_return doneFailure(std::move(**timeout));
         }
     }
 
@@ -693,30 +1053,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
-        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e)));
+        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e), *buildLog));
     } catch (BuildError & e) {
         builder.reset();
         outputLocks.unlock();
-// Allow selecting a subset of enum values
-#  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wswitch-enum"
-        switch (e.status) {
-        case BuildResult::Failure::HashMismatch:
-            worker.hashMismatch = true;
-            /* See header, the protocols don't know about `HashMismatch`
-               yet, so change it to `OutputRejected`, which they expect
-               for this case (hash mismatch is a type of output
-               rejection). */
-            e.status = BuildResult::Failure::OutputRejected;
-            break;
-        case BuildResult::Failure::NotDeterministic:
-            worker.checkMismatch = true;
-            break;
-        default:
-            /* Other statuses need no adjusting */
-            break;
-        }
-#  pragma GCC diagnostic pop
         co_return doneFailure(std::move(e));
     }
     {
@@ -735,7 +1075,21 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
             worker.markContentsGood(output.outPath);
             outputPaths.insert(output.outPath);
         }
-        runPostBuildHook(worker.store, *logger, drvPath, outputPaths);
+
+        if (worker.settings.postBuildHook.get() != "") {
+            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+            worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
+            while (true) {
+                auto event = co_await WaitForChildEvent{};
+                if (auto * output = std::get_if<ChildOutput>(&event)) {
+                    (*hookState->sink)(output->data);
+                } else if (std::get_if<ChildEOF>(&event)) {
+                    hookState->complete();
+                    worker.childTerminated(this);
+                    break;
+                }
+            }
+        }
 
         /* It is now safe to delete the lock files, since all future
            lockers will see that the output paths are valid; they will
@@ -748,73 +1102,59 @@ Goal::Co DerivationBuildingGoal::tryToBuild()
 #endif
 }
 
-static void runPostBuildHook(
-    const StoreDirConfig & store, Logger & logger, const StorePath & drvPath, const StorePathSet & outputPaths)
+static std::unique_ptr<PostBuildHookState> runPostBuildHook(
+    const WorkerSettings & workerSettings,
+    const StoreDirConfig & store,
+    Logger & logger,
+    const StorePath & drvPath,
+    const StorePathSet & outputPaths)
 {
-    auto hook = settings.postBuildHook;
-    if (hook == "")
-        return;
+#ifdef _WIN32
+    throw UnimplementedError("post-build-hook is not implemented on Windows");
+#else
+    auto state =
+        std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
 
-    Activity act(
-        logger,
-        lvlTalkative,
-        actPostBuildHook,
-        fmt("running post-build-hook '%s'", settings.postBuildHook),
-        Logger::Fields{store.printStorePath(drvPath)});
-    PushActivity pact(act.id);
-    StringMap hookEnvironment = getEnv();
+    auto hook = workerSettings.postBuildHook.get();
 
-    hookEnvironment.emplace("DRV_PATH", store.printStorePath(drvPath));
-    hookEnvironment.emplace("OUT_PATHS", chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths))));
-    hookEnvironment.emplace("NIX_CONFIG", globalConfig.toKeyValue());
+    OsStringMap hookEnvironment = getEnvOs();
 
-    struct LogSink : Sink
-    {
-        Activity & act;
-        std::string currentLine;
+    hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
+    hookEnvironment.emplace(
+        OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
+    hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
-        LogSink(Activity & act)
-            : act(act)
-        {
-        }
+    ProcessOptions processOptions;
+    processOptions.allowVfork = false;
 
-        void operator()(std::string_view data) override
-        {
-            for (auto c : data) {
-                if (c == '\n') {
-                    flushLine();
-                } else {
-                    currentLine += c;
-                }
-            }
-        }
+    state->pid = startProcess(
+        [&] {
+            replaceEnv(hookEnvironment);
+            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
+                throw SysError("cannot dup stdout into stderr");
 
-        void flushLine()
-        {
-            act.result(resPostBuildLogLine, currentLine);
-            currentLine.clear();
-        }
+            Strings args_;
+            args_.push_front(hook);
 
-        ~LogSink()
-        {
-            if (currentLine != "") {
-                currentLine += '\n';
-                flushLine();
-            }
-        }
-    };
+            unix::closeExtraFDs();
 
-    LogSink sink(act);
+            restoreProcessContext();
 
-    runProgram2({
-        .program = settings.postBuildHook,
-        .environment = hookEnvironment,
-        .standardOut = &sink,
-        .mergeStderrToStdout = true,
-    });
+            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
+
+            throw SysError("executing %s", PathFmt(hook));
+        },
+        processOptions);
+
+    state->out->writeSide.close();
+
+    return state;
+#endif
 }
 
-BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e)
+BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
 {
     auto msg =
         fmt("Cannot build '%s'.\n"
@@ -824,6 +1164,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
 
     msg += showKnownOutputs(worker.store, *drv);
 
+    auto & logTail = buildLog.getTail();
     if (!logger->isVerbose() && !logTail.empty()) {
         msg += fmt("\nLast %d log lines:\n", logTail.size());
         for (auto & line : logTail) {
@@ -846,25 +1187,25 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(
-    const std::map<std::string, InitialOutput> & initialOutputs, const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
 #else
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
-    if (settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
+    if (worker.settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
         return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>();
+        worker.hook = std::make_unique<HookInstance>(worker.settings.buildHook);
 
     try {
 
         /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < settings.maxBuildJobs ? 1 : 0) << drv->platform
-                          << worker.store.printStorePath(drvPath) << drvOptions.getRequiredSystemFeatures(*drv);
+        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
+                          << drv->platform << worker.store.printStorePath(drvPath)
+                          << drvOptions.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -903,8 +1244,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(
         else if (reply != "accept")
             throw Error("bad hook reply '%s'", reply);
 
-    } catch (SysError & e) {
-        if (e.errNo == EPIPE) {
+    } catch (SystemError & e) {
+        if (e.is(std::errc::broken_pipe)) {
             printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
             worker.hook = 0;
             return rpDecline;
@@ -912,193 +1253,60 @@ HookReply DerivationBuildingGoal::tryBuildHook(
             throw;
     }
 
-    hook = std::move(worker.hook);
-
-    try {
-        hook->machineName = readLine(hook->fromHook.readSide.get());
-    } catch (Error & e) {
-        e.addTrace({}, "while reading the machine name from the build hook");
-        throw;
-    }
-
-    CommonProto::WriteConn conn{hook->sink};
-
-    /* Tell the hook all the inputs that have to be copied to the
-       remote system. */
-    CommonProto::write(worker.store, conn, inputPaths);
-
-    /* Tell the hooks the missing outputs that have to be copied back
-       from the remote system. */
-    {
-        StringSet missingOutputs;
-        for (auto & [outputName, status] : initialOutputs) {
-            // XXX: Does this include known CA outputs?
-            if (buildMode != bmCheck && status.known && status.known->isValid())
-                continue;
-            missingOutputs.insert(outputName);
-        }
-        CommonProto::write(worker.store, conn, missingOutputs);
-    }
-
-    hook->sink = FdSink();
-    hook->toHook.writeSide.close();
-
-    /* Create the log file and pipe. */
-    [[maybe_unused]] Path logFile = openLogFile();
-
-    std::set<MuxablePipePollState::CommChannel> fds;
-    fds.insert(hook->fromHook.readSide.get());
-    fds.insert(hook->builderOut.readSide.get());
-    worker.childStarted(shared_from_this(), fds, false, false);
-
     return rpAccept;
 #endif
 }
 
-Path DerivationBuildingGoal::openLogFile()
+LogFile::LogFile(Store & store, const StorePath & drvPath, const LogFileSettings & logSettings)
 {
-    logSize = 0;
+    if (!logSettings.keepLog)
+        return;
 
-    if (!settings.keepLog)
-        return "";
+    auto baseName = std::string(baseNameOf(store.printStorePath(drvPath)));
 
-    auto baseName = std::string(baseNameOf(worker.store.printStorePath(drvPath)));
-
-    /* Create a log file. */
-    Path logDir;
-    if (auto localStore = dynamic_cast<LocalStore *>(&worker.store))
-        logDir = localStore->config->logDir;
-    else
-        logDir = settings.nixLogDir;
-    Path dir = fmt("%s/%s/%s/", logDir, LocalFSStore::drvsLogDir, baseName.substr(0, 2));
+    auto dir = store.config.getLogDir() / LocalFSStore::drvsLogDir / baseName.substr(0, 2);
     createDirs(dir);
 
-    Path logFileName = fmt("%s/%s%s", dir, baseName.substr(2), settings.compressLog ? ".bz2" : "");
+    auto logFileName = dir / (baseName.substr(2) + (logSettings.compressLog ? ".bz2" : ""));
 
-    fdLogFile = toDescriptor(open(
-        logFileName.c_str(),
-        O_CREAT | O_WRONLY | O_TRUNC
-#ifndef _WIN32
-            | O_CLOEXEC
-#endif
-        ,
-        0666));
-    if (!fdLogFile)
-        throw SysError("creating log file '%1%'", logFileName);
+    fd = openNewFileForWrite(
+        logFileName,
+        0666,
+        {
+            .truncateExisting = true,
+            .followSymlinksOnTruncate = true, /* FIXME: Probably shouldn't follow symlinks. */
+        });
+    if (!fd)
+        throw SysError("creating log file %1%", PathFmt(logFileName));
 
-    logFileSink = std::make_shared<FdSink>(fdLogFile.get());
+    fileSink = std::make_shared<FdSink>(fd.get());
 
-    if (settings.compressLog)
-        logSink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *logFileSink));
+    if (logSettings.compressLog)
+        sink = std::shared_ptr<CompressionSink>(makeCompressionSink(CompressionAlgo::bzip2, *fileSink));
     else
-        logSink = logFileSink;
-
-    return logFileName;
+        sink = fileSink;
 }
 
-void DerivationBuildingGoal::closeLogFile()
+LogFile::~LogFile()
 {
-    auto logSink2 = std::dynamic_pointer_cast<CompressionSink>(logSink);
-    if (logSink2)
-        logSink2->finish();
-    if (logFileSink)
-        logFileSink->flush();
-    logSink = logFileSink = 0;
-    fdLogFile.close();
-}
-
-bool DerivationBuildingGoal::isReadDesc(Descriptor fd)
-{
-#ifdef _WIN32 // TODO enable build hook on Windows
-    return false;
-#else
-    return (hook && fd == hook->builderOut.readSide.get()) || (builder && fd == builder->builderOut.get());
-#endif
-}
-
-Goal::Co DerivationBuildingGoal::processChildOutput(Descriptor fd, std::string_view data)
-{
-    // local & `ssh://`-builds are dealt with here.
-    auto isWrittenToLog = isReadDesc(fd);
-    if (isWrittenToLog) {
-        logSize += data.size();
-        if (settings.maxLogSize && logSize > settings.maxLogSize) {
-            killChild();
-            co_return doneFailure(BuildError(
-                BuildResult::Failure::LogLimitExceeded,
-                "%s killed after writing more than %d bytes of log output",
-                getName(),
-                settings.maxLogSize));
-        }
-
-        for (auto c : data)
-            if (c == '\r')
-                currentLogLinePos = 0;
-            else if (c == '\n')
-                flushLine();
-            else {
-                if (currentLogLinePos >= currentLogLine.size())
-                    currentLogLine.resize(currentLogLinePos + 1);
-                currentLogLine[currentLogLinePos++] = c;
-            }
-
-        if (logSink)
-            (*logSink)(data);
+    try {
+        auto sink2 = std::dynamic_pointer_cast<CompressionSink>(sink);
+        if (sink2)
+            sink2->finish();
+        if (fileSink)
+            fileSink->flush();
+    } catch (...) {
+        ignoreExceptionInDestructor();
     }
-
-#ifndef _WIN32 // TODO enable build hook on Windows
-    if (hook && fd == hook->fromHook.readSide.get()) {
-        for (auto c : data)
-            if (c == '\n') {
-                auto json = parseJSONMessage(currentHookLine, "the derivation builder");
-                if (json) {
-                    auto s = handleJSONLogMessage(*json, worker.act, hook->activities, "the derivation builder", true);
-                    // ensure that logs from a builder using `ssh-ng://` as protocol
-                    // are also available to `nix log`.
-                    if (s && !isWrittenToLog && logSink) {
-                        const auto type = (*json)["type"];
-                        const auto fields = (*json)["fields"];
-                        if (type == resBuildLogLine) {
-                            (*logSink)((fields.size() > 0 ? fields[0].get<std::string>() : "") + "\n");
-                        } else if (type == resSetPhase && !fields.is_null()) {
-                            const auto phase = fields[0];
-                            if (!phase.is_null()) {
-                                // nixpkgs' stdenv produces lines in the log to signal
-                                // phase changes.
-                                // We want to get the same lines in case of remote builds.
-                                // The format is:
-                                //   @nix { "action": "setPhase", "phase": "$curPhase" }
-                                const auto logLine = nlohmann::json::object({{"action", "setPhase"}, {"phase", phase}});
-                                (*logSink)(
-                                    "@nix " + logLine.dump(-1, ' ', false, nlohmann::json::error_handler_t::replace)
-                                    + "\n");
-                            }
-                        }
-                    }
-                }
-                currentHookLine.clear();
-            } else
-                currentHookLine += c;
-    }
-#endif
-    co_return Return{};
 }
 
-void DerivationBuildingGoal::flushLine()
+Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
 {
-    if (handleJSONLogMessage(currentLogLine, *act, builderActivities, "the derivation builder", false))
-        ;
-
-    else {
-        logTail.push_back(currentLogLine);
-        if (logTail.size() > settings.logLines)
-            logTail.pop_front();
-
-        act->result(resBuildLogLine, currentLogLine);
-    }
-
-    currentLogLine = "";
-    currentLogLinePos = 0;
+    return doneFailure(BuildError(
+        BuildResult::Failure::LogLimitExceeded,
+        "%s killed after writing more than %d bytes of log output",
+        getName(),
+        worker.settings.maxLogSize));
 }
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()
@@ -1141,12 +1349,12 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                                                                               : PathStatus::Corrupt,
             };
         }
-        auto drvOutput = DrvOutput{info.outputHash, i.first};
+        auto drvOutput = DrvOutput{drvPath, i.first};
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
             if (auto real = worker.store.queryRealisation(drvOutput)) {
                 info.known = {
                     .path = real->outPath,
-                    .status = PathStatus::Valid,
+                    .status = worker.store.isValidPath(real->outPath) ? PathStatus::Valid : PathStatus::Absent,
                 };
             } else if (info.known && info.known->isValid()) {
                 // We know the output because it's a static output of the
@@ -1186,11 +1394,6 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
 
 Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs)
 {
-    buildResult.inner = BuildResult::Success{
-        .status = status,
-        .builtOutputs = std::move(builtOutputs),
-    };
-
     mcRunningBuilds.reset();
 
     if (status == BuildResult::Success::Built)
@@ -1198,28 +1401,24 @@ Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status stat
 
     worker.updateProgress();
 
-    return amDone(ecSuccess, std::nullopt);
+    return Goal::doneSuccess(
+        BuildResult::Success{
+            .status = status,
+            .builtOutputs = std::move(builtOutputs),
+        });
 }
 
 Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
 {
-    buildResult.inner = BuildResult::Failure{
-        .status = ex.status,
-        .errorMsg = fmt("%s", Uncolored(ex.info().msg)),
-    };
-
     mcRunningBuilds.reset();
 
-    if (ex.status == BuildResult::Failure::TimedOut)
-        worker.timedOut = true;
-    if (ex.status == BuildResult::Failure::PermanentFailure)
-        worker.permanentFailure = true;
+    worker.exitStatusFlags.updateFromStatus(ex.status);
     if (ex.status != BuildResult::Failure::DependencyFailed)
         worker.failedBuilds++;
 
     worker.updateProgress();
 
-    return amDone(ecFailed, {std::move(ex)});
+    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix

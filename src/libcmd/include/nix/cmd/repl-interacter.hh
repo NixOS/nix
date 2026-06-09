@@ -2,7 +2,9 @@
 /// @file
 
 #include "nix/util/finally.hh"
+#include "nix/util/fun.hh"
 #include "nix/util/types.hh"
+#include <filesystem>
 #include <functional>
 #include <string>
 
@@ -14,6 +16,7 @@ namespace detail {
 struct ReplCompleterMixin
 {
     virtual StringSet completePrefix(const std::string & prefix) = 0;
+    virtual ~ReplCompleterMixin() = default;
 };
 }; // namespace detail
 
@@ -25,7 +28,7 @@ enum class ReplPromptType {
 class ReplInteracter
 {
 public:
-    using Guard = Finally<std::function<void()>>;
+    using Guard = Finally<fun<void()>>;
 
     virtual Guard init(detail::ReplCompleterMixin * repl) = 0;
     /** Returns a boolean of whether the interacter got EOF */
@@ -35,10 +38,10 @@ public:
 
 class ReadlineLikeInteracter : public virtual ReplInteracter
 {
-    std::string historyFile;
+    std::filesystem::path historyFile;
 public:
-    ReadlineLikeInteracter(std::string historyFile)
-        : historyFile(historyFile)
+    ReadlineLikeInteracter(std::filesystem::path historyFile)
+        : historyFile(std::move(historyFile))
     {
     }
 

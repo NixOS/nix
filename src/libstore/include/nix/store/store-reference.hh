@@ -4,6 +4,9 @@
 #include <variant>
 
 #include "nix/util/types.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/json-impls.hh"
+#include "nix/util/json-non-null.hh"
 
 namespace nix {
 
@@ -54,6 +57,7 @@ struct StoreReference
 
     /**
      * General case, a regular `scheme://authority` URL.
+     * @todo Consider making this pluggable instead of passing through the encoded authority + path.
      */
     struct Specified
     {
@@ -93,6 +97,7 @@ struct StoreReference
     Params params;
 
     bool operator==(const StoreReference & rhs) const = default;
+    auto operator<=>(const StoreReference & rhs) const = default;
 
     /**
      * Render the whole store reference as a URI, optionally including parameters.
@@ -120,4 +125,14 @@ static inline std::ostream & operator<<(std::ostream & os, const StoreReference 
  */
 std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::string & uri);
 
+template<>
+struct json_avoids_null<StoreReference> : std::true_type
+{};
+
+NIX_DECLARE_CONFIG_SERIALISER(StoreReference)
+NIX_DECLARE_CONFIG_SERIALISER(std::vector<StoreReference>)
+NIX_DECLARE_CONFIG_SERIALISER(std::set<StoreReference>)
+
 } // namespace nix
+
+JSON_IMPL(StoreReference)

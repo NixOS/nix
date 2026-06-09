@@ -4,7 +4,6 @@
 #include "nix/util/signals.hh"
 
 #include <cstdlib>
-#include <iomanip>
 #include <nlohmann/json.hpp>
 
 namespace nix {
@@ -98,11 +97,14 @@ json printValueAsJSON(
         break;
 
     case nThunk:
+    case nFailed:
     case nFunction:
         state.error<TypeError>("cannot convert %1% to JSON", showType(v)).atPos(v.determinePos(pos)).debugThrow();
     }
     return out;
 }
+
+void JSONSerializationError::anchor() {}
 
 void printValueAsJSON(
     EvalState & state,
