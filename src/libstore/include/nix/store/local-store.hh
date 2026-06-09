@@ -9,10 +9,11 @@
 #include "nix/store/active-builds.hh"
 #include "nix/util/sync.hh"
 
+#include <atomic>
 #include <chrono>
 #include <future>
 #include <string>
-#include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/concurrent_flat_set_fwd.hpp>
 
 namespace nix {
 
@@ -28,8 +29,8 @@ const int nixSchemaVersion = 10;
 
 struct OptimiseStats
 {
-    unsigned long filesLinked = 0;
-    uint64_t bytesFreed = 0;
+    std::atomic<unsigned long> filesLinked = 0;
+    std::atomic<uint64_t> bytesFreed = 0;
 };
 
 struct LocalSettings;
@@ -519,7 +520,7 @@ private:
 
     std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
-    typedef boost::unordered_flat_set<ino_t> InodeHash;
+    typedef boost::concurrent_flat_set<ino_t> InodeHash;
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);
