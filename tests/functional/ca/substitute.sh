@@ -27,7 +27,7 @@ clearStore
 # mentioning it explicitly again. (#11896, #11928).
 buildDrvs --substitute --substituters "$REMOTE_STORE" --no-require-sigs -j0 transitivelyDependentCA dependentCA
 # Check that the thing we’ve just substituted has its build trace stored
-nix build-trace info --file ./content-addressed.nix transitivelyDependentCA
+nix store build-trace info --file ./content-addressed.nix transitivelyDependentCA
 # Check that its dependencies have it too
 # Use the old command to make sure that the alias works
 nix realisation info --file ./content-addressed.nix dependentCA

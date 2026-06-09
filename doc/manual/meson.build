@@ -261,8 +261,6 @@ endforeach
 nix3_manpages = [
   'nix',
   'nix3-build',
-  'nix3-build-trace',
-  'nix3-build-trace-info',
   'nix3-bundle',
   'nix3-config',
   'nix3-config-check',
@@ -337,6 +335,8 @@ nix3_manpages = [
   'nix3-store-add',
   'nix3-store-add-file',
   'nix3-store-add-path',
+  'nix3-store-build-trace-info',
+  'nix3-store-build-trace',
   'nix3-store-cat',
   'nix3-store-copy-log',
   'nix3-store-copy-sigs',
