@@ -42,6 +42,7 @@ if canUseSandbox; then
   fifoDir="$TEST_ROOT/sync-fifo"
   mkdir -p "$fifoDir"
   mkfifo "$fifoDir/fifo"
+  chmod a+rw "$fifoDir/fifo"
   sandboxArgs+=(--option extra-sandbox-paths "/sync-fifo=$TEST_ROOT/sync-fifo")
 fi
 
