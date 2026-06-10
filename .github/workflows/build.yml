@@ -130,14 +130,20 @@ jobs:
       - uses: DeterminateSystems/determinate-nix-action@main
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
+          tests=$(nix flake show --json \
+            | jq -r '
+              .inventory.hydraJobs.output.children.tests.children
+              | with_entries(select(.value | has("derivation")))
+              | keys[]
+              | "${{ inputs.flake }}#hydraJobs.tests." + .')
+
+          if [ -z "$tests" ]; then
+            echo "error: no tests found in hydraJobs.tests"
+            exit 1
+          fi
+
           cmd() {
-            nix build -L --keep-going --timeout 600 \
-              $(nix flake show --json \
-                | jq -r '
-                  .inventory.hydraJobs.output.children.tests.children
-                  | with_entries(select(.value | has("derivation")))
-                  | keys[]
-                  | "${{ inputs.flake }}#hydraJobs.tests." + .')
+            nix build -L --keep-going --timeout 600 $tests
           }
 
           if ! cmd; then
