@@ -35,7 +35,7 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR "$shellDotNix" -A shellDrv 
 [ "$output" = " - foo - bar - baz" ]
 
 # test NIX_BUILD_TOP
-testTmpDir=$(pwd)/nix-shell
+testTmpDir=$TEST_ROOT/tmp-dir
 mkdir -p "$testTmpDir"
 # shellcheck disable=SC2016
 output=$(TMPDIR="$testTmpDir" nix-shell --pure "$shellDotNix" -A shellDrv --run 'echo $NIX_BUILD_TOP')
