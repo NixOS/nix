@@ -342,45 +342,62 @@ void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * o
 
 /** @} */ // doxygen group GC
 
-/** @addtogroup libexpr_eval
+/** @defgroup libexpr_eval Evaluation
  * @ingroup libexpr
  * @brief Higher-level evaluation helpers
  * @{
  */
 
 /**
- * @brief Attempt to interpret a Nix value as a derivation.
+ * @brief Determine whether a Nix value is a derivation and, if so, return its
+ *        store derivation path.
  *
- * If the value represents a derivation, returns its drvPath. Returns NULL
- * (without setting an error) when the value is not a derivation and the
- * caller should recurse into its attributes instead.
+ * Forces @p value and inspects it. The value is considered a derivation when it
+ * is an attribute set whose `type` attribute is the string `"derivation"`; in
+ * that case its `drvPath` attribute is parsed and returned. Otherwise NULL is
+ * returned without recording an error, which signals that the caller should
+ * treat @p value as an ordinary attribute set (e.g. recurse into it).
  *
- * Derivation metadata (name, system, outputs, meta) can be queried from
- * the value itself using the existing attrset accessors
- * (nix_get_attr_byname, nix_get_string, etc.).
+ * Only the derivation path is returned. Other metadata (`name`, `system`,
+ * outputs, `meta`, ...) lives on @p value itself and can be read with the
+ * attribute-set accessors such as nix_get_attr_byname() and nix_get_string().
  *
- * @param[out] context Optional, stores error information. Check
- *  last_err_code to distinguish NULL-from-error from NULL-as-not-derivation.
+ * @param[out] context Optional, stores error information. On a NULL return,
+ *  inspect the error code via nix_err_code() to tell the two NULL cases apart:
+ *  NIX_OK means @p value is simply not a derivation, any other code means
+ *  inspection failed. See @ref errors.
  * @param[in] state The evaluation state.
- * @param[in] value The value to inspect.
- * @param[in] ignoreAssertionFailures Whether to ignore AssertionErrors
- *  in the derivation's meta evaluation.
- * @return A new StorePath, or NULL. Free with nix_store_path_free().
+ * @param[in] value The value to inspect. It is forced by this call.
+ * @param[in] ignoreAssertionFailures If true, an assertion failure raised while
+ *  forcing @p value is treated as "not a derivation" (NULL is returned without
+ *  an error) rather than being reported as an error.
+ * @return A newly allocated StorePath holding the derivation path, or NULL.
+ *  Free a non-NULL result with nix_store_path_free().
  */
 StorePath *
 nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value, bool ignoreAssertionFailures);
 
 /**
- * @brief Auto-call a function with auto-args (the --arg / --argstr pattern).
+ * @brief Call a function, drawing its arguments from an attribute set.
  *
- * This corresponds to nix::EvalState::autoCallFunction.
+ * Forces @p fn_val and writes its application into @p result:
+ *
+ * - If @p fn_val is a function that takes a set of named arguments
+ *   (e.g. `{ a, b ? 1 }: ...`), it is called with an attribute set assembled
+ *   from @p auto_args: each named argument is taken from @p auto_args when
+ *   present; an argument absent from @p auto_args falls back to its default;
+ *   an argument that is both absent and has no default is an error.
+ * - Otherwise @p fn_val is copied into @p result unchanged. This includes any
+ *   non-function value as well as a function that takes a single unnamed
+ *   argument (e.g. `x: ...`), since there are no named arguments to supply.
  *
  * @param[out] context Optional, stores error information
  * @param[in] state The evaluation state.
- * @param[in] auto_args An attrset value containing auto-args, or NULL for
- *  empty.
- * @param[in] fn_val The function to call.
- * @param[out] result Pre-allocated nix_value to receive the result.
+ * @param[in] auto_args Attribute set value supplying the named arguments, or
+ *  NULL to supply none.
+ * @param[in] fn_val The value to call.
+ * @param[out] result Pre-allocated nix_value that receives the result.
+ * @return NIX_OK if the call was successful, an error code otherwise.
  */
 nix_err nix_value_auto_call_function(
     nix_c_context * context, EvalState * state, nix_value * auto_args, nix_value * fn_val, nix_value * result);
