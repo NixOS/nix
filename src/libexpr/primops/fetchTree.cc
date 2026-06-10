@@ -427,17 +427,38 @@ static void fetch(
             .atPos(pos)
             .debugThrow();
 
+    // early exit if pinned and already in the store
+    if (expectedHash && expectedHash->algo == HashAlgorithm::SHA256) {
+        auto expectedPath = state.store->makeFixedOutputPath(
+            name,
+            FixedOutputInfo{
+                .method = unpack ? FileIngestionMethod::NixArchive : FileIngestionMethod::Flat,
+                .hash = *expectedHash,
+                .references = {}});
+
+        // Try to get the path from the local store or substituters
+        try {
+            state.store->ensurePath(expectedPath);
+            debug("using substituted/cached path '%s' for '%s'", state.store->printStorePath(expectedPath), *url);
+            state.allowAndSetStorePathString(expectedPath, v);
+            return;
+        } catch (Error & e) {
+            debug(
+                "substitution of '%s' failed, will try to download: %s",
+                state.store->printStorePath(expectedPath),
+                e.what());
+            // Fall through to download
+        }
+    }
+
     if (unpack) {
         auto attrs = fetchers::Attrs{
             {"type", "tarball"},
             {"url", *url},
             {"name", name},
         };
-        if (expectedHash) {
+        if (expectedHash)
             attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
-            // Mark as final to allow the tree to be substituted.
-            attrs.emplace("__final", Explicit<bool>{true});
-        }
         auto input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
         auto cachedInput =
             state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
