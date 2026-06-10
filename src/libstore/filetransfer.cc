@@ -700,6 +700,13 @@ struct curlFileTransfer : public FileTransfer
 
                 if (std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode)
                     != s3RetryableErrors.end()) {
+                    if (s3ErrorCode == "RequestTimeout")
+                        /* Sigh, S3 400 RequestTimeout errors apparently should be retried
+                           immediately with no backoff, since we are only exacerbating the
+                           stale connection closing issue.
+                           See e.g. https://github.com/awslabs/aws-c-s3/issues/464 and a multitude
+                           of related issues. */
+                        retryTimeMs = 0;
                     debug("S3 error '%s', will retry", s3ErrorCode);
                 } else if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
@@ -789,6 +796,8 @@ struct curlFileTransfer : public FileTransfer
                     int ms = retryTimeMs
                              * std::pow(
                                  2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                    /* Clamp the maximum to something sane to avoid yeeting off the retries to infinity. */
+                    ms = std::clamp<int>(ms, 0, 60000);
 
                     if (writtenToSink) {
                         warn(
