@@ -134,8 +134,8 @@ jobs:
             nix build -L --keep-going --timeout 600 \
               $(nix flake show --json \
                 | jq -r '
-                  .hydraJobs.tests
-                  | with_entries(select(.value.type == "derivation"))
+                  .inventory.hydraJobs.output.children.tests.children
+                  | with_entries(select(.value | has("derivation")))
                   | keys[]
                   | "${{ inputs.flake }}#hydraJobs.tests." + .')
           }
