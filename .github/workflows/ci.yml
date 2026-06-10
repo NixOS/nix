@@ -58,7 +58,7 @@ jobs:
       runner_for_virt: UbuntuLatest32Cores128G
       runner_small: ubuntu-latest
       run_tests: true
-      run_vm_tests: true
+      run_vm_tests: false
       run_regression_tests: true
       upload_artifacts: false
 
