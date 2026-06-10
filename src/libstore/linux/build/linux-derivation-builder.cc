@@ -10,6 +10,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/cgroup.hh"
 #include "nix/util/linux-namespaces.hh"
+#include "nix/util/file-system-at.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "linux/fchmodat2-compat.hh"
@@ -17,8 +18,9 @@
 #include <algorithm>
 #include <string_view>
 #include <cstdint>
-#include <fcntl.h>
+#include <atomic>
 
+#include <fcntl.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <netinet/ip.h>
@@ -35,6 +37,42 @@
 #endif
 
 #define pivot_root(new_root, put_old) (syscall(SYS_pivot_root, new_root, put_old))
+
+/* Polyfill for musl that doesn't have the syscall wrappers. */
+
+#if !HAVE_OPEN_TREE
+
+#  ifndef OPEN_TREE_CLONE
+#    define OPEN_TREE_CLONE 1
+#  endif
+
+#  ifndef OPEN_TREE_CLOEXEC
+#    define OPEN_TREE_CLOEXEC O_CLOEXEC
+#  endif
+
+static int open_tree(int dirfd, const char * filename, unsigned int flags)
+{
+    return ::syscall(__NR_open_tree, dirfd, filename, flags);
+}
+
+#endif
+
+#if !HAVE_MOVE_MOUNT
+
+#  ifndef MOVE_MOUNT_F_EMPTY_PATH
+#    define MOVE_MOUNT_F_EMPTY_PATH 0x00000004
+#  endif
+
+#  ifndef MOVE_MOUNT_T_EMPTY_PATH
+#    define MOVE_MOUNT_T_EMPTY_PATH 0x00000040
+#  endif
+
+static int move_mount(int sourceDirFd, const char * source, int destDirFd, const char * dest, unsigned int flags)
+{
+    return ::syscall(__NR_move_mount, sourceDirFd, source, destDirFd, dest, flags);
+}
+
+#endif
 
 namespace nix {
 
@@ -205,35 +243,154 @@ static void setupLandlock()
 
 #endif
 
-static void doBind(const std::filesystem::path & source, const std::filesystem::path & target, bool optional = false)
+static void doBind(
+    const std::filesystem::path & source,
+    Descriptor chrootRootDirFd,
+    const std::filesystem::path & target,
+    const std::filesystem::path & chrootRootDirPath,
+    bool optional = false)
 {
-    debug("bind mounting %1% to %2%", PathFmt(source), PathFmt(target));
+    /* `target` denotes a relative path inside the chroot directory. All operations happen
+        relative to chrootRootDirFd. Bail out if the path is not what we expect. */
+    if (target.empty() || target.is_absolute())
+        throw Error("invalid path to bind mount in the chroot: %s", PathFmt(target));
 
-    auto bindMount = [&]() {
-        if (mount(source.c_str(), target.c_str(), "", MS_BIND | MS_REC, 0) == -1)
-            throw SysError("bind mount from %1% to %2% failed", PathFmt(source), PathFmt(target));
+    /* Sanity check against insane setups. This would never be passed in
+       sandbox paths for dependencies, but the user might specify it in
+       extra-sandbox-paths. */
+    if (const auto filename = target.filename().native(); filename == "." || filename == "..")
+        throw Error("sandbox path to bind mount in the chroot has an invalid filename: %s", PathFmt(target));
+
+    debug("bind mounting %1% to %2%", PathFmt(source), PathFmt(chrootRootDirPath / target));
+
+    auto fallbackBindMount = [&](Descriptor sourceFd, Descriptor destFd) {
+        auto selfProcSourcePath = std::filesystem::path("/proc/self/fd") / std::to_string(sourceFd);
+        auto selfProcDestPath = std::filesystem::path("/proc/self/fd") / std::to_string(destFd);
+
+        if (mount(selfProcSourcePath.c_str(), selfProcDestPath.c_str(), "", MS_BIND | MS_REC, 0) == -1)
+            throw SysError(
+                "bind mount from %1% (%3%) to %2% (%4%) failed",
+                PathFmt(source),
+                PathFmt(chrootRootDirPath / target),
+                PathFmt(selfProcSourcePath),
+                PathFmt(selfProcDestPath));
     };
 
-    auto maybeSt = maybeLstat(source);
-    if (!maybeSt) {
-        if (optional)
+    auto bindMount = [&](Descriptor sourceFd, Descriptor destFd) {
+        static std::atomic_flag openTreeUnsupported{};
+        if (openTreeUnsupported.test())
+            return fallbackBindMount(sourceFd, destFd);
+
+        AutoCloseFD treeFd =
+            ::open_tree(sourceFd, "", OPEN_TREE_CLONE | AT_RECURSIVE | OPEN_TREE_CLOEXEC | AT_EMPTY_PATH);
+
+        if (!treeFd) {
+            if (errno != ENOSYS)
+                throw SysError("opening bind mount source %1%", PathFmt(source));
+
+            /* Cache and try the old fallback via procfs. */
+            openTreeUnsupported.test_and_set();
+            return fallbackBindMount(sourceFd, destFd);
+        }
+
+        if (::move_mount(treeFd.get(), "", destFd, "", MOVE_MOUNT_T_EMPTY_PATH | MOVE_MOUNT_F_EMPTY_PATH) == -1)
+            throw SysError("bind mount from %1% to %2% failed", PathFmt(source), PathFmt(chrootRootDirPath / target));
+    };
+
+    /* TODO: Replace the sucky implementation of createDirs and use that instead. */
+    auto createDirsAndOpen =
+        [&](const std::filesystem::path & path) -> std::tuple<AutoCloseFD, Descriptor, bool /*isRoot*/> {
+        Descriptor parentFd = chrootRootDirFd;
+        AutoCloseFD maybeParentFdOwned;
+        /* How many directories deep we are. */
+        unsigned nestedDirCount = 0;
+
+        for (const auto & p : path) {
+            /* Trailing `/`, we don't care. It might matter for symlink resolution, so better skip it.
+               Also skip `.` as a no-op. */
+            if (p.native().empty() || p.native() == ".")
+                continue;
+
+            /* TODO: Add additional validation in config parsing in case the
+               user specified a borked `extra-sandbox-paths`. Maybe we should just
+               reject `..` components completely? */
+            if (p.native() == "..") {
+                if (nestedDirCount == 0)
+                    throw Error("sandbox path %s escapes the chroot", PathFmt(path));
+                --nestedDirCount;
+            } else {
+                ++nestedDirCount;
+            }
+
+            assert(!p.native().starts_with("/")); /* Already check that the path is relative, can't happen. */
+
+            /* No symlinks shall be followed. */
+            AutoCloseFD nextComponent = ::openat(parentFd, p.c_str(), O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+            if (!nextComponent) {
+                if (errno != ENOENT) /* We might have to create it if it doesn't exist. */
+                    throw SysError("creating directory component %s in the sandbox path %s", PathFmt(p), PathFmt(path));
+
+                /* Let the umask restrict the permissions. TODO: Do we want
+                   this? We don't handle EEXIST here because that would mean
+                   somebody is already racing us. Fail closed. */
+                if (::mkdirat(parentFd, p.c_str(), 0777) == -1)
+                    throw SysError("creating directory component %s in the sandbox path %s", PathFmt(p), PathFmt(path));
+
+                /* Try again after creating the directory. Should succeed. */
+                nextComponent = ::openat(parentFd, p.c_str(), O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+                if (!nextComponent) /* Something is terribly wrong, bail out. */
+                    throw SysError("creating directory component %s in the sandbox path %s", PathFmt(p), PathFmt(path));
+            }
+
+            /* Proceed to the next iteration. */
+            maybeParentFdOwned = std::move(nextComponent);
+            parentFd = maybeParentFdOwned.get();
+        }
+
+        return {std::move(maybeParentFdOwned), parentFd, nestedDirCount == 0};
+    };
+
+    AutoCloseFD sourceFd = ::open(source.c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
+
+    /* Skip non-existent files source paths if .optional is set. */
+    if (!sourceFd) {
+        if (optional && (errno == ENOENT || errno == ENOTDIR))
             return;
         else
             throw SysError("getting attributes of path %1%", PathFmt(source));
     }
-    auto st = *maybeSt;
+
+    auto st = nix::fstat(sourceFd.get());
 
     if (S_ISDIR(st.st_mode)) {
-        createDirs(target);
-        bindMount();
+        auto [maybeDirFdOwned, dirFd, isRoot] = createDirsAndOpen(target);
+        /* We must always open a fresh directory - i.e. the path must not resolve to chrootRootDir itself. */
+        if (isRoot || !maybeDirFdOwned)
+            throw Error("sandbox path %s escapes the chroot", PathFmt(chrootRootDirPath / target));
+        assert(maybeDirFdOwned.get() == dirFd); /* See the comment above. */
+        bindMount(sourceFd.get(), dirFd);
     } else if (S_ISLNK(st.st_mode)) {
-        // Symlinks can (apparently) not be bind-mounted, so just copy it
-        createDirs(target.parent_path());
-        copyFile(source, target, false);
+        /* Symlinks can't be bind-mounted, so copy the contents.
+           The kernel implies AT_EMPTY_PATH for readlinkat
+           since https://github.com/torvalds/linux/commit/65cfc6722361 (v2.6.39).
+           See also: https://github.com/cyphar/libpathrs/issues/18 */
+        auto symlinkTarget = readLinkAt(sourceFd.get(), CanonPath::root);
+        auto filename = target.filename();
+        auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
+        if (::symlinkat(symlinkTarget.data(), parentFd, filename.c_str()) == -1)
+            throw SysError("creating symlink %s", PathFmt(chrootRootDirPath / target));
+        /* Copy the write/access time from the source symlink. */
+        const std::array<::timespec, 2> times = {st.st_atim, st.st_mtim};
+        if (::utimensat(parentFd, filename.c_str(), times.data(), AT_SYMLINK_NOFOLLOW) == -1)
+            throw SysError("changing write time of %s", PathFmt(chrootRootDirPath / target));
     } else {
-        createDirs(target.parent_path());
-        writeFile(target, "");
-        bindMount();
+        auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
+        /* Strictly speaking, O_NOFOLLOW is redundant because O_CREAT | O_EXCL would never follow links anyway. */
+        AutoCloseFD destFd =
+            ::openat(parentFd, target.filename().c_str(), O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0666);
+        if (!destFd)
+            throw SysError("creating regular file %s", PathFmt(chrootRootDirPath / target));
+        bindMount(sourceFd.get(), destFd.get());
     }
 }
 
@@ -647,6 +804,11 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         pathsInChroot.emplace(i, canonicalPath);
     }
 
+    /* We really do have to reopen the dirfd in the child, otherwise move_mount dies with EINVAL. */
+    AutoCloseFD chrootRootDirFd = openDirectory(chrootRootDir, FinalSymlink::DontFollow);
+    if (!chrootRootDirFd)
+        throw SysError("opening directory %s", PathFmt(chrootRootDir));
+
     /* Bind-mount all the directories from the "host"
        filesystem that we want in the chroot
        environment. */
@@ -666,7 +828,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         } else
 #endif
         {
-            doBind(i.second.source, chrootRootDir / i.first.relative_path(), i.second.optional);
+            doBind(i.second.source, chrootRootDirFd.get(), i.first.relative_path(), chrootRootDir, i.second.optional);
         }
     }
 
@@ -709,8 +871,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
         } else {
             if (errno != EINVAL)
                 throw SysError("mounting /dev/pts");
-            doBind("/dev/pts", chrootRootDir / "dev" / "pts");
-            doBind("/dev/ptmx", chrootRootDir / "dev" / "ptmx");
+            doBind("/dev/pts", chrootRootDirFd.get(), "dev/pts", chrootRootDir);
+            doBind("/dev/ptmx", chrootRootDirFd.get(), "dev/ptmx", chrootRootDir);
         }
     }
 
@@ -796,7 +958,8 @@ void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
 
 void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
 {
-    auto [source, target] = ChrootDerivationBuilder::addDependencyPrep(path);
+    auto [source, targetRelPath] = ChrootDerivationBuilder::addDependencyPrep(path);
+    assert(targetRelPath.is_relative()); /* The path is relative to the chroot. */
 
     /* Bind-mount the path into the sandbox. This requires
        entering its mount namespace, which is not possible
@@ -809,7 +972,11 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
         if (setns(sandboxMountNamespace.get(), CLONE_NEWNS) == -1)
             throw SysError("entering sandbox mount namespace");
 
-        doBind(source, target);
+        /* We really do have to reopen the dirfd in the child, otherwise move_mount dies with EINVAL. */
+        AutoCloseFD chrootRootDirFd = openDirectory(chrootRootDir, FinalSymlink::DontFollow);
+        if (!chrootRootDirFd)
+            throw SysError("opening directory %s", PathFmt(chrootRootDir));
+        doBind(source, chrootRootDirFd.get(), targetRelPath, chrootRootDir);
 
         _exit(0);
     }));

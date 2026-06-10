@@ -71,6 +71,8 @@ configdata_priv.set('CAN_LINK_SYMLINK', can_link_symlink.to_int())
 check_funcs = [
   'posix_fallocate',
   'statvfs',
+  'open_tree',
+  'move_mount',
 ]
 foreach funcspec : check_funcs
   define_name = 'HAVE_' + funcspec.underscorify().to_upper()

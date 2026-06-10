@@ -96,3 +96,58 @@ nix-sandbox-build symlink-derivation.nix -A test_sandbox_paths \
     --option extra-sandbox-paths "/dir=$TEST_ROOT" \
     --option extra-sandbox-paths "/symlinkDir=$symlinkDir" \
     --option extra-sandbox-paths "/symlink=$symlinkcert"
+
+invalidLeafPaths=(
+    "/foo/.."
+    "/foo/."
+    "/.."
+    "/."
+)
+
+for badPath in "${invalidLeafPaths[@]}"; do
+    expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "$badPath=$cert" |
+        grepQuiet "invalid filename"
+done
+
+badPaths=(
+    "/../escape"
+    "/foo/../../escape"
+    "//foo///.//../../escape"
+    "/./../escape"
+    "///.//./../escape//"
+    "/a/b/../../../escape"
+)
+
+sources=(
+    "$cert"
+    "$symlinkcert"
+    "$symlinkDir"
+    "$TEST_ROOT"
+)
+
+for badPath in "${badPaths[@]}"; do
+    for source in "${sources[@]}"; do
+        expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "$badPath=$source" |
+            grepQuiet "escapes the chroot"
+    done
+done
+
+# Trailing slash in the destination should fail for non-directory files.
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$cert" | grepQuiet "error: creating regular file.*: No such file or directory"
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$symlinkcert" | grepQuiet "error: creating symlink.*: No such file or directory"
+
+# Escaping to chroot directory.
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/foo/../=$cert" | grepQuiet "error: creating regular file.*: No such file or directory"
+
+# Can't overmount the chroot.
+expectStderr 1 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/foo/../=$TEST_ROOT" | grepQuiet "error: .*escapes the chroot"
+
+# The build should fail, not the mounting.
+expectStderr 100 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$TEST_ROOT"
+expectStderr 100 nix-sandbox-build simple-failing.nix --option extra-sandbox-paths "/a/=$TEST_ROOT/"
+
+nix-sandbox-build symlink-derivation.nix -A test_sandbox_paths \
+    --option extra-sandbox-paths "/./file=$cert" \
+    --option extra-sandbox-paths "//dir/=$TEST_ROOT/" \
+    --option extra-sandbox-paths "///./symlinkDir=$symlinkDir" \
+    --option extra-sandbox-paths "/symlink=$symlinkcert"
