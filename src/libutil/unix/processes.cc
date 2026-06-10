@@ -155,6 +155,11 @@ pid_t Pid::release()
     return p;
 }
 
+pid_t Pid::get()
+{
+    return pid;
+}
+
 void killUser(uid_t uid)
 {
     debug("killing all processes running under uid '%1%'", uid);
@@ -311,10 +316,25 @@ void runProgram2(const RunOptions & options)
     checkInterrupt();
 
     /* Create a pipe. */
-    Pipe out;
+    auto out = std::make_shared<Pipe>();
     if (options.standardOut)
-        out.create();
+        out->create();
 
+    auto pid = startProgram(options, out);
+
+    out->writeSide.close();
+
+    if (options.standardOut)
+        drainFD(out->readSide.get(), *options.standardOut);
+
+    /* Wait for the child to finish. */
+    int status = pid.wait();
+    if (status)
+        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+}
+
+Pid startProgram(const RunOptions & options, std::shared_ptr<Pipe> out)
+{
     ProcessOptions processOptions;
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
@@ -323,19 +343,28 @@ void runProgram2(const RunOptions & options)
 
     auto suspension = logger->suspendIf(options.isInteractive);
 
-    /* Fork. */
-    Pid pid = startProcess(
+    return startProcess(
         [&] {
             if (options.environment)
                 replaceEnv(*options.environment);
-            if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+            if (options.standardOut && dup2(out->writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("dupping stdout");
             if (options.mergeStderrToStdout)
                 if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
                     throw SysError("cannot dup stdout into stderr");
+            for (auto redirection : options.redirections) {
+                if (dup2(redirection.to, redirection.from) == -1) {
+                    throw SysError("dupping fd %i to %i", redirection.from, redirection.to);
+                }
+            }
 
             if (options.chdir && chdir((*options.chdir).c_str()) == -1)
                 throw SysError("chdir failed");
+#ifdef __linux__
+            if (!options.caps.empty() && prctl(PR_SET_KEEPCAPS, 1) < 0) {
+                throw SysError("setting keep-caps failed");
+            }
+#endif
             if (options.gid && setgid(*options.gid) == -1)
                 throw SysError("setgid failed");
             /* Drop all other groups if we're setgid. */
@@ -343,6 +372,45 @@ void runProgram2(const RunOptions & options)
                 throw SysError("setgroups failed");
             if (options.uid && setuid(*options.uid) == -1)
                 throw SysError("setuid failed");
+
+#ifdef __linux__
+            if (!options.caps.empty()) {
+                if (prctl(PR_SET_KEEPCAPS, 0)) {
+                    throw SysError("clearing keep-caps failed");
+                }
+
+                // we do the capability dance like this to avoid a dependency
+                // on libcap, which has a rather large build closure and many
+                // more features that we need for now. maybe some other time.
+                static constexpr uint32_t LINUX_CAPABILITY_VERSION_3 = 0x20080522;
+                static constexpr uint32_t LINUX_CAPABILITY_U32S_3 = 2;
+                struct user_cap_header_struct
+                {
+                    uint32_t version;
+                    int pid;
+                } hdr = {LINUX_CAPABILITY_VERSION_3, 0};
+                struct user_cap_data_struct
+                {
+                    uint32_t effective;
+                    uint32_t permitted;
+                    uint32_t inheritable;
+                } data[LINUX_CAPABILITY_U32S_3] = {};
+                for (auto cap : options.caps) {
+                    assert(cap / 32 < LINUX_CAPABILITY_U32S_3);
+                    data[cap / 32].permitted |= 1 << (cap % 32);
+                    data[cap / 32].inheritable |= 1 << (cap % 32);
+                }
+                if (syscall(SYS_capset, &hdr, data)) {
+                    throw SysError("couldn't set capabilities");
+                }
+
+                for (auto cap : options.caps) {
+                    if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, cap, 0, 0) < 0) {
+                        throw SysError("couldn't set ambient caps");
+                    }
+                }
+            }
+#endif
 
             Strings args_(options.args);
             args_.push_front(options.program.native());
@@ -359,16 +427,6 @@ void runProgram2(const RunOptions & options)
             throw SysError("executing %s", PathFmt(options.program));
         },
         processOptions);
-
-    out.writeSide.close();
-
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
-
-    /* Wait for the child to finish. */
-    int status = pid.wait();
-    if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }
 
 //////////////////////////////////////////////////////////////////////

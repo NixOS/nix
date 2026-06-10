@@ -181,6 +181,7 @@ suites = [
       'external-builders.sh',
       'delete-no-keep.sh',
       'fixed-slow-vs-bad.sh',
+      'pasta-network.sh',
     ],
     'workdir' : meson.current_source_dir(),
   },
