@@ -100,7 +100,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     trace("output path substituted");
 
                     if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id});
+                        worker.store.registerDrvOutput({*g->outputInfo, id}, NoCheckSigs);
                     else
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
@@ -453,7 +453,8 @@ std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPa
                         .drvPath = drvPath,
                         .outputName = wantedOutput,
                     },
-                });
+                },
+                NoCheckSigs);
         }
 
         return {{*mRealisation, status}};

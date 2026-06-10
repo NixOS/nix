@@ -499,7 +499,7 @@ void RemoteStore::addMultipleToStore(
     conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
 }
 
-void RemoteStore::registerDrvOutput(const Realisation & info)
+void RemoteStore::registerDrvOutputUnchecked(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;

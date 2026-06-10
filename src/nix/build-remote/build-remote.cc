@@ -411,7 +411,7 @@ static int main_build_remote(int argc, char ** argv)
             // Should hold, because if the feature isn't enabled the set
             // of missing realisations should be empty
             experimentalFeatureSettings.require(Xp::CaDerivations);
-            store->registerDrvOutput(realisation);
+            store->registerDrvOutput(realisation, NoCheckSigs);
         }
 
         return 0;
