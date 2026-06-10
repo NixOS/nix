@@ -35,7 +35,7 @@ output=$(nix-shell --pure --keep SELECTED_IMPURE_VAR "$shellDotNix" -A shellDrv 
 [ "$output" = " - foo - bar - baz" ]
 
 # test NIX_BUILD_TOP
-testTmpDir=$(pwd)/nix-shell
+testTmpDir=$TEST_ROOT/tmp-dir
 mkdir -p "$testTmpDir"
 # shellcheck disable=SC2016
 output=$(TMPDIR="$testTmpDir" nix-shell --pure "$shellDotNix" -A shellDrv --run 'echo $NIX_BUILD_TOP')
@@ -88,7 +88,7 @@ sed -e "s|@ENV_PROG@|$(type -P env)|" shell.shebang.expr > "$TEST_ROOT"/shell.sh
 chmod a+rx "$TEST_ROOT"/shell.shebang.expr
 # Should fail due to expressions using relative path
  "$TEST_ROOT"/shell.shebang.expr bar && exit 1
-cp shell.nix "${config_nix}" "$TEST_ROOT"
+cp shell.nix "$TEST_ROOT"
 # Should succeed
 echo "cwd: $PWD"
 output=$("$TEST_ROOT"/shell.shebang.expr bar)

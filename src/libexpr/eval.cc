@@ -6,6 +6,7 @@
 #include "nix/expr/symbol-table.hh"
 #include "nix/expr/value.hh"
 #include "nix/util/exit.hh"
+#include "nix/util/signals.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/util/environment-variables.hh"
@@ -2220,6 +2221,8 @@ void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, c
     Value * recovery = nullptr;
     try {
         std::rethrow_exception(e);
+    } catch (const Interrupted & e) {
+        recovery = allocValue();
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {
@@ -2237,6 +2240,8 @@ void EvalState::handleEvalExceptionForApp(Value & v, const Value & savedApp)
     Value * recovery = nullptr;
     try {
         std::rethrow_exception(e);
+    } catch (const Interrupted & e) {
+        recovery = allocValue();
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {

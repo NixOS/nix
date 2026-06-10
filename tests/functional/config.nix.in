@@ -5,6 +5,11 @@ let
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
   } else {};
+
+  # Fingerprint the test to improve test isolation with a shared store.
+  # Test setup sprinkles some salt on the template, so we end with with
+  # different derivations for distinct tests.
+  testSalt = builtins.hashFile "sha256" __curPos.file;
 in
 
 rec {
@@ -18,7 +23,7 @@ rec {
 
   mkDerivation = args:
     derivation ({
-      inherit system;
+      inherit system testSalt;
       builder = shell;
       args = ["-e" args.builder or (builtins.toFile "builder-${args.name}.sh" ''
         if [ -e "$NIX_ATTRS_SH_FILE" ]; then source $NIX_ATTRS_SH_FILE; fi;

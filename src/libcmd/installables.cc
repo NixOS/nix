@@ -1,3 +1,4 @@
+#include "nix/cmd/built-path.hh"
 #include "nix/store/globals.hh"
 #include "nix/cmd/installables.hh"
 #include "nix/cmd/installable-derived-path.hh"
@@ -535,28 +536,6 @@ ref<Installable> SourceExprCommand::parseInstallable(ref<Store> store, const std
     return installables.front();
 }
 
-static SingleBuiltPath getBuiltPath(ref<Store> evalStore, ref<Store> store, const SingleDerivedPath & b)
-{
-    return std::visit(
-        overloaded{
-            [&](const SingleDerivedPath::Opaque & bo) -> SingleBuiltPath { return SingleBuiltPath::Opaque{bo.path}; },
-            [&](const SingleDerivedPath::Built & bfd) -> SingleBuiltPath {
-                auto drvPath = getBuiltPath(evalStore, store, *bfd.drvPath);
-                // Resolving this instead of `bfd` will yield the same result, but avoid duplicative work.
-                SingleDerivedPath::Built truncatedBfd{
-                    .drvPath = makeConstantStorePathRef(drvPath.outPath()),
-                    .output = bfd.output,
-                };
-                auto outputPath = resolveDerivedPath(*store, truncatedBfd, &*evalStore);
-                return SingleBuiltPath::Built{
-                    .drvPath = make_ref<SingleBuiltPath>(std::move(drvPath)),
-                    .output = {bfd.output, outputPath},
-                };
-            },
-        },
-        b.raw());
-}
-
 std::vector<BuiltPathWithResult> Installable::build(
     ref<Store> evalStore, ref<Store> store, Realise mode, const Installables & installables, BuildMode bMode)
 {
@@ -655,33 +634,15 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
         throwBuildErrors(buildResults, *store);
         for (auto & buildResult : buildResults) {
-            // If we didn't throw, they must all be sucesses
-            auto & success = std::get<nix::BuildResult::Success>(buildResult.inner);
             for (auto & aux : backmap[buildResult.path]) {
-                std::visit(
-                    overloaded{
-                        [&](const DerivedPath::Built & bfd) {
-                            std::map<std::string, StorePath> outputs;
-                            for (auto & [outputName, realisation] : success.builtOutputs)
-                                outputs.emplace(outputName, realisation.outPath);
-                            res.push_back(
-                                {aux.installable,
-                                 {.path =
-                                      BuiltPath::Built{
-                                          .drvPath =
-                                              make_ref<SingleBuiltPath>(getBuiltPath(evalStore, store, *bfd.drvPath)),
-                                          .outputs = outputs,
-                                      },
-                                  .info = aux.info,
-                                  .result = buildResult}});
-                        },
-                        [&](const DerivedPath::Opaque & bo) {
-                            res.push_back(
-                                {aux.installable,
-                                 {.path = BuiltPath::Opaque{bo.path}, .info = aux.info, .result = buildResult}});
-                        },
+                res.push_back({
+                    aux.installable,
+                    BuiltPathWithResult{
+                        .path = toBuiltPath(buildResult, evalStore, store),
+                        .info = aux.info,
+                        .result = buildResult,
                     },
-                    buildResult.path.raw());
+                });
             }
         }
 

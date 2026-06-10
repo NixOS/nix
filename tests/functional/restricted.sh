@@ -6,7 +6,7 @@ clearStoreIfPossible
 
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)
-TMPFILE=$(mktemp); echo '1 + 2' >"$TMPFILE"; (! nix-instantiate --eval --restrict-eval "$TMPFILE"); rm "$TMPFILE"
+TMPFILE=$(mktemp -p "$TEST_ROOT"); echo '1 + 2' >"$TMPFILE"; (! nix-instantiate --eval --restrict-eval "$TMPFILE");
 
 mkdir -p "$TEST_ROOT/nix"
 cp ./simple.nix "$TEST_ROOT/nix"
@@ -62,8 +62,8 @@ expectStderr 1 nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { pr
 [[ $(nix-instantiate --restrict-eval --eval -E "let __nixPath = [ { prefix = \"foo\"; path = $TEST_ROOT/tunnel.d; } ]; in builtins.readDir <foo/tunnel>" -I "$TEST_ROOT"/tunnel.d) == '{ "tunnel.d" = "directory"; }' ]]
 
 # Check whether we can leak symlink information through directory traversal.
-traverseDir="${_NIX_TEST_SOURCE_DIR}/restricted-traverse-me"
-ln -sfn "${_NIX_TEST_SOURCE_DIR}/restricted-secret" "${_NIX_TEST_SOURCE_DIR}/restricted-innocent"
+traverseDir="$TEST_ROOT/restricted-traverse-me"
+ln -sfn "$TEST_ROOT/restricted-secret" "$TEST_ROOT/restricted-innocent"
 mkdir -p "$traverseDir"
 # shellcheck disable=SC2001
 goUp="..$(echo "$traverseDir" | sed -e 's,[^/]\+,..,g')"

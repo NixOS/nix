@@ -15,7 +15,7 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
 {
     std::string description() override
     {
-        return "Add a store derivation";
+        return "add a store derivation";
     }
 
     std::string doc() override

@@ -316,7 +316,7 @@ nixComponents.callPackage (
               pkgs.buildPackages.gnused
               modular.pre-commit.settings.package
               (pkgs.writeScriptBin "pre-commit-hooks-install" modular.pre-commit.settings.installationScript)
-              pkgs.buildPackages.nixfmt-rfc-style
+              pkgs.buildPackages.nixfmt
               pkgs.buildPackages.shellcheck
               pkgs.buildPackages.include-what-you-use
             ]
@@ -324,7 +324,7 @@ nixComponents.callPackage (
             ++ lib.optional (stdenv.cc.isClang && stdenv.hostPlatform == stdenv.buildPlatform) (
               lib.hiPrio pkgs.buildPackages.clang-tools
             )
-            ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold-wrapped;
+            ++ lib.optional stdenv.hostPlatform.isLinux pkgs.buildPackages.mold;
         in
         # FIXME: separateDebugInfo = false doesn't actually prevent -Wa,--compress-debug-sections
         # from making its way into NIX_CFLAGS_COMPILE.

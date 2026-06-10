@@ -6,6 +6,8 @@ mkDerivation {
   name = "nested-sandboxing";
   busybox = builtins.getEnv "busybox";
   EXTRA_SANDBOX = builtins.getEnv "EXTRA_SANDBOX";
+  TEST_SUITE_NAME = builtins.getEnv "TEST_SUITE_NAME";
+  TEST_NAME = builtins.getEnv "TEST_NAME";
   buildCommand = ''
     set -x
     set -eu -o pipefail

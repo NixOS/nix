@@ -19,11 +19,11 @@ nix-build dependencies.nix --no-out-link --compress-build-log
 [ "$(nix-store -l "$path")" = FOO ]
 
 # test whether empty logs work fine with `nix log`.
-builder="$(realpath "$(mktemp)")"
+builder=$TEST_ROOT/builder
 echo -e "#!/bin/sh\nmkdir \$out" > "$builder"
 outp="$(nix-build -E \
     'with import '"${config_nix}"'; mkDerivation { name = "fnord"; builder = '"$builder"'; }' \
-    --out-link "$(mktemp -d)/result")"
+    --out-link "$TEST_ROOT/result")"
 
 test -d "$outp"
 

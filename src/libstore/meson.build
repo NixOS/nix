@@ -29,8 +29,7 @@ subdir('nix-meson-build-support/default-system-cpu')
 configdata_pub.set_quoted(
   'NIX_LOCAL_SYSTEM',
   nix_system_cpu + '-' + host_machine.system(),
-  description : 'This is the system name Nix expects for local running instance of Nix.\n\n'
-    + 'See the "system" setting for additional details',
+  description : 'This is the system name Nix expects for local running instance of Nix.\n\n' + 'See the "system" setting for additional details',
 )
 
 deps_private_maybe_subproject = []
@@ -84,9 +83,11 @@ if host_machine.system() == 'linux'
   configdata_priv.set('HAVE_LANDLOCK', has_landlock.to_int())
 endif
 
-has_acl_support = cxx.has_header('sys/xattr.h') \
-  and cxx.has_function('llistxattr') \
-  and cxx.has_function('lremovexattr')
+has_acl_support = cxx.has_header('sys/xattr.h') and cxx.has_function(
+  'llistxattr',
+) and cxx.has_function(
+  'lremovexattr',
+)
 # Used in public header. Affects ABI!
 configdata_pub.set(
   'NIX_SUPPORT_ACL',

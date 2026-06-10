@@ -9,7 +9,11 @@ with import ./config.nix;
 
     buildCommand = ''
       echo "slow: Started" >&2
-      echo slow-ready > /sync-fifo/fifo || echo "slow: No sync fifo, continuing" >&2
+      if [[ -p /sync-fifo/fifo ]]; then
+        echo slow-ready > /sync-fifo/fifo
+      else
+        echo "slow: No sync fifo, continuing" >&2
+      fi
       echo "slow: Entering infinite loop" >&2
       while true ; do echo -n .; done
     '';

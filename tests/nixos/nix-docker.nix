@@ -46,7 +46,7 @@ in
           pkgs.stdenv
           pkgs.hello
         ];
-        services.harmonia.enable = true;
+        services.harmonia.cache.enable = true;
         networking.firewall.allowedTCPPorts = [ 5000 ];
       };
   };
@@ -54,7 +54,7 @@ in
   testScript =
     { nodes }:
     ''
-      cache.wait_for_unit("harmonia.service")
+      cache.wait_for_unit("harmonia.socket")
       cache.wait_for_unit("network-addresses-eth1.service")
 
       machine.succeed("mkdir -p /etc/containers")

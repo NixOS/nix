@@ -36,7 +36,7 @@ throw "error"
 EOF
 
 # Test the completion of a subcommand
-[[ "$(NIX_GET_COMPLETIONS=1 nix buil)" == $'normal\nbuild\t\nbuild-trace\t' ]]
+[[ "$(NIX_GET_COMPLETIONS=1 nix buil)" == $'normal\nbuild\t' ]]
 [[ "$(NIX_GET_COMPLETIONS=2 nix flake metad)" == $'normal\nmetadata\t' ]]
 
 # Filename completion

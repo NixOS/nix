@@ -407,13 +407,16 @@ void createOutLinks(const std::filesystem::path & outLink, const BuiltPaths & bu
 struct MixOutLinkBase : virtual Args
 {
     /** Prefix for any output symlinks. Empty means do not write an output symlink. */
-    std::filesystem::path outLink;
+    std::optional<std::filesystem::path> outLink = std::nullopt;
 
-    MixOutLinkBase(const std::string & defaultOutLink)
+    MixOutLinkBase(const std::optional<std::filesystem::path> & defaultOutLink)
         : outLink(defaultOutLink)
     {
     }
 
+    /** underlying function */
+    void createOutLinksMaybe(const BuiltPaths & paths, ref<Store> & store);
+    /** smaller wrapper for convenience (historically this was the only one) */
     void createOutLinksMaybe(const std::vector<BuiltPathWithResult> & buildables, ref<Store> & store);
 };
 
@@ -435,9 +438,25 @@ struct MixOutLinkByDefault : MixOutLinkBase, virtual Args
         addFlag({
             .longName = "no-link",
             .description = "Do not create symlinks to the build results.",
-            .handler = {&outLink, std::filesystem::path{}},
+            .handler = {[&] { outLink = std::nullopt; }},
         });
     }
+};
+
+struct MixPrintOutPaths : virtual Args
+{
+    bool printOutputPaths = false;
+
+    MixPrintOutPaths()
+    {
+        addFlag({
+            .longName = "print-out-paths",
+            .description = "Print the resulting output paths",
+            .handler = {&printOutputPaths, true},
+        });
+    }
+
+    void printOutPathsMaybe(const BuiltPaths & paths, ref<Store> store);
 };
 
 } // namespace nix
