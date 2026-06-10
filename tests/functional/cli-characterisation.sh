@@ -30,7 +30,7 @@ normalize() {
 
 diffAndAccept() {
     local testName="$1"
-    local got="cli-characterisation/$testName.$2"
+    local got="$TEST_ROOT/$testName.$2"
     local expected="cli-characterisation/$testName.$3"
     diffAndAcceptInner "$testName" "$got" "$expected"
 }
@@ -53,10 +53,10 @@ for cmdFile in cli-characterisation/*.cmd; do
     if
         # shellcheck disable=SC2086 # word splitting of cmd is intended
         expect "$expectedExit" $cmd \
-            1> "cli-characterisation/$testName.out" \
-            2> "cli-characterisation/$testName.err"
+            1> "$TEST_ROOT/$testName.out" \
+            2> "$TEST_ROOT/$testName.err"
     then
-        normalize "cli-characterisation/$testName.out" "cli-characterisation/$testName.err"
+        normalize "$TEST_ROOT/$testName.out" "$TEST_ROOT/$testName.err"
         diffAndAccept "$testName" out out.exp
         diffAndAccept "$testName" err err.exp
     else
@@ -74,10 +74,10 @@ testName=nix-build-multi-output
 echo "testing $testName"
 if
     expect 1 nix-build "$drvPath!out,bin" \
-        1> "cli-characterisation/$testName.out" \
-        2> "cli-characterisation/$testName.err"
+        1> "$TEST_ROOT/$testName.out" \
+        2> "$TEST_ROOT/$testName.err"
 then
-    normalize "cli-characterisation/$testName.out" "cli-characterisation/$testName.err"
+    normalize "$TEST_ROOT/$testName.out" "$TEST_ROOT/$testName.err"
     diffAndAccept "$testName" out out.exp
     diffAndAccept "$testName" err err.exp
 else
@@ -90,10 +90,10 @@ testName=nix-build-bad-output
 echo "testing $testName"
 if
     expect 1 nix-build "$drvPath!nonexistent" \
-        1> "cli-characterisation/$testName.out" \
-        2> "cli-characterisation/$testName.err"
+        1> "$TEST_ROOT/$testName.out" \
+        2> "$TEST_ROOT/$testName.err"
 then
-    normalize "cli-characterisation/$testName.out" "cli-characterisation/$testName.err"
+    normalize "$TEST_ROOT/$testName.out" "$TEST_ROOT/$testName.err"
     diffAndAccept "$testName" out out.exp
     diffAndAccept "$testName" err err.exp
 else
