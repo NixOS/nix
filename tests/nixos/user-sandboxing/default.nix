@@ -75,7 +75,6 @@ in
         create-hello-world
         pkgs.socat
       ];
-      boot.kernelPackages = pkgs.linuxPackages_latest;
       users.users.alice = {
         isNormalUser = true;
       };
