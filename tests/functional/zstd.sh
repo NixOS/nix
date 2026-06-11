@@ -4,9 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-clearCache
-
 cacheURI="file://$cacheDir?compression=zstd"
 
 outPath=$(nix-build dependencies.nix --no-out-link)

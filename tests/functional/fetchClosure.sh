@@ -6,9 +6,6 @@ enableFeatures "fetch-closure"
 
 TODO_NixOS
 
-clearStore
-clearCacheCache
-
 # Old daemons don't properly zero out the self-references when
 # calculating the CA hashes, so this breaks `nix store
 # make-content-addressed` which expects the client and the daemon to

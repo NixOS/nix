@@ -4,15 +4,11 @@ source common.sh
 
 requireGit
 
-clearStoreIfPossible
-
 # Intentionally not in a canonical form
 # See https://github.com/NixOS/nix/issues/6195
 repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
-
-rm -rf "${repo}"-tmp "$TEST_HOME"/.cache/nix "$TEST_ROOT"/worktree "$TEST_ROOT"/minimal
 
 createGitRepo "$repo"
 

@@ -4,9 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-clearProfiles
-
 enableFeatures "ca-derivations"
 restartDaemon
 

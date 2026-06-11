@@ -6,8 +6,6 @@ needLocalStore "the sandbox only runs on the builder side, so it makes no sense 
 
 TODO_NixOS
 
-clearStore
-
 requireSandboxSupport
 requiresUnprivilegedUserNamespaces
 
@@ -18,9 +16,6 @@ requiresUnprivilegedUserNamespaces
 if [[ ! $SHELL =~ /nix/store ]]; then skipTest "Shell is not from Nix store"; fi
 # An alias to automatically bind-mount the $SHELL on nix-build invocations
 nix-sandbox-build () { nix-build --no-out-link --sandbox-paths /nix/store "$@"; }
-
-chmod -R u+w "$TEST_ROOT"/store0 || true
-rm -rf "$TEST_ROOT"/store0
 
 export NIX_STORE_DIR=/my/store
 export NIX_REMOTE=$TEST_ROOT/store0

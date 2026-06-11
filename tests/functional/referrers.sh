@@ -6,8 +6,6 @@ needLocalStore "uses some low-level store manipulations that aren’t available 
 
 TODO_NixOS
 
-clearStore
-
 max=500
 
 reference=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bla

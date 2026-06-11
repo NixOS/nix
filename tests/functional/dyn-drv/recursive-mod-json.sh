@@ -9,10 +9,6 @@ export NIX_TESTS_CA_BY_DEFAULT=1
 enableFeatures 'recursive-nix'
 restartDaemon
 
-clearStore
-
-rm -f "$TEST_ROOT"/result
-
 EXTRA_PATH=$(dirname "$(type -p nix)"):$(dirname "$(type -p jq)")
 export EXTRA_PATH
 

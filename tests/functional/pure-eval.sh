@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 nix eval --expr 'assert 1 + 2 == 3; true'
 
 [[ $(nix eval --impure --expr 'builtins.readFile ./pure-eval.sh') =~ clearStore ]]

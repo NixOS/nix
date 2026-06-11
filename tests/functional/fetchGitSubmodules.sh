@@ -2,16 +2,10 @@
 
 source common.sh
 
-set -u
-
 requireGit
-
-clearStoreIfPossible
 
 rootRepo=$TEST_ROOT/gitSubmodulesRoot
 subRepo=$TEST_ROOT/gitSubmodulesSub
-
-rm -rf "${rootRepo}" "${subRepo}" "$TEST_HOME"/.cache/nix
 
 # Submodules can't be fetched locally by default, which can cause
 # information leakage vulnerabilities, but for these tests our

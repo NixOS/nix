@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 outPath=$(nix-build dependencies.nix --no-out-link)
 
 nix-store --export "$outPath" > "$TEST_ROOT"/exp

@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 testStdinHeredoc=$(nix eval -f - <<EOF
 {
   bar = 3 + 1;
