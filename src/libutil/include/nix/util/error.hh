@@ -19,13 +19,16 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/config.hh"
+#include "nix/util/eval-context.hh"
 
 #include <concepts>
 #include <cstring>
+#include <functional>
 #include <list>
 #include <memory>
 #include <optional>
 #include <utility>
+#include <vector>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -98,12 +101,62 @@ struct ErrorInfo
      */
     unsigned int status = 1;
 
+    /**
+     * High-level description of what evaluation was being performed,
+     * e.g. "evaluation of installable nixpkgs#hello" or
+     * "evaluation of \u00abstring\u00bb". Set automatically from the
+     * thread-local EvalContextGuard when a BaseError is constructed.
+     */
+    std::optional<std::string> evalContext;
+
     Suggestions suggestions;
 
     static std::optional<std::string> programName;
 };
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
+
+/**
+ * Structured representation of a trace display decision.
+ * Separates the algorithm (which traces to show, skip, deduplicate)
+ * from the rendering (formatting to a stream).
+ */
+struct TraceEvent
+{
+    enum Kind
+    {
+        /** A trace frame to be printed. */
+        Print,
+        /** A chunk of duplicate frames was omitted. */
+        DuplicatesOmitted,
+        /** The trace was truncated (show-trace not enabled). */
+        Truncated,
+    };
+
+    Kind kind;
+
+    /** For Print: pointer to the trace to display. */
+    const Trace * trace = nullptr;
+
+    /** For DuplicatesOmitted: how many frames were omitted. */
+    size_t count = 0;
+};
+
+/**
+ * Compute the structured list of trace display events from a trace list.
+ *
+ * This encodes the truncation, deduplication, and TracePrint::Always logic
+ * without any rendering, making it independently testable.
+ *
+ * @param traces The list of traces (innermost first).
+ * @param showTrace Whether --show-trace is enabled.
+ * @param hasPos A predicate that returns true if a trace has a displayable position.
+ *        In production this checks `pos && *pos`, but tests can supply a custom predicate.
+ */
+std::vector<TraceEvent> computeTraceDisplay(
+    const std::list<Trace> & traces,
+    bool showTrace,
+    std::function<bool(const Trace &)> hasPos = {});
 
 /**
  * BaseError should generally not be caught, as it has Interrupted as
@@ -136,33 +189,41 @@ public:
     BaseError(unsigned int status, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .status = status}
     {
+        err.evalContext = currentEvalContext();
     }
 
     template<typename... Args>
     explicit BaseError(const std::string & fs, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(fs, std::forward<Args>(args)...), .pos = {}}
     {
+        err.evalContext = currentEvalContext();
     }
 
     template<typename... Args>
     BaseError(const Suggestions & sug, Args &&... args)
         : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .suggestions = sug}
     {
+        err.evalContext = currentEvalContext();
     }
 
     BaseError(HintFmt hint)
         : err{.level = lvlError, .msg = hint, .pos = {}}
     {
+        err.evalContext = currentEvalContext();
     }
 
     BaseError(ErrorInfo && e)
         : err(std::move(e))
     {
+        if (!err.evalContext)
+            err.evalContext = currentEvalContext();
     }
 
     BaseError(const ErrorInfo & e)
         : err(e)
     {
+        if (!err.evalContext)
+            err.evalContext = currentEvalContext();
     }
 
     /** The error message without "error: " prefixed to it. */

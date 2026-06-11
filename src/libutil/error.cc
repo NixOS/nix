@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/signals.hh"
@@ -60,6 +61,29 @@ bool BaseError::hasPos() const
 }
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;
+
+static thread_local std::optional<std::string> evalContextStr;
+
+const std::optional<std::string> & currentEvalContext()
+{
+    return evalContextStr;
+}
+
+EvalContextGuard::EvalContextGuard(std::string context)
+    : previous(evalContextStr)
+    , didSet(!evalContextStr.has_value())
+{
+    // Only the outermost guard sets the context — inner guards are no-ops.
+    if (didSet)
+        evalContextStr = std::move(context);
+}
+
+EvalContextGuard::~EvalContextGuard()
+{
+    // Always restore, so the context is unset once the outermost guard is destroyed.
+    if (didSet)
+        evalContextStr = std::move(previous);
+}
 
 std::ostream & operator<<(std::ostream & os, const HintFmt & hf)
 {
@@ -226,6 +250,104 @@ void printSkippedTracesMaybe(
     skippedTraces.clear();
 }
 
+std::vector<TraceEvent> computeTraceDisplay(
+    const std::list<Trace> & traces,
+    bool showTrace,
+    std::function<bool(const Trace &)> hasPos)
+{
+    if (!hasPos)
+        hasPos = [](const Trace & t) { return t.pos && *t.pos; };
+
+    std::vector<TraceEvent> events;
+    std::set<Trace> tracesSeen;
+    std::vector<const Trace *> skippedTraces;
+    bool truncate = false;
+
+    auto flushSkipped = [&]() {
+        if (skippedTraces.empty())
+            return;
+        if (skippedTraces.size() <= 5) {
+            for (auto * t : skippedTraces) {
+                events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = t});
+            }
+        } else {
+            events.push_back(TraceEvent{.kind = TraceEvent::DuplicatesOmitted, .count = skippedTraces.size()});
+            tracesSeen.clear();
+        }
+        skippedTraces.clear();
+    };
+
+    // When not showing the full trace, we truncate outer (earlier) frames
+    // and keep the inner (later) frames closest to the error. This way the
+    // output reads bottom-up: error message at the end, innermost context
+    // just above, and the truncation message at the top.
+    //
+    // To decide where to truncate, we walk the list from the inner end
+    // (back) and count how many positioned traces we'd keep. The first
+    // trace that would exceed the limit marks the truncation boundary.
+    size_t keepFrom = 0; // index in the trace list from which we start keeping
+    if (!showTrace) {
+        // Collect non-empty traces to index them
+        std::vector<const Trace *> nonEmpty;
+        for (const auto & trace : traces) {
+            if (!trace.hint.str().empty())
+                nonEmpty.push_back(&trace);
+        }
+
+        // Walk from the inner end to find the cutoff
+        size_t count = 0;
+        size_t cutoff = 0; // how many traces from the end we keep
+        for (size_t i = nonEmpty.size(); i > 0; i--) {
+            auto * t = nonEmpty[i - 1];
+            if (t->print == TracePrint::Always) {
+                cutoff = nonEmpty.size() - (i - 1);
+                continue;
+            }
+            if (hasPos(*t))
+                count++;
+            if (count > 3) {
+                truncate = true;
+                break;
+            }
+            cutoff = nonEmpty.size() - (i - 1);
+        }
+
+        if (truncate) {
+            keepFrom = nonEmpty.size() - cutoff;
+        }
+    }
+
+    if (truncate) {
+        events.push_back(TraceEvent{.kind = TraceEvent::Truncated});
+    }
+
+    // Now emit the kept traces, handling deduplication
+    size_t idx = 0;
+    for (const auto & trace : traces) {
+        if (trace.hint.str().empty())
+            continue;
+
+        bool keep = !truncate || idx >= keepFrom || trace.print == TracePrint::Always;
+        idx++;
+
+        if (keep) {
+            if (tracesSeen.count(trace)) {
+                skippedTraces.push_back(&trace);
+                continue;
+            }
+
+            flushSkipped();
+            tracesSeen.insert(trace);
+
+            events.push_back(TraceEvent{.kind = TraceEvent::Print, .trace = &trace});
+        }
+    }
+
+    flushSkipped();
+
+    return events;
+}
+
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace)
 {
     std::string prefix;
@@ -376,46 +498,44 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
     auto ellipsisIndent = "  ";
 
     if (!einfo.traces.empty()) {
-        // Stack traces seen since we last printed a chunk of `duplicate frames
-        // omitted`.
-        std::set<Trace> tracesSeen;
-        // A consecutive sequence of stack traces that are all in `tracesSeen`.
-        std::vector<Trace> skippedTraces;
-        size_t count = 0;
-        bool truncate = false;
+        auto events = computeTraceDisplay(einfo.traces, showTrace, [](const Trace & t) {
+            return t.pos && *t.pos;
+        });
 
-        for (const auto & trace : einfo.traces) {
-            if (trace.hint.str().empty())
-                continue;
-
-            if (!showTrace && count > 3) {
-                truncate = true;
-            }
-
-            if (!truncate || trace.print == TracePrint::Always) {
-
-                if (tracesSeen.count(trace)) {
-                    skippedTraces.push_back(trace);
-                    continue;
+        // Use evalContext if available, otherwise fall back to the outermost
+        // trace hint. This provides a high-level summary on the "error:" line,
+        // e.g. "error: during evaluation of installable nixpkgs#hello"
+        if (einfo.evalContext) {
+            oss << *einfo.evalContext << "\n";
+        } else {
+            for (const auto & trace : einfo.traces) {
+                if (!trace.hint.str().empty()) {
+                    oss << trace.hint.str();
+                    if (trace.pos && *trace.pos)
+                        oss << ", " ANSI_BLUE "at " ANSI_WARNING << *trace.pos << ANSI_NORMAL;
+                    oss << "\n";
+                    break;
                 }
-
-                tracesSeen.insert(trace);
-
-                printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-                count++;
-
-                printTrace(oss, ellipsisIndent, count, trace);
             }
         }
 
-        printSkippedTracesMaybe(oss, ellipsisIndent, count, skippedTraces, tracesSeen);
-
-        if (truncate) {
-            oss << "\n"
-                << ANSI_WARNING
-                "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
-                << "\n";
+        size_t count = 0;
+        for (const auto & event : events) {
+            switch (event.kind) {
+            case TraceEvent::Print:
+                printTrace(oss, ellipsisIndent, count, *event.trace);
+                break;
+            case TraceEvent::DuplicatesOmitted:
+                oss << "\n"
+                    << ANSI_WARNING "(" << event.count << " duplicate frames omitted)" ANSI_NORMAL << "\n";
+                break;
+            case TraceEvent::Truncated:
+                oss << "\n"
+                    << ANSI_WARNING
+                    "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
+                    << "\n\n";
+                break;
+            }
         }
 
         oss << "\n" << prefix;

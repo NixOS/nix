@@ -38,6 +38,7 @@ headers = [ config_pub_h ] + files(
   'english.hh',
   'environment-variables.hh',
   'error.hh',
+  'eval-context.hh',
   'exec.hh',
   'executable-path.hh',
   'exit.hh',

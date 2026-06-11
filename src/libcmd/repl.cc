@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "nix/util/error.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/cmd/repl-interacter.hh"
 #include "nix/cmd/repl.hh"
 
@@ -701,6 +702,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
 
 void NixRepl::loadFile(const std::filesystem::path & path)
 {
+    EvalContextGuard ctx(fmt("during loading of '%s'", path.string()));
     Value v, v2;
     state->evalFile(lookupFileArg(*state, path.string()), v);
     state->autoCallFunction(*autoArgs, v, v2);
@@ -915,6 +917,7 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
 
 void NixRepl::evalString(std::string s, Value & v)
 {
+    EvalContextGuard ctx(fmt("during evaluation of REPL expression '%s'", s));
     Expr * e = parseString(s);
     e->eval(*state, *env, v);
     state->forceValue(v, v.determinePos(noPos));

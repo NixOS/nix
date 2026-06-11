@@ -1,4 +1,5 @@
 #include "nix/cmd/command-installable-value.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
@@ -59,6 +60,12 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
 
     void run(ref<Store> store, ref<InstallableValue> installable) override
     {
+        auto what = installable->what();
+        EvalContextGuard ctx(
+            expr ? fmt("during evaluation of expression '%s'", *expr)
+            : what.empty() ? "during evaluation"
+            : fmt("during evaluation of '%s'", what));
+
         if (raw && json)
             throw UsageError("--raw and --json are mutually exclusive");
 

@@ -1,4 +1,5 @@
 #include "nix/store/globals.hh"
+#include "nix/util/eval-context.hh"
 #include "nix/expr/print-ambiguous.hh"
 #include "nix/main/shared.hh"
 #include "nix/expr/eval.hh"
@@ -40,6 +41,7 @@ void processExpr(
     }
 
     Value vRoot;
+    EvalContextGuard ctx("during nix-instantiate evaluation");
     state.eval(e, vRoot);
 
     for (auto & i : attrPaths) {
