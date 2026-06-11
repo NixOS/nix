@@ -2,14 +2,8 @@
 
 source common.sh
 
-rm -rf "$TEST_ROOT/filterin"
-mkdir "$TEST_ROOT/filterin"
-mkdir "$TEST_ROOT/filterin/foo"
-touch "$TEST_ROOT/filterin/foo/bar"
-touch "$TEST_ROOT/filterin/xyzzy"
-touch "$TEST_ROOT/filterin/b"
-touch "$TEST_ROOT/filterin/bak"
-touch "$TEST_ROOT"/filterin/bla.c.bak
+mkdir -p "$TEST_ROOT/filterin/foo"
+touch "$TEST_ROOT"/filterin/{foo/bar,xyzzy,b,bak,bla.c.bak}
 ln -s xyzzy "$TEST_ROOT/filterin/link"
 
 checkFilter() {

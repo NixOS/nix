@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 cd "$TEST_ROOT"
 
 test_fetch_file () {

@@ -5,10 +5,6 @@ source common.sh
 # https://github.com/NixOS/nix/pull/14189
 requireDaemonNewerThan "2.33"
 
-clearStoreIfPossible
-
-rm -f "$TEST_ROOT"/result
-
 nix-build structured-attrs.nix -A all -o "$TEST_ROOT"/result
 
 [[ $(cat "$TEST_ROOT"/result/foo) = bar ]]

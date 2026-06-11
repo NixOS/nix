@@ -8,8 +8,6 @@ TODO_NixOS
 
 needLocalStore "the GC test needs a synchronisation point"
 
-clearStore
-
 # This FIFO is read just after the global GC lock has been acquired,
 # but before the root server is started.
 fifo1=$TEST_ROOT/test2.fifo

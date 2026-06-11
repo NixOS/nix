@@ -6,13 +6,9 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 # Intentionally not in a canonical form
 # See https://github.com/NixOS/nix/issues/6195
 repo=$TEST_ROOT/./hg
-
-rm -rf "$repo" "${repo}"-tmp "$TEST_HOME"/.cache/nix
 
 hg init "$repo"
 {

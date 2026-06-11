@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStoreIfPossible
-
 rm -f "$TEST_ROOT"/result*
 
 # Placeholder strings are opaque, so cannot do this check for floating

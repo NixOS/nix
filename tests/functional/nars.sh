@@ -2,12 +2,7 @@
 
 source common.sh
 
-TODO_NixOS
-
-clearStore
-
 # Check that NARs with duplicate directory entries are rejected.
-rm -rf "$TEST_ROOT/out"
 expectStderr 1 nix-store --restore "$TEST_ROOT/out" < duplicate.nar | grepQuiet "NAR directory is not sorted"
 
 # Check that nix-store --restore fails if the output already exists.

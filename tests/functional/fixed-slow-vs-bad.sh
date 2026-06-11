@@ -7,8 +7,6 @@ requireSandboxSupport
 # Requires bug fix for daemon
 requireDaemonNewerThan "2.35.0pre20260518"
 
-clearStoreIfPossible
-
 # See https://github.com/NixOS/nix/issues/15846
 #
 # `slow` is a fixed-output derivation that never finishes (which simulates a

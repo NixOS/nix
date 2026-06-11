@@ -2,8 +2,6 @@
 
 source common.sh
 
-set -o pipefail
-
 source characterisation/framework.sh
 
 # specialize function a bit

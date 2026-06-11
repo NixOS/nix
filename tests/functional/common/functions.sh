@@ -54,7 +54,7 @@ doClearStore() {
     clearProfiles
 }
 
-clearCache() {
+clearBinaryCache() {
     rm -rf "${cacheDir?}"
 }
 

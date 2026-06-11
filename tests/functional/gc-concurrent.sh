@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 lockFifo1=$TEST_ROOT/test1.fifo
 mkfifo "$lockFifo1"
 

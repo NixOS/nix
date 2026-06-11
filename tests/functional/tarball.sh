@@ -2,12 +2,7 @@
 
 source common.sh
 
-clearStoreIfPossible
-
-rm -rf "$TEST_HOME"
-
 tarroot=$TEST_ROOT/tarball
-rm -rf "$tarroot"
 mkdir -p "$tarroot"
 cp dependencies.nix "$tarroot/default.nix"
 cp "${config_nix}" dependencies.builder*.sh "$tarroot/"
@@ -83,7 +78,6 @@ json=$(nix flake prefetch --json "tarball+file://$(pwd)/tree.tar.gz" --out-link 
 [[ $(cat "$TEST_ROOT/result/fnord") = bar ]]
 
 # Test a tarball that has multiple top-level directories.
-rm -rf "$TEST_ROOT/tar_root"
 mkdir -p "$TEST_ROOT/tar_root" "$TEST_ROOT/tar_root/foo" "$TEST_ROOT/tar_root/bar"
 tar cvf "$TEST_ROOT/tar.tar" -C "$TEST_ROOT/tar_root" .
 path="$(nix flake prefetch --json "tarball+file://$TEST_ROOT/tar.tar" | jq -r .storePath)"

@@ -6,9 +6,6 @@ source nix-copy-ssh-common.sh "ssh-ng"
 
 TODO_NixOS
 
-clearStore
-clearRemoteStore
-
 outPath=$(nix-build --no-out-link dependencies.nix)
 
 nix store info --store "$remoteStore"

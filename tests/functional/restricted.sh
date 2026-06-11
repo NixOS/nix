@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 nix-instantiate --restrict-eval --eval -E '1 + 2'
 (! nix-instantiate --eval --restrict-eval ./restricted.nix)
 TMPFILE=$(mktemp -p "$TEST_ROOT"); echo '1 + 2' >"$TMPFILE"; (! nix-instantiate --eval --restrict-eval "$TMPFILE");

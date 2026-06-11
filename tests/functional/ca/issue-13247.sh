@@ -6,8 +6,6 @@ export NIX_TESTS_CA_BY_DEFAULT=1
 
 source common.sh
 
-clearStoreIfPossible
-
 set -x
 
 # Build derivation (both outputs)

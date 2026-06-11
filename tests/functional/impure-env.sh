@@ -17,7 +17,6 @@ varTest() {
     clearStore
 }
 
-clearStore
 startDaemon
 
 varTest env_name value --impure-env env_name=value

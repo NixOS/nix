@@ -7,8 +7,6 @@
 
 source common.sh
 
-set -o pipefail
-
 skipTest "Too memory intensive for CI. Attempt to reduce memory usage was unsuccessful, because it made detection of the bug unreliable."
 
 # Regression test for #11141. The stack pointer corrector assigned the base

@@ -7,10 +7,6 @@ echo "testing nix-build -j..."
 
 TODO_NixOS
 
-clearStore
-
-rm -f "$_NIX_TEST_SHARED".cur "$_NIX_TEST_SHARED".max
-
 outPath=$(nix-build -j10000 parallel.nix --no-out-link)
 
 echo "output path is $outPath"

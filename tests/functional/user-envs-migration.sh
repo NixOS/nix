@@ -15,10 +15,6 @@ unset NIX_REMOTE
 
 TODO_NixOS
 
-clearStore
-clearProfiles
-rm -rf ~/.nix-profile
-
 # Fill the environment using the older Nix
 PATH_WITH_NEW_NIX="$PATH"
 export PATH="$NIX_DAEMON_PACKAGE/bin:$PATH"
