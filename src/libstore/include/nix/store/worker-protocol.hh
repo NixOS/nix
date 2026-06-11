@@ -136,6 +136,12 @@ struct WorkerProto
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
     /**
+     * Feature for derivation-meta support: the daemon understands
+     * __meta extraction and output hash computation without meta.
+     */
+    static constexpr std::string_view featureDerivationMeta = "derivation-meta";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */

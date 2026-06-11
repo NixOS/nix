@@ -807,6 +807,12 @@ unsigned int RemoteStore::getProtocol()
     return conn->protoVersion.number.toWire();
 }
 
+bool RemoteStore::hasProtoFeature(std::string_view feature)
+{
+    auto conn(connections->get());
+    return conn->protoVersion.features.contains(feature);
+}
+
 std::optional<TrustedFlag> RemoteStore::isTrustedClient()
 {
     auto conn(getConnection());

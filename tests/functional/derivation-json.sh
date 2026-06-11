@@ -21,3 +21,12 @@ jq '.name = "foo"' < "$TEST_HOME/simple.json" | expectStderr 1 nix derivation ad
 # deferred and fill in the right input address for us.
 drvPath3=$(jq '.outputs |= map_values(del(.path))' < "$TEST_HOME/simple.json" | nix derivation add)
 [[ "$drvPath" = "$drvPath3" ]]
+
+# Test backward compatibility: JSON without 'meta' field should still be ingestible
+drvPath4=$(jq 'del(.meta)' < "$TEST_HOME/simple.json" | nix derivation add)
+[[ "$drvPath" = "$drvPath4" ]]
+
+# Test that ingesting derivation with 'meta' field requires experimental feature
+jq '.meta = {"description": "test"} | .structuredAttrs = {"requiredSystemFeatures": ["derivation-meta"]}' < "$TEST_HOME/simple.json" \
+    | expectStderr 1 nix derivation add --experimental-features nix-command \
+    | grepQuiet "experimental Nix feature 'derivation-meta' is disabled"

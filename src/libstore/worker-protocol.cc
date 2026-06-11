@@ -25,10 +25,9 @@ const WorkerProto::Version WorkerProto::latest = {
         },
     .features =
         {
-            std::string{
-                WorkerProto::featureRealisationWithPath,
-            },
+            std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+            std::string{WorkerProto::featureDerivationMeta},
         },
 };
 

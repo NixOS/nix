@@ -183,6 +183,17 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
             return pathS;
     };
 
+    if (parsed) {
+        auto & structuredAttrs = parsed->structuredAttrs;
+
+        /* After extractMeta, __meta should not remain in structuredAttrs.
+           If it does, the derivation has __meta without opting into
+           derivation-meta via requiredSystemFeatures. */
+        if (structuredAttrs.contains("__meta")) {
+            throw Error("derivation has '__meta' attribute but does not require 'derivation-meta' system feature");
+        }
+    }
+
     if (shouldWarn && parsed) {
         auto & structuredAttrs = parsed->structuredAttrs;
 
@@ -366,6 +377,8 @@ StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivat
         res.insert(i);
     if (!drv.type().hasKnownOutputPaths())
         res.insert("ca-derivations");
+    if (drv.meta.has_value())
+        res.insert("derivation-meta");
     return res;
 }
 

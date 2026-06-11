@@ -527,7 +527,7 @@ Hash adl_serializer<Hash>::from_json(const json & json, const ExperimentalFeatur
     return Hash::parseSRI(s, xpSettings);
 }
 
-void adl_serializer<Hash>::to_json(json & json, const Hash & hash)
+void adl_serializer<Hash>::to_json(json & json, const Hash & hash, const ExperimentalFeatureSettings &)
 {
     json = hash.to_string(HashFormat::SRI, true);
 }

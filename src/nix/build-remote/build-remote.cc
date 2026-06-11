@@ -21,6 +21,7 @@
 #include "nix/util/strings.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/worker-protocol.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/store/globals.hh"
@@ -310,6 +311,14 @@ static int main_build_remote(int argc, char ** argv)
         uploadLock = -1;
 
         auto drv = store->readDerivation(*drvPath);
+
+        if (drv.meta && !sshStore->hasProtoFeature(WorkerProto::featureDerivationMeta)) {
+            throw Error(
+                "derivation '%s' uses 'derivation-meta', but the store '%s' does not support this feature; "
+                "consider updating it to Nix 2.35, or disable your use of 'derivation-meta' in your derivations",
+                store->printStorePath(*drvPath),
+                sshStore->config.getHumanReadableURI());
+        }
 
         std::optional<BuildResult> optResult;
 

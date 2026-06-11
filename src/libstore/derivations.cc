@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/worker-protocol.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/common-protocol.hh"
@@ -136,6 +137,16 @@ StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv)
 
 StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
+    /* Check that the store supports derivation-meta before writing,
+       to produce a clear error instead of a confusing hash mismatch. */
+    if (drv.meta && !hasProtoFeature(WorkerProto::featureDerivationMeta)) {
+        throw Error(
+            "derivation '%s' uses 'derivation-meta', but the store '%s' does not support this feature; "
+            "consider updating it to Nix 2.35, or disable your use of 'derivation-meta' in your derivations",
+            drv.name,
+            config.getHumanReadableURI());
+    }
+
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
     /* In case the derivation is already valid, we bail out early since that's
@@ -518,6 +529,7 @@ Derivation parseDerivation(
     }
 
     expect(str, ')');
+    drv.extractMeta(xpSettings);
     return drv;
 }
 
@@ -641,7 +653,10 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 }
 
 std::string Derivation::unparse(
-    const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
+    const StoreDirConfig & store,
+    bool maskOutputs,
+    DerivedPathMap<StringSet>::ChildNode::Map * actualInputs,
+    bool includeMeta) const
 {
     std::string s;
     s.reserve(65536);
@@ -771,7 +786,30 @@ std::string Derivation::unparse(
     StructuredAttrs::checkKeyNotInUse(env);
     if (structuredAttrs) {
         StringPairs scratch = env;
-        scratch.insert(structuredAttrs->unparse());
+        if (includeMeta && meta) {
+            // Re-inject __meta and derivation-meta for the full ATerm representation.
+            // requiredSystemFeatures was validated as sorted during extraction,
+            // so inserting in sorted position reproduces the original.
+            auto fullAttrs = structuredAttrs->structuredAttrs;
+            fullAttrs["__meta"] = *meta;
+            auto rsf = nlohmann::json::array();
+            bool inserted = false;
+            if (auto it = fullAttrs.find("requiredSystemFeatures"); it != fullAttrs.end() && it->second.is_array()) {
+                for (const auto & feature : it->second) {
+                    if (!inserted && feature.get<std::string>() > "derivation-meta") {
+                        rsf.push_back("derivation-meta");
+                        inserted = true;
+                    }
+                    rsf.push_back(feature);
+                }
+            }
+            if (!inserted)
+                rsf.push_back("derivation-meta");
+            fullAttrs["requiredSystemFeatures"] = std::move(rsf);
+            scratch.insert(StructuredAttrs{.structuredAttrs = std::move(fullAttrs)}.unparse());
+        } else {
+            scratch.insert(structuredAttrs->unparse());
+        }
         unparseEnv(scratch);
     } else {
         unparseEnv(env);
@@ -897,6 +935,65 @@ static DrvHashModulo pathDerivationModulo(Store & store, const StorePath & drvPa
    don't leak the provenance of fixed outputs, reducing pointless cache
    misses as the build itself won't know this.
  */
+bool hasDerivationMetaFeature(const nlohmann::json::object_t & structuredAttrs)
+{
+    auto metaIt = structuredAttrs.find("__meta");
+    if (metaIt == structuredAttrs.end())
+        return false;
+
+    // Validate that __meta is an object
+    if (!metaIt->second.is_object())
+        return false;
+
+    if (auto it = structuredAttrs.find("requiredSystemFeatures");
+        it != structuredAttrs.end() && it->second.is_array()) {
+        for (const auto & feature : it->second) {
+            if (feature.is_string() && feature.get<std::string>() == "derivation-meta") {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+void BasicDerivation::extractMeta(const ExperimentalFeatureSettings & xpSettings)
+{
+    if (meta || !structuredAttrs)
+        return;
+
+    auto & sa = structuredAttrs->structuredAttrs;
+
+    if (!hasDerivationMetaFeature(sa))
+        return;
+
+    xpSettings.require(Xp::DerivationMeta);
+
+    // Require sorted requiredSystemFeatures so that re-injection in
+    // unparse() produces a deterministic ATerm matching the original.
+    auto & rsf = sa.at("requiredSystemFeatures");
+    for (size_t i = 1; i < rsf.size(); i++) {
+        if (rsf[i - 1].get<std::string>() >= rsf[i].get<std::string>())
+            throw Error("'requiredSystemFeatures' must be sorted when using 'derivation-meta'");
+    }
+
+    auto metaIt = sa.find("__meta");
+    meta = getObject(metaIt->second);
+    sa.erase(metaIt);
+
+    // Remove derivation-meta from requiredSystemFeatures
+    auto filtered = nlohmann::json::array();
+    for (const auto & feature : rsf) {
+        if (!(feature.is_string() && feature.get<std::string>() == "derivation-meta")) {
+            filtered.push_back(feature);
+        }
+    }
+    if (filtered.empty()) {
+        sa.erase("requiredSystemFeatures");
+    } else {
+        rsf = std::move(filtered);
+    }
+}
+
 DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs)
 {
     /* Return a fixed hash for fixed-output derivations. */
@@ -969,7 +1066,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
         }
     }
 
-    return hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2));
+    return hashString(HashAlgorithm::SHA256, drv.unparse(store, maskOutputs, &inputs2, false));
 }
 
 static DerivationOutput readDerivationOutput(Source & in, const StoreDirConfig & store)
@@ -1029,6 +1126,7 @@ Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivati
         drv.env[key] = value;
     }
     drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
+    drv.extractMeta();
 
     return in;
 }
@@ -1437,7 +1535,8 @@ namespace nlohmann {
 
 using namespace nix;
 
-void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutput & o)
+void adl_serializer<DerivationOutput>::to_json(
+    json & res, const DerivationOutput & o, const ExperimentalFeatureSettings &)
 {
     res = nlohmann::json::object();
     std::visit(
@@ -1532,14 +1631,14 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
-static void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
+void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
 {
     res = nlohmann::json::array();
     for (auto & input : inputSrcs)
         res.emplace_back(input);
 }
 
-static void basicDerivationToJson(json & res, const BasicDerivation & d)
+void basicDerivationToJson(json & res, const BasicDerivation & d, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     res = nlohmann::json::object();
 
@@ -1560,30 +1659,39 @@ static void basicDerivationToJson(json & res, const BasicDerivation & d)
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+
+    if (xpSettings.isEnabled(nix::Xp::DerivationMeta)) {
+        if (d.meta)
+            res["meta"] = *d.meta;
+        else
+            res["meta"] = nullptr;
+    }
 }
 
-void adl_serializer<BasicDerivation>::to_json(json & res, const BasicDerivation & d)
+void adl_serializer<BasicDerivation>::to_json(
+    json & res, const BasicDerivation & d, const ExperimentalFeatureSettings & xpSettings)
 {
-    basicDerivationToJson(res, d);
+    basicDerivationToJson(res, d, xpSettings);
 
     inputSrcsToJson(res["inputs"], d.inputSrcs);
 }
 
-void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
+void adl_serializer<Derivation>::to_json(
+    json & res, const Derivation & d, const ExperimentalFeatureSettings & xpSettings)
 {
-    basicDerivationToJson(res, d);
+    basicDerivationToJson(res, d, xpSettings);
 
     {
         auto & inputsObj = res["inputs"];
-        inputsObj = nlohmann::json::object();
+        inputsObj = json::object();
 
         inputSrcsToJson(inputsObj["srcs"], d.inputSrcs);
 
-        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
-            auto value = nlohmann::json::object();
+        auto doInput = [&](this const auto & doInput, const auto & inputNode) -> json {
+            auto value = json::object();
             value["outputs"] = inputNode.value;
             {
-                auto next = nlohmann::json::object();
+                auto next = json::object();
                 for (auto & [outputId, childNode] : inputNode.childMap)
                     next[outputId] = doInput(childNode);
                 value["dynamicOutputs"] = std::move(next);
@@ -1592,7 +1700,7 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
         };
 
         auto & inputDrvsObj = inputsObj["drvs"];
-        inputDrvsObj = nlohmann::json::object();
+        inputDrvsObj = json::object();
         for (auto & [inputDrv, inputNode] : d.inputDrvs.map)
             inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
     }
@@ -1641,8 +1749,17 @@ static void basicDerivationFromJson(
         throw;
     }
 
-    if (auto structuredAttrs = get(json, "structuredAttrs"))
-        res.structuredAttrs = StructuredAttrs{*structuredAttrs};
+    if (auto structuredAttrs = get(json, "structuredAttrs")) {
+        res.structuredAttrs = StructuredAttrs{getObject(*structuredAttrs)};
+    }
+
+    // Restore meta from top-level field (already extracted form)
+    if (auto metaPtr = optionalValueAt(json, "meta")) {
+        if (!metaPtr->is_null()) {
+            xpSettings.require(Xp::DerivationMeta);
+            res.meta = getObject(*metaPtr);
+        }
+    }
 }
 
 BasicDerivation
