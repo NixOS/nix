@@ -12,6 +12,8 @@ unset NIX_STORE_DIR
 
 remoteDir=$TEST_ROOT/remote
 
+echo "secret-key-files =" >> "$test_nix_conf"
+
 # Note: ssh{-ng}://localhost bypasses ssh. See tests/functional/build-remote.sh for
 # more details.
 nix-build "$file" -o "$TEST_ROOT/result" --max-jobs 0 \
