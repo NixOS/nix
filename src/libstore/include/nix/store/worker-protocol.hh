@@ -11,6 +11,7 @@ namespace nix {
 
 #define WORKER_MAGIC_1 0x6e697863
 #define WORKER_MAGIC_2 0x6478696f
+#define WORKER_MAGIC_ACCESS_DENIED 0xab9a9ff0 // = 🚫
 
 #define STDERR_NEXT 0x6f6c6d67
 #define STDERR_READ 0x64617461  // data needed from source
