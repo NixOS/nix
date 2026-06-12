@@ -488,7 +488,7 @@
                     }
                 )
               )
-              // {
+              // lib.optionalAttrs (linuxOnly -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux) {
                 "${pkgName}-static" =
                   let
                     pkgs = nixpkgsFor.${system};
