@@ -238,12 +238,15 @@ enableFeatures() {
 }
 
 onError() {
-    set +x
-    echo "$0: test failed at:" >&2
-    for ((i = 1; i < ${#BASH_SOURCE[@]}; i++)); do
-        if [[ -z ${BASH_SOURCE[i]} ]]; then break; fi
-        echo "  ${FUNCNAME[i]} in ${BASH_SOURCE[i]}:${BASH_LINENO[i-1]}" >&2
-    done
+    # Don't print the message if set +e has been explicitly set.
+    if [[ $- == *e* ]]; then
+        set +x
+        echo "$0: test failed at:" >&2
+        for ((i = 1; i < ${#BASH_SOURCE[@]}; i++)); do
+            if [[ -z ${BASH_SOURCE[i]} ]]; then break; fi
+            echo "  ${FUNCNAME[i]} in ${BASH_SOURCE[i]}:${BASH_LINENO[i-1]}" >&2
+        done
+    fi
 }
 
 # Prints an error message prefix referring to the last call into this file.
