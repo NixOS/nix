@@ -1043,6 +1043,7 @@ void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, Repai
 
     auto realPath = toRealPath(info.path);
 
+    // TODO: make repair more safe: write to a temporary location first before renaming/deleting.
     deletePath(realPath);
 
     /* Maybe free up some disk space (before writing the NAR) so that
