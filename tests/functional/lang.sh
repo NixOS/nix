@@ -2,7 +2,7 @@
 
 source common.sh
 
-source characterisation/framework.sh
+source common/characterisation/framework.sh
 
 # specialize function a bit
 function diffAndAccept() {
