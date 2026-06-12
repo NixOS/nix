@@ -83,7 +83,7 @@ public:
 
     void narFromPath(const StorePath & path, Sink & sink) override
     {
-        Store::narFromPath(path, sink);
+        RemoteStore::narFromPath(path, sink);
     }
 
     /**
