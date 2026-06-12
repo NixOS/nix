@@ -161,8 +161,11 @@ WorkerProto::Version WorkerProto::BasicClientConnection::handshake(
     to.flush();
 
     unsigned int magic = readInt(from);
-    if (magic != WORKER_MAGIC_2)
-        throw Error("nix-daemon protocol mismatch from");
+    if (magic != WORKER_MAGIC_2) {
+        if (magic == WORKER_MAGIC_ACCESS_DENIED)
+            throw Error("access denied by the Nix daemon (check the `allowed-users` setting in the daemon)");
+        throw Error("Nix daemon protocol mismatch");
+    }
     auto daemonVersion = WorkerProto::Version::Number::fromWire(readInt(from));
 
     if (daemonVersion.major != WorkerProto::latest.number.major)

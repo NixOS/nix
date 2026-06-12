@@ -110,7 +110,8 @@ void RemoteStore::initConnection(Connection & conn)
         if (ex)
             std::rethrow_exception(ex);
     } catch (Error & e) {
-        throw Error("cannot open connection to remote store '%s': %s", config.getHumanReadableURI(), e.what());
+        throw Error(
+            "cannot open connection to remote store '%s': %s", config.getHumanReadableURI(), Uncolored(e.message()));
     }
 
     setOptions(conn);
