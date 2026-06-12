@@ -762,6 +762,8 @@ struct EnsureRead : Source
     {
         try {
             finish();
+        } catch (EndOfFile &) {
+            // Ignore this, since an EOF will generally already have been encountered by the user of EnsureRead.
         } catch (...) {
             ignoreExceptionInDestructor();
         }
