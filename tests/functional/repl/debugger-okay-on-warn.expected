@@ -1,0 +1,20 @@
+evaluation warning: this is a warning hello
+Nix <nix version> debugger
+Type :? for help.
+
+nix-repl> :p fails
+error:
+       … while calling the 'throw' builtin
+         at /path/to/tests/functional/repl/debugger-okay-on-warn.in.debugexpr.nix:3:11:
+            2|   msg = "hello";
+            3|   fails = throw (toString 1);
+             |           ^
+            4|   succeeds = 1;
+
+       error: 1
+
+nix-repl> :p succeeds
+1
+
+nix-repl> :s
+1
