@@ -80,7 +80,6 @@ suites = [
       'compression-levels.sh',
       'config.sh',
       'db-migration.sh',
-      'debugger.sh',
       'delete-no-keep.sh',
       'dependencies.sh',
       'derivation-advanced-attributes.sh',

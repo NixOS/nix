@@ -1,0 +1,98 @@
+error: oh snap
+
+Nix <nix version> debugger
+Type :? for help.
+
+nix-repl> :env
+Env level 0
+static: _ 
+
+Env level 1
+static: 
+with: a 
+
+Env level 2
+static: x 
+
+Env level 3
+builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation 
+
+nix-repl> :bt
+
+0: error: oh snap
+/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:23
+
+     4| with x;
+     5| (_: builtins.seq x.a (throw "oh snap")) x.a
+      |                       ^
+     6| 
+
+1: while calling a function
+/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:23
+
+     4| with x;
+     5| (_: builtins.seq x.a (throw "oh snap")) x.a
+      |                       ^
+     6| 
+
+2: while calling a function
+/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:5
+
+     4| with x;
+     5| (_: builtins.seq x.a (throw "oh snap")) x.a
+      |     ^
+     6| 
+
+3: while calling anonymous lambda
+/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:2
+
+     4| with x;
+     5| (_: builtins.seq x.a (throw "oh snap")) x.a
+      |  ^
+     6| 
+
+4: while calling a function
+/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:1
+
+     4| with x;
+     5| (_: builtins.seq x.a (throw "oh snap")) x.a
+      | ^
+     6| 
+
+5: while evaluating a 'let' expression
+
+6: while evaluating the file '/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix':
+
+
+error:
+       … while evaluating the file '/path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix':
+
+       … from call site
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:1:
+            4| with x;
+            5| (_: builtins.seq x.a (throw "oh snap")) x.a
+             | ^
+            6|
+
+       … while calling anonymous lambda
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:2:
+            4| with x;
+            5| (_: builtins.seq x.a (throw "oh snap")) x.a
+             |  ^
+            6|
+
+       … while calling the 'seq' builtin
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:5:
+            4| with x;
+            5| (_: builtins.seq x.a (throw "oh snap")) x.a
+             |     ^
+            6|
+
+       … while calling the 'throw' builtin
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-2.in.debugexpr.nix:5:23:
+            4| with x;
+            5| (_: builtins.seq x.a (throw "oh snap")) x.a
+             |                       ^
+            6|
+
+       error: oh snap
