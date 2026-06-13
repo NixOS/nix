@@ -75,7 +75,7 @@ static NarInfo makeNarInfo(const Store & store, bool includeImpureInfo)
         };
 
         info.url = "nar/1w1fff338fvdw53sqgamddn1b2xgds473pv6y13gizdbqjv4i5p3.nar.xz";
-        info.compression = "xz";
+        info.compression = CompressionAlgo::xz;
         info.fileHash = Hash::parseSRI("sha256-FePFYIlMuycIXPZbWi7LGEiMmZSX9FMbaQenWBzm1Sc=");
         info.fileSize = 4029176;
     }

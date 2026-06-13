@@ -15,67 +15,52 @@ TEST(compress, noneMethodDoesNothingToTheInput)
     ASSERT_EQ(o, "this-is-a-test");
 }
 
+/* FIXME: Deduplicate this with a parameterised test suite? */
+
 TEST(decompress, decompressNoneCompressed)
 {
-    auto method = "none";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, str);
-
-    ASSERT_EQ(o, str);
-}
-
-TEST(decompress, decompressEmptyCompressed)
-{
-    // Empty-method decompression used e.g. by S3 store
-    // (Content-Encoding == "").
-    auto method = "";
-    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, str);
+    auto o = decompress(CompressionAlgo::none, str);
 
     ASSERT_EQ(o, str);
 }
 
 TEST(decompress, decompressXzCompressed)
 {
-    auto method = "xz";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(CompressionAlgo::xz, str));
+    auto o = decompress(CompressionAlgo::xz, compress(CompressionAlgo::xz, str));
 
     ASSERT_EQ(o, str);
 }
 
 TEST(decompress, decompressBzip2Compressed)
 {
-    auto method = "bzip2";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(CompressionAlgo::bzip2, str));
+    auto o = decompress(CompressionAlgo::bzip2, compress(CompressionAlgo::bzip2, str));
 
     ASSERT_EQ(o, str);
 }
 
 TEST(decompress, decompressBrCompressed)
 {
-    auto method = "br";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(CompressionAlgo::brotli, str));
+    auto o = decompress(CompressionAlgo::brotli, compress(CompressionAlgo::brotli, str));
 
     ASSERT_EQ(o, str);
 }
 
 TEST(decompress, decompressZstdCompressed)
 {
-    auto method = "zstd";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(CompressionAlgo::zstd, str));
+    auto o = decompress(CompressionAlgo::zstd, compress(CompressionAlgo::zstd, str));
 
     ASSERT_EQ(o, str);
 }
 
 TEST(decompress, decompressZstdCompressedParallel)
 {
-    auto method = "zstd";
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(method, compress(CompressionAlgo::zstd, str, true));
+    auto o = decompress(CompressionAlgo::zstd, compress(CompressionAlgo::zstd, str, true));
 
     ASSERT_EQ(o, str);
 }
@@ -88,7 +73,7 @@ TEST(decompress, decompressZstdMultiFrameLargeInput)
     for (size_t i = 0; i < str.size(); i += 997)
         str[i] = 'y'; // add some variation
     auto compressed = compress(CompressionAlgo::zstd, str);
-    auto o = decompress("zstd", compressed);
+    auto o = decompress(CompressionAlgo::zstd, compressed);
 
     ASSERT_EQ(o, str);
 }
@@ -99,7 +84,7 @@ TEST(compress, zstdEmptyInput)
     // Empty input should still emit a valid (empty-content) zstd
     // frame so it round-trips through the decompressor.
     ASSERT_FALSE(compressed.empty());
-    auto o = decompress("zstd", compressed);
+    auto o = decompress(CompressionAlgo::zstd, compressed);
     ASSERT_EQ(o, "");
 }
 
@@ -109,7 +94,7 @@ TEST(compress, zstdExactFrameBoundary)
     // emit a trailing zero-content frame.
     std::string str(16 * 1024 * 1024, 'z');
     auto compressed = compress(CompressionAlgo::zstd, str);
-    auto o = decompress("zstd", compressed);
+    auto o = decompress(CompressionAlgo::zstd, compressed);
     ASSERT_EQ(o, str);
 
     // Verify there is exactly one frame by checking that
@@ -121,10 +106,9 @@ TEST(compress, zstdExactFrameBoundary)
 
 TEST(decompress, decompressInvalidInputThrowsCompressionError)
 {
-    auto method = "bzip2";
     auto str = "this is a string that does not qualify as valid bzip2 data";
 
-    ASSERT_THROW(decompress(method, str), CompressionError);
+    ASSERT_THROW(decompress(CompressionAlgo::bzip2, str), CompressionError);
 }
 
 /* ----------------------------------------------------------------------------
@@ -146,7 +130,7 @@ TEST(makeCompressionSink, compressAndDecompress)
 {
     StringSink strSink;
     auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto decompressionSink = makeDecompressionSink("bzip2", strSink);
+    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
     auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
 
     (*sink)(inputString);

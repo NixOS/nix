@@ -239,6 +239,7 @@ bool SQLiteStmt::Use::next()
 std::string SQLiteStmt::Use::getStr(int col)
 {
     auto s = (const char *) sqlite3_column_text(stmt, col);
+    // FIXME: Don't crash on nulls?
     assert(s);
     return s;
 }
