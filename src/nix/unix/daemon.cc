@@ -357,6 +357,8 @@ static void daemonLoop(
                 options.runExitHandlers = true;
                 startProcess(
                     [&, storeConfig, closeListeners = std::move(closeListeners)]() {
+                        setInterrupted(false);
+
                         closeListeners();
 
                         // Background the daemon.
