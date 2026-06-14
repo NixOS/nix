@@ -15,44 +15,45 @@ TEST(compress, noneMethodDoesNothingToTheInput)
     ASSERT_EQ(o, "this-is-a-test");
 }
 
-/* FIXME: Deduplicate this with a parameterised test suite? */
+struct CompressionDecompressionTest : ::testing::WithParamInterface<CompressionAlgo>, public ::testing::Test
+{
+    static constexpr std::string_view dummyInput = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
+};
+
+TEST_P(CompressionDecompressionTest, roundtrip)
+{
+    auto o = decompress(GetParam(), compress(GetParam(), dummyInput));
+    ASSERT_EQ(o, dummyInput);
+}
+
+TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
+{
+    StringSink strSink;
+    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
+    auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
+
+    (*sink)(dummyInput);
+    sink->finish();
+    decompressionSink->finish();
+
+    ASSERT_EQ(strSink.s.c_str(), dummyInput);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    CompressionDecompression,
+    CompressionDecompressionTest,
+    ::testing::Values(
+        CompressionAlgo::none,
+        CompressionAlgo::xz,
+        CompressionAlgo::bzip2,
+        CompressionAlgo::brotli,
+        CompressionAlgo::zstd),
+    [](const ::testing::TestParamInfo<CompressionAlgo> & info) { return showCompressionAlgo(info.param); });
 
 TEST(decompress, decompressNoneCompressed)
 {
     auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
     auto o = decompress(CompressionAlgo::none, str);
-
-    ASSERT_EQ(o, str);
-}
-
-TEST(decompress, decompressXzCompressed)
-{
-    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(CompressionAlgo::xz, compress(CompressionAlgo::xz, str));
-
-    ASSERT_EQ(o, str);
-}
-
-TEST(decompress, decompressBzip2Compressed)
-{
-    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(CompressionAlgo::bzip2, compress(CompressionAlgo::bzip2, str));
-
-    ASSERT_EQ(o, str);
-}
-
-TEST(decompress, decompressBrCompressed)
-{
-    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(CompressionAlgo::brotli, compress(CompressionAlgo::brotli, str));
-
-    ASSERT_EQ(o, str);
-}
-
-TEST(decompress, decompressZstdCompressed)
-{
-    auto str = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto o = decompress(CompressionAlgo::zstd, compress(CompressionAlgo::zstd, str));
 
     ASSERT_EQ(o, str);
 }
@@ -122,20 +123,6 @@ TEST(makeCompressionSink, noneSinkDoesNothingToInput)
     auto sink = makeCompressionSink(CompressionAlgo::none, strSink);
     (*sink)(inputString);
     sink->finish();
-
-    ASSERT_STREQ(strSink.s.c_str(), inputString);
-}
-
-TEST(makeCompressionSink, compressAndDecompress)
-{
-    StringSink strSink;
-    auto inputString = "slfja;sljfklsa;jfklsjfkl;sdjfkl;sadjfkl;sdjf;lsdfjsadlf";
-    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
-    auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
-
-    (*sink)(inputString);
-    sink->finish();
-    decompressionSink->finish();
 
     ASSERT_STREQ(strSink.s.c_str(), inputString);
 }
