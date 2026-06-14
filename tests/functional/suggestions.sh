@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 cd "$TEST_HOME"
 
 cat <<EOF > flake.nix

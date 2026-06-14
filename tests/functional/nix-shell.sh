@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 if [[ -n ${NIX_TESTS_CA_BY_DEFAULT:-} ]]; then
     shellDotNix="$PWD/ca-shell.nix"
 else
@@ -244,8 +242,6 @@ diff "$TEST_ROOT"/dev-env{,2}.json
 
 # Run tests involving `source <(nix print-dev-env)` in subshells to avoid modifying the current
 # environment.
-
-set -u
 
 # Ensure `source <(nix print-dev-env)` modifies the environment.
 (

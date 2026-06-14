@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 RESULT=$TEST_ROOT/result
 
 nix-build -o "$RESULT" check-reqs.nix -A test1

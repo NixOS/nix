@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 drvPath=$(nix-instantiate dependencies.nix)
 
 echo "derivation is $drvPath"

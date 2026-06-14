@@ -6,8 +6,6 @@ needLocalStore "--repair needs a local store"
 
 TODO_NixOS
 
-clearStore
-
 path=$(nix-build dependencies.nix -o "$TEST_ROOT"/result)
 path2=$(nix-store -qR "$path" | grep input-2)
 
@@ -51,7 +49,7 @@ fi
 
 # Corrupt a path that has a substitute and check whether nix-store
 # --verify can fix it.
-clearCache
+clearBinaryCache
 
 nix copy --to file://"$cacheDir" "$path"
 

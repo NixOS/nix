@@ -7,10 +7,6 @@ TODO_NixOS # can't enable a sandbox feature easily
 enableFeatures 'recursive-nix'
 restartDaemon
 
-clearStore
-
-rm -f "$TEST_ROOT"/result
-
 unreachable=$(nix store add-path ./recursive.sh)
 export unreachable
 

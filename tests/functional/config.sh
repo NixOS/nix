@@ -2,10 +2,6 @@
 
 source common.sh
 
-# Isolate the home for this test.
-# Other tests (e.g. flake registry tests) could be writing to $HOME in parallel.
-export HOME=$TEST_ROOT/userhome
-
 # Test that using XDG_CONFIG_HOME works
 # Assert the config folder didn't exist initially.
 [ ! -e "$HOME/.config" ]

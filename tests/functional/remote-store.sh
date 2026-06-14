@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 # Ensure "fake ssh" remote store works just as legacy fake ssh would.
 nix --store ssh-ng://localhost?remote-store="$TEST_ROOT"/other-store doctor
 

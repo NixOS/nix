@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 # Regression test for nix-store --print-env argument escaping
 # This tests that arguments in _args are properly escaped as a single string
 # rather than double-escaped which could lead to command injection

@@ -28,11 +28,11 @@ let
     name = "fod-input";
     buildCommand = ''
       echo ${hashInvalidator}
-      echo FOD > $out
+      echo -n fod-input-${testSalt} > $out
     '';
     outputHashMode = "flat";
     outputHashAlgo = "sha256";
-    outputHash = "1dq9p0hnm1y75q2x40fws5887bq1r840hzdxak0a9djbwvx0b16d";
+    outputHash = "${builtins.hashString "sha256" "fod-input-${testSalt}"}";
   };
 
 in

@@ -35,8 +35,6 @@ diffAndAccept() {
     diffAndAcceptInner "$testName" "$got" "$expected"
 }
 
-clearProfiles
-
 # Each test case has a descriptor: cli-characterisation/<name>.cmd
 # containing: <expected-exit-code> <command...>
 #

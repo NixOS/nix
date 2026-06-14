@@ -283,7 +283,6 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
 
 OsString readLinkAt(Descriptor dirFd, const CanonPath & path)
 {
-    assert(!path.isRoot());
     assert(!path.rel().starts_with('/')); /* Just in case the invariant is somehow broken. */
     std::vector<char> buf;
     for (ssize_t bufSize = PATH_MAX / 4; true; bufSize += bufSize / 2) {

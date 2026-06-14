@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 echo "Testing build-cores configuration behavior..."
 
 # Test 1: When build-cores is set to a non-zero value, NIX_BUILD_CORES should have that value

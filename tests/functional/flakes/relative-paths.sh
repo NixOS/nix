@@ -9,7 +9,6 @@ subflake0="$rootFlake/sub0"
 subflake1="$rootFlake/sub1"
 subflake2="$rootFlake/sub2"
 
-rm -rf "$rootFlake"
 mkdir -p "$rootFlake" "$subflake0" "$subflake1" "$subflake2"
 
 cat > "$rootFlake/flake.nix" <<EOF

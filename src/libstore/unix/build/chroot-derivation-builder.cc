@@ -110,7 +110,8 @@ ChrootDerivationBuilder::addDependencyPrep(const StorePath & path)
     debug("materialising '%s' in the sandbox", store.printStorePath(path));
 
     std::filesystem::path source = store.toRealPath(path);
-    std::filesystem::path target = chrootRootDir / std::filesystem::path(store.printStorePath(path)).relative_path();
+    auto targetRelPath = std::filesystem::path(store.printStorePath(path)).relative_path();
+    std::filesystem::path target = chrootRootDir / targetRelPath;
 
     if (pathExists(target)) {
         // There is a similar debug message in doBind, so only run it in this block to not have double messages.
@@ -118,7 +119,7 @@ ChrootDerivationBuilder::addDependencyPrep(const StorePath & path)
         throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
     }
 
-    return {source, target};
+    return {source, targetRelPath};
 }
 
 } // namespace nix

@@ -4,8 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 path=$(nix-build dependencies.nix --no-out-link)
 
 # Test nix-store -l.

@@ -4,9 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-clearProfiles
-
 checkRef() {
     nix-store -q --references "$TEST_ROOT"/result | grepQuiet "$1"'$' || fail "missing reference $1"
 }

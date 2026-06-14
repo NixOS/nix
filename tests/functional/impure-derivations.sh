@@ -9,8 +9,6 @@ TODO_NixOS
 enableFeatures "ca-derivations impure-derivations"
 restartDaemon
 
-clearStoreIfPossible
-
 # Basic test of impure derivations: building one a second time should not use the previous result.
 printf 0 > "$TEST_ROOT"/counter
 

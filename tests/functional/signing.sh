@@ -2,9 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-clearCache
-
 nix-store --generate-binary-cache-key cache1.example.org "$TEST_ROOT"/sk1 "$TEST_ROOT"/pk1
 pk1=$(cat "$TEST_ROOT"/pk1)
 nix-store --generate-binary-cache-key cache2.example.org "$TEST_ROOT"/sk2 "$TEST_ROOT"/pk2

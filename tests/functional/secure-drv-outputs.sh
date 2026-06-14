@@ -8,8 +8,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-
 startDaemon
 
 # Determine the output path of the "good" derivation.

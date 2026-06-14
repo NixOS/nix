@@ -6,9 +6,6 @@ TODO_NixOS
 
 requireGit
 
-clearStore
-rm -rf "$TEST_HOME"/.cache "$TEST_HOME"/.config
-
 createFlake1
 createFlake2
 

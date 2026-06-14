@@ -4,9 +4,6 @@ source common.sh
 
 TODO_NixOS
 
-clearStore
-clearCache
-
 # nix shell is an alias for nix env shell. We'll use the shorter form in the rest of the test.
 nix env shell -f shell-hello.nix hello -c hello | grep 'Hello World'
 
