@@ -340,6 +340,8 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
                 options.allowVfork = false;
                 startProcess(
                     [&, storeConfig, closeListeners = std::move(closeListeners)]() {
+                        setInterrupted(false);
+
                         closeListeners();
 
                         // Background the daemon.
