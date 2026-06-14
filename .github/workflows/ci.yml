@@ -127,6 +127,8 @@ jobs:
       - build_aarch64-linux_no_dsp
       - build_aarch64-darwin_no_dsp
     if: ${{ always() }}
+    outputs:
+      store-path: ${{ steps.buildfallback.outputs.store-path }}
     steps:
       - run: "true"
       - run: |
@@ -157,6 +159,7 @@ jobs:
           done
 
       - name: Build fallback-paths.nix
+        id: buildfallback
         if: ${{
               github.event_name != 'pull_request'
               || (
@@ -171,6 +174,14 @@ jobs:
           nix build ./packaging/secure-packages#fallbackPathsNix --out-link fallback
           nix build .#fallbackPathsNix --out-link fallback.no-dsp
           cat fallback > ./artifacts/fallback-paths.nix
+          nix path-info -r --json ./fallback > ./artifacts/closure.json
+          nix path-info -r ./fallback > ./artifacts/closure.txt
+          echo "store-path=$(readlink -f fallback)" >> "$GITHUB_OUTPUT"
+
+      - uses: DeterminateSystems/public-slice-mirror/.github/actions/upload-store-paths@381c2a441618b35b2bae85bddb257ede8f9aef0f
+        if: steps.buildfallback.outputs.store-path != ''
+        with:
+          store-paths: ${{ steps.buildfallback.outputs.store-path }}
 
       - uses: DeterminateSystems/push-artifact-ids@main
         with:
@@ -185,7 +196,7 @@ jobs:
   publish:
     needs:
       - success
-    if: (!github.repository.fork && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
+    if: (!github.event.repository.fork && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
     environment: ${{ github.event_name == 'release' && 'production' || '' }}
     runs-on: ubuntu-latest
     permissions:
@@ -207,3 +218,20 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           gh release edit "$TAG_NAME" --notes-file doc/manual/source/release-notes-determinate/"$TAG_NAME".md || true
+
+  mirror:
+    if: ${{
+          (
+            (needs.success.outputs.store-path != '')
+            && (!github.event.repository.fork && (startsWith(github.ref, 'refs/tags/')))
+          )
+        }}
+    needs: success
+    permissions:
+      id-token: write   # required so the workflow can auth to FlakeHub
+      contents: read
+    uses: DeterminateSystems/public-slice-mirror/.github/workflows/subset-mirror.yml@381c2a441618b35b2bae85bddb257ede8f9aef0f
+    with:
+      flake-name: DeterminateSystems/nix-artifacts
+      rolling: false
+      tag: ${{ github.ref_name }}
