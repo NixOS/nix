@@ -35,6 +35,15 @@ TEST_P(CompressionDecompressionTest, empty)
     ASSERT_EQ(o, "");
 }
 
+TEST_P(CompressionDecompressionTest, invalidDecompression)
+{
+    if (GetParam() == CompressionAlgo::none)
+        GTEST_SKIP();
+
+    ASSERT_THROW(
+        decompress(GetParam(), "this is a string that does not qualify as valid compressed data"), CompressionError);
+}
+
 TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
 {
     StringSink strSink;
@@ -102,13 +111,6 @@ TEST(compress, zstdExactFrameBoundary)
     size_t frameSize = ZSTD_findFrameCompressedSize(compressed.data(), compressed.size());
     ASSERT_FALSE(ZSTD_isError(frameSize));
     ASSERT_EQ(frameSize, compressed.size());
-}
-
-TEST(decompress, decompressInvalidInputThrowsCompressionError)
-{
-    auto str = "this is a string that does not qualify as valid bzip2 data";
-
-    ASSERT_THROW(decompress(CompressionAlgo::bzip2, str), CompressionError);
 }
 
 /* ----------------------------------------------------------------------------
