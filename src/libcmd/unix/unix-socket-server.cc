@@ -104,7 +104,6 @@ PeerInfo getPeerInfo(Descriptor remote)
                 socklen_t remoteAddrLen = sizeof(remoteAddr);
 
                 AutoCloseFD remote = accept(fd.fd, (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-                checkInterrupt();
                 if (!remote) {
                     if (errno == EINTR)
                         continue;
