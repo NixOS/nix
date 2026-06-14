@@ -26,6 +26,15 @@ TEST_P(CompressionDecompressionTest, roundtrip)
     ASSERT_EQ(o, dummyInput);
 }
 
+TEST_P(CompressionDecompressionTest, empty)
+{
+    auto compressed = compress(GetParam(), "");
+    if (GetParam() != CompressionAlgo::none)
+        ASSERT_FALSE(compressed.empty());
+    auto o = decompress(GetParam(), compressed);
+    ASSERT_EQ(o, "");
+}
+
 TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
 {
     StringSink strSink;
@@ -77,16 +86,6 @@ TEST(decompress, decompressZstdMultiFrameLargeInput)
     auto o = decompress(CompressionAlgo::zstd, compressed);
 
     ASSERT_EQ(o, str);
-}
-
-TEST(compress, zstdEmptyInput)
-{
-    auto compressed = compress(CompressionAlgo::zstd, "");
-    // Empty input should still emit a valid (empty-content) zstd
-    // frame so it round-trips through the decompressor.
-    ASSERT_FALSE(compressed.empty());
-    auto o = decompress(CompressionAlgo::zstd, compressed);
-    ASSERT_EQ(o, "");
 }
 
 TEST(compress, zstdExactFrameBoundary)
