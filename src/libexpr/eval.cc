@@ -331,7 +331,6 @@ EvalState::EvalState(
     , debugStop(false)
     , trylevel(0)
     , asyncPathWriter(AsyncPathWriter::make(store))
-    , srcToStore(make_ref<decltype(srcToStore)::element_type>())
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
@@ -2534,23 +2533,16 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
     if (nix::isDerivation(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
-    auto dstPathCached = getConcurrent(*srcToStore, path);
-
-    auto dstPath = dstPathCached ? *dstPathCached : [&]() {
-        auto dstPath = fetchToStore(
-            fetchSettings,
-            *store,
-            path.resolveSymlinks(SymlinkResolution::Ancestors),
-            settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
-            computeBaseName(path, pos),
-            ContentAddressMethod::Raw::NixArchive,
-            nullptr,
-            repair);
-        allowPath(dstPath);
-        srcToStore->try_emplace(path, dstPath);
-        printMsg(lvlChatty, "copied source '%1%' -> '%2%'", path, store->printStorePath(dstPath));
-        return dstPath;
-    }();
+    auto dstPath = fetchToStore(
+        fetchSettings,
+        *store,
+        path.resolveSymlinks(SymlinkResolution::Ancestors),
+        settings.readOnlyMode ? FetchMode::DryRun : FetchMode::Copy,
+        computeBaseName(path, pos),
+        ContentAddressMethod::Raw::NixArchive,
+        nullptr,
+        repair);
+    allowPath(dstPath);
 
     context.insert(NixStringContextElem::Opaque{.path = dstPath});
     return dstPath;
