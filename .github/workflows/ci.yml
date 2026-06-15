@@ -128,7 +128,8 @@ jobs:
       - build_aarch64-darwin_no_dsp
     if: ${{ always() }}
     outputs:
-      store-path: ${{ steps.buildfallback.outputs.store-path }}
+      store-path-dsp: ${{ steps.buildfallback.outputs.store-path-dsp }}
+      store-path-root: ${{ steps.buildfallback.outputs.store-path-root }}
     steps:
       - run: "true"
       - run: |
@@ -171,17 +172,25 @@ jobs:
               )
             }}
         run: |
-          nix build ./packaging/secure-packages#fallbackPathsNix --out-link fallback
-          nix build .#fallbackPathsNix --out-link fallback.no-dsp
-          cat fallback > ./artifacts/fallback-paths.nix
-          nix path-info -r --json ./fallback > ./artifacts/closure.json
-          nix path-info -r ./fallback > ./artifacts/closure.txt
-          echo "store-path=$(readlink -f fallback)" >> "$GITHUB_OUTPUT"
+          nix build ./packaging/secure-packages#fallbackPathsNix --out-link fallback.dsp
+          cat fallback.dsp > ./artifacts/fallback-paths.nix
+
+          nix path-info -r --json ./fallback.dsp > ./artifacts/closure.dsp.json
+          nix path-info -r ./fallback.dsp > ./artifacts/closure.dsp.txt
+
+          nix build .#fallbackPathsNix --out-link fallback.root
+          nix path-info -r --json ./fallback.root > ./artifacts/closure.root.json
+          nix path-info -r ./fallback.root > ./artifacts/closure.root.txt
+
+          echo "store-path-dsp=$(readlink -f fallback.dsp)" >> "$GITHUB_OUTPUT"
+          echo "store-path-root=$(readlink -f fallback.root)" >> "$GITHUB_OUTPUT"
 
       - uses: DeterminateSystems/public-slice-mirror/.github/actions/upload-store-paths@381c2a441618b35b2bae85bddb257ede8f9aef0f
-        if: steps.buildfallback.outputs.store-path != ''
+        if: steps.buildfallback.outputs.store-path-dsp != ''
         with:
-          store-paths: ${{ steps.buildfallback.outputs.store-path }}
+          store-paths: |
+            ${{ steps.buildfallback.outputs.store-path-dsp }}
+            ${{ steps.buildfallback.outputs.store-path-root }}
 
       - uses: DeterminateSystems/push-artifact-ids@main
         with:
@@ -222,7 +231,7 @@ jobs:
   mirror:
     if: ${{
           (
-            (needs.success.outputs.store-path != '')
+            (needs.success.outputs.store-path-dsp != '')
             && (!github.event.repository.fork && (startsWith(github.ref, 'refs/tags/')))
           )
         }}
