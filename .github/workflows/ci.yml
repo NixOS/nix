@@ -65,20 +65,25 @@ jobs:
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
     with:
-      if: ${{
-            github.event_name != 'pull_request'
-            || (
-              github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
-              && (
-                (github.event.action == 'labeled' && github.event.label.name == 'upload to s3')
-                || (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'upload to s3'))
-              )
-            )
-          }}
       system: aarch64-linux
       runner: UbuntuLatest32Cores128GArm
       runner_for_virt: UbuntuLatest32Cores128GArm
       runner_small: UbuntuLatest32Cores128GArm
+    secrets:
+      sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      sentry_org: ${{ secrets.SENTRY_ORG }}
+      sentry_project: ${{ secrets.SENTRY_PROJECT }}
+
+  build_aarch64-linux_no_dsp:
+    uses: ./.github/workflows/build.yml
+    if: github.event_name == 'merge_group'
+    with:
+      flake: .
+      system: aarch64-linux
+      runner: UbuntuLatest32Cores128GArm
+      runner_for_virt: UbuntuLatest32Cores128GArm
+      runner_small: UbuntuLatest32Cores128GArm
+      upload_artifacts: false
     secrets:
       sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
       sentry_org: ${{ secrets.SENTRY_ORG }}
@@ -96,6 +101,21 @@ jobs:
       sentry_org: ${{ secrets.SENTRY_ORG }}
       sentry_project: ${{ secrets.SENTRY_PROJECT }}
 
+  build_aarch64-darwin_no_dsp:
+    uses: ./.github/workflows/build.yml
+    if: github.event_name == 'merge_group'
+    with:
+      flake: .
+      system: aarch64-darwin
+      runner: namespace-profile-mac-m2-12c28g
+      runner_for_virt: namespace-profile-mac-m2-12c28g
+      runner_small: macos-latest-xlarge
+      upload_artifacts: false
+    secrets:
+      sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      sentry_org: ${{ secrets.SENTRY_ORG }}
+      sentry_project: ${{ secrets.SENTRY_PROJECT }}
+
   success:
     runs-on: ubuntu-latest
     needs:
@@ -103,6 +123,9 @@ jobs:
       - build_x86_64-linux
       - build_aarch64-linux
       - build_aarch64-darwin
+      - build_x86_64-linux_no_dsp
+      - build_aarch64-linux_no_dsp
+      - build_aarch64-darwin_no_dsp
     if: ${{ always() }}
     steps:
       - run: "true"
@@ -146,6 +169,7 @@ jobs:
             }}
         run: |
           nix build ./packaging/secure-packages#fallbackPathsNix --out-link fallback
+          nix build .#fallbackPathsNix --out-link fallback.no-dsp
           cat fallback > ./artifacts/fallback-paths.nix
 
       - uses: DeterminateSystems/push-artifact-ids@main
