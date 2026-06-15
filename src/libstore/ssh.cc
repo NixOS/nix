@@ -262,7 +262,7 @@ std::optional<std::filesystem::path> SSHMaster::startMaster()
             if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("duping over stdout");
 
-            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N"};
+            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-oControlPersist=no"};
             if (verbosity >= lvlChatty)
                 args.push_back("-v");
             addCommonSSHOpts(args, state->socketPath);
