@@ -979,6 +979,7 @@ static RegisterPrimOp primop_break(
          }
 
          // Return the value we were passed.
+         state.forceValue(*args[0], pos);
          v = *args[0];
      }});
 
