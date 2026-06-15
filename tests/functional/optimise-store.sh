@@ -15,14 +15,12 @@ TODO_NixOS # ignoring the client-specified setting 'auto-optimise-store', becaus
 inode1="$(stat --format=%i "$outPath1"/foo)"
 inode2="$(stat --format=%i "$outPath2"/foo)"
 if [ "$inode1" != "$inode2" ]; then
-    echo "inodes do not match"
-    exit 1
+    fail "inodes do not match"
 fi
 
 nlink="$(stat --format=%h "$outPath1"/foo)"
 if [ "$nlink" != 3 ]; then
-    echo "link count incorrect"
-    exit 1
+    fail "link count incorrect"
 fi
 
 # shellcheck disable=SC2016
@@ -30,8 +28,7 @@ outPath3=$(echo 'with import '"${config_nix}"'; mkDerivation { name = "foo3"; bu
 
 inode3="$(stat --format=%i "$outPath3"/foo)"
 if [ "$inode1" = "$inode3" ]; then
-    echo "inodes match unexpectedly"
-    exit 1
+    fail "inodes match unexpectedly"
 fi
 
 # XXX: This should work through the daemon too
@@ -40,8 +37,7 @@ NIX_REMOTE="" nix-store --optimise
 inode1="$(stat --format=%i "$outPath1"/foo)"
 inode3="$(stat --format=%i "$outPath3"/foo)"
 if [ "$inode1" != "$inode3" ]; then
-    echo "inodes do not match"
-    exit 1
+    fail "inodes do not match"
 fi
 
 # shellcheck disable=SC2016
@@ -52,19 +48,16 @@ NIX_REMOTE="" nix store optimise
 inode1="$(stat --format=%i "$outPath1"/foo)"
 inode4="$(stat --format=%i "$outPath4"/foo)"
 if [ "$inode1" != "$inode4" ]; then
-    echo "inodes do not match"
-    exit 1
+    fail "inodes do not match"
 fi
 
 # alias of optimise
 if ! NIX_REMOTE="" nix store optimize; then
-    echo "nix store optimize alias is not present"
-    exit 1
+    fail "nix store optimize alias is not present"
 fi
 
 nix-store --gc
 
 if [ -n "$(ls "$NIX_STORE_DIR"/.links)" ]; then
-    echo ".links directory not empty after GC"
-    exit 1
+    fail ".links directory not empty after GC"
 fi
