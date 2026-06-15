@@ -14,8 +14,9 @@
 namespace nix {
 
 struct GitRepo;
+struct SrcToStore;
 
-}
+} // namespace nix
 
 namespace nix::fetchers {
 
@@ -151,6 +152,15 @@ struct Settings : public Config
     ref<Cache> getCache() const;
 
     ref<GitRepo> getTarballCache() const;
+
+    /**
+     * In-memory cache for calls to fetchToStore(); maps source paths to their store
+     * paths / hashes.
+     */
+    static ref<SrcToStore> createSrcToStore();
+
+    const ref<SrcToStore> srcToStore = createSrcToStore();
+
 
 private:
     void anchor() override;
