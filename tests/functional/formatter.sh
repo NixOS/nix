@@ -4,9 +4,6 @@ source common.sh
 
 TODO_NixOS # Provide a `shell` variable. Try not to `export` it, perhaps.
 
-clearStoreIfPossible
-rm -rf "$TEST_HOME"/.cache "$TEST_HOME"/.config "$TEST_HOME"/.local
-
 cp ./simple.nix ./simple.builder.sh ./formatter.simple.sh "${config_nix}" "$TEST_HOME"
 
 cd "$TEST_HOME"

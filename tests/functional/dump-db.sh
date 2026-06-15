@@ -6,8 +6,6 @@ TODO_NixOS
 
 needLocalStore "--dump-db requires a local store"
 
-clearStore
-
 nix-build dependencies.nix -o "$TEST_ROOT"/result
 deps="$(nix-store -qR "$TEST_ROOT"/result)"
 

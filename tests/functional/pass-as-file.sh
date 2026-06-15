@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 # shellcheck disable=SC2034
 outPath=$(nix-build --no-out-link -E "
 with import ${config_nix};

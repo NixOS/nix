@@ -15,8 +15,6 @@ source ../common.sh
 
 requireGit
 
-clearStoreIfPossible
-
 # Intentionally not in a canonical form
 # See https://github.com/NixOS/nix/issues/6195
 repo=$TEST_ROOT/./git

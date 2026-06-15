@@ -7,8 +7,6 @@ requireSandboxSupport
 # Requires bug fix for daemon
 requireDaemonNewerThan "2.35.0pre20260518"
 
-clearStoreIfPossible
-
 # See https://github.com/NixOS/nix/issues/15846
 #
 # `slow` is a fixed-output derivation that never finishes (which simulates a
@@ -42,6 +40,7 @@ if canUseSandbox; then
   fifoDir="$TEST_ROOT/sync-fifo"
   mkdir -p "$fifoDir"
   mkfifo "$fifoDir/fifo"
+  chmod a+rw "$fifoDir/fifo"
   sandboxArgs+=(--option extra-sandbox-paths "/sync-fifo=$TEST_ROOT/sync-fifo")
 fi
 

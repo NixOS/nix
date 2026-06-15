@@ -11,9 +11,6 @@ needLocalStore "“--eval-store” doesn't achieve much with the daemon"
 
 eval_store=$TEST_ROOT/eval-store
 
-clearStore
-rm -rf "$eval_store"
-
 nix build -f dependencies.nix --eval-store "$eval_store" -o "$TEST_ROOT/result"
 [[ -e $TEST_ROOT/result/foobar ]]
 if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then

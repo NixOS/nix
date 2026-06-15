@@ -7,8 +7,6 @@ needLocalStore "“min-free” and “max-free” are daemon options"
 
 TODO_NixOS
 
-clearStore
-
 # shellcheck disable=SC2034
 garbage1=$(nix store add-path --name garbage1 ./nar-access.sh)
 # shellcheck disable=SC2034

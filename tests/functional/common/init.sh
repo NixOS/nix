@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 
 # for shellcheck
-: "${test_nix_conf_dir?}" "${test_nix_conf?}"
+: "${test_nix_conf_dir?}" "${test_nix_conf?}" "${config_nix?}"
 
 if isTestOnNixOS; then
 
@@ -69,3 +69,8 @@ nix-store --init
 test -e "$NIX_STATE_DIR"/db/db.sqlite
 
 fi # !isTestOnNixOS
+
+# Salt the test-specific config.nix file a bit to improve test isolation with a
+# shared store.
+echo "# config.nix for test $TEST_SUITE_NAME / $TEST_NAME" > "$config_nix"
+cat "${_NIX_TEST_BUILD_DIR}/config.nix" >> "$config_nix"

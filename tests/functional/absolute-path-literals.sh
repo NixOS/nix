@@ -5,8 +5,6 @@ source common.sh
 # Tests for absolute path literals that require NIX_CONFIG or grepQuietInverse.
 # Basic warn/fatal/default behavior tests are in lang/eval-*-abs-path-*.nix
 
-clearStoreIfPossible
-
 # Test: Setting via NIX_CONFIG
 NIX_CONFIG='lint-absolute-path-literals = warn' nix eval --expr '/tmp/bar' 2>"$TEST_ROOT"/stderr
 grepQuiet "absolute path literals are not portable" "$TEST_ROOT/stderr"

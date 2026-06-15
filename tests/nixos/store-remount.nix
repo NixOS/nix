@@ -36,7 +36,7 @@
 
       # Set up a minimal container root (which needs its own db to avoid
       # UID-mapping issues on the host db).
-      machine.succeed("mkdir -p /tmp/container/{nix/store,nix/var/nix/db,tmp,etc,proc,sys}")
+      machine.succeed("mkdir -p /tmp/container/{nix/store,nix/var/nix/db,tmp,etc,proc,sys,usr}")
       machine.succeed("echo 'root:x:0:0:root:/root:/bin/sh' > /tmp/container/etc/passwd")
       machine.succeed("echo 'root:x:0:' > /tmp/container/etc/group")
 

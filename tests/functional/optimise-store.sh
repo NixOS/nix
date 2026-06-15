@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 # shellcheck disable=SC2016
 outPath1=$(echo 'with import '"${config_nix}"'; mkDerivation { name = "foo1"; builder = builtins.toFile "builder" "mkdir $out; echo hello > $out/foo"; }' | nix-build - --no-out-link --auto-optimise-store)
 # shellcheck disable=SC2016

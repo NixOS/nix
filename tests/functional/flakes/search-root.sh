@@ -2,8 +2,6 @@
 
 source common.sh
 
-clearStoreIfPossible
-
 writeSimpleFlake "$TEST_HOME"
 cd "$TEST_HOME"
 mkdir -p foo/subdir

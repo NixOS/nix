@@ -45,13 +45,13 @@ struct ChunkedCompressionSink : CompressionSink
 
 struct ArchiveDecompressionSource : Source
 {
-    std::unique_ptr<TarArchive> archive = 0;
+    std::unique_ptr<TarArchive> archive;
     Source & src;
-    std::optional<std::string> compressionMethod;
+    CompressionAlgo compressionMethod;
 
-    ArchiveDecompressionSource(Source & src, std::optional<std::string> compressionMethod = std::nullopt)
+    ArchiveDecompressionSource(Source & src, CompressionAlgo compressionMethod)
         : src(src)
-        , compressionMethod(std::move(compressionMethod))
+        , compressionMethod(compressionMethod)
     {
     }
 
@@ -61,8 +61,8 @@ struct ArchiveDecompressionSource : Source
     {
         struct archive_entry * ae;
         if (!archive) {
-            archive = std::make_unique<TarArchive>(src, /*raw*/ true, compressionMethod);
-            this->archive->check(archive_read_next_header(this->archive->archive, &ae), "failed to read header (%s)");
+            archive = std::make_unique<TarArchive>(src, /*raw=*/true, compressionMethod);
+            archive->check(archive_read_next_header(this->archive->archive, &ae), "failed to read header (%s)");
             if (archive_filter_count(this->archive->archive) < 2) {
                 throw CompressionError("input compression not recognized");
             }
@@ -254,7 +254,7 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
 
 } // namespace
 
-std::string decompress(const std::string & method, std::string_view in)
+std::string decompress(CompressionAlgo method, std::string_view in)
 {
     StringSink ssink;
     auto sink = makeDecompressionSink(method, ssink);
@@ -263,11 +263,11 @@ std::string decompress(const std::string & method, std::string_view in)
     return std::move(ssink.s);
 }
 
-std::unique_ptr<FinishSink> makeDecompressionSink(const std::string & method, Sink & nextSink)
+std::unique_ptr<FinishSink> makeDecompressionSink(CompressionAlgo method, Sink & nextSink)
 {
-    if (method == "none" || method == "" || method == "identity")
+    if (method == CompressionAlgo::none)
         return std::make_unique<NoneSink>(nextSink);
-    else if (method == "br")
+    else if (method == CompressionAlgo::brotli)
         return std::make_unique<BrotliDecompressionSink>(nextSink);
     else
         return sourceToSink([method, &nextSink](Source & source) {

@@ -4,9 +4,6 @@ source ../common.sh
 
 TODO_NixOS
 
-clearStore
-rm -rf "$TEST_HOME/.cache" "$TEST_HOME/.config" "$TEST_HOME/.local"
-
 # Create flake under test.
 cp ../shell-hello.nix "$config_nix" "$TEST_HOME/"
 cat <<EOF >"$TEST_HOME/flake.nix"

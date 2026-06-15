@@ -71,6 +71,7 @@ PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path);
 
 /**
  * Read a symlink relative to a directory file descriptor.
+ * On Linux, this also supports reading from O_PATH descriptors with CanonPath::root.
  *
  * @throws SystemError on any I/O errors.
  * @throws Interrupted if interrupted.

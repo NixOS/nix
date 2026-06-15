@@ -37,7 +37,7 @@ copyAttr () {
 
 testRemoteCacheFor () {
     local derivationPath=$1
-    clearCache
+    clearBinaryCache
     copyAttr "$derivationPath" 1
     clearStore
     # Check nothing gets built.

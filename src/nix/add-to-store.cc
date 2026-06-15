@@ -49,7 +49,7 @@ struct CmdAdd : CmdAddToStore
 {
     std::string description() override
     {
-        return "Add a file or directory to the Nix store";
+        return "add a file or directory to the Nix store";
     }
 
     std::string doc() override

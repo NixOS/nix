@@ -173,7 +173,7 @@ std::optional<std::string> LocalFSStore::getBuildLogExact(const StorePath & path
 
         else if (pathExists(logBz2Path)) {
             try {
-                return decompress("bzip2", readFile(logBz2Path));
+                return decompress(CompressionAlgo::bzip2, readFile(logBz2Path));
             } catch (Error &) {
             }
         }
