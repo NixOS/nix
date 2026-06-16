@@ -9,7 +9,7 @@ You can build it yourself:
 
 ```
 # nix build .#hydraJobs.coverage
-# xdg-open ./result/coverage/index.html
+# xdg-open ./result/index.html
 ```
 
 [Extensive records of build metrics](https://hydra.nixos.org/job/nix/master/coverage#tabs-charts), such as test coverage over time, are also available online.
@@ -34,31 +34,28 @@ The unit tests are defined using the [googletest] and [rapidcheck] frameworks.
 > │   ├── value/context.cc
 > │   …
 > │
-> ├── tests
-> │   │
+> ├── libutil-tests
+> │   ├── meson.build
 > │   …
-> │   ├── libutil-tests
+> │   ├── data
+> │   │   ├── git/tree.txt
+> │       …
+> │
+> ├── libexpr-test-support
+> │   ├── meson.build
+> │   ├── include/nix/expr
 > │   │   ├── meson.build
-> │   │   …
-> │   │   └── data
-> │   │       ├── git/tree.txt
-> │   │       …
-> │   │
-> │   ├── libexpr-test-support
-> │   │   ├── meson.build
-> │   │   ├── include/nix/expr
-> │   │   │   ├── meson.build
-> │   │   │   └── tests
-> │   │   │       ├── value/context.hh
-> │   │   │       …
 > │   │   └── tests
-> │   │       ├── value/context.cc
+> │   │       ├── value/context.hh
 > │   │       …
-> │   │
-> │   ├── libexpr-tests
-> │   …   ├── meson.build
+> │   ├── tests
 > │       ├── value/context.cc
 > │       …
+> │
+> ├── libexpr-tests
+> │   ├── meson.build
+> │   ├── value/context.cc
+> │    …
 > …
 > ```
 
@@ -257,15 +254,6 @@ GNU gdb (GDB) 12.1
 One can debug the Nix invocation in all the usual ways.
 For example, enter `run` to start the Nix invocation.
 
-### Troubleshooting
-
-Sometimes running tests in the development shell may leave artefacts in the local repository.
-To remove any traces of that:
-
-```console
-git clean -x --force tests
-```
-
 ### Characterisation testing { #characterisation-testing-functional }
 
 Occasionally, Nix utilizes a technique called [Characterisation Testing](https://en.wikipedia.org/wiki/Characterization_test) as part of the functional tests.
@@ -311,78 +299,34 @@ Generally, this build is sufficient, but in nightly or CI we also test the attri
 
 The integration tests are defined in the Nix flake under the `hydraJobs.tests` attribute.
 These tests include everything that needs to interact with external services or run Nix in a non-trivial distributed setup.
-Because these tests are expensive and require more than what the standard github-actions setup provides, they only run on the master branch (on <https://hydra.nixos.org/jobset/nix/master>).
+Because these tests are expensive and require more than what the standard github-actions setup provides, most of them only run on the master branch (on <https://hydra.nixos.org/jobset/nix/master>).
 
 You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`.
 
 ## Installer tests
 
-After a one-time setup, the Nix repository's GitHub Actions continuous integration (CI) workflow can test the installer each time you push to a branch.
+GitHub Actions CI in the Nix repository also tests the installer on PRs. It does not require additional setup and utilises [GHA Artifacts](https://docs.github.com/en/actions/tutorials/store-and-share-data) and can be run in any Nix repository fork.
 
-Creating a Cachix cache for your installer tests and adding its authorisation token to GitHub enables [two installer-specific jobs in the CI workflow](https://github.com/NixOS/nix/blob/88a45d6149c0e304f6eb2efcc2d7a4d0d569f8af/.github/workflows/ci.yml#L50-L91):
-
-- The `installer` job generates installers for the platforms below and uploads them to your Cachix cache:
+- The `tests` job generates installers for the platforms below and uploads them as an artifact:
   - `x86_64-linux`
-  - `armv6l-linux`
-  - `armv7l-linux`
-  - `x86_64-darwin`
+  - `aarch64-darwin`
 
-- The `installer_test` job (which runs on `ubuntu-24.04` and `macos-14`) will try to install Nix with the cached installer and run a trivial Nix command.
+- The `installer_test` job (which runs on Linux and macOS) will try to install Nix with the cached installer and run a trivial Nix command.
+- Both the scripted installer and the [standalone Rust-based installer](https://github.com/NixOS/nix-installer) are tested.
 
-### One-time setup
-
-1. Have a GitHub account with a fork of the [Nix repository](https://github.com/NixOS/nix).
-2. At cachix.org:
-    - Create or log in to an account.
-    - Create a Cachix cache using the format `<github-username>-nix-install-tests`.
-    - Navigate to the new cache > Settings > Auth Tokens.
-    - Generate a new Cachix auth token and copy the generated value.
-3. At github.com:
-    - Navigate to your Nix fork > Settings > Secrets > Actions > New repository secret.
-    - Name the secret `CACHIX_AUTH_TOKEN`.
-    - Paste the copied value of the Cachix cache auth token.
+You can generate the installer tarball and script manually by running `nix build .#hydraJobs.installerScriptForGHA.<system-double>`.
 
 ## Working on documentation
 
 ### Using the CI-generated installer for manual testing
 
-After the CI run completes, you can check the output to extract the installer URL:
+After the CI run completes, you can check the output to extract the installer artifact:
 1. Click into the detailed view of the CI run.
-2. Click into any `installer_test` run (the URL you're here to extract will be the same in all of them).
-3. Click into the `Run cachix/install-nix-action@v...` step and click the detail triangle next to the first log line (it will also be `Run cachix/install-nix-action@v...`)
-4. Copy the value of `install_url`
-5. To generate an install command, plug this `install_url` and your GitHub username into this template:
+2. Scroll down to `Artifacts` section.
+3. Download the corresponding installer artifact (`installer-darwin` for `aarch64-darwin` and `installer-linux` for `x86_64-linux`).
+4. Unpack the downloaded `.zip` artifact.
+5. To generate an install command, plug the path to the unpacked artifact into this template:
 
     ```console
-    curl -L <install_url> | sh -s -- --tarball-url-prefix https://<github-username>-nix-install-tests.cachix.org/serve
+    sh <path/to/artifact>/install --tarball-url-prefix file://<path/to/artifact>
     ```
-
-<!-- #### Manually generating test installers
-
-There's obviously a manual way to do this, and it's still the only way for
-platforms that lack GA runners.
-
-I did do this back in Fall 2020 (before the GA approach encouraged here). I'll
-sketch what I recall in case it encourages someone to fill in detail, but: I
-didn't know what I was doing at the time and had to fumble/ask around a lot--
-so I don't want to uphold any of it as "right". It may have been dumb or
-the _hard_ way from the getgo. Fundamentals may have changed since.
-
-Here's the build command I used to do this on and for x86_64-darwin:
-nix build --out-link /tmp/foo ".#checks.x86_64-darwin.binaryTarball"
-
-I used the stable out-link to make it easier to script the next steps:
-link=$(readlink /tmp/foo)
-cp $link/*-darwin.tar.xz ~/somewheres
-
-I've lost the last steps and am just going from memory:
-
-From here, I think I had to extract and modify the `install` script to point
-it at this tarball (which I scped to my own site, but it might make more sense
-to just share them locally). I extracted this script once and then just
-search/replaced in it for each new build.
-
-The installer now supports a `--tarball-url-prefix` flag which _may_ have
-solved this need?
--->
-
