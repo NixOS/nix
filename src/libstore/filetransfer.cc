@@ -134,11 +134,20 @@ struct curlMultiError final : CloneableError<curlMultiError, Error>
     }
 };
 
+/* Check if the linked libcurl was built with HTTP3 support. */
+bool curlSupportsHttp3()
+{
+    const auto * info = ::curl_version_info(CURLVERSION_NOW);
+    return info && (info->features & CURL_VERSION_HTTP3);
+}
+
 } // namespace
 
 struct curlFileTransfer : public FileTransfer
 {
     const FileTransferSettings & settings;
+
+    const bool http3Supported = curlSupportsHttp3();
 
     curlMulti curlm;
 
@@ -599,7 +608,10 @@ struct curlFileTransfer : public FileTransfer
                                                                 : ""))
                     .c_str());
             curl_easy_setopt(req, CURLOPT_PIPEWAIT, 1);
-            if (fileTransfer.settings.enableHttp2)
+            /* Enable HTTP3 only on user config and linked libcurl have support, o.w. fall back. */
+            if (fileTransfer.settings.enableHttp3 && fileTransfer.http3Supported)
+                curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_3);
+            else if (fileTransfer.settings.enableHttp2)
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2TLS);
             else
                 curl_easy_setopt(req, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
