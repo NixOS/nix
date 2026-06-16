@@ -9,6 +9,7 @@
 #include "nix/store/remote-store-connection.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/serialise.hh"
+#include "nix/util/strings.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/derivations.hh"
@@ -272,12 +273,32 @@ static void daemonLoop(
         auto rootCgroupPath = *cgroupFS / rootCgroup.rel();
         if (!pathExists(rootCgroupPath))
             throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
-        auto daemonCgroupPath = rootCgroupPath + "/nix-daemon";
+        auto daemonCgroupPath = rootCgroupPath / "nix-daemon";
         //  Create new sub-cgroup for the daemon.
         if (mkdir(daemonCgroupPath.c_str(), 0755) != 0 && errno != EEXIST)
-            throw SysError("creating cgroup '%s'", daemonCgroupPath);
+            throw SysError("creating cgroup %s", PathFmt(daemonCgroupPath));
         //  Move daemon into the new cgroup.
-        writeFile(daemonCgroupPath + "/cgroup.procs", fmt("%d", getpid()));
+        writeFile(daemonCgroupPath / "cgroup.procs", fmt("%d", getpid()));
+
+        /* Now that the root cgroup has no processes, enable controllers
+           for the per-build sibling cgroups so they get memory/io stats. */
+        try {
+            auto available = tokenizeString<StringSet>(readFile(rootCgroupPath / "cgroup.controllers"));
+            Strings enable;
+            for (auto & c : {"cpu", "memory", "io", "pids"})
+                if (available.count(c))
+                    enable.push_back(fmt("+%s", c));
+            if (!enable.empty())
+                writeFile(rootCgroupPath / "cgroup.subtree_control", concatStringsSep(" ", enable));
+        } catch (SystemError & e) {
+            /* This is what we get when trying to violate the "no internal processes" rule. */
+            if (e.is(std::errc::device_or_resource_busy))
+                warn(
+                    "could not enable cgroup controllers because current cgroup (%s) is not process-free",
+                    PathFmt(rootCgroupPath));
+            else
+                warn("could not enable cgroup controllers for builds: %s", e.ec().message());
+        }
     }
 #endif
 
