@@ -1,0 +1,45 @@
+info: breakpoint reached
+
+Nix <nix version> debugger
+Type :? for help.
+
+nix-repl> :bt
+
+0: error: breakpoint reached
+
+1: while calling a function
+/path/to/tests/functional/repl/debugger-okay-break.in.debugexpr.nix:5:1
+
+     4| in
+     5| builtins.break othervar
+      | ^
+     6| 
+
+2: while evaluating a 'let' expression
+
+3: while evaluating the file '/path/to/tests/functional/repl/debugger-okay-break.in.debugexpr.nix':
+
+nix-repl> :backtrace
+
+0: error: breakpoint reached
+
+1: while calling a function
+/path/to/tests/functional/repl/debugger-okay-break.in.debugexpr.nix:5:1
+
+     4| in
+     5| builtins.break othervar
+      | ^
+     6| 
+
+2: while evaluating a 'let' expression
+
+3: while evaluating the file '/path/to/tests/functional/repl/debugger-okay-break.in.debugexpr.nix':
+
+nix-repl> :p somevar
+hello
+
+nix-repl> :p othervar
+42
+
+nix-repl> :c
+42

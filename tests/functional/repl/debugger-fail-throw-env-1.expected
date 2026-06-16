@@ -1,0 +1,35 @@
+error: oh snap
+
+Nix <nix version> debugger
+Type :? for help.
+
+nix-repl> :env
+Env level 0
+static: _ 
+
+Env level 1
+builtins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation 
+
+nix-repl> :quit
+error:
+       … while evaluating the file '/path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix':
+
+       … from call site
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix:1:1:
+            1| (_: throw "oh snap") 42
+             | ^
+            2|
+
+       … while calling anonymous lambda
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix:1:2:
+            1| (_: throw "oh snap") 42
+             |  ^
+            2|
+
+       … while calling the 'throw' builtin
+         at /path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix:1:5:
+            1| (_: throw "oh snap") 42
+             |     ^
+            2|
+
+       error: oh snap

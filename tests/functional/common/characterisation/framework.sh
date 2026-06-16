@@ -16,7 +16,7 @@ function diffAndAcceptInner() {
     if test -e "$expected"; then
         local -r expectedOrEmpty="$expected"
     else
-        local -r expectedOrEmpty=characterisation/empty
+        local -r expectedOrEmpty=common/characterisation/empty
     fi
 
     # Diff so we get a nice message

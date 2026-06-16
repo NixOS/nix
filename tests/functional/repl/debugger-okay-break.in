@@ -1,0 +1,5 @@
+:bt
+:backtrace
+:p somevar
+:p othervar
+:c
