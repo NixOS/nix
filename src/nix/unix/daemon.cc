@@ -277,6 +277,19 @@ static void daemonLoop(
             throw SysError("creating cgroup '%s'", daemonCgroupPath);
         //  Move daemon into the new cgroup.
         writeFile(daemonCgroupPath + "/cgroup.procs", fmt("%d", getpid()));
+
+        /* The daemon's process now lives in a leaf cgroup, so the service
+           cgroup has no member processes and we can delegate the resource
+           controllers to the per-build sub-cgroups (cgroup-v2 "no internal
+           process" rule). Without this, build cgroups only expose cpu.stat,
+           never memory.peak / io.stat / memory.events (nix#9675). */
+        try {
+            linux::delegateCgroupControllers(rootCgroupPath);
+        } catch (Error & e) {
+            warn(
+                "could not delegate cgroup controllers, per-build memory and I/O metrics will be unavailable: %s",
+                e.msg());
+        }
     }
 #endif
 

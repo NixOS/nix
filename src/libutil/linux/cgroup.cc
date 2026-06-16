@@ -76,6 +76,31 @@ CgroupStats getCgroupStats(const std::filesystem::path & cgroup)
     return stats;
 }
 
+std::optional<std::string> subtreeControlEnableLine(std::string_view availableControllers)
+{
+    auto available = tokenizeString<StringSet>(availableControllers);
+
+    std::string line;
+    for (std::string controller : {"cpu", "memory", "io", "pids"})
+        if (available.contains(controller))
+            line += (line.empty() ? "+" : " +") + controller;
+
+    return line.empty() ? std::nullopt : std::make_optional(line);
+}
+
+void delegateCgroupControllers(const std::filesystem::path & cgroup)
+{
+    auto controllersFile = cgroup / "cgroup.controllers";
+    if (!pathExists(controllersFile))
+        throw Error("%s is not a cgroup-v2 directory", PathFmt(cgroup));
+
+    auto line = subtreeControlEnableLine(readFile(controllersFile));
+    if (!line)
+        throw Error("no delegatable resource controllers available in %s", PathFmt(controllersFile));
+
+    writeFile(cgroup / "cgroup.subtree_control", *line);
+}
+
 static CgroupStats destroyCgroup(const std::filesystem::path & cgroup, bool returnStats)
 {
     if (!pathExists(cgroup))
