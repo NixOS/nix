@@ -274,16 +274,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                attribute set.  Evaluate it to get the names of the
                attributes. */
             auto expr = cur.substr(0, dot);
-            auto cur2 = cur.substr(dot + 1);
-
-            /* If the user started typing a quoted attribute name
-               (e.g. `foo."bar`), strip the opening quote so we can
-               match against the raw attribute names. */
-            bool insideQuote = false;
-            if (!cur2.empty() && cur2[0] == '"') {
-                cur2 = cur2.substr(1);
-                insideQuote = true;
-            }
 
             Expr * e = parseString(expr);
             Value v;
@@ -293,27 +283,13 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                 noPos,
                 "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
-            for (auto & i : *v.attrs()) {
-                std::string_view name = state->symbols[i.name];
-                if (name.substr(0, cur2.size()) != cur2)
-                    continue;
-                auto formattedName = formatAttrName(name);
-                if (insideQuote) {
-                    /* The user already typed an opening `"`, so the
-                       completion string must include it to keep the
-                       character offsets aligned with the input buffer.
-                       `formattedName` already wraps names that need
-                       quoting in `"…"`, so we can use it directly for
-                       those.  For plain identifiers that the user
-                       gratuitously quoted, wrap them ourselves. */
-                    if (formattedName.size() >= 2 && formattedName[0] == '"')
-                        completions.insert(concatStrings(prev, expr, ".", formattedName));
-                    else
-                        completions.insert(concatStrings(prev, expr, ".\"", formattedName, "\""));
-                } else {
-                    completions.insert(concatStrings(prev, expr, ".", formattedName));
-                }
-            }
+            StringSet attrNames;
+            for (auto & i : *v.attrs())
+                attrNames.insert(std::string(state->symbols[i.name]));
+
+            auto matched = matchAttrCompletions(cur, attrNames);
+            for (auto & c : matched)
+                completions.insert(prev + c);
 
         } catch (ParseError & e) {
             // Quietly ignore parse errors.

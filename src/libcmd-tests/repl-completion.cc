@@ -139,4 +139,57 @@ TEST(formatAttrName, anotherKeyword)
     ASSERT_EQ(result, "\"let\"");
 }
 
+/* ----------------------------------------------------------------------------
+ * matchAttrCompletions (parametrized TEST_P suite)
+ * --------------------------------------------------------------------------*/
+
+struct CompletionTestCase
+{
+    std::string prefix;
+    StringSet attrNames;
+    StringSet expected;
+};
+
+class AttrCompletionTest : public ::testing::TestWithParam<CompletionTestCase>
+{};
+
+TEST_P(AttrCompletionTest, matchesExpected)
+{
+    const auto & [prefix, attrNames, expected] = GetParam();
+    auto result = matchAttrCompletions(prefix, attrNames);
+    EXPECT_EQ(result, expected);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Completions,
+    AttrCompletionTest,
+    ::testing::Values(
+        // Simple prefix matching after a dot
+        CompletionTestCase{"foo.b", {"bar", "baz", "qux"}, {"foo.bar", "foo.baz"}},
+        // All attributes match when prefix after dot is empty
+        CompletionTestCase{"foo.", {"alpha", "beta"}, {"foo.alpha", "foo.beta"}},
+        // No matches when nothing starts with the typed prefix
+        CompletionTestCase{"foo.xyz", {"alpha", "beta"}, {}},
+        // Exact single match
+        CompletionTestCase{"pkg.name", {"name", "version"}, {"pkg.name"}},
+        // Attribute name requiring quoting (contains a dot)
+        CompletionTestCase{"a.test", {"test.server.example.com", "testing"}, {"a.\"test.server.example.com\"", "a.testing"}},
+        // Quoted prefix — user typed opening quote, name needs quoting
+        CompletionTestCase{"a.\"test", {"test.server.example.com", "other"}, {"a.\"test.server.example.com\""}},
+        // Quoted prefix — user typed opening quote for a plain identifier
+        CompletionTestCase{"a.\"foo", {"fooBar", "fooQux"}, {"a.\"fooBar\"", "a.\"fooQux\""}},
+        // Attribute name with space requires quoting
+        CompletionTestCase{"pkg.he", {"hello world", "help"}, {"pkg.help", "pkg.\"hello world\""}},
+        // Attribute name starting with digit requires quoting
+        CompletionTestCase{"x.1", {"123abc", "1foo"}, {"x.\"123abc\"", "x.\"1foo\""}},
+        // Reserved keyword requires quoting
+        CompletionTestCase{"cfg.i", {"if", "import-path"}, {"cfg.\"if\"", "cfg.import-path"}},
+        // Multi-level dotted path — only last component is matched
+        CompletionTestCase{"a.b.c", {"cat", "car", "dog"}, {"a.b.cat", "a.b.car"}},
+        // No unquoted dot — returns empty (not an attr path)
+        CompletionTestCase{"nodot", {"foo", "bar"}, {}},
+        // Quoted segment in path prefix — dots inside quotes are ignored
+        CompletionTestCase{"a.\"b.c\".d", {"dog", "deer", "fox"}, {"a.\"b.c\".dog", "a.\"b.c\".deer"}}
+    ));
+
 } // namespace nix
