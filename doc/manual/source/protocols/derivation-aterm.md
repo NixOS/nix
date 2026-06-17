@@ -26,7 +26,7 @@ Derivations are serialised in one of the following formats:
 
 When derivation is encoded to a [store object] we make the following choices:
 
-- The store path name is the derivation name with `.drv` suffixed at the end
+- The store path [name](@docroot@/store/store-path.md#name) is the derivation name with `.drv` suffixed at the end
 
   Indeed, the ATerm format above does *not* contain the name of the derivation, on the assumption that a store path will also be provided out-of-band.
 

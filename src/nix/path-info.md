@@ -82,9 +82,8 @@ R""(
 This command shows information about the store paths produced by
 [*installables*](./nix.md#installables), or about all paths in the store if you pass `--all`.
 
-By default, this command only prints the store paths. You can get
-additional information by passing flags such as `--closure-size`,
-`--size`, `--sigs` or `--json`.
+By default, this command only prints the store paths.
+You can get additional information by passing flags such as `--closure-size`, `--size`, `--sigs` or `--json`.
 
 > **Warning**
 >

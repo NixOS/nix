@@ -4,7 +4,7 @@ title: Build Trace Entry
 description: |
   A record of a successful build outcome for a specific derivation output.
 
-  This schema describes the JSON representation of a [build trace entry](@docroot@/store/build-trace.md).
+  This schema describes the JSON representation of an [entry](@docroot@/store/build-trace.md#entry) in a [build trace](@docroot@/store/build-trace.md).
 
   > **Warning**
   >
@@ -39,7 +39,7 @@ additionalProperties: false
   key:
     title: Build Trace Key
     description: |
-      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      A [build trace entry](@docroot@/store/build-trace.md#entry) is a key-value pair.
       This is the "key" part, referring to a derivation and output.
     type: object
     required:
@@ -61,7 +61,7 @@ additionalProperties: false
   value:
     title: Build Trace Value
     description: |
-      A [build trace entry](@docroot@/store/build-trace.md) is a key-value pair.
+      A [build trace entry](@docroot@/store/build-trace.md#entry) is a key-value pair.
       This is the "value" part, describing an output.
     type: object
     required:

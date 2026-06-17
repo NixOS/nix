@@ -39,7 +39,7 @@ to revoke a key).
 # Format
 
 Both secret and public keys are represented as the key name followed
-by a base-64 encoding of the Ed25519 key data, e.g.
+by a [Base64](https://en.wikipedia.org/wiki/Base64) encoding of the Ed25519 key data, e.g.
 
 ```
 cache.example.org-0:E7lAO+MsPwTFfPXsdPtW8GKui/5ho4KQHVcAGnX+Tti1V4dUxoVoqLyWJ4YESuZJwQ67GVIksDt47og+tPVUZw==

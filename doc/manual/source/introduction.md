@@ -49,7 +49,7 @@ builds correctly on your system, this is because you specified the
 dependency explicitly. This takes care of the build-time dependencies.
 
 Once a package is built, runtime dependencies are found by scanning
-binaries for the hash parts of Nix store paths (such as `r8vvq9kq…`).
+binaries for the [hash parts](@docroot@/store/store-path.md#digest) of Nix store paths (such as `r8vvq9kq…`).
 This sounds risky, but it works extremely well.
 
 ## Multi-user support

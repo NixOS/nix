@@ -149,9 +149,9 @@ The new structured format follows the [JSON guidelines](@docroot@/development/js
   }
   ```
 
-  The map from store path base names to store object info is nested under the `info` field.
+  The map from [store path base names](@docroot@/store/store-path.md#base-name) to store object info is nested under the `info` field.
 
-- **Store path base names instead of full paths**:
+- **[Store path base names](@docroot@/store/store-path.md#base-name) instead of full paths**:
 
   Map keys and references use store path base names (e.g., `"abc...-foo"`) instead of full absolute store paths.
   Combined with `storeDir`, the full path can be reconstructed.
