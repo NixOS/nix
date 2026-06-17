@@ -50,11 +50,13 @@ Pid::Pid(pid_t pid)
 }
 
 Pid::~Pid()
-try {
-    if (pid != -1)
-        kill(/*allowInterrupts=*/false);
-} catch (...) {
-    ignoreExceptionInDestructor();
+{
+    try {
+        if (pid != -1)
+            kill(/*allowInterrupts=*/false);
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
 }
 
 void Pid::operator=(pid_t pid)
