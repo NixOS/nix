@@ -732,6 +732,14 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     pathInfoCache->lock()->clear();
 }
 
+void RemoteStore::deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::DeleteBuildTrace << drvPath.to_string() << outputs.to_string();
+    conn.processStderr();
+    readInt(conn->from);
+}
+
 void RemoteStore::optimiseStore()
 {
     auto conn(getConnection());

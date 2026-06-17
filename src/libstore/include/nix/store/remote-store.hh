@@ -132,6 +132,8 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
 
+    void deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs) override;
+
     void optimiseStore() override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;

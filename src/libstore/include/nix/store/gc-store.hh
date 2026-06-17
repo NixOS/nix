@@ -139,10 +139,7 @@ public:
     /**
      * Delete a build trace entry (realisation) from the store's database.
      */
-    virtual void deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs)
-    {
-        unsupported("deleteBuildTrace");
-    };
+    virtual void deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs) = 0;
 };
 
 } // namespace nix

@@ -1,4 +1,5 @@
 #include "nix/store/daemon.hh"
+#include "nix/store/outputs-spec.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
@@ -1009,6 +1010,18 @@ static void performOp(
             source.drainInto(sink);
             logStore.addBuildLog(path, sink.s);
         }
+        logger->stopWork();
+        conn.to << 1;
+        break;
+    }
+
+    case WorkerProto::Op::DeleteBuildTrace: {
+        logger->startWork();
+        StorePath path{readString(conn.from)};
+        auto outputs = OutputsSpec::parse(readString(conn.from));
+
+        auto & gcStore = require<GcStore>(*store);
+        gcStore.deleteBuildTrace(path, outputs);
         logger->stopWork();
         conn.to << 1;
         break;

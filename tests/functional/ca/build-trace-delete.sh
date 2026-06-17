@@ -4,9 +4,7 @@ source common.sh
 
 set -x
 
-needLocalStore "command 'nix store build-trace delete' can’t be used with the daemon"
-
-clearStore
+requireDaemonNewerThan "2.35.0pre20260517"
 
 singleOutput=$(nix-instantiate ./nondeterministic-ns.nix -A singleOut)
 multiOutput=$(nix-instantiate ./nondeterministic-ns.nix -A multiOut)
