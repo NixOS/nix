@@ -10,7 +10,7 @@ as
 
     /nix/store/q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1/
 
-where `b6gvzjyb2pg0…` is a unique identifier for the package that
+where `q06x3jll2yfz…` is a unique identifier for the package that
 captures all its dependencies (it’s a cryptographic hash of the
 package’s build dependency graph).  This enables many powerful
 features.
@@ -174,7 +174,7 @@ the package:
 
 ## Portability
 
-Nix runs on Linux and macOS.
+Nix runs on Linux, macOS and FreeBSD.
 
 ## NixOS
 
