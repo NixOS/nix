@@ -27,7 +27,8 @@
 /contributing/documentation /development/documentation 301!
 /contributing/experimental-features /development/experimental-features 301!
 /contributing/cli-guideline /development/cli-guideline 301!
-/contributing/json-guideline /development/json-guideline 301!
+/contributing/json-guideline /development/data-modeling 301!
+/development/json-guideline /development/data-modeling 301!
 /contributing/cxx /development/cxx 301!
 
 /expressions/expression-language /language/ 301!

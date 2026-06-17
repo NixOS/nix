@@ -149,7 +149,7 @@
   - [Debugging](development/debugging.md)
   - [Documentation](development/documentation.md)
   - [CLI guideline](development/cli-guideline.md)
-  - [JSON guideline](development/json-guideline.md)
+  - [Data Modeling Guidelines](development/data-modeling.md)
   - [C++ style guide](development/cxx.md)
   - [Static Analysis](development/static-analysis.md)
   - [Experimental Features](development/experimental-features.md)

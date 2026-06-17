@@ -135,7 +135,7 @@ This is the legacy format, preserved for backwards compatibility:
 
 ### Version 2 (`--json-format 2`)
 
-The new structured format follows the [JSON guidelines](@docroot@/development/json-guideline.md) with the following changes:
+The new structured format follows the [data modeling guidelines](@docroot@/development/data-modeling.md) with the following changes:
 
 - **Nested structure with top-level metadata**:
 
