@@ -1248,6 +1248,13 @@ void LocalStore::addMultipleToStore(
 
             auto & info = item->first;
 
+            /* Make sure that the Source object is destroyed when
+               we're done. In particular, a SinkToSource object must
+               be destroyed to ensure that the destructors on its
+               stack frame are run; this includes
+               LegacySSHStore::narFromPath()'s connection lock. */
+            auto source = std::move(item->second);
+
             MaintainCount<decltype(nrRunning)> mc(nrRunning);
             showProgress();
 
@@ -1271,7 +1278,7 @@ void LocalStore::addMultipleToStore(
                 notice("reusing previously unpacked path at '%s'", printStorePath(info.path));
                 act.setExpected(actCopyPath, bytesExpected -= info.narSize);
             } else {
-                doAddToStore(info, *item->second, repair);
+                doAddToStore(info, *source, repair);
                 /* The path has been unpacked, so mark it as such. */
                 writeFile(unpackedMarker, "");
             }
