@@ -158,13 +158,26 @@ wait "$pid2"
 [[ $(cat "$TEST_ROOT/log1" "$TEST_ROOT/log2" | grep -c "downloading.*nar'") -eq 1 ]]
 
 
-# Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
+# Test whether Nix notices if the NAR doesn't match the file size in the NAR info.
 clearStore
 
 nar=$cacheDir/$(nix path-info --json --store "file://$cacheDir" "$depPath" | jq -r .[].url)
 mv "$nar" "$nar".good
 mkdir -p "$TEST_ROOT/empty"
 nix-store --dump "$TEST_ROOT/empty" | xz > "$nar"
+
+expect 1 nix-build --substituters "$httpBinaryCacheUrl" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result" 2>&1 | tee "$TEST_ROOT/log"
+grepQuiet "size mismatch" "$TEST_ROOT/log"
+
+mv "$nar".good "$nar"
+
+
+# Test whether Nix notices if the NAR doesn't match the hash in the NAR info.
+clearStore
+
+nar=$cacheDir/$(nix path-info --json --store "file://$cacheDir" "$depPath" | jq -r .[].url)
+mv "$nar" "$nar".good
+xz -cd <"$nar".good | sed 's/foo/Foo/' | xz -c >"$nar"
 
 expect 1 nix-build --substituters "$httpBinaryCacheUrl" --no-require-sigs dependencies.nix -o "$TEST_ROOT/result" 2>&1 | tee "$TEST_ROOT/log"
 grepQuiet "hash mismatch" "$TEST_ROOT/log"

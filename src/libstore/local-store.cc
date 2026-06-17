@@ -1060,19 +1060,19 @@ void LocalStore::doAddToStore(const ValidPathInfo & info, Source & source, Repai
 
     auto hashResult = hashSink.finish();
 
-    if (hashResult.hash != info.narHash)
-        throw Error(
-            "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
-            printStorePath(info.path),
-            info.narHash.to_string(HashFormat::SRI, true),
-            hashResult.hash.to_string(HashFormat::SRI, true));
-
     if (hashResult.numBytesDigested != info.narSize)
         throw Error(
             "size mismatch importing path '%s';\n  specified: %s\n  got:       %s",
             printStorePath(info.path),
             info.narSize,
             hashResult.numBytesDigested);
+
+    if (hashResult.hash != info.narHash)
+        throw Error(
+            "hash mismatch importing path '%s';\n  specified: %s\n  got:       %s",
+            printStorePath(info.path),
+            info.narHash.to_string(HashFormat::SRI, true),
+            hashResult.hash.to_string(HashFormat::SRI, true));
 
     if (info.ca) {
         auto & specified = *info.ca;
