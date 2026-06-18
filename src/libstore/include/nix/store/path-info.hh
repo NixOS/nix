@@ -91,14 +91,6 @@ struct UnkeyedValidPathInfo
     uint64_t narSize = 0;
 
     /**
-     * internal use only: SQL primary key for on-disk store objects with
-     * `LocalStore`.
-     *
-     * @todo Remove, layer violation
-     */
-    uint64_t id = 0;
-
-    /**
      * Whether the path is ultimately trusted, that is, it's a
      * derivation output that was built locally.
      */
