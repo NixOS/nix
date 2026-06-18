@@ -85,14 +85,18 @@ std::string replaceStrings(std::string res, std::string_view from, std::string_v
     return res;
 }
 
-std::string rewriteStrings(std::string s, const StringMap & rewrites)
+std::string
+rewriteStrings(std::string s, const StringMap & rewrites, std::set<uint64_t> * matches, uint64_t offsetShift)
 {
     for (auto & i : rewrites) {
         if (i.first == i.second)
             continue;
         size_t j = 0;
-        while ((j = s.find(i.first, j)) != s.npos)
+        while ((j = s.find(i.first, j)) != s.npos) {
+            if (matches)
+                matches->insert(j + offsetShift);
             s.replace(j, i.first.size(), i.second);
+        }
     }
     return s;
 }

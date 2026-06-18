@@ -7,10 +7,10 @@ enableFeatures "fetch-closure"
 TODO_NixOS
 
 # Old daemons don't properly zero out the self-references when
-# calculating the CA hashes, so this breaks `nix store
+# calculating the CA hashes and take their positions into account, so this breaks `nix store
 # make-content-addressed` which expects the client and the daemon to
-# compute the same hash
-requireDaemonNewerThan "2.16.0pre20230524"
+# compute the same hash.
+requireDaemonNewerThan "2.35"
 
 # Initialize binary cache.
 nonCaPath=$(nix build --json --file ./dependencies.nix --no-link | jq -r .[].outputs.out)

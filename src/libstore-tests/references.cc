@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <random>
+#include <set>
+
 namespace nix {
 
 struct RewriteParams
@@ -42,6 +45,100 @@ INSTANTIATE_TEST_CASE_P(
         RewriteParams{"foooo", "baroo", {{"foo", "bar"}, {"bar", "baz"}}},
         RewriteParams{"foooo", "bazoo", {{"fou", "bar"}, {"foo", "baz"}}},
         RewriteParams{"foooo", "foooo", {}}));
+
+TEST(references, rewritingSinkChunking)
+{
+    std::mt19937 rng(42);
+
+    /* Build a set of rewrites. Keys are random [a-z] strings of random
+       length in [8, 32]; values are same-length [A-Z] strings so a
+       replacement never produces a new match for any key. We also skip
+       any key that would be a substring of (or have as a substring) an
+       existing key, so that inserting one key into the input cannot also
+       produce a match for a different key. */
+    StringMap rewrites;
+    std::vector<std::string> keys;
+    {
+        std::uniform_int_distribution<int> lowerDist('a', 'z');
+        std::uniform_int_distribution<int> upperDist('A', 'Z');
+        std::uniform_int_distribution<size_t> lenDist(8, 32);
+
+        while (rewrites.size() < 8) {
+            std::string from(lenDist(rng), '\0');
+            for (auto & c : from)
+                c = lowerDist(rng);
+            if (rewrites.count(from))
+                continue;
+            bool overlap = false;
+            for (auto & other : keys)
+                if (from.find(other) != std::string::npos || other.find(from) != std::string::npos) {
+                    overlap = true;
+                    break;
+                }
+            if (overlap)
+                continue;
+            std::string to(from.size(), '\0');
+            for (auto & c : to)
+                c = upperDist(rng);
+            rewrites[from] = to;
+            keys.push_back(from);
+        }
+    }
+
+    /* Build a ~1 MB input mixing rewrite keys with [0-9] digits. Always
+       emit at least one digit between two consecutive keys so adjacency
+       cannot create spurious matches at key boundaries. Compute the
+       expected output string and matches vector at the same time. */
+    std::string input;
+    std::string expectedOutput;
+    std::set<uint64_t> expectedMatches;
+    input.reserve(1'000'000);
+    expectedOutput.reserve(1'000'000);
+    {
+        std::uniform_int_distribution<int> digitDist('0', '9');
+        std::uniform_int_distribution<size_t> keyDist(0, keys.size() - 1);
+        std::bernoulli_distribution useKeyDist(0.2);
+        bool justInsertedKey = false;
+
+        while (input.size() < 1'000'000) {
+            if (useKeyDist(rng) && !justInsertedKey) {
+                const auto & from = keys[keyDist(rng)];
+                expectedMatches.insert(input.size());
+                expectedOutput += rewrites.at(from);
+                input += from;
+                justInsertedKey = true;
+            } else {
+                char d = static_cast<char>(digitDist(rng));
+                input.push_back(d);
+                expectedOutput.push_back(d);
+                justInsertedKey = false;
+            }
+        }
+    }
+
+    StringSink singleOut;
+    RewritingSink singleSink(rewrites, singleOut);
+    singleSink(input);
+    singleSink.flush();
+
+    StringSink chunkedOut;
+    RewritingSink chunkedSink(rewrites, chunkedOut);
+    {
+        std::uniform_int_distribution<size_t> chunkDist(1, 128);
+        std::string_view remaining(input);
+        while (!remaining.empty()) {
+            auto n = std::min(chunkDist(rng), remaining.size());
+            chunkedSink(remaining.substr(0, n));
+            remaining = remaining.substr(n);
+        }
+    }
+    chunkedSink.flush();
+
+    ASSERT_EQ(singleOut.s, expectedOutput);
+    ASSERT_EQ(chunkedOut.s, expectedOutput);
+    ASSERT_EQ(singleSink.matches, expectedMatches);
+    ASSERT_EQ(chunkedSink.matches, expectedMatches);
+}
 
 TEST(references, scan)
 {

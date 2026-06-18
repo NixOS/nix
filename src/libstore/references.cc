@@ -78,7 +78,7 @@ void RewritingSink::operator()(std::string_view data)
     std::string s(prev);
     s.append(data);
 
-    s = rewriteStrings(s, rewrites);
+    s = rewriteStrings(s, rewrites, &matches, pos);
 
     prev = s.size() < maxRewriteSize ? s
            : maxRewriteSize == 0     ? ""
@@ -103,6 +103,7 @@ void RewritingSink::flush()
 
 HashModuloSink::HashModuloSink(HashAlgorithm ha, const std::string & modulus)
     : hashSink(ha)
+    // Zero out self-references (the "modulus").
     , rewritingSink(modulus, std::string(modulus.size(), 0), hashSink)
 {
 }
