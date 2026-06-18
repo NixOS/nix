@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.1.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.2.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -206,3 +206,47 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 <!-- Determinate Nix version 3.21.1 -->
 
 * Determinate Nix is built against Determinate Secure Packages. [DeterminateSystems/nix-src#288](https://github.com/DeterminateSystems/nix-src/pull/288)
+
+<!-- Determinate Nix version 3.21.2 -->
+
+* Add missing manpages by @edolstra in [DeterminateSystems/nix-src#490](https://github.com/DeterminateSystems/nix-src/pull/490)
+
+* SQLiteStmt::Use: Rename operator() -> apply() by @edolstra in [DeterminateSystems/nix-src#491](https://github.com/DeterminateSystems/nix-src/pull/491)
+
+* Make optimiseStore() multi-threaded by @edolstra in [DeterminateSystems/nix-src#492](https://github.com/DeterminateSystems/nix-src/pull/492)
+
+* Binary cache info by @edolstra in [DeterminateSystems/nix-src#493](https://github.com/DeterminateSystems/nix-src/pull/493)
+
+* Fix running hydraJobs in CI by @edolstra in [DeterminateSystems/nix-src#494](https://github.com/DeterminateSystems/nix-src/pull/494)
+
+* ci: include output paths in FlakeHub upload by @cole-h in [DeterminateSystems/nix-src#495](https://github.com/DeterminateSystems/nix-src/pull/495)
+
+* fixup: don't include linux-only drvs if not on linux by @cole-h in [DeterminateSystems/nix-src#496](https://github.com/DeterminateSystems/nix-src/pull/496)
+
+* Improve error message when user isn't allowed access to the daemon by @edolstra in [DeterminateSystems/nix-src#498](https://github.com/DeterminateSystems/nix-src/pull/498)
+
+* Daemon: Ignore interrupts between accept() and child start by @edolstra in [DeterminateSystems/nix-src#502](https://github.com/DeterminateSystems/nix-src/pull/502)
+
+* Build all the archs without DSP by @grahamc in [DeterminateSystems/nix-src#503](https://github.com/DeterminateSystems/nix-src/pull/503)
+
+* Mirror to nix-artifacts on release of tags by @grahamc in [DeterminateSystems/nix-src#501](https://github.com/DeterminateSystems/nix-src/pull/501)
+
+* nario tweaks by @edolstra in [DeterminateSystems/nix-src#499](https://github.com/DeterminateSystems/nix-src/pull/499)
+
+* Fix crash in builtins.break by @edolstra in [DeterminateSystems/nix-src#505](https://github.com/DeterminateSystems/nix-src/pull/505)
+
+* Fix SSH connection sharing by @edolstra in [DeterminateSystems/nix-src#506](https://github.com/DeterminateSystems/nix-src/pull/506)
+
+* Move the srcToStore cache into fetchToStore() by @edolstra in [DeterminateSystems/nix-src#507](https://github.com/DeterminateSystems/nix-src/pull/507)
+
+* Replace select() by poll() by @edolstra in [DeterminateSystems/nix-src#504](https://github.com/DeterminateSystems/nix-src/pull/504)
+
+* LocalStore::doAddToStore(): Check NAR size before NAR hash by @edolstra in [DeterminateSystems/nix-src#512](https://github.com/DeterminateSystems/nix-src/pull/512)
+
+* Increase the sourceToSink/sinkToSource coroutine stack sizes by @edolstra in [DeterminateSystems/nix-src#511](https://github.com/DeterminateSystems/nix-src/pull/511)
+
+* Fix LocalStore::addMultipleToStore SinkToSource destructor unsoundness by @cole-h in [DeterminateSystems/nix-src#513](https://github.com/DeterminateSystems/nix-src/pull/513)
+
+* ci: fixup mirroring by @cole-h in [DeterminateSystems/nix-src#515](https://github.com/DeterminateSystems/nix-src/pull/515)
+
+* Fix exceptions not being caught in nix::Pid::~Pid by @cole-h in [DeterminateSystems/nix-src#516](https://github.com/DeterminateSystems/nix-src/pull/516)
