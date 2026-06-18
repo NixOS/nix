@@ -814,8 +814,6 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
 
     auto info = std::make_shared<ValidPathInfo>(path, UnkeyedValidPathInfo(*this, narHash));
 
-    info->id = id;
-
     info->registrationTime = useQueryPathInfo.getInt(2);
 
     auto s = (const char *) sqlite3_column_text(state.stmts->QueryPathInfo, 3);
@@ -836,7 +834,7 @@ std::shared_ptr<const ValidPathInfo> LocalStore::queryPathInfoInternal(State & s
         info->ca = ContentAddress::parseOpt(s);
 
     /* Get the references. */
-    auto useQueryReferences(state.stmts->QueryReferences.use().apply(info->id));
+    auto useQueryReferences(state.stmts->QueryReferences.use().apply(id));
 
     while (useQueryReferences.next())
         info->references.insert(parseStorePath(useQueryReferences.getStr(0)));
