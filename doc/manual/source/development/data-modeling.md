@@ -1,7 +1,12 @@
-# JSON guideline
+# Data Modeling Guidelines
 
-Nix consumes and produces JSON in a variety of contexts.
-These guidelines ensure consistent practices for all our JSON interfaces, for ease of use, and so that experience in one part carries over to another.
+Nix consumes and produces JSON and attribute sets in a variety of contexts.
+These guidelines ensure consistent practices for our interfaces, for ease of use, and so that experience in one part carries over to another.
+
+For these guidelines, we will use JSON terminology, but they apply equally well to new attribute set interfaces (primops, etc.).
+Note that these are guidelines first and foremost. Exceptions include:
+- Feature testing: e.g., it is OK to do `builtins?frobnicate`.
+- Compatibility: we generally do not change stable interfaces just to make them comply. New replacements can be added with care.
 
 ## Extensibility
 
