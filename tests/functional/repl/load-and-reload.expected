@@ -1,0 +1,21 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> :l file-b.nix
+Added 3 variables.
+fromB, fromBFails, funcFromB
+
+nix-repl> :l ./does-not-exist.nix
+error: path '/path/to/tests/functional/repl/does-not-exist.nix' does not exist
+
+nix-repl> :p fromBFails
+error:
+       … while calling the 'throw' builtin
+         at «string»:1:18:
+            1| fromBFails
+             |                  ^
+
+       error: b
+
+nix-repl> :doc funcFromB
+error: basic_string::substr: __pos (which is 3) > this->size() (which is 0)
