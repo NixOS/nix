@@ -132,7 +132,8 @@ private:
     ChildEvents childEvents;
 
 public:
-    typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
+    // Do not remove values from this enum, need to support older daemons
+    typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters, ecIncompleteClosure } ExitCode;
 
     /**
      * Backlink to the worker.

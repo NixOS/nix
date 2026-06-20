@@ -209,6 +209,10 @@ Goal::Done Goal::amDone(ExitCode result)
     trace("done");
     assert(top_co);
     assert(exitCode == ecBusy);
+    // Support for ecIncompleteClosure was removed in https://github.com/NixOS/nix/pull/13176
+    // Handle the case where a user has an old daemon and new client
+    if (result == ecIncompleteClosure)
+        result = ecNoSubstituters;
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
 
