@@ -79,6 +79,38 @@ struct Builder
     buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode = bmNormal) = 0;
 
     /**
+     * Like the other buildDerivation(), but additionally copies a set of
+     * input paths into the builder's store before the build is run.
+     *
+     * This lets the caller ship the build inputs together with the build
+     * request, rather than as a separate prior `copyPaths()`. Whether the
+     * inputs are fetched via substitution or copied directly is governed by
+     * the `builders-use-substitutes` setting.
+     *
+     * @param inputs The store paths to make available in the builder's
+     * store before building. For a remote builder these are copied across
+     * the connection; for the local `Worker` they are copied from the eval
+     * store.
+     */
+    virtual BuildResult buildDerivation(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StorePathSet & inputs,
+        BuildMode buildMode = bmNormal) = 0;
+
+    /**
+     * Like the other buildPathsWithResults(), but additionally copies a set
+     * of input paths into the builder's store before building.
+     *
+     * @param inputs The store paths to make available in the builder's
+     * store before building, copied subject to the
+     * `builders-use-substitutes` setting (see the buildDerivation() overload
+     * above).
+     */
+    virtual std::vector<KeyedBuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode = bmNormal) = 0;
+
+    /**
      * Ensure that a path is valid.  If it is not currently valid, it
      * may be made valid by running a substitute (if defined for the
      * path).
