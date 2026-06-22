@@ -24,7 +24,7 @@ jobs:
   eval:
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -40,7 +40,7 @@ jobs:
     name: pre-commit checks
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/install-nix-action
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -87,7 +87,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -144,7 +144,7 @@ jobs:
     continue-on-error: true
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -180,7 +180,7 @@ jobs:
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Download installer tarball
       uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
@@ -217,7 +217,7 @@ jobs:
     runs-on: ubuntu-24.04
     name: clang-tidy
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
@@ -235,14 +235,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout nix
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Checkout flake-regressions
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: NixOS/flake-regressions
           path: flake-regressions
       - name: Checkout flake-regressions-data
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
@@ -272,7 +272,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref_name == 'master'
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: ./.github/actions/install-nix-action
