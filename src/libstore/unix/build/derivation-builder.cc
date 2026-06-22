@@ -499,8 +499,7 @@ static void handleDiffHook(
                 .gid = gid,
                 .chdir = "/"});
         if (!statusOk(diffRes.first))
-            throw ExecError(
-                diffRes.first, "diff-hook program %s %2%", PathFmt(diffHook), statusToString(diffRes.first));
+            throw ExecError(diffRes.first, "diff-hook program %s %s", PathFmt(diffHook), statusToString(diffRes.first));
 
         if (diffRes.second != "")
             printError(chomp(diffRes.second));
