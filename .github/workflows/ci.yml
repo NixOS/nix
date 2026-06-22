@@ -32,6 +32,9 @@ jobs:
 
   build_x86_64-linux:
     uses: ./.github/workflows/build.yml
+    # Determinate Secure Packages is a private flake dependency that external
+    # (fork) contributors can't access, so only build it for non-fork PRs.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
     with:
       system: x86_64-linux
       runner: namespace-profile-linuxamd32c64g-cache
@@ -50,7 +53,9 @@ jobs:
 
   build_x86_64-linux_no_dsp:
     uses: ./.github/workflows/build.yml
-    if: github.event_name == 'merge_group'
+    # Build the non-DSP flake in the merge queue and for external (fork) PRs,
+    # which can't access Determinate Secure Packages.
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: x86_64-linux
@@ -64,6 +69,7 @@ jobs:
 
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
     with:
       system: aarch64-linux
       runner: UbuntuLatest32Cores128GArm
@@ -76,7 +82,7 @@ jobs:
 
   build_aarch64-linux_no_dsp:
     uses: ./.github/workflows/build.yml
-    if: github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: aarch64-linux
@@ -91,6 +97,7 @@ jobs:
 
   build_aarch64-darwin:
     uses: ./.github/workflows/build.yml
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'DeterminateSystems/nix-src'
     with:
       system: aarch64-darwin
       runner: namespace-profile-mac-m2-12c28g
@@ -103,7 +110,7 @@ jobs:
 
   build_aarch64-darwin_no_dsp:
     uses: ./.github/workflows/build.yml
-    if: github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: aarch64-darwin
