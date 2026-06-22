@@ -1189,7 +1189,6 @@ void EvalState::resetFileCache()
     fileEvalCache->clear();
     inputCache->clear();
     lookupPathResolved->clear();
-    positions.clear();
     rootFS->invalidateCache();
 }
 
