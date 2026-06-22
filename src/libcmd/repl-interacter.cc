@@ -203,8 +203,25 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
 
     setupSignals();
 #endif
-    char * s = readline(promptForType(promptType));
-    Finally doFree([&]() { free(s); });
+
+    /* Buffer for the non-interactive input. */
+    std::string buffer;
+    const char * s = nullptr;
+    char * rl = nullptr;
+
+    /* Use plain std::getline for non-interactive mode, which we also use for
+       testing purposes. readline/editline seem to disagree too much about how
+       to handle final prompts etc., so it's easier to bypass those. The tests
+       are mostly about testing the core repl logic, not input handling. */
+    if (isInteractive) {
+        rl = ::readline(promptForType(promptType));
+        s = rl;
+    } else {
+        s = std::getline(std::cin, buffer) ? buffer.c_str() : nullptr;
+    }
+
+    Finally doFree([&]() { ::free(rl); });
+
 #ifndef _WIN32 // TODO use more signals.hh for this
     restoreSignals();
 #endif
@@ -215,15 +232,12 @@ bool ReadlineLikeInteracter::getLine(std::string & input, ReplPromptType promptT
         return true;
     }
 
-    // editline doesn't echo the input to the output when non-interactive, unlike readline
-    // this results in a different behavior when running tests. The echoing is
-    // quite useful for reading the test output, so we add it here.
+    /* Echo the prompt into the output if run in non-interactive mode, somewhat
+       for the purposes of characterisation tests. */
     if (auto e = getEnv("_NIX_TEST_REPL_ECHO"); s && e && *e == "1") {
-#if !USE_READLINE
         // This is probably not right for multi-line input, but we don't use that
         // in the characterisation tests, so it's fine.
         std::cout << promptForType(promptType) << s << std::endl;
-#endif
     }
 
     if (!s)

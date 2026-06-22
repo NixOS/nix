@@ -1,8 +1,10 @@
 #pragma once
 /// @file
 
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/fun.hh"
+#include "nix/util/terminal.hh"
 #include "nix/util/types.hh"
 #include <filesystem>
 #include <functional>
@@ -39,6 +41,8 @@ public:
 class ReadlineLikeInteracter : public virtual ReplInteracter
 {
     std::filesystem::path historyFile;
+    bool isInteractive = nix::isTTY(getStandardInput());
+
 public:
     ReadlineLikeInteracter(std::filesystem::path historyFile)
         : historyFile(std::move(historyFile))

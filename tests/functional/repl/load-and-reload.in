@@ -1,0 +1,7 @@
+:l file-b.nix
+:l ./does-not-exist.nix
+:p fromBFails
+:doc funcFromB
+:l file-a.nix
+:r
+fromA + fromB
