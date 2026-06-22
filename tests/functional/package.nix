@@ -100,6 +100,9 @@ mkMesonDerivation (
 
     _NIX_TEST_EXTRA_CONFIG = lib.optionalString lazyTrees "lazy-trees = true";
 
+    # Required for HTTP `nix serve`-based tests in binary-cache.sh
+    __darwinAllowLocalNetworking = true;
+
     meta = {
       platforms = lib.platforms.unix;
     };

@@ -151,5 +151,8 @@ scope: {
   libmicrohttpd = pkgs.libmicrohttpd.overrideDerivation (old: {
     # Don't pull in gnutls since it's pretty big and we don't need it.
     configureFlags = old.configureFlags or [ ] ++ [ "--without-gnutls" ];
+
+    # Required for configuration detection for getsockname (for automatic port allocation for `nix serve`)
+    __darwinAllowLocalNetworking = true;
   });
 }
