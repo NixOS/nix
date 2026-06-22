@@ -11,11 +11,32 @@ error: path '/path/to/tests/functional/repl/does-not-exist.nix' does not exist
 nix-repl> :p fromBFails
 error:
        … while calling the 'throw' builtin
-         at «string»:1:18:
-            1| fromBFails
-             |                  ^
+         at /path/to/tests/functional/repl/file-b.nix:2:16:
+            1| {
+            2|   fromBFails = throw "b";
+             |                ^
+            3|   fromB = 2;
 
        error: b
 
 nix-repl> :doc funcFromB
-error: basic_string::substr: __pos (which is 3) > this->size() (which is 0)
+Function `funcFromB`\
+  … defined at /path/to/tests/functional/repl/file-b.nix:7:15
+
+
+Some documentation.
+
+nix-repl> :l file-a.nix
+Added 1 variables.
+fromA
+
+nix-repl> :r
+Loading "file-b.nix"...
+Added 3 variables.
+fromB, fromBFails, funcFromB
+Loading "file-a.nix"...
+Added 1 variables.
+fromA
+
+nix-repl> fromA + fromB
+3
