@@ -159,6 +159,7 @@ jobs:
           path: downloaded
       - name: Move downloaded artifacts to artifacts directory
         run: |
+          shopt -s nullglob
           for dir in ./downloaded/*; do
             arch="$(basename "$dir")"
             mv "$dir"/*.xz ./artifacts/"${arch}"
