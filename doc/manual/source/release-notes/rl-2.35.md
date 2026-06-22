@@ -1,46 +1,165 @@
 # Release 2.35.0 (2026-06-22)
 
-- Make post-build-hook asynchronous [#15406](https://github.com/NixOS/nix/issues/15406) [#15451](https://github.com/NixOS/nix/pull/15451)
+## Highlights
 
-  This change makes the `post-build-hook` run asynchronously but still as part of the goal.
-  This retains the current behavior that a waiting goal will not start until the `post-build-hook` of the goal it is waiting on completes.
-  However, multiple `post-build-hook`s can now run concurrently just as multiple goals can run concurrently.
+- Flakes are not copied to the store unnecessarily [#3121](https://github.com/NixOS/nix/issues/3121) [#15711](https://github.com/NixOS/nix/pull/15711)
 
-- S3 substituters fall back to the URL's region for STS WebIdentity auth [#15594](https://github.com/NixOS/nix/pull/15594)
+  Historically, flakes source trees have been eagerly fetched to and evaluated from Nix store to ensure deterministic and hermetic evaluation, even if the resulting store object is not used as a derivation input. This made the implementation simpler, yet made flakes unusable in large repositories and performed unnecessary writes to the store on each change to the source tree.
 
-  When authenticating to an S3 binary cache via STS WebIdentity (EKS IRSA,
-  GitHub Actions OIDC), Nix now uses the `?region=` parameter from the S3 URL
-  as a fallback for the STS endpoint region if neither `AWS_REGION` nor
-  `AWS_DEFAULT_REGION` is set. Previously, IRSA setups that exported
-  `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN` but no region would fail
-  with a misleading "IMDS provider" error.
+  Since Nix 2.32, all I/O (excluding `path:` and `hg+:`-style inputs) for reading sources during evaluation has been funneled to their original filesystem location (or to the `~/.cache/nix/tarball-cache-v2` bare git repository for tarball-based inputs). However, the source tree was still fetched to the store -- primarily for computing the resulting content-addressed store path. In most cases, (such as importing the `nixpkgs` package set) this is not necessary.
 
-- Rust nix-installer in beta
+  Touching (and hashing the NAR serialisation of) the whole source tree is unavoidable, since:
 
-  The Rust-based rewrite of the Nix installer is now in beta.
-  We'd love help testing it out!
+  - In case of flake inputs, `narHash` integrity must be checked eagerly.
+  - The `outPath` attribute of a flake must be known in advance, and for backwards compatibility must be a content-addressed store path string with [constant string context](@docroot@/language/string-context.md#string-context-constant) representing the flake source tree.
 
-  To test out the new installer, run:
-  ```
-  curl -sSfL https://artifacts.nixos.org/nix-installer | sh -s -- install
-  ```
+  Even in the limitations imposed by backwards compatibility requirements, there are several improvements that are achievable. To reduce the number of copies performed, Nix now hashes the input without copying first, assuming that the `.outPath` will not end up in a derivation attribute and thus would never have to be actually fetched to the store. This comes at the slight cost or doing more work in case the assumption is wrong, but results in less work in typical use cases. The evaluator continues to behave as if the copy was performed:
 
-  This installer can be run even when you have an existing, script-based Nix installation without any adjustments.
+  - Flakes are still evaluated from the store, from the evaluator's point of view.
+  - `toString ./.` continues to produce a content-addressed store path string without context.
+  - Path resolution crossing trees located in the filesystem and in the Nix's view of it (with "virtual" overlays on top) continues to work. For example, the flake source tree can contain a relative symlink pointing outside its corresponding store object (though such usage is discouraged and makes further improvements to laziness intangible).
+  - Reading files from the flake's `outPath` continues to work. For example, such code is well-formed and is not considered [IFD](@docroot@/language/import-from-derivation.md):
 
-  This new installer also comes with the ability to uninstall your Nix installation; run:
-  ```
-  /nix/nix-installer uninstall
+  ```nix
+  builtins.readFile ( /. + (builtins.unsafeDiscardStringContext self.outPath) + "/flake.nix" )
   ```
 
-  This will get rid of your entire Nix installation (even if you installed over an existing, script-based installation).
+- Support FreeBSD `libjail` based sandboxing, add `x86_64-freebsd` to installer [#9968](https://github.com/NixOS/nix/pull/9968) [#13281](https://github.com/NixOS/nix/pull/13281) [#15673](https://github.com/NixOS/nix/pull/15673)
 
-  This installer is a modified version of the [Determinate Nix Installer](https://github.com/DeterminateSystems/nix-installer) by Determinate Systems.
-  Thanks to Determinate Systems for all the investment they've put into the installer.
+  The FreeBSD build of Nix now supports build sandboxing via FreeBSD jails and is enabled by default.
+  A FreeBSD build has been added to the traditional installer script. The beta rust-based installer is not yet supported.
+  FreeBSD support is not as well-tested as Linux or macOS, but is fully capable of building packages and performing other tasks expected of Nix on Linux.
 
-  Source for the installer is in https://github.com/NixOS/nix-installer.
-  Report any issues in that repo.
+## Improvements
 
-  For CI usage, a GitHub Action to install Nix using this installer is available at https://github.com/NixOS/nix-installer-action.
+- HTTP/3 (QUIC) support
+
+  Nix can now fetch from binary caches and other HTTP(S) sources over HTTP/3 (QUIC), controlled by a new [`http3`](@docroot@/command-ref/conf-file.md#conf-http3) setting (disabled by default).
+  When enabled, Nix requests HTTP/3 and transparently falls back to HTTP/2 or HTTP/1.1 for servers that do not advertise QUIC.
+  The setting only takes effect when linked against a `libcurl` built with HTTP/3 support, otherwise it is ignored and Nix keeps using HTTP/2 without warning or error.
+
+  Enable it with:
+
+  ```
+  nix.conf: http3 = true
+  CLI:      --http3
+  ```
+
+  Or disable with:
+
+  ```
+  nix.conf: http3 = false
+  CLI:      --no-http3
+  ```
+
+- Link mimalloc for faster evaluation [#15596](https://github.com/NixOS/nix/pull/15596)
+
+  The `nix` binary now links [mimalloc](https://github.com/microsoft/mimalloc) by default, replacing glibc's malloc for all non-GC allocations.
+  This yields a **5–12% wall-clock improvement** on evaluation workloads, ranging from `nix-instantiate hello` to `nix-env -qa` and full NixOS configurations.
+  The allocator can be disabled at build time with `-Dmimalloc=disabled`.
+
+- Configurable file-transfer retry backoff with full jitter and `Retry-After` support [#15023](https://github.com/NixOS/nix/issues/15023) [#15419](https://github.com/NixOS/nix/issues/15419) [#15449](https://github.com/NixOS/nix/pull/15449)
+
+  File transfer retries (downloads and uploads) now use AWS-style "full jitter" exponential backoff, treat HTTP 503 as rate-limited (same longer delay as 429),
+  and honor the `Retry-After` response header.
+
+  Retry timing is configurable via new `nix.conf` settings:
+
+  - [`filetransfer-retry-delay`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-delay): base delay for transient errors
+  - [`filetransfer-retry-delay-rate-limited`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-delay-rate-limited): base delay for 429/503
+  - [`filetransfer-retry-max-delay`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-max-delay): per-attempt delay ceiling
+  - [`filetransfer-retry-jitter`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-jitter): enable full jitter
+
+  The existing `download-attempts` setting has been renamed to [`filetransfer-retry-attempts`](@docroot@/command-ref/conf-file.md#conf-filetransfer-retry-attempts) to reflect that it applies to uploads as well as downloads.
+  The old name remains as an alias for backwards compatibility.
+
+  Per-substituter overrides are available as store reference parameters ([`retry-delay`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-delay), [`retry-delay-rate-limited`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-delay-rate-limited), [`retry-max-delay`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-max-delay), [`retry-attempts`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-attempts)), e.g. `s3://my-cache?retry-attempts=8`.
+
+- Improve daemon socket path logic for chroot stores [#15429](https://github.com/NixOS/nix/pull/15429)
+
+  The default daemon socket path now uses the per-store [`state`](@docroot@/store/types/local-store.md#store-local-store-state) directory whenever one is defined, rather than always using the global [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR).
+  This means [local chroot stores](@docroot@/store/types/local-store.md#chroot) each get their own socket path automatically.
+
+  Example:
+
+  ```bash
+  nix-daemon --store /foo/bar
+  ```
+
+  will now use a socket at:
+  ```
+  /foo/bar/nix/var/nix/daemon-socket/socket
+  ```
+  instead of
+  ```
+  $NIX_STATE_DIR/daemon-socket/socket
+  ```
+
+  Users who wish to serve or connect to a chroot store at the old location will have to force the socket location:
+
+  - When serving (running a daemon), use the new [`--socket-path`](@docroot@/command-ref/new-cli/nix3-daemon.md#opt-socket-path) flag:
+
+    ```bash
+    nix daemon --socket-path "$NIX_STATE_DIR/daemon-socket/socket"
+    ```
+
+  - When connecting as a client  put the path in the [store URL](@docroot@/store/types/local-daemon-store.md):
+
+    ```
+    unix://$NIX_STATE_DIR/daemon-socket/socket
+    ```
+
+- Linux sandbox: also block `listxattr` syscalls [#15743](https://github.com/NixOS/nix/pull/15743)
+
+  The Linux sandbox now also returns `ENOTSUP` for `listxattr`, `llistxattr` and `flistxattr`, matching the existing treatment of `getxattr`/`setxattr`/`removexattr`.
+  This prevents host xattrs (e.g. `security.selinux`) from leaking into builds and fixes tools such as `mkfs.ubifs` that probe xattr support via `listxattr`.
+
+- Support SCP-like URLs in fetchGit and type = "git" flake inputs [#14852](https://github.com/NixOS/nix/issues/14852) [#14867](https://github.com/NixOS/nix/issues/14867) [#14863](https://github.com/NixOS/nix/pull/14863)
+
+  Nix now (once again) recognizes [SCP-like syntax for Git URLs](https://git-scm.com/docs/git-clone#_git_urls). This partially
+  restores compatibility with Nix 2.3 for `fetchGit`. The following syntax is once again supported:
+
+  ```nix
+  builtins.fetchGit "host:/absolute/path/to/repo"
+  ```
+
+  Nix also passes through the tilde (for home directories) verbatim:
+
+  ```nix
+  builtins.fetchGit "host:~/relative/to/home"
+  ```
+
+  IPv6 addresses also supported when bracketed:
+
+  ```nix
+  builtins.fetchGit "user@[::1]:~/relative/to/home"
+  ```
+
+  `builtins.fetchTree` also supports this syntax now:
+
+  ```nix
+  builtins.fetchTree { type = "git"; url = "host:/path/to/repo"; }
+  ```
+
+- nix flake check now supports --out-link [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
+
+  `nix flake check` now supports the flag `--out-link`, defaulting to not creating out links if the flag is not specified.
+
+- nix flake check now supports --print-out-paths [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
+
+  `nix flake check` now supports the flag `--print-out-paths`.
+
+- Added `--skip-alive` option to `nix store delete` for collecting garbage within a closure [#7239](https://github.com/NixOS/nix/issues/7239) [#15236](https://github.com/NixOS/nix/pull/15236) [#15727](https://github.com/NixOS/nix/pull/15727)
+
+  `nix store delete --recursive --skip-alive` can be used to collect garbage within a closure, in which case it will only collect the dead paths that are part of the closure of its arguments.
+  The additional option `--also-referrers` is added to support this mode, which allows referrers of paths in the closure to also be deleted.
+
+- `builtins.getFlake` now supports path values [#15290](https://github.com/NixOS/nix/pull/15290)
+
+  `builtins.getFlake` now accepts path values in addition to flakerefs. This improves the usability of relative flakes, allowing you to write `builtins.getFlake ./subflake`.
+  This change does not allow specifying paths that are not already in the store (though they do not have valid store objects, i.e. this will not force a copy if the flake has only been hashed -- and not copied to the store). This may change in a future release.
+
+## Backwards incompatible changes
 
 - Content-addressed derivations: realisations keyed by store path instead of hash modulo [#11897](https://github.com/NixOS/nix/issues/11897) [#12464](https://github.com/NixOS/nix/pull/12464)
 
@@ -135,99 +254,25 @@
     Implementations interfacing with the CA derivations protocol are simplified.
     The derivation hash modulo algorithm is no longer required to form build trace keys.
 
-- Added `--skip-alive` option to `nix store delete` for collecting garbage within a closure [#7239](https://github.com/NixOS/nix/issues/7239) [#15236](https://github.com/NixOS/nix/pull/15236) [#15727](https://github.com/NixOS/nix/pull/15727)
+## Build performance improvements
 
-  `nix store delete --recursive --skip-alive` can be used to collect garbage within a closure, in which case it will only collect the dead paths that are part of the closure of its arguments.
-  The additional option `--also-referrers` is added to support this mode, which allows referrers of paths in the closure to also be deleted.
+- Make post-build-hook asynchronous [#15406](https://github.com/NixOS/nix/issues/15406) [#15451](https://github.com/NixOS/nix/pull/15451)
 
-- Fixed a bug where keep-outputs and keep-derivations can interfere with delete commands [#15776](https://github.com/NixOS/nix/pull/15776)
+  The [`post-build-hook`](@docroot@/command-ref/conf-file.md#conf-post-build-hook) now runs asynchronously, without blocking the build event loop.
+  Dependent builds are not started until the hook finishes, but multiple hook instances are now launched concurrently -- up to the [`max-jobs`](@docroot@/command-ref/conf-file.md#conf-max-jobs) limit.
 
-  Setting `keep-derivations = true` and trying to delete a derivation with realised outputs would previously fail.
-  Same with `keep-outputs = true` and trying to delete an output that still has derivers.
-  These options no longer affect the deletion commands, and are now documented as such.
+- zstd compression now emits multi-frame output and uses less memory [#15550](https://github.com/NixOS/nix/pull/15550)
 
-- Configurable file-transfer retry backoff with full jitter and Retry-After support [#15023](https://github.com/NixOS/nix/issues/15023) [#15419](https://github.com/NixOS/nix/issues/15419) [#15449](https://github.com/NixOS/nix/pull/15449)
+  zstd-compressed NARs are now written as a sequence of independent 16 MiB frames instead of a single large frame.
+  This lays the groundwork for parallel decompression in a future release without requiring caches to be repopulated, and significantly lowers peak memory use during compression
+  (e.g. from ~600 MiB to ~100 MiB for a 1 GiB store path).
 
-  File transfer retries (downloads and uploads) now use AWS-style "full jitter"
-  exponential backoff, treat HTTP 503 as rate-limited (same longer delay as 429),
-  and honor the `Retry-After` response header. Retry timing is configurable via
-  new `nix.conf` settings:
+  The output remains standard zstd and is decoded unchanged by existing Nix binaries and the `zstd` CLI; compression ratio is effectively unchanged.
 
-  - `filetransfer-retry-delay` (default 100ms): base delay for transient errors
-  - `filetransfer-retry-delay-rate-limited` (default 5000ms): base delay for 429/503
-  - `filetransfer-retry-max-delay` (default 60000ms): per-attempt delay ceiling
-  - `filetransfer-retry-jitter` (default true): enable full jitter
+  Per-frame compression now uses up to 4 worker threads. For zstd this is the new default: the [`parallel-compression`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-parallel-compression) store setting defaults to `true` when `compression=zstd` (it remains `false` for other compression algorithms like `xz`).
+  Set `?parallel-compression=false` to opt out.
 
-  The existing `download-attempts` setting has been renamed to
-  `filetransfer-retry-attempts` to reflect that it applies to uploads as well as
-  downloads. The old name remains as an alias for backwards compatibility.
-
-  Per-substituter overrides are available as store URL parameters
-  (`retry-delay`, `retry-delay-rate-limited`, `retry-max-delay`,
-  `retry-attempts`), e.g. `s3://my-cache?retry-attempts=8`.
-
-  This addresses thundering-herd scenarios where many CI jobs hit the same
-  S3 prefix and receive 503 SlowDown; previously the retry window for 503
-  was only ~4 seconds.
-
-- C API: Fix `EvalState` pointer passed to primop callbacks [#15300](https://github.com/NixOS/nix/pull/15300) [#15383](https://github.com/NixOS/nix/pull/15383)
-
-  The `EvalState *` passed to C API primop callbacks was incorrectly pointing to
-  the internal `nix::EvalState` rather than the C API wrapper struct. This caused
-  a segfault when the callback used the pointer with C API functions such as
-  `nix_alloc_value()`. The same issue affected `printValueAsJSON` and
-  `printValueAsXML` callbacks on external values.
-
-- nix flake check now supports --out-link [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
-
-  `nix flake check` now supports the flag `--out-link`, defaulting to not creating out links if the flag is not specified.
-
-- nix flake check now supports --print-out-paths [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
-
-  `nix flake check` now supports the flag `--print-out-paths`.
-
-- Enable FreeBSD sandboxing, add `x86_64-freebsd` to installer [#9968](https://github.com/NixOS/nix/pull/9968) [#13281](https://github.com/NixOS/nix/pull/13281) [#15673](https://github.com/NixOS/nix/pull/15673)
-
-  A FreeBSD build has been added to the traditional installer script, with sandboxing enabled.
-  The beta installer is not yet supported.
-
-  FreeBSD support is not as well-tested as Linux or macOS, but is fully capable of building packages
-  and performing other tasks expected of Nix on Linux.
-
-- `builtins.getFlake` now supports path values [#15290](https://github.com/NixOS/nix/pull/15290)
-
-  `builtins.getFlake` now accepts path values in addition to flakerefs, allowing you to write `builtins.getFlake ./subflake` instead of having to use ugly workarounds to construct a pure flakeref.
-
-- Support SCP-like URLs in fetchGit and type = "git" flake inputs [#14852](https://github.com/NixOS/nix/issues/14852) [#14867](https://github.com/NixOS/nix/issues/14867) [#14863](https://github.com/NixOS/nix/pull/14863)
-
-  Nix now (once again) recognizes [SCP-like syntax for Git URLs](https://git-scm.com/docs/git-clone#_git_urls). This partially
-  restores compatibility with Nix 2.3 for `fetchGit`. The following syntax is once again supported:
-
-  ```nix
-  builtins.fetchGit "host:/absolute/path/to/repo"
-  ```
-
-  Nix also passes through the tilde (for home directories) verbatim:
-
-  ```nix
-  builtins.fetchGit "host:~/relative/to/home"
-  ```
-
-  IPv6 addresses also supported when bracketed:
-
-  ```nix
-  builtins.fetchGit "user@[::1]:~/relative/to/home"
-  ```
-
-  `builtins.fetchTree` also supports this syntax now:
-
-  ```nix
-  builtins.fetchTree { type = "git"; url = "host:/path/to/repo"; }
-  ```
-
-- GitHub fetcher now validates URL parameters [#15304](https://github.com/NixOS/nix/issues/15304) [#15331](https://github.com/NixOS/nix/pull/15331)
-
-  The `github:` fetcher now validates URL parameters, and will error if an invalid parameter like `tag` is provided.
+## Bug fixes
 
 - Fix hash collision between store paths with self-references and their zeroed-out equivalents [#15837](https://github.com/NixOS/nix/issues/15837) [#15931](https://github.com/NixOS/nix/pull/15931)
 
@@ -238,128 +283,41 @@
   As a consequence, content-addressed store paths derived from self-referential NARs will differ from those produced by Nix 2.17 through 2.34.
   This affects users of the experimental `ca-derivations` features, as well as users of `nix store make-content-addressed`.
 
-- HTTP/3 (QUIC) support
+- C API: Fix `EvalState` pointer passed to primop callbacks [#15300](https://github.com/NixOS/nix/pull/15300) [#15383](https://github.com/NixOS/nix/pull/15383)
 
-  Nix can now fetch from binary caches and other HTTP(S) sources over HTTP/3
-  (QUIC), controlled by a new
-  [`http3`](@docroot@/command-ref/conf-file.md#conf-http3) setting (disabled by
-  default). When enabled, Nix requests HTTP/3 and transparently falls back to
-  HTTP/2 or HTTP/1.1 for servers that do not advertise QUIC. The setting only
-  takes effect when linked against a libcurl built with HTTP/3 support, otherwise
-  it is ignored and Nix keeps using HTTP/2 without warning or error.
+  The `EvalState *` passed to C API primop callbacks was incorrectly pointing to the internal `nix::EvalState` rather than the C API wrapper struct.
+  This caused a segfault when the callback used the pointer with C API functions such as `nix_alloc_value()`.
+  The same issue affected `printValueAsJSON` and `printValueAsXML` callbacks on external values.
 
-  Enable it with:
+- GitHub fetcher now validates URL parameters [#15304](https://github.com/NixOS/nix/issues/15304) [#15331](https://github.com/NixOS/nix/pull/15331)
 
-  ```
-  nix.conf: http3 = true
-  CLI:      --http3
-  ```
+  The `github:` fetcher now validates URL parameters, and will error if an invalid parameter like `tag` is provided.
 
-  Or disable with:
+- Fixed a bug where keep-outputs and keep-derivations can interfere with delete commands [#15776](https://github.com/NixOS/nix/pull/15776)
 
-  ```
-  nix.conf: http3 = false
-  CLI:      --no-http3
-  ```
+  Setting [`keep-derivations`](@docroot@/command-ref/conf-file.md#conf-keep-derivations) to `true` and trying to delete a derivation with realised outputs would previously fail.
+  Same with [`keep-outputs`](@docroot@/command-ref/conf-file.md#conf-keep-outputs) and trying to delete an output that still has derivers.
+  These options no longer affect the deletion commands, and are now documented as such.
 
-- Link mimalloc for faster evaluation [#15596](https://github.com/NixOS/nix/pull/15596)
+- S3 substituters fall back to the URL's region for STS WebIdentity auth [#15594](https://github.com/NixOS/nix/pull/15594)
 
-  The `nix` binary now links [mimalloc](https://github.com/microsoft/mimalloc)
-  by default on non-Windows platforms, replacing glibc's malloc for all
-  non-GC allocations.
-
-  This yields a **5–12% wall-clock improvement** on evaluation workloads,
-  ranging from `nix-instantiate hello` to `nix-env -qa` and full NixOS
-  configurations.
-
-  The allocator can be disabled at build time with `-Dmimalloc=disabled`
-  or by passing `withMimalloc = false` to the Nix package.
+  When authenticating to an S3 binary cache via STS WebIdentity (EKS IRSA, GitHub Actions OIDC), Nix now uses the `?region=` parameter from the S3 URL as a fallback for the STS endpoint region if neither `AWS_REGION` nor `AWS_DEFAULT_REGION` is set.
+  Previously, IRSA setups that exported `AWS_WEB_IDENTITY_TOKEN_FILE` and `AWS_ROLE_ARN` but no region would fail with a misleading "IMDS provider" error.
 
 - S3: restore STS WebIdentity and ECS container credential providers [#15507](https://github.com/NixOS/nix/pull/15507)
 
-  Nix 2.33 replaced the S3 backend's `aws-sdk-cpp` credential chain with a
-  custom chain built on `aws-c-auth`. That chain omitted two providers,
-  breaking S3 binary cache access in container workloads:
+  Nix 2.33 replaced the S3 backend's `aws-sdk-cpp` credential chain with a custom chain built on `aws-c-auth`.
+  That chain omitted two providers, breaking S3 binary cache access in container workloads:
 
-  - **STS WebIdentity** (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`,
-    `AWS_ROLE_SESSION_NAME`) — used by EKS IRSA, GitHub Actions OIDC, and
-    any `sts:AssumeRoleWithWebIdentity` federation.
-  - **ECS container metadata** (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`,
-    `AWS_CONTAINER_CREDENTIALS_FULL_URI`) — used by ECS tasks and EKS Pod
-    Identity.
+  - **STS WebIdentity** (`AWS_WEB_IDENTITY_TOKEN_FILE`, `AWS_ROLE_ARN`, `AWS_ROLE_SESSION_NAME`) -- used by EKS IRSA, GitHub Actions OIDC, and any `sts:AssumeRoleWithWebIdentity` federation.
+  - **ECS container metadata** (`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI`, `AWS_CONTAINER_CREDENTIALS_FULL_URI`) -- used by ECS tasks and EKS Pod Identity.
 
-  The typical symptom was a misleading IMDS error
-  (`Valid credentials could not be sourced by the IMDS provider`), because
-  IMDS is the last provider tried after the correct one was skipped.
+  The typical symptom was a misleading IMDS error (`Valid credentials could not be sourced by the IMDS provider`), because IMDS is the last provider tried after the correct one was skipped.
 
-  Both providers are now part of the chain, ordered to match the
-  pre-2.33 `DefaultAWSCredentialsProviderChain`:
-  `Environment → SSO → Profile → STS WebIdentity → (ECS | IMDS)`.
-  As in both the old and new AWS SDK default chains, ECS and IMDS are
-  mutually exclusive: when container credential environment variables are
-  set, IMDS is skipped.
-
-- Linux sandbox: also block `listxattr` syscalls [#15743](https://github.com/NixOS/nix/pull/15743)
-
-  The Linux sandbox now also returns `ENOTSUP` for `listxattr`,
-  `llistxattr` and `flistxattr`, matching the existing treatment of
-  `getxattr`/`setxattr`/`removexattr`. This prevents host xattrs (e.g.
-  `security.selinux`) from leaking into builds and fixes tools such as
-  `mkfs.ubifs` that probe xattr support via `listxattr`.
-
-- Improve daemon socket path logic for chroot stores [#15429](https://github.com/NixOS/nix/pull/15429)
-
-  The default daemon socket path now uses the per-store [`state`](@docroot@/store/types/local-store.md#store-local-store-state) directory whenever one is defined, rather than always using the global [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR).
-  This means [local chroot stores](@docroot@/store/types/local-store.md#chroot) each get their own socket path automatically.
-
-  Example:
-
-  ```bash
-  nix-daemon --store /foo/bar
-  ```
-
-  will now use a socket at:
-  ```
-  /foo/bar/nix/var/nix/daemon-socket/socket
-  ```
-  instead of
-  ```
-  $NIX_STATE_DIR/daemon-socket/socket
-  ```
-
-  Users who wish to serve or connect to a chroot store at the old location will have to force the socket location:
-
-  - When serving (running a daemon), use the new [`--socket-path`](@docroot@/command-ref/new-cli/nix3-daemon.md#opt-socket-path) flag:
-
-    ```bash
-    nix daemon --socket-path "$NIX_STATE_DIR/daemon-socket/socket"
-    ```
-
-  - When connecting as a client  put the path in the [store URL](@docroot@/store/types/local-daemon-store.md):
-
-    ```
-    unix://$NIX_STATE_DIR/daemon-socket/socket
-    ```
-
-- zstd compression now emits multi-frame output and uses less memory [#15550](https://github.com/NixOS/nix/pull/15550)
-
-  zstd-compressed NARs are now written as a sequence of independent 16 MiB
-  frames instead of a single large frame. This lays the groundwork for
-  parallel decompression in a future release without requiring caches to be
-  repopulated, and significantly lowers peak memory use during compression
-  (e.g. from ~600 MiB to ~100 MiB for a 1 GiB store path).
-
-  The output remains standard zstd and is decoded unchanged by existing Nix
-  binaries and the `zstd` CLI; compression ratio is effectively unchanged.
-
-  Per-frame compression now uses up to 4 worker threads. For zstd this is the
-  new default: the `parallel-compression` store setting defaults to `true` when
-  `compression=zstd` (it remains `false` for `xz`). Set
-  `?parallel-compression=false` to opt out.
-
+  Both providers are now part of the chain, ordered to match the pre-2.33 behaviour.
+  As in both the old and new AWS SDK default chains, ECS and IMDS are mutually exclusive: when container credential environment variables are set, IMDS is skipped.
 
 ## Contributors
-
 
 This release was made possible by the following 58 contributors:
 
