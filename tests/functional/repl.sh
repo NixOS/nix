@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source common.sh
-source characterisation/framework.sh
+source common/characterisation/framework.sh
 
 testDir="$PWD"
 cd "$TEST_ROOT"
@@ -252,8 +252,7 @@ stripFinalPrompt() {
     -e 's/[ \n]*$/\n/'
 }
 
-runRepl () {
-
+filterReplOutput () {
   # That is right, we are also filtering out the testdir _without underscores_.
   # This is crazy, but without it, GHA will fail to run the tests, showing paths
   # _with_ underscores in the set -x log, but _without_ underscores in the
@@ -262,10 +261,7 @@ runRepl () {
   local testDirNoUnderscores
   testDirNoUnderscores="${testDir//_/}"
 
-  _NIX_TEST_RAW_MARKDOWN=1 \
-  _NIX_TEST_REPL_ECHO=1 \
-  nix repl "$@" 2>&1 \
-    | stripColors \
+  stripColors \
     | tr -d '\0' \
     | stripEmptyLinesBeforePrompt \
     | stripFinalPrompt \
@@ -275,6 +271,18 @@ runRepl () {
       -e "s@$nixVersion@<nix version>@g" \
     | grep -vF $'warning: you don\'t have Internet access; disabling some network-dependent features' \
     ;
+}
+
+runRepl () {
+    _NIX_TEST_RAW_MARKDOWN=1 \
+    _NIX_TEST_REPL_ECHO=1 \
+    nix repl "$@" 2>&1 | filterReplOutput
+}
+
+runDebugRepl () {
+    _NIX_TEST_RAW_MARKDOWN=1 \
+    _NIX_TEST_REPL_ECHO=1 \
+    nix eval --file "$1" --debugger "${@:2}" 2>&1 | filterReplOutput
 }
 
 for test in $(cd "$testDir/repl"; echo *.in); do
@@ -290,10 +298,36 @@ for test in $(cd "$testDir/repl"; echo *.in); do
     # Allow putting comments (lines starting with `# COM:`) in the test for
     # documentation purposes. Regular comments are not skipped, since those are
     # also interpreted by the repl.
-    (cd "$testDir/repl"; set +x; runRepl "${flags[@]}" 2>&1) < <(grep -Ev '^[[:space:]]*#[[:space:]]*COM:' "$in") > "$actual" || {
-        echo "FAIL: $test (exit code $?)" >&2
-        badExitCode=1
-    }
+    inputWithoutComments=$(grep -Ev '^[[:space:]]*#[[:space:]]*COM:' "$in")
+
+    if [ -f "$testDir/repl/$test.in.debugexpr.nix" ]; then
+        if [[ "$test" =~ debugger-fail-.* ]]; then
+            expectedFail=1
+        elif [[ "$test" =~ debugger-okay-.* ]]; then
+            expectedFail=0
+        else
+            die "unexpected debugger test name: '$test', should be either debugger-okay-* or debugger-fail-*"
+        fi
+
+        set +e
+        (cd "$testDir/repl"; set +x; echo "$inputWithoutComments" | runDebugRepl "$testDir/repl/$test.in.debugexpr.nix" "${flags[@]}" 2>&1) > "$actual"
+        debuggerTestCode=$?
+        set -e
+
+        if ((expectedFail == 0 && debuggerTestCode != 0)); then
+            echo "test failed: $test (exit code $debuggerTestCode)" >&2
+            badExitCode=1
+        elif ((expectedFail == 1 && debuggerTestCode == 0)); then
+            echo "test failed: $test unexpectedly succeeded" >&2
+            badExitCode=1
+        fi
+    else
+        (cd "$testDir/repl"; set +x; echo "$inputWithoutComments" | runRepl "${flags[@]}" 2>&1) > "$actual" || {
+            echo "test failed: $test (exit code $?)" >&2
+            badExitCode=1
+        }
+    fi
+
     diffAndAcceptInner "$test" "$actual" "$expected"
 done
 

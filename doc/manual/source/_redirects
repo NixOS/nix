@@ -27,7 +27,8 @@
 /contributing/documentation /development/documentation 301!
 /contributing/experimental-features /development/experimental-features 301!
 /contributing/cli-guideline /development/cli-guideline 301!
-/contributing/json-guideline /development/json-guideline 301!
+/contributing/json-guideline /development/data-modeling 301!
+/development/json-guideline /development/data-modeling 301!
 /contributing/cxx /development/cxx 301!
 
 /expressions/expression-language /language/ 301!
@@ -47,6 +48,7 @@
 /package-management/package-management /package-management 301!
 /package-management/s3-substituter /store/types/s3-binary-cache-store 301!
 
+/protocols/nix-cache-info /protocols/binary-cache/nix-cache-info 301!
 /protocols/protocols /protocols 301!
 /json/* /protocols/json/:splat 301!
 

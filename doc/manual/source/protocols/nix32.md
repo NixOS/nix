@@ -1,6 +1,6 @@
 # Nix32 Encoding
 
-Nix32 is Nix's variant of base-32 encoding, used for [store path digests](@docroot@/protocols/store-path.md), hash output via [`nix hash`](@docroot@/command-ref/new-cli/nix3-hash.md), and the [`outputHash`](@docroot@/language/advanced-attributes.md#adv-attr-outputHash) derivation attribute.
+Nix32 is Nix's variant of [Base32](https://en.wikipedia.org/wiki/Base32) encoding, used for [store path digests](@docroot@/protocols/store-path.md), hash output via [`nix hash`](@docroot@/command-ref/new-cli/nix3-hash.md), and the [`outputHash`](@docroot@/language/advanced-attributes.md#adv-attr-outputHash) derivation attribute.
 
 ## Alphabet
 

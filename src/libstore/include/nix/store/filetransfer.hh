@@ -34,6 +34,18 @@ public:
 
     Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
+    Setting<bool> enableHttp3{
+        this,
+        false,
+        "http3",
+        R"(
+          Whether to try enabling HTTP/3 (QUIC).
+          When enabled, Nix requests HTTP/3 and transparently falls back
+          to HTTP/2 or HTTP/1.1 for servers that do not support it.
+          This option has no effect unless the `nix` binary is linked
+          against a libcurl built with HTTP/3 (QUIC) support.
+        )"};
+
     Setting<std::string> userAgentSuffix{
         this, "", "user-agent-suffix", "String appended to the user agent in HTTP requests."};
 

@@ -9,7 +9,7 @@ The outputs specification is a map, from names to specifications for individual 
 
 ## Output Names {#outputs}
 
-Output names can be any string which is also a valid [store path](@docroot@/store/store-path.md) name.
+Output names can be any string which is also a valid [store path name](@docroot@/store/store-path.md#name).
 The name mapped to each output specification is not actually the name of the output.
 In the general case, the output store object has name `derivationName + "-" + outputSpecName`, not any other metadata about it.
 However, an output spec named "out" describes and output store object whose name is just the derivation name.

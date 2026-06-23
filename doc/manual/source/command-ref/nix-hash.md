@@ -45,20 +45,20 @@ md5sum`.
 
 - `--base32`
 
-  Print the hash in a base-32 representation rather than hexadecimal.
-  This base-32 representation is more compact and can be used in Nix
+  Print the hash in [Nix32](@docroot@/protocols/nix32.md) representation rather than hexadecimal.
+  This representation is more compact and can be used in Nix
   expressions (such as in calls to `fetchurl`).
 
 - `--base64`
 
-  Similar to --base32, but print the hash in a base-64 representation,
-  which is more compact than the base-32 one.
+  Similar to `--base32`, but print the hash in a [Base64](https://en.wikipedia.org/wiki/Base64) representation,
+  which is more compact than the Nix32 one.
 
 - `--sri`
 
-  Print the hash in SRI format with base-64 encoding.
+  Print the hash in [SRI](@docroot@/glossary.md#gloss-sri) format with Base64 encoding.
   The type of hash algorithm will be prepended to the hash string,
-  followed by a hyphen (-) and the base-64 hash body.
+  followed by a hyphen (-) and the Base64 hash body.
 
 - `--truncate`
 
@@ -71,18 +71,18 @@ md5sum`.
 
 - `--to-base16`
 
-  Don’t hash anything, but convert the base-32 hash representation
+  Don’t hash anything, but convert the [Nix32](@docroot@/protocols/nix32.md) hash representation
   *hash* to hexadecimal.
 
 - `--to-base32`
 
   Don’t hash anything, but convert the hexadecimal hash representation
-  *hash* to base-32.
+  *hash* to [Nix32](@docroot@/protocols/nix32.md).
 
 - `--to-base64`
 
   Don’t hash anything, but convert the hexadecimal hash representation
-  *hash* to base-64.
+  *hash* to Base64.
 
 - `--to-sri`
 
@@ -134,7 +134,7 @@ $ nix-hash --type sha256 --flat test/world
 5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03
 ```
 
-Converting between hexadecimal, base-32, base-64, and SRI:
+Converting between hexadecimal, Nix32, Base64, and SRI:
 
 ```console
 $ nix-hash --type sha1 --to-base32 e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6

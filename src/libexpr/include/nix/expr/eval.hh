@@ -459,10 +459,6 @@ public:
 
 private:
 
-    /* Cache for calls to addToStore(); maps source paths to the store
-       paths. */
-    const ref<boost::concurrent_flat_map<SourcePath, StorePath>> srcToStore;
-
     /**
      * A cache that maps paths to "resolved" paths for importing Nix
      * expressions, i.e. `/foo` to `/foo/default.nix`.

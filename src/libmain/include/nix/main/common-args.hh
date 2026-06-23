@@ -81,8 +81,8 @@ struct MixPrintJSON : virtual Args
      * This is a template to avoid accidental coercions from `string` to `json` in the caller,
      * to avoid mistakenly passing an already serialized JSON to this function.
      *
-     * It is not recommended to print a JSON string - see the JSON guidelines
-     * about extensibility, https://nix.dev/manual/nix/development/development/json-guideline.html -
+     * It is not recommended to print a JSON string - see the data modeling guidelines
+     * about extensibility, https://nix.dev/manual/nix/development/development/data-modeling.html -
      * but you _can_ print a sole JSON string by explicitly coercing it to
      * `nlohmann::json` first.
      */

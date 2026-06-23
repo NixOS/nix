@@ -11,8 +11,7 @@ in a directory
 another version might be stored in
 `/nix/store/5mq2jcn36ldlmh93yj1n8s9c95pj7c5s-subversion-1.1.2`. The long
 strings prefixed to the directory names are cryptographic hashes (to be
-precise, 160-bit truncations of SHA-256 hashes encoded in a base-32
-notation) of *all* inputs involved in building the package — sources,
+precise, 160-bit truncations of SHA-256 hashes encoded in [Nix32](@docroot@/protocols/nix32.md)) of *all* inputs involved in building the package — sources,
 dependencies, compiler flags, and so on. So if two packages differ in
 any way, they end up in different locations in the file system, so they
 don’t interfere with each other. Here is what a part of a typical Nix

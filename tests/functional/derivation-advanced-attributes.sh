@@ -5,7 +5,7 @@ source common/paths.sh
 
 set -eu -o pipefail
 
-source characterisation/framework.sh
+source common/characterisation/framework.sh
 
 badDiff=0
 badExitCode=0

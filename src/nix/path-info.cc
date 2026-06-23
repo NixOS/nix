@@ -143,7 +143,11 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         addFlag({
             .longName = "json-format",
             .description =
-                "JSON format version to use (1 or 2). Version 1 uses string hashes and full store paths. Version 2 uses structured hashes and store path base names. This flag will be required in a future release.",
+                "JSON format version of [store object info](@docroot@/protocols/json/store-object-info.md) to use (1, 2, or 3).\n"
+                "Version 1 uses string hashes and full store paths.\n"
+                "Version 2 uses structured hashes and [store path base names](@docroot@/store/store-path.md#base-name).\n"
+                "Version 3 uses structured signatures.\n"
+                "This flag will be required in a future release.",
             .labels = {"version"},
             .handler = {[this](std::string s) {
                 jsonFormat = parsePathInfoJsonFormat(string2IntWithUnitPrefix<uint64_t>(s));

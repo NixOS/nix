@@ -149,10 +149,14 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     }
 
     auto resolutionGoal = worker.makeDerivationResolutionGoal(drvPath, drv, buildMode);
+    /* We'll handle the error below. */
+    resolutionGoal->preserveFailure = true;
     co_await await({resolutionGoal});
 
     if (nrFailed != 0) {
-        co_return doneFailure({BuildResult::Failure::DependencyFailed, "Build failed due to failed dependency"});
+        auto * failure = resolutionGoal->buildResult.tryGetFailure();
+        assert(failure);
+        co_return doneFailure(*failure);
     }
 
     if (resolutionGoal->resolvedDrv) {

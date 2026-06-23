@@ -1,0 +1,128 @@
+info: breakpoint reached
+
+Nix <nix version> debugger
+Type :? for help.
+
+nix-repl> :bt
+
+0: error: breakpoint reached
+
+1: while calling a function
+/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix:6:13
+
+     5| let
+     6|   bricked = break tried;
+      |             ^
+     7| in
+
+2: while evaluating a 'let' expression
+
+3: while evaluating a 'let' expression
+
+4: while evaluating the file '/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix':
+
+nix-repl> :st 3
+
+3: while evaluating a 'let' expression
+
+Env level 0
+static: someFailingExpr tried 
+
+Env level 1
+abort baseNameOf break builtins derivation derivationStrict dirOf false fetchGit fetchMercurial fetchTarball fetchTree fromTOML import isNull map null placeholder removeAttrs scopedImport throw toString true 
+
+nix-repl> :p bricked
+error: undefined variable 'bricked'
+       at «string»:1:1:
+            1| bricked
+             | ^
+
+nix-repl> :p tried
+{
+  success = false;
+  value = false;
+}
+
+nix-repl> :st 2
+
+2: while evaluating a 'let' expression
+
+Env level 0
+static: bricked 
+
+Env level 1
+static: someFailingExpr tried 
+
+Env level 2
+abort baseNameOf break builtins derivation derivationStrict dirOf false fetchGit fetchMercurial fetchTarball fetchTree fromTOML import isNull map null placeholder removeAttrs scopedImport throw toString true 
+
+nix-repl> :p bricked
+error: infinite recursion encountered
+       at «string»:1:1:
+            1| bricked
+             | ^
+
+nix-repl> :p tried
+{
+  success = false;
+  value = false;
+}
+
+nix-repl> :st 1
+
+1: while calling a function
+/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix:6:13
+
+     5| let
+     6|   bricked = break tried;
+      |             ^
+     7| in
+
+Env level 0
+static: bricked 
+
+Env level 1
+static: someFailingExpr tried 
+
+Env level 2
+abort baseNameOf break builtins derivation derivationStrict dirOf false fetchGit fetchMercurial fetchTarball fetchTree fromTOML import isNull map null placeholder removeAttrs scopedImport throw toString true 
+
+nix-repl> :p bricked
+error: infinite recursion encountered
+       at «string»:1:1:
+            1| bricked
+             | ^
+
+nix-repl> :p tried
+{
+  success = false;
+  value = false;
+}
+
+nix-repl> :st 0
+
+0: error: breakpoint reached
+
+Env level 0
+static: bricked 
+
+Env level 1
+static: someFailingExpr tried 
+
+Env level 2
+abort baseNameOf break builtins derivation derivationStrict dirOf false fetchGit fetchMercurial fetchTarball fetchTree fromTOML import isNull map null placeholder removeAttrs scopedImport throw toString true 
+
+nix-repl> :p bricked
+error: infinite recursion encountered
+       at «string»:1:1:
+            1| bricked
+             | ^
+
+nix-repl> :p tried
+{
+  success = false;
+  value = false;
+}
+
+nix-repl> :c
+{ success = false; value = false; }

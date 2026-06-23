@@ -172,7 +172,7 @@ ref<NarInfo> BinaryCacheStore::uploadData(Source & narSource, RepairFlag repair,
 
     auto info = mkInfo(narHashSink.finish());
     auto narInfo = make_ref<NarInfo>(info);
-    narInfo->compression = config.compression.to_string(); // FIXME: Make NarInfo use CompressionAlgo
+    narInfo->compression = config.compression;
     auto [fileHash, fileSize] = fileHashSink.finish();
     narInfo->fileHash = fileHash;
     narInfo->fileSize = fileSize;
@@ -565,7 +565,13 @@ void BinaryCacheStore::narFromPath(const StorePath & storePath, Sink & sink)
             stats.narReadBytes += narSize;
         }};
 
-    auto decompressor = makeDecompressionSink(info->compression, uncompressedSink);
+    /* makeDecompressionSink used to treat empty strings as "none". It seems
+       impossible that it would actually end up here with an empty string though
+       (since an empty `Compression: ' is treated as bzip2 when parsed from a
+       .narinfo file and the narinfo disk cache wouldn't handle empty strings).
+       TODO: Revisit this and convert to an assert probably or even made
+       compression a non-optional field. */
+    auto decompressor = makeDecompressionSink(info->compression.value_or(CompressionAlgo::none), uncompressedSink);
 
     try {
         getFile(info->url, *decompressor);

@@ -8,7 +8,7 @@
 
 source common.sh
 
-source characterisation/framework.sh
+source common/characterisation/framework.sh
 
 set +x
 
