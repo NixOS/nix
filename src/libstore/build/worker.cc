@@ -106,10 +106,10 @@ std::shared_ptr<DerivationBuildingGoal> Worker::makeDerivationBuildingGoal(
     return initGoalIfNeeded(derivationBuildingGoals[drvPath], drvPath, drv, *this, buildMode, storeDerivation);
 }
 
-std::shared_ptr<PathSubstitutionGoal>
-Worker::makePathSubstitutionGoal(const StorePath & path, RepairFlag repair, std::optional<ContentAddress> ca)
+std::shared_ptr<PathSubstitutionGoal> Worker::makePathSubstitutionGoal(
+    const StorePath & path, bool pathRequired, RepairFlag repair, std::optional<ContentAddress> ca)
 {
-    return initGoalIfNeeded(substitutionGoals[path], path, *this, repair, ca);
+    return initGoalIfNeeded(substitutionGoals[path], path, *this, pathRequired, repair, ca);
 }
 
 std::shared_ptr<DrvOutputSubstitutionGoal> Worker::makeDrvOutputSubstitutionGoal(const DrvOutput & id)
@@ -125,7 +125,7 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
                 return makeDerivationTrampolineGoal(bfd.drvPath, bfd.outputs, buildMode);
             },
             [&](const DerivedPath::Opaque & bo) -> GoalPtr {
-                return makePathSubstitutionGoal(bo.path, buildMode == bmRepair ? Repair : NoRepair);
+                return makePathSubstitutionGoal(bo.path, false, buildMode == bmRepair ? Repair : NoRepair);
             },
         },
         req.raw());

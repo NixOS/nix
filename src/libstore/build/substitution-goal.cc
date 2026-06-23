@@ -12,9 +12,14 @@
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(
-    const StorePath & storePath, Worker & worker, RepairFlag repair, std::optional<ContentAddress> ca)
+    const StorePath & storePath,
+    Worker & worker,
+    bool pathRequired,
+    RepairFlag repair,
+    std::optional<ContentAddress> ca)
     : Goal(worker, init())
     , storePath(storePath)
+    , pathRequired(pathRequired)
     , repair(repair)
     , ca(ca)
 {
@@ -141,7 +146,7 @@ Goal::Co PathSubstitutionGoal::init()
            paths referenced by this one. */
         for (auto & i : info->references)
             if (i != storePath) /* ignore self-references */
-                waitees.insert(worker.makePathSubstitutionGoal(i));
+                waitees.insert(worker.makePathSubstitutionGoal(i, pathRequired));
 
         co_await await(std::move(waitees));
 
@@ -169,7 +174,7 @@ Goal::Co PathSubstitutionGoal::init()
        In that case the calling derivation should just do a
        build. */
     co_return doneFailure(
-        substituterFailed ? ecFailed : ecNoSubstituters,
+        substituterFailed || pathRequired ? ecFailed : ecNoSubstituters,
         BuildResult::Failure{{
             .status = BuildResult::Failure::NoSubstituters,
             .msg = HintFmt(

@@ -235,7 +235,10 @@ public:
      * @ref PathSubstitutionGoal "substitution goal"
      */
     std::shared_ptr<PathSubstitutionGoal> makePathSubstitutionGoal(
-        const StorePath & storePath, RepairFlag repair = NoRepair, std::optional<ContentAddress> ca = std::nullopt);
+        const StorePath & storePath,
+        bool pathRequired = false,
+        RepairFlag repair = NoRepair,
+        std::optional<ContentAddress> ca = std::nullopt);
     std::shared_ptr<DrvOutputSubstitutionGoal> makeDrvOutputSubstitutionGoal(const DrvOutput & id);
 
     /**
