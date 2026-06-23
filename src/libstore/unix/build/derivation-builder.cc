@@ -974,9 +974,32 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         /* Close all other file descriptors. */
         unix::closeExtraFDs();
 
-        /* Disable core dumps by default. */
-        struct rlimit limit = {0, RLIM_INFINITY};
-        setrlimit(RLIMIT_CORE, &limit);
+        static constexpr auto rlimits = std::to_array({
+            /* Disable core dumps by default. */
+            std::tuple{RLIMIT_CORE, "RLIMIT_CORE", ::rlimit{0, RLIM_INFINITY}},
+            /* Set the stack size to a deterministic value. These values are the kernel default
+               and is also what's been historically used by the nix-daemon on NixOS. */
+            std::tuple{RLIMIT_STACK, "RLIMIT_STACK", ::rlimit{8 * 1024 * 1024, RLIM_INFINITY}},
+            /* FIXME: set other limits to deterministic values? Probably the most meaningful one would RLIMIT_NOFILE. */
+        });
+
+        for (const auto & [resource, name, lim] : rlimits) {
+            /* First, the happy path. Set the deterministic limit if we have the privileges for it. */
+            if (::setrlimit(resource, &lim) == 0)
+                continue;
+            if (errno != EPERM && errno != EINVAL)
+                throw SysError("setting rlimit %1%", name);
+
+            /* Otherwise set the soft limit on best-effort basis and leave the hard limit alone.
+               This isn't great for reproducibility, but oh well... */
+            ::rlimit cur{};
+            if (::getrlimit(resource, &cur) != 0)
+                throw SysError("getting rlimit %1%", name);
+
+            cur.rlim_cur = std::min(lim.rlim_cur, cur.rlim_max);
+            if (::setrlimit(resource, &cur) != 0)
+                debug("could not set rlimit %1%: %2%", name, ::strerror(errno));
+        }
 
         /* Make sure the builder inherits a predictable umask. It must not be group-writable, since registerOutputs
          * rejects those as defense-in-depth. */
