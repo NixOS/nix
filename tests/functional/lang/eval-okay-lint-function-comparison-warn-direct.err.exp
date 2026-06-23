@@ -1,0 +1,6 @@
+warning: function comparison is unreliable; it may return true or false depending on structure and evaluation order (lint-function-comparison)
+         at /pwd/lang/eval-okay-lint-function-comparison-warn-direct.nix:3:8:
+              2| # The result is still false, but a warning is emitted.
+              3| (x: x) == (x: x)
+               |        ^
+              4|
