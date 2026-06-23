@@ -129,6 +129,7 @@ suites = [
       'logging.sh',
       'make-content-addressed.sh',
       'misc.sh',
+      'multiple-outputs-substitute-failure.sh',
       'multiple-outputs.sh',
       'nar-access.sh',
       'nars.sh',
