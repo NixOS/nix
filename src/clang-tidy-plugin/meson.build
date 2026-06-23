@@ -33,6 +33,11 @@ nix_clang_tidy_plugin = shared_module(
 # Export plugin path for consumers (nix-meson-build-support/common/clang-tidy/meson.build).
 # In monolithic builds: override_dependency provides the build-dir path.
 # In per-component Nix builds: the .pc file provides the installed path.
+plugin_suffix = 'so'
+if host_machine.system() == 'darwin'
+  plugin_suffix = 'dylib'
+endif
+
 meson.override_dependency(
   'nix-clang-tidy',
   declare_dependency(
@@ -45,6 +50,6 @@ import('pkgconfig').generate(
   name : 'nix-clang-tidy',
   description : 'Custom clang-tidy checks for Nix',
   variables : {
-    'plugin_path' : get_option('prefix') / get_option('libdir') / 'libnix-clang-tidy.so',
+    'plugin_path' : get_option('prefix') / get_option('libdir') / ('libnix-clang-tidy.' + plugin_suffix),
   },
 )
