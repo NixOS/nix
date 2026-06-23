@@ -4,8 +4,10 @@
 #include "nix/store/nar-info-disk-cache.hh"
 #include "nix/store/sqlite.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/closure.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/topo-sort.hh"
 
 namespace nix {
 
@@ -78,6 +80,46 @@ void HttpBinaryCacheStore::init()
         diskCache->createCache(
             cacheKey, config->storeDir, {.wantMassQuery = config->wantMassQuery, .priority = config->priority});
     }
+}
+
+StorePaths HttpBinaryCacheStore::topoSortPaths(const StorePathSet & paths)
+{
+    std::unordered_map<StorePath, ref<const ValidPathInfo>> pathInfos;
+    StorePathSet referencesClosureSet;
+
+    /* Traverse the references closure that is also present in the starting set
+       in an asynchronous manner. */
+    computeClosure<StorePath>(
+        paths,
+        referencesClosureSet,
+        [this, &paths, &pathInfos](const StorePath & path) -> asio::awaitable<StorePathSet> {
+            StorePathSet res;
+            auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+
+            for (auto & ref : info->references)
+                /* Don't traverse into items that don't exist in our starting set. */
+                if (ref != path && paths.count(ref))
+                    res.insert(ref);
+
+            /* Fill the map. */
+            pathInfos.emplace(path, info);
+
+            co_return res;
+        });
+
+    auto result = topoSort(paths, [&](const StorePath & path) { return pathInfos.at(path)->references; });
+
+    return std::visit(
+        overloaded{
+            [&](const Cycle<StorePath> & cycle) -> StorePaths {
+                throw Error(
+                    "cycle detected in the references of '%s' from '%s'",
+                    printStorePath(cycle.path),
+                    printStorePath(cycle.parent));
+            },
+            [](const auto & sorted) { return sorted; }},
+        result);
 }
 
 std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const std::string & path)
