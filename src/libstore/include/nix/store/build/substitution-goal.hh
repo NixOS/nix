@@ -19,6 +19,11 @@ struct PathSubstitutionGoal : public Goal
     StorePath storePath;
 
     /**
+     * Whether, if there are not substituters, to return ecNoSubstituters or ecFailed.
+     */
+    bool pathRequired;
+
+    /**
      * Whether to try to repair a valid path.
      */
     RepairFlag repair;
@@ -45,6 +50,7 @@ public:
     PathSubstitutionGoal(
         const StorePath & storePath,
         Worker & worker,
+        bool pathRequired,
         RepairFlag repair = NoRepair,
         std::optional<ContentAddress> ca = std::nullopt);
     ~PathSubstitutionGoal();

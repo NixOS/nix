@@ -99,7 +99,7 @@ void Store::ensurePath(const StorePath & path)
         return;
 
     Worker worker(*this, *this);
-    GoalPtr goal = worker.makePathSubstitutionGoal(path);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path, true);
     Goals goals = {goal};
 
     worker.run(goals);
@@ -114,7 +114,7 @@ void Store::ensurePath(const StorePath & path)
 void Store::repairPath(const StorePath & path)
 {
     Worker worker(*this, *this);
-    GoalPtr goal = worker.makePathSubstitutionGoal(path, Repair);
+    GoalPtr goal = worker.makePathSubstitutionGoal(path, true, Repair);
     Goals goals = {goal};
 
     worker.run(goals);
