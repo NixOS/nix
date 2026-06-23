@@ -203,6 +203,17 @@ Most Nix commands accept the following command-line options:
   For `nix-shell`, this option is commonly used to give you a shell in which you can build the packages returned by the expression.
   If you want to get a shell which contain the *built* packages ready for use, give your expression to the `nix-shell --packages ` convenience flag instead.
 
+- <span id="opt-tree">[`--tree`](#opt-tree)</span> *tree-ref*
+
+  Fetch *tree-ref* using the [`fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree) infrastructure and evaluate the `default.nix` inside the fetched tree.
+  *tree-ref* is any reference understood by `builtins.fetchTree`, such as `github:NixOS/nixpkgs` or `git+https://example.com/repo`.
+  Positional `--attr` / `-A` attribute paths select attributes from the resulting expression.
+  (`nix-instantiate`, `nix-build` and `nix-shell` only.)
+
+  This flag cannot be combined with positional file arguments, `--expr` / `-E`, `-p` (for `nix-shell`), or reading from standard input.
+
+  `--tree` requires the [`fetch-tree`](@docroot@/development/experimental-features.md#xp-feature-fetch-tree) experimental feature (which is implied by [`flakes`](@docroot@/development/experimental-features.md#xp-feature-flakes)).
+
 - <span id="opt-I">[`-I` / `--include`](#opt-I)</span> *path*
 
   Add an entry to the list of search paths used to resolve [lookup paths](@docroot@/language/constructs/lookup-path.md).
