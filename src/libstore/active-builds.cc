@@ -83,6 +83,7 @@ ActiveBuildInfo::ProcessInfo adl_serializer<ActiveBuildInfo::ProcessInfo>::from_
         .stime = parseDuration(j, "stime"),
         .cutime = parseDuration(j, "cutime"),
         .cstime = parseDuration(j, "cstime"),
+        .mem = j.at("mem").get<unsigned>(),
     };
 }
 
@@ -97,6 +98,7 @@ void adl_serializer<ActiveBuildInfo::ProcessInfo>::to_json(json & j, const Activ
         {"stime", printDuration(process.stime)},
         {"cutime", printDuration(process.cutime)},
         {"cstime", printDuration(process.cstime)},
+        {"mem", process.mem.value_or(0)},
     };
 }
 
@@ -141,6 +143,7 @@ ActiveBuildInfo adl_serializer<ActiveBuildInfo>::from_json(const json & j)
     info.processes = j.at("processes").get<std::vector<ActiveBuildInfo::ProcessInfo>>();
     info.utime = parseDuration(j, "utime");
     info.stime = parseDuration(j, "stime");
+    info.mem = j.at("mem").get<unsigned>();
     return info;
 }
 
@@ -150,6 +153,7 @@ void adl_serializer<ActiveBuildInfo>::to_json(json & j, const ActiveBuildInfo & 
     j["processes"] = build.processes;
     j["utime"] = printDuration(build.utime);
     j["stime"] = printDuration(build.stime);
+    j["mem"] = build.mem.value_or(0);
 }
 
 } // namespace nlohmann
