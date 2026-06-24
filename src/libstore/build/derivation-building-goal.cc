@@ -655,12 +655,14 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
        destroyed (e.g., during failure cascades). */
     hook->onKillChild = [this]() { worker.childTerminated(this, JobCategory::Build); };
 
-    try {
-        hook->machineName = readLine(hook->fromHook.readSide.get());
-    } catch (Error & e) {
-        e.addTrace({}, "while reading the machine name from the build hook");
-        throw;
-    }
+    std::string machineName = [&hook]() {
+        try {
+            return readLine(hook->fromHook.readSide.get());
+        } catch (Error & e) {
+            e.addTrace({}, "while reading the machine name from the build hook");
+            throw;
+        }
+    }();
 
     CommonProto::WriteConn conn{hook->sink};
 
@@ -699,16 +701,12 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
             : buildMode == bmCheck ? "checking outputs of '%s'"
                                    : "building '%s'",
             worker.store.printStorePath(drvPath));
-    msg += fmt(" on '%s'", hook->machineName);
+    msg += fmt(" on '%s'", machineName);
 
     std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
         worker.settings.logLines,
         std::make_unique<Activity>(
-            *logger,
-            lvlInfo,
-            actBuild,
-            msg,
-            Logger::Fields{worker.store.printStorePath(drvPath), hook->machineName, 1, 1}));
+            *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), machineName, 1, 1}));
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 
