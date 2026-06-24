@@ -570,6 +570,7 @@ static void opDumpDB(Strings opFlags, Strings opArgs)
 
 static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
 {
+    auto localStore = ensureLocalStore();
     ValidPathInfos infos;
 
     while (1) {
@@ -587,7 +588,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
             /* !!! races */
             if (canonicalise)
                 canonicalisePathMetaData(
-                    store->printStorePath(info->path),
+                    localStore->toRealPath(info->path),
                     {NIX_WHEN_SUPPORT_ACLS(settings.getLocalSettings().ignoredAcls)});
             if (!hashGiven) {
                 HashResult hash = hashPath(
@@ -601,7 +602,7 @@ static void registerValidity(bool reregister, bool hashGiven, bool canonicalise)
         }
     }
 
-    ensureLocalStore()->registerValidPaths(infos);
+    localStore->registerValidPaths(infos);
 }
 
 static void opLoadDB(Strings opFlags, Strings opArgs)
