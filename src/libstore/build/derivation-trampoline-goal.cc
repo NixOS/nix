@@ -2,6 +2,9 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
 
+#include <ranges>
+#include <algorithm>
+
 namespace nix {
 
 DerivationTrampolineGoal::DerivationTrampolineGoal(
@@ -145,6 +148,9 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         },
         wantedOutputs.raw);
 
+    /* Must have at least one wanted output. This is assumed below. */
+    assert(!resolvedWantedOutputs.empty());
+
     Goals concreteDrvGoals;
 
     /* Build this step! */
@@ -156,20 +162,71 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         concreteDrvGoals.insert(std::move(g));
     }
 
-    // Copy on purpose
-    co_await await(Goals(concreteDrvGoals));
+    co_await await(concreteDrvGoals);
 
     trace("outer build done");
 
-    auto & g = *concreteDrvGoals.begin();
-    buildResult = g->buildResult;
-    if (auto * successP = buildResult.tryGetSuccess())
-        for (auto & g2 : concreteDrvGoals)
-            if (auto * successP2 = g2->buildResult.tryGetSuccess())
-                for (auto && [x, y] : successP2->builtOutputs)
-                    successP->builtOutputs.insert_or_assign(x, y);
+    if (nrFailed != 0) {
+        auto gi = std::ranges::find_if(concreteDrvGoals, [](const GoalPtr & goal) -> bool {
+            auto exitCode = goal->exitCode;
+            /* Note that without --keep-going waitees might be cancelled before
+               we are woken up. */
+            return exitCode != ecBusy && exitCode != ecSuccess;
+        });
 
-    co_return amDone(g->exitCode);
+        const Goal * g = gi->get();
+        assert(gi != concreteDrvGoals.end() && "expected a failing goal");
+        auto exitCode = g->exitCode;
+        const auto * failure = g->buildResult.tryGetFailure();
+        assert(failure && "failing goal does not report a failed build result");
+
+        /* Report the exit status of *some* failing goal. This might not be strictly
+           correct, since multiple subgoals can fail independently, but this should be
+           a good enough heuristic without --keep-going. */
+        co_return doneFailure(exitCode, *failure);
+    }
+
+    SingleDrvOutputs outputs;
+
+    auto successes = std::views::transform(concreteDrvGoals, [](const GoalPtr & a) -> const BuildResult::Success & {
+        auto * success = a->buildResult.tryGetSuccess();
+        assert(success && "goal succeeded, but some waitees do not report a successful status");
+        return *success;
+    });
+
+    for (const auto & success : successes)
+        std::ranges::copy(success.builtOutputs, std::inserter(outputs, outputs.end()));
+
+    auto statuses = successes | std::views::transform(&BuildResult::Success::status);
+
+    /* Aggregate the status code. If some outputs we already valid, but we had
+       to build/substitute the other ones, report it as the smallest common
+       denominator. */
+    auto compareSuccesses = [](auto a, auto b) {
+        /* This is technically an identity mapping of the underlying values, but
+           it would be worse to rely on the enum ordering here. */
+        auto toPriority = [](auto st) {
+            using enum BuildResult::Success::Status;
+            switch (st) {
+            case Built:
+                return 0;
+            case Substituted:
+                return 1;
+            case AlreadyValid:
+                return 2;
+            case ResolvesToAlreadyValid:
+                return 3;
+            default:
+                unreachable();
+            }
+        };
+        return toPriority(a) < toPriority(b);
+    };
+
+    co_return doneSuccess({
+        .status = std::ranges::min(statuses, compareSuccesses),
+        .builtOutputs = std::move(outputs),
+    });
 }
 
 } // namespace nix
