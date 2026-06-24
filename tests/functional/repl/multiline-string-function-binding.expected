@@ -1,0 +1,11 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> f = x: x
+
+nix-repl> y = f ''
+        >   world
+        > ''
+
+nix-repl> y
+"world\n"
