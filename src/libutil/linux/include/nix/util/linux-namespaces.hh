@@ -1,21 +1,27 @@
 #pragma once
 ///@file
 
-#include <optional>
-
-#include "nix/util/types.hh"
+#include <filesystem>
 
 namespace nix {
 
 /**
- * Save the current mount namespace. Ignored if called more than
- * once.
+ * Save the parent mount namespace and enter a private one via
+ * `unshare(CLONE_NEWNS)`.
  */
-void saveMountNamespace();
+void tryEnterPrivateMountNamespace();
 
 /**
- * Restore the mount namespace saved by saveMountNamespace(). Ignored
- * if saveMountNamespace() was never called.
+ * Remount `path` writable if its mount is read-only, leaving
+ * already-writable mounts untouched. This throws if we aren't in a
+ * private mount namespace, since remounting would leak into the
+ * host mount table.
+ */
+void remountReadOnlyWritable(const std::filesystem::path & path);
+
+/**
+ * Restore the parent mount namespace saved when we entered a private
+ * one. Ignored if `tryEnterPrivateMountNamespace()` never succeeded.
  */
 void restoreMountNamespace();
 
