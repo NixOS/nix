@@ -7,6 +7,7 @@
 #include "nix_api_util_internal.h"
 
 #include "nix/store/path.hh"
+#include "nix/store/realisation.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-reference.hh"
@@ -299,6 +300,72 @@ nix_err nix_derivation_to_json(
         if (callback) {
             callback(result.data(), result.size(), userdata);
         }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_outputs(
+    nix_c_context * context,
+    Store * store,
+    const nix_derivation * drv,
+    const StorePath * drv_path,
+    void * userdata,
+    void (*callback)(nix_c_context * context, void * userdata, const char * output_name, const char * drv_output_id))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & [outputName, _output] : drv->drv.outputs) {
+                nix::DrvOutput key{drv_path->path, outputName};
+                auto rendered = key.render(*store->ptr);
+                callback(context, userdata, outputName.c_str(), rendered.c_str());
+                if (context && context->last_err_code != NIX_OK)
+                    return context->last_err_code;
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_get_input_drv_outputs(
+    nix_c_context * context,
+    Store * store,
+    const nix_derivation * drv,
+    void * userdata,
+    void (*callback)(nix_c_context * context, void * userdata, const char * input_drv_path, const char * output_name))
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (callback) {
+            for (const auto & [inputDrvPath, childNode] : drv->drv.inputDrvs.map) {
+                auto rendered = store->ptr->printStorePath(inputDrvPath);
+                for (const auto & outputName : childNode.value) {
+                    callback(context, userdata, rendered.c_str(), outputName.c_str());
+                    if (context && context->last_err_code != NIX_OK)
+                        return context->last_err_code;
+                }
+            }
+        }
+    }
+    NIXC_CATCH_ERRS
+}
+
+nix_err nix_derivation_has_dynamic_inputs(nix_c_context * context, const nix_derivation * drv, bool * out_has_dynamic)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        bool has = false;
+        for (const auto & [_inputDrvPath, childNode] : drv->drv.inputDrvs.map) {
+            if (!childNode.childMap.empty()) {
+                has = true;
+                break;
+            }
+        }
+        if (out_has_dynamic)
+            *out_has_dynamic = has;
     }
     NIXC_CATCH_ERRS
 }
