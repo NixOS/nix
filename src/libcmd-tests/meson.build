@@ -25,9 +25,6 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-rapidcheck = dependency('rapidcheck')
-deps_private += rapidcheck
-
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
@@ -45,8 +42,7 @@ this_exe = executable(
   sources,
   dependencies : deps_private_subproject + deps_private + deps_other,
   include_directories : include_dirs,
-  # TODO: -lrapidcheck, see ../libutil-support/build.meson
-  link_args : linker_export_flags + [ '-lrapidcheck' ],
+  link_args : linker_export_flags,
   # get main from gtest
   install : true,
 )

@@ -6,141 +6,97 @@
 namespace nix {
 
 /* ----------------------------------------------------------------------------
- * findLastUnquotedDot
+ * findLastUnquotedDot (parametrised TEST_P suite)
  * --------------------------------------------------------------------------*/
 
-TEST(findLastUnquotedDot, noDot)
+struct FindLastUnquotedDotCase
 {
-    ASSERT_EQ(findLastUnquotedDot("foobar"), std::string::npos);
+    std::string input;
+    size_t expected;
+};
+
+class FindLastUnquotedDotTest : public ::testing::TestWithParam<FindLastUnquotedDotCase>
+{};
+
+TEST_P(FindLastUnquotedDotTest, findsCorrectPosition)
+{
+    const auto & [input, expected] = GetParam();
+    EXPECT_EQ(findLastUnquotedDot(input), expected);
 }
 
-TEST(findLastUnquotedDot, emptyString)
-{
-    ASSERT_EQ(findLastUnquotedDot(""), std::string::npos);
-}
-
-TEST(findLastUnquotedDot, singleDot)
-{
-    ASSERT_EQ(findLastUnquotedDot("foo.bar"), 3u);
-}
-
-TEST(findLastUnquotedDot, multipleDots)
-{
-    ASSERT_EQ(findLastUnquotedDot("a.b.c"), 3u);
-}
-
-TEST(findLastUnquotedDot, dotInsideQuotes)
-{
-    // The dot inside "b.c" should be ignored
-    ASSERT_EQ(findLastUnquotedDot("a.\"b.c\""), 1u);
-}
-
-TEST(findLastUnquotedDot, allDotsInsideQuotes)
-{
-    // All dots are inside quotes — no unquoted dot
-    ASSERT_EQ(findLastUnquotedDot("\"a.b.c\""), std::string::npos);
-}
-
-TEST(findLastUnquotedDot, dotAfterQuotedSegment)
-{
-    // a."b.c".d — last unquoted dot is before 'd'
-    ASSERT_EQ(findLastUnquotedDot("a.\"b.c\".d"), 7u);
-}
-
-TEST(findLastUnquotedDot, mixedQuotedAndUnquoted)
-{
-    // foo."bar.baz".qux."x.y"
-    // Unquoted dots at positions 3 and 13
-    auto s = std::string("foo.\"bar.baz\".qux.\"x.y\"");
-    auto result = findLastUnquotedDot(s);
-    // Last unquoted dot is before "x.y" segment
-    ASSERT_EQ(result, 17u);
-}
-
-TEST(findLastUnquotedDot, onlyDot)
-{
-    ASSERT_EQ(findLastUnquotedDot("."), 0u);
-}
-
-TEST(findLastUnquotedDot, dotAtStart)
-{
-    ASSERT_EQ(findLastUnquotedDot(".foo"), 0u);
-}
-
-TEST(findLastUnquotedDot, dotAtEnd)
-{
-    ASSERT_EQ(findLastUnquotedDot("foo."), 3u);
-}
-
-TEST(findLastUnquotedDot, unclosedQuoteHidesDot)
-{
-    // An unclosed quote means the trailing dot is "inside" the quote
-    ASSERT_EQ(findLastUnquotedDot("foo.\"bar."), 3u);
-}
+INSTANTIATE_TEST_SUITE_P(
+    FindLastUnquotedDot,
+    FindLastUnquotedDotTest,
+    ::testing::Values(
+        // No dot at all
+        FindLastUnquotedDotCase{"foobar", std::string::npos},
+        // Empty string
+        FindLastUnquotedDotCase{"", std::string::npos},
+        // Single dot
+        FindLastUnquotedDotCase{"foo.bar", 3u},
+        // Multiple dots — returns last
+        FindLastUnquotedDotCase{"a.b.c", 3u},
+        // Dot inside quotes should be ignored
+        FindLastUnquotedDotCase{"a.\"b.c\"", 1u},
+        // All dots inside quotes — no unquoted dot
+        FindLastUnquotedDotCase{"\"a.b.c\"", std::string::npos},
+        // Dot after quoted segment: a."b.c".d — last unquoted dot before 'd'
+        FindLastUnquotedDotCase{"a.\"b.c\".d", 7u},
+        // Mixed quoted and unquoted: foo."bar.baz".qux."x.y"
+        FindLastUnquotedDotCase{"foo.\"bar.baz\".qux.\"x.y\"", 17u},
+        // Only a dot
+        FindLastUnquotedDotCase{".", 0u},
+        // Dot at start
+        FindLastUnquotedDotCase{".foo", 0u},
+        // Dot at end
+        FindLastUnquotedDotCase{"foo.", 3u},
+        // Unclosed quote hides trailing dot
+        FindLastUnquotedDotCase{"foo.\"bar.", 3u}));
 
 /* ----------------------------------------------------------------------------
- * formatAttrName
+ * formatAttrName (parametrised TEST_P suite)
  * --------------------------------------------------------------------------*/
 
-TEST(formatAttrName, simpleIdentifier)
+struct FormatAttrNameCase
 {
-    // A valid identifier should be returned bare
-    ASSERT_EQ(formatAttrName("foo"), "foo");
+    std::string input;
+    std::string expected;
+};
+
+class FormatAttrNameTest : public ::testing::TestWithParam<FormatAttrNameCase>
+{};
+
+TEST_P(FormatAttrNameTest, formatsCorrectly)
+{
+    const auto & [input, expected] = GetParam();
+    EXPECT_EQ(formatAttrName(input), expected);
 }
 
-TEST(formatAttrName, identifierWithUnderscore)
-{
-    ASSERT_EQ(formatAttrName("foo_bar"), "foo_bar");
-}
-
-TEST(formatAttrName, identifierWithHyphen)
-{
-    // Hyphens are valid in Nix attribute identifiers
-    ASSERT_EQ(formatAttrName("foo-bar"), "foo-bar");
-}
-
-TEST(formatAttrName, nameWithDot)
-{
-    // A name containing a dot must be quoted
-    auto result = formatAttrName("test.server.example.com");
-    ASSERT_EQ(result, "\"test.server.example.com\"");
-}
-
-TEST(formatAttrName, nameWithSpace)
-{
-    auto result = formatAttrName("hello world");
-    ASSERT_EQ(result, "\"hello world\"");
-}
-
-TEST(formatAttrName, emptyName)
-{
-    // An empty name needs quoting
-    auto result = formatAttrName("");
-    ASSERT_EQ(result, "\"\"");
-}
-
-TEST(formatAttrName, nameStartingWithDigit)
-{
-    // Names starting with a digit are not valid identifiers
-    auto result = formatAttrName("123abc");
-    ASSERT_EQ(result, "\"123abc\"");
-}
-
-TEST(formatAttrName, reservedKeyword)
-{
-    // Reserved keywords like "if", "then", "else" need quoting
-    auto result = formatAttrName("if");
-    ASSERT_EQ(result, "\"if\"");
-}
-
-TEST(formatAttrName, anotherKeyword)
-{
-    auto result = formatAttrName("let");
-    ASSERT_EQ(result, "\"let\"");
-}
+INSTANTIATE_TEST_SUITE_P(
+    FormatAttrName,
+    FormatAttrNameTest,
+    ::testing::Values(
+        // Simple identifier — returned bare
+        FormatAttrNameCase{"foo", "foo"},
+        // Identifier with underscore
+        FormatAttrNameCase{"foo_bar", "foo_bar"},
+        // Hyphens are valid in Nix attribute identifiers
+        FormatAttrNameCase{"foo-bar", "foo-bar"},
+        // Name containing a dot must be quoted
+        FormatAttrNameCase{"test.server.example.com", "\"test.server.example.com\""},
+        // Name with space must be quoted
+        FormatAttrNameCase{"hello world", "\"hello world\""},
+        // Empty name needs quoting
+        FormatAttrNameCase{"", "\"\""},
+        // Name starting with digit is not a valid identifier
+        FormatAttrNameCase{"123abc", "\"123abc\""},
+        // Reserved keyword "if" needs quoting
+        FormatAttrNameCase{"if", "\"if\""},
+        // Reserved keyword "let" needs quoting
+        FormatAttrNameCase{"let", "\"let\""}));
 
 /* ----------------------------------------------------------------------------
- * matchAttrCompletions (parametrized TEST_P suite)
+ * matchAttrCompletions (parametrised TEST_P suite)
  * --------------------------------------------------------------------------*/
 
 struct CompletionTestCase
@@ -189,7 +145,6 @@ INSTANTIATE_TEST_SUITE_P(
         // No unquoted dot — returns empty (not an attr path)
         CompletionTestCase{"nodot", {"foo", "bar"}, {}},
         // Quoted segment in path prefix — dots inside quotes are ignored
-        CompletionTestCase{"a.\"b.c\".d", {"dog", "deer", "fox"}, {"a.\"b.c\".dog", "a.\"b.c\".deer"}}
-    ));
+        CompletionTestCase{"a.\"b.c\".d", {"dog", "deer", "fox"}, {"a.\"b.c\".dog", "a.\"b.c\".deer"}}));
 
 } // namespace nix
