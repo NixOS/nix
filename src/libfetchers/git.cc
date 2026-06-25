@@ -164,13 +164,6 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 
 static const Hash nullRev{HashAlgorithm::SHA1};
 
-static LazyAttr makeLazyAttr(fun<ResolvedAttr()> compute)
-{
-    return make_ref<LazyAttrComputation>(LazyAttrComputation{
-        .compute = memo<ResolvedAttr>(std::move(compute)),
-    });
-}
-
 struct GitInputScheme : InputScheme
 {
     std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
