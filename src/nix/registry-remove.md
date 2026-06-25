@@ -11,7 +11,7 @@ R""(
 * Remove the entry `nixpkgs` from a custom registry:
 
   ```console
-  # nix registry remove --registry ./custom-flake-registry.json nixpkgs
+  # nix registry remove --file ./flake-registry.json nixpkgs
   ```
 
 # Description
