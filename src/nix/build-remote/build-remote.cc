@@ -110,6 +110,10 @@ static int main_build_remote(int argc, char ** argv)
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
 
+        // Whether to force local building on the target store bypassing build
+        // hooks
+        bool forceLocal = false;
+
         auto machines = Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
         debug("got %d remote builders", machines.size());
 
@@ -252,6 +256,8 @@ static int main_build_remote(int argc, char ** argv)
 
                     sshStore = bestMachine->openStore();
                     sshStore->connect();
+
+                    forceLocal = bestMachine->forceLocal;
                 } catch (std::exception & e) {
                     auto msg = chomp(drainFD(5, {.block = false}));
                     printError("cannot build on '%s': %s%s", storeUri, e.what(), msg.empty() ? "" : ": " + msg);
@@ -321,6 +327,8 @@ static int main_build_remote(int argc, char ** argv)
             !trusted || *trusted;
         });
 
+        auto buildMode = forceLocal ? bmLocal : bmNormal;
+
         // See the very large comment in `case WorkerProto::Op::BuildDerivation:` in
         // `src/libstore/daemon.cc` that explains the trust model here.
         //
@@ -338,7 +346,7 @@ static int main_build_remote(int argc, char ** argv)
             //    output ids, which break CA derivations
             if (!drv.inputDrvs.map.empty())
                 drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
+            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv), buildMode);
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {
@@ -353,10 +361,12 @@ static int main_build_remote(int argc, char ** argv)
             }
         } else {
             copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);
-            auto res = sshStore->buildPathsWithResults({DerivedPath::Built{
-                .drvPath = makeConstantStorePathRef(*drvPath),
-                .outputs = OutputsSpec::All{},
-            }});
+            auto res = sshStore->buildPathsWithResults(
+                {DerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(*drvPath),
+                    .outputs = OutputsSpec::All{},
+                }},
+                buildMode);
             // One path to build should produce exactly one build result
             assert(res.size() == 1);
             optResult = std::move(res[0]);
@@ -392,9 +402,10 @@ static int main_build_remote(int argc, char ** argv)
 
         if (!missingPaths.empty()) {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
-            if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
-                for (auto & path : missingPaths)
-                    localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+            if (!settings.getWorkerSettings().avoidLocal)
+                if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
+                    for (auto & path : missingPaths)
+                        localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
             copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
         }
         // XXX: Should be done as part of `copyPaths`

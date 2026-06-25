@@ -201,6 +201,8 @@ public:
 
              The value for this field can be obtained via `base64 -w0`.
 
+          9. A boolean which if true, forces the build to not use builders on the remote store
+
           > **Example**
           >
           > Multiple builders specified on the command line:
@@ -271,6 +273,16 @@ public:
 
           It means that remote build hosts fetch as many dependencies as possible from their own substituters (e.g, from `cache.nixos.org`) instead of waiting for the local machine to upload them all.
           This can drastically reduce build times if the network connection between the local machine and the remote build host is slow.
+        )"};
+
+    Setting<bool> avoidLocal{
+        this,
+        false,
+        "avoid-local",
+        R"(
+          If set to `true`, Nix will not build derivations locally which can be built by the [`builders`]{#conf-builders}. This does not include derivations with preferLocalBuild set for which [`max-jobs`]{#conf-max-jobs} still applies.
+
+          This enables remote only locks which are not used by local builds
         )"};
 
     Setting<bool> useSubstitutes{

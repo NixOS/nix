@@ -50,7 +50,7 @@ enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
 
 enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
-enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
+enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck, bmLocal };
 
 enum TrustedFlag : bool { NotTrusted = false, Trusted = true };
 

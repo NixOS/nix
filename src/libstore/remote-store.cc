@@ -573,6 +573,12 @@ void RemoteStore::buildPaths(
     auto conn(getConnection());
     conn->to << WorkerProto::Op::BuildPaths;
     WorkerProto::write(*this, *conn, drvPaths);
+    if (buildMode == bmLocal && !conn->protoVersion.features.contains(WorkerProto::featureLocalBuilds)) {
+        warn(
+            "the daemon is missing the '%s' protocol feature, needed to prevent cycles with remote builds",
+            WorkerProto::featureLocalBuilds);
+        buildMode = bmNormal;
+    }
     conn->to << buildMode;
     conn.processStderr();
     readInt(conn->from);
