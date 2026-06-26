@@ -82,8 +82,10 @@ void BinaryCacheStore::applyCacheInfoFields(const std::map<std::string, std::str
 {
     if (auto * value = get(fields, "WantMassQuery"))
         config.wantMassQuery.setDefault(*value == "1");
-    if (auto * value = get(fields, "Priority"))
-        config.priority.setDefault(std::stoi(*value));
+    if (auto * value = get(fields, "Priority")) {
+        if (auto priority = string2Int<int>(*value))
+            config.priority.setDefault(*priority);
+    }
 }
 
 void BinaryCacheStore::init()
