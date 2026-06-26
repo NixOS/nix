@@ -69,16 +69,16 @@ void HttpBinaryCacheStore::init()
     auto cacheKey = config->getReference().render(/*withParams=*/false);
 
     if (auto cacheInfo = diskCache->upToDateCacheExists(cacheKey)) {
-        config->wantMassQuery.setDefault(cacheInfo->wantMassQuery);
-        config->priority.setDefault(cacheInfo->priority);
+        applyCacheInfoFields(cacheInfo->fields);
     } else {
+        std::map<std::string, std::string> fields;
         try {
-            BinaryCacheStore::init();
+            fields = parseNixCacheInfo();
         } catch (UploadToHTTP &) {
             throw Error("'%s' does not appear to be a binary cache", config->cacheUri.to_string());
         }
-        diskCache->createCache(
-            cacheKey, config->storeDir, {.wantMassQuery = config->wantMassQuery, .priority = config->priority});
+        applyCacheInfoFields(fields);
+        diskCache->createCache(cacheKey, config->storeDir, {.fields = std::move(fields)});
     }
 }
 

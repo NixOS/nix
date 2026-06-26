@@ -99,6 +99,16 @@ protected:
     BinaryCacheStore(Config &);
 
     /**
+     * Fetch and parse `nix-cache-info`.
+     */
+    std::map<std::string, std::string> parseNixCacheInfo();
+
+    /**
+     * Apply the known `nix-cache-info` fields from `fields` to this store.
+     */
+    void applyCacheInfoFields(const std::map<std::string, std::string> & fields);
+
+    /**
      * Compute the path to the given realisation
      *
      * It's `${realisationsPrefix}/${drvOutput}.doi`.

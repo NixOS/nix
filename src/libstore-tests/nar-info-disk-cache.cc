@@ -15,6 +15,13 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
     int prio = 12345;
     bool wantMassQuery = true;
 
+    auto mkFields = [](bool wantMassQuery, int prio) {
+        return std::map<std::string, std::string>{
+            {"WantMassQuery", wantMassQuery ? "1" : "0"},
+            {"Priority", std::to_string(prio)},
+        };
+    };
+
     auto tmpDir = createTempDir();
     AutoDelete delTmpDir(tmpDir);
     auto dbPath(tmpDir / "test-narinfo-disk-cache.sqlite");
@@ -30,22 +37,20 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
 
         // Set up "background noise" and check that different caches receive different ids
         {
-            auto bc1 =
-                cache->createCache("https://bar", "/nix/storedir", {.wantMassQuery = wantMassQuery, .priority = prio});
-            auto bc2 = cache->createCache("https://xyz", "/nix/storedir", {.priority = 12});
+            auto bc1 = cache->createCache("https://bar", "/nix/storedir", {.fields = mkFields(wantMassQuery, prio)});
+            auto bc2 = cache->createCache("https://xyz", "/nix/storedir", {.fields = mkFields(false, 12)});
             ASSERT_NE(bc1, bc2);
             barId = bc1;
         }
 
         // Check that the fields are saved and returned correctly. This does not test
         // the select statement yet, because of in-memory caching.
-        savedId = cache->createCache("http://foo", "/nix/storedir", {.wantMassQuery = wantMassQuery, .priority = prio});
+        savedId = cache->createCache("http://foo", "/nix/storedir", {.fields = mkFields(wantMassQuery, prio)});
         ;
         {
             auto r = cache->upToDateCacheExists("http://foo");
             ASSERT_TRUE(r);
-            ASSERT_EQ(r->priority, prio);
-            ASSERT_EQ(r->wantMassQuery, wantMassQuery);
+            ASSERT_EQ(r->fields, mkFields(wantMassQuery, prio));
             ASSERT_EQ(savedId, r->id);
         }
 
@@ -68,8 +73,7 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
         {
             auto r = cache->upToDateCacheExists("http://foo");
             ASSERT_TRUE(r);
-            ASSERT_EQ(r->priority, prio);
-            ASSERT_EQ(r->wantMassQuery, wantMassQuery);
+            ASSERT_EQ(r->fields, mkFields(wantMassQuery, prio));
         }
     }
 
@@ -85,13 +89,12 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
         }
 
         // "Update", same data, check that the id number is reused
-        cache2->createCache("http://foo", "/nix/storedir", {.wantMassQuery = wantMassQuery, .priority = prio});
+        cache2->createCache("http://foo", "/nix/storedir", {.fields = mkFields(wantMassQuery, prio)});
 
         {
             auto r = cache2->upToDateCacheExists("http://foo");
             ASSERT_TRUE(r);
-            ASSERT_EQ(r->priority, prio);
-            ASSERT_EQ(r->wantMassQuery, wantMassQuery);
+            ASSERT_EQ(r->fields, mkFields(wantMassQuery, prio));
             ASSERT_EQ(r->id, savedId);
         }
 
@@ -108,11 +111,9 @@ TEST(NarInfoDiskCacheImpl, create_and_read)
             auto r0 = cache2->upToDateCacheExists("https://bar");
             ASSERT_FALSE(r0);
 
-            cache2->createCache(
-                "https://bar", "/nix/storedir", {.wantMassQuery = !wantMassQuery, .priority = prio + 10});
+            cache2->createCache("https://bar", "/nix/storedir", {.fields = mkFields(!wantMassQuery, prio + 10)});
             auto r = cache2->upToDateCacheExists("https://bar");
-            ASSERT_EQ(r->wantMassQuery, !wantMassQuery);
-            ASSERT_EQ(r->priority, prio + 10);
+            ASSERT_EQ(r->fields, mkFields(!wantMassQuery, prio + 10));
             ASSERT_EQ(r->id, barId);
         }
 
