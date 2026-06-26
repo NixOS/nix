@@ -1,4 +1,6 @@
 #include "nix/util/bump-memory-resource.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/error.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/alignment.hh"
 #include "nix/util/logging.hh"
@@ -57,7 +59,7 @@ static bool canOvercommit(std::size_t reserveSize)
 
 #endif // _WIN32
 
-BumpMemoryResource::BumpMemoryResource(std::size_t reserveSize, std::pmr::memory_resource * upstream)
+BumpMemoryResource::BumpMemoryResource(std::size_t reserveSize, std::pmr::memory_resource * upstream, bool dontDump)
     : upstreamResource(upstream)
 {
 #ifndef _WIN32
@@ -83,6 +85,12 @@ BumpMemoryResource::BumpMemoryResource(std::size_t reserveSize, std::pmr::memory
 
     base = p;
     capacity = reserveSize;
+
+#  ifdef MADV_DONTDUMP
+    static const bool dumpEverything = getEnv("_NIX_CORE_DUMP_EVERYTHING").value_or("0") == "1";
+    if (!dumpEverything && dontDump && ::madvise(p, reserveSize, MADV_DONTDUMP))
+        throw SysError("calling madvise");
+#  endif
 #endif
 }
 

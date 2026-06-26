@@ -104,4 +104,34 @@ TEST_F(nix_api_expr_test, nix_external_printValueAsJSON_can_use_state)
     nix_gc_decref(ctx, toJsonFn);
 }
 
+TEST_F(nix_api_expr_test, nix_get_external_roundtrip)
+{
+    int content = 42;
+    NixCExternalValueDesc desc{};
+    ExternalValue * ext = nix_create_external_value(ctx, &desc, &content);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, ext);
+
+    nix_init_external(ctx, value, ext);
+    assert_ctx_ok();
+
+    nix_value_force(ctx, state, value);
+    assert_ctx_ok();
+
+    ExternalValue * retrieved = nix_get_external(ctx, value);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, retrieved);
+
+    void * content_ptr = nix_get_external_value_content(ctx, retrieved);
+    assert_ctx_ok();
+    ASSERT_EQ(&content, content_ptr);
+
+    nix_gc_decref(ctx, ext);
+}
+
+TEST_F(nix_api_expr_test, nix_get_external_value_content_null)
+{
+    ASSERT_EQ(nullptr, nix_get_external_value_content(ctx, nullptr));
+}
+
 } // namespace nixC

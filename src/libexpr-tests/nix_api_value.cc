@@ -119,6 +119,14 @@ TEST_F(nix_api_expr_test, nix_value_set_get_path)
     ASSERT_EQ(NIX_TYPE_PATH, nix_get_type(ctx, value));
 }
 
+TEST_F(nix_api_expr_test, nix_get_external_invalid)
+{
+    ASSERT_EQ(nullptr, nix_get_external(ctx, nullptr));
+    assert_ctx_err();
+    ASSERT_EQ(nullptr, nix_get_external(ctx, value));
+    assert_ctx_err();
+}
+
 TEST_F(nix_api_expr_test, nix_build_and_init_list_invalid)
 {
     ASSERT_EQ(nullptr, nix_get_list_byidx(ctx, nullptr, state, 0));

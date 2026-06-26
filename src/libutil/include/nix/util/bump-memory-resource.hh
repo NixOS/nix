@@ -39,7 +39,8 @@ public:
 
     explicit BumpMemoryResource(
         std::size_t reserveSize = defaultReserveSize,
-        std::pmr::memory_resource * upstream = std::pmr::new_delete_resource());
+        std::pmr::memory_resource * upstream = std::pmr::new_delete_resource(),
+        bool dontDump = true);
 
     BumpMemoryResource(BumpMemoryResource &&) = delete;
     BumpMemoryResource(const BumpMemoryResource &) = delete;

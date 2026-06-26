@@ -335,7 +335,7 @@ ExternalValue * nix_get_external(nix_c_context * context, nix_value * value)
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        auto & v = check_value_out(value);
+        auto & v = check_value_in(value);
         assert(v.type() == nix::nExternal);
         return (ExternalValue *) v.external();
     }
