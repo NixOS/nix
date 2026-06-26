@@ -28,14 +28,15 @@ fi
 
 OS="$(uname -s)"
 
-# macOS support for 10.12.6 or higher
+# Since nixpkgs 25.11 the minimum deployment target is macOS 14.0
 if [ "$OS" = "Darwin" ]; then
+    # shellcheck disable=SC2034
     IFS='.' read -r macos_major macos_minor macos_patch << EOF
 $(sw_vers -productVersion)
 EOF
-    if [ "$macos_major" -lt 10 ] || { [ "$macos_major" -eq 10 ] && [ "$macos_minor" -lt 12 ]; } || { [ "$macos_minor" -eq 12 ] && [ "$macos_patch" -lt 6 ]; }; then
+    if [ "$macos_major" -lt 14 ]; then
         # patch may not be present; command substitution for simplicity
-        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 10.12.6 or higher"
+        echo "$0: macOS $(sw_vers -productVersion) is not supported, upgrade to 14.0 or higher"
         exit 1
     fi
 fi
