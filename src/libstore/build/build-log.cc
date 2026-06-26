@@ -10,9 +10,16 @@ BuildLog::BuildLog(size_t maxTailLines, std::unique_ptr<Activity> act)
 
 void BuildLog::operator()(std::string_view data)
 {
-    for (auto c : data)
+    for (auto c : data) {
+        /* Only let a '\r' reset the column if it isn't followed by '\n', so
+           "\r\n" acts as a line terminator; defer a char to handle split chunks. */
+        if (pendingCR) {
+            pendingCR = false;
+            if (c != '\n')
+                currentLogLinePos = 0;
+        }
         if (c == '\r')
-            currentLogLinePos = 0;
+            pendingCR = true;
         else if (c == '\n')
             flushLine();
         else {
@@ -20,6 +27,7 @@ void BuildLog::operator()(std::string_view data)
                 currentLogLine.resize(currentLogLinePos + 1);
             currentLogLine[currentLogLinePos++] = c;
         }
+    }
 }
 
 void BuildLog::flush()
