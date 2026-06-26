@@ -19,8 +19,7 @@ create table if not exists BinaryCaches (
     url       text unique not null,
     timestamp integer not null,
     storeDir  text not null,
-    wantMassQuery integer not null,
-    priority  integer not null
+    fields    text not null
 );
 
 create table if not exists NARs (
@@ -84,7 +83,7 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
     NarInfoDiskCacheImpl(
         const Settings & settings,
         SQLiteSettings sqliteSettings,
-        std::filesystem::path dbPath = getCacheDir() / "binary-cache-detsys-v1.sqlite")
+        std::filesystem::path dbPath = getCacheDir() / "binary-cache-detsys-v2.sqlite")
         : NarInfoDiskCache{settings}
     {
         auto state(_state.lock());
@@ -99,11 +98,10 @@ struct NarInfoDiskCacheImpl : NarInfoDiskCache
 
         state->insertCache.create(
             state->db,
-            "insert into BinaryCaches(url, timestamp, storeDir, wantMassQuery, priority) values (?1, ?2, ?3, ?4, ?5) on conflict (url) do update set timestamp = ?2, storeDir = ?3, wantMassQuery = ?4, priority = ?5 returning id;");
+            "insert into BinaryCaches(url, timestamp, storeDir, fields) values (?1, ?2, ?3, ?4) on conflict (url) do update set timestamp = ?2, storeDir = ?3, fields = ?4 returning id;");
 
         state->queryCache.create(
-            state->db,
-            "select id, storeDir, wantMassQuery, priority from BinaryCaches where url = ? and timestamp > ?");
+            state->db, "select id, storeDir, fields from BinaryCaches where url = ? and timestamp > ?");
 
         state->insertNAR.create(
             state->db,
@@ -193,8 +191,7 @@ private:
                 .storeDir = queryCache.getStr(1),
                 .info = {
                     .id = (int) queryCache.getInt(0),
-                    .wantMassQuery = queryCache.getInt(2) != 0,
-                    .priority = (int) queryCache.getInt(3),
+                    .fields = nlohmann::json::parse(queryCache.getStr(2)).get<std::map<std::string, std::string>>(),
                 }};
             state.caches.emplace(uri, cache);
         }
@@ -222,8 +219,7 @@ public:
                            .apply(uri)
                            .apply(time(nullptr))
                            .apply(storeDir)
-                           .apply(info.wantMassQuery)
-                           .apply(info.priority));
+                           .apply(nlohmann::json(info.fields).dump()));
                 if (!r.next()) {
                     unreachable();
                 }
