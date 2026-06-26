@@ -24,6 +24,7 @@ jobs:
       reference-id: ${{ inputs.reference-id }}
       version: ${{ inputs.version }}
       extra-commands-early: |
+        nix flake update --commit-lock-file --flake ./packaging/secure-packages
         echo ${{ inputs.version }} > .version-determinate
         git add .version-determinate
         git commit -m "Set .version-determinate to ${{ inputs.version }}" || true
