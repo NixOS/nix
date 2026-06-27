@@ -23,6 +23,8 @@
 #include <curl/curl.h>
 
 #include <cmath>
+#include <algorithm>
+#include <array>
 #include <cstring>
 #include <queue>
 #include <random>
@@ -558,6 +560,14 @@ struct curlFileTransfer : public FileTransfer
 #endif
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransfer.settings.connectTimeout.get());
 
+            /* Enable TCP keepalive to detect dead connections and server closures.
+               Probes every 30s to catch network failures and idle timeouts early. */
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPALIVE, 1L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPIDLE, 30L);
+            curl_easy_setopt(req, CURLOPT_TCP_KEEPINTVL, 30L);
+            /* Don't reuse idle connections older than 90s. */
+            curl_easy_setopt(req, CURLOPT_MAXAGE_CONN, 90L);
+
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransfer.settings.stalledDownloadTimeout.get());
 
@@ -661,7 +671,44 @@ struct curlFileTransfer : public FileTransfer
                 // We treat most errors as transient, but won't retry when hopeless
                 Error err = Transient;
 
-                if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
+                // S3 returns certain retryable errors as HTTP 400/500/503 with XML error codes.
+                // These take precedence over the generic HTTP status handling below.
+                // Only parse the response body on status codes where S3 XML errors can appear.
+                static constexpr std::array<std::string_view, 12> s3RetryableErrors{{
+                    "IncompleteBody",       // HTTP 400 - network issue
+                    "InternalError",        // HTTP 500 - S3 internal failure
+                    "InternalFailure",      // HTTP 500 - alias for InternalError
+                    "InternalServerError",  // HTTP 500 - alias for InternalError
+                    "RequestExpired",       // HTTP 400 - clock skew / slow upload
+                    "RequestTimeout",       // HTTP 400 - stale connection reuse
+                    "RequestTimeTooSkewed", // HTTP 403 - clock drift
+                    "RequestThrottled",     // HTTP 400 - throttling variant
+                    "SlowDown",             // HTTP 503 - throttling
+                    "ServiceUnavailable",   // HTTP 503 - temporary unavailability
+                    "Throttling",           // HTTP 400 - throttling variant
+                    "ThrottledException",   // HTTP 400 - throttling variant
+                }};
+                // S3 error responses have the form <Error><Code>...</Code>...</Error>.
+                // Require the <Error> root to avoid matching unrelated XML with a <Code> element.
+                static std::regex s3ErrorCodeRegex("<Error>[^]*<Code>([^<]+)</Code>");
+                std::smatch s3Match;
+                bool isS3XmlStatus = httpStatus == 400 || httpStatus == 403 || httpStatus == 500 || httpStatus == 503;
+                auto s3ErrorCode =
+                    (isS3XmlStatus && errorSink && std::regex_search(errorSink->s, s3Match, s3ErrorCodeRegex))
+                        ? s3Match[1].str()
+                        : "";
+
+                if (std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode)
+                    != s3RetryableErrors.end()) {
+                    if (s3ErrorCode == "RequestTimeout")
+                        /* Sigh, S3 400 RequestTimeout errors apparently should be retried
+                           immediately with no backoff, since we are only exacerbating the
+                           stale connection closing issue.
+                           See e.g. https://github.com/awslabs/aws-c-s3/issues/464 and a multitude
+                           of related issues. */
+                        retryTimeMs = 0;
+                    debug("S3 error '%s', will retry", s3ErrorCode);
+                } else if (httpStatus == 404 || httpStatus == 410 || code == CURLE_FILE_COULDNT_READ_FILE) {
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == 401 || httpStatus == 403 || httpStatus == 407) {
@@ -749,6 +796,8 @@ struct curlFileTransfer : public FileTransfer
                     int ms = retryTimeMs
                              * std::pow(
                                  2.0f, attempt - 1 + std::uniform_real_distribution<>(0.0, 0.5)(fileTransfer.mt19937));
+                    /* Clamp the maximum to something sane to avoid yeeting off the retries to infinity. */
+                    ms = std::clamp<int>(ms, 0, 60000);
 
                     if (writtenToSink) {
                         warn(
