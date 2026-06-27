@@ -4,6 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/args.hh"
 #include "nix/util/abstract-setting-to-json.hh"
 #include "nix/util/compute-levels.hh"
@@ -254,11 +255,11 @@ StringSet Settings::getDefaultExtraPlatforms()
     // machines. Note that we can’t force processes from executing
     // x86_64 in aarch64 environments or vice versa since they can
     // always exec with their own binary preferences.
+    //
+    // The runtime file exists iff Rosetta 2 is installed; checking it avoids
+    // spawning a subprocess during static initialization of `settings`.
     if (std::string{NIX_LOCAL_SYSTEM} == "aarch64-darwin"
-        && runProgram(
-               RunOptions{.program = "arch", .args = {"-arch", "x86_64", "/usr/bin/true"}, .mergeStderrToStdout = true})
-                   .first
-               == 0)
+        && pathExists("/Library/Apple/usr/libexec/oah/libRosettaRuntime"))
         extraPlatforms.insert("x86_64-darwin");
 #endif
 
