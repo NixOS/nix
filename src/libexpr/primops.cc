@@ -1961,25 +1961,21 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
             .debugThrow();
 
     NixStringContext context;
-    auto path =
-        state.coerceToPath(pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'")
-            .path;
-    /* Here we are leaving the realm of the rootFS accessor and must actually fetch to the store.
-       TODO: This could probably get optimised to avoid the fetching altogether to short-circuit when the path
-       is already mounted on storeFS. */
-    state.ensureLazyPathsCopied(context);
+    SourcePath sourcePath = state.coerceToPath(
+        pos, *args[0], context, "while evaluating the first argument passed to 'builtins.storePath'");
+
     /* Resolve symlinks in ‘path’, unless ‘path’ itself is a symlink
        directly in the store.  The latter condition is necessary so
        e.g. nix-push does the right thing. */
-    if (!state.store->isStorePath(path.abs()))
-        path = CanonPath(canonPath(path.abs(), true).string());
-    if (!state.store->isInStore(path.abs()))
-        state.error<EvalError>("path '%1%' is not in the Nix store", path).atPos(pos).debugThrow();
-    auto path2 = state.store->toStorePath(path.abs()).first;
-    if (!settings.readOnlyMode)
-        state.store->ensurePath(path2);
-    context.insert(NixStringContextElem::Opaque{.path = path2});
-    v.mkString(path.abs(), context, state.mem);
+    if (!state.store->isStorePath(sourcePath.path.abs()))
+        sourcePath = sourcePath.resolveSymlinks(SymlinkResolution::Full);
+    if (!state.store->isInStore(sourcePath.path.abs()))
+        state.error<EvalError>("path '%1%' is not in the Nix store", sourcePath).atPos(pos).debugThrow();
+    auto storePath = state.store->toStorePath(sourcePath.path.abs()).first;
+    if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath))) && !settings.readOnlyMode)
+        state.store->ensurePath(storePath);
+    context.insert(NixStringContextElem::Opaque{.path = storePath});
+    v.mkString(sourcePath.path.abs(), context, state.mem);
 }
 
 static RegisterPrimOp primop_storePath({
