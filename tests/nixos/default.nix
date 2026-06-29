@@ -196,6 +196,8 @@ in
 
   s3-binary-cache-store = runNixOSTest ./s3-binary-cache-store.nix;
 
+  gcs-binary-cache-store = runNixOSTest ./gcs-binary-cache-store.nix;
+
   fsync = runNixOSTest ./fsync.nix;
 
   cgroups = runNixOSTest ./cgroups;
