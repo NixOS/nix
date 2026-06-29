@@ -6,6 +6,7 @@ suites += {
     'develop.sh',
     'edit.sh',
     'run.sh',
+    'default-nix-fallback.sh',
     'mercurial.sh',
     'circular.sh',
     'init.sh',
