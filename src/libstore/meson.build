@@ -290,6 +290,7 @@ sources = files(
   'export-import.cc',
   'filetransfer.cc',
   'gc.cc',
+  'gcs-url.cc',
   'globals.cc',
   'http-binary-cache-store.cc',
   'indirect-root-store.cc',
