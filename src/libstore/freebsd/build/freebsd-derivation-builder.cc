@@ -367,6 +367,9 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 #if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif
+#if NIX_WITH_GCS_AUTH
+        .gcpAccessToken = preResolveGcpAccessToken(),
+#endif
     };
 
     if (derivationType.isSandboxed()) {
