@@ -32,6 +32,13 @@ subdir('nix-meson-build-support/windows-version')
 sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
 deps_private += sqlite
 
+# Needed by gcp-creds.cc tests (RSA keygen + signature verification). The test
+# bodies are guarded by NIX_WITH_GCS_AUTH so this is harmless when disabled.
+openssl = dependency('libcrypto', 'openssl', required : false)
+if openssl.found()
+  deps_private += openssl
+endif
+
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
 
@@ -66,6 +73,7 @@ sources = files(
   'dummy-store.cc',
   'filetransfer-request.cc',
   'filetransfer-retry.cc',
+  'gcp-creds.cc',
   'gcs-url.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
