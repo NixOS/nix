@@ -31,6 +31,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <time.h>
+#include <variant>
 
 #ifndef _WIN32
 #  include <grp.h>
@@ -112,6 +113,8 @@ struct LocalStore::State::Stmts
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt UpdateRealisedOutput;
+    SQLiteStmt DeleteRealisedOutputByName;
+    SQLiteStmt DeleteRealisedOutputs;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
@@ -387,6 +390,23 @@ LocalStore::LocalStore(ref<const Config> config)
                 where
                     drvPath = ? and
                     outputName = ?
+                ;
+            )");
+        state->stmts->DeleteRealisedOutputByName.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
+        state->stmts->DeleteRealisedOutputs.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
+                where
+                    drvPath = ?
                 ;
             )");
         state->stmts->QueryRealisedOutput.create(
@@ -692,6 +712,21 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 .apply(printStorePath(info.outPath))
                 .apply(concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
+        }
+    });
+}
+
+void LocalStore::deleteBuildTrace(const StorePath & drvPath, const OutputsSpec & outputs)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
+    retrySQLite<void>([&]() {
+        auto state(_state->lock());
+        if (auto names = std::get_if<OutputsSpec::Names>(&outputs.raw)) {
+            for (auto name : *names) {
+                state->stmts->DeleteRealisedOutputByName.use().apply(drvPath.to_string()).apply(name).exec();
+            }
+        } else {
+            state->stmts->DeleteRealisedOutputs.use().apply(drvPath.to_string()).exec();
         }
     });
 }
