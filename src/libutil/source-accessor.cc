@@ -71,13 +71,6 @@ std::string SourceAccessor::readFile(const CanonPath & path)
     return std::move(sink.s);
 }
 
-void SourceAccessor::readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback)
-{
-    auto s = readFile(path);
-    sizeCallback(s.size());
-    sink(s);
-}
-
 Hash SourceAccessor::hashPath(const CanonPath & path, PathFilter & filter, HashAlgorithm ha)
 {
     HashSink sink(ha);
