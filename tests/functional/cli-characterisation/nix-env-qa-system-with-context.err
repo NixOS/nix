@@ -1,0 +1,11 @@
+error:
+       … while querying the derivation named 'system-with-context-1.0'
+
+       … while evaluating the 'system' attribute of a derivation
+         at /pwd/cli-characterisation/system-with-context.nix:11:3:
+           10|   name = "system-with-context-1.0";
+           11|   system = "${normal}";
+             |   ^
+           12|   outPath = "/nix/store/fake";
+
+       error: the string '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-normal-1.0' is not allowed to refer to a store path (such as '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-normal-1.0.drv^out')

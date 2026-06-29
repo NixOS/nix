@@ -1,0 +1,6 @@
+error: attribute 'x.y.y' already defined at «stdin»:2:3
+       at «stdin»:3:9:
+            2|   x.y.y = 3;
+            3|   x = { y.y= 3; z = 3; };
+             |         ^
+            4| }

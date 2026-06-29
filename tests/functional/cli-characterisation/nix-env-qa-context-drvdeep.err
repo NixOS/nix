@@ -1,0 +1,4 @@
+error:
+       … while evaluating the 'name' attribute of a derivation
+
+       error: the string '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-helper-1.0.drv' is not allowed to refer to a store path (such as '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-helper-1.0.drv (deep)')

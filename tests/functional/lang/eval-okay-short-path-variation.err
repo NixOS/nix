@@ -1,0 +1,12 @@
+warning: relative path literal 'foo/bar' should be prefixed with '.' for clarity: './foo/bar' (lint-short-path-literals)
+         at /pwd/lang/eval-okay-short-path-variation.nix:4:3:
+              3| [
+              4|   foo/bar
+               |   ^
+              5|   a/b/c/d
+warning: relative path literal 'a/b/c/d' should be prefixed with '.' for clarity: './a/b/c/d' (lint-short-path-literals)
+         at /pwd/lang/eval-okay-short-path-variation.nix:5:3:
+              4|   foo/bar
+              5|   a/b/c/d
+               |   ^
+              6| ]

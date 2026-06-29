@@ -1,0 +1,5 @@
+error: syntax error, unexpected invalid token, expecting end of file
+       at «stdin»:1:5:
+            1| 123 é 4
+             |     ^
+            2|
