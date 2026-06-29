@@ -130,6 +130,53 @@ TEST_F(nix_api_expr_test, nix_value_auto_call_function_uses_defaults)
     nix_gc_decref(ctx, result);
 }
 
+TEST_F(nix_api_expr_test, nix_value_auto_call_function_forces_auto_args)
+{
+    nix_expr_eval_from_string(ctx, state, "{ a }: a + 1", ".", value);
+    assert_ctx_ok();
+
+    nix_value * identity = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "x: x", ".", identity);
+    assert_ctx_ok();
+
+    nix_value * attrs = nix_alloc_value(ctx, state);
+    nix_expr_eval_from_string(ctx, state, "{ a = 4; }", ".", attrs);
+    assert_ctx_ok();
+
+    nix_value * args = nix_alloc_value(ctx, state);
+    nix_init_apply(ctx, args, identity, attrs);
+    assert_ctx_ok();
+
+    nix_value * result = nix_alloc_value(ctx, state);
+    nix_value_auto_call_function(ctx, state, args, value, result);
+    assert_ctx_ok();
+
+    ASSERT_EQ(5, nix_get_int(ctx, result));
+
+    nix_gc_decref(ctx, identity);
+    nix_gc_decref(ctx, attrs);
+    nix_gc_decref(ctx, args);
+    nix_gc_decref(ctx, result);
+}
+
+TEST_F(nix_api_expr_test, nix_value_auto_call_function_non_attr_auto_args_is_error)
+{
+    nix_expr_eval_from_string(ctx, state, "{ a ? 7 }: a", ".", value);
+    assert_ctx_ok();
+
+    nix_value * args = nix_alloc_value(ctx, state);
+    nix_init_int(ctx, args, 42);
+    assert_ctx_ok();
+
+    nix_value * result = nix_alloc_value(ctx, state);
+    nix_value_auto_call_function(ctx, state, args, value, result);
+    ASSERT_EQ(NIX_ERR_NIX_ERROR, nix_err_code(ctx));
+    ASSERT_THAT(nix_err_msg(nullptr, ctx, nullptr), ::nix::testing::HasSubstrIgnoreANSIMatcher("expected a set"));
+
+    nix_gc_decref(ctx, args);
+    nix_gc_decref(ctx, result);
+}
+
 TEST_F(nix_api_expr_test, nix_value_auto_call_function_null_args_uses_defaults)
 {
     nix_expr_eval_from_string(ctx, state, "{ a ? 7 }: a", ".", value);

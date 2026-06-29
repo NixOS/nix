@@ -8,16 +8,14 @@
 #include "nix_api_util.h"
 #include "nix_api_util_internal.h"
 
-static const nix::Bindings * get_bindings_or_null(nix_value * autoArgs)
+static const nix::Bindings & get_bindings_or_empty(nix::EvalState & state, nix_value * autoArgs)
 {
     if (!autoArgs) {
-        return nullptr;
+        return nix::Bindings::emptyBindings;
     }
     auto & v = check_value_in(autoArgs);
-    if (v.type() == nix::nAttrs) {
-        return v.attrs();
-    }
-    return nullptr;
+    state.forceAttrs(v, nix::noPos, "while evaluating automatic function arguments");
+    return *v.attrs();
 }
 
 extern "C" {
@@ -46,14 +44,10 @@ nix_err nix_value_auto_call_function(
         context->last_err_code = NIX_OK;
     try {
         auto & fn = check_value_in(fn_val);
-        auto & res = *result->value;
+        auto & res = check_value_not_null(result);
 
-        const nix::Bindings * b = get_bindings_or_null(auto_args);
-        if (b) {
-            state->state.autoCallFunction(*b, fn, res);
-        } else {
-            state->state.autoCallFunction(nix::Bindings::emptyBindings, fn, res);
-        }
+        auto & b = get_bindings_or_empty(state->state, auto_args);
+        state->state.autoCallFunction(b, fn, res);
     }
     NIXC_CATCH_ERRS
 }
