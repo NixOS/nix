@@ -334,19 +334,149 @@ builtPathsPerInstallable(const std::vector<std::pair<ref<Installable>, BuiltPath
     return res;
 }
 
-struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
+/**
+ * Translate a `BuildEnvFileConflictError` raised by `updateProfile` into a
+ * user-facing `Error` explaining the conflict. `prioritiseSubcommand` is the
+ * `nix profile` subcommand (with any required arguments) used to suggest how
+ * to re-prioritise the new package, e.g. `"add"` or `"replace foo"`.
+ */
+static void rethrowProfileFileConflict(
+    ProfileManifest & manifest,
+    Store & store,
+    BuildEnvFileConflictError & conflictError,
+    std::string_view prioritiseSubcommand)
+{
+    // FIXME use C++20 std::ranges once macOS has it
+    //       See
+    //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
+    auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
+        for (auto it = begin; it != end; it++) {
+            auto & [name, profileElement] = *it;
+            for (auto & storePath : profileElement.storePaths) {
+                if (conflictError.fileA.string().starts_with(store.printStorePath(storePath)))
+                    return std::tuple(conflictError.fileA, name, profileElement.toInstallables(store));
+                if (conflictError.fileB.string().starts_with(store.printStorePath(storePath)))
+                    return std::tuple(conflictError.fileB, name, profileElement.toInstallables(store));
+            }
+        }
+        throw conflictError;
+    };
+    // The first matching package is the one already installed; the last is the new one.
+    auto [originalPath, originalName, _origRefs] =
+        findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
+    auto [newPath, _newName, newRefs] = findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+    auto newRefsStr = concatStringsSep(" ", newRefs);
+    auto p = conflictError.priority;
+
+    throw Error(
+        "An existing package already provides the following file:\n"
+        "\n"
+        "  %1%\n"
+        "\n"
+        "This is the conflicting file from the new package:\n"
+        "\n"
+        "  %2%\n"
+        "\n"
+        "To remove the existing package:\n"
+        "\n"
+        "  nix profile remove %3%\n"
+        "\n"
+        "The new package can also be added next to the existing one by assigning a different priority.\n"
+        "The conflicting packages have a priority of %4%.\n"
+        "To prioritise the new package:\n"
+        "\n"
+        "  nix profile %5% %6% --priority %7%\n"
+        "\n"
+        "To prioritise the existing package:\n"
+        "\n"
+        "  nix profile %5% %6% --priority %8%\n",
+        PathFmt(originalPath),
+        PathFmt(newPath),
+        originalName,
+        p,
+        prioritiseSubcommand,
+        newRefsStr,
+        p - 1,
+        p + 1);
+}
+
+/**
+ * Build the manifest and update the profile, translating any
+ * `BuildEnvFileConflictError` into a user-facing error via
+ * `rethrowProfileFileConflict`. `prioritiseSubcommand` is forwarded to
+ * the conflict reporter (e.g. `"add"` or `"replace foo"`).
+ */
+static void buildAndUpdateProfileWithCatchConflict(
+    MixProfile & cmd, ref<Store> store, ProfileManifest & manifest, std::string_view prioritiseSubcommand)
+{
+    try {
+        cmd.updateProfile(*store, manifest.build(store));
+    } catch (BuildEnvFileConflictError & conflictError) {
+        rethrowProfileFileConflict(manifest, *store, conflictError, prioritiseSubcommand);
+    }
+}
+
+/**
+ * Adds a `--priority` flag for commands that build a single
+ * `ProfileElement` from an installable.
+ */
+struct MixProfilePriority : virtual Args
 {
     std::optional<int64_t> priority;
 
-    CmdProfileAdd()
+    MixProfilePriority(std::string_view description)
     {
         addFlag({
             .longName = "priority",
-            .description = "The priority of the package to add.",
+            .description = std::string(description),
             .labels = {"priority"},
             .handler = {&priority},
         });
-    };
+    }
+};
+
+/**
+ * Build a `ProfileElement` from an installable's build result. `built` is the
+ * `(BuiltPaths, ExtraPathInfo)` entry produced by `builtPathsPerInstallable`.
+ * If `priorityOverride` is set, it takes precedence over any priority recorded
+ * on the installable.
+ */
+static ProfileElement makeProfileElement(
+    ref<Store> evalStore,
+    ref<Store> store,
+    const std::pair<BuiltPaths, ref<ExtraPathInfo>> & built,
+    std::optional<int64_t> priorityOverride)
+{
+    auto & [res, info] = built;
+
+    ProfileElement element;
+
+    if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
+        element.source = ProfileElementSource{
+            .originalRef = info2->flake.originalRef,
+            .lockedRef = info2->flake.lockedRef,
+            .attrPath = info2->value.attrPath,
+            .outputs = info2->value.extendedOutputsSpec,
+        };
+    }
+
+    element.priority = priorityOverride ? *priorityOverride : ({
+        auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
+        info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
+    });
+
+    element.updateStorePaths(evalStore, store, res);
+
+    return element;
+}
+
+struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile, MixProfilePriority
+{
+    CmdProfileAdd()
+        : MixProfilePriority("The priority of the package to add.")
+    {
+    }
 
     std::string description() override
     {
@@ -368,30 +498,11 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
             Installable::build2(getEvalStore(), store, Realise::Outputs, installables, bmNormal));
 
         for (auto & installable : installables) {
-            ProfileElement element;
-
             auto iter = builtPaths.find(&*installable);
             if (iter == builtPaths.end())
                 continue;
-            auto & [res, info] = iter->second;
 
-            if (auto * info2 = dynamic_cast<ExtraPathInfoFlake *>(&*info)) {
-                element.source = ProfileElementSource{
-                    .originalRef = info2->flake.originalRef,
-                    .lockedRef = info2->flake.lockedRef,
-                    .attrPath = info2->value.attrPath,
-                    .outputs = info2->value.extendedOutputsSpec,
-                };
-            }
-
-            // If --priority was specified we want to override the
-            // priority of the installable.
-            element.priority = priority ? *priority : ({
-                auto * info2 = dynamic_cast<ExtraPathInfoValue *>(&*info);
-                info2 ? info2->value.priority.value_or(defaultPriority) : defaultPriority;
-            });
-
-            element.updateStorePaths(getEvalStore(), store, res);
+            auto element = makeProfileElement(getEvalStore(), store, iter->second, priority);
 
             auto elementName = getNameFromElement(element);
 
@@ -412,65 +523,7 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
             manifest.addElement(elementName, std::move(element));
         }
 
-        try {
-            updateProfile(*store, manifest.build(store));
-        } catch (BuildEnvFileConflictError & conflictError) {
-            // FIXME use C++20 std::ranges once macOS has it
-            //       See
-            //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
-            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
-                for (auto it = begin; it != end; it++) {
-                    auto & [name, profileElement] = *it;
-                    for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
-                        }
-                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
-                        }
-                    }
-                }
-                throw conflictError;
-            };
-            // There are 2 conflicting files. We need to find out which one is from the already installed package and
-            // which one is the package that is the new package that is being installed.
-            // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
-                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
-            // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
-                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
-
-            throw Error(
-                "An existing package already provides the following file:\n"
-                "\n"
-                "  %1%\n"
-                "\n"
-                "This is the conflicting file from the new package:\n"
-                "\n"
-                "  %2%\n"
-                "\n"
-                "To remove the existing package:\n"
-                "\n"
-                "  nix profile remove %3%\n"
-                "\n"
-                "The new package can also be added next to the existing one by assigning a different priority.\n"
-                "The conflicting packages have a priority of %5%.\n"
-                "To prioritise the new package:\n"
-                "\n"
-                "  nix profile add %4% --priority %6%\n"
-                "\n"
-                "To prioritise the existing package:\n"
-                "\n"
-                "  nix profile add %4% --priority %7%\n",
-                PathFmt(originalConflictingFilePath),
-                PathFmt(newConflictingFilePath),
-                originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
-                conflictError.priority,
-                conflictError.priority - 1,
-                conflictError.priority + 1);
-        }
+        buildAndUpdateProfileWithCatchConflict(*this, store, manifest, "add");
     }
 };
 
@@ -687,6 +740,88 @@ struct CmdProfileRemove : virtual EvalCommand, MixProfileElementMatchers
         printInfo("removed %d packages, kept %d packages", removedCount, newManifest.elements.size());
 
         updateProfile(*store, newManifest.build(store));
+    }
+};
+
+struct CmdProfileReplace : virtual SourceExprCommand, MixDefaultProfile, MixProfilePriority
+{
+    std::string elementName;
+    std::string rawInstallable;
+
+    CmdProfileReplace()
+        : MixProfilePriority("The priority of the replacement package.")
+    {
+        expectArgs({
+            .label = "element",
+            .optional = false,
+            .handler = {&elementName},
+            .completer =
+                [this](AddCompletions & completions, size_t, std::string_view prefix) {
+                    auto * evalCmd = dynamic_cast<EvalCommand *>(this);
+                    if (!evalCmd)
+                        return;
+                    auto evalState = evalCmd->getEvalState();
+                    ProfileManifest manifest(*evalState, *profile);
+                    for (auto & [name, element] : manifest.elements)
+                        if (name.starts_with(prefix))
+                            completions.add(name, element.identifier());
+                },
+        });
+        // Marked optional so that completion of the first argument
+        // (`element`) succeeds even when no `installable` has been
+        // typed yet. Missing `installable` is validated in `run()`.
+        expectArgs({
+            .label = "installable",
+            .optional = true,
+            .handler = {&rawInstallable},
+            .completer = getCompleteInstallable(),
+        });
+    }
+
+    std::string description() override
+    {
+        return "replace a package in a profile";
+    }
+
+    std::string doc() override
+    {
+        return
+#include "profile-replace.md"
+            ;
+    }
+
+    void run(ref<Store> store) override
+    {
+        if (rawInstallable.empty())
+            throw UsageError("'nix profile replace' requires an installable as the second argument");
+
+        ProfileManifest manifest(*getEvalState(), *profile);
+
+        auto it = manifest.elements.find(elementName);
+        if (it == manifest.elements.end())
+            throw Error(
+                "package '%s' not found in the profile. Use 'nix profile list' to see installed packages.",
+                elementName);
+
+        notice("replacing '%s'", it->second.identifier());
+
+        // Build the new installable.
+        auto installable = parseInstallable(store, rawInstallable);
+
+        auto builtPaths = builtPathsPerInstallable(
+            Installable::build2(getEvalStore(), store, Realise::Outputs, {installable}, bmNormal));
+
+        auto iter = builtPaths.find(&*installable);
+        if (iter == builtPaths.end())
+            throw Error("failed to build '%s'", rawInstallable);
+
+        auto element = makeProfileElement(getEvalStore(), store, iter->second, priority);
+
+        // Remove the old element and add the new one under the same name.
+        manifest.elements.erase(it);
+        manifest.elements.insert_or_assign(elementName, std::move(element));
+
+        buildAndUpdateProfileWithCatchConflict(*this, store, manifest, fmt("replace %s", elementName));
     }
 };
 
@@ -1002,6 +1137,7 @@ struct CmdProfile : NixMultiCommand
               {
                   {"add", []() { return make_ref<CmdProfileAdd>(); }},
                   {"remove", []() { return make_ref<CmdProfileRemove>(); }},
+                  {"replace", []() { return make_ref<CmdProfileReplace>(); }},
                   {"upgrade", []() { return make_ref<CmdProfileUpgrade>(); }},
                   {"list", []() { return make_ref<CmdProfileList>(); }},
                   {"diff-closures", []() { return make_ref<CmdProfileDiffClosures>(); }},
