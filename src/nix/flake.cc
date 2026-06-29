@@ -1436,7 +1436,9 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             description = aDescription->getString();
                     }
                     if (!aType || aType->getString() != "app")
-                        state->error<EvalError>("not an app definition").debugThrow();
+                        state->error<EvalError>("not an app definition: %s", concatStringsSep(".", attrPathS))
+                            .debugThrow();
+                    // }
                     if (json) {
                         j.emplace("type", "app");
                         if (description)
