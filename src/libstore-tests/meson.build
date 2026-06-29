@@ -58,8 +58,6 @@ sources = files(
   'common-protocol.cc',
   'content-address.cc',
   'derivation-advanced-attrs.cc',
-  'derivation/external-formats.cc',
-  'derivation/invariants.cc',
   'derivations.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
@@ -91,6 +89,7 @@ sources = files(
   'store-reference.cc',
   'uds-remote-store.cc',
   'worker-protocol.cc',
+  'derivation.cc',
   'worker-substitution.cc',
   'write-derivation.cc',
 )

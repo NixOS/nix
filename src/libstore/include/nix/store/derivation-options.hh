@@ -13,8 +13,16 @@
 
 namespace nix {
 
+class Store;
+
 struct StoreDirConfig;
-struct BasicDerivation;
+
+struct DerivationOutput;
+
+template<typename Inputs, typename Output>
+struct DerivationT;
+using BasicDerivation = DerivationT<StorePathSet, DerivationOutput>;
+
 struct StructuredAttrs;
 
 template<typename V>
@@ -180,14 +188,16 @@ struct DerivationOptions
      * the future we'll flip things around so a `BasicDerivation` has
      * `DerivationOptions` instead.
      */
-    StringSet getRequiredSystemFeatures(const BasicDerivation & drv) const;
+    template<typename Inputs>
+    StringSet getRequiredSystemFeatures(const DerivationT<Inputs, DerivationOutput> & drv) const;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
     /**
      * @param drv See note on `getRequiredSystemFeatures`
      */
-    bool useUidRange(const BasicDerivation & drv) const;
+    template<typename Inputs>
+    bool useUidRange(const DerivationT<Inputs, DerivationOutput> & drv) const;
 };
 
 extern template struct DerivationOptions<StorePath>;
@@ -203,7 +213,7 @@ struct DerivationOutput;
  */
 DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
-    const DerivedPathMap<StringSet> & inputDrvs,
+    const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn = true,
@@ -229,6 +239,20 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     const DerivationOptions<SingleDerivedPath> & drvOptions,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
+
+/**
+ * The inverse of `tryResolve`: lift resolved options back into the
+ * general form, turning every store path into a constant deriving
+ * path. Counterpart of `BasicDerivation::unresolve`.
+ */
+DerivationOptions<SingleDerivedPath> unresolve(const DerivationOptions<StorePath> & drvOptions);
+
+template<typename T>
+struct json_avoids_null;
+
+template<typename Input>
+struct json_avoids_null<DerivationOptions<Input>> : std::true_type
+{};
 
 }; // namespace nix
 

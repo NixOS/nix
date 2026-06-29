@@ -12,6 +12,30 @@
     "j1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep1-dev"
   ],
   "name": "with-inputs",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {
+      "forAllOutputs": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [],
+        "disallowedRequisites": [],
+        "ignoreSelfRefs": false,
+        "maxClosureSize": null,
+        "maxSize": null
+      }
+    },
+    "passAsFile": [],
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
+  },
   "outputs": {
     "dev": {
       "hashAlgo": "sha256",

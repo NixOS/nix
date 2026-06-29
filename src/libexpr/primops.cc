@@ -1514,8 +1514,9 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             "passed to builtins.derivationStrict");
 
     /* Build the derivation expression by processing the attributes. */
-    Derivation drv;
-    drv.name = drvName;
+    Derivation drv{
+        .name = std::string{drvName},
+    };
 
     NixStringContext context;
 
@@ -1748,22 +1749,34 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputSrcs.insert(j);
+                        drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                                drv.inputs.insert(
+                                    SingleDerivedPath::Built{
+                                        .drvPath = makeConstantStorePathRef(j),
+                                        .output = outputName,
+                                    });
+                            }
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.insert(
+                        SingleDerivedPath::Built{
+                            .drvPath = b.drvPath,
+                            .output = b.output,
+                        });
                 },
-                [&](const NixStringContextElem::Opaque & o) {
-                    state.ensureLazyPathCopied(o.path);
-                    drv.inputSrcs.insert(o.path);
-                },
+                [&](const NixStringContextElem::Opaque & o) { drv.inputs.insert(SingleDerivedPath::Opaque{o.path}); },
             },
             c.raw);
     }
+
+    /* Construct options after the loop above, so the CA-output
+       placeholders of all input derivations are resolvable. */
+    drv.options = derivationOptionsFromStructuredAttrs(
+        *state.store, drv.inputs, drv.env, drv.structuredAttrs ? &*drv.structuredAttrs : nullptr);
 
     /* Do we have all required attributes? */
     if (drv.builder == "")
@@ -1866,7 +1879,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        auto h = hashDerivationModulo(*state.store, drv, false);
+        auto h = hashInputDerivationModulo(*state.store, drv);
         drvHashes.insert_or_assign(drvPath, std::move(h));
     }
 

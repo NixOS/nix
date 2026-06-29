@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
@@ -75,7 +76,7 @@ void Store::computeFSClosure(
     computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv)
+const ContentAddress * getDerivationCA(const Derivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
@@ -184,7 +185,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv, std::set<DerivedPath> & edges) {
         res.willBuild.insert(drvPath);
-        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+        for (const auto & [inputDrv, inputNode] : FullInputs::fromSet(drv.inputs).drvs.map)
             collectDerivedPaths(edges, makeConstantStorePathRef(inputDrv), inputNode);
     };
 
@@ -226,19 +227,9 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         co_return;
 
                     auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
-                    DerivationOptions<SingleDerivedPath> drvOptions;
-                    try {
-                        // FIXME: this is a lot of work just to get the value
-                        // of `allowSubstitutes`.
-                        drvOptions = derivationOptionsFromStructuredAttrs(
-                            *this, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
-                    } catch (Error & e) {
-                        e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
-                        throw;
-                    }
 
                     if (!knownOutputPaths && settings.getWorkerSettings().useSubstitutes
-                        && drvOptions.substitutesAllowed(settings.getWorkerSettings())) {
+                        && drv->options.substitutesAllowed(settings.getWorkerSettings())) {
                         experimentalFeatureSettings.require(Xp::CaDerivations);
 
                         // If there are unknown output paths, attempt to find if the
@@ -269,7 +260,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                     }
 
                     if (knownOutputPaths && settings.getWorkerSettings().useSubstitutes
-                        && drvOptions.substitutesAllowed(settings.getWorkerSettings())) {
+                        && drv->options.substitutesAllowed(settings.getWorkerSettings())) {
                         bool mustBuild = false;
                         StorePathSet substitutable;
                         auto * cap = getDerivationCA(*drv);

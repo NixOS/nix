@@ -17,6 +17,30 @@
     "srcs": []
   },
   "name": "depends-on-drv",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "outputChecks": {
+      "forAllOutputs": {
+        "allowedReferences": null,
+        "allowedRequisites": null,
+        "disallowedReferences": [],
+        "disallowedRequisites": [],
+        "ignoreSelfRefs": true,
+        "maxClosureSize": null,
+        "maxSize": null
+      }
+    },
+    "passAsFile": [],
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": [],
+    "unsafeDiscardReferences": {}
+  },
   "outputs": {
     "out": {
       "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"

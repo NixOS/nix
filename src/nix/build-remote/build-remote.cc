@@ -20,6 +20,7 @@
 #include "nix/store/store-open.hh"
 #include "nix/util/strings.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/local-store.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
@@ -327,18 +328,31 @@ static int main_build_remote(int argc, char ** argv)
         // This condition mirrors that: that code enforces the "rules" outlined there;
         // we do the best we can given those "rules".
         if (trustedOrLegacy || drv.type().isCA()) {
-            // Hijack the inputs paths of the derivation to include all
-            // the paths that come from the `inputDrvs` set. We don’t do
-            // that for the derivations whose `inputDrvs` is empty
-            // because:
-            //
-            // 1. It’s not needed
-            //
-            // 2. Changing the `inputSrcs` set changes the associated
-            //    output ids, which break CA derivations
-            if (!drv.inputDrvs.map.empty())
-                drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
+            // Check if there are any derivation inputs
+            bool hasInputDrvs = std::ranges::any_of(drv.inputs, [](const auto & input) {
+                return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+            });
+
+            BasicDerivation resolvedDrv{
+                .outputs = drv.outputs,
+                // Hijack the inputs paths of the derivation to include
+                // all the paths that come from the `inputDrvs` set. We
+                // don't do that for the derivations whose `inputDrvs`
+                // is empty because:
+                //
+                // 1. It's not needed
+                //
+                // 2. Changing the `inputSrcs` set changes the
+                //    associated output ids, which break CA derivations
+                .inputs = hasInputDrvs ? store->parseStorePathSet(inputs) : FullInputs::fromSet(drv.inputs).srcs,
+                .platform = drv.platform,
+                .builder = drv.builder,
+                .args = drv.args,
+                .env = drv.env,
+                .structuredAttrs = drv.structuredAttrs,
+                .name = drv.name,
+            };
+            optResult = sshStore->buildDerivation(*drvPath, resolvedDrv);
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {

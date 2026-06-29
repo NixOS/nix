@@ -726,6 +726,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
 
     std::string drvJson = R"({
         "version": 4,
+        "options": {"additionalSandboxProfile": "", "allowLocalNetworking": false, "allowSubstitutes": true, "exportReferencesGraph": {}, "impureEnvVars": [], "impureHostDeps": [], "noChroot": false, "outputChecks": {"forAllOutputs": {"allowedReferences": null, "allowedRequisites": null, "disallowedReferences": [], "disallowedRequisites": [], "ignoreSelfRefs": true, "maxClosureSize": null, "maxSize": null}}, "passAsFile": [], "preferLocalBuild": false, "requiredSystemFeatures": [], "unsafeDiscardReferences": {}},
         "name": "multi-output-test",
         "system": ")" + nix::settings.thisSystem.get()
                           + R"(",

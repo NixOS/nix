@@ -105,7 +105,7 @@ static std::pair<Derivation, StorePath> resolveDerivation(
                     store, *concreteDrvPath, depOutputName, evalStore_, queryRealisation, cache, resCache);
             });
         if (resolvedDrv)
-            drv = Derivation{*resolvedDrv};
+            drv = resolvedDrv->first.unresolve();
     }
 
     auto resolvedDrvPath = computeStorePath(store, drv);
@@ -117,7 +117,7 @@ static std::pair<Derivation, StorePath> resolveDerivation(
 void queryPartialDerivationOutputMapCA(
     Store & store,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
+    const Derivation & drv,
     std::map<std::string, std::optional<StorePath>> & outputs,
     QueryRealisationFun queryRealisation,
     RealisationCache & resCache)
@@ -185,7 +185,7 @@ static std::optional<StorePath> deepQueryPartialDerivationOutputImpl(
 void queryPartialDerivationOutputMapCA(
     Store & store,
     const StorePath & drvPath,
-    const BasicDerivation & drv,
+    const Derivation & drv,
     std::map<std::string, std::optional<StorePath>> & outputs,
     QueryRealisationFun queryRealisation)
 {

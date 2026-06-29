@@ -30,8 +30,8 @@
 namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
-    const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode, bool storeDerivation)
-    : Goal(worker, gaveUpOnSubstitution(storeDerivation))
+    const StorePath & drvPath, ref<const BasicDerivation> drv, Worker & worker, BuildMode buildMode)
+    : Goal(worker, gaveUpOnSubstitution())
     , drvPath(drvPath)
     , drv{std::move(drv)}
     , buildMode(buildMode)
@@ -51,7 +51,8 @@ std::string DerivationBuildingGoal::key()
     return "dd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv)
+template<typename InputsType>
+std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType> & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
@@ -65,6 +66,9 @@ std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & dr
     }
     return msg;
 }
+
+template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<std::set<SingleDerivedPath>> & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<StorePathSet> & drv);
 
 namespace {
 
@@ -144,7 +148,7 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
+Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
 {
     Goals waitees;
 
@@ -155,13 +159,13 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
        are (resolved) derivation outputs in a resolved derivation. */
     if (&worker.evalStore != &worker.store) {
         RealisedPath::Set inputSrcs;
-        for (auto & i : drv->inputSrcs)
+        for (auto & i : drv->inputs)
             if (worker.evalStore.isValidPath(i))
                 inputSrcs.insert(i);
         copyClosure(worker.evalStore, worker.store, inputSrcs);
     }
 
-    for (auto & i : drv->inputSrcs) {
+    for (auto & i : drv->inputs) {
         if (worker.store.isValidPath(i))
             continue;
         if (!worker.settings.useSubstitutes)
@@ -192,47 +196,8 @@ Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution(bool storeDerivation)
 
     /* Determine the full set of input paths. */
 
-    if (storeDerivation) {
-        assert(drv->inputDrvs.map.empty());
-        /* Store the resolved derivation, as part of the record of
-           what we're actually building */
-        worker.store.writeDerivation(*drv);
-    }
-
     StorePathSet inputPaths;
-
-    {
-        /* If we get this far, we know no dynamic drvs inputs */
-
-        for (auto & [depDrvPath, depNode] : drv->inputDrvs.map) {
-            for (auto & outputName : depNode.value) {
-                /* Don't need to worry about `inputGoals`, because
-                   impure derivations are always resolved above. Can
-                   just use DB. This case only happens in the (older)
-                   input addressed and fixed output derivation cases. */
-                auto outMap = [&] {
-                    for (auto * drvStore : {&worker.evalStore, &worker.store})
-                        if (drvStore->isValidPath(depDrvPath))
-                            return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
-                    assert(false);
-                }();
-
-                auto outMapPath = outMap.find(outputName);
-                if (outMapPath == outMap.end()) {
-                    throw Error(
-                        "derivation '%s' requires non-existent output '%s' from input derivation '%s'",
-                        worker.store.printStorePath(drvPath),
-                        outputName,
-                        worker.store.printStorePath(depDrvPath));
-                }
-
-                worker.store.computeFSClosure(outMapPath->second, inputPaths);
-            }
-        }
-    }
-
-    /* Second, the input sources. */
-    worker.store.computeFSClosure(drv->inputSrcs, inputPaths);
+    worker.store.computeFSClosure(drv->inputs, inputPaths);
 
     debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
               return "'" + worker.store.printStorePath(p) + "'";
@@ -336,38 +301,8 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
-    auto drvOptions = [&] {
-        DerivationOptions<SingleDerivedPath> temp;
-        try {
-            temp =
-                derivationOptionsFromStructuredAttrs(worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-
-        auto res = tryResolve(
-            temp,
-            [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
-                try {
-                    return resolveDerivedPath(
-                        worker.store, SingleDerivedPath::Built{drvPath, outputName}, &worker.evalStore);
-                } catch (Error &) {
-                    return std::nullopt;
-                }
-            });
-
-        /* The derivation must have all of its inputs gotten this point,
-           so the resolution will surely succeed.
-
-           (Actually, we shouldn't even enter this goal until we have a
-           resolved derivation, or derivation with only input addressed
-           transitive inputs, so this should be a no-opt anyways.)
-         */
-        assert(res);
-        return *res;
-    }();
-
+    const auto & resolvedDrv = *drv;
+    auto drvOptions = drv->options;
     std::map<std::string, InitialOutput> initialOutputs;
 
     /* Recheck at this point. In particular, whereas before we were
@@ -422,7 +357,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
 
         {
-            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto required = drvOptions.getRequiredSystemFeatures(resolvedDrv);
             auto & available = worker.store.config.systemFeatures.get();
             if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
                 wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
@@ -963,8 +898,10 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 defaultPathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
             }
 
+            const auto & drvOptionsResolved = drvOptions;
+
             try {
-                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptionsResolved, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 co_return doneFailure(std::move(e));

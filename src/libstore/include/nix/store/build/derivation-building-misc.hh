@@ -9,7 +9,13 @@
 namespace nix {
 
 class Store;
-struct Derivation;
+
+struct DerivationOutput;
+
+template<typename Inputs, typename Output>
+struct DerivationT;
+struct SingleDerivedPath;
+using Derivation = DerivationT<std::set<SingleDerivedPath>, DerivationOutput>;
 
 /**
  * Unless we are repairing, we don't both to test validity and just assume it,
@@ -51,6 +57,7 @@ struct InitialOutput
 /**
  * Format the known outputs of a derivation for use in error messages.
  */
-std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
+template<typename InputsType>
+std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType, DerivationOutput> & drv);
 
 } // namespace nix

@@ -220,6 +220,8 @@ Goal::Done Goal::amDone(ExitCode result)
         if (auto * failure = buildResult.tryGetFailure()) {
             if (!preserveFailure && !waiters.empty())
                 logError(failure->info());
+            else
+                logErrorInfo(lvlDebug, failure->info());
         }
     }
 

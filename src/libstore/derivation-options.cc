@@ -82,11 +82,11 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn,
     const ExperimentalFeatureSettings & mockXpSettings)
 {
-    /* Use the SingleDerivedPath version with empty inputDrvs, then
+    /* Use the SingleDerivedPath version with empty inputs, then
        resolve. */
-    DerivedPathMap<StringSet> emptyInputDrvs{};
+    std::set<SingleDerivedPath> emptyInputs{};
     auto singleDerivedPathOptions =
-        derivationOptionsFromStructuredAttrs(store, emptyInputDrvs, env, parsed, shouldWarn, mockXpSettings);
+        derivationOptionsFromStructuredAttrs(store, emptyInputs, env, parsed, shouldWarn, mockXpSettings);
 
     /* "Resolve" all SingleDerivedPath inputs to StorePath. */
     auto resolved = tryResolve(
@@ -116,7 +116,7 @@ static void flatten(const nlohmann::json & value, StringSet & res)
 
 DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     const StoreDirConfig & store,
-    const DerivedPathMap<StringSet> & inputDrvs,
+    const std::set<SingleDerivedPath> & inputs,
     const StringMap & env,
     const StructuredAttrs * parsed,
     bool shouldWarn,
@@ -126,33 +126,12 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 
     std::map<std::string, SingleDerivedPath::Built, std::less<>> placeholders;
     if (mockXpSettings.isEnabled(Xp::CaDerivations)) {
-        /* Initialize placeholder map from inputDrvs */
-        auto initPlaceholders = [&](this const auto & initPlaceholders,
-                                    ref<const SingleDerivedPath> basePath,
-                                    const DerivedPathMap<StringSet>::ChildNode & node) -> void {
-            for (const auto & outputName : node.value) {
-                auto built = SingleDerivedPath::Built{
-                    .drvPath = basePath,
-                    .output = outputName,
-                };
+        /* Initialize placeholder map from inputs */
+        for (const auto & input : inputs) {
+            if (auto * built = std::get_if<SingleDerivedPath::Built>(&input.raw())) {
                 placeholders.insert_or_assign(
-                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(built, mockXpSettings).render(),
-                    std::move(built));
+                    DownstreamPlaceholder::fromSingleDerivedPathBuilt(*built, mockXpSettings).render(), *built);
             }
-
-            for (const auto & [outputName, childNode] : node.childMap) {
-                initPlaceholders(
-                    make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
-                        .drvPath = basePath,
-                        .output = outputName,
-                    }),
-                    childNode);
-            }
-        };
-
-        for (const auto & [drvPath, outputs] : inputDrvs.map) {
-            auto basePath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{drvPath});
-            initPlaceholders(basePath, outputs);
         }
     }
 
@@ -358,7 +337,8 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
 }
 
 template<typename Input>
-StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const BasicDerivation & drv) const
+template<typename Inputs>
+StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs, DerivationOutput> & drv) const
 {
     // FIXME: cache this?
     StringSet res;
@@ -376,7 +356,8 @@ bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerS
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::useUidRange(const BasicDerivation & drv) const
+template<typename Inputs>
+bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs, DerivationOutput> & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
@@ -529,8 +510,91 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     };
 }
 
+DerivationOptions<SingleDerivedPath> unresolve(const DerivationOptions<StorePath> & drvOptions)
+{
+    auto unresolveRef = [](const DrvRef<StorePath> & ref) -> DrvRef<SingleDerivedPath> {
+        return std::visit(
+            overloaded{
+                [](const OutputName & outputName) -> DrvRef<SingleDerivedPath> { return outputName; },
+                [](const StorePath & path) -> DrvRef<SingleDerivedPath> {
+                    return SingleDerivedPath{SingleDerivedPath::Opaque{path}};
+                }},
+            ref);
+    };
+
+    auto unresolveRefSet = [&](const std::set<DrvRef<StorePath>> & refSet) {
+        std::set<DrvRef<SingleDerivedPath>> res;
+        for (const auto & ref : refSet)
+            res.insert(unresolveRef(ref));
+        return res;
+    };
+
+    auto unresolveChecks = [&](const DerivationOptions<StorePath>::OutputChecks & checks) {
+        return DerivationOptions<SingleDerivedPath>::OutputChecks{
+            .ignoreSelfRefs = checks.ignoreSelfRefs,
+            .maxSize = checks.maxSize,
+            .maxClosureSize = checks.maxClosureSize,
+            .allowedReferences = checks.allowedReferences ? std::optional{unresolveRefSet(*checks.allowedReferences)}
+                                                          : std::nullopt,
+            .disallowedReferences = unresolveRefSet(checks.disallowedReferences),
+            .allowedRequisites = checks.allowedRequisites ? std::optional{unresolveRefSet(*checks.allowedRequisites)}
+                                                          : std::nullopt,
+            .disallowedRequisites = unresolveRefSet(checks.disallowedRequisites),
+        };
+    };
+
+    using UnresolvedOutputChecks = std::variant<
+        DerivationOptions<SingleDerivedPath>::OutputChecks,
+        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>>;
+
+    auto outputChecks = std::visit(
+        overloaded{
+            [&](const DerivationOptions<StorePath>::OutputChecks & checks) -> UnresolvedOutputChecks {
+                return unresolveChecks(checks);
+            },
+            [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> & checksMap)
+                -> UnresolvedOutputChecks {
+                std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>> res;
+                for (const auto & [outputName, checks] : checksMap)
+                    res.emplace(outputName, unresolveChecks(checks));
+                return res;
+            }},
+        drvOptions.outputChecks);
+
+    std::map<std::string, std::set<SingleDerivedPath>, std::less<>> exportReferencesGraph;
+    for (const auto & [name, paths] : drvOptions.exportReferencesGraph) {
+        std::set<SingleDerivedPath> set;
+        for (const auto & path : paths)
+            set.insert(SingleDerivedPath::Opaque{path});
+        exportReferencesGraph.emplace(name, std::move(set));
+    }
+
+    return DerivationOptions<SingleDerivedPath>{
+        .outputChecks = std::move(outputChecks),
+        .unsafeDiscardReferences = drvOptions.unsafeDiscardReferences,
+        .passAsFile = drvOptions.passAsFile,
+        .exportReferencesGraph = std::move(exportReferencesGraph),
+        .additionalSandboxProfile = drvOptions.additionalSandboxProfile,
+        .noChroot = drvOptions.noChroot,
+        .impureHostDeps = drvOptions.impureHostDeps,
+        .impureEnvVars = drvOptions.impureEnvVars,
+        .allowLocalNetworking = drvOptions.allowLocalNetworking,
+        .requiredSystemFeatures = drvOptions.requiredSystemFeatures,
+        .preferLocalBuild = drvOptions.preferLocalBuild,
+        .allowSubstitutes = drvOptions.allowSubstitutes,
+    };
+}
+
 template struct DerivationOptions<StorePath>;
 template struct DerivationOptions<SingleDerivedPath>;
+
+template StringSet
+DerivationOptions<StorePath>::getRequiredSystemFeatures(const DerivationT<StorePathSet, DerivationOutput> &) const;
+template bool DerivationOptions<StorePath>::useUidRange(const DerivationT<StorePathSet, DerivationOutput> &) const;
+template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(
+    const DerivationT<std::set<SingleDerivedPath>, DerivationOutput> &) const;
+template bool DerivationOptions<SingleDerivedPath>::useUidRange(
+    const DerivationT<std::set<SingleDerivedPath>, DerivationOutput> &) const;
 
 } // namespace nix
 

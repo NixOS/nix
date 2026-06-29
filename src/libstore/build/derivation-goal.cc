@@ -49,16 +49,6 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
-    auto drvOptions = [&]() -> DerivationOptions<SingleDerivedPath> {
-        try {
-            return derivationOptionsFromStructuredAttrs(
-                worker.store, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
-
     if (!drv->type().hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
@@ -84,14 +74,15 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
-        if (worker.settings.useSubstitutes && drvOptions.substitutesAllowed(worker.settings)) {
+        if (worker.settings.useSubstitutes && drv->options.substitutesAllowed(worker.settings)) {
             if (!checkResult) {
                 DrvOutput id{drvPath, wantedOutput};
                 auto g = worker.makeDrvOutputSubstitutionGoal(id);
-                waitees.insert(g);
+                waitees.insert(upcast_goal(g));
                 co_await await(std::move(waitees));
 
                 if (nrFailed == 0) {
+                    assert(g->outputInfo);
                     // optimization depending on moved containers being empty afterwards
                     // NOLINTNEXTLINE(bugprone-use-after-move)
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
@@ -99,9 +90,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
                     trace("output path substituted");
 
-                    if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id});
-                    else
+                    if (nrFailed > 0)
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
             } else {
@@ -160,11 +149,11 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     }
 
     if (resolutionGoal->resolvedDrv) {
-        auto & [pathResolved, drvResolved] = *resolutionGoal->resolvedDrv;
+        auto & [pathResolved, drvResolved, drvOptionsResolved] = *resolutionGoal->resolvedDrv;
 
         auto resolvedDrvGoal = worker.makeDerivationGoal(
             pathResolved,
-            make_ref<const Derivation>(drvResolved),
+            make_ref<const Derivation>(drvResolved.unresolve()),
             wantedOutput,
             buildMode,
             /*storeDerivation=*/true);
@@ -230,7 +219,88 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
     /* Give up on substitution for the output we want, actually build this derivation */
 
-    auto g = worker.makeDerivationBuildingGoal(drvPath, drv, buildMode, storeDerivation);
+    /* Project down to the `BasicDerivation` the builder consumes,
+       adding the outputs of the input derivations to the input
+       sources. */
+    /* Don't need to worry about `inputGoals`, because impure
+       derivations are always resolved above. Can just use DB. This
+       case only happens in the (older) input addressed and fixed
+       output derivation cases. */
+    auto queryResolutionChain =
+        [&](ref<const SingleDerivedPath> depDrvPathRef, const std::string & outputName) -> std::optional<StorePath> {
+        auto & depDrvPath = std::get<SingleDerivedPath::Opaque>(depDrvPathRef->raw()).path;
+        auto outMap = [&] {
+            for (auto * drvStore : {&worker.evalStore, &worker.store})
+                if (drvStore->isValidPath(depDrvPath))
+                    return deepQueryDerivationOutputMap(worker.store, depDrvPath, drvStore);
+            assert(false);
+        }();
+        auto outMapPath = outMap.find(outputName);
+        if (outMapPath == outMap.end())
+            return std::nullopt;
+        return outMapPath->second;
+    };
+
+    auto basicDrv = drv->mapInputs([&](const std::set<SingleDerivedPath> & inputs) {
+        StorePathSet srcs;
+        for (auto & input : inputs)
+            std::visit(
+                overloaded{
+                    [&](const SingleDerivedPath::Opaque & op) { srcs.insert(op.path); },
+                    [&](const SingleDerivedPath::Built & built) {
+                        auto depDrvPath = std::visit(
+                            overloaded{
+                                [&](const SingleDerivedPath::Opaque & op) { return op.path; },
+                                [&](const SingleDerivedPath::Built &) -> StorePath { std::abort(); }},
+                            built.drvPath->raw());
+                        auto outMap = [&] {
+                            for (auto * drvStore : {&worker.evalStore, &worker.store})
+                                if (drvStore->isValidPath(depDrvPath))
+                                    return worker.store.queryDerivationOutputMap(depDrvPath, drvStore);
+                            assert(false);
+                        }();
+                        auto outMapPath = outMap.find(built.output);
+                        if (outMapPath == outMap.end()) {
+                            throw Error(
+                                "derivation '%s' requires non-existent output '%s' from an input derivation",
+                                worker.store.printStorePath(drvPath),
+                                built.output,
+                                worker.store.printStorePath(depDrvPath));
+                        }
+                        srcs.insert(outMapPath->second);
+                    }},
+                input.raw());
+        return srcs;
+    });
+
+    /* `mapInputs` only transforms the inputs; the options carry input
+       references too and must be resolved separately. */
+    auto resolvedOptions = tryResolve(drv->options, queryResolutionChain);
+    if (!resolvedOptions)
+        throw Error("cannot resolve options of derivation '%s'", worker.store.printStorePath(drvPath));
+    basicDrv.options = std::move(*resolvedOptions);
+
+    auto resolvedDrv = make_ref<const BasicDerivation>(std::move(basicDrv));
+
+    if (storeDerivation) {
+        assert(std::ranges::none_of(drv->inputs, [](const auto & input) {
+            return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+        }));
+        /* `writeDerivation` checks the derivation's references are valid,
+           so the eval store's sources must be copied over first. */
+        if (&worker.evalStore != &worker.store) {
+            RealisedPath::Set inputSrcs;
+            for (auto & i : resolvedDrv->inputs)
+                if (worker.evalStore.isValidPath(i))
+                    inputSrcs.insert(i);
+            copyClosure(worker.evalStore, worker.store, inputSrcs);
+        }
+        /* Store the resolved derivation, as part of the record of
+           what we're actually building */
+        worker.store.writeDerivation(resolvedDrv->unresolve());
+    }
+
+    auto g = worker.makeDerivationBuildingGoal(drvPath, resolvedDrv, buildMode);
 
     /* We will finish with it ourselves, as if we were the derivational goal. */
     g->preserveFailure = true;

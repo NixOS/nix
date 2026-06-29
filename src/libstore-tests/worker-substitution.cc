@@ -241,7 +241,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Create a derivation goal for the CA derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(drvPath, make_ref<Derivation>(drv), "out", bmNormal, true);
+    auto goal = worker.makeDerivationGoal(drvPath, make_ref<const Derivation>(drv), "out", bmNormal, true);
 
     // Run the worker
     Goals goals;
@@ -329,7 +329,12 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
         },
     };
     // Add the dependency derivation as an input
-    rootDrv.inputDrvs = {.map = {{depDrvPath, {.value = {"out"}}}}};
+    rootDrv.inputs = {
+        SingleDerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(depDrvPath),
+            .output = "out",
+        },
+    };
 
     // Write the root derivation to the destination store
     auto rootDrvPath = dummyStore->writeDerivation(rootDrv);
@@ -345,7 +350,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(resolvedRootDrv);
 
     // Write the resolved derivation to the substituter
-    auto resolvedRootDrvPath = substituter->writeDerivation(Derivation{*resolvedRootDrv});
+    auto resolvedRootDrvPath = substituter->writeDerivation(resolvedRootDrv->first.unresolve());
 
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);
@@ -403,7 +408,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Create a derivation goal for the root derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(rootDrvPath, make_ref<Derivation>(rootDrv), "out", bmNormal, false);
+    auto goal = worker.makeDerivationGoal(rootDrvPath, make_ref<const Derivation>(rootDrv), "out", bmNormal, false);
 
     // Run the worker
     Goals goals;
@@ -426,9 +431,9 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(depRealisation);
     ASSERT_EQ(depRealisation->outPath, depOutputPath);
 
-    // TODO #11928: The dependency's OUTPUT should NOT be fetched (not referenced
-    // by root output). Once #11928 is fixed, change ASSERT_TRUE to ASSERT_FALSE.
-    ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
+    // The dependency's OUTPUT should NOT be fetched (not referenced by
+    // root output).
+    ASSERT_FALSE(dummyStore->isValidPath(depOutputPath));
 
     // Verify the goal succeeded
     ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);

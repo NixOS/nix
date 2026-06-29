@@ -43,12 +43,12 @@ protected:
      */
     Derivation makeLeafDrv(std::string name)
     {
-        Derivation drv;
-        drv.name = std::move(name);
-        drv.platform = "x86_64-linux";
-        drv.builder = "/bin/sh";
-        drv.outputs = {{"out", caFloatingOutput()}};
-        return drv;
+        return Derivation{
+            .outputs = {{"out", caFloatingOutput()}},
+            .platform = "x86_64-linux",
+            .builder = "/bin/sh",
+            .name = std::move(name),
+        };
     }
 };
 
@@ -72,8 +72,16 @@ TEST_F(OutputsQueryTest, fibonacciChainQueryCount)
     // d_i depends on d_{i-1} and d_{i-2}
     for (size_t i = 2; i <= N; ++i) {
         Derivation drv = makeLeafDrv("d" + std::to_string(i));
-        drv.inputDrvs.map[drvPaths[i - 1]].value.insert("out");
-        drv.inputDrvs.map[drvPaths[i - 2]].value.insert("out");
+        drv.inputs.insert(
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(drvPaths[i - 1]),
+                .output = "out",
+            });
+        drv.inputs.insert(
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(drvPaths[i - 2]),
+                .output = "out",
+            });
         drvPaths.push_back(store->writeDerivation(drv));
     }
 
