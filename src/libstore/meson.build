@@ -358,6 +358,7 @@ sources = files(
   'remote-store.cc',
   'restricted-store.cc',
   's3-binary-cache-store.cc',
+  's3-compat-binary-cache-store.cc',
   's3-url.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
