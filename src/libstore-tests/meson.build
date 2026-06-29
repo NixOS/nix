@@ -74,6 +74,7 @@ sources = files(
   'filetransfer-request.cc',
   'filetransfer-retry.cc',
   'gcp-creds.cc',
+  'gcs-binary-cache-store.cc',
   'gcs-url.cc',
   'http-binary-cache-store.cc',
   'legacy-ssh-store.cc',
