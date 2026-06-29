@@ -355,8 +355,7 @@ void nix_gc_register_finalizer(void * obj, void * cd, void (*finalizer)(void * o
  * Forces @p value and inspects it. The value is considered a derivation when it
  * is an attribute set whose `type` attribute is the string `"derivation"`; in
  * that case its `drvPath` attribute is parsed and returned. Otherwise NULL is
- * returned without recording an error, which signals that the caller should
- * treat @p value as an ordinary attribute set (e.g. recurse into it).
+ * returned without recording an error.
  *
  * Only the derivation path is returned. Other metadata (`name`, `system`,
  * outputs, `meta`, ...) lives on @p value itself and can be read with the
@@ -380,7 +379,9 @@ nix_get_derivation(nix_c_context * context, EvalState * state, nix_value * value
 /**
  * @brief Call a function, drawing its arguments from an attribute set.
  *
- * Forces @p fn_val and writes its application into @p result:
+ * Forces @p fn_val and writes the application result into @p result. The result
+ * is not forced; call nix_value_force() to evaluate it before inspecting the
+ * final value.
  *
  * - If @p fn_val is a function that takes a set of named arguments
  *   (e.g. `{ a, b ? 1 }: ...`), it is called with an attribute set assembled
