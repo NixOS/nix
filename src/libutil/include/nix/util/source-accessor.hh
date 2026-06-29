@@ -81,7 +81,8 @@ public:
      * @note subclasses of `SourceAccessor` need to implement at least
      * one of the `readFile()` variants.
      */
-    virtual void readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback = [](uint64_t size) {});
+    virtual void
+    readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback = [](uint64_t size) {}) = 0;
 
     virtual bool pathExists(const CanonPath & path);
 
