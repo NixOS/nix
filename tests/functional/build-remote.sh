@@ -1,10 +1,11 @@
 # shellcheck shell=bash
 
+# shellcheck disable=SC2154
 : "${file?must be defined by caller (remote building test case using this)}"
 
 requireSandboxSupport
 requiresUnprivilegedUserNamespaces
-[[ "${busybox-}" =~ busybox ]] || skipTest "no busybox"
+requireBusybox
 
 # Avoid store dir being inside sandbox build-dir
 unset NIX_STORE_DIR
