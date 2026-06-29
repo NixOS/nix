@@ -17,3 +17,4 @@ The following [store types](@docroot@/store/types/index.md) use the binary cache
 - [HTTP Binary Cache Store](@docroot@/store/types/http-binary-cache-store.md) — served over HTTP(S)
 - [Local Binary Cache Store](@docroot@/store/types/local-binary-cache-store.md) — stored on the file system
 - [S3 Binary Cache Store](@docroot@/store/types/s3-binary-cache-store.md) — stored in an AWS S3 bucket
+- [GCS Binary Cache Store](@docroot@/store/types/gcs-binary-cache-store.md) — stored in a Google Cloud Storage bucket

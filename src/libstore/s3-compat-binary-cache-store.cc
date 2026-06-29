@@ -268,8 +268,8 @@ std::string S3CompatBinaryCacheStore::createMultipartUpload(
 {
     auto req = makeRequest(key);
 
-    // prepareRequest() converts s3:// / gs:// to https:// but strips query parameters,
-    // so call it first, then add the multipart parameters.
+    // For S3, prepareRequest() converts s3:// to https:// but strips query parameters.
+    // Call it first, then add the multipart parameters.
     prepareRequest(req);
 
     auto url = req.uri.parsed();
