@@ -5,14 +5,18 @@
     <key>Label</key>
     <string>org.nixos.nix-daemon</string>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+      <key>PathState</key>
+      <dict>
+        <key>/nix/var/nix/profiles/default/bin/nix-daemon</key>
+        <true/>
+      </dict>
+    </dict>
     <key>RunAtLoad</key>
-    <true/>
+    <false/>
     <key>ProgramArguments</key>
     <array>
-      <string>/bin/sh</string>
-      <string>-c</string>
-      <string>/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon &amp;&amp; exec /nix/var/nix/profiles/default/bin/nix-daemon</string>
+      <string>/nix/var/nix/profiles/default/bin/nix-daemon</string>
     </array>
     <key>StandardErrorPath</key>
     <string>/var/log/nix-daemon.log</string>
