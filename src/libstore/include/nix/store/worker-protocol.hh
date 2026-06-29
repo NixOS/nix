@@ -136,6 +136,11 @@ struct WorkerProto
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
     /**
+     * Feature for preserving `ErrorInfo::status` in daemon errors.
+     */
+    static constexpr std::string_view featureErrorStatus = "error-status";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */

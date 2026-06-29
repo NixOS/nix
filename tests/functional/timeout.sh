@@ -4,14 +4,16 @@
 
 source common.sh
 
-# XXX: This shouldn’t be, but #4813 cause this test to fail
-needLocalStore "see #4813"
+requireDaemonNewerThan "2.35pre"
 
-# FIXME: https://github.com/NixOS/nix/issues/4813
-expectStderr 101 nix-build -Q timeout.nix -A infiniteLoop --timeout 2 | grepQuiet "timed out" \
-    || skipTest "Do not block CI until fixed"
+expectStderr 101 nix-build -Q timeout.nix -A infiniteLoop --timeout 2 | grepQuiet "timed out"
 
-expectStderr 1 nix-build -Q timeout.nix -A infiniteLoop --max-build-log-size 100 | grepQuiet "killed after writing more than 100 bytes of log output"
+# When this test runs in the NixOS VM, builds go through the daemon as an
+# untrusted user. The daemon ignores client-provided max-build-log-size in that
+# mode, so the builder below would run until the Meson test timeout.
+if ! isTestOnNixOS; then
+    expectStderr 1 nix-build -Q timeout.nix -A infiniteLoop --max-build-log-size 100 | grepQuiet "killed after writing more than 100 bytes of log output"
+fi
 
 expectStderr 101 nix-build timeout.nix -A silent --max-silent-time 2 | grepQuiet "timed out after 2 seconds"
 
