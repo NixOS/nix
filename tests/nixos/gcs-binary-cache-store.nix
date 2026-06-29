@@ -124,6 +124,17 @@ in
       machine.succeed(f"{ENV} nix copy --no-check-sigs --from '{mp_url}' {large}")
       machine.succeed(f"nix path-info {large}")
 
+      # === builtin:fetchurl gs:// with a URL-supplied endpoint ===
+      # A gs:// URL cannot carry an endpoint. Bearer tokens are host-independent
+      # and a URL-supplied one would let a derivation exfiltrate the daemon's token.
+      info_url = f"gs://private-cache/nix-cache-info?{ENDPOINT}"
+      out = machine.fail(
+          f"{ENV} nix build --debug --impure --no-link --expr '"
+          f'import <nix/fetchurl.nix> {{ name = "gcs-fork-test"; url = "{info_url}"; sha256 = "{"0"*52}"; }}'
+          "' 2>&1"
+      )
+      assert "not accepted in a gs:// URL" in out, out
+
       # === user-project header forwarded ===
       up_url = store_url("billing-cache", **{"user-project": "billing-proj"})
       machine.succeed(f"{ENV} nix copy --to '{up_url}' {PKG_A}")

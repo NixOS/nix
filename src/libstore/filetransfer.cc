@@ -1380,6 +1380,15 @@ void FileTransferRequest::setupForGCS()
     if (parsed.userProject)
         headers.emplace_back("x-goog-user-project", *parsed.userProject);
 
+    if (preResolvedGcpAccessToken) {
+        bearerToken = *preResolvedGcpAccessToken;
+        return;
+    }
+
+    /* Parent already resolved (to nothing). Don't consult the provider. */
+    if (gcpCredentialsPreResolved)
+        return;
+
 #if NIX_WITH_GCS_AUTH
     if (gcpCredentialProvider) {
         if (auto creds = gcpCredentialProvider->maybeGetCredentials())

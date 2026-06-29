@@ -271,6 +271,15 @@ protected:
     std::optional<AwsCredentials> preResolveAwsCredentials();
 #endif
 
+#if NIX_WITH_GCS_AUTH
+    /**
+     * Pre-resolve a GCP access token for gs:// URLs in builtin:fetchurl.
+     * Called before forking so the sandboxed child does not need ADC files
+     * or metadata-server access.
+     */
+    std::optional<std::string> preResolveGcpAccessToken();
+#endif
+
 private:
 
     /**
@@ -332,6 +341,9 @@ protected:
     {
 #if NIX_WITH_AWS_AUTH
         std::optional<AwsCredentials> awsCredentials;
+#endif
+#if NIX_WITH_GCS_AUTH
+        std::optional<std::string> gcpAccessToken;
 #endif
     };
 
