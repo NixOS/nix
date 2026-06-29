@@ -46,6 +46,7 @@ public:
         , store{store}
         , miscMethods{miscMethods}
         , derivationType{drv.type()}
+        , submittedOutputs(make_ref<Sync<OutputPathMap>>())
     {
     }
 
@@ -62,7 +63,12 @@ public:
             ignoreExceptionInDestructor();
         }
         try {
-            stopDaemon();
+            stopWorkerProtoDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            stopVarlinkDaemon();
         } catch (...) {
             ignoreExceptionInDestructor();
         }
@@ -129,6 +135,15 @@ protected:
      */
     OutputPathMap scratchOutputs;
 
+    /**
+     * Whether or not derivation is using outputs submitted via varlink
+     */
+    bool usingSubmitted;
+    /**
+     * Output paths from the `SubmitOutput` varlink command
+     */
+    ref<Sync<OutputPathMap>> submittedOutputs;
+
     const static std::filesystem::path homeDir;
 
     /**
@@ -151,6 +166,21 @@ protected:
      * The daemon worker threads.
      */
     std::list<DaemonWorkerState> daemonWorkerThreads;
+
+    /**
+     * The Varlink builder RPC daemon socket.
+     */
+    AutoCloseFD varlinkSocket;
+
+    /**
+     * The Varlink daemon main thread.
+     */
+    std::thread varlinkThread;
+
+    /**
+     * The Varlink daemon worker threads.
+     */
+    std::vector<std::thread> varlinkWorkerThreads;
 
     const StorePathSet & originalPaths() override
     {
@@ -288,15 +318,26 @@ protected:
 private:
 
     /**
-     * Start an in-process nix daemon thread for recursive-nix.
+     * Start an in-process worker protocol daemon thread for recursive-nix.
      */
-    void startDaemon();
+    void startWorkerProtoDaemon();
 
     /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
+     * Stop the worker protocol daemon thread.
+     * @see startWorkerProtoDaemon
      */
-    void stopDaemon();
+    void stopWorkerProtoDaemon();
+
+    /**
+     * Start an in-process Varlink daemon thread for builder-rpc-v1.
+     */
+    void startVarlinkDaemon();
+
+    /**
+     * Stop the Varlink daemon thread.
+     * @see startVarlinkDaemon
+     */
+    void stopVarlinkDaemon();
 
 protected:
 
@@ -365,6 +406,12 @@ private:
      * as valid.
      */
     SingleDrvOutputs registerOutputs();
+
+    /**
+     * Check that the derivation outputs submitted by varlink exist
+     * and attach them to the derivation
+     */
+    SingleDrvOutputs checkSubmittedOutputs();
 
 protected:
 

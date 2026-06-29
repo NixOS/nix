@@ -388,6 +388,9 @@ StringSet Store::Config::getDefaultSystemFeatures()
     if (experimentalFeatureSettings.isEnabled(Xp::RecursiveNix))
         res.insert("recursive-nix");
 
+    if (experimentalFeatureSettings.isEnabled(Xp::BuilderRpc))
+        res.insert("builder-rpc-v1");
+
     return res;
 }
 
