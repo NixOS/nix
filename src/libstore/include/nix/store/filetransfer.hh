@@ -321,6 +321,20 @@ struct FileTransferRequest
      */
     std::shared_ptr<GcpCredentialProvider> gcpCredentialProvider;
 
+    /**
+     * Pre-resolved GCP OAuth2 bearer token for `gs://` requests.
+     * When set, `setupForGCS()` uses it verbatim instead of consulting the credential provider.
+     * Used to forward credentials into the sandboxed `builtin:fetchurl` child.
+     */
+    std::optional<std::string> preResolvedGcpAccessToken;
+
+    /**
+     * The parent already resolved GCP credentials (possibly to "none").
+     * When set, `setupForGCS()` skips the provider and goes anonymous if there is
+     * no `preResolvedGcpAccessToken`.
+     */
+    bool gcpCredentialsPreResolved = false;
+
     std::optional<std::string> bearerToken;
 
     std::function<std::optional<std::string>()> refreshBearerToken;
