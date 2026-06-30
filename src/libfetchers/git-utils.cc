@@ -1232,6 +1232,28 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             cur->children.insert_or_assign(name, std::move(child));
     }
 
+    /* Set the object ID of a reserved leaf, skipping if it was superseded (id changed) meanwhile. */
+    void setNodeOid(State & state, const CanonPath & path, const git_oid & oid, size_t id)
+    {
+        auto parent = path.parent();
+        assert(parent);
+
+        Directory * cur = &state.root;
+        for (auto & name : *parent) {
+            auto i = cur->children.find(std::string(name));
+            if (i == cur->children.end())
+                return;
+            auto dir = std::get_if<Directory>(&i->second.file);
+            if (!dir)
+                return;
+            cur = dir;
+        }
+
+        auto i = cur->children.find(std::string(*path.baseName()));
+        if (i != cur->children.end() && i->second.id == id)
+            i->second.file = oid;
+    }
+
     void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
     {
         checkInterrupt();
@@ -1301,6 +1323,10 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         func(*crf);
 
         auto id = nextId++;
+        auto mode = crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB;
+
+        /* Reserve the node now, in order; workers fill the oid later. */
+        addNode(*_state.lock(), crf->path, Child{mode, git_oid{}, id});
 
         if (crf->stream) {
             /* Finish the slow path by creating the blob object synchronously.
@@ -1309,10 +1335,7 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             git_oid oid;
             if (git_blob_create_from_stream_commit(&oid, crf->stream.release()))
                 throw GitError("creating a blob object for '%s'", path);
-            addNode(
-                *_state.lock(),
-                crf->path,
-                Child{crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
+            setNodeOid(*_state.lock(), crf->path, oid, id);
             return;
         }
 
@@ -1324,10 +1347,7 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             if (git_blob_create_from_buffer(&oid, *repo, crf->contents.data(), crf->contents.size()))
                 throw GitError("creating a blob object for '%s' from in-memory buffer", crf->path);
 
-            addNode(
-                *_state.lock(),
-                crf->path,
-                Child{crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid, id});
+            setNodeOid(*_state.lock(), crf->path, oid, id);
         });
     }
 
@@ -1341,15 +1361,16 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
 
     void createSymlink(const CanonPath & path, const std::string & target) override
     {
-        workers.enqueue([this, path, target]() {
+        auto id = nextId++;
+        addNode(*_state.lock(), path, Child{GIT_FILEMODE_LINK, git_oid{}, id});
+        workers.enqueue([this, path, target, id]() {
             auto repo(repoPool.get());
 
             git_oid oid;
             if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
                 throw GitError("creating a blob object for tarball symlink member '%s'", path);
 
-            auto state(_state.lock());
-            addNode(*state, path, Child{GIT_FILEMODE_LINK, oid});
+            setNodeOid(*_state.lock(), path, oid, id);
         });
     }
 
