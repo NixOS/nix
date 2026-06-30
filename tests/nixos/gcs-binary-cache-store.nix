@@ -19,6 +19,27 @@ let
       token_uri = "http://localhost:${toString port}/token";
     }
   );
+
+  # external_account (workload identity federation):
+  # This mock's STS endpoint.
+  # The second variant additionally impersonates a service account.
+  subjectTokenFile = pkgs.writeText "subject-token" "fake-oidc-subject-token";
+  externalAccount = {
+    type = "external_account";
+    audience = "//iam.googleapis.com/projects/0/locations/global/workloadIdentityPools/p/providers/x";
+    subject_token_type = "urn:ietf:params:oauth:token-type:jwt";
+    token_url = "http://localhost:${toString port}/sts";
+    credential_source.file = "${subjectTokenFile}";
+  };
+  wifAdc = pkgs.writeText "wif-adc.json" (builtins.toJSON externalAccount);
+  wifImpersonateAdc = pkgs.writeText "wif-imp-adc.json" (
+    builtins.toJSON (
+      externalAccount
+      // {
+        service_account_impersonation_url = "http://localhost:${toString port}/v1/projects/-/serviceAccounts/sa@example.iam.gserviceaccount.com:generateAccessToken";
+      }
+    )
+  );
 in
 {
   name = "gcs-binary-cache-store";
@@ -64,6 +85,20 @@ in
       machine.succeed(f"nix store delete --ignore-liveness {PKG_A}")
       machine.fail(f"nix path-info {PKG_A}")
       machine.succeed(f"{ENV} nix copy --no-check-sigs --from '{url}' {PKG_A}")
+      machine.succeed(f"nix path-info {PKG_A}")
+
+      # === workload identity federation (external_account) ===
+      # Direct STS token exchange: file subject-token source, no impersonation.
+      WIF = "GOOGLE_APPLICATION_CREDENTIALS=${wifAdc}"
+      machine.succeed(f"{WIF} nix copy --to '{url}' {PKG_A}")
+      machine.succeed(f"nix store delete --ignore-liveness {PKG_A}")
+      machine.succeed(f"{WIF} nix copy --no-check-sigs --from '{url}' {PKG_A}")
+      machine.succeed(f"nix path-info {PKG_A}")
+
+      # Federated token exchanged again for an impersonated service-account token.
+      WIF_IMP = "GOOGLE_APPLICATION_CREDENTIALS=${wifImpersonateAdc}"
+      machine.succeed(f"nix store delete --ignore-liveness {PKG_A}")
+      machine.succeed(f"{WIF_IMP} nix copy --no-check-sigs --from '{url}' {PKG_A}")
       machine.succeed(f"nix path-info {PKG_A}")
 
       # === anonymous read from public bucket ===
