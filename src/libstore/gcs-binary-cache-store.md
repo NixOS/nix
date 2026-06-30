@@ -16,8 +16,10 @@ The following sources are tried in order:
 2. `$CLOUDSDK_CONFIG/application_default_credentials.json`, otherwise `~/.config/gcloud/application_default_credentials.json` (created by `gcloud auth application-default login`).
 3. The GCE/GKE metadata server, when running on Google Cloud.
 
+Service-account, `authorized_user`, and `external_account` (workload identity federation) credentials are all accepted.
+For workload identity federation only the `file` and `url` subject-token sources are supported; the `aws` and `executable` sources are not.
+
 If no credentials are found, requests are sent unauthenticated, which works for public buckets.
-Workload-identity federation (`external_account` credentials) is not yet supported.
 
 [adc]: https://cloud.google.com/docs/authentication/application-default-credentials
 

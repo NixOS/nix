@@ -21,6 +21,8 @@
 
 #  include <algorithm>
 #  include <chrono>
+#  include <cstdio>
+#  include <ctime>
 
 namespace nix {
 
@@ -37,6 +39,7 @@ static constexpr auto kExpirySlack = 225s;
 static constexpr auto kMinCacheLifetime = 30s;
 
 static constexpr std::string_view kOauthScope = "https://www.googleapis.com/auth/devstorage.read_write";
+static constexpr std::string_view kCloudPlatformScope = "https://www.googleapis.com/auth/cloud-platform";
 static constexpr std::string_view kDefaultTokenUri = "https://oauth2.googleapis.com/token";
 static constexpr std::string_view kMetadataHost = "metadata.google.internal";
 static constexpr std::string_view kMetadataTokenPath = "/computeMetadata/v1/instance/service-accounts/default/token";
@@ -162,6 +165,25 @@ std::optional<std::filesystem::path> findAdcFile()
     return std::nullopt;
 }
 
+std::string extractSubjectToken(const std::string & raw, const nlohmann::json & format)
+{
+    auto type = format.is_null() ? std::string{"text"} : format.value("type", std::string{"text"});
+    if (type == "text")
+        return raw;
+    if (type == "json") {
+        auto field = format.value("subject_token_field_name", std::string{});
+        if (field.empty())
+            throw GcpAuthError("external_account json credential_source missing 'subject_token_field_name'");
+        try {
+            return nlohmann::json::parse(raw).at(field).get<std::string>();
+        } catch (nlohmann::json::exception & e) {
+            throw GcpAuthError(
+                "external_account subject token JSON invalid or missing field '%s': %s", field, e.what());
+        }
+    }
+    throw GcpAuthError("external_account credential_source has unsupported format type '%s'", type);
+}
+
 } // namespace gcp_detail
 
 namespace {
@@ -259,6 +281,126 @@ GcpCredentials serviceAccountCredentials(FileTransfer & ft, const nlohmann::json
     return parseTokenResponse(httpPostForm(ft, tokenUri, std::move(body)).data);
 }
 
+/** Retrieve the subject token named by an `external_account` `credential_source`. */
+std::string retrieveSubjectToken(FileTransfer & ft, const nlohmann::json & source)
+{
+    auto format = source.value("format", nlohmann::json{});
+    if (auto file = source.value("file", std::string{}); !file.empty()) {
+        try {
+            return extractSubjectToken(readFile(file), format);
+        } catch (SysError & e) {
+            throw GcpAuthError("failed to read external_account subject token '%s': %s", file, e.what());
+        }
+    }
+    if (auto url = source.value("url", std::string{}); !url.empty()) {
+        Headers headers;
+        auto hdrs = source.value("headers", nlohmann::json::object());
+        for (auto & [k, v] : hdrs.items())
+            headers.emplace_back(k, v.get<std::string>());
+        return extractSubjectToken(httpGet(ft, url, std::move(headers), /*attempts=*/std::nullopt).data, format);
+    }
+    /* `aws` and `executable` sources are not implemented here.
+     * The `aws` source needs SigV4 request signing and lives behind NIX_WITH_AWS_AUTH.
+     */
+    throw GcpAuthError("external_account credential_source is unsupported (only 'file' and 'url' are implemented)");
+}
+
+/** RFC 8693 token exchange against the STS endpoint. It yields a federated access token. */
+GcpCredentials stsExchange(
+    FileTransfer & ft,
+    const std::string & tokenUrl,
+    const std::string & subjectToken,
+    const std::string & subjectTokenType,
+    const std::string & audience,
+    std::string_view scope)
+{
+    auto body = encodeQuery({
+        {"grant_type", "urn:ietf:params:oauth:grant-type:token-exchange"},
+        {"requested_token_type", "urn:ietf:params:oauth:token-type:access_token"},
+        {"subject_token_type", subjectTokenType},
+        {"subject_token", subjectToken},
+        {"audience", audience},
+        {"scope", std::string{scope}},
+    });
+    return parseTokenResponse(httpPostForm(ft, tokenUrl, std::move(body)).data);
+}
+
+/** Exchange a federated token for a service-account token via `generateAccessToken`. */
+GcpCredentials impersonate(FileTransfer & ft, const std::string & url, const std::string & federatedToken)
+{
+    auto payload = nlohmann::json{{"scope", nlohmann::json::array({std::string{kOauthScope}})}}.dump();
+    FileTransferRequest req{VerbatimURL{url}};
+    req.method = HttpMethod::Post;
+    StringSource src{payload};
+    req.data = {src};
+    req.mimeType = "application/json";
+    req.headers = {{"Authorization", "Bearer " + federatedToken}};
+    auto res = ft.upload(req);
+
+    nlohmann::json j;
+    try {
+        j = nlohmann::json::parse(res.data);
+    } catch (nlohmann::json::exception & e) {
+        throw GcpAuthError("impersonation endpoint returned invalid JSON: %s", e.what());
+    }
+    auto token = j.value("accessToken", std::string{});
+    if (token.empty()) {
+        debug("GCP impersonation response: %s", res.data);
+        throw GcpAuthError("impersonation response missing 'accessToken'");
+    }
+
+    /* `expireTime` is an RFC3339 UTC timestamp; the documented default is 1h.
+     * std::chrono::parse is not yet in Apple libc++, so parse by hand. */
+    std::chrono::seconds lifetime = 1h;
+    struct tm tm{};
+    if (std::sscanf(
+            j.value("expireTime", std::string{}).c_str(),
+            "%d-%d-%dT%d:%d:%d",
+            &tm.tm_year,
+            &tm.tm_mon,
+            &tm.tm_mday,
+            &tm.tm_hour,
+            &tm.tm_min,
+            &tm.tm_sec)
+        == 6) {
+        tm.tm_year -= 1900;
+        tm.tm_mon -= 1;
+        lifetime = std::chrono::duration_cast<std::chrono::seconds>(
+            std::chrono::system_clock::from_time_t(timegm(&tm)) - std::chrono::system_clock::now());
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    return GcpCredentials{
+        .accessToken = std::move(token),
+        .expiresAt = std::max(now + lifetime - kExpirySlack, now + kMinCacheLifetime),
+    };
+}
+
+/** `"type":"external_account"` is a workload identity federation (RFC 8693). */
+GcpCredentials externalAccountCredentials(FileTransfer & ft, const nlohmann::json & j)
+{
+    auto require = [&](const char * k) { return requireField(j, "external_account", k); };
+    auto audience = require("audience");
+    auto subjectTokenType = require("subject_token_type");
+    auto tokenUrl = require("token_url");
+    if (!j.contains("credential_source"))
+        throw GcpAuthError("external_account credentials missing 'credential_source'");
+
+    auto subjectToken = retrieveSubjectToken(ft, j.at("credential_source"));
+
+    /* With impersonation the federated token only needs cloud-platform; the
+       desired storage scope is applied at the impersonation step. */
+    auto impersonationUrl = j.value("service_account_impersonation_url", std::string{});
+    auto sts = stsExchange(
+        ft,
+        tokenUrl,
+        subjectToken,
+        subjectTokenType,
+        audience,
+        impersonationUrl.empty() ? kOauthScope : kCloudPlatformScope);
+    return impersonationUrl.empty() ? sts : impersonate(ft, impersonationUrl, sts.accessToken);
+}
+
 std::optional<GcpCredentials> fileCredentials(FileTransfer & ft, const std::filesystem::path & path)
 {
     std::string content;
@@ -282,10 +424,8 @@ std::optional<GcpCredentials> fileCredentials(FileTransfer & ft, const std::file
         return serviceAccountCredentials(ft, j);
     if (type == "authorized_user")
         return authorizedUserCredentials(ft, j);
-    /* `external_account` (workload identity federation) is intentionally
-       unsupported to avoid pulling in the heavy google-cloud-cpp SDK.
-       Surface a clear error rather than silently skipping so the user knows
-       why auth failed. */
+    if (type == "external_account")
+        return externalAccountCredentials(ft, j);
     throw GcpAuthError("GCP credentials '%s' have unsupported type '%s'", path.string(), type);
 }
 

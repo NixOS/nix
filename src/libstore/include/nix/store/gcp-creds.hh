@@ -13,6 +13,8 @@
 #  include <span>
 #  include <string>
 
+#  include <nlohmann/json_fwd.hpp>
+
 namespace nix {
 
 struct FileTransfer;
@@ -52,7 +54,8 @@ public:
 /**
  * Build the default Application Default Credentials chain:
  *
- *  1. `$GOOGLE_APPLICATION_CREDENTIALS` → service-account or authorized-user JSON
+ *  1. `$GOOGLE_APPLICATION_CREDENTIALS` → service-account, authorized-user, or
+ *     external-account (workload identity federation) JSON
  *  2. `$CLOUDSDK_CONFIG/application_default_credentials.json`, else
  * `~/.config/gcloud/application_default_credentials.json`
  *  3. GCE/GKE metadata server (`metadata.google.internal` or `$GCE_METADATA_HOST`)
@@ -83,6 +86,15 @@ GcpCredentials parseTokenResponse(const std::string & body);
 
 /** Locate the ADC JSON file from env vars / well-known path. */
 std::optional<std::filesystem::path> findAdcFile();
+
+/**
+ * Extract a workload-identity subject token from a `credential_source` payload
+ * `raw` per its optional `format` (`text` verbatim, or a field of a `json`
+ * document).
+ *
+ * Throws GcpAuthError on a malformed format spec or payload.
+ */
+std::string extractSubjectToken(const std::string & raw, const nlohmann::json & format);
 
 } // namespace gcp_detail
 
