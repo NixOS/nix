@@ -626,9 +626,12 @@ string_t AttrCursor::getStringWithContext()
                             [&](const NixStringContextElem::Path & p) -> const StorePath * { return nullptr; },
                         },
                         c.raw);
-                    if (!path || !root->state.store->isValidPath(*path)) {
-                        valid = false;
-                        break;
+                    if (path) {
+                        root->state.store->addTempRoot(*path);
+                        if (!root->state.store->isValidPath(*path)) {
+                            valid = false;
+                            break;
+                        }
                     }
                 }
                 if (valid) {

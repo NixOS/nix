@@ -378,6 +378,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
     /* If not, try to substitute the input. */
     if (storePath) {
         try {
+            store.addTempRoot(*storePath);
             store.ensurePath(*storePath);
             return makeStoreAccessor();
         }
