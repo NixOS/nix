@@ -116,6 +116,13 @@ FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
 
+FileTransferRequest::FileTransferRequest(VerbatimURL uri)
+    : uri(std::move(uri))
+    , parentAct(getCurActivity())
+    , authenticator(auth::getAuthenticator())
+{
+}
+
 FileTransfer::~FileTransfer() {}
 
 namespace {
@@ -716,7 +723,9 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 
-            // Set up username/password authentication if provided
+            // Set up username/password authentication if provided. Credentials
+            // from the authenticator are resolved into `usernameAuth` by
+            // FileTransferRequest::setupAuth() before the transfer is enqueued.
             if (request.usernameAuth) {
                 curl_easy_setopt(req, CURLOPT_USERNAME, request.usernameAuth->username.c_str());
                 if (request.usernameAuth->password) {
@@ -824,6 +833,11 @@ struct curlFileTransfer : public FileTransfer
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
+                    /* Server (401) rejected our credentials; don't reuse them. A
+                       407 is the proxy's failure, not the server's, so leave the
+                       server credentials alone. */
+                    if (httpStatus == HttpStatus::Unauthorized && request.authData)
+                        request.authenticator->reject(*request.authData);
                     err = Unauthorized;
                 } else if (httpStatus == HttpStatus::Forbidden) {
                     // Don't retry on authentication/authorization failures.
@@ -1220,14 +1234,12 @@ struct curlFileTransfer : public FileTransfer
 
     ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
+        auto modifiedRequest = request;
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
-        if (request.uri.scheme() == "s3") {
-            auto modifiedRequest = request;
+        if (modifiedRequest.uri.scheme() == "s3")
             modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-        }
-
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        modifiedRequest.setupAuth();
+        return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
     }
 
     void unpauseTransfer(std::weak_ptr<Item> item)
@@ -1289,6 +1301,34 @@ std::string FileTransferRequest::displayUri() const
     } catch (BadURL &) {
     }
     return uri.to_string();
+}
+
+void FileTransferRequest::setupAuth()
+{
+    /* Explicit credentials (e.g. S3 access keys) take precedence. */
+    if (usernameAuth)
+        return;
+    try {
+        auto url = uri.parsed();
+        if (!url.authority)
+            return;
+        auto & auth = *url.authority;
+        /* git-credential's `host` field is `host[:port]`. */
+        auth::AuthData request{
+            .protocol = url.scheme,
+            .host = auth.port ? fmt("%s:%d", auth.host, *auth.port) : auth.host,
+            .path = authPath.value_or(renderUrlPathNoPctEncoding(url.path)),
+            .userName = auth.user,
+        };
+        authData = authenticator->fill(request, requireAuth);
+        if (authData)
+            usernameAuth = UsernameAuth{
+                .username = authData->userName.value_or(""),
+                .password = authData->password,
+            };
+    } catch (nix::Error & e) {
+        debug("not authenticating '%s': %s", displayUri(), e.msg());
+    }
 }
 
 void FileTransferRequest::setupForS3()
