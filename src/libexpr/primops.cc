@@ -3392,6 +3392,75 @@ static RegisterPrimOp primop_listToAttrs({
     .impl = prim_listToAttrs,
 });
 
+static void prim_listToSet(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToSet");
+
+    auto listView = args[0]->listView();
+    size_t listSize = listView.size();
+
+    if (listSize == 0) {
+        v.mkAttrs(&Bindings::emptyBindings);
+        return;
+    }
+
+    auto & bindings = *state.mem.allocBindings(listSize);
+
+    size_t idx = 0;
+    for (auto v2 : listView) {
+        auto name = state.forceStringNoCtx(
+            *v2,
+            pos,
+            "while evaluating an element of the list passed to builtins.listToSet");
+        auto sym = state.symbols.create(name);
+        bindings[idx++] = Attr(sym, nullptr);
+    }
+
+    std::sort(&bindings[0], &bindings[listSize]);
+
+    Symbol prev;
+    for (size_t n = 0; n < listSize; n++) {
+        auto attr = bindings[n];
+        if (prev == attr.name) {
+            continue;
+        }
+        prev = attr.name;
+        bindings.push_back({prev, &Value::vNull, pos});
+    }
+    // help GC and clear end of allocated array
+    for (size_t n = bindings.size(); n < listSize; n++) {
+        bindings[n] = Attr{};
+    }
+    v.mkAttrs(&bindings);
+}
+
+static RegisterPrimOp primop_listToSet({
+    .name = "__listToSet",
+    .args = {"list"},
+    .doc = R"(
+      Construct an attribute set from a list of strings. Every attribute in the
+      result set has its value set to `null`.
+
+      In case of duplicate occurrences of the same name, only one attribute
+      is created.
+
+      Example:
+
+      ```nix
+      builtins.listToSet [ "foo" "bar" "foo" ]
+      ```
+
+      evaluates to
+
+      ```nix
+      { foo = null; bar = null; }
+      ```
+
+      Has `O(n log n)` time complexity, where `n` is size of the list.
+    )",
+    .impl = prim_listToSet,
+});
+
 static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceAttrs(*args[0], pos, "while evaluating the first argument passed to builtins.intersectAttrs");

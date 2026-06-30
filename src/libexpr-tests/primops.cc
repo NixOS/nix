@@ -271,6 +271,31 @@ TEST_F(PrimOpTest, listToAttrs)
     ASSERT_THAT(*key->value, IsIntEq(123));
 }
 
+TEST_F(PrimOpTest, listToSetEmptyList)
+{
+    auto v = eval("builtins.listToSet []");
+    ASSERT_THAT(v, IsAttrsOfSize(0));
+    ASSERT_EQ(v.type(), nAttrs);
+    ASSERT_EQ(v.attrs()->size(), 0u);
+}
+
+TEST_F(PrimOpTest, listToSetNotString)
+{
+    ASSERT_THROW(eval("builtins.listToSet [1]"), Error);
+}
+
+TEST_F(PrimOpTest, listToSet)
+{
+    auto v = eval("builtins.listToSet [ \"foo\" \"bar\" \"foo\" ]");
+    ASSERT_THAT(v, IsAttrsOfSize(2));
+    auto foo = v.attrs()->get(createSymbol("foo"));
+    ASSERT_NE(foo, nullptr);
+    ASSERT_EQ(foo->value->type(), nNull);
+    auto bar = v.attrs()->get(createSymbol("bar"));
+    ASSERT_NE(bar, nullptr);
+    ASSERT_EQ(bar->value->type(), nNull);
+}
+
 TEST_F(PrimOpTest, intersectAttrs)
 {
     auto v = eval("builtins.intersectAttrs { a = 1; b = 2; } { b = 3; c = 4; }");
