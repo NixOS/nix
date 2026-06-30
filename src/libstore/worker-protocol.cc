@@ -40,6 +40,21 @@ const WorkerProto::Version WorkerProto::minimum = {
         },
 };
 
+const WorkerProto::Version WorkerProto::builderRpcV0 = {
+    .number =
+        {
+            .major = 1,
+            .minor = 38,
+        },
+    .features =
+        {
+            std::string{
+                WorkerProto::featureRealisationWithPath,
+            },
+            std::string{WorkerProto::featureDisableSetOptions},
+        },
+};
+
 std::partial_ordering WorkerProto::Version::operator<=>(const WorkerProto::Version & other) const
 {
     auto numCmp = number <=> other.number;
@@ -225,6 +240,18 @@ void WorkerProto::Serialise<DerivedPath>::write(
             },
             sOrDrvPath);
     }
+}
+
+SingleDerivedPath
+WorkerProto::Serialise<SingleDerivedPath>::read(const StoreDirConfig & store, WorkerProto::ReadConn conn)
+{
+    return SingleDerivedPath::parse(store, readString(conn.from));
+}
+
+void WorkerProto::Serialise<SingleDerivedPath>::write(
+    const StoreDirConfig & store, WorkerProto::WriteConn conn, const SingleDerivedPath & req)
+{
+    conn.to << req.to_string(store);
 }
 
 KeyedBuildResult

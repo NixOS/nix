@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/store/outputs-spec.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/util/hash.hh"

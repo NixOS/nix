@@ -1,4 +1,6 @@
 #include "nix/store/daemon.hh"
+#include "nix/util/configuration.hh"
+#include "nix/util/file-content-address.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/worker-protocol-connection.hh"
@@ -310,6 +312,38 @@ static void performOp(
 {
     WorkerProto::ReadConn rconn(conn);
     WorkerProto::WriteConn wconn(conn);
+
+    if (recursive == daemon::RecursiveSubmitted) {
+        // Limit valid calls to reduce opportunities for nonreproducability in builds
+        // Since this is an allowlist, it's easiest to put it at the top before the switch
+        static constexpr std::array validOperations = {
+            // All the types of "Add" should be allowed
+            WorkerProto::Op::AddToStore,
+            WorkerProto::Op::AddMultipleToStore,
+            WorkerProto::Op::AddToStoreNar,
+            WorkerProto::Op::AddToStoreScanning,
+            // SubmitOutput is designed specifically for this use case
+            WorkerProto::Op::SubmitOutput,
+            // Used by nix cli, should never change actual outputs
+            WorkerProto::Op::AddTempRoot,
+            // Used by nix cli, restricted store will prevent it from seeing derivations it shouldn't
+            WorkerProto::Op::IsValidPath,
+        };
+        if (std::ranges::find(validOperations, op) == validOperations.end()) {
+            throw Error("Operation %d not allowed inside derivation", op);
+        }
+    } else {
+        // Operations designed only for the experimental builder-rpc-v0 should never be exposed outside
+        // derivaitons that use it.
+        // Throw the same error we do when using an unknown operation.
+        static constexpr std::array bannedOperations = {
+            WorkerProto::Op::AddToStoreScanning,
+            WorkerProto::Op::SubmitOutput,
+        };
+        if (std::ranges::find(bannedOperations, op) != bannedOperations.end()) {
+            throw Error("invalid operation %1%", op);
+        }
+    }
 
     switch (op) {
 
@@ -801,7 +835,7 @@ static void performOp(
 
         // FIXME: use some setting in recursive mode. Will need to use
         // non-global variables.
-        if (!recursive)
+        if (recursive == NotRecursive)
             clientSettings.apply(trusted);
 
         logger->stopWork();
@@ -1014,6 +1048,50 @@ static void performOp(
         break;
     }
 
+    case WorkerProto::Op::AddToStoreScanning: {
+        auto name = readString(conn.from);
+        auto camStr = readString(conn.from);
+
+        experimentalFeatureSettings.require(Xp::DynamicDerivations);
+        if (recursive != daemon::RecursiveSubmitted)
+            throw Error("SubmitOutput only valid within derivation with `builder-rpc-v0` feature");
+
+        auto & submitStore = require<SubmitStore>(*store);
+
+        logger->startWork();
+        auto pathInfo = [&]() {
+            // NB: FramedSource must be out of scope before logger->stopWork();
+            // FIXME: this means that if there is an error
+            // half-way through, the client will keep sending
+            // data, since we haven't sent it the error yet.
+            auto [contentAddressMethod, hashAlgo] = ContentAddressMethod::parseWithAlgo(camStr);
+            FramedSource source(conn.from);
+            FileSerialisationMethod dumpMethod = contentAddressMethod.getFileSerialisationMethod();
+            return submitStore.addToStoreScanning(source, name, dumpMethod, contentAddressMethod, hashAlgo);
+        }();
+        logger->stopWork();
+
+        WorkerProto::Serialise<ValidPathInfo>::write(*store, wconn, *pathInfo);
+        break;
+    }
+
+    case WorkerProto::Op::SubmitOutput: {
+        auto path = WorkerProto::Serialise<SingleDerivedPath>::read(*store, rconn);
+        auto output = WorkerProto::Serialise<OutputName>::read(*store, rconn);
+
+        experimentalFeatureSettings.require(Xp::DynamicDerivations);
+        if (recursive != daemon::RecursiveSubmitted)
+            throw Error("SubmitOutput only valid within derivation with `builder-rpc-v0` feature");
+
+        auto & submitStore = require<SubmitStore>(*store);
+
+        logger->startWork();
+        submitStore.submitOutput(path, output);
+        logger->stopWork();
+        conn.to << 1;
+        break;
+    }
+
     default:
         throw Error("invalid operation %1%", op);
     }
@@ -1022,7 +1100,7 @@ static void performOp(
 void processConnection(ref<Store> store, FdSource && from, FdSink && to, TrustedFlag trusted, RecursiveFlag recursive)
 {
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
-    auto monitor = !recursive ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
+    auto monitor = (recursive == NotRecursive) ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
     ReceiveInterrupts receiveInterrupts;
 
@@ -1038,9 +1116,13 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
 #endif
 
     /* Exchange the greeting. */
-    auto localVersion = WorkerProto::latest;
-    if (recursive)
-        localVersion.features.insert(std::string{WorkerProto::featureDisableSetOptions});
+    WorkerProto::Version localVersion;
+
+    if (recursive == RecursiveSubmitted) {
+        localVersion = WorkerProto::builderRpcV0;
+    } else {
+        localVersion = WorkerProto::latest;
+    }
 
     WorkerProto::BasicServerConnection conn;
     conn.protoVersion = WorkerProto::BasicServerConnection::handshake(to, from, localVersion);
@@ -1054,7 +1136,7 @@ void processConnection(ref<Store> store, FdSource && from, FdSink && to, Trusted
     auto tunnelLogger = new TunnelLogger(conn.to, conn.protoVersion);
     auto prevLogger = logger;
     // FIXME
-    if (!recursive) {
+    if (recursive == NotRecursive) {
         logger = tunnelLogger;
         applyJSONLogger();
     }

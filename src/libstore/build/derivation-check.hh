@@ -28,7 +28,7 @@ void checkCAFixedOutput(
 void checkOutputs(
     Store & store,
     const StorePath & drvPath,
-    const decltype(Derivation::outputs) & drvOutputs,
+    const BasicDerivation & drv,
     const decltype(DerivationOptions<StorePath>::outputChecks) & drvOptions,
     const std::map<std::string, ValidPathInfo> & outputs);
 

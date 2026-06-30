@@ -2,6 +2,9 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/source-accessor.hh"
+#include "nix/store/store-cast.hh"
+#include "nix/store/submit-store.hh"
+#include "nix/util/file-system.hh"
 #include "nix/cmd/misc-store-flags.hh"
 
 namespace nix {
@@ -12,6 +15,7 @@ struct CmdAddToStore : MixDryRun, StoreCommand
     std::optional<std::string> namePart;
     ContentAddressMethod caMethod = ContentAddressMethod::Raw::NixArchive;
     HashAlgorithm hashAlgo = HashAlgorithm::SHA256;
+    bool scan = false;
 
     CmdAddToStore()
     {
@@ -29,18 +33,49 @@ struct CmdAddToStore : MixDryRun, StoreCommand
         addFlag(flag::contentAddressMethod(&caMethod));
 
         addFlag(flag::hashAlgo(&hashAlgo));
+
+        addFlag({
+            .longName = "scan",
+            .description = "Scan for references. Only works within a `builder-rpc-v0` derivation.",
+            .handler = {&scan, true},
+        });
     }
 
     void run(ref<Store> store) override
     {
+        // Although this would be convenient, if we are scanning then we are connecting to a daemon.
+        // A dry-run scan would require either daemon-support for scanning a path for references
+        // or listing referenceable paths, both of which come with downsides.
+        if (dryRun && scan)
+            throw UsageError("Cannot dry-run while scanning");
+
         if (!namePart)
             namePart = path.filename().string();
 
         auto sourcePath = makeFSSourceAccessor(absPath(path));
 
-        auto storePath = dryRun ? store->computeStorePath(*namePart, sourcePath, caMethod, hashAlgo, {}).first
-                                : store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
+        auto storePath = ([&]() {
+            if (scan) {
+                auto & submitStore = require<SubmitStore>(*store);
 
+                auto serialisationMethod = caMethod.getFileSerialisationMethod();
+
+                std::optional<StorePath> storePath;
+                auto sink = sourceToSink([&](Source & source) {
+                    auto info =
+                        submitStore.addToStoreScanning(source, *namePart, serialisationMethod, caMethod, hashAlgo);
+                    storePath = info->path;
+                });
+                dumpPath(sourcePath, *sink, serialisationMethod, defaultPathFilter);
+                sink->finish();
+
+                return storePath.value();
+            } else if (dryRun) {
+                return store->computeStorePath(*namePart, sourcePath, caMethod, hashAlgo, {}).first;
+            } else {
+                return store->addToStoreSlow(*namePart, sourcePath, caMethod, hashAlgo, {}).path;
+            }
+        })();
         logger->cout("%s", store->printStorePath(storePath));
     }
 };

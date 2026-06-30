@@ -1,5 +1,6 @@
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/file-content-address.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -422,22 +423,7 @@ StorePath RemoteStore::addToStoreFromDump(
     const StorePathSet & references,
     RepairFlag repair)
 {
-    FileSerialisationMethod fsm;
-    switch (hashMethod.getFileIngestionMethod()) {
-    case FileIngestionMethod::Flat:
-        fsm = FileSerialisationMethod::Flat;
-        break;
-    case FileIngestionMethod::NixArchive:
-        fsm = FileSerialisationMethod::NixArchive;
-        break;
-    case FileIngestionMethod::Git:
-        // Use NAR; Git is not a serialization method
-        fsm = FileSerialisationMethod::NixArchive;
-        break;
-    default:
-        assert(false);
-    }
-    if (fsm != dumpMethod)
+    if (hashMethod.getFileSerialisationMethod() != dumpMethod)
         unsupported("RemoteStore::addToStoreFromDump doesn't support this `dumpMethod` `hashMethod` combination");
     auto storePath = addCAToStore(dump, name, hashMethod, hashAlgo, references, repair)->path;
     invalidatePathInfoCacheFor(storePath);
@@ -515,6 +501,38 @@ void RemoteStore::registerDrvOutput(const Realisation & info)
     conn->to << WorkerProto::Op::RegisterDrvOutput;
     WorkerProto::write(*this, *conn, info);
     conn.processStderr();
+}
+
+void RemoteStore::submitOutput(const SingleDerivedPath & path, const OutputName & output)
+{
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::SubmitOutput;
+    WorkerProto::Serialise<SingleDerivedPath>::write(*this, *conn, path);
+    conn->to << output;
+    conn.processStderr();
+    readInt(conn->from);
+}
+
+ref<const ValidPathInfo> RemoteStore::addToStoreScanning(
+    Source & dump,
+    std::string_view name,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
+    HashAlgorithm hashAlgo)
+{
+    if (hashMethod.getFileSerialisationMethod() != dumpMethod)
+        unsupported("RemoteStore::addToStoreScanning doesn't support this `dumpMethod` `hashMethod` combination");
+    auto conn(getConnection());
+    conn->to << WorkerProto::Op::AddToStoreScanning << name << hashMethod.renderWithAlgo(hashAlgo);
+
+    // The dump source may invoke the store, so we need to make some room.
+    connections->incCapacity();
+    {
+        Finally cleanup([&]() { connections->decCapacity(); });
+        conn.withFramedSink([&](Sink & sink) { dump.drainInto(sink); });
+    }
+
+    return make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
 }
 
 void RemoteStore::queryRealisationUncached(

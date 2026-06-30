@@ -170,6 +170,8 @@ suites = [
       'store-info.sh',
       'store-print-env.sh',
       'structured-attrs.sh',
+      'submit-failure.sh',
+      'submit-reference.sh',
       'substitute-with-invalid-ca.sh',
       'suggestions.sh',
       'supplementary-groups.sh',
