@@ -271,22 +271,22 @@ TEST_F(PrimOpTest, listToAttrs)
     ASSERT_THAT(*key->value, IsIntEq(123));
 }
 
-TEST_F(PrimOpTest, listToSetEmptyList)
+TEST_F(PrimOpTest, listToAttrsNullEmptyList)
 {
-    auto v = eval("builtins.listToSet []");
+    auto v = eval("builtins.listToAttrsNull []");
     ASSERT_THAT(v, IsAttrsOfSize(0));
     ASSERT_EQ(v.type(), nAttrs);
     ASSERT_EQ(v.attrs()->size(), 0u);
 }
 
-TEST_F(PrimOpTest, listToSetNotString)
+TEST_F(PrimOpTest, listToAttrsNullNotString)
 {
-    ASSERT_THROW(eval("builtins.listToSet [1]"), Error);
+    ASSERT_THROW(eval("builtins.listToAttrsNull [1]"), Error);
 }
 
-TEST_F(PrimOpTest, listToSet)
+TEST_F(PrimOpTest, listToAttrsNull)
 {
-    auto v = eval("builtins.listToSet [ \"foo\" \"bar\" \"foo\" ]");
+    auto v = eval("builtins.listToAttrsNull [ \"foo\" \"bar\" \"foo\" ]");
     ASSERT_THAT(v, IsAttrsOfSize(2));
     auto foo = v.attrs()->get(createSymbol("foo"));
     ASSERT_NE(foo, nullptr);

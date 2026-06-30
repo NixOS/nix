@@ -3414,9 +3414,9 @@ static RegisterPrimOp primop_listToAttrs({
     .impl = prim_listToAttrs,
 });
 
-static void prim_listToSet(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_listToAttrsNull(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToSet");
+    state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrsNull");
 
     auto listView = args[0]->listView();
     size_t listSize = listView.size();
@@ -3431,7 +3431,7 @@ static void prim_listToSet(EvalState & state, const PosIdx pos, Value ** args, V
     size_t idx = 0;
     for (auto v2 : listView) {
         auto sym =
-            forceStringSymbol(state, pos, *v2, "while evaluating an element of the list passed to builtins.listToSet");
+            forceStringSymbol(state, pos, *v2, "while evaluating an element of the list passed to builtins.listToAttrsNull");
         bindings[idx++] = Attr(sym, nullptr);
     }
 
@@ -3440,8 +3440,8 @@ static void prim_listToSet(EvalState & state, const PosIdx pos, Value ** args, V
     finalizeBindings(state, bindings, listSize, v, [&](const Attr & attr) { return std::pair{&Value::vNull, pos}; });
 }
 
-static RegisterPrimOp primop_listToSet({
-    .name = "__listToSet",
+static RegisterPrimOp primop_listToAttrsNull({
+    .name = "__listToAttrsNull",
     .args = {"list"},
     .doc = R"(
       Construct an attribute set from a list of strings. Every attribute in the
@@ -3453,7 +3453,7 @@ static RegisterPrimOp primop_listToSet({
       Example:
 
       ```nix
-      builtins.listToSet [ "foo" "bar" "foo" ]
+      builtins.listToAttrsNull [ "foo" "bar" "foo" ]
       ```
 
       evaluates to
@@ -3464,7 +3464,7 @@ static RegisterPrimOp primop_listToSet({
 
       Has `O(n log n)` time complexity, where `n` is size of the list.
     )",
-    .impl = prim_listToSet,
+    .impl = prim_listToAttrsNull,
 });
 
 static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
