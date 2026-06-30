@@ -69,6 +69,8 @@ class WholeStoreViewAccessor : public SourceAccessor
         });
 
         if (!res)
+            /* The accessor is truly empty, i.e. without any file at root so
+               any subsequent operation with it will fail. */
             res = &emptyAccessor;
 
         return callback(*res, path);
@@ -107,6 +109,7 @@ public:
 
     DirEntries readDirectory(const CanonPath & path) override
     {
+        /* FIXME: Special-case the root directory to read the whole store, not just an empty root. */
         return callWithAccessorForPath(
             path, [](SourceAccessor & accessor, const CanonPath & path) { return accessor.readDirectory(path); });
     }

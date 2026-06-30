@@ -13,7 +13,7 @@ function diffAndAccept() {
 }
 
 export TEST_VAR=foo # for eval-okay-getenv.nix
-export NIX_REMOTE=dummy://
+export NIX_REMOTE=dummy:// # FIXME: Run with multiple store types and without readonly mode
 export NIX_STORE_DIR=/nix/store
 
 nix-instantiate --eval -E 'builtins.trace "Hello" 123' 2>&1 | grepQuiet Hello

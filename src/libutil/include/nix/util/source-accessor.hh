@@ -84,6 +84,13 @@ public:
     virtual void
     readFile(const CanonPath & path, Sink & sink, fun<void(uint64_t)> sizeCallback = [](uint64_t size) {}) = 0;
 
+    /**
+     * @brief Check whether a file exists at @p path.
+     *
+     * @todo Consider making this non-virtual, since the evaluator uses
+     * maybeLstat as an indication that a file exists always (for positive
+     * caching purposes).
+     */
     virtual bool pathExists(const CanonPath & path);
 
     enum Type {
