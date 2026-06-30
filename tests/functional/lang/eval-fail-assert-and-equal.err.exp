@@ -1,0 +1,14 @@
+error:
+       … while evaluating the condition of the assertion '((1 == 1) && (2 == 3))'
+         at /pwd/lang/eval-fail-assert-and-equal.nix:1:1:
+            1| assert 1 == 1 && 2 == 3;
+             | ^
+            2| abort "unreachable"
+
+       … while evaluating the right operand of the && operator
+         at /pwd/lang/eval-fail-assert-and-equal.nix:1:15:
+            1| assert 1 == 1 && 2 == 3;
+             |               ^
+            2| abort "unreachable"
+
+       error: an integer with value '2' is not equal to an integer with value '3'
