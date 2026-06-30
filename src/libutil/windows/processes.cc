@@ -278,6 +278,9 @@ void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
+    if (options.input)
+        throw UnimplementedError("feeding input to a program is not yet supported on Windows");
+
     /* Create a pipe. */
     Pipe out;
     // TODO: I copied this from unix but this is handled again in spawnProcess, so might be weird to split it up like

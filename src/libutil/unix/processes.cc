@@ -317,6 +317,10 @@ void runProgram2(const RunOptions & options)
     if (options.standardOut)
         out.create();
 
+    Pipe in;
+    if (options.input)
+        in.create();
+
     ProcessOptions processOptions;
     // vfork implies that the environment of the main process and the fork will
     // be shared (technically this is undefined, but in practice that's the
@@ -332,6 +336,8 @@ void runProgram2(const RunOptions & options)
                 replaceEnv(*options.environment);
             if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("dupping stdout");
+            if (options.input && dup2(in.readSide.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping stdin");
             if (options.mergeStderrToStdout)
                 if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
                     throw SysError("cannot dup stdout into stderr");
@@ -363,6 +369,14 @@ void runProgram2(const RunOptions & options)
         processOptions);
 
     out.writeSide.close();
+
+    if (options.input) {
+        in.readSide.close();
+        /* Input is written in full before draining stdout, so this only
+           works for payloads small enough not to fill the stdout pipe. */
+        writeFull(in.writeSide.get(), *options.input);
+        in.writeSide.close();
+    }
 
     if (options.standardOut)
         drainFD(out.readSide.get(), *options.standardOut);
