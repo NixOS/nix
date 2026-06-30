@@ -16,6 +16,7 @@ headers = [ config_pub_h ] + files(
   'args/root.hh',
   'array-from-string-literal.hh',
   'async.hh',
+  'auth.hh',
   'base-n.hh',
   'base-nix-32.hh',
   'bump-memory-resource.hh',
