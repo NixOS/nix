@@ -150,7 +150,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     if (pathExists(path / "flake.nix")) {
                         found = true;
                         break;
-                    } else if (pathExists(path / ".git"))
+                    } else if (pathExists(path / ".git") || pathExists(path / ".jj"))
                         throw Error(
                             "path %s is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
                             PathFmt(path));
@@ -172,6 +172,34 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
             std::string subdir;
 
             while (flakeRoot.parent_path() != flakeRoot) {
+                /* A Jujutsu (jj) working copy has a `.jj` directory. Prefer it
+                   over `.git`: a colocated repo (`jj git init --colocate`) has
+                   both, and the presence of `.jj` signals a deliberate choice to
+                   use jj, so we drive all operations through jj. (The jj fetcher
+                   does not yet implement git-specific features such as
+                   submodules, LFS or signed-commit verification; a colocated repo
+                   that needs those can be selected explicitly with a `git+file://`
+                   URL.) Without this, a jj-only tree — e.g. a `jj workspace add`
+                   workspace or a non-Git-backend repo — would fall back to the
+                   unfiltered `path` fetcher. */
+                if (pathExists(flakeRoot / ".jj")) {
+                    auto parsedURL = ParsedURL{
+                        .scheme = "jj+file",
+                        .authority = ParsedURL::Authority{},
+                        .path = pathToUrlPath(flakeRoot),
+                        .query = query,
+                        .fragment = fragment,
+                    };
+
+                    if (subdir != "") {
+                        if (parsedURL.query.count("dir"))
+                            throw Error("flake URL '%s' has an inconsistent 'dir' parameter", url);
+                        parsedURL.query.insert_or_assign("dir", subdir);
+                    }
+
+                    return fromParsedURL(fetchSettings, std::move(parsedURL), isFlake);
+                }
+
                 if (pathExists(flakeRoot / ".git")) {
                     auto parsedURL = ParsedURL{
                         .scheme = "git+file",
