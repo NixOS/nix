@@ -2,7 +2,7 @@
 
 ## Highlights
 
-- Flakes are not copied to the store unnecessarily [#3121](https://github.com/NixOS/nix/issues/3121) [#15711](https://github.com/NixOS/nix/pull/15711)
+- Sources are copied to the store more lazily [#3121](https://github.com/NixOS/nix/issues/3121) [#15711](https://github.com/NixOS/nix/pull/15711) [#15920](https://github.com/NixOS/nix/pull/15920)
 
   Historically, flakes source trees have been eagerly fetched to and evaluated from Nix store to ensure deterministic and hermetic evaluation, even if the resulting store object is not used as a derivation input. This made the implementation simpler, yet made flakes unusable in large repositories and performed unnecessary writes to the store on each change to the source tree.
 
@@ -23,6 +23,11 @@
   ```nix
   builtins.readFile ( /. + (builtins.unsafeDiscardStringContext self.outPath) + "/flake.nix" )
   ```
+
+  Similar treatment has been applied to `builtins.fetchTarball`, which no longer eagerly copies paths to the store.
+  `builtins.storePath` now also short-circuits on "lazy-ish" store paths and doesn't substitute unless necessary.
+
+  This change is expected to significantly reduce disk usage required for typical evaluations and results in ~2x speedup for fetching and unpacking a nixpkgs tarball (either via `fetchTree`/flakes or via `fetchTarball`).
 
 - Support FreeBSD `libjail` based sandboxing, add `x86_64-freebsd` to installer [#9968](https://github.com/NixOS/nix/pull/9968) [#13281](https://github.com/NixOS/nix/pull/13281) [#15673](https://github.com/NixOS/nix/pull/15673)
 
@@ -57,6 +62,12 @@
   The `nix` binary now links [mimalloc](https://github.com/microsoft/mimalloc) by default, replacing glibc's malloc for all non-GC allocations.
   This yields a **5–12% wall-clock improvement** on evaluation workloads, ranging from `nix-instantiate hello` to `nix-env -qa` and full NixOS configurations.
   The allocator can be disabled at build time with `-Dmimalloc=disabled`.
+
+- The `revCount` attribute of the Git fetchers is now lazily computed and passed-through as-is when explicitly specified [#15772](https://github.com/NixOS/nix/pull/15772) [#14596](https://github.com/NixOS/nix/pull/14596)
+
+  `revCount` and `lastModified` attributes passed to the Git fetcher are no longer eagerly validated when explicitly specified.
+
+  When not explicitly specified, `revCount` is now also a thunk value and not computed eagerly. This delays this (potentially) expensive computation until the value is actually required.
 
 - Configurable file-transfer retry backoff with full jitter and `Retry-After` support [#15023](https://github.com/NixOS/nix/issues/15023) [#15419](https://github.com/NixOS/nix/issues/15419) [#15449](https://github.com/NixOS/nix/pull/15449)
 
@@ -271,6 +282,16 @@
 
   Per-frame compression now uses up to 4 worker threads. For zstd this is the new default: the [`parallel-compression`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-parallel-compression) store setting defaults to `true` when `compression=zstd` (it remains `false` for other compression algorithms like `xz`).
   Set `?parallel-compression=false` to opt out.
+
+- The derivation build scheduler memory usage reduction and performance improvements [#15611](https://github.com/NixOS/nix/pull/15611) [#15695](https://github.com/NixOS/nix/pull/15695)
+
+  Memory usage of the derivation build scheduler has been improved to allow more state sharing.
+  Inefficiencies leading to quadratic complexity of scheduling build/substitution jobs have been addressed.
+  Scheduling resources are allocated more sparingly and freed earlier to reduce peak consumption.
+
+  These improvements amount to ~2-8x less `nix-daemon` memory usage for typical workloads and more in larger derivation graphs, not accounting for short-lived allocations used during substitution.
+
+  Notably, the current architecture of the build scheduler gets proportionally slower on Linux with larger heaps as derivation "builder" processes are `fork`-ed directly from the Nix process, which blocks the builder event loop for the duration of the `fork`. Thus, smaller heap of `nix-daemon` translates into faster build startups.
 
 ## Bug fixes
 
