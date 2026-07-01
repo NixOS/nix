@@ -116,13 +116,22 @@ inline void MonitorFdHup::runThread(int watchFd, int notifyFd)
             }
         }
 
-        if (fds[0].revents & POLLHUP) {
+        // Treat any terminal event on the monitored fd as
+        // disconnection.  POLLERR and POLLNVAL are delivered
+        // regardless of the requested events mask (per POSIX)
+        // and indicate a broken or invalid fd.  If we only
+        // check POLLHUP, a socket in an error state (POLLERR
+        // without POLLHUP) causes a tight 100% CPU spin since
+        // poll() returns immediately on every call.
+        if (fds[0].revents & (POLLHUP | POLLERR | POLLNVAL)) {
             unix::triggerInterrupt();
             break;
         }
 
-        if (fds[1].revents & POLLHUP) {
-            // Notify pipe closed, exit thread
+        // The notifyPipe is used by ~MonitorFdHup to signal
+        // the thread to exit.  Do NOT call triggerInterrupt()
+        // here — this is the normal destruction path.
+        if (fds[1].revents & (POLLHUP | POLLERR | POLLNVAL)) {
             break;
         }
     }
