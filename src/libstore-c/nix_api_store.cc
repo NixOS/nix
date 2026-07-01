@@ -8,6 +8,7 @@
 
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/store-reference.hh"
 #include "nix/store/build-result.hh"
@@ -178,7 +179,7 @@ nix_err nix_store_realise(
             .drvPath = nix::makeConstantStorePathRef(path->path), .outputs = nix::OutputsSpec::All{}}};
 
         const auto nixStore = store->ptr;
-        auto results = nixStore->buildPathsWithResults(paths, nix::bmNormal, nixStore);
+        auto results = nix::getDefaultBuilder(nixStore, nixStore)->buildPathsWithResults(paths, nix::bmNormal);
 
         assert(results.size() == 1);
 

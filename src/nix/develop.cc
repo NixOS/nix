@@ -5,6 +5,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/outputs-query.hh"
@@ -290,13 +291,13 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
     auto shellDrvPath = evalStore->writeDerivation(drv);
 
     /* Build the derivation. */
-    store->buildPaths(
-        {DerivedPath::Built{
-            .drvPath = makeConstantStorePathRef(shellDrvPath),
-            .outputs = OutputsSpec::All{},
-        }},
-        bmNormal,
-        evalStore);
+    getDefaultBuilder(store, evalStore)
+        ->buildPaths(
+            {DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(shellDrvPath),
+                .outputs = OutputsSpec::All{},
+            }},
+            bmNormal);
 
     // `get-env.sh` will write its JSON output to an arbitrary output
     // path, so return the first non-empty output path.
