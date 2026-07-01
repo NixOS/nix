@@ -129,6 +129,11 @@ struct RunOptions
 #endif
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
+    /**
+     * Data to feed to the program's standard input. stdin is only
+     * connected to a pipe when this is set.
+     */
+    std::optional<std::string> input;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
     bool isInteractive = false;
