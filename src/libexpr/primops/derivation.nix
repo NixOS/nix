@@ -26,34 +26,52 @@
   Note that `derivation` is very bare-bones, and provides almost no commands during the build.
   Most likely, you'll want to use functions like `stdenv.mkDerivation` in Nixpkgs to set up a basic environment.
 */
+let
+  inherit (builtins) listToAttrs head;
+  defaultOutputs = [ "out" ];
+in
 drvAttrs@{
-  outputs ? [ "out" ],
+  outputs ? defaultOutputs,
   ...
 }:
 
-let
+# Special-case the happy path, performing as little work as possible when the
+# only output is out
+if !drvAttrs ? outputs || outputs == defaultOutputs then
+  let
+    strict = derivationStrict drvAttrs;
 
-  strict = derivationStrict drvAttrs;
-
-  commonAttrs =
-    drvAttrs
-    // (builtins.listToAttrs outputsList)
-    // {
-      all = map (x: x.value) outputsList;
+    self = drvAttrs // {
       inherit drvAttrs;
-    };
-
-  outputToAttrListElement = outputName: {
-    name = outputName;
-    value = commonAttrs // {
-      outPath = strict.${outputName};
-      drvPath = strict.drvPath;
       type = "derivation";
-      inherit outputName;
+      all = [ self ];
+      drvPath = strict.drvPath;
+      outPath = strict.out;
+      out = self;
+      outputName = "out";
     };
-  };
+  in
+  self
+else
+  let
+    strict = derivationStrict drvAttrs;
 
-  outputsList = map outputToAttrListElement outputs;
+    commonAttrs =
+      drvAttrs
+      // (listToAttrs outputsList)
+      // {
+        all = map (x: x.value) outputsList;
+        inherit drvAttrs;
+        drvPath = strict.drvPath;
+        type = "derivation";
+      };
 
-in
-(builtins.head outputsList).value
+    outputsList = map (outputName: {
+      name = outputName;
+      value = commonAttrs // {
+        outPath = strict.${outputName};
+        inherit outputName;
+      };
+    }) outputs;
+  in
+  (head outputsList).value
