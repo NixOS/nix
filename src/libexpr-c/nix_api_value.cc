@@ -12,41 +12,6 @@
 #include "nix_api_store_internal.h"
 #include "nix_api_value.h"
 
-// Internal helper functions to check [in] and [out] `Value *` parameters
-static const nix::Value & check_value_not_null(const nix_value * value)
-{
-    if (!value) {
-        throw std::runtime_error("nix_value is null");
-    }
-    return *value->value;
-}
-
-static nix::Value & check_value_not_null(nix_value * value)
-{
-    if (!value) {
-        throw std::runtime_error("nix_value is null");
-    }
-    return *value->value;
-}
-
-static const nix::Value & check_value_in(const nix_value * value)
-{
-    auto & v = check_value_not_null(value);
-    if (!v.isValid()) {
-        throw std::runtime_error("Uninitialized nix_value");
-    }
-    return v;
-}
-
-static nix::Value & check_value_in(nix_value * value)
-{
-    auto & v = check_value_not_null(value);
-    if (!v.isValid()) {
-        throw std::runtime_error("Uninitialized nix_value");
-    }
-    return v;
-}
-
 static nix::Value & check_value_out(nix_value * value)
 {
     auto & v = check_value_not_null(value);
