@@ -168,7 +168,7 @@
 
 - The computed Git LFS endpoint URLs have been fixed to follow the spec [#15891](https://github.com/NixOS/nix/pull/15891) and memory usage of LFS fetches has been decreased [#15912](https://github.com/NixOS/nix/pull/15912).
 
-- We now verify that fetched Git LFS objects have the same OID as they do in regular Git [#15845](https://github.com/NixOS/nix/pull/15845).
+- We now verify that fetched Git LFS objects have the same OID as requested [#15845](https://github.com/NixOS/nix/pull/15845).
 
 - Primop documentation now includes time complexity information [#14554](https://github.com/NixOS/nix/pull/14554).
 
