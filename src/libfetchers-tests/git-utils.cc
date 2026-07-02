@@ -139,6 +139,46 @@ TEST_F(GitUtilsTest, sink_no_parent_dir)
         ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("parent of 'foo/bar' is not a directory")));
 }
 
+TEST_F(GitUtilsTest, sink_no_parent_dir_symlink)
+{
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createDirectory(CanonPath::root);
+
+            sink->createRegularFile(CanonPath("foo"), [](CreateRegularFileSink & fileSink) {
+                writeString(fileSink, "test", /*executable=*/false);
+            });
+
+            sink->createSymlink(CanonPath("foo/bar"), "target");
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("parent of 'foo/bar' is not a directory")));
+}
+
+TEST_F(GitUtilsTest, sink_no_parent_dir_hardlink)
+{
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createDirectory(CanonPath::root);
+
+            sink->createRegularFile(CanonPath("foo"), [](CreateRegularFileSink & fileSink) {
+                writeString(fileSink, "test", /*executable=*/false);
+            });
+
+            sink->createHardlink(CanonPath("foo/bar"), CanonPath("foo"));
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("parent of 'foo/bar' is not a directory")));
+}
+
 TEST_F(GitUtilsTest, peel_reference)
 {
     // Create a commit in the repo
