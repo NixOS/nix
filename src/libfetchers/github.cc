@@ -412,22 +412,28 @@ struct GitHubInputScheme : GitArchiveInputScheme
     RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
     {
         auto host = getHost(input);
-        auto url = fmt(
-            host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s" : "https://%s/api/v3/repos/%s/%s/commits/%s",
-            host,
-            getOwner(input),
-            getRepo(input),
-            *input.getRef());
+        auto owner = getOwner(input);
+        auto repo = getRepo(input);
+        auto ref = *input.getRef();
+        auto url = fmt("https://%s/%s/%s.git", host, owner, repo);
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Cache::Key refToRevKey{"gitHubRefToRev", {{"url", url}, {"ref", ref}}};
+        auto cached = settings.getCache()->lookupExpired(refToRevKey);
+        if (cached && !cached->expired)
+            return RefInfo{.rev = getRevAttr(cached->value, "rev")};
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
-        auto json = nlohmann::json::parse(
-            store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
-
-        return RefInfo{
-            .rev = Hash::parseAny(std::string{json["sha"]}, HashAlgorithm::SHA1),
-            .treeHash = Hash::parseAny(std::string{json["commit"]["tree"]["sha"]}, HashAlgorithm::SHA1)};
+        auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
+        auto token = getAccessToken(settings, host, hostAndPath).value_or("");
+        try {
+            auto rev = resolveRemoteRef(url, ref, token);
+            settings.getCache()->upsert(refToRevKey, {{"rev", rev.gitRev()}});
+            return RefInfo{.rev = rev};
+        } catch (Error & e) {
+            if (!cached)
+                throw;
+            warn("%s; using cached GitHub revision for ref '%s' of '%s'", e.message(), ref, url);
+            return RefInfo{.rev = getRevAttr(cached->value, "rev")};
+        }
     }
 
     DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override

@@ -56,25 +56,55 @@ let
   };
 
   private-flake-rev = "9f1dd0df5b54a7dc75b618034482ed42ce34383d";
+  annotated-tag-object = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-  private-flake-api = pkgs.runCommand "private-flake" { } ''
-    mkdir -p $out/{commits,tarball}
+  # Build a mock git smart-HTTP ref advertisement (the `info/refs` response
+  # for `git-upload-pack`). `headRev` is advertised as HEAD; `refLines` are the
+  # remaining "<oid> <refname>" advertisement lines.
+  mkGitRefs =
+    name: headRev: refLines:
+    pkgs.runCommand name { } ''
+      mkdir -p $out/info
+      pkt_line() {
+        local content="$1"
+        # length prefix (4) + content + trailing newline (1)
+        local len=$(( ''${#content} + 4 + 1 ))
+        printf '%04x%s\n' "$len" "$content"
+      }
+      # The first ref line carries a trailing null byte separating the ref name
+      # from the server capabilities (git smart HTTP protocol).
+      first_ref_pkt_line() {
+        local content="$1"
+        # length prefix (4) + content + null byte (1) + trailing newline (1)
+        local len=$(( ''${#content} + 4 + 2 ))
+        printf '%04x%s\0\n' "$len" "$content"
+      }
+      {
+        pkt_line "# service=git-upload-pack"
+        printf '0000'
+        first_ref_pkt_line "${headRev} HEAD"
+        ${lib.concatMapStringsSep "\n        " (l: ''pkt_line "${l}"'') refLines}
+        printf '0000'
+      } > $out/info/refs
+    '';
 
-    # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-    echo '{"sha": "${private-flake-rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
+  private-flake-git-refs = mkGitRefs "private-flake-git-refs" private-flake-rev [
+    "${private-flake-rev} refs/heads/master"
+  ];
 
-    # Setup tarball download via API
+  nixpkgs-git-refs = mkGitRefs "nixpkgs-git-refs" nixpkgs.rev [
+    "${nixpkgs.rev} refs/heads/master"
+    "${nixpkgs.rev} refs/pull/357207/head"
+    "${annotated-tag-object} refs/tags/annotated"
+    "${nixpkgs.rev} refs/tags/annotated^{}"
+  ];
+
+  private-flake-tarball = pkgs.runCommand "private-flake-tarball" { } ''
+    mkdir -p $out/tarball
     dir=private-flake
     mkdir $dir
     echo '{ outputs = {...}: {}; }' > $dir/flake.nix
     tar cfz $out/tarball/${private-flake-rev} $dir --hard-dereference
-  '';
-
-  nixpkgs-api = pkgs.runCommand "nixpkgs-flake" { } ''
-    mkdir -p $out/commits
-
-    # Setup https://docs.github.com/en/rest/commits/commits#get-a-commit
-    echo '{"sha": "${nixpkgs.rev}", "commit": {"tree": {"sha": "ffffffffffffffffffffffffffffffffffffffff"}}}' > $out/commits/HEAD
   '';
 
   archive = pkgs.runCommand "nixpkgs-flake" { } ''
@@ -124,12 +154,8 @@ in
           sslServerCert = "${cert}/server.crt";
           servedDirs = [
             {
-              urlPath = "/repos/NixOS/nixpkgs";
-              dir = nixpkgs-api;
-            }
-            {
               urlPath = "/repos/fancy-enterprise/private-flake";
-              dir = private-flake-api;
+              dir = private-flake-tarball;
             }
           ];
         };
@@ -137,10 +163,23 @@ in
           forceSSL = true;
           sslServerKey = "${cert}/server.key";
           sslServerCert = "${cert}/server.crt";
+          extraConfig = ''
+            <LocationMatch "\.git/info/refs$">
+              ForceType application/x-git-upload-pack-advertisement
+            </LocationMatch>
+          '';
           servedDirs = [
             {
               urlPath = "/NixOS/nixpkgs";
               dir = archive;
+            }
+            {
+              urlPath = "/NixOS/nixpkgs.git";
+              dir = nixpkgs-git-refs;
+            }
+            {
+              urlPath = "/fancy-enterprise/private-flake.git";
+              dir = private-flake-git-refs;
             }
           ];
         };
@@ -204,7 +243,18 @@ in
       assert info["revision"] == "${nixpkgs.rev}", f"revision mismatch: {info['revision']} != ${nixpkgs.rev}"
       cat_log()
 
-      # ... otherwise it should use the API
+      out = client.succeed("nix flake metadata github:NixOS/nixpkgs/pull/357207/head --json --tarball-ttl 0")
+      print(out)
+      info = json.loads(out)
+      assert info["revision"] == "${nixpkgs.rev}", f"pull ref revision mismatch: {info['revision']} != ${nixpkgs.rev}"
+
+      out = client.succeed("nix flake metadata github:NixOS/nixpkgs/annotated --json --tarball-ttl 0")
+      print(out)
+      info = json.loads(out)
+      assert info["revision"] == "${nixpkgs.rev}", f"annotated tag revision mismatch: {info['revision']} != ${nixpkgs.rev}"
+
+      # ... otherwise the access token is used to authenticate (passed to the git
+      # credential callback for ref resolution, and to the API for tarball download).
       out = client.succeed("nix flake metadata private-flake --json --access-tokens github.com=ghp_000000000000000000000000000000000000 --tarball-ttl 0")
       print(out)
       info = json.loads(out)
@@ -232,6 +282,9 @@ in
 
       # Shut down the web server. The flake should be cached on the client.
       github.succeed("systemctl stop httpd.service")
+
+      info = json.loads(client.succeed("nix flake metadata github:NixOS/nixpkgs --json --tarball-ttl 0"))
+      assert info["revision"] == "${nixpkgs.rev}", f"cached revision mismatch: {info['revision']} != ${nixpkgs.rev}"
 
       info = json.loads(client.succeed("nix flake metadata nixpkgs --json"))
       date = time.strftime("%Y%m%d%H%M%S", time.gmtime(info['lastModified']))
