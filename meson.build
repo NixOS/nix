@@ -52,6 +52,7 @@ if get_option('unit-tests')
   subproject('libexpr-test-support')
   subproject('libexpr-tests')
   subproject('libflake-tests')
+  subproject('libcmd-tests')
 endif
 
 if get_option('functional-tests')

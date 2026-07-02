@@ -29,6 +29,7 @@
 #include "nix/expr/print.hh"
 #include "nix/util/ref.hh"
 #include "nix/expr/value.hh"
+#include "nix/cmd/repl-completion.hh"
 
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
@@ -271,7 +272,7 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
             }
         } catch (Error &) {
         }
-    } else if ((dot = cur.rfind('.')) == std::string::npos) {
+    } else if ((dot = findLastUnquotedDot(cur)) == std::string::npos) {
         /* This is a variable name; look it up in the current scope. */
         StringSet::iterator i = varNames.lower_bound(cur);
         while (i != varNames.end()) {
@@ -290,7 +291,6 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                attribute set.  Evaluate it to get the names of the
                attributes. */
             auto expr = cur.substr(0, dot);
-            auto cur2 = cur.substr(dot + 1);
 
             Expr * e = parseString(expr);
             Value v;
@@ -300,12 +300,13 @@ StringSet NixRepl::completePrefix(const std::string & prefix)
                 noPos,
                 "while evaluating an attrset for the purpose of completion (this error should not be displayed; file an issue?)");
 
-            for (auto & i : *v.attrs()) {
-                std::string_view name = state->symbols[i.name];
-                if (name.substr(0, cur2.size()) != cur2)
-                    continue;
-                completions.insert(concatStrings(prev, expr, ".", name));
-            }
+            StringSet attrNames;
+            for (auto & i : *v.attrs())
+                attrNames.insert(std::string(state->symbols[i.name]));
+
+            auto matched = matchAttrCompletions(cur, attrNames);
+            for (auto & c : matched)
+                completions.insert(prev + c);
 
         } catch (ParseError & e) {
             // Quietly ignore parse errors.
