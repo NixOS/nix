@@ -278,9 +278,8 @@ TEST(to_string, doesntReencodeUrl)
     auto s = "http://localhost:8181/test/+3d.tar.gz";
     auto flakeref = parseFlakeRef(fetchSettings, s);
     auto unparsed = flakeref.to_string();
-    auto expected = "http://localhost:8181/test/%2B3d.tar.gz";
 
-    ASSERT_EQ(unparsed, expected);
+    ASSERT_EQ(unparsed, s);
 }
 
 TEST(parseFlakeRef, malformedGithubUrlDoesNotCrash)

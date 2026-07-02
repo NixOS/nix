@@ -74,6 +74,38 @@ TEST_F(GitHubInputTest, throwOnInvalidURLParam)
         ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("tag")));
 }
 
+TEST(checkLocks, acceptsEquivalentUrlEncodings)
+{
+    fetchers::Settings settings;
+
+    /* Lock files written by older nix over-encoded sub-delims in URL paths
+       (e.g. `+` as `%2B`). When a final input from such a lock file is compared
+       against the result of a fresh fetch, the `url` field now differs only in
+       encoding. checkLocks must treat these as equal. */
+    auto specified = Input::fromAttrs(
+        settings,
+        Attrs{
+            {"type", Attr("tarball")},
+            {"url", Attr("https://example.org/f/0.1.1618%2Brev-abc/source.tar.gz")},
+            {"narHash", Attr("sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")},
+            {"__final", Attr(Explicit<bool>{true})},
+        });
+
+    auto result = Input::fromAttrs(
+        settings,
+        Attrs{
+            {"type", Attr("tarball")},
+            {"url", Attr("https://example.org/f/0.1.1618+rev-abc/source.tar.gz")},
+            {"narHash", Attr("sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")},
+            {"__final", Attr(Explicit<bool>{true})},
+        });
+
+    EXPECT_NO_THROW(Input::checkLocks(specified, result));
+
+    /* After normalization, result.attrs should contain the canonical form. */
+    EXPECT_EQ(getStrAttr(result.attrs, "url"), "https://example.org/f/0.1.1618+rev-abc/source.tar.gz");
+}
+
 } // namespace fetchers
 
 } // namespace nix

@@ -535,6 +535,29 @@ INSTANTIATE_TEST_SUITE_P(
                 },
         },
         ParseURLSuccessCase{
+            .input = "file:///tmp/nix-build-foo-1.0+3.drv-0/cache",
+            .expected =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = Authority{},
+                    .path = {"", "tmp", "nix-build-foo-1.0+3.drv-0", "cache"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
+            // all RFC 3986 sub-delims in one segment
+            .input = "file:///seg!$&'()*+,;=ment",
+            .expected =
+                ParsedURL{
+                    .scheme = "file",
+                    .authority = Authority{},
+                    .path = {"", "seg!$&'()*+,;=ment"},
+                    .query = (StringMap) {},
+                    .fragment = "",
+                },
+        },
+        ParseURLSuccessCase{
             .input = "https://www.example.org/file.tar.gz?download=fast&when=now#hello",
             .expected =
                 ParsedURL{
