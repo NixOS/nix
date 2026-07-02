@@ -145,6 +145,7 @@ void RemoteStore::setOptions(Connection & conn)
     overrides.erase(settings.getWorkerSettings().useSubstitutes.name);
     overrides.erase(loggerSettings.showTrace.name);
     overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
+    overrides.erase(settings.useXDGBaseDirectories.name);
     overrides.erase("plugin-files");
     conn.to << overrides.size();
     for (auto & i : overrides)
