@@ -125,6 +125,9 @@ std::optional<std::string> Input::getFingerprint(Store & store) const
 
     auto fingerprint = scheme->getFingerprint(store, *this);
 
+    if (fingerprint)
+        fingerprint = std::string(scheme->schemeName()) + ":" + *fingerprint;
+
     cachedFingerprint = fingerprint;
 
     return fingerprint;
