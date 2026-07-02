@@ -126,7 +126,7 @@ The rules are:
 
 ## Anticipate where help is needed
 
-Even better then requiring the user to search for help is to anticipate and
+Even better than requiring the user to search for help is to anticipate and
 predict when user might need it. Either because the lack of discoverability,
 typo in the input or simply taking the opportunity to teach the user of
 interesting - but less visible - details.
@@ -136,7 +136,7 @@ interesting - but less visible - details.
 This type of help is most common and almost expected by users. We need to
 **provide the best shell completion** for `bash`, `zsh` and `fish`.
 
-Completion needs to be **context aware**, this mean when a user types:
+Completion needs to be **context aware**, this means when a user types:
 
 ```shell
 $ nix build n<TAB>
@@ -175,7 +175,7 @@ $ nix init --template=template#python
   Error! Template `template#python` not found.
 ------------------------------------------------------------------------
 Initializing Nix project at `/path/to/here`.
-      Select a template for you new project:
+      Select a template for your new project:
           |> template#python
              template#python-pip
              template#python-poetry
@@ -284,7 +284,7 @@ A place to use prompt and provide user with interactive select
 ```shell
 $ nix init
 Initializing Nix project at `/path/to/here`.
-      Select a template for you new project:
+      Select a template for your new project:
           |> py
              template#python-pip
              template#python-poetry
@@ -393,7 +393,7 @@ status section, but only print warnings and errors.
 
 CLIs don't always make it clear when an action has taken place. For every
 action a user performs, your CLI should provide an equal and appropriate
-reaction, clearly highlighting the what just happened. For example:
+reaction, clearly highlighting what just happened. For example:
 
 ```shell
 $ nix build
@@ -471,7 +471,7 @@ implemented only with ASCII characters and will be used when `--ascii` option
 is going to be passed in. Please make sure that you test your output also
 without Unicode characters
 
-More they showing all the different Unicode characters it is important to
+Rather than showing all the different Unicode characters it is important to
 **establish common set of characters** that we use for certain situations.
 
 ## Emojis
@@ -504,11 +504,11 @@ table header, for more the table can be manipulated by the following options:
 
 Interactive output was selected to be able to strike the balance between
 beginners and advance users. While the default output will target beginners it
-can, with a few key strokes, be changed into and advance introspection tool.
+can, with a few key strokes, be changed into an advanced introspection tool.
 
 ### Progress
 
-For longer running commands we should provide and overview the progress.
+For longer running commands we should provide an overview of the progress.
 This is shown best in `nix build` example:
 
 ```shell
@@ -538,7 +538,7 @@ Use a `fzf` like fuzzy search when there are multiple options to choose from.
 ```shell
 $ nix init
 Initializing Nix project at `/path/to/here`.
-      Select a template for you new project:
+      Select a template for your new project:
           |> py
              template#python-pip
              template#python-poetry
