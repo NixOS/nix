@@ -51,7 +51,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             self(make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrv, outputName}), childNode);
     };
 
-    for (const auto & [inputDrvPath, inputNode] : drv->inputDrvs.map) {
+    for (const auto & [inputDrvPath, inputNode] : drv->inputs.drvs.map) {
         /* Ensure that pure, non-fixed-output derivations don't
            depend on impure derivations. */
         if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
@@ -133,7 +133,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             }
             assert(attempt);
 
-            auto pathResolved = computeStorePath(worker.store, Derivation{*attempt});
+            auto pathResolved = computeStorePath(worker.store, attempt->unresolve());
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",
