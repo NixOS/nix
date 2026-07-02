@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/expr/eval-settings.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/memory-source-accessor.hh"
 
 #include "nix/expr/tests/libexpr.hh"
@@ -863,18 +864,50 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST_F(PrimOpTest, replaceStrings)
 {
-    // FIXME: add a test that verifies the string context is as expected
     auto v = eval("builtins.replaceStrings [\"oo\" \"a\"] [\"a\" \"i\"] \"foobar\"");
     ASSERT_EQ(v.type(), nString);
     ASSERT_EQ(v.string_view(), "fabir");
 }
 
+TEST_F(PrimOpTest, replaceStringsContext)
+{
+    settings.readOnlyMode = true;
+    auto v = eval(R"(
+        let
+          drv1 = derivation { name = "a"; builder = "a"; system = "a"; };
+          drv2 = derivation { name = "b"; builder = "b"; system = "b"; };
+          result = builtins.replaceStrings ["x"] ["${drv1}"] "x${drv2}";
+          expected = {
+            ${builtins.unsafeDiscardStringContext drv1.drvPath} = { outputs = ["out"]; };
+            ${builtins.unsafeDiscardStringContext drv2.drvPath} = { outputs = ["out"]; };
+          };
+        in builtins.getContext result == expected
+    )");
+    ASSERT_THAT(v, IsTrue());
+}
+
 TEST_F(PrimOpTest, concatStringsSep)
 {
-    // FIXME: add a test that verifies the string context is as expected
     auto v = eval("builtins.concatStringsSep \"%\" [\"foo\" \"bar\" \"baz\"]");
     ASSERT_EQ(v.type(), nString);
     ASSERT_EQ(v.string_view(), "foo%bar%baz");
+}
+
+TEST_F(PrimOpTest, concatStringsSepContext)
+{
+    settings.readOnlyMode = true;
+    auto v = eval(R"(
+        let
+          drv1 = derivation { name = "a"; builder = "a"; system = "a"; };
+          drv2 = derivation { name = "b"; builder = "b"; system = "b"; };
+          result = builtins.concatStringsSep "${drv1}" ["x" "${drv2}"];
+          expected = {
+            ${builtins.unsafeDiscardStringContext drv1.drvPath} = { outputs = ["out"]; };
+            ${builtins.unsafeDiscardStringContext drv2.drvPath} = { outputs = ["out"]; };
+          };
+        in builtins.getContext result == expected
+    )");
+    ASSERT_THAT(v, IsTrue());
 }
 
 TEST_F(PrimOpTest, split1)
