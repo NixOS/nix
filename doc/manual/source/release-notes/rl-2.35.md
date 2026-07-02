@@ -346,6 +346,8 @@
 
 - Fixed build failures on systems with the `unprivileged_userns_clone=0` kernel option [#15131](https://github.com/NixOS/nix/pull/15131).
 
+- Fixed a race wherein the garbage collector could delete paths being used by a build [#15992](https://github.com/NixOS/nix/pull/15992).
+
 ## Contributors
 
 This release was made possible by the following 58 contributors:
