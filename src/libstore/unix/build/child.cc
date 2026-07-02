@@ -3,6 +3,7 @@
 #include "nix/util/logging.hh"
 
 #include <fcntl.h>
+#include <signal.h>
 #include <unistd.h>
 
 namespace nix {
@@ -13,6 +14,22 @@ void commonChildInit()
 
     const static std::string pathNullDevice = "/dev/null";
     restoreProcessContext(false);
+
+    /* Reset all signal dispositions to SIG_DFL. The process that started
+       the daemon (typically systemd) may have set SIG_IGN for certain
+       signals, and ignored signal dispositions survive both fork() and
+       execve(). Without this reset, builds are non-deterministic depending
+       on how the daemon was started. */
+    {
+        struct sigaction act = {};
+        act.sa_handler = SIG_DFL;
+        sigemptyset(&act.sa_mask);
+        for (int sig = 1; sig < NSIG; sig++) {
+            if (sig == SIGKILL || sig == SIGSTOP)
+                continue;
+            sigaction(sig, &act, nullptr);
+        }
+    }
 
     /* Put the child in a separate session (and thus a separate
        process group) so that it has no controlling terminal (meaning

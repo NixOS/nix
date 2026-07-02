@@ -208,6 +208,8 @@ in
 
   storeRemount = runNixOSTest ./store-remount.nix;
 
+  signalDisposition = runNixOSTest ./signal-disposition;
+
   upgrade-nix = runNixOSTest {
     imports = [ ./upgrade-nix.nix ];
     upgrade-nix.oldNix = nixComponents.nix-cli;
