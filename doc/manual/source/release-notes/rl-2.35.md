@@ -86,7 +86,7 @@
 
   Per-substituter overrides are available as store reference parameters ([`retry-delay`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-delay), [`retry-delay-rate-limited`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-delay-rate-limited), [`retry-max-delay`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-max-delay), [`retry-attempts`](@docroot@/store/types/http-binary-cache-store.md#store-http-binary-cache-store-retry-attempts)), e.g. `s3://my-cache?retry-attempts=8`.
 
-- Improve daemon socket path logic for chroot stores [#15429](https://github.com/NixOS/nix/pull/15429)
+- Improve daemon socket path logic for chroot stores [#15190](https://github.com/NixOS/nix/pull/15190)
 
   The default daemon socket path now uses the per-store [`state`](@docroot@/store/types/local-store.md#store-local-store-state) directory whenever one is defined, rather than always using the global [`NIX_STATE_DIR`](@docroot@/command-ref/env-common.md#env-NIX_STATE_DIR).
   This means [local chroot stores](@docroot@/store/types/local-store.md#chroot) each get their own socket path automatically.
@@ -152,13 +152,7 @@
   builtins.fetchTree { type = "git"; url = "host:/path/to/repo"; }
   ```
 
-- nix flake check now supports --out-link [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
-
-  `nix flake check` now supports the flag `--out-link`, defaulting to not creating out links if the flag is not specified.
-
-- nix flake check now supports --print-out-paths [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476)
-
-  `nix flake check` now supports the flag `--print-out-paths`.
+- `nix flake check` now supports `--print-out-paths` [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476) and `--out-link` [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476) defaulting to not creating out links if the flag is not specified.
 
 - Added `--skip-alive` option to `nix store delete` for collecting garbage within a closure [#7239](https://github.com/NixOS/nix/issues/7239) [#15236](https://github.com/NixOS/nix/pull/15236) [#15727](https://github.com/NixOS/nix/pull/15727)
 
@@ -169,6 +163,16 @@
 
   `builtins.getFlake` now accepts path values in addition to flakerefs. This improves the usability of relative flakes, allowing you to write `builtins.getFlake ./subflake`.
   This change does not allow specifying paths that are not already in the store (though they do not have valid store objects, i.e. this will not force a copy if the flake has only been hashed -- and not copied to the store). This may change in a future release.
+
+- `nix-profile.fish` and `nix-profile-daemon.fish` now use `$NIX_LINK` for computing the value of `NIX_PROFILE` instead of `$HOME/.nix-profile` [#14293](https://github.com/NixOS/nix/pull/14293)
+
+- The computed Git LFS endpoint URLs have been fixed to follow the spec [#15891](https://github.com/NixOS/nix/pull/15891) and memory usage of LFS fetches has been decreased [#15912](https://github.com/NixOS/nix/pull/15912).
+
+- Primop documentation now includes time complexity information [#14554](https://github.com/NixOS/nix/pull/14554).
+
+- Improved documentation on store paths and derivation building [#14699](https://github.com/NixOS/nix/pull/14699).
+
+- The build hook is now killed with `SIGTERM` instead of `SIGKILL` [#15105](https://github.com/NixOS/nix/pull/15105).
 
 ## Backwards incompatible changes
 
@@ -337,6 +341,8 @@
 
   Both providers are now part of the chain, ordered to match the pre-2.33 behaviour.
   As in both the old and new AWS SDK default chains, ECS and IMDS are mutually exclusive: when container credential environment variables are set, IMDS is skipped.
+
+- Fixed build failures on systems with the `unprivileged_userns_clone=0` kernel option [#15131](https://github.com/NixOS/nix/pull/15131).
 
 ## Contributors
 
