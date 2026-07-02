@@ -96,8 +96,9 @@ std::pair<StorePath, Hash> fetchToStore2(
     Activity act(
         *logger,
         lvlChatty,
-        actUnknown,
-        fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path));
+        actFetchToStore,
+        fmt(mode == FetchMode::DryRun ? "hashing '%s'" : "copying '%s' to the store", path),
+        {path.to_string(), (uint64_t) (mode == FetchMode::DryRun)});
 
     auto filter2 = filter ? *filter : defaultPathFilter;
 
@@ -133,6 +134,8 @@ std::pair<StorePath, Hash> fetchToStore2(
                       hash.to_string(HashFormat::SRI, true));
                   return std::make_pair(storePath, hash);
               }();
+
+    act.result(resFetchToStore, store.printStorePath(storePath));
 
     if (cacheKey)
         settings.getCache()->upsert(*cacheKey, {{"hash", hash.to_string(HashFormat::SRI, true)}});
