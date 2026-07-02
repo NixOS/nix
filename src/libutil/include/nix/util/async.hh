@@ -95,10 +95,14 @@ asio::awaitable<void> forEachAsync(Range && range, const F & f)
     auto pending = std::ranges::size(range);
     if (pending == 0)
         co_return;
+    else if (pending == 1)
+        co_return co_await f(*range.begin());
 
     auto executor = co_await asio::this_coro::executor;
     std::exception_ptr err;
 
+    /* TODO: Handle cancellation on first error. Not very useful for now since we
+       do all-or-nothing cancellation typically. */
     co_await asio::async_initiate<decltype(asio::use_awaitable), void(std::exception_ptr)>(
         [&](auto handler) {
             auto h = std::make_shared<decltype(handler)>(std::move(handler));
