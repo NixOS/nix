@@ -154,7 +154,7 @@
 
 - `nix flake check` now supports `--print-out-paths` [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476) and `--out-link` [#13470](https://github.com/NixOS/nix/issues/13470) [#15476](https://github.com/NixOS/nix/pull/15476) defaulting to not creating out links if the flag is not specified.
 
-- Added `--skip-alive` option to `nix store delete` for collecting garbage within a closure [#7239](https://github.com/NixOS/nix/issues/7239) [#15236](https://github.com/NixOS/nix/pull/15236) [#15727](https://github.com/NixOS/nix/pull/15727)
+- Added `--skip-alive` (and `--skip-live` alias for compatibility with Lix users) option to `nix store delete` for collecting garbage within a closure [#7239](https://github.com/NixOS/nix/issues/7239) [#15236](https://github.com/NixOS/nix/pull/15236) [#15727](https://github.com/NixOS/nix/pull/15727)
 
   `nix store delete --recursive --skip-alive` can be used to collect garbage within a closure, in which case it will only collect the dead paths that are part of the closure of its arguments.
   The additional option `--also-referrers` is added to support this mode, which allows referrers of paths in the closure to also be deleted.
