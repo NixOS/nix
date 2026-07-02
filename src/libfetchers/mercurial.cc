@@ -225,8 +225,6 @@ struct MercurialInputScheme : InputScheme
                 if (settings.warnDirty)
                     warn("Mercurial tree '%s' is unclean", PathFmt{localPath});
 
-                input.attrs.insert_or_assign("ref", chomp(runHg({OS_STR("branch"), OS_STR("-R"), localPath.native()})));
-
                 auto files = tokenizeString<StringSet>(
                     runHg({
                         OS_STR("status"),
@@ -401,6 +399,9 @@ struct MercurialInputScheme : InputScheme
 
         auto storePath = fetchToStore(settings, store, input);
         auto accessor = store.requireStoreObjectAccessor(storePath);
+
+        if (!input.getRev())
+            accessor->fingerprint = store.queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true);
 
         accessor->setPathDisplay("«" + input.to_string() + "»");
 
