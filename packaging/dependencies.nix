@@ -56,6 +56,34 @@ scope: {
     useTBB = !(stdenv.hostPlatform.isWindows || stdenv.hostPlatform.isStatic);
   };
 
+  # Force the s2n TLS backend in aws-c-io on macOS; Apple SecureTransport is not
+  # fork-safe and crashes daemon workers (NixOS/nix#15857). Override it across
+  # the whole aws-c-* stack so one aws-c-io is shared.
+  aws-crt-cpp =
+    if !stdenv.hostPlatform.isDarwin then
+      pkgs.aws-crt-cpp
+    else
+      let
+        aws-c-io = pkgs.aws-c-io.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ ./aws-c-io-s2n-darwin.patch ];
+        });
+        aws-c-http = pkgs.aws-c-http.override { inherit aws-c-io; };
+        aws-c-auth = pkgs.aws-c-auth.override { inherit aws-c-io aws-c-http; };
+        aws-c-event-stream = pkgs.aws-c-event-stream.override { inherit aws-c-io; };
+        aws-c-mqtt = pkgs.aws-c-mqtt.override { inherit aws-c-io aws-c-http; };
+        aws-c-s3 = pkgs.aws-c-s3.override { inherit aws-c-io aws-c-http aws-c-auth; };
+      in
+      pkgs.aws-crt-cpp.override {
+        inherit
+          aws-c-io
+          aws-c-http
+          aws-c-auth
+          aws-c-event-stream
+          aws-c-mqtt
+          aws-c-s3
+          ;
+      };
+
   libgit2 =
     if lib.versionAtLeast pkgs.libgit2.version "1.9.3" then
       pkgs.libgit2
