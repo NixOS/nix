@@ -114,6 +114,12 @@ struct CmdSearch : InstallableValueCommand, MixJSON
                             work,
                             std::string_view(state->symbols[attr]).find("Packages") != std::string_view::npos ? 0 : 2,
                             [cursor2, attrPath2, visit]() { visit(*cursor2, attrPath2, false); });
+                        /* Spawn incrementally rather than after the whole
+                           enumeration, so that idle worker threads can start
+                           on the first attributes while we're still
+                           enumerating the rest. */
+                        if (work.size() >= 256)
+                            futures.spawn(std::exchange(work, {}));
                     }
                     futures.spawn(std::move(work));
                 };
