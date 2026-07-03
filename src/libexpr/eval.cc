@@ -106,7 +106,42 @@ const StringData & StringData::make(EvalMemory & mem, std::string_view s)
 
 RootValue allocRootValue(Value * v)
 {
-    return std::allocate_shared<Value *>(traceable_allocator<Value *>(), v);
+#if NIX_USE_BOEHMGC
+    /* Root slots are carved out of uncollectable slabs, which are
+       permanently part of the GC root set, and recycled through a free
+       list. This avoids doing a GC_MALLOC_UNCOLLECTABLE() / GC_FREE()
+       pair per root value, which requires taking the global GC
+       allocation lock — a significant source of contention during
+       parallel evaluation. Never destroyed since root values held by
+       other statics may be released after us during shutdown. */
+    static auto & pool = *new Sync<std::vector<Value **>>;
+
+    Value ** slot;
+    {
+        auto pool_(pool.lock());
+        if (pool_->empty()) {
+            constexpr size_t slabSize = 4096;
+            auto slab = (Value **) GC_MALLOC_UNCOLLECTABLE(slabSize * sizeof(Value *));
+            if (!slab)
+                throw std::bad_alloc();
+            pool_->reserve(slabSize);
+            for (size_t i = 0; i < slabSize; ++i)
+                pool_->push_back(slab + i);
+        }
+        slot = pool_->back();
+        pool_->pop_back();
+    }
+
+    *slot = v;
+
+    return RootValue(slot, [](Value ** slot) {
+        /* Clear the slot so it doesn't keep the value alive. */
+        *slot = nullptr;
+        pool.lock()->push_back(slot);
+    });
+#else
+    return std::make_shared<Value *>(v);
+#endif
 }
 
 // Pretty print types for assertion errors
