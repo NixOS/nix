@@ -1,0 +1,75 @@
+Raw measurement output. Machine: AMD Ryzen 9 5950X (16C/32T), governor=powersave,
+boost on, perf_event_paranoid=2. Pinned taskset -c 4-7, setarch -R, 3 warmups
+discarded. Nix master b41781ed0 (2.35.0-dev), GCC 15.2.0. See report.md for analysis.
+
+======================================================================
+INTERPOSITION A/B  (same source, GCC release, flags off vs on)
+  base   = 0 compile units with -fno-semantic-interposition
+  interp = 325 compile units; both emit identical output derivation
+======================================================================
+### baseline (round 1, reps=20)
+    25,957,357,076  instructions:u   ( +- 0.00% )
+    15,074,572,778  cycles:u         ( +- 0.38% )
+          4,560.73  msec task-clock   ( +- 0.70% )
+       4.706586066  s wall           ( +- 0.75% )
+### interp (round 1, reps=20)
+    23,455,718,985  instructions:u   ( +- 0.00% )
+    13,199,852,587  cycles:u         ( +- 0.29% )
+          4,073.78  msec task-clock   ( +- 0.64% )
+       4.196755132  s wall           ( +- 0.57% )
+### interp (round 2, run FIRST, reps=15)   -- order-reversed confirmation
+    23,455,838,297  instructions:u   ( +- 0.00% )
+    13,237,078,034  cycles:u         ( +- 0.29% )
+### baseline (round 2, run SECOND, reps=15)
+    25,957,287,971  instructions:u   ( +- 0.00% )
+    14,968,237,510  cycles:u         ( +- 0.49% )
+=> instructions -9.6% (deterministic, order-independent); cycles ~-12%; wall ~-10.5%
+
+======================================================================
+PURE vs IMPURE  (same 2.35 master binary, identical nixpkgs 3aa71a66)
+======================================================================
+### impure (<nixpkgs>, reps=15)
+    23,772,869,745  instructions:u   ( +- 0.00% )
+    13,329,609,484  cycles:u         ( +- 0.30% )
+          4,147.19  msec task-clock   ( +- 0.73% )
+       4.286918486  s wall           ( +- 0.74% )
+### pure (flake, reps=15)
+    24,834,638,400  instructions:u   ( +- 0.00% )
+    14,597,730,818  cycles:u         ( +- 0.18% )
+          4,788.42  msec task-clock   ( +- 0.56% )
+       5.220266882  s wall           ( +- 0.61% )
+=> pure +4.5% instr, +9.5% cyc, +21.8% wall; off-CPU (wall-taskclock) 140ms->432ms
+
+======================================================================
+VERSION 2.32.1 vs 2.35 master  (impure, identical nixpkgs)
+======================================================================
+### 2.32.1 installed (reps=15)
+    29,918,514,457  instructions:u   ( +- 0.00% )
+    15,644,098,943  cycles:u         ( +- 0.28% )
+       5.035442100  s wall           ( +- 0.54% )
+### 2.35.0 master (reps=15)
+    23,773,062,209  instructions:u   ( +- 0.00% )
+    13,862,658,759  cycles:u         ( +- 0.59% )
+       4.354017785  s wall           ( +- 0.76% )
+=> 2.35 uses -20.5% instructions (-6.15 G) vs 2.32.1
+
+======================================================================
+FLAMEGRAPH weighted sample shares (symbol-rich build-interp, --call-graph dwarf)
+======================================================================
+impure   fetchToStore=0.9%   hashing=1.7%   parser=19.8%   GC=22.2%
+pure     fetchToStore=10.3%  hashing=1.9%   parser=16.2%   GC=20.3%
+=> store-copy (fetchToStore) 0.9% -> 10.3% pure; eval is parser(~20%)+GC(~22%) bound
+
+======================================================================
+TARBALL CACHE  git multi-pack-index write/repack/expire  (on a copy)
+======================================================================
+before: 155 packs, 322 MB
+after :   1 pack + MIDX, 194 MB (-40% disk)
+bulk  scan  (--batch-all-objects): 155.9ms +- 11.9ms  ->  154.0ms +- 16.4ms  (no change)
+random 20k-OID lookup            :  67.3ms +- 10.2ms  ->   40.6ms +-  2.7ms  (-40%, 1.66x)
+
+======================================================================
+SQLITE VACUUM  (on copies)
+======================================================================
+fetcher-cache-v4.sqlite : 166 MB (freelist 0)        -> 151 MB  reclaimed 15 MB    1.9 s
+/nix/var/nix/db/db.sqlite: 3.4 GB (freelist 765844)  -> 345 MB  reclaimed 3.1 GB  40.9 s
