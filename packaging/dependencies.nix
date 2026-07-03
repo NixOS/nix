@@ -22,6 +22,14 @@ scope: {
       inherit stdenv;
     }).overrideAttrs
       (attrs: {
+        # Reduce contention on the GC allocation lock during parallel
+        # evaluation by handing out multiple heap blocks worth of
+        # objects per lock acquisition in GC_generic_malloc_many().
+        # The default batch size is set via GC_MANY_BLOCKS_DEFAULT
+        # below and can be overridden at runtime through the
+        # GC_MALLOC_MANY_BLOCKS environment variable.
+        patches = (attrs.patches or [ ]) ++ [ ./patches/boehmgc-batch-malloc-many.patch ];
+
         env = (attrs.env or { }) // {
           # Increase the initial mark stack size to avoid stack
           # overflows, since these inhibit parallel marking (see
@@ -32,6 +40,7 @@ scope: {
           NIX_CFLAGS_COMPILE = toString (
             [
               "-DINITIAL_MARK_STACK_SIZE=1048576"
+              "-DGC_MANY_BLOCKS_DEFAULT=64"
             ]
             # For some reason that is not clear, it is wanting to use libgcc_eh which is not available.
             # Force this to be built with compiler-rt & libunwind over libgcc_eh works.
