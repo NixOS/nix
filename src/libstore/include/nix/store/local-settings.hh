@@ -23,6 +23,21 @@ SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
 template<>
 std::string BaseSetting<SandboxMode>::to_string() const;
 
+/**
+ * What to do when a store path hash rewrite would invalidate a
+ * Mach-O code signature. See `macho-signature-rewrite-check`.
+ */
+enum struct MachOSignatureCheck {
+    Ignore,
+    Warn,
+    Refuse,
+};
+
+template<>
+MachOSignatureCheck BaseSetting<MachOSignatureCheck>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<MachOSignatureCheck>::to_string() const;
+
 template<>
 PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
 template<>
@@ -493,6 +508,45 @@ public:
         "darwin-log-sandbox-violations",
         "Whether to log Darwin sandbox access violations to the system log."};
 #endif
+
+    Setting<MachOSignatureCheck> machOSignatureRewriteCheck{
+        this,
+        MachOSignatureCheck::Refuse,
+        "macho-signature-rewrite-check",
+        R"(
+          What to do when registering a build output would require
+          rewriting store path hashes inside a Mach-O file that carries
+          a code signature (`LC_CODE_SIGNATURE`). The rewrite changes
+          bytes that the signature's page hashes cover, so the
+          resulting binary is killed by the macOS kernel when it is
+          first executed (see
+          [nixpkgs#507531](https://github.com/NixOS/nixpkgs/issues/507531)).
+
+          The rewrite happens when an output being built already exists
+          in the store at build start — for example after a partial
+          substitution, a `nix-store --delete` of one output of a
+          multi-output derivation, or `--check` — and the freshly built
+          output embeds that path. Content-addressed builds hit it on
+          every cold build of a self-referential signed binary.
+
+          - `refuse` (default): fail the build with an error naming the
+            affected files and the already-present store paths whose
+            deletion allows a clean rebuild. Note that this makes
+            `--check` / `--rebuild` of a signed self-referential binary
+            fail with this error (previously reported as a spurious
+            non-determinism failure), and makes content-addressed cold
+            builds of such binaries fail rather than register a
+            silently broken output.
+
+          - `warn`: print a warning for each affected file, then
+            register the output anyway (with its now-invalid
+            signature).
+
+          - `ignore`: rewrite silently, without checking.
+
+          The check is content-based, so it also fires when
+          cross-building darwin binaries on other platforms.
+        )"};
 
     Setting<bool> runDiffHook{
         this,

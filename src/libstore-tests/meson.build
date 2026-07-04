@@ -95,6 +95,12 @@ sources = files(
   'write-derivation.cc',
 )
 
+if host_machine.system() != 'windows'
+  sources += files(
+    'macho-signature.cc',
+  )
+endif
+
 include_dirs = [ include_directories('.') ]
 
 

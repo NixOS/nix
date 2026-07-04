@@ -364,6 +364,50 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
     });
 }
 
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    MachOSignatureCheck,
+    {
+        {MachOSignatureCheck::Ignore, "ignore"},
+        {MachOSignatureCheck::Warn, "warn"},
+        {MachOSignatureCheck::Refuse, "refuse"},
+    });
+
+template<>
+MachOSignatureCheck BaseSetting<MachOSignatureCheck>::parse(const std::string & str) const
+{
+    if (str == "ignore")
+        return MachOSignatureCheck::Ignore;
+    else if (str == "warn")
+        return MachOSignatureCheck::Warn;
+    else if (str == "refuse")
+        return MachOSignatureCheck::Refuse;
+    else
+        throw UsageError("option '%s' has invalid value '%s', expected 'ignore', 'warn', or 'refuse'", name, str);
+}
+
+template<>
+struct BaseSetting<MachOSignatureCheck>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<>
+std::string BaseSetting<MachOSignatureCheck>::to_string() const
+{
+    switch (value) {
+    case MachOSignatureCheck::Ignore:
+        return "ignore";
+    case MachOSignatureCheck::Warn:
+        return "warn";
+    case MachOSignatureCheck::Refuse:
+        return "refuse";
+    }
+    unreachable();
+}
+
+template class BaseSetting<MachOSignatureCheck>;
+
+
 void to_json(nlohmann::json & j, const ChrootPath & cp)
 {
     j = nlohmann::json{{"source", cp.source.string()}, {"optional", cp.optional}};

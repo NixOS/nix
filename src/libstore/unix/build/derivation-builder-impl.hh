@@ -2,6 +2,7 @@
 
 #include "nix/store/aws-creds.hh"
 #include "nix/store/build/derivation-builder.hh"
+#include "nix/store/macho-signature.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/user-lock.hh"
@@ -365,6 +366,33 @@ private:
      * as valid.
      */
     SingleDrvOutputs registerOutputs();
+
+    /**
+     * Enforce the `macho-signature-rewrite-check` setting: before
+     * `rewriteOutput` applies `rewrites` to the output at
+     * `actualPath`, refuse (or warn) if the rewrite would modify
+     * bytes covered by a Mach-O code signature.
+     *
+     * @param caSelfRef Whether this is the self-reference rewrite of
+     * a content-addressed output (never repairable: no consistent
+     * page hash exists, and no rebuild can avoid the rewrite).
+     */
+    void checkRewritesDontBreakMachOSignatures(
+        const std::filesystem::path & actualPath,
+        const std::string & outputName,
+        const StringMap & rewrites,
+        bool caSelfRef);
+
+    /**
+     * Refuse the output at `actualPath`: delete it and throw the
+     * `macho-signature-rewrite-check` build error.
+     */
+    [[noreturn]] void throwMachOSignatureRefusal(
+        const std::vector<MachOSignatureRewriteHit> & hits,
+        const std::filesystem::path & actualPath,
+        const std::string & outputName,
+        bool caSelfRef,
+        std::string_view extraNote);
 
 protected:
 

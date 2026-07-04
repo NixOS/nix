@@ -52,6 +52,7 @@
 #include "build/derivation-check.hh"
 
 #include "derivation-builder-impl.hh"
+#include "nix/store/macho-signature.hh"
 
 #ifdef __linux__
 #  include "chroot-linux-derivation-builder.hh"
@@ -1066,6 +1067,113 @@ void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & en
     execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
+void DerivationBuilderImpl::checkRewritesDontBreakMachOSignatures(
+    const std::filesystem::path & actualPath,
+    const std::string & outputName,
+    const StringMap & rewrites,
+    bool caSelfRef)
+{
+    auto mode = localSettings.machOSignatureRewriteCheck.get();
+    if (mode == MachOSignatureCheck::Ignore)
+        return;
+
+    StringSet hashParts;
+    for (auto & [from, _to] : rewrites)
+        hashParts.insert(from);
+
+    auto hits = scanForMachOSignatureRewrites(actualPath, hashParts);
+    if (hits.empty())
+        return;
+
+    if (mode == MachOSignatureCheck::Warn) {
+        for (auto & hit : hits)
+            warn(
+                "rewriting store path hashes inside %s (output '%s' of '%s') invalidates its macOS code signature; "
+                "the binary will be killed by the kernel when it is first executed",
+                PathFmt(hit.path),
+                outputName,
+                store.printStorePath(drvPath));
+        return;
+    }
+
+    throwMachOSignatureRefusal(hits, actualPath, outputName, caSelfRef, "");
+}
+
+void DerivationBuilderImpl::throwMachOSignatureRefusal(
+    const std::vector<MachOSignatureRewriteHit> & hits,
+    const std::filesystem::path & actualPath,
+    const std::string & outputName,
+    bool caSelfRef,
+    std::string_view extraNote)
+{
+    std::string files;
+    bool anyCms = false, anyUnchecked = false;
+    for (auto & hit : hits) {
+        std::string_view annotation = hit.kind == MachOSignatureKind::Cms ? "  (CMS-signed)"
+                                      : hit.kind == MachOSignatureKind::Unchecked
+                                          ? "  (too large to inspect; assumed signed)"
+                                          : "";
+        files += fmt("\n  %s%s", PathFmt(hit.path), annotation);
+        anyCms = anyCms || hit.kind == MachOSignatureKind::Cms;
+        anyUnchecked = anyUnchecked || hit.kind == MachOSignatureKind::Unchecked;
+    }
+
+    std::string remediation{extraNote};
+    if (caSelfRef)
+        /* The self-reference rewrite of a content-addressed output:
+           the final hash is only known after the build, so no rebuild
+           can avoid the rewrite. */
+        remediation +=
+            "\nThe output is content-addressed and the signed file embeds its own output path, "
+            "so no rebuild can currently preserve the signature.";
+    else {
+        Strings presentPaths;
+        for (auto & [name, status] : initialOutputs)
+            if (status.known && status.known->isPresent())
+                presentPaths.push_back(store.printStorePath(status.known->path));
+        if (!presentPaths.empty())
+            remediation +=
+                fmt("\nThe rewrite is needed because the following outputs were already present in the store "
+                    "when the build started:\n  %s\n"
+                    "Delete them (`nix-store --delete <path>`) and build again to get correctly signed binaries.",
+                    concatStringsSep("\n  ", presentPaths));
+        else
+            /* Nothing was present at build start, so the rewrite maps
+               a content-addressed sibling output built in this run:
+               its final hash was likewise unknown while the file was
+               being signed, and no rebuild avoids the rewrite. */
+            remediation +=
+                "\nThe signed file embeds the path of a content-addressed output whose final hash is "
+                "only known after the build, so no rebuild can currently preserve the signature.";
+    }
+
+    if (anyCms)
+        remediation += "\nFiles marked CMS-signed cannot be re-signed without the original signing identity.";
+    if (anyUnchecked)
+        remediation +=
+            fmt("\nFiles larger than %d MiB are not parsed; if such a file is certainly unsigned, "
+                "set `macho-signature-rewrite-check = warn` to proceed.",
+                512);
+
+    /* Delete the rejected output before failing. A floating CA
+       output sits at a fallback scratch path that — unlike a known
+       output path — is not deleted at the start of the next build,
+       so leaving it in place would make a retry's builder fail with
+       a permission error instead of reproducing this error. */
+    deletePath(actualPath);
+
+    throw BuildError(
+        BuildResult::Failure::OutputRejected,
+        "refusing to rewrite store path hashes inside signed Mach-O file(s) of output '%s' of '%s':%s\n"
+        "The rewrite would modify bytes covered by the signature's page hashes, and macOS kills such "
+        "binaries when they are first executed.%s\n"
+        "Set `macho-signature-rewrite-check = warn` to allow registering the broken output anyway.",
+        outputName,
+        store.printStorePath(drvPath),
+        files,
+        remediation);
+}
+
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 {
     std::map<std::string, ValidPathInfo> infos;
@@ -1278,9 +1386,11 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             continue;
         auto references = *referencesOpt;
 
-        auto rewriteOutput = [&](const StringMap & rewrites) {
+        auto rewriteOutput = [&](const StringMap & rewrites, bool caSelfRef = false) {
             /* Apply hash rewriting if necessary. */
             if (!rewrites.empty()) {
+                checkRewritesDontBreakMachOSignatures(actualPath, outputName, rewrites, caSelfRef);
+
                 debug("rewriting hashes in %1%; cross fingers", PathFmt(actualPath));
 
                 /* FIXME: Is this actually streaming? */
@@ -1354,7 +1464,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         "since recursive hashing is not enabled (one of outputHashMode={flat,text} is true)",
                         PathFmt(actualPath));
             }
-            rewriteOutput(outputRewrites);
+            rewriteOutput(outputRewrites, false);
             /* FIXME optimize and deduplicate with addToStore */
             std::string oldHashPart{scratchPath->hashPart()};
             auto got = [&] {
@@ -1386,7 +1496,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 // (note that this doesn't invalidate the ca hash we calculated
                 // above because it's computed *modulo the self-references*, so
                 // it already takes this rewrite into account).
-                rewriteOutput(StringMap{{oldHashPart, std::string(newInfo0.path.hashPart())}});
+                rewriteOutput(StringMap{{oldHashPart, std::string(newInfo0.path.hashPart())}}, true);
             }
 
             {
