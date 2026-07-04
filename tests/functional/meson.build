@@ -129,6 +129,7 @@ suites = [
       'logging.sh',
       'macho-signature-check.sh',
       'macho-signature-impure.sh',
+      'macho-signature-verify.sh',
       'make-content-addressed.sh',
       'misc.sh',
       'multiple-outputs-substitute-failure.sh',

@@ -14,7 +14,8 @@
 
 /**
  * `nix __fixup-macho [--check] <path>...` — the default payload of
- * the `macho-signature-repair-hook` setting.
+ * the `macho-signature-repair-hook` setting, and the verification/repair child
+ * of `macho-signature-verify` and `nix store fixup-macho`.
  *
  * Recomputes Mach-O `LC_CODE_SIGNATURE` page hashes for any pages
  * whose stored hash disagrees with the on-disk contents — the state a

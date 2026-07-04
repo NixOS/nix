@@ -570,7 +570,7 @@ static std::vector<MachOSignatureRewriteHit> scanImpl(const std::filesystem::pat
     auto end = std::filesystem::recursive_directory_iterator();
     for (; it != end; it.increment(ec)) {
         if (ec) {
-            debug("scanForMachOSignatureRewrites: %s: directory iteration error: %s", PathFmt(root), ec.message());
+            debug("scanForMachOSignatures: %s: directory iteration error: %s", PathFmt(root), ec.message());
             ec.clear();
             continue;
         }
@@ -590,6 +590,11 @@ scanForMachOSignatureRewrites(const std::filesystem::path & root, const StringSe
     if (hashParts.empty())
         return {};
     return scanImpl(root, &hashParts);
+}
+
+std::vector<MachOSignatureRewriteHit> scanForMachOSignatures(const std::filesystem::path & root)
+{
+    return scanImpl(root, nullptr);
 }
 
 bool fixupMachOSignature(std::string & contents, const std::filesystem::path & path, bool checkOnly)

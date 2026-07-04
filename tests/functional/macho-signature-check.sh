@@ -162,3 +162,29 @@ nix-store --delete "$unsupOut"
 expectStderr 1 nix-store --realise "$unsupDrv" >"$TEST_ROOT/unsupported.stderr"
 grepQuiet "refusing to rewrite store path hashes inside signed Mach-O file" "$TEST_ROOT/unsupported.stderr"
 grepQuiet "exited successfully but left signatures" "$TEST_ROOT/unsupported.stderr"
+
+# Register the broken CMS binary anyway (warn mode), then confirm the
+# at-rest sweep skips it with a warning instead of failing the batch.
+nix-store --realise "$cmsDrv" --option macho-signature-rewrite-check warn 2>&1 |
+    grepQuiet "invalidates its macOS code signature"
+nix store fixup-macho "$cmsOut" 2>&1 >"$TEST_ROOT/cms-sweep.out" | tee "$TEST_ROOT/cms-sweep.stderr" >/dev/null
+grepQuiet "not repairing" "$TEST_ROOT/cms-sweep.stderr"
+grepQuiet "CMS signature" "$TEST_ROOT/cms-sweep.stderr"
+
+# Batch resilience: an unrepairable path earlier in the batch must not
+# prevent a repairable path later in the same invocation. Build a
+# genuinely broken (ad-hoc) path alongside the CMS one and sweep both
+# in one call (CMS listed first). The CMS path is skipped with a
+# warning; the broken path is still repaired and verifies.
+brokenDrv=$(nix-instantiate ./macho-signature-check.nix)
+nix-store --realise "$brokenDrv" >/dev/null
+brokenOut=$(nix-store --query --outputs "$brokenDrv" | grep -v -- '-doc$')
+nix-store --delete "$brokenOut"
+nix-store --realise "$brokenDrv" --option macho-signature-rewrite-check warn --option macho-signature-repair-hook "" 2>&1 |
+    grepQuiet "invalidates its macOS code signature"
+expect 1 /usr/bin/codesign --verify "$brokenOut/bin/hello"
+# nix logging (printInfo/warn) goes to stderr; capture both streams.
+nix store fixup-macho "$cmsOut" "$brokenOut" >"$TEST_ROOT/batch.log" 2>&1
+grepQuiet "not repairing" "$TEST_ROOT/batch.log" # cms skipped
+grepQuiet "repaired '" "$TEST_ROOT/batch.log"    # broken repaired despite cms earlier
+/usr/bin/codesign --verify "$brokenOut/bin/hello"

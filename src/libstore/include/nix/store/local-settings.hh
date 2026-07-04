@@ -38,6 +38,22 @@ MachOSignatureCheck BaseSetting<MachOSignatureCheck>::parse(const std::string & 
 template<>
 std::string BaseSetting<MachOSignatureCheck>::to_string() const;
 
+/**
+ * What to do when a substituted path contains a Mach-O file with an
+ * invalid code signature. See `macho-signature-verify`.
+ */
+enum struct MachOSignatureVerify {
+    Ignore,
+    Warn,
+    Refuse,
+    Repair,
+};
+
+template<>
+MachOSignatureVerify BaseSetting<MachOSignatureVerify>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<MachOSignatureVerify>::to_string() const;
+
 template<>
 PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
 template<>
@@ -571,8 +587,9 @@ public:
           `<program> --check <file>...` it must modify nothing and
           exit `0` if every file's signature is valid, `2` if any
           signature is stale or cannot be verified. Nix runs this
-          mode after each repair; an output is only registered once
-          the check passes.
+          mode after each repair — an output is only registered once
+          the check passes — and to verify paths under
+          [`macho-signature-verify`](#conf-macho-signature-verify).
 
           The default is the internal Nix tool that recomputes the
           stale page hashes in place, modifying only the stale hash
@@ -591,6 +608,58 @@ public:
           signatures, and self-referential content-addressed outputs,
           where no consistent page hash exists — are never passed to
           the hook; those fail the build regardless.
+        )"};
+
+    Setting<MachOSignatureVerify> machOSignatureVerify{
+        this,
+        MachOSignatureVerify::Ignore,
+        "macho-signature-verify",
+        R"(
+          Whether to check, when adding a path to the store from a
+          substituter or another store, that the code signatures of
+          the Mach-O files it contains match their contents. A binary
+          with stale signature page hashes is killed by the macOS
+          kernel when it is first executed, so this turns "mystery
+          SIGKILLs" from broken cached binaries — whatever broke them:
+          the producing daemon, a build tool, or a broken upstream
+          artifact — into a diagnostic at download time.
+
+          - `ignore` (default): no checking.
+
+          - `warn`: print a warning naming the path and the affected
+            files, but add the path anyway.
+
+          - `refuse`: fail the substitution. Nix falls back to
+            building the path locally if possible. A signature that
+            cannot be verified — a file too large to parse, or a
+            CodeDirectory whose hash type Nix does not support — is
+            treated the same as an invalid one (fail closed).
+
+          - `repair`: recompute the stale page hashes before the path
+            is registered, by running the
+            [`macho-signature-repair-hook`](#conf-macho-signature-repair-hook) with the
+            privileges of a build user. The path's NAR hash then
+            differs from the substituter's advertised one, so its
+            signatures no longer apply: the repaired path is
+            registered unsigned, and a store that
+            [requires signatures](#conf-require-sigs) will not accept
+            it from this one. Content-addressed paths and
+            CMS/Developer-ID-signed files are never repaired; those
+            fall back to `warn`.
+
+          The check itself is performed by the
+          [`macho-signature-repair-hook`](#conf-macho-signature-repair-hook) tool; if that
+          setting is empty, paths are added without checking whatever
+          this is set to.
+
+          Note the asymmetry with
+          [`macho-signature-rewrite-check`](#conf-macho-signature-rewrite-check):
+          under `refuse` this setting never modifies a path — the
+          substitution simply fails — while the build-time check under
+          its `refuse` first lets the `macho-signature-repair-hook` repair the
+          output and only refuses what the hook cannot fix. A store
+          that must never register a Nix-modified signed binary needs
+          `macho-signature-repair-hook` emptied as well.
         )"};
 
     Setting<bool> runDiffHook{

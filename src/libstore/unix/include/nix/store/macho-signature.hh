@@ -14,9 +14,9 @@ namespace nix {
  * Classify the wait-status of a `nix __fixup-macho --check` child:
  * exit 0 = every signature is valid, exit 2 = at least one file has
  * stale page hashes or a signature that could not be verified,
- * anything else = the check itself failed. Every caller interprets
- * it through this one definition, keeping them in lockstep with the
- * tool's exit contract.
+ * anything else = the check itself failed. The build door, the
+ * substitution door and the at-rest sweep all interpret it this way;
+ * one definition keeps them in lockstep with the tool's exit contract.
  */
 enum struct MachOCheckOutcome { Valid, Stale, Error };
 
@@ -99,6 +99,13 @@ struct MachOSignatureRewriteHit
  */
 std::vector<MachOSignatureRewriteHit>
 scanForMachOSignatureRewrites(const std::filesystem::path & root, const StringSet & hashParts);
+
+/**
+ * Like `scanForMachOSignatureRewrites`, but reports every signed
+ * Mach-O file regardless of contents. Used by the substitution-time
+ * check, where any of a path's signatures may be stale.
+ */
+std::vector<MachOSignatureRewriteHit> scanForMachOSignatures(const std::filesystem::path & root);
 
 /**
  * Recompute the code-signature page hashes of the Mach-O file

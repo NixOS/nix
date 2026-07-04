@@ -1,5 +1,5 @@
 ---
-synopsis: "Store path hash rewrites that would break a Mach-O code signature are now refused"
+synopsis: "macOS code-signature validity is now checked when store paths are registered"
 issues: [6065]
 prs: [15638]
 ---
@@ -12,22 +12,27 @@ it is run. Previously this corruption was silent; the build "succeeded" and
 the registered binary was broken (see the [`fish`
 issue](https://github.com/NixOS/nixpkgs/issues/507531)).
 
-The new `macho-signature-rewrite-check` setting (`refuse` by default) makes
-the build fail instead, with an error naming the affected files and the
-already-present store paths whose deletion allows a clean rebuild. This also
-replaces the spurious "may not be deterministic" failure previously reported
-for signed binaries under `--check`, and makes content-addressed cold builds
-of self-referential signed binaries fail loudly rather than register silently
-broken outputs. `warn` and `ignore` restore the previous behaviour with and
-without a diagnostic.
+Nix now treats a valid Mach-O signature as a property to preserve when bytes
+enter the store, controlled by three settings:
 
-Most builds succeed transparently rather than failing: the new
-`macho-signature-repair-hook` (an internal tool by default, run with the
-privileges of a build user) deterministically repairs the stale page hashes
-in place, touching no other byte, and the output is registered only once the
-repaired signatures verify. Files signed with a certificate (Developer ID)
-and self-referential content-addressed outputs cannot be repaired and are
-still refused.
+- `macho-signature-rewrite-check` (`refuse` by default) checks build outputs
+  before the rewrite. Under `refuse`, the build fails with an error naming
+  the affected files; the new `macho-signature-repair-hook` (an internal tool by
+  default, run with the privileges of a build user) then deterministically
+  repairs the stale page hashes in place, touching no other byte, and the
+  output is registered only once the repaired signatures verify — so most
+  builds succeed transparently. `warn` and `ignore` are also available.
+
+- `macho-signature-verify` (`ignore` by default) checks paths obtained from
+  a substituter — where binaries broken elsewhere actually reach users — and
+  can `warn`, `refuse`, or `repair` them. A signature that cannot be
+  verified (a file too large to parse, an unsupported hash type) is treated
+  as invalid rather than waved through.
+
+- `nix store fixup-macho` repairs broken signatures in paths already in the
+  store.
 
 Detection is content-based, so cross-builds of macOS binaries on other
-platforms are covered too.
+platforms are covered too. Files signed with a certificate (Developer ID)
+and self-referential content-addressed outputs cannot be repaired and are
+reported rather than silently altered.

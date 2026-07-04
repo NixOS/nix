@@ -17,6 +17,12 @@
 #include "nix/store/keys.hh"
 #include "nix/util/users.hh"
 #include "nix/store/store-registration.hh"
+#include "nix/util/processes.hh"
+
+#ifndef _WIN32
+#  include "nix/store/macho-signature.hh"
+#  include "nix/store/user-lock.hh"
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -1043,6 +1049,242 @@ bool LocalStore::realisationIsUntrusted(const Realisation & realisation)
     return config->requireSigs && !realisation.checkSignatures(realisation.id, getPublicKeys());
 }
 
+#ifndef _WIN32
+/**
+ * Enforce the `macho-signature-verify` setting on a path just
+ * restored at `realPath` but not yet registered: check the code
+ * signatures of the Mach-O files it contains, and depending on the
+ * setting warn, refuse, or repair (updating `info`'s NAR hash and
+ * dropping its now-inapplicable signatures).
+ *
+ * The daemon itself performs only the bounded, read-only detection
+ * parse (finding signed Mach-O files); the page-hash verification
+ * and the repair run in a child process with the privileges of a
+ * build user (`nix __fixup-macho`, the macho-signature-repair-hook payload).
+ */
+static void verifyMachOSignatures(
+    LocalStore & store,
+    const LocalSettings & localSettings,
+    const std::filesystem::path & realPath,
+    ValidPathInfo & info)
+{
+    auto mode = localSettings.machOSignatureVerify.get();
+    if (mode == MachOSignatureVerify::Ignore)
+        return;
+
+    /* Cheap in-daemon pre-filter: only paths containing signed
+       Mach-O files need the child process at all. */
+    auto hits = scanForMachOSignatures(realPath);
+    if (hits.empty())
+        return;
+
+    /* The check runs privilege-dropped through the same tool as the
+       repair, so an empty `macho-signature-repair-hook` leaves nothing to verify
+       with; the path is added unchecked regardless of mode. */
+    auto hook = localSettings.machOSignatureRepairHook.get();
+    if (hook.empty()) {
+        warn(
+            "adding '%s' without verifying its Mach-O code signatures: `macho-signature-repair-hook` is empty",
+            store.printStorePath(info.path));
+        return;
+    }
+
+    /* A Mach-O file too large to parse is reported `Unchecked` by the
+       scan, and the check child skips it — its exit status says
+       nothing about such a file. Treat the path as unverifiable
+       rather than valid: refuse under `refuse`, warn otherwise. */
+    bool anyUnchecked = false;
+    for (auto & hit : hits)
+        anyUnchecked = anyUnchecked || hit.kind == MachOSignatureKind::Unchecked;
+    if (anyUnchecked) {
+        if (mode == MachOSignatureVerify::Refuse)
+            throw Error(
+                "refusing to add '%s' to the store: it contains Mach-O file(s) too large to have their "
+                "code signatures verified (set `macho-signature-verify` to `warn` or `ignore` to "
+                "accept such paths)",
+                store.printStorePath(info.path));
+        warn(
+            "'%s' contains Mach-O file(s) too large to have their code signatures verified",
+            store.printStorePath(info.path));
+    }
+
+    /* Both `--check` and the repair run privilege-dropped. Use a
+       build user from the same pool as builds; if none is configured
+       (single-user mode), run at the daemon's own (unprivileged)
+       uid. If the pool is exhausted, fail the substitution with a
+       retryable error rather than silently running the hook with the
+       daemon's privileges — the privilege drop is the point. */
+    std::unique_ptr<UserLock> userLock;
+    if (useBuildUsers(localSettings)) {
+        userLock = acquireUserLock(settings.nixStateDir, localSettings, 1, false);
+        if (!userLock)
+            throw Error(
+                "cannot verify Mach-O code signatures of '%s': all build users are currently in use "
+                "(retry, or increase the size of `build-users-group`)",
+                store.printStorePath(info.path));
+    }
+
+    auto runHook = [&](bool check) {
+        RunOptions options{
+            .program = hook.front(),
+            .lookupPath = true,
+            .chdir = "/",
+            .environment = OsStringMap{},
+        };
+        for (auto i = std::next(hook.begin()); i != hook.end(); ++i)
+            options.args.push_back(string_to_os_string(*i));
+        if (check)
+            options.args.push_back(OS_STR("--check"));
+        options.args.push_back(realPath.native());
+        if (userLock) {
+            options.uid = userLock->getUID();
+            options.gid = userLock->getGID();
+        }
+        return runProgram(std::move(options)).first;
+    };
+
+    int checkStatus = runHook(true);
+    switch (classifyMachOCheck(checkStatus)) {
+    case MachOCheckOutcome::Valid:
+        return;
+    case MachOCheckOutcome::Stale:
+        break;
+    case MachOCheckOutcome::Error:
+        throw Error(
+            "Mach-O signature verification of '%s' failed: %s",
+            store.printStorePath(info.path),
+            statusToString(checkStatus));
+    }
+
+    bool repairable = mode == MachOSignatureVerify::Repair
+                      /* A content-addressed path cannot be repaired: its
+                         `ca` field would no longer match the contents. */
+                      && !info.ca;
+    if (repairable)
+        for (auto & hit : hits)
+            if (hit.kind != MachOSignatureKind::AdHoc) {
+                repairable = false;
+                break;
+            }
+
+    if (mode == MachOSignatureVerify::Refuse)
+        throw Error(
+            "refusing to add '%s' to the store: it contains Mach-O file(s) with invalid code signatures, "
+            "which macOS kills at first execution (set `macho-signature-verify` to `warn`, `repair`, or "
+            "`ignore` to accept such paths)",
+            store.printStorePath(info.path));
+
+    if (!repairable) {
+        warn(
+            "'%s' contains Mach-O file(s) with invalid code signatures; "
+            "the affected binaries will be killed by the macOS kernel when they are first executed",
+            store.printStorePath(info.path));
+        return;
+    }
+
+    /* The child writes the files, so they must be owned by the hook
+       user; the caller canonicalises ownership back immediately
+       after. The substituter's signatures are then dropped: they
+       cover the pre-repair content, which the recomputed NAR hash no
+       longer matches. */
+    debug("repairing Mach-O code signatures of '%s'", store.printStorePath(info.path));
+    if (userLock)
+        for (auto & hit : hits) {
+            chown(hit.path, userLock->getUID(), userLock->getGID());
+            std::filesystem::permissions(
+                hit.path, std::filesystem::perms::owner_write, std::filesystem::perm_options::add);
+        }
+
+    int repairStatus = runHook(false);
+    if (!statusOk(repairStatus))
+        throw Error(
+            "failed to repair Mach-O code signatures of '%s': %s",
+            store.printStorePath(info.path),
+            statusToString(repairStatus));
+
+    /* The hook's exit status says it ran, not that the signatures
+       are now valid — a custom hook may do less than it claims, so
+       re-check before calling the path repaired. Either way the
+       recorded NAR hash must describe the bytes actually on disk,
+       which the repair may have changed even when it could not fix
+       everything. */
+    bool repaired = classifyMachOCheck(runHook(true)) == MachOCheckOutcome::Valid;
+
+    auto narHashAndSize = hashPath(
+        {makeFSSourceAccessor(realPath), CanonPath::root}, FileSerialisationMethod::NixArchive, HashAlgorithm::SHA256);
+    if (narHashAndSize.hash != info.narHash) {
+        info.narHash = narHashAndSize.hash;
+        info.narSize = narHashAndSize.numBytesDigested;
+        /* The substituter's signatures signed the old contents. */
+        info.sigs.clear();
+    }
+
+    if (repaired)
+        warn(
+            "repaired invalid Mach-O code signature(s) in '%s' (registered unsigned; NAR hash updated)",
+            store.printStorePath(info.path));
+    else
+        warn(
+            "'%s' contains Mach-O file(s) with invalid code signatures that the "
+            "`macho-signature-repair-hook` did not repair; the affected binaries will be killed "
+            "by the macOS kernel when they are first executed",
+            store.printStorePath(info.path));
+}
+#endif
+
+void LocalStore::replaceStorePath(
+    const StorePath & path, const std::filesystem::path & source, const ValidPathInfo & info)
+{
+    assert(info.path == path);
+
+    auto realPath = toRealPath(path);
+
+    PathLocks outputLock({realPath});
+
+    canonicalisePathMetaData(source, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
+
+    {
+        /* Swap the repaired contents in, the same rename window
+           `repairPath` uses. Plain `rename`, not `moveFile`: the
+           latter swallows non-EXDEV errors, and a silent failure here
+           would leave the path unrepaired while the database records
+           the repaired hash. */
+        auto oldPath =
+            std::filesystem::path(realPath).replace_filename(std::filesystem::path(realPath).filename() += ".old");
+        deletePath(oldPath);
+        /* On darwin, renaming a read-only directory fails with
+           EACCES, so temporarily restore owner-write on both (the
+           old path is deleted right after; the new one is re-locked
+           below). */
+        auto addOwnerWrite = [](const std::filesystem::path & p) {
+            if (std::filesystem::is_directory(p))
+                std::filesystem::permissions(
+                    p, std::filesystem::perms::owner_write, std::filesystem::perm_options::add);
+        };
+        addOwnerWrite(realPath);
+        addOwnerWrite(source);
+        std::filesystem::rename(realPath, oldPath);
+        try {
+            std::filesystem::rename(source, realPath);
+        } catch (...) {
+            std::filesystem::rename(oldPath, realPath);
+            throw;
+        }
+        deletePath(oldPath);
+        canonicaliseTimestampAndPermissions(realPath);
+    }
+
+    optimisePath(realPath, NoRepair);
+
+    if (config->getLocalSettings().fsyncStorePaths) {
+        recursiveSync(realPath);
+        syncParent(realPath);
+    }
+
+    registerValidPath(info);
+    invalidatePathInfoCacheFor(path);
+}
+
 void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs)
 {
     if (checkSigs && pathInfoIsUntrusted(info))
@@ -1129,6 +1371,14 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
 
                 autoGC();
 
+                /* Possibly-modified copy: signature repair updates
+                   the NAR hash and drops the signatures. */
+                ValidPathInfo infoToRegister{info};
+
+#ifndef _WIN32
+                verifyMachOSignatures(*this, config->getLocalSettings(), realPath, infoToRegister);
+#endif
+
                 canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
@@ -1138,7 +1388,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                     syncParent(realPath);
                 }
 
-                registerValidPath(info);
+                registerValidPath(infoToRegister);
             } else
                 // We may have a negative cache entry for this path, so get rid of it.
                 invalidatePathInfoCacheFor(info.path);

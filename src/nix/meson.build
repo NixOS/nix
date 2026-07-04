@@ -118,6 +118,7 @@ nix_sources = [ config_priv_h ] + files(
   'sigs.cc',
   'store-copy-log.cc',
   'store-delete.cc',
+  'store-fixup-macho.cc',
   'store-gc.cc',
   'store-info.cc',
   'store-repair.cc',

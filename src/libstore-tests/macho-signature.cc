@@ -553,8 +553,9 @@ TEST(fixupMachOSignature, checkModeFailsOnUnverifiableSignature)
 {
     /* A signature the engine cannot verify must not pass the check:
        the callers that fail closed on the check's word (the build
-       door's post-repair re-check) would otherwise accept a binary
-       whose signature was never actually verified. */
+       door's post-repair re-check, `macho-signature-verify`, the
+       at-rest sweep) would otherwise accept a binary whose signature
+       was never actually verified. */
     std::vector<CdSpec> cds{{CS_HASHTYPE_SHA256_, 32}};
     constexpr size_t pageSize = 4096;
     size_t cdOff = 2 * pageSize + (12 + 8);

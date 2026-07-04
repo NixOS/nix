@@ -295,6 +295,19 @@ public:
 
     void addToStore(const ValidPathInfo & info, Source & source, RepairFlag repair, CheckSigsFlag checkSigs) override;
 
+    /**
+     * Replace the contents of the valid store path `info.path` with
+     * the file system object at `source` (which is moved), updating
+     * the database row with `info`'s new NAR hash, size and
+     * signatures. Used by `nix store fixup-macho`, which must not
+     * modify a path's files in place because `auto-optimise-store`
+     * may hard-link them into other paths.
+     *
+     * The swap window (old path moved away, new one moved in) is the
+     * same as `repairPath`'s.
+     */
+    void replaceStorePath(const StorePath & path, const std::filesystem::path & source, const ValidPathInfo & info);
+
     StorePath addToStoreFromDump(
         Source & dump,
         std::string_view name,

@@ -407,6 +407,54 @@ std::string BaseSetting<MachOSignatureCheck>::to_string() const
 
 template class BaseSetting<MachOSignatureCheck>;
 
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    MachOSignatureVerify,
+    {
+        {MachOSignatureVerify::Ignore, "ignore"},
+        {MachOSignatureVerify::Warn, "warn"},
+        {MachOSignatureVerify::Refuse, "refuse"},
+        {MachOSignatureVerify::Repair, "repair"},
+    });
+
+template<>
+MachOSignatureVerify BaseSetting<MachOSignatureVerify>::parse(const std::string & str) const
+{
+    if (str == "ignore")
+        return MachOSignatureVerify::Ignore;
+    else if (str == "warn")
+        return MachOSignatureVerify::Warn;
+    else if (str == "refuse")
+        return MachOSignatureVerify::Refuse;
+    else if (str == "repair")
+        return MachOSignatureVerify::Repair;
+    else
+        throw UsageError(
+            "option '%s' has invalid value '%s', expected 'ignore', 'warn', 'refuse', or 'repair'", name, str);
+}
+
+template<>
+struct BaseSetting<MachOSignatureVerify>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<>
+std::string BaseSetting<MachOSignatureVerify>::to_string() const
+{
+    switch (value) {
+    case MachOSignatureVerify::Ignore:
+        return "ignore";
+    case MachOSignatureVerify::Warn:
+        return "warn";
+    case MachOSignatureVerify::Refuse:
+        return "refuse";
+    case MachOSignatureVerify::Repair:
+        return "repair";
+    }
+    unreachable();
+}
+
+template class BaseSetting<MachOSignatureVerify>;
 
 void to_json(nlohmann::json & j, const ChrootPath & cp)
 {
