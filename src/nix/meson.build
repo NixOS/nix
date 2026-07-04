@@ -94,6 +94,7 @@ nix_sources = [ config_priv_h ] + files(
   'edit.cc',
   'env.cc',
   'eval.cc',
+  'fixup-macho.cc',
   'flake-prefetch-inputs.cc',
   'flake.cc',
   'formatter.cc',

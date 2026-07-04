@@ -4,10 +4,10 @@
 # a CA output's final hash is only known after the build, so a signed
 # binary embedding its own output path must be rewritten on every
 # cold build — no store state needed. The guard refuses, with the
-# CA-specific remediation (no rebuild can preserve the signature):
-# the hashed pages contain the output's own path, which is a function
-# of those pages, so no consistent repaired value exists
-# (NixOS/nix#6065).
+# CA-specific remediation (no rebuild can preserve the signature).
+# The signature repair hook never runs here: the hashed pages contain the
+# output's own path, which is a function of those pages, so no
+# consistent repaired value exists (NixOS/nix#6065).
 
 source common.sh
 

@@ -371,7 +371,9 @@ private:
      * Enforce the `macho-signature-rewrite-check` setting: before
      * `rewriteOutput` applies `rewrites` to the output at
      * `actualPath`, refuse (or warn) if the rewrite would modify
-     * bytes covered by a Mach-O code signature.
+     * bytes covered by a Mach-O code signature. Repairable damage is
+     * recorded in `pendingMachOSignatureRepairs` for the
+     * `macho-signature-repair-hook` instead of refusing.
      *
      * @param caSelfRef Whether this is the self-reference rewrite of
      * a content-addressed output (never repairable: no consistent
@@ -393,6 +395,20 @@ private:
         const std::string & outputName,
         bool caSelfRef,
         std::string_view extraNote);
+
+    /**
+     * Files recorded by `checkRewritesDontBreakMachOSignatures` for
+     * repair; consumed by `runPostRewriteHook` after the rewrite has
+     * been applied.
+     */
+    std::vector<MachOSignatureRewriteHit> pendingMachOSignatureRepairs;
+
+    /**
+     * Run the `macho-signature-repair-hook` (as the build user, like the diff
+     * hook) on `pendingMachOSignatureRepairs`. A failing hook
+     * refuses the output — fail closed.
+     */
+    void runPostRewriteHook(const std::filesystem::path & actualPath, const std::string & outputName);
 
 protected:
 

@@ -1096,6 +1096,28 @@ void DerivationBuilderImpl::checkRewritesDontBreakMachOSignatures(
         return;
     }
 
+    /* Under `refuse`, damage that is repairable is handed to the
+       signature repair hook after the rewrite; only irreparable damage
+       fails the build here. Not repairable: CMS signatures (the
+       page hashes could be recomputed, but the signer's certificate
+       chain commits to them — only the original identity can
+       re-sign), files too large to have been parsed, and the
+       self-reference rewrite of a content-addressed output (the
+       hashed pages contain the output's own path, which is itself a
+       function of those pages — no consistent value exists; see
+       issue 6065). */
+    bool repairable = !caSelfRef && !localSettings.machOSignatureRepairHook.get().empty();
+    if (repairable)
+        for (auto & hit : hits)
+            if (hit.kind != MachOSignatureKind::AdHoc) {
+                repairable = false;
+                break;
+            }
+    if (repairable) {
+        pendingMachOSignatureRepairs = hits;
+        return;
+    }
+
     throwMachOSignatureRefusal(hits, actualPath, outputName, caSelfRef, "");
 }
 
@@ -1172,6 +1194,101 @@ void DerivationBuilderImpl::throwMachOSignatureRefusal(
         store.printStorePath(drvPath),
         files,
         remediation);
+}
+
+void DerivationBuilderImpl::runPostRewriteHook(const std::filesystem::path & actualPath, const std::string & outputName)
+{
+    if (pendingMachOSignatureRepairs.empty())
+        return;
+    auto hits = std::move(pendingMachOSignatureRepairs);
+    pendingMachOSignatureRepairs.clear();
+
+    auto hook = localSettings.machOSignatureRepairHook.get();
+    assert(!hook.empty());
+
+    auto makeOptions = [&](bool check) {
+        RunOptions options{
+            .program = hook.front(),
+            .lookupPath = true,
+            .chdir = "/",
+            /* The hook gets a minimal environment, not the daemon's. */
+            .environment = OsStringMap{},
+        };
+        for (auto i = std::next(hook.begin()); i != hook.end(); ++i)
+            options.args.push_back(string_to_os_string(*i));
+        if (check)
+            options.args.push_back(OS_STR("--check"));
+        for (auto & hit : hits)
+            options.args.push_back(hit.path.native());
+        if (buildUser) {
+            options.uid = buildUser->getUID();
+            options.gid = buildUser->getGID();
+        }
+        return options;
+    };
+
+    for (auto & hit : hits) {
+        /* The rewrite left the file daemon-owned and read-only; the
+           hook runs as the build user (privilege-dropped, like the
+           diff hook) and rewrites it in place. Add owner-write only —
+           the executable bit must survive, since the canonicalisation
+           that runs right after derives the final 0444/0555 from it. */
+        chownToBuilder(hit.path);
+        std::filesystem::permissions(hit.path, std::filesystem::perms::owner_write, std::filesystem::perm_options::add);
+    }
+    if (buildUser) {
+        /* A fixed-output or impure output has been moved into a
+           0700 daemon-owned temporary directory at this point; the
+           build user could not traverse it. The directory is
+           transient (deleted after registration) and the sandbox has
+           already been torn down, so handing it to the build user is
+           the same trust step the file chown above takes. */
+        auto parent = actualPath.parent_path();
+        if (parent != std::filesystem::path(store.config->realStoreDir.get()))
+            chownToBuilder(parent);
+    }
+
+    try {
+        auto res = runProgram(makeOptions(false));
+        if (!statusOk(res.first))
+            throw ExecError(res.first, "signature repair hook %s", statusToString(res.first));
+        if (res.second != "")
+            printError(chomp(res.second));
+    } catch (Error & e) {
+        logError(e.info());
+        throwMachOSignatureRefusal(
+            hits, actualPath, outputName, false, "\nThe signature repair hook failed to repair the file(s).");
+    }
+
+    /* The hook's exit status says it ran, not that the signatures are
+       now valid: the default tool skips what it cannot process (an
+       unsupported hash type, a malformed CodeDirectory), and a custom
+       hook may do less than it claims. Registering the output on the
+       hook's word alone would admit exactly the broken binary this
+       check exists to stop, so re-verify — same hook, same
+       privileges, `--check`. */
+    int checkStatus = runProgram(makeOptions(true)).first;
+    switch (classifyMachOCheck(checkStatus)) {
+    case MachOCheckOutcome::Valid:
+        for (auto & hit : hits)
+            debug("signature repair hook repaired %s", PathFmt(hit.path));
+        return;
+    case MachOCheckOutcome::Stale:
+        throwMachOSignatureRefusal(
+            hits,
+            actualPath,
+            outputName,
+            false,
+            "\nThe signature repair hook exited successfully but left signatures that are still "
+            "invalid or that it cannot process (such as an unsupported hash type).");
+    case MachOCheckOutcome::Error:
+        throwMachOSignatureRefusal(
+            hits,
+            actualPath,
+            outputName,
+            false,
+            fmt("\nRe-checking the repaired file(s) failed: signature repair hook %s", statusToString(checkStatus)));
+    }
 }
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
@@ -1408,6 +1525,13 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 restorePath(tmpPath, *source);
                 deletePath(actualPath);
                 movePath(tmpPath, actualPath);
+
+                /* Repair any signed Mach-O files the rewrite just
+                   damaged. Runs before the canonicalisation below so
+                   the NAR hash covers the repaired bytes and the
+                   canonicalisation restores ownership and
+                   permissions over the hook's intermediate state. */
+                runPostRewriteHook(actualPath, outputName);
 
                 /* FIXME: set proper permissions in restorePath() so
                    we don't have to do another traversal. */

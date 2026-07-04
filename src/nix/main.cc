@@ -393,6 +393,13 @@ void mainWrapped(int argc, char ** argv)
             "__build-remote",
         });
 
+    /* Same self-invocation for the default signature repair hook. */
+    settings.getLocalSettings().machOSignatureRepairHook.setDefault(
+        Strings{
+            getNixBin({}).string(),
+            "__fixup-macho",
+        });
+
     initNix();
     initGC();
     flakeSettings.configureEvalSettings(evalSettings);
@@ -412,6 +419,12 @@ void mainWrapped(int argc, char ** argv)
 
     if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         programName = "build-remote";
+        argv++;
+        argc--;
+    }
+
+    if (argc > 1 && std::string_view(argv[1]) == "__fixup-macho") {
+        programName = "fixup-macho";
         argv++;
         argc--;
     }

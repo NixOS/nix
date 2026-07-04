@@ -128,6 +128,7 @@ suites = [
       'linux-sandbox.sh',
       'logging.sh',
       'macho-signature-check.sh',
+      'macho-signature-impure.sh',
       'make-content-addressed.sh',
       'misc.sh',
       'multiple-outputs-substitute-failure.sh',

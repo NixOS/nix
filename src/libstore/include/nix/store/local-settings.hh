@@ -546,6 +546,51 @@ public:
 
           The check is content-based, so it also fires when
           cross-building darwin binaries on other platforms.
+
+          When the check fires in `refuse` mode and the damage is
+          repairable, the [`macho-signature-repair-hook`](#conf-macho-signature-repair-hook)
+          is given a chance to repair the file before the build is
+          failed.
+        )"};
+
+    Setting<Strings> machOSignatureRepairHook{
+        this,
+        {"nix", "__fixup-macho"},
+        "macho-signature-repair-hook",
+        R"(
+          The program (with arguments) that is executed when a store
+          path hash rewrite has modified a file carrying a Mach-O code
+          signature, to repair the signature. It is invoked with the
+          affected files appended as additional arguments, running as
+          the build user (like the diff hook), and must exit `0` with
+          every file repaired; otherwise the build fails with the
+          [`macho-signature-rewrite-check`](#conf-macho-signature-rewrite-check)
+          error.
+
+          The program must also implement a check mode: invoked as
+          `<program> --check <file>...` it must modify nothing and
+          exit `0` if every file's signature is valid, `2` if any
+          signature is stale or cannot be verified. Nix runs this
+          mode after each repair; an output is only registered once
+          the check passes.
+
+          The default is the internal Nix tool that recomputes the
+          stale page hashes in place, modifying only the stale hash
+          slots and no other byte — deterministic, unlike a
+          `codesign` re-sign, which rewrites the whole signature and
+          would make every repair a new source of `--check` and
+          content-addressing divergence.
+
+          The hook runs with a minimal environment; a custom program
+          should be given as an absolute path.
+
+          Set it to an empty string to disable repair; the check then
+          refuses outright.
+
+          Files whose damage is not repairable — CMS/Developer-ID
+          signatures, and self-referential content-addressed outputs,
+          where no consistent page hash exists — are never passed to
+          the hook; those fail the build regardless.
         )"};
 
     Setting<bool> runDiffHook{

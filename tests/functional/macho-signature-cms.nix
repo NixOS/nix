@@ -2,9 +2,10 @@ with import ./config.nix;
 
 # Like macho-signature-check.nix, but the binary's SuperBlob carries a
 # synthetic non-empty CMS blob wrapper (the shape of a Developer-ID
-# signature). Recomputing such a file's page hashes would invalidate
-# the (would-be) PKCS#7 chain, so the rewrite guard annotates it
-# distinctly: only the original signing identity could fix it.
+# signature). Repair must never touch such a file — recomputing the
+# page hashes would invalidate the (would-be) PKCS#7 chain — so the
+# rewrite guard refuses even with the signature repair hook enabled, and
+# the at-rest sweep skips the path.
 
 mkDerivation {
   name = "macho-signature-cms";

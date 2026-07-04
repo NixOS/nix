@@ -21,5 +21,13 @@ of self-referential signed binaries fail loudly rather than register silently
 broken outputs. `warn` and `ignore` restore the previous behaviour with and
 without a diagnostic.
 
+Most builds succeed transparently rather than failing: the new
+`macho-signature-repair-hook` (an internal tool by default, run with the
+privileges of a build user) deterministically repairs the stale page hashes
+in place, touching no other byte, and the output is registered only once the
+repaired signatures verify. Files signed with a certificate (Developer ID)
+and self-referential content-addressed outputs cannot be repaired and are
+still refused.
+
 Detection is content-based, so cross-builds of macOS binaries on other
 platforms are covered too.
