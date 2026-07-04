@@ -3414,11 +3414,11 @@ static RegisterPrimOp primop_listToAttrs({
     .impl = prim_listToAttrs,
 });
 
-static void prim_listToAttrsNull(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_listToAttrsWithValue(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrsNull");
+    state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.listToAttrsWithValue");
 
-    auto listView = args[0]->listView();
+    auto listView = args[1]->listView();
     size_t listSize = listView.size();
 
     if (listSize == 0) {
@@ -3431,21 +3431,21 @@ static void prim_listToAttrsNull(EvalState & state, const PosIdx pos, Value ** a
     size_t idx = 0;
     for (auto v2 : listView) {
         auto sym =
-            forceStringSymbol(state, pos, *v2, "while evaluating an element of the list passed to builtins.listToAttrsNull");
+            forceStringSymbol(state, pos, *v2, "while evaluating an element of the list passed to builtins.listToAttrsWithValue");
         bindings[idx++] = Attr(sym, nullptr);
     }
 
     std::sort(&bindings[0], &bindings[listSize]);
 
-    finalizeBindings(state, bindings, listSize, v, [&](const Attr & attr) { return std::pair{&Value::vNull, pos}; });
+    finalizeBindings(state, bindings, listSize, v, [&](const Attr & attr) { return std::pair{args[0], pos}; });
 }
 
-static RegisterPrimOp primop_listToAttrsNull({
-    .name = "__listToAttrsNull",
-    .args = {"list"},
+static RegisterPrimOp primop_listToAttrsWithValue({
+    .name = "__listToAttrsWithValue",
+    .args = {"value", "list"},
     .doc = R"(
-      Construct an attribute set from a list of strings. Every attribute in the
-      result set has its value set to `null`.
+      Construct an attribute set from a list of strings where every attribute in the
+      result set has its value set to the given `value`.
 
       In case of duplicate occurrences of the same name, only one attribute
       is created.
@@ -3453,18 +3453,18 @@ static RegisterPrimOp primop_listToAttrsNull({
       Example:
 
       ```nix
-      builtins.listToAttrsNull [ "foo" "bar" "foo" ]
+      builtins.listToAttrsWithValue true [ "foo" "bar" "foo" ]
       ```
 
       evaluates to
 
       ```nix
-      { foo = null; bar = null; }
+      { foo = true; bar = true; }
       ```
 
       Has `O(n log n)` time complexity, where `n` is size of the list.
     )",
-    .impl = prim_listToAttrsNull,
+    .impl = prim_listToAttrsWithValue,
 });
 
 static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
