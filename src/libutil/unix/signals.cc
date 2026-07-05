@@ -11,6 +11,8 @@ namespace nix {
 
 void Interrupted::anchor() {}
 
+void Cancelled::anchor() {}
+
 std::atomic<bool> unix::_isInterrupted = false;
 
 thread_local std::function<bool()> unix::interruptCheck;

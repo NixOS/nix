@@ -4,4 +4,6 @@ namespace nix {
 
 void Interrupted::anchor() {}
 
+void Cancelled::anchor() {}
+
 } // namespace nix
