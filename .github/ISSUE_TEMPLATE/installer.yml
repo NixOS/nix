@@ -1,0 +1,59 @@
+name: "Installer Issue"
+description: "Report problems with installation"
+labels:
+  - installer
+body:
+  - type: dropdown
+    id: "platform"
+    attributes:
+      label: "Platform"
+      description: "Select the platform on which you tried to install Nix"
+      options:
+        - "Linux"
+        - "macOS"
+        - "WSL"
+    validations:
+      required: true
+  - type: input
+    id: "linux-distribution"
+    attributes:
+      label: "Linux Distribution"
+      description: "If you selected Linux, state your distribution"
+      placeholder: "Arch Linux, Ubuntu, Fedora, ..."
+  - type: textarea
+    id: "additional-information"
+    attributes:
+      label: "Additional Information"
+      description: "State special circumstances on your system or additional steps you have taken prior to installation"
+  - type: textarea
+    id: "logs"
+    attributes:
+      label: "Logs"
+      description: "Paste console logs"
+      render: logs
+  - type: checkboxes
+    id: "checklist"
+    attributes:
+      label: "Checklist"
+      description: "Make sure this issue is not redundant or obsolete"
+      options:
+        - label: "Checked [latest Nix manual](https://nix.dev/manual/nix/development)"
+          required: true
+        - label: "Checked [open installer issues and pull requests](https://github.com/NixOS/nix/labels/installer) for possible duplicates"
+          required: true
+  - type: markdown
+    attributes:
+      value: |
+        # Thank you for helping improve Nix!
+
+        ---
+  - type: textarea
+    id: "prioritisation"
+    attributes:
+      label: "Is this issue important to you?"
+      description: |
+        **Please do not modify this text area!**
+
+        This template helps Nix developers know which issues should be prioritised by allowing users to vote with a 👍 reaction.
+        This is not a guarantee that highly-requested issues will be fixed first, but it helps us to figure out what's important to users. Please react on other users' issues if you find them important.
+      value: "Add a 👍 [reaction](https://github.blog/news-insights/product-news/add-reactions-to-pull-requests-issues-and-comments) to [issues you find important](https://github.com/NixOS/nix/issues?q=is:issue+state:open+sort:reactions-%2B1-desc)"
