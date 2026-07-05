@@ -70,6 +70,7 @@ suites = [
       'build-remote-trustless-should-pass-3.sh',
       'build-remote-with-mounted-ssh-ng.sh',
       'build.sh',
+      'ca-old-daemon.sh',
       'characterisation-test-infra.sh',
       'check-refs.sh',
       'check-reqs.sh',
