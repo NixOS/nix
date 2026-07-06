@@ -1,0 +1,26 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 403bbf6..f095c4d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -100,6 +100,9 @@ elseif (APPLE)
+             "source/posix/*.c"
+             "source/darwin/*.c"
+             )
++    # nix#15857: use s2n TLS, not fork-unsafe Apple SecureTransport
++    list(REMOVE_ITEM AWS_IO_OS_SRC "${CMAKE_CURRENT_SOURCE_DIR}/source/darwin/secure_transport_tls_channel_handler.c")
++    set(USE_S2N ON)
+ 
+     find_library(SECURITY_LIB Security)
+     find_library(NETWORK_LIB Network)
+diff --git a/cmake/aws-c-io-config.cmake b/cmake/aws-c-io-config.cmake
+index 156e032..d6b222d 100644
+--- a/cmake/aws-c-io-config.cmake
++++ b/cmake/aws-c-io-config.cmake
+@@ -1,6 +1,6 @@
+ include(CMakeFindDependencyMacro)
+ 
+-if (UNIX AND NOT APPLE AND NOT BYO_CRYPTO)
++if (UNIX AND NOT BYO_CRYPTO)
+     find_dependency(s2n)
+ endif()
+ 
