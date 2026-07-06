@@ -1366,7 +1366,12 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         sort = true;
     }
 
-    bindings.bindings->pos = pos;
+    /* Empty attrsets share the static Bindings::emptyBindings, which we
+       must not write to: apart from being a data race, it causes false
+       sharing on emptyBindings' cache line (which may also hold other hot
+       globals such as Counter::enabled) between all evaluator threads. */
+    if (bindings.bindings != &Bindings::emptyBindings)
+        bindings.bindings->pos = pos;
 
     v.mkAttrs(sort ? bindings.finish() : bindings.alreadySorted());
 }
