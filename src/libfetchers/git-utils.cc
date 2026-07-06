@@ -41,7 +41,8 @@
 
 #include <boost/unordered/concurrent_flat_set.hpp>
 #include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
+
+#include <unordered_set>
 #include <iostream>
 #include <regex>
 #include <ranges>
@@ -1474,11 +1475,16 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
+
+    // Allow access to empty (submodule) directories without their content.
+    std::unordered_set<CanonPath> allowedPaths{wd.emptyDirs.begin(), wd.emptyDirs.end()};
+    // Always allow access to the root, but not its children.
+    allowedPaths.insert(CanonPath::root);
+
     ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
                                            makeFSSourceAccessor(path),
                                            /*allowedPrefixes=*/wd.files,
-                                           // Always allow access to the root, but not its children.
-                                           /*allowedPaths=*/{CanonPath::root},
+                                           allowedPaths,
                                            std::move(makeNotAllowedError))
                                            .cast<SourceAccessor>();
     if (options.exportIgnore)
