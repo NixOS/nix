@@ -150,7 +150,7 @@ MixEvalArgs::MixEvalArgs()
     });
 }
 
-Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
+const Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 {
     auto res = state.buildBindings(autoArgs.size());
     for (auto & [name, arg] : autoArgs) {

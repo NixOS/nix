@@ -76,7 +76,7 @@ struct InstallSourceInfo
     std::shared_ptr<SourcePath> nixExprPath; /* for srcNixExprDrvs, srcNixExprs */
     std::filesystem::path profile;           /* for srcProfile */
     std::string systemFilter;                /* for srcNixExprDrvs */
-    Bindings * autoArgs;
+    const Bindings * autoArgs;
 };
 
 struct Globals
@@ -207,7 +207,7 @@ static void loadDerivations(
     EvalState & state,
     const SourcePath & nixExprPath,
     std::string systemFilter,
-    Bindings & autoArgs,
+    const Bindings & autoArgs,
     const std::string & pathPrefix,
     PackageInfos & elems)
 {

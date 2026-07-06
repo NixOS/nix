@@ -205,7 +205,7 @@ static int main_nix_prefetch_url(int argc, char ** argv)
         auto store = openStore();
         auto state = std::make_shared<EvalState>(myArgs.lookupPath, store, fetchSettings, evalSettings);
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+        const Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
         /* If -A is given, get the URL from the specified Nix
            expression. */

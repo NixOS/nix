@@ -5,7 +5,7 @@
 
 namespace nix {
 
-Bindings Bindings::emptyBindings;
+const constinit Bindings Bindings::emptyBindings;
 
 /* Allocate a new array of attributes for an attribute set with a specific
    capacity. The space is implicitly reserved after the Bindings
@@ -13,7 +13,8 @@ Bindings Bindings::emptyBindings;
 Bindings * EvalMemory::allocBindings(size_t capacity)
 {
     if (capacity == 0)
-        return &Bindings::emptyBindings;
+        /* Swear that we are not going to modify this. */
+        return const_cast<Bindings *>(&Bindings::emptyBindings);
     if (capacity > std::numeric_limits<Bindings::size_type>::max())
         throw Error("attribute set of size %d is too big", capacity);
     stats.nrAttrsets++;

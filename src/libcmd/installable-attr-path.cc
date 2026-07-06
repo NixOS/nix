@@ -43,7 +43,7 @@ DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
         return {*derivedPathWithInfo};
     }
 
-    Bindings & autoArgs = *cmd.getAutoArgs(*state);
+    const Bindings & autoArgs = *cmd.getAutoArgs(*state);
 
     PackageInfos packageInfos;
     getDerivations(*state, *v, "", autoArgs, packageInfos, false);
