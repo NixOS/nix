@@ -6,6 +6,7 @@
 #include "nix/expr/eval-profiler.hh"
 #include "nix/util/types.hh"
 #include "nix/expr/value.hh"
+#include "nix/expr/root-value.hh"
 #include "nix/expr/nixexpr.hh"
 #include "nix/expr/symbol-table.hh"
 #include "nix/util/configuration.hh"
@@ -165,9 +166,7 @@ struct Constant
     bool impureOnly = false;
 };
 
-typedef std::
-    map<std::string, Value *, std::less<std::string>, traceable_allocator<std::pair<const std::string, Value *>>>
-        ValMap;
+typedef std::map<std::string, UniqueRootValue> ValMap;
 
 typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
@@ -468,13 +467,7 @@ private:
     /**
      * A cache from resolved paths to values.
      */
-    const ref<boost::concurrent_flat_map<
-        SourcePath,
-        Value *,
-        std::hash<SourcePath>,
-        std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value *>>>>
-        fileEvalCache;
+    const ref<boost::concurrent_flat_map<SourcePath, UniqueRootValue>> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
@@ -833,13 +826,7 @@ public:
     /**
      * Internal primops not exposed to the user.
      */
-    boost::unordered_flat_map<
-        std::string,
-        Value *,
-        StringViewHash,
-        std::equal_to<>,
-        traceable_allocator<std::pair<const std::string, Value *>>>
-        internalPrimOps;
+    boost::unordered_flat_map<std::string, UniqueRootValue, StringViewHash> internalPrimOps;
 
     /**
      * Name and documentation about every constant.

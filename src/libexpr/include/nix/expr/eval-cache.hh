@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <variant>
+#include "nix/expr/root-value.hh"
 
 namespace nix::eval_cache {
 
@@ -41,7 +42,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
     EvalState & state;
     typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
-    RootValue value;
+    UniqueRootValue value;
 
     Value * getRootValue();
 
@@ -105,7 +106,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     ref<EvalCache> root;
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     Parent parent;
-    RootValue _value;
+    UniqueRootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
     AttrKey getKey();

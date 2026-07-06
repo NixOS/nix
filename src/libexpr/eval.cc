@@ -104,46 +104,6 @@ const StringData & StringData::make(EvalMemory & mem, std::string_view s)
     return res;
 }
 
-RootValue allocRootValue(Value * v)
-{
-#if NIX_USE_BOEHMGC
-    /* Root slots are carved out of uncollectable slabs, which are
-       permanently part of the GC root set, and recycled through a free
-       list. This avoids doing a GC_MALLOC_UNCOLLECTABLE() / GC_FREE()
-       pair per root value, which requires taking the global GC
-       allocation lock — a significant source of contention during
-       parallel evaluation. Never destroyed since root values held by
-       other statics may be released after us during shutdown. */
-    static auto & pool = *new Sync<std::vector<Value **>>;
-
-    Value ** slot;
-    {
-        auto pool_(pool.lock());
-        if (pool_->empty()) {
-            constexpr size_t slabSize = 4096;
-            auto slab = (Value **) GC_MALLOC_UNCOLLECTABLE(slabSize * sizeof(Value *));
-            if (!slab)
-                throw std::bad_alloc();
-            pool_->reserve(slabSize);
-            for (size_t i = 0; i < slabSize; ++i)
-                pool_->push_back(slab + i);
-        }
-        slot = pool_->back();
-        pool_->pop_back();
-    }
-
-    *slot = v;
-
-    return RootValue(slot, [](Value ** slot) {
-        /* Clear the slot so it doesn't keep the value alive. */
-        *slot = nullptr;
-        pool.lock()->push_back(slot);
-    });
-#else
-    return std::make_shared<Value *>(v);
-#endif
-}
-
 // Pretty print types for assertion errors
 std::ostream & operator<<(std::ostream & os, const ValueType t)
 {
@@ -599,7 +559,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     v->mkPrimOp(new PrimOp(primOp));
 
     if (primOp.internal)
-        internalPrimOps.emplace(primOp.name, v);
+        internalPrimOps.emplace(primOp.name, UniqueRootValue(v));
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
@@ -780,11 +740,11 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
         if (se.isWith && !env.values[0]->isThunk()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
-                vm.insert_or_assign(std::string(st[j.name]), j.value);
+                vm.insert_or_assign(std::string(st[j.name]), UniqueRootValue(j.value));
         } else {
             // iterate through staticenv bindings and add them.
             for (auto & i : se.vars)
-                vm.insert_or_assign(std::string(st[i.first]), env.values[i.second]);
+                vm.insert_or_assign(std::string(st[i.first]), UniqueRootValue(env.values[i.second]));
         }
     }
 }
@@ -1190,10 +1150,14 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
         importResolutionCache->emplace(path, *resolvedPath);
     }
 
-    if (auto v2 = getConcurrent(*fileEvalCache, *resolvedPath)) {
-        forceValue(**v2, noPos);
-        v = **v2;
-        return;
+    {
+        Value * v2 = nullptr;
+        fileEvalCache->cvisit(*resolvedPath, [&](auto & i) { v2 = *i.second; });
+        if (v2) {
+            forceValue(*v2, noPos);
+            v = *v2;
+            return;
+        }
     }
 
     Value * vExpr;
@@ -1205,13 +1169,13 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
     fileEvalCache->try_emplace_and_cvisit(
         *resolvedPath,
-        nullptr,
+        UniqueRootValue(nullptr),
         [&](auto & i) {
             vExpr = allocValue();
             vExpr->mkThunk(&baseEnv, expr);
-            i.second = vExpr;
+            *i.second = vExpr;
         },
-        [&](auto & i) { vExpr = i.second; });
+        [&](auto & i) { vExpr = *i.second; });
 
     forceValue(*vExpr, noPos);
 
