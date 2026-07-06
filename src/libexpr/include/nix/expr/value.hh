@@ -1540,8 +1540,6 @@ typedef boost::unordered_flat_map<
     std::equal_to<Symbol>,
     traceable_allocator<std::pair<const Symbol, Value *>>>
     ValueMap;
-typedef std::map<Symbol, ValueVector, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, ValueVector>>>
-    ValueVectorMap;
 
 /**
  * A value allocated in traceable memory.

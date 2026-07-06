@@ -3698,24 +3698,64 @@ static RegisterPrimOp primop_filterAttrs({
     .impl = prim_filterAttrs,
 });
 
+/**
+ * A (name, value) pair collected by primops that group values by name
+ * (`zipAttrsWith`, `groupBy`).
+ *
+ * Note that vectors of these can be invisible to the GC (provided that
+ * the values are reachable in some other way for the duration of the
+ * primop, e.g. from the primop's arguments), which avoids allocating
+ * GC-visible (uncollectable) storage for temporaries. The latter is
+ * expensive and a source of GC allocation lock contention during
+ * parallel evaluation.
+ */
+struct NameValue
+{
+    Symbol name;
+    Value * value;
+};
+
+/**
+ * Stably sort `items` by name, so that the values of equal names form
+ * contiguous runs in their original relative order, and return the
+ * number of distinct names. The resulting order is the same as that of
+ * a std::map<Symbol, ...>.
+ */
+static size_t sortByName(std::vector<NameValue> & items)
+{
+    std::stable_sort(
+        items.begin(), items.end(), [](const NameValue & a, const NameValue & b) { return a.name < b.name; });
+
+    size_t nrNames = 0;
+    for (size_t i = 0; i < items.size(); ++i)
+        if (i == 0 || items[i - 1].name != items[i].name)
+            nrNames++;
+    return nrNames;
+}
+
+/**
+ * Call `f(name, list)` for every distinct name in `items` (which must
+ * have been sorted with `sortByName()`), where `list` is a ListBuilder
+ * containing the values associated with that name.
+ */
+template<typename F>
+static void forEachByName(EvalState & state, const std::vector<NameValue> & items, F f)
+{
+    for (size_t i = 0; i < items.size();) {
+        auto sym = items[i].name;
+        size_t j = i;
+        while (j < items.size() && items[j].name == sym)
+            j++;
+        auto list = state.buildList(j - i);
+        for (size_t k = i; k < j; ++k)
+            list[k - i] = items[k].value;
+        f(sym, list);
+        i = j;
+    }
+}
+
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    // We collect all (name, value) pairs into a vector and group them by
-    // stable-sorting on the name, which yields the same attribute order and
-    // per-attribute value order as inserting into a std::map<Symbol, ...>.
-    // Note that it's fine that the vector is invisible to the GC: the values
-    // it points to are kept alive by the attrsets in *args[1], which is
-    // reachable for the duration of this function. This avoids allocating
-    // GC-visible (uncollectable) storage for temporaries, which is expensive
-    // and a source of GC allocation lock contention during parallel
-    // evaluation.
-
-    struct NameValue
-    {
-        Symbol name;
-        Value * value;
-    };
-
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
     const auto listItems = args[1]->listView();
@@ -3727,6 +3767,8 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
         nrAttrs += vElem->attrs()->size();
     }
 
+    /* The vector is invisible to the GC, but that's fine: the values are
+       kept alive by the attrsets in *args[1]. */
     std::vector<NameValue> attrsSeen;
     attrsSeen.reserve(nrAttrs);
 
@@ -3734,24 +3776,9 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
         for (auto & attr : *vElem->attrs())
             attrsSeen.push_back({attr.name, attr.value});
 
-    std::stable_sort(
-        attrsSeen.begin(), attrsSeen.end(), [](const NameValue & a, const NameValue & b) { return a.name < b.name; });
+    auto attrs = state.buildBindings(sortByName(attrsSeen));
 
-    size_t nrNames = 0;
-    for (size_t i = 0; i < attrsSeen.size(); ++i)
-        if (i == 0 || attrsSeen[i - 1].name != attrsSeen[i].name)
-            nrNames++;
-
-    auto attrs = state.buildBindings(nrNames);
-
-    for (size_t i = 0; i < attrsSeen.size();) {
-        auto sym = attrsSeen[i].name;
-        size_t j = i;
-        while (j < attrsSeen.size() && attrsSeen[j].name == sym)
-            j++;
-        auto list = state.buildList(j - i);
-        for (size_t k = i; k < j; ++k)
-            list[k - i] = attrsSeen[k].value;
+    forEachByName(state, attrsSeen, [&](Symbol sym, ListBuilder & list) {
         auto name = Value::toPtr(state.symbols[sym]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
@@ -3760,8 +3787,7 @@ static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args
         arg->mkList(list);
         call2->mkApp(call1, arg);
         attrs.insert(sym, call2);
-        i = j;
-    }
+    });
 
     v.mkAttrs(attrs.alreadySorted());
 }
@@ -4348,26 +4374,24 @@ static void prim_groupBy(EvalState & state, const PosIdx pos, Value ** args, Val
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.groupBy");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.groupBy");
 
-    ValueVectorMap attrs;
+    const auto listItems = args[1]->listView();
 
-    for (auto vElem : args[1]->listView()) {
+    /* The vector is invisible to the GC, but that's fine: the values are
+       kept alive by the list in *args[1]. */
+    std::vector<NameValue> items;
+    items.reserve(listItems.size());
+
+    for (auto vElem : listItems) {
         Value res;
         state.callFunction(*args[0], *vElem, res, pos);
         auto name = state.forceStringNoCtx(
             res, pos, "while evaluating the return value of the grouping function passed to builtins.groupBy");
-        auto sym = state.symbols.create(name);
-        auto vector = attrs.try_emplace<ValueVector>(sym, {}).first;
-        vector->second.push_back(vElem);
+        items.push_back({state.symbols.create(name), vElem});
     }
 
-    auto attrs2 = state.buildBindings(attrs.size());
+    auto attrs2 = state.buildBindings(sortByName(items));
 
-    for (auto & i : attrs) {
-        auto size = i.second.size();
-        auto list = state.buildList(size);
-        memcpy(list.elems, i.second.data(), sizeof(Value *) * size);
-        attrs2.alloc(i.first).mkList(list);
-    }
+    forEachByName(state, items, [&](Symbol sym, ListBuilder & list) { attrs2.alloc(sym).mkList(list); });
 
     v.mkAttrs(attrs2.alreadySorted());
 }
