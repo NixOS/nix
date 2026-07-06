@@ -23,8 +23,10 @@ TODO_NixOS # following line fails.
 # `nix develop` is a slightly special way of dealing with environment vars, it parses
 # these from a shell-file exported from a derivation. This is to test especially `outputs`
 # (which is an associative array in this case) being fine.
+# Unset the caller's `$out`: `nix develop` merges the caller's environment, so an
+# ambient `$out` (e.g. when the suite runs inside a Nix build) would satisfy this vacuously.
 # shellcheck disable=SC2016
-nix develop -f structured-attrs-shell.nix -c bash -c 'test -n "$out"'
+env -u out nix develop -f structured-attrs-shell.nix -c bash -c 'test "$out" = "$(pwd -P)/outputs/out"'
 
 nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_JSON_FILE='
 nix print-dev-env -f structured-attrs-shell.nix | grepQuiet 'NIX_ATTRS_SH_FILE='
