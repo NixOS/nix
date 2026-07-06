@@ -27,7 +27,7 @@ void processExpr(
     const Strings & attrPaths,
     bool parseOnly,
     bool strict,
-    Bindings & autoArgs,
+    const Bindings & autoArgs,
     bool evalOnly,
     OutputKind output,
     bool location,
@@ -172,7 +172,7 @@ static int main_nix_instantiate(int argc, char ** argv)
         auto state = std::make_shared<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
         state->repair = myArgs.repair;
 
-        Bindings & autoArgs = *myArgs.getAutoArgs(*state);
+        const Bindings & autoArgs = *myArgs.getAutoArgs(*state);
 
         if (attrPaths.empty())
             attrPaths = {""};

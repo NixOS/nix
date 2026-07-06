@@ -29,11 +29,15 @@ struct Attr
     Symbol name;
     PosIdx pos;
     Value * value = nullptr;
+
     Attr(Symbol name, Value * value, PosIdx pos = noPos)
         : name(name)
         , pos(pos)
-        , value(value) {};
-    Attr() {};
+        , value(value)
+    {
+    }
+
+    constexpr Attr() {}
 
     auto operator<=>(const Attr & a) const
     {
@@ -70,7 +74,7 @@ public:
      * An instance of bindings objects with 0 attributes.
      * This object must never be modified.
      */
-    static Bindings emptyBindings;
+    static const constinit Bindings emptyBindings;
 
 private:
     /**
@@ -101,7 +105,7 @@ private:
      */
     Attr attrs[0];
 
-    Bindings() = default;
+    constexpr Bindings() = default;
     Bindings(const Bindings &) = delete;
     Bindings(Bindings &&) = delete;
     Bindings & operator=(const Bindings &) = delete;
@@ -550,14 +554,14 @@ public:
 
     Value & alloc(std::string_view name, PosIdx pos = noPos);
 
-    Bindings * finish()
+    const Bindings * finish()
     {
         bindings->sort();
         finishSizeIfNecessary();
         return bindings;
     }
 
-    Bindings * alreadySorted()
+    const Bindings * alreadySorted()
     {
         finishSizeIfNecessary();
         return bindings;

@@ -23,7 +23,7 @@ PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & use
     if (pathExists(manifestFile)) {
         Value v;
         state.evalFile(state.rootPath(CanonPath(manifestFile.string())).resolveSymlinks(), v);
-        Bindings & bindings = Bindings::emptyBindings;
+        const Bindings & bindings = Bindings::emptyBindings;
         getDerivations(state, v, "", bindings, elems, false);
     }
     return elems;
