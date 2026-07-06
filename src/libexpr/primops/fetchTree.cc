@@ -39,7 +39,7 @@ void emitTreeAttrs(
         attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
     else
         // Lazily compute the NAR hash for backward compatibility.
-        attrs.alloc("narHash").mkApp(*get(state.internalPrimOps, "narHash"), &vStorePath);
+        attrs.alloc("narHash").mkApp(**get(state.internalPrimOps, "narHash"), &vStorePath);
 
     if (input.getType() == "git")
         attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));

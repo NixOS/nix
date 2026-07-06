@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <variant>
+#include "nix/expr/root-value.hh"
 
 namespace nix::eval_cache {
 
@@ -44,7 +45,7 @@ public:
 private:
     typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
-    RootValue value;
+    UniqueRootValue value;
 
     Value * getRootValue();
 
@@ -111,7 +112,7 @@ public:
 private:
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     const Parent parent;
-    RootValue _value;
+    UniqueRootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
     AttrKey getKey();

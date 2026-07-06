@@ -10,6 +10,7 @@
 #include <memory_resource>
 #include <exception>
 #include <span>
+#include <utility>
 #include <string_view>
 #include <type_traits>
 #include <concepts>
@@ -1540,13 +1541,6 @@ typedef boost::unordered_flat_map<
     std::equal_to<Symbol>,
     traceable_allocator<std::pair<const Symbol, Value *>>>
     ValueMap;
-
-/**
- * A value allocated in traceable memory.
- */
-typedef std::shared_ptr<Value *> RootValue;
-
-RootValue allocRootValue(Value * v);
 
 void forceNoNullByte(std::string_view s, std::function<Pos()> = nullptr);
 } // namespace nix

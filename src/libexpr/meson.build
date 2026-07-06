@@ -184,6 +184,7 @@ sources = files(
   'print-ambiguous.cc',
   'print.cc',
   'provenance.cc',
+  'root-value.cc',
   'search-path.cc',
   'symbol-table.cc',
   'value-to-json.cc',

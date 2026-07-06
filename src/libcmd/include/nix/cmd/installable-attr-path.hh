@@ -20,13 +20,14 @@
 
 #include <regex>
 #include <queue>
+#include "nix/expr/root-value.hh"
 
 namespace nix {
 
 class InstallableAttrPath : public InstallableValue
 {
     SourceExprCommand & cmd;
-    RootValue v;
+    UniqueRootValue v;
     std::string attrPath;
     ExtendedOutputsSpec extendedOutputsSpec;
 
