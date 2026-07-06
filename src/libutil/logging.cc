@@ -48,7 +48,18 @@ void Logger::warn(const std::string & msg)
 void Logger::writeToStdout(std::string_view s)
 {
     Descriptor standard_out = getStandardOutput();
-    writeFull(standard_out, s);
+    // Call sites emit ANSI escapes unconditionally, and -- unlike the stderr
+    // log path -- nothing filters them here. Strip them when stdout is not an
+    // interactive terminal (or the user set NO_COLOR), following the CLI
+    // guideline that design elements are removed when no TTY is detected on
+    // stdout. Only the escapes are removed, so tab-delimited output (e.g. shell
+    // completions) and other bytes are preserved.
+    static const bool ansi = isTTY(getStandardOutput()) && getEnv("TERM").value_or("dumb") != "dumb"
+                             && !(getEnv("NO_COLOR").has_value() || getEnv("NOCOLOR").has_value());
+    if (ansi)
+        writeFull(standard_out, s);
+    else
+        writeFull(standard_out, stripANSIEscapes(s));
     writeFull(standard_out, "\n");
 }
 
