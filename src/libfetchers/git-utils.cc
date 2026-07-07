@@ -45,6 +45,7 @@
 #include <iostream>
 #include <regex>
 #include <ranges>
+#include <future>
 
 namespace std {
 
@@ -1246,27 +1247,30 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         }
     };
 
-    size_t nextId = 0; // for Child.id
+    /* FIXME: Most of this logic is independent from git. Come up with a tree sink interface
+       and an adapter for a ExtendedFileSystemObjectSink that implements the tarball unpacking
+       semantics (i.e. overwriting of entries). Also deduplicate with MemorySourceAccessor. */
 
     struct Child
     {
         git_filemode_t mode;
-        std::variant<Directory, git_oid> file;
+        std::variant<Directory, git_oid, std::shared_future<git_oid>> file;
 
-        /// Sequential numbering of the file in the tarball. This is
-        /// used to make sure we only import the latest version of a
-        /// path.
-        size_t id{0};
+        const git_oid & getOid() const &
+        {
+            return std::visit(
+                overloaded{
+                    [](const Directory & dir) -> const git_oid & { return dir.oid.value(); },
+                    [](const git_oid & oid) -> const git_oid & { return oid; },
+                    [](const std::shared_future<git_oid> & oid) -> const git_oid & { return oid.get(); },
+                },
+                file);
+        }
     };
 
-    struct State
-    {
-        Directory root;
-    };
+    Directory root;
 
-    Sync<State> _state;
-
-    void addNode(State & state, const CanonPath & path, Child && child)
+    void addNode(const CanonPath & path, Child && child)
     {
         if (path.isRoot())
             throw Error("cannot create a file at the root of the git repository");
@@ -1274,7 +1278,7 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         auto parent = path.parent();
         assert(parent);
 
-        Directory * cur = &state.root;
+        Directory * cur = &root;
 
         for (auto & i : *parent) {
             auto child = std::get_if<Directory>(
@@ -1285,31 +1289,29 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         }
 
         std::string name(*path.baseName());
+        auto prev = cur->children.find(name);
 
-        if (auto prev = cur->children.find(name); prev == cur->children.end() || prev->second.id < child.id)
-            cur->children.insert_or_assign(name, std::move(child));
-    }
-
-    /* Set the object ID of a reserved leaf, skipping if it was superseded (id changed) meanwhile. */
-    void setNodeOid(State & state, const CanonPath & path, const git_oid & oid, size_t id)
-    {
-        auto parent = path.parent();
-        assert(parent);
-
-        Directory * cur = &state.root;
-        for (auto & name : *parent) {
-            auto i = cur->children.find(name);
-            if (i == cur->children.end())
-                return;
-            auto dir = std::get_if<Directory>(&i->second.file);
-            if (!dir)
-                return;
-            cur = dir;
+        if (prev == cur->children.end()) {
+            cur->children.insert_or_assign(std::move(name), std::move(child));
+            return;
         }
 
-        auto i = cur->children.find(*path.baseName());
-        if (i != cur->children.end() && i->second.id == id)
-            i->second.file = oid;
+        /* Overwriting part of the tree. We'd like to behave somewhat
+           similarly to libarchive without ARCHIVE_EXTRACT_NO_OVERWRITE. */
+        const auto & prevChild = prev->second;
+
+        /* libarchive tries to unlink an entry, which only succeeds on empty
+           trees - so behave the same way. Everything else is fair game. */
+        if (const auto * maybePrevDir = std::get_if<Directory>(&prevChild.file)) {
+            /* "Replacing" directory with a directory is always a-ok. */
+            if (std::holds_alternative<Directory>(child.file))
+                return;
+
+            if (!maybePrevDir->children.empty())
+                throw Error("cannot create '%1%', conflicting non-empty directory", path.rel());
+        }
+
+        cur->children.insert_or_assign(std::move(name), std::move(child));
     }
 
     void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)> func) override
@@ -1380,12 +1382,6 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
 
         func(*crf);
 
-        auto id = nextId++;
-        auto mode = crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB;
-
-        /* Reserve the node now, in order; workers fill the oid later. */
-        addNode(*_state.lock(), crf->path, Child{mode, git_oid{}, id});
-
         if (crf->stream) {
             /* Finish the slow path by creating the blob object synchronously.
                Call .release(), since git_blob_create_from_stream_commit
@@ -1393,43 +1389,52 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             git_oid oid;
             if (git_blob_create_from_stream_commit(&oid, crf->stream.release()))
                 throw GitError("creating a blob object for '%s'", path);
-            setNodeOid(*_state.lock(), crf->path, oid, id);
+            addNode(crf->path, Child{crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB, oid});
             return;
         }
 
-        /* Fast path: create the blob object in a separate thread. */
-        workers.enqueue([this, crf{std::move(crf)}, id]() {
-            auto repo(repoPool.get());
+        std::promise<git_oid> promise;
+        addNode(
+            crf->path,
+            Child{
+                crf->executable ? GIT_FILEMODE_BLOB_EXECUTABLE : GIT_FILEMODE_BLOB,
+                promise.get_future(),
+            });
 
-            git_oid oid;
-            if (git_blob_create_from_buffer(&oid, *repo, crf->contents.data(), crf->contents.size()))
-                throw GitError("creating a blob object for '%s' from in-memory buffer", crf->path);
+        /* Fast path: create the blob object in a separate thread.
+           FIXME: Ugly, make ThreadPool use std::move_only_function. */
+        workers.enqueue(
+            [this, crf{std::move(crf)}, promise = make_ref<decltype(promise)>(std::move(promise))]() mutable {
+                auto repo(repoPool.get());
 
-            setNodeOid(*_state.lock(), crf->path, oid, id);
-        });
+                git_oid oid;
+                if (git_blob_create_from_buffer(&oid, *repo, crf->contents.data(), crf->contents.size()))
+                    throw GitError("creating a blob object for '%s' from in-memory buffer", crf->path);
+
+                /* We don't generally bother with exceptions because those will
+                   be propagated by the thread pool during .process(). */
+                promise->set_value(oid);
+            });
     }
 
     void createDirectory(const CanonPath & path) override
     {
         if (path.isRoot())
             return;
-        auto state(_state.lock());
-        addNode(*state, path, {GIT_FILEMODE_TREE, Directory()});
+        addNode(path, {GIT_FILEMODE_TREE, Directory()});
     }
 
     void createSymlink(const CanonPath & path, const std::string & target) override
     {
-        auto id = nextId++;
-        addNode(*_state.lock(), path, Child{GIT_FILEMODE_LINK, git_oid{}, id});
-        workers.enqueue([this, path, target, id]() {
-            auto repo(repoPool.get());
+        /* Symlinks are written to the this repo instance, the mempack backend
+           for which includes the trees. This way we flush both symlinks and
+           trees to the same packfile. Doing this synchronously isn't expensive
+           because symlinks are tiny, so hashing them is cheap. */
+        git_oid oid;
+        if (git_blob_create_from_buffer(&oid, *repo, requireCString(target), target.size()))
+            throw GitError("creating a blob object for tarball symlink member '%s'", path);
 
-            git_oid oid;
-            if (git_blob_create_from_buffer(&oid, *repo, target.c_str(), target.size()))
-                throw GitError("creating a blob object for tarball symlink member '%s'", path);
-
-            setNodeOid(*_state.lock(), path, oid, id);
-        });
+        addNode(path, Child{GIT_FILEMODE_LINK, oid});
     }
 
     std::map<CanonPath, CanonPath> hardLinks;
@@ -1445,16 +1450,14 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
 
         /* Create hard links. */
         {
-            auto state(_state.lock());
             for (auto & [path, target] : hardLinks) {
                 if (target.isRoot())
                     continue;
                 try {
-                    auto child = state->root.lookup(target);
-                    auto oid = std::get_if<git_oid>(&child.file);
-                    if (!oid)
+                    const auto & child = root.lookup(target);
+                    if (std::holds_alternative<Directory>(child.file))
                         throw Error("cannot create a hard link to a directory");
-                    addNode(*state, path, {child.mode, *oid});
+                    addNode(path, {child.mode, child.getOid()});
                 } catch (Error & e) {
                     e.addTrace(nullptr, "while creating a hard link from '%s' to '%s'", path, target);
                     throw;
@@ -1468,30 +1471,30 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             ThreadPool workers{repos.size()};
             for (auto & repo : repos)
                 workers.enqueue([repo]() { repo->flush(); });
+            workers.enqueue([repo = repo]() { repo->flush(); });
             workers.process();
         }
 
         // Write the Git trees to disk. Would be nice to have this multithreaded too, but that's hard because a tree
         // can't refer to an object that hasn't been written yet. Also it doesn't make a big difference for performance.
-        auto repo(repoPool.get());
 
-        [&](this const auto & visit, Directory & node) -> void {
+        [&, &repo = *repo](this const auto & visit, Directory & node) -> void {
             checkInterrupt();
 
             // Write the child directories.
             for (auto & child : node.children)
                 if (auto dir = std::get_if<Directory>(&child.second.file))
+                    /* TODO: Limit recursion depth? */
                     visit(*dir);
 
             // Write this directory.
             git_treebuilder * b;
-            if (git_treebuilder_new(&b, *repo, nullptr))
+            if (git_treebuilder_new(&b, repo, nullptr))
                 throw GitError("creating a tree builder");
             TreeBuilder builder(b);
 
-            for (auto & [name, child] : node.children) {
-                auto oid_p = std::get_if<git_oid>(&child.file);
-                auto oid = oid_p ? *oid_p : std::get<Directory>(child.file).oid.value();
+            for (const auto & [name, child] : node.children) {
+                const auto & oid = child.getOid();
                 if (git_treebuilder_insert(nullptr, builder.get(), name.c_str(), &oid, child.mode))
                     throw GitError("adding a file to a tree builder");
             }
@@ -1500,11 +1503,11 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             if (git_treebuilder_write(&oid, builder.get()))
                 throw GitError("creating a tree object");
             node.oid = oid;
-        }(_state.lock()->root);
+        }(root);
 
         repo->flush();
 
-        return toHash(_state.lock()->root.oid.value());
+        return toHash(root.oid.value());
     }
 };
 
