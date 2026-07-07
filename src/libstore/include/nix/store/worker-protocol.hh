@@ -114,6 +114,7 @@ struct WorkerProto
     static constexpr std::string_view featureProvenance = "provenance";
     static constexpr std::string_view featureVersionedAddToStoreMultiple = "versionedAddToStoreMultiple";
     static constexpr std::string_view featureAddTempRoots = "addTempRoots";
+    static constexpr std::string_view featureQueryPathInfos = "queryPathInfos";
 
     /**
      * A unidirectional read connection, to be used by the read half of the
@@ -240,6 +241,7 @@ enum struct WorkerProto::Op : uint64_t {
     AddPermRoot = 47,
     QueryActiveBuilds = 48,
     AddTempRoots = 49,
+    QueryPathInfos = 50,
 };
 
 struct WorkerProto::ClientHandshakeInfo
