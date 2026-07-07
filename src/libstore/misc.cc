@@ -47,51 +47,61 @@ void Store::computeFSClosure(
         asio::io_context ctx;
         std::exception_ptr ex;
 
-        asio::co_spawn(
-            ctx,
-            [&]() -> asio::awaitable<void> {
-                auto todo = startPaths;
+        StorePathSet required, done;
 
-                StorePathSet required, done;
+        std::function<asio::awaitable<void>(StorePathSet)> doPaths;
+        doPaths = [&](StorePathSet paths) -> asio::awaitable<void> {
+            StorePathSet batch;
+            for (auto & path : std::exchange(paths, {}))
+                if (done.insert(path).second)
+                    batch.insert(path);
 
-                while (!todo.empty()) {
-                    StorePathSet batch;
-                    for (auto & path : std::exchange(todo, {}))
-                        if (done.insert(path).second)
-                            batch.insert(path);
+            auto executor = co_await asio::this_coro::executor;
 
-                    co_await queryPathInfos(
-                        batch, [&](std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> infos) {
-                            for (auto & [path, info] : infos) {
-                                if (!info) {
-                                    if (required.contains(path))
-                                        throw InvalidPath("path '%s' is not valid", printStorePath(path));
-                                    continue;
-                                }
+            co_await queryPathInfos(
+                batch, [&](std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> infos) {
+                    StorePathSet todo;
 
-                                out.insert(path);
+                    for (auto & [path, info] : infos) {
+                        if (!info) {
+                            if (required.contains(path))
+                                throw InvalidPath("path '%s' is not valid", printStorePath(path));
+                            continue;
+                        }
 
-                                for (auto & ref : info->references)
-                                    if (ref != path) {
-                                        required.insert(ref);
-                                        todo.insert(ref);
-                                    }
+                        out.insert(path);
 
-                                if (includeOutputs && path.isDerivation())
-                                    // FIXME: need an async, multiple-path version of queryPartialDerivationOutputMap().
-                                    for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                                        if (maybeOutPath)
-                                            todo.insert(*maybeOutPath);
-
-                                if (includeDerivers && info->deriver)
-                                    todo.insert(*info->deriver);
+                        for (auto & ref : info->references)
+                            if (ref != path) {
+                                required.insert(ref);
+                                todo.insert(ref);
                             }
-                        });
-                }
 
-                co_return;
-            },
-            [&](std::exception_ptr e) { ex = e; });
+                        if (includeOutputs && path.isDerivation())
+                            // FIXME: need an async, multiple-path version of queryPartialDerivationOutputMap().
+                            for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                                if (maybeOutPath)
+                                    todo.insert(*maybeOutPath);
+
+                        if (includeDerivers && info->deriver)
+                            todo.insert(*info->deriver);
+
+                        // FIXME: process partialClosure when we merge
+                        // https://github.com/DeterminateSystems/nix-src/pull/523.
+                    }
+
+                    if (!todo.empty())
+                        asio::co_spawn(executor, std::bind(doPaths, todo), [&](std::exception_ptr e) {
+                            if (e)
+                                ex = e;
+                        });
+                });
+        };
+
+        asio::co_spawn(ctx, std::bind(doPaths, startPaths), [&](std::exception_ptr e) {
+            if (e)
+                ex = e;
+        });
 
         ctx.run();
         if (ex)
