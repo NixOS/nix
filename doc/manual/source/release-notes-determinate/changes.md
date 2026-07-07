@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.3.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.4.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -212,3 +212,5 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 * `nix optimise store` is  multi-threaded in Determinate Nix. [DeterminateSystems/nix-src#492](https://github.com/DeterminateSystems/nix-src/pull/492)
 
 <!-- Determinate Nix version 3.21.3 -->
+
+<!-- Determinate Nix version 3.21.4 -->
