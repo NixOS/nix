@@ -214,5 +214,3 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 <!-- Determinate Nix version 3.21.3 -->
 
 <!-- Determinate Nix version 3.21.4 -->
-
-* fixup: publish step by @cole-h in [DeterminateSystems/nix-src#543](https://github.com/DeterminateSystems/nix-src/pull/543)
