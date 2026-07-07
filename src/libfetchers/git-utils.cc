@@ -99,6 +99,32 @@ struct GitError final : public CloneableError<GitError, Error>
     }
 };
 
+struct GitIndexerSink final : public BufferedSink
+{
+    git_indexer * indexer;
+    git_indexer_progress stats{};
+
+    GitIndexerSink(git_indexer * indexer)
+        : BufferedSink(1 * 1024 * 1024)
+        , indexer(indexer)
+    {
+        assert(indexer);
+    }
+
+    GitIndexerSink(GitIndexerSink &&) = delete;
+    GitIndexerSink(const GitIndexerSink &) = delete;
+    GitIndexerSink & operator=(GitIndexerSink &&) = delete;
+    GitIndexerSink & operator=(const GitIndexerSink &) = delete;
+    ~GitIndexerSink() = default;
+
+    void writeUnbuffered(std::string_view data) override
+    {
+        checkInterrupt();
+        if (git_indexer_append(indexer, data.data(), data.size(), &stats))
+            throw GitError("appending to git packfile index");
+    }
+};
+
 } // namespace
 
 typedef std::unique_ptr<git_repository, Deleter<git_repository_free>> Repository;
@@ -337,52 +363,79 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void flush() override
     {
+        std::size_t objectCount;
+        if (git_mempack_object_count(&objectCount, mempackBackend))
+            throw GitError("querying the number of objects in a git memory packer backend");
+
+        if (!objectCount)
+            /* Nothing to do. */
+            return;
+
         checkInterrupt();
 
-        git_buf buf = GIT_BUF_INIT;
-        Finally _disposeBuf{[&] { git_buf_dispose(&buf); }};
         PackBuilder packBuilder;
         PackBuilderContext packBuilderContext;
-        git_packbuilder_new(Setter(packBuilder), *this);
-        git_packbuilder_set_callbacks(packBuilder.get(), PACKBUILDER_PROGRESS_CHECK_INTERRUPT, &packBuilderContext);
+        if (git_packbuilder_new(Setter(packBuilder), *this))
+            throw GitError("creating git pack builder");
+
+        if (git_packbuilder_set_callbacks(packBuilder.get(), PACKBUILDER_PROGRESS_CHECK_INTERRUPT, &packBuilderContext))
+            throw GitError("setting git pack builder callbacks");
+
         git_packbuilder_set_threads(packBuilder.get(), 0 /* autodetect */);
 
         packBuilderContext.handleException(
             "preparing packfile", git_mempack_write_thin_pack(mempackBackend, packBuilder.get()));
         checkInterrupt();
-        packBuilderContext.handleException("writing packfile", git_packbuilder_write_buf(&buf, packBuilder.get()));
-        checkInterrupt();
 
-        std::string repo_path = std::string(git_repository_path(repo.get()));
-        while (!repo_path.empty() && repo_path.back() == '/')
-            repo_path.pop_back();
-        std::string pack_dir_path = repo_path + "/objects/pack";
+        auto packFilesPath = std::filesystem::path(git_repository_path(repo.get())) / "objects/pack";
 
-        // TODO (performance): could the indexing be done in a separate thread?
-        //                     we'd need a more streaming variation of
-        //                     git_packbuilder_write_buf, or incur the cost of
-        //                     copying parts of the buffer to a separate thread.
-        //                     (synchronously on the git_packbuilder_write_buf thread)
         Indexer indexer;
-        git_indexer_progress stats;
-        if (git_indexer_new(Setter(indexer), pack_dir_path.c_str(), 0, nullptr, nullptr))
+        if (git_indexer_new(Setter(indexer), packFilesPath.c_str(), 0, nullptr, nullptr))
             throw GitError("creating git packfile indexer");
 
-        // TODO: provide index callback for checkInterrupt() termination
-        //       though this is about an order of magnitude faster than the packbuilder
-        //       expect up to 1 sec latency due to uninterruptible git_indexer_append.
-        constexpr size_t chunkSize = 128 * 1024;
-        for (size_t offset = 0; offset < buf.size; offset += chunkSize) {
-            if (git_indexer_append(indexer.get(), buf.ptr + offset, std::min(chunkSize, buf.size - offset), &stats))
-                throw GitError("appending to git packfile index");
-            checkInterrupt();
-        }
+        struct State
+        {
+            Indexer & indexer;
+            PackBuilderContext & packBuilderContext;
+            GitIndexerSink sink{indexer.get()};
+        };
+
+        State state{
+            .indexer = indexer,
+            .packBuilderContext = packBuilderContext,
+        };
+
+        packBuilderContext.handleException(
+            "writing packfile",
+            git_packbuilder_foreach(
+                packBuilder.get(),
+                [](void * buf, size_t size, void * payload) -> int {
+                    auto & state = *static_cast<State *>(payload);
+                    try {
+                        state.sink(std::string_view(static_cast<const char *>(buf), size));
+                    } catch (...) {
+                        state.packBuilderContext.exception = std::current_exception();
+                        return GIT_EUSER;
+                    }
+                    return GIT_OK;
+                },
+                &state));
+
+        state.sink.flush();
+
+        auto & stats = state.sink.stats;
 
         if (git_indexer_commit(indexer.get(), &stats))
             throw GitError("committing git packfile index");
 
         if (git_mempack_reset(mempackBackend))
             throw GitError("resetting git mempack backend");
+
+        debug(
+            "committed index and pack file to pack-%s.{idx,pack}, objects = %d, deltas = %d",
+            git_indexer_name(indexer.get()),
+            stats.total_objects,
+            stats.total_deltas);
 
         checkInterrupt();
     }
