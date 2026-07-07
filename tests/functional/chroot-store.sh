@@ -60,6 +60,15 @@ PATH7=$(nix path-info --store "local://$TEST_ROOT/x%2Bchroot" "$CORRECT_PATH")
 # Path gets decoded.
 [[ ! -d "$TEST_ROOT/x%2Bchroot" ]]
 
+# Regression test: `nix-store --register-validity` against a chroot store must
+# canonicalise the real (chroot-prefixed) path, not the logical store path
+# (which does not exist on the host filesystem).
+regPath=$NIX_STORE_DIR/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-reg
+touch "$TEST_ROOT/x/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-reg"
+[[ ! -e "$regPath" ]]
+(echo "$regPath" && echo && echo 0) | nix-store --store "local?root=$TEST_ROOT/x" --register-validity
+nix-store --store "$TEST_ROOT/x" --check-validity "$regPath"
+
 # Ensure store info trusted works with local store
 nix --store "$TEST_ROOT/x" store info --json | jq -e '.trusted'
 
