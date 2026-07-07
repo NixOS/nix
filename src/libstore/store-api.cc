@@ -613,6 +613,25 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
         }});
 }
 
+asio::awaitable<void> Store::queryPathInfos(
+    const std::set<StorePath> & paths,
+    fun<void(std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>>)> callback)
+{
+    /* Default implementation: query each path individually, reporting
+       each result as it arrives. */
+    co_await forEachAsync(paths, [&](const StorePath & path) -> asio::awaitable<void> {
+        std::shared_ptr<const ValidPathInfo> info;
+        try {
+            auto i = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
+                [&](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+            info = i.get_ptr();
+        } catch (InvalidPath &) {
+        }
+        std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> result{{path, info}};
+        callback(std::move(result));
+    });
+}
+
 void Store::queryRealisation(
     const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept
 {
