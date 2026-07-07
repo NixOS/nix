@@ -224,11 +224,6 @@ struct ExternalAuthSource : AuthSource
     {
         return run("store", authData).has_value();
     }
-
-    void erase(const AuthData & authData) override
-    {
-        run("erase", authData);
-    }
 };
 
 } // namespace
@@ -241,21 +236,25 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
     if (!request.host)
         throw Error("authentication request %s does not specify a host", request);
 
-    std::lock_guard<std::mutex> lock(mutex);
+    {
+        auto cache(cache_.lock());
+        for (auto & entry : *cache)
+            if (auto res = entry.match(request)) {
+                debug("authentication cache hit for %s", request);
+                return res;
+            }
+    }
 
-    for (auto & entry : cache)
-        if (auto res = entry.match(request)) {
-            debug("authentication cache hit for %s", request);
-            return res;
-        }
-
+    /* Query sources without holding the cache lock: external helpers
+       may block on subprocesses or user interaction, and we don't want
+       to serialise unrelated transfers behind that. */
     for (auto & authSource : authSources)
         if (auto res = authSource->get(request, required)) {
             /* Cache host-scoped: sources return `res` seeded from the
                request (including its exact path), which would only ever
                match that one URL again. */
             res->path.reset();
-            cache.push_back(*res);
+            cache_.lock()->push_back(*res);
             return res;
         }
 
@@ -278,7 +277,7 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
 
         if (res.userName && !res.userName->empty() && res.password && !res.password->empty()) {
             res.path.reset();
-            cache.push_back(res);
+            cache_.lock()->push_back(res);
             if (authSettings.storeAuth)
                 for (auto & authSource : authSources)
                     if (authSource->set(res))
@@ -293,22 +292,13 @@ std::optional<AuthData> Authenticator::fill(const AuthData & request, bool requi
 void Authenticator::reject(const AuthData & authData)
 {
     debug("rejecting authentication data %s", authData);
-    std::lock_guard<std::mutex> lock(mutex);
-    std::erase_if(cache, [&](const AuthData & entry) { return entry.match(authData).has_value(); });
-    for (auto & authSource : authSources)
-        authSource->erase(authData);
-}
-
-void Authenticator::addAuthSource(ref<AuthSource> authSource)
-{
-    std::lock_guard<std::mutex> lock(mutex);
-    authSources.push_back(authSource);
-}
-
-void Authenticator::setAuthSource(ref<AuthSource> authSource)
-{
-    std::lock_guard<std::mutex> lock(mutex);
-    authSources = {authSource};
+    /* Only invalidate the in-process cache. Propagating an `erase` to
+       external helpers would fork a subprocess from whichever thread
+       observed the 401 (currently the curl worker), and a transient
+       server-side auth failure shouldn't destructively modify the
+       user's credential store. */
+    auto cache(cache_.lock());
+    std::erase_if(*cache, [&](const AuthData & entry) { return entry.match(authData).has_value(); });
 }
 
 ref<Authenticator> getAuthenticator()

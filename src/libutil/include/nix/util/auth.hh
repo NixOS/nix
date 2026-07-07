@@ -1,12 +1,12 @@
 #pragma once
 ///@file
 
-#include <mutex>
 #include <optional>
 
 #include "nix/util/types.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
+#include "nix/util/sync.hh"
 
 namespace nix::auth {
 
@@ -93,21 +93,21 @@ struct AuthSource
     {
         return false;
     }
-
-    virtual void erase(const AuthData & authData) {}
 };
 
 class Authenticator
 {
     /**
-     * Guards `authSources` and `cache`. `fill()`/`reject()` may be
-     * called concurrently (e.g. from substituter threads).
+     * Immutable after construction so it can be read without
+     * synchronisation while helpers run.
      */
-    std::mutex mutex;
+    const std::vector<ref<AuthSource>> authSources;
 
-    std::vector<ref<AuthSource>> authSources;
-
-    std::vector<AuthData> cache;
+    /**
+     * Positive cache of resolved credentials. `fill()`/`reject()` may
+     * be called concurrently (e.g. from substituter threads).
+     */
+    Sync<std::vector<AuthData>> cache_;
 
 public:
 
@@ -118,11 +118,12 @@ public:
 
     std::optional<AuthData> fill(const AuthData & request, bool required);
 
+    /**
+     * Drop `authData` from the in-process cache so the next `fill()`
+     * re-queries the sources. Cheap enough to call from latency-
+     * sensitive contexts (e.g. the curl worker thread).
+     */
     void reject(const AuthData & authData);
-
-    void addAuthSource(ref<AuthSource> authSource);
-
-    void setAuthSource(ref<AuthSource> authSource);
 };
 
 ref<Authenticator> getAuthenticator();
