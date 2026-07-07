@@ -1,0 +1,8 @@
+# vim: filetype=meson
+
+option(
+  'git-program',
+  type : 'string',
+  value : 'git',
+  description : 'the git program used for fetching, ls-remote and signature verification (a name resolved via PATH, or an absolute path)',
+)
