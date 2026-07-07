@@ -273,6 +273,8 @@ configdata_priv.set_quoted(
 : 'lsof',
 )
 
+configdata_priv.set_quoted('SSH_PROGRAM', get_option('ssh-program'))
+
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'store-config-private.hh',

@@ -39,3 +39,10 @@ option(
   type : 'feature',
   description : 'build support for AWS authentication with S3',
 )
+
+option(
+  'ssh-program',
+  type : 'string',
+  value : 'ssh',
+  description : 'the ssh program used for remote stores, remote builders and store copies (a name resolved via PATH, or an absolute path)',
+)
