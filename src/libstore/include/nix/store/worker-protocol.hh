@@ -136,6 +136,11 @@ struct WorkerProto
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
     /**
+     * Feature for the addTempRoots() operation.
+     */
+    static constexpr std::string_view featureAddTempRoots = "addTempRoots";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -256,6 +261,7 @@ enum struct WorkerProto::Op : uint64_t {
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    AddTempRoots = 49,
 };
 
 struct WorkerProto::ClientHandshakeInfo
