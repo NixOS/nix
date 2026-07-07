@@ -12,7 +12,6 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/url.hh"
-#include "nix/util/auth.hh"
 
 #include "nix/store/config.hh"
 #if NIX_WITH_AWS_AUTH
@@ -308,20 +307,11 @@ struct FileTransferRequest
      */
     std::optional<UsernameAuth> usernameAuth;
 
-    /**
-     * Consulted for HTTP credentials when `usernameAuth` is unset.
-     */
-    ref<auth::Authenticator> authenticator;
-
     /// Path used for credential matching instead of `uri`'s path.
     std::optional<std::string> authPath;
 
     /// Whether the authenticator may prompt the user for credentials.
     bool requireAuth = false;
-
-    /// Credentials resolved by `setupAuth()`, kept so they can be
-    /// rejected if the server returns 401.
-    std::optional<auth::AuthData> authData;
 #if NIX_WITH_AWS_AUTH
     /**
      * Pre-resolved AWS session token for S3 requests.
@@ -330,7 +320,11 @@ struct FileTransferRequest
     std::optional<std::string> preResolvedAwsSessionToken;
 #endif
 
-    FileTransferRequest(VerbatimURL uri);
+    FileTransferRequest(VerbatimURL uri)
+        : uri(std::move(uri))
+        , parentAct(getCurActivity())
+    {
+    }
 
     /**
      * `uri` with any userinfo (`user:password@`) stripped, for use in
@@ -376,14 +370,6 @@ struct FileTransferRequest
     }
 
     void setupForS3();
-
-    /**
-     * Resolve credentials via the authenticator into `usernameAuth`,
-     * unless they were already set explicitly (e.g. S3 access keys).
-     * Run on the enqueueing thread, since it may execute credential
-     * helpers or prompt the user.
-     */
-    void setupAuth();
 
 private:
     friend struct curlFileTransfer;
