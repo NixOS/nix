@@ -747,17 +747,40 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
 
 void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
+    if (paths.empty())
+        return;
+
     auto conn(getConnection());
 
-    for (auto & path : paths) {
-        if (conn->tempRootsPinned.get(path))
-            continue;
-
-        /* Unclear if adding a new operation would be worthwhile */
+    if (conn->protoVersion.features.contains(WorkerProto::featureAddTempRoots)) {
+        StorePathSet newPaths;
         for (auto & path : paths)
+            if (!conn->tempRootsPinned.get(path))
+                newPaths.insert(path);
+
+        if (newPaths.empty())
+            return;
+
+        conn->to << WorkerProto::Op::AddTempRoots;
+        WorkerProto::write(*this, *conn, newPaths);
+        conn.processStderr();
+        readInt(conn->from);
+
+        for (auto & path : newPaths)
+            conn->tempRootsPinned.upsert(path, true);
+    } else {
+        /* Fallback for daemons that don't support the batched
+           operation. Note that this is very slow for large sets of
+           paths on high-latency links, due to a network round-trip per
+           path. */
+        for (auto & path : paths) {
+            if (conn->tempRootsPinned.get(path))
+                continue;
+
             conn->addTempRoot(*this, &conn.daemonException, path);
 
-        conn->tempRootsPinned.upsert(path, true);
+            conn->tempRootsPinned.upsert(path, true);
+        }
     }
 }
 

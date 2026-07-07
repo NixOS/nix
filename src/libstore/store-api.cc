@@ -1029,8 +1029,7 @@ std::map<StorePath, StorePath> copyPaths(
     CheckSigsFlag checkSigs,
     SubstituteFlag substitute)
 {
-    for (auto & path : storePaths)
-        dstStore.addTempRoot(path);
+    dstStore.addTempRoots(storePaths);
 
     auto valid = dstStore.queryValidPaths(storePaths, substitute);
 
