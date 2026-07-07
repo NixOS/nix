@@ -219,7 +219,7 @@ jobs:
   publish:
     needs:
       - success
-    if: (!github.event.repository.fork && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
+    if: (github.repository == 'DeterminateSystems/nix-src' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
     environment: ${{ github.event_name == 'release' && 'production' || '' }}
     runs-on: ubuntu-latest
     permissions:
