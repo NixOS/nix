@@ -190,6 +190,129 @@ TEST_F(GitUtilsTest, sink_no_parent_dir_hardlink)
         ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("parent of 'foo/bar' is not a directory")));
 }
 
+TEST_F(GitUtilsTest, sink_replacing_empty_directory)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createDirectory(CanonPath::root);
+    sink->createDirectory(CanonPath("foo"));
+    sink->createDirectory(CanonPath("foo/bar"));
+    /* Under tarball unpacking semantics, creating the same directories
+       (implicitly or explicitly) is fine. */
+    sink->createDirectory(CanonPath("foo/bar"));
+    sink->createDirectory(CanonPath("foo"));
+
+    sink->createRegularFile(CanonPath("foo/bar"), [](CreateRegularFileSink & fileSink) {
+        writeString(fileSink, "test", /*executable=*/false);
+    });
+
+    auto accessor = repo->getAccessor(sink->flush(), {}, getRepoName());
+
+    ASSERT_THAT(accessor, testing::HasDirectory(CanonPath("foo"), std::set<std::string>{"bar"}));
+    ASSERT_THAT(accessor, testing::HasContents(CanonPath("foo/bar"), "test"));
+}
+
+TEST_F(GitUtilsTest, sink_replacing_non_empty_directory)
+{
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createDirectory(CanonPath::root);
+            sink->createDirectory(CanonPath("foo"));
+            sink->createDirectory(CanonPath("foo/bar"));
+
+            /* This fails. libarchive (and other tarball unpackers) doesn't recursive unlink existing non-empty
+               directories.
+               https://github.com/libarchive/libarchive/blob/761652401fe35fca9744607a0cf0009afbf04f42/libarchive/archive_write_disk_posix.c#L3411-L3417
+             */
+
+            sink->createRegularFile(CanonPath("foo"), [](CreateRegularFileSink & fileSink) {
+                writeString(fileSink, "test", /*executable=*/false);
+            });
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("cannot create 'foo', conflicting non-empty directory")));
+}
+
+TEST_F(GitUtilsTest, sink_hardlink_to_directory)
+{
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createDirectory(CanonPath::root);
+            sink->createDirectory(CanonPath("foo"));
+            sink->createHardlink(CanonPath("bar"), CanonPath("foo"));
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("cannot create a hard link to a directory")));
+}
+
+TEST_F(GitUtilsTest, sink_hardlink_to_directory_root)
+{
+    auto repo = openRepo();
+    auto sink = repo->getFileSystemObjectSink();
+
+    sink->createDirectory(CanonPath::root);
+    sink->createDirectory(CanonPath("foo"));
+    sink->createHardlink(CanonPath("bar"), CanonPath::root);
+
+    auto accessor = repo->getAccessor(sink->flush(), {}, getRepoName());
+
+    /* FIXME: Why does it behave this way? This seems like a bug. */
+    ASSERT_THAT(
+        accessor,
+        testing::HasDirectory(
+            CanonPath::root,
+            std::set<std::string>{
+                "foo",
+            }));
+}
+
+TEST_F(GitUtilsTest, sink_hardlink_to_self)
+{
+    /* Here we are more strict than libarchive, which only warns on cyclic hardlinks.
+       https://github.com/libarchive/libarchive/blob/761652401fe35fca9744607a0cf0009afbf04f42/libarchive/archive_write_disk_posix.c#L632-L641
+     */
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createDirectory(CanonPath::root);
+            sink->createHardlink(CanonPath("foo"), CanonPath("foo"));
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(testing::HasSubstrIgnoreANSIMatcher("/foo")));
+}
+
+TEST_F(GitUtilsTest, sink_non_directory_root)
+{
+    /* FIXME: Allow non-directory roots. GitFileSystemObjectSink is too tarball-brained. */
+    ASSERT_THAT(
+        [&]() {
+            auto repo = openRepo();
+            auto sink = repo->getFileSystemObjectSink();
+
+            sink->createRegularFile(CanonPath::root, [](CreateRegularFileSink & fileSink) {
+                writeString(fileSink, "test", /*executable=*/false);
+            });
+
+            sink->flush();
+        },
+        ::testing::ThrowsMessage<Error>(
+            testing::HasSubstrIgnoreANSIMatcher("cannot create a file at the root of the git repository")));
+}
+
 TEST_F(GitUtilsTest, peel_reference)
 {
     // Create a commit in the repo
