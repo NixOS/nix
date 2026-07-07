@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.2.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.3.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -210,3 +210,40 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 <!-- Determinate Nix version 3.21.2 -->
 
 * `nix optimise store` is  multi-threaded in Determinate Nix. [DeterminateSystems/nix-src#492](https://github.com/DeterminateSystems/nix-src/pull/492)
+
+<!-- Determinate Nix version 3.21.3 -->
+
+* Allow local networking in libmicrohttpd and functional tests by @lilyinstarlight in [DeterminateSystems/nix-src#518](https://github.com/DeterminateSystems/nix-src/pull/518)
+
+* Make queryMissing(), computeClosure() etc async by @edolstra in [DeterminateSystems/nix-src#514](https://github.com/DeterminateSystems/nix-src/pull/514)
+
+* Don't ignore substitution failures for BasicDerivation inputSrcs by @edolstra in [DeterminateSystems/nix-src#520](https://github.com/DeterminateSystems/nix-src/pull/520)
+
+* Sync with upstream 2.34-maintenance by @edolstra in [DeterminateSystems/nix-src#521](https://github.com/DeterminateSystems/nix-src/pull/521)
+
+* fixup: make binary cache nuclear option more general by @cole-h in [DeterminateSystems/nix-src#524](https://github.com/DeterminateSystems/nix-src/pull/524)
+
+* NarInfoDiskCache: Support arbitrary nix-cache-info fields by @edolstra in [DeterminateSystems/nix-src#525](https://github.com/DeterminateSystems/nix-src/pull/525)
+
+* ci: update DSP on releases by @cole-h in [DeterminateSystems/nix-src#526](https://github.com/DeterminateSystems/nix-src/pull/526)
+
+* Add some calls to addTempRoot() by @edolstra in [DeterminateSystems/nix-src#527](https://github.com/DeterminateSystems/nix-src/pull/527)
+
+* flake.lock: Update by @edolstra in [DeterminateSystems/nix-src#529](https://github.com/DeterminateSystems/nix-src/pull/529)
+
+* Fix INITIAL_MARK_STACK_SIZE override in boehm-gc by @edolstra in [DeterminateSystems/nix-src#531](https://github.com/DeterminateSystems/nix-src/pull/531)
+
+* nix search: Print total number of derivations by @edolstra in [DeterminateSystems/nix-src#532](https://github.com/DeterminateSystems/nix-src/pull/532)
+
+* Make zipAttrsWith more parallel-eval friendly by @edolstra in [DeterminateSystems/nix-src#535](https://github.com/DeterminateSystems/nix-src/pull/535)
+
+* builtins.groupBy: Drop ValueVectorMap by @edolstra in [DeterminateSystems/nix-src#536](https://github.com/DeterminateSystems/nix-src/pull/536)
+
+* ExprAttrs::eval: Don't write to the shared empty Bindings by @edolstra in [DeterminateSystems/nix-src#537](https://github.com/DeterminateSystems/nix-src/pull/537)
+
+* Fix very slow remote temp root registration in copyPaths() by @edolstra in [DeterminateSystems/nix-src#538](https://github.com/DeterminateSystems/nix-src/pull/538)
+
+* Make computeFSClosure() much faster over SSH by @edolstra in [DeterminateSystems/nix-src#539](https://github.com/DeterminateSystems/nix-src/pull/539)
+
+
+* @lilyinstarlight made their first contribution in [DeterminateSystems/nix-src#518](https://github.com/DeterminateSystems/nix-src/pull/518)
