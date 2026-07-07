@@ -33,6 +33,9 @@ deps_private += rapidcheck
 gtest = dependency('gtest', main : true)
 deps_private += gtest
 
+gmock = dependency('gmock')
+deps_private += gmock
+
 libgit2 = dependency('libgit2')
 deps_private += libgit2
 

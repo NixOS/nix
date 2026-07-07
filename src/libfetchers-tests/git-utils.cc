@@ -86,13 +86,24 @@ TEST_F(GitUtilsTest, sink_basic)
 
     auto result = repo->dereferenceSingletonDirectory(sink->flush());
     auto accessor = repo->getAccessor(result, {}, getRepoName());
-    auto entries = accessor->readDirectory(CanonPath::root);
-    ASSERT_EQ(entries.size(), 5u);
-    ASSERT_EQ(accessor->readFile(CanonPath("hello")), "hello world");
-    ASSERT_EQ(accessor->readFile(CanonPath("bye")), "thanks for all the fish");
-    ASSERT_EQ(accessor->readLink(CanonPath("bye-link")), "bye");
-    ASSERT_EQ(accessor->readDirectory(CanonPath("empty")).size(), 0u);
-    ASSERT_EQ(accessor->readFile(CanonPath("links/foo")), "hello world");
+
+    ASSERT_THAT(
+        accessor,
+        testing::HasDirectory(
+            CanonPath::root,
+            std::set<std::string>{
+                "hello",
+                "bye",
+                "bye-link",
+                "empty",
+                "links",
+            }));
+
+    ASSERT_THAT(accessor, testing::HasContents(CanonPath("hello"), "hello world"));
+    ASSERT_THAT(accessor, testing::HasContents(CanonPath("bye"), "thanks for all the fish"));
+    ASSERT_THAT(accessor, testing::HasSymlink(CanonPath("bye-link"), "bye"));
+    ASSERT_THAT(accessor, testing::HasDirectory(CanonPath("empty"), std::set<std::string>{}));
+    ASSERT_THAT(accessor, testing::HasContents(CanonPath("links/foo"), "hello world"));
 };
 
 TEST_F(GitUtilsTest, sink_hardlink)
