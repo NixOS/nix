@@ -1204,6 +1204,11 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
     {
     }
 
+    GitFileSystemObjectSinkImpl(GitFileSystemObjectSinkImpl &&) = delete;
+    GitFileSystemObjectSinkImpl(const GitFileSystemObjectSinkImpl &) = delete;
+    GitFileSystemObjectSinkImpl & operator=(GitFileSystemObjectSinkImpl &&) = delete;
+    GitFileSystemObjectSinkImpl & operator=(const GitFileSystemObjectSinkImpl &) = delete;
+
     ~GitFileSystemObjectSinkImpl()
     {
         // Make sure the worker threads are destroyed before any state
