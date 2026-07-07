@@ -21,6 +21,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/active-builds.hh"
 #include "nix/util/provenance.hh"
+#include "nix/util/async.hh"
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
@@ -883,6 +884,37 @@ static void performOp(
         } else {
             conn.to << 0;
         }
+        break;
+    }
+
+    case WorkerProto::Op::QueryPathInfos: {
+        auto paths = WorkerProto::Serialise<StorePathSet>::read(*store, rconn);
+        logger->startWork();
+        std::vector<ValidPathInfo> infos;
+        {
+            asio::io_context ctx;
+            std::exception_ptr ex;
+            asio::co_spawn(
+                ctx,
+                [&]() -> asio::awaitable<void> {
+                    co_await store->queryPathInfos(
+                        paths, [&](std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> results) {
+                            for (auto & [path, info] : results)
+                                if (info)
+                                    infos.push_back(*info);
+                        });
+                },
+                [&](std::exception_ptr e) { ex = e; });
+            ctx.run();
+            if (ex)
+                std::rethrow_exception(ex);
+        }
+        logger->stopWork();
+        /* Write the infos for the valid paths. Paths not reported are
+           invalid. */
+        conn.to << infos.size();
+        for (auto & info : infos)
+            WorkerProto::write(*store, wconn, info);
         break;
     }
 

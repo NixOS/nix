@@ -246,6 +246,71 @@ void RemoteStore::queryPathInfoUncached(
     }
 }
 
+asio::awaitable<void> RemoteStore::queryPathInfos(
+    const std::set<StorePath> & paths,
+    fun<void(std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>>)> callback)
+{
+    /* Filter out paths that we already have cached. */
+    StorePathSet uncached;
+    {
+        std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> cached;
+        for (auto & path : paths) {
+            if (auto r = queryPathInfoFromClientCache(path))
+                cached.emplace_back(path, *r);
+            else
+                uncached.insert(path);
+        }
+        if (!cached.empty())
+            callback(std::move(cached));
+    }
+
+    if (uncached.empty())
+        co_return;
+
+    {
+        auto conn(getConnection());
+
+        if (conn->protoVersion.features.contains(WorkerProto::featureQueryPathInfos)) {
+            auto cacheResult = [&](const StorePath & path, std::shared_ptr<const ValidPathInfo> info) {
+                pathInfoCache->lock()->upsert(path, PathInfoCacheValue{.value = info});
+            };
+
+            conn->to << WorkerProto::Op::QueryPathInfos;
+            WorkerProto::write(*this, *conn, uncached);
+            conn.processStderr();
+
+            /* Read the infos for the valid paths. Paths not reported
+               by the daemon are invalid. */
+            auto todo = uncached;
+            auto n = readNum<size_t>(conn->from);
+            std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> results;
+            for (size_t i = 0; i < n; i++) {
+                auto info =
+                    std::make_shared<const ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
+                if (!todo.erase(info->path))
+                    throw Error("daemon returned path info for unexpected path '%s'", printStorePath(info->path));
+                cacheResult(info->path, info);
+                results.emplace_back(info->path, info);
+            }
+
+            for (auto & path : todo) {
+                cacheResult(path, nullptr);
+                results.emplace_back(path, nullptr);
+            }
+
+            callback(std::move(results));
+
+            co_return;
+        }
+
+        /* Release the connection to prevent the fallback below from
+           deadlocking on the connection pool. */
+    }
+
+    /* Fallback for daemons that don't support the batched operation. */
+    co_await Store::queryPathInfos(uncached, std::move(callback));
+}
+
 void RemoteStore::queryReferrers(const StorePath & path, StorePathSet & referrers)
 {
     auto conn(getConnection());

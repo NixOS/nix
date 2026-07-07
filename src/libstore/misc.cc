@@ -19,15 +19,11 @@
 namespace nix {
 
 void Store::computeFSClosure(
-    const StorePathSet & startPaths,
-    StorePathSet & paths_,
-    bool flipDirection,
-    bool includeOutputs,
-    bool includeDerivers)
+    const StorePathSet & startPaths, StorePathSet & out, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {
-    std::function<asio::awaitable<StorePathSet>(const StorePath & path)> queryDeps;
-    if (flipDirection)
-        queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
+    if (flipDirection) {
+        std::function<asio::awaitable<StorePathSet>(const StorePath & path)> queryDeps =
+            [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
             StorePathSet res;
             StorePathSet referrers;
             queryReferrers(path, referrers);
@@ -45,27 +41,62 @@ void Store::computeFSClosure(
                         res.insert(*maybeOutPath);
             co_return res;
         };
-    else
-        queryDeps = [this, includeOutputs, includeDerivers](const StorePath & path) -> asio::awaitable<StorePathSet> {
-            StorePathSet res;
-            auto info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
-                [this, path](Callback<ref<const ValidPathInfo>> cb) { queryPathInfo(path, std::move(cb)); });
+        computeClosure<StorePath>(startPaths, out, GetEdgesAsync<StorePath>(queryDeps));
+    } else {
 
-            for (auto & ref : info->references)
-                if (ref != path)
-                    res.insert(ref);
+        asio::io_context ctx;
+        std::exception_ptr ex;
 
-            if (includeOutputs && path.isDerivation())
-                for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
-                    if (maybeOutPath && isValidPath(*maybeOutPath))
-                        res.insert(*maybeOutPath);
+        asio::co_spawn(
+            ctx,
+            [&]() -> asio::awaitable<void> {
+                auto todo = startPaths;
 
-            if (includeDerivers && info->deriver && isValidPath(*info->deriver))
-                res.insert(*info->deriver);
-            co_return res;
-        };
+                StorePathSet required, done;
 
-    computeClosure<StorePath>(startPaths, paths_, GetEdgesAsync<StorePath>(queryDeps));
+                while (!todo.empty()) {
+                    StorePathSet batch;
+                    for (auto & path : std::exchange(todo, {}))
+                        if (done.insert(path).second)
+                            batch.insert(path);
+
+                    co_await queryPathInfos(
+                        batch, [&](std::vector<std::pair<StorePath, std::shared_ptr<const ValidPathInfo>>> infos) {
+                            for (auto & [path, info] : infos) {
+                                if (!info) {
+                                    if (required.contains(path))
+                                        throw InvalidPath("path '%s' is not valid", printStorePath(path));
+                                    continue;
+                                }
+
+                                out.insert(path);
+
+                                for (auto & ref : info->references)
+                                    if (ref != path) {
+                                        required.insert(ref);
+                                        todo.insert(ref);
+                                    }
+
+                                if (includeOutputs && path.isDerivation())
+                                    // FIXME: need an async, multiple-path version of queryPartialDerivationOutputMap().
+                                    for (auto & [_, maybeOutPath] : queryPartialDerivationOutputMap(path))
+                                        if (maybeOutPath)
+                                            todo.insert(*maybeOutPath);
+
+                                if (includeDerivers && info->deriver)
+                                    todo.insert(*info->deriver);
+                            }
+                        });
+                }
+
+                co_return;
+            },
+            [&](std::exception_ptr e) { ex = e; });
+
+        ctx.run();
+        if (ex)
+            std::rethrow_exception(ex);
+    }
 }
 
 void Store::computeFSClosure(
