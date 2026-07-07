@@ -265,13 +265,13 @@ if host_machine.system() != 'windows'
   configdata_priv.set_quoted('NIX_CONF_DIR', sysconfdir / 'nix')
 endif
 
-lsof = find_program('lsof', required : false)
-configdata_priv.set_quoted(
-  'LSOF',
-  lsof.found() ? lsof.full_path()
-  # Just look up on the PATH
-: 'lsof',
-)
+lsof_program = get_option('lsof-program')
+if lsof_program == ''
+  lsof = find_program('lsof', required : false)
+  # Just look up on the PATH if not found at build time
+  lsof_program = lsof.found() ? lsof.full_path() : 'lsof'
+endif
+configdata_priv.set_quoted('LSOF', lsof_program)
 
 configdata_priv.set_quoted('SSH_PROGRAM', get_option('ssh-program'))
 

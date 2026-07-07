@@ -46,3 +46,10 @@ option(
   value : 'ssh',
   description : 'the ssh program used for remote stores, remote builders and store copies (a name resolved via PATH, or an absolute path)',
 )
+
+option(
+  'lsof-program',
+  type : 'string',
+  value : '',
+  description : 'the lsof program used by the garbage collector to find runtime roots (empty means: detect at build time, falling back to PATH lookup at run time)',
+)
