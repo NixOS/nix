@@ -27,6 +27,7 @@ subdir('nix-meson-build-support/subprojects')
 
 configdata_priv = configuration_data()
 configdata_priv.set_quoted('GIT_PROGRAM', get_option('git-program'))
+configdata_priv.set('ENABLE_MERCURIAL', get_option('mercurial-fetcher') ? 1 : 0)
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'fetchers-config-private.hh',

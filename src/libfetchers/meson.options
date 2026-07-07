@@ -6,3 +6,10 @@ option(
   value : 'git',
   description : 'the git program used for fetching, ls-remote and signature verification (a name resolved via PATH, or an absolute path)',
 )
+
+option(
+  'mercurial-fetcher',
+  type : 'boolean',
+  value : true,
+  description : 'support fetching from Mercurial repositories by shelling out to hg; when disabled, hg inputs fail with an explicit error',
+)
