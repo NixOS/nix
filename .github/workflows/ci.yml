@@ -234,6 +234,12 @@ jobs:
           visibility: "public"
           tag: "${{ github.ref_name }}"
           include-output-paths: true
+      - name: Ensure that we actually released
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          nix flake metadata https://flakehub.com/f/DeterminateSystems/nix-src/"$TAG_NAME"
       - name: Update the release notes
         if: startsWith(github.ref, 'refs/tags/')
         env:
