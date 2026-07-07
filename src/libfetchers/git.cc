@@ -1060,6 +1060,15 @@ struct GitInputScheme : InputScheme
                 input.attrs.insert_or_assign("dirtyShortRev", repoInfo.workdirInfo.headRev->gitShortRev() + "-dirty");
             }
 
+            if (!getShallowAttr(input)) {
+                if (!repoInfo.workdirInfo.headRev) {
+                    input.attrs.insert_or_assign("revCount", uint64_t(0));
+                } else {
+                    input.attrs.insert_or_assign(
+                        "revCount", lazyRevCount(settings, repoInfo, repoPath, *repoInfo.workdirInfo.headRev));
+                }
+            }
+
             verifyCommit(input, nullptr);
         }
 
