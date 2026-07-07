@@ -5,9 +5,9 @@ configure_file(
   install_dir : get_option('prefix') / 'Library/LaunchDaemons',
   install_mode : 'rw-r--r--',
   configuration : {
-    # TODO: unhardcode paths with something like:
+    # TODO: unhardcode more paths with something like:
     # 'storedir' : store_dir,
     # 'localstatedir' : localstatedir,
-    # 'bindir' : bindir,
-},
+    'bindir' : bindir,
+  },
 )
