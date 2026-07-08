@@ -219,7 +219,10 @@ jobs:
   publish:
     needs:
       - success
-    if: (github.repository == 'DeterminateSystems/nix-src' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
+    # NOTE(cole-h): we need always() here because if any of the needs jobs are skipped (this is
+    # transitive as well, so if any of success's needs jobs are skipped, like the *_no_dsp ones
+    # usually are on release), this gets skipped too...
+    if: (always() && github.repository == 'DeterminateSystems/nix-src' && (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/')))
     environment: ${{ github.event_name == 'release' && 'production' || '' }}
     runs-on: ubuntu-latest
     permissions:
