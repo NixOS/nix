@@ -1474,13 +1474,15 @@ ref<SourceAccessor> GitRepoImpl::getAccessor(
     const WorkdirInfo & wd, const GitAccessorOptions & options, MakeNotAllowedError makeNotAllowedError)
 {
     auto self = ref<GitRepoImpl>(shared_from_this());
-    ref<SourceAccessor> fileAccessor = AllowListSourceAccessor::create(
-                                           makeFSSourceAccessor(path),
-                                           /*allowedPrefixes=*/wd.files,
-                                           // Always allow access to the root, but not its children.
-                                           /*allowedPaths=*/{CanonPath::root},
-                                           std::move(makeNotAllowedError))
-                                           .cast<SourceAccessor>();
+    ref<SourceAccessor> fileAccessor =
+        AllowListSourceAccessor::create(
+            // Follow the final symlink to the repo. Older nix versions used to do this (maybe somewhat accidentally).
+            makeFSSourceAccessor(path, /*trackLastModified=*/false, FinalSymlink::Follow),
+            /*allowedPrefixes=*/wd.files,
+            // Always allow access to the root, but not its children.
+            /*allowedPaths=*/{CanonPath::root},
+            std::move(makeNotAllowedError))
+            .cast<SourceAccessor>();
     if (options.exportIgnore)
         fileAccessor = make_ref<GitExportIgnoreSourceAccessor>(self, fileAccessor, std::nullopt);
     return fileAccessor;
