@@ -447,7 +447,6 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
      */
     Pool<GitRepoImpl> getPool()
     {
-        // TODO: as an optimization, it would be nice to include `this` in the pool.
         return Pool<GitRepoImpl>(std::numeric_limits<size_t>::max(), [this]() -> ref<GitRepoImpl> {
             auto repo = make_ref<GitRepoImpl>(path, options);
 
@@ -1194,6 +1193,13 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
 
     ThreadPool workers{concurrency};
 
+    /**
+     * If repo has a non-null packBackend, this has a copy of the refresh function
+     * from the backend virtual table. This is needed to restore it after we've flushed
+     * the sink. We modify it to avoid unnecessary I/O on non-existent oids.
+     */
+    decltype(::git_odb_backend::refresh) packfileOdbRefresh = nullptr;
+
     /** Total file contents in flight. */
     std::atomic<size_t> totalBufSize{0};
 
@@ -1203,6 +1209,8 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         : repo(repo)
         , repoPool(repo->getPool())
     {
+        if (auto * backend = repo->packBackend)
+            packfileOdbRefresh = std::exchange(backend->refresh, nullptr);
     }
 
     GitFileSystemObjectSinkImpl(GitFileSystemObjectSinkImpl &&) = delete;
@@ -1215,6 +1223,8 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         // Make sure the worker threads are destroyed before any state
         // they're referring to.
         workers.shutdown();
+        if (auto * backend = repo->packBackend; backend && packfileOdbRefresh)
+            backend->refresh = packfileOdbRefresh;
     }
 
     struct Child;
@@ -1475,6 +1485,10 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
             workers.process();
         }
 
+        if (auto * backend = repo->packBackend)
+            /* We are done writing blobs. Need to refresh to get the objects written by other threads. */
+            packfileOdbRefresh(backend);
+
         // Write the Git trees to disk. Would be nice to have this multithreaded too, but that's hard because a tree
         // can't refer to an object that hasn't been written yet. Also it doesn't make a big difference for performance.
 
@@ -1506,6 +1520,9 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
         }(root);
 
         repo->flush();
+
+        if (auto * backend = repo->packBackend)
+            backend->refresh = std::exchange(packfileOdbRefresh, nullptr);
 
         return toHash(root.oid.value());
     }
