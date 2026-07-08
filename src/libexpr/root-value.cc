@@ -78,9 +78,4 @@ void freeRootValueSlot(Value ** slot)
 #endif
 }
 
-RootValue allocRootValue(Value * v)
-{
-    return RootValue(allocRootValueSlot(v), freeRootValueSlot);
-}
-
 } // namespace nix
