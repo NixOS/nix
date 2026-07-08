@@ -33,6 +33,7 @@ headers = [ config_pub_h ] + files(
   'print.hh',
   'provenance.hh',
   'repl-exit-status.hh',
+  'root-value.hh',
   'search-path.hh',
   'static-string-data.hh',
   'symbol-table.hh',
