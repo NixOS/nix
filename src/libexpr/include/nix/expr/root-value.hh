@@ -49,6 +49,8 @@ public:
 
     UniqueRootValue & operator=(UniqueRootValue && other) noexcept
     {
+        if (this == &other)
+            return *this;
         if (slot)
             freeRootValueSlot(slot);
         slot = std::exchange(other.slot, nullptr);
