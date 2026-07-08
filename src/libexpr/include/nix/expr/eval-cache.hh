@@ -42,7 +42,7 @@ class EvalCache : public std::enable_shared_from_this<EvalCache>
     EvalState & state;
     typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
-    UniqueRootValue value;
+    RootValue value;
 
     Value * getRootValue();
 
@@ -106,7 +106,7 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     ref<EvalCache> root;
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     Parent parent;
-    UniqueRootValue _value;
+    RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
     AttrKey getKey();

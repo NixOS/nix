@@ -559,7 +559,7 @@ Value * EvalState::addPrimOp(PrimOp && primOp)
     v->mkPrimOp(new PrimOp(primOp));
 
     if (primOp.internal)
-        internalPrimOps.emplace(primOp.name, UniqueRootValue(v));
+        internalPrimOps.emplace(primOp.name, RootValue(v));
     else {
         staticBaseEnv->vars.emplace_back(envName, baseEnvDispl);
         baseEnv.values[baseEnvDispl++] = v;
@@ -740,11 +740,11 @@ void mapStaticEnvBindings(const SymbolTable & st, const StaticEnv & se, const En
         if (se.isWith && !env.values[0]->isThunk()) {
             // add 'with' bindings.
             for (auto & j : *env.values[0]->attrs())
-                vm.insert_or_assign(std::string(st[j.name]), UniqueRootValue(j.value));
+                vm.insert_or_assign(std::string(st[j.name]), RootValue(j.value));
         } else {
             // iterate through staticenv bindings and add them.
             for (auto & i : se.vars)
-                vm.insert_or_assign(std::string(st[i.first]), UniqueRootValue(env.values[i.second]));
+                vm.insert_or_assign(std::string(st[i.first]), RootValue(env.values[i.second]));
         }
     }
 }
@@ -1169,7 +1169,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
     fileEvalCache->try_emplace_and_cvisit(
         *resolvedPath,
-        UniqueRootValue(nullptr),
+        RootValue(nullptr),
         [&](auto & i) {
             vExpr = allocValue();
             vExpr->mkThunk(&baseEnv, expr);

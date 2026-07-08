@@ -166,7 +166,7 @@ struct Constant
     bool impureOnly = false;
 };
 
-typedef std::map<std::string, UniqueRootValue> ValMap;
+typedef std::map<std::string, RootValue> ValMap;
 
 typedef boost::unordered_flat_map<PosIdx, DocComment, std::hash<PosIdx>> DocCommentMap;
 
@@ -467,7 +467,7 @@ private:
     /**
      * A cache from resolved paths to values.
      */
-    const ref<boost::concurrent_flat_map<SourcePath, UniqueRootValue>> fileEvalCache;
+    const ref<boost::concurrent_flat_map<SourcePath, RootValue>> fileEvalCache;
 
     /**
      * Associate source positions of certain AST nodes with their preceding doc comment, if they have one.
@@ -826,7 +826,7 @@ public:
     /**
      * Internal primops not exposed to the user.
      */
-    boost::unordered_flat_map<std::string, UniqueRootValue, StringViewHash> internalPrimOps;
+    boost::unordered_flat_map<std::string, RootValue, StringViewHash> internalPrimOps;
 
     /**
      * Name and documentation about every constant.

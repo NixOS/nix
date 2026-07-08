@@ -11,7 +11,7 @@ struct Value;
 /**
  * Allocate a slot from the root value pool, i.e. a GC-visible
  * `Value *` cell that keeps the value it points to alive across
- * garbage collections. Use `UniqueRootValue`/`RootValue` rather than
+ * garbage collections. Use `RootValue`/`RootValue` rather than
  * calling this directly.
  */
 Value ** allocRootValueSlot(Value * v);
@@ -27,27 +27,27 @@ void freeRootValueSlot(Value ** slot);
  * over `RootValue` unless the handle must be copyable (e.g. when it's
  * captured in a `std::function`-backed lambda).
  */
-class UniqueRootValue
+class RootValue
 {
     Value ** slot = nullptr;
 
 public:
-    UniqueRootValue() = default;
+    RootValue() = default;
 
-    explicit UniqueRootValue(Value * v)
+    explicit RootValue(Value * v)
         : slot(allocRootValueSlot(v))
     {
     }
 
-    UniqueRootValue(const UniqueRootValue &) = delete;
-    UniqueRootValue & operator=(const UniqueRootValue &) = delete;
+    RootValue(const RootValue &) = delete;
+    RootValue & operator=(const RootValue &) = delete;
 
-    UniqueRootValue(UniqueRootValue && other) noexcept
+    RootValue(RootValue && other) noexcept
         : slot(std::exchange(other.slot, nullptr))
     {
     }
 
-    UniqueRootValue & operator=(UniqueRootValue && other) noexcept
+    RootValue & operator=(RootValue && other) noexcept
     {
         if (slot)
             freeRootValueSlot(slot);
@@ -55,7 +55,7 @@ public:
         return *this;
     }
 
-    ~UniqueRootValue()
+    ~RootValue()
     {
         if (slot)
             freeRootValueSlot(slot);
