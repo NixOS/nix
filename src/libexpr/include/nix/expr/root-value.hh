@@ -85,12 +85,4 @@ public:
     }
 };
 
-/**
- * A copyable, shared handle rooting a Value. Only use this instead of
- * `UniqueRootValue` if the handle must be copyable.
- */
-typedef std::shared_ptr<Value *> RootValue;
-
-RootValue allocRootValue(Value * v);
-
 } // namespace nix
