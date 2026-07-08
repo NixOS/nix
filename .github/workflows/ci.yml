@@ -7,7 +7,6 @@ on:
       # NOTE: make sure any branches here are also valid directory names,
       # otherwise creating the directory and uploading to s3 will fail
       - main
-      - master
   merge_group:
   release:
     types:
@@ -53,9 +52,9 @@ jobs:
 
   build_x86_64-linux_no_dsp:
     uses: ./.github/workflows/build.yml
-    # Build the non-DSP flake in the merge queue and for external (fork) PRs,
+    # Build the non-DSP flake in the merge queue, on tags, and for external (fork) PRs,
     # which can't access Determinate Secure Packages.
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
+    if: github.event_name == 'merge_group' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: x86_64-linux
@@ -82,7 +81,7 @@ jobs:
 
   build_aarch64-linux_no_dsp:
     uses: ./.github/workflows/build.yml
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
+    if: github.event_name == 'merge_group' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: aarch64-linux
@@ -110,7 +109,7 @@ jobs:
 
   build_aarch64-darwin_no_dsp:
     uses: ./.github/workflows/build.yml
-    if: github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
+    if: github.event_name == 'merge_group' || startsWith(github.ref, 'refs/tags/') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != 'DeterminateSystems/nix-src')
     with:
       flake: .
       system: aarch64-darwin
