@@ -1,0 +1,154 @@
+Reduce contention on the GC allocation lock: make GC_generic_malloc_many()
+hand out up to GC_many_blocks heap blocks worth of objects per acquisition
+of the allocation lock, instead of exactly one. This matters for
+parallel evaluation in Nix, where all evaluator threads replenish their
+thread-local free lists (Values, Envs, Bindings) through this function
+and otherwise serialize on the allocation lock.
+
+The batch size is settable via the GC_MALLOC_MANY_BLOCKS environment
+variable (1..64); the compile-time default is GC_MANY_BLOCKS_DEFAULT
+(1 = upstream behavior, overridden in packaging/dependencies.nix).
+
+diff -ur a/include/private/gc_priv.h b/include/private/gc_priv.h
+--- a/include/private/gc_priv.h	2026-07-03 12:56:51.388341746 +0200
++++ b/include/private/gc_priv.h	2026-07-09 20:00:13.787169270 +0200
+@@ -1767,6 +1767,17 @@
+ 
+ GC_EXTERN unsigned GC_n_kinds;
+ 
++/* Number of heap blocks worth of objects to hand out per allocation    */
++/* lock acquisition in GC_generic_malloc_many().  Larger values reduce  */
++/* contention on the allocation lock when many threads allocate small   */
++/* objects heavily.  Settable at runtime via the GC_MALLOC_MANY_BLOCKS  */
++/* environment variable (clamped to [1, GC_MANY_BLOCKS_MAX]).           */
++#ifndef GC_MANY_BLOCKS_DEFAULT
++# define GC_MANY_BLOCKS_DEFAULT 1
++#endif
++#define GC_MANY_BLOCKS_MAX 64
++GC_EXTERN int GC_many_blocks;
++
+ GC_EXTERN size_t GC_page_size;
+ 
+ /* Round up allocation size to a multiple of a page size.       */
+diff -ur a/mallocx.c b/mallocx.c
+--- a/mallocx.c	2026-07-03 12:56:51.389341768 +0200
++++ b/mallocx.c	2026-07-09 20:00:13.787169270 +0200
+@@ -300,6 +300,9 @@
+ /* since the collector would not retain the entire list if it were      */
+ /* invoked just as we were returning.                                   */
+ /* Note that the client should usually clear the link field.            */
++/* See the description in gc_priv.h. */
++GC_INNER int GC_many_blocks = GC_MANY_BLOCKS_DEFAULT;
++
+ GC_API void GC_CALL GC_generic_malloc_many(size_t lb, int k, void **result)
+ {
+     void *op;
+@@ -433,7 +436,7 @@
+         my_bytes_allocd = 0;
+         for (p = op; p != 0; p = obj_link(p)) {
+           my_bytes_allocd += lb;
+-          if ((word)my_bytes_allocd >= HBLKSIZE) {
++          if ((word)my_bytes_allocd >= (word)GC_many_blocks * HBLKSIZE) {
+             *opp = obj_link(p);
+             obj_link(p) = 0;
+             break;
+@@ -442,12 +445,24 @@
+         GC_bytes_allocd += my_bytes_allocd;
+         goto out;
+       }
+-    /* Next try to allocate a new block worth of objects of this size.  */
++    /* Next try to allocate new blocks worth of objects of this size.   */
++    /* Up to GC_many_blocks heap blocks are allocated per acquisition   */
++    /* of the allocation lock, to reduce contention on it.              */
+     {
+-        struct hblk *h = GC_allochblk(lb, k, 0);
+-        if (h /* != NULL */) { /* CPPCHECK */
+-          if (IS_UNCOLLECTABLE(k)) GC_set_hdr_marks(HDR(h));
++        struct hblk *hbs[GC_MANY_BLOCKS_MAX];
++        int nblocks = GC_many_blocks;
++        int i;
++
++        if (nblocks < 1) nblocks = 1;
++        if (nblocks > GC_MANY_BLOCKS_MAX) nblocks = GC_MANY_BLOCKS_MAX;
++        for (i = 0; i < nblocks; i++) {
++          hbs[i] = GC_allochblk(lb, k, 0);
++          if (NULL == hbs[i]) break;
++          if (IS_UNCOLLECTABLE(k)) GC_set_hdr_marks(HDR(hbs[i]));
+           GC_bytes_allocd += HBLKSIZE - HBLKSIZE % lb;
++        }
++        nblocks = i;
++        if (nblocks > 0) {
+ #         ifdef PARALLEL_MARK
+             if (GC_parallel) {
+               GC_acquire_mark_lock();
+@@ -455,8 +470,10 @@
+               UNLOCK();
+               GC_release_mark_lock();
+ 
+-              op = GC_build_fl(h, lw,
+-                        (ok -> ok_init || GC_debugging_started), 0);
++              op = 0;
++              for (i = 0; i < nblocks; i++)
++                op = GC_build_fl(hbs[i], lw,
++                          (ok -> ok_init || GC_debugging_started), (ptr_t)op);
+ 
+               *result = op;
+               GC_acquire_mark_lock();
+@@ -467,7 +484,10 @@
+               return;
+             }
+ #         endif
+-          op = GC_build_fl(h, lw, (ok -> ok_init || GC_debugging_started), 0);
++          op = 0;
++          for (i = 0; i < nblocks; i++)
++            op = GC_build_fl(hbs[i], lw,
++                      (ok -> ok_init || GC_debugging_started), (ptr_t)op);
+           goto out;
+         }
+     }
+diff -ur a/misc.c b/misc.c
+--- a/misc.c	2026-07-03 12:56:51.390341791 +0200
++++ b/misc.c	2026-07-09 20:00:13.788169293 +0200
+@@ -1157,6 +1157,14 @@
+       }
+     }
+     {
++        char * many_blocks_string = GETENV("GC_MALLOC_MANY_BLOCKS");
++        if (many_blocks_string != NULL) {
++          int many_blocks = atoi(many_blocks_string);
++          if (many_blocks > 0 && many_blocks <= GC_MANY_BLOCKS_MAX)
++            GC_many_blocks = many_blocks;
++        }
++    }
++    {
+         char * space_divisor_string = GETENV("GC_FREE_SPACE_DIVISOR");
+         if (space_divisor_string != NULL) {
+           int space_divisor = atoi(space_divisor_string);
+diff -ur a/os_dep.c b/os_dep.c
+--- a/os_dep.c	2026-07-03 12:56:51.390341791 +0200
++++ b/os_dep.c	2026-07-04 01:00:23.191858912 +0200
+@@ -2286,6 +2286,24 @@
+     if (((word)result % HBLKSIZE) != 0)
+       ABORT(
+        "GC_unix_get_mem: Memory returned by mmap is not aligned to HBLKSIZE.");
++#   if defined(LINUX) && defined(MADV_HUGEPAGE)
++      /* Optionally ask for transparent huge pages.  The heap is large    */
++      /* and densely touched, so 2 MiB pages greatly reduce first-touch   */
++      /* page-fault and TLB overhead.  However, under the "madvise" THP   */
++      /* policy, faults in a MADV_HUGEPAGE region perform synchronous     */
++      /* memory compaction, which can stall for a long time when          */
++      /* physical memory is fragmented.  Hence this is opt-in via the     */
++      /* GC_MADVISE_HUGEPAGES environment variable; setting the system    */
++      /* THP policy to "always" (which takes huge pages opportunistically */
++      /* without direct compaction) is generally preferable.              */
++      {
++        static int use_hugepages = -1;
++        if (use_hugepages < 0)
++          use_hugepages = GETENV("GC_MADVISE_HUGEPAGES") != NULL;
++        if (use_hugepages)
++          (void)madvise(result, bytes, MADV_HUGEPAGE);
++      }
++#   endif
+     return((ptr_t)result);
+   }
+ # endif  /* !MSWIN_XBOX1 */
