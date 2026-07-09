@@ -1,11 +1,21 @@
 error:
        … while calling the 'toJSON' builtin
-         at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:4:1:
-            3| # string, so serialisation fails.
-            4| builtins.toJSON { __toString = self: { a = 1; }; }
+         at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:2:1:
+            1| # toJSON checks the return type of __toString
+            2| builtins.toJSON { __toString = self: { a = 1; }; }
              | ^
-            5|
+            3|
 
        … while evaluating the result of the `__toString` attribute
+         at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:2:19:
+            1| # toJSON checks the return type of __toString
+            2| builtins.toJSON { __toString = self: { a = 1; }; }
+             |                   ^
+            3|
 
-       error: cannot coerce a set to a string: { a = 1; }
+       error: `__toString` must return a string, but got a set: { a = 1; }
+       at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:2:19:
+            1| # toJSON checks the return type of __toString
+            2| builtins.toJSON { __toString = self: { a = 1; }; }
+             |                   ^
+            3|

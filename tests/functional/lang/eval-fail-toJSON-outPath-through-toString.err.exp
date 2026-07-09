@@ -1,16 +1,21 @@
 error:
        … while calling the 'toJSON' builtin
          at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:4:1:
-            3| # fails, even though the outer `outPath` traversal itself succeeded.
+            3| # fails, even though the outer `outPath` traversal could otherwise succeed.
             4| builtins.toJSON {
              | ^
             5|   outPath = {
 
        … while evaluating the result of the `__toString` attribute
-         at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:5:3:
-            4| builtins.toJSON {
+         at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:6:5:
             5|   outPath = {
-             |   ^
             6|     __toString = self: 42;
+             |     ^
+            7|   };
 
-       error: cannot coerce an integer to a string: 42
+       error: `__toString` must return a string, but got an integer: 42
+       at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:6:5:
+            5|   outPath = {
+            6|     __toString = self: 42;
+             |     ^
+            7|   };

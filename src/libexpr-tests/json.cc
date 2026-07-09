@@ -76,4 +76,50 @@ TEST_F(JSONValueTest, DISABLED_Path)
     v.mkPath(state.rootPath(CanonPath("/test")), state.mem);
     ASSERT_EQ(getJSONValue(v), "\"/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x\"");
 }
+
+/* Fixture for JSONValueTest/ToStringAcceptsExternal */
+namespace {
+class MyExternal : public ExternalValueBase
+{
+    std::string showType() const override
+    {
+        return "an-external";
+    }
+
+    std::string typeOf() const override
+    {
+        return "an-external";
+    }
+
+    std::ostream & print(std::ostream & str) const override
+    {
+        return str << "<external>";
+    }
+
+    nlohmann::json printValueAsJSON(EvalState &, bool, NixStringContext &, bool) const override
+    {
+        return "external-json";
+    }
+};
+} // namespace
+
+TEST_F(JSONValueTest, ToStringAcceptsExternal)
+{
+    MyExternal ext;
+
+    static PrimOp primOp{
+        .name = "toStringReturningExternal",
+        .arity = 1,
+        .impl = [&](EvalState &, PosIdx, Value **, Value & v) { v.mkExternal(&ext); },
+    };
+    Value vPrimOp;
+    vPrimOp.mkPrimOp(&primOp);
+
+    BindingsBuilder builder = state.buildBindings(1);
+    builder.insert(state.s.toString, &vPrimOp);
+    Value vAttrs;
+    vAttrs.mkAttrs(builder.finish());
+
+    ASSERT_EQ(getJSONValue(vAttrs), "\"external-json\"");
+}
 } /* namespace nix */

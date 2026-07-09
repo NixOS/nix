@@ -49,27 +49,33 @@ json printValueAsJSON(
         break;
 
     case nAttrs: {
-        auto maybeString = state.tryAttrsToString(pos, v, context, false, false);
-        if (maybeString) {
-            out = *maybeString;
-            break;
-        }
-        if (auto i = v.attrs()->get(state.s.outPath))
-            return printValueAsJSON(state, strict, *i->value, i->pos, context, copyToStore);
-        else {
-            out = json::object();
-            for (auto & a : v.attrs()->lexicographicOrder(state.symbols)) {
-                try {
-                    out.emplace(
-                        state.symbols[a->name],
-                        printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
-                } catch (Error & e) {
-                    e.addTrace(
-                        state.positions[a->pos], HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
-                    throw;
+        out = state.peelToStringOutPath(
+            pos, v, /*checkToStringReturn=*/true, [&](Value * peeled, bool cameThroughToString) -> json {
+                if (peeled->type() != nAttrs) {
+                    // Historical quirk preserved here for reproducibility:
+                    // In some coercions, Nix would coerce paths to a raw string
+                    // if they came from a __toString result.
+                    auto copyToStore2 = copyToStore && !cameThroughToString;
+                    return printValueAsJSON(state, strict, *peeled, pos, context, copyToStore2);
                 }
-            }
-        }
+                // Peelable attrs handled. Returned attrs are not peelable.
+                // Quirk: builtins.toJSON { outPath.foo = true; } == "{\"foo\":true}"
+                // All that remains is to return a JSON object.
+                json obj = json::object();
+                for (auto & a : peeled->attrs()->lexicographicOrder(state.symbols)) {
+                    try {
+                        obj.emplace(
+                            state.symbols[a->name],
+                            printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
+                    } catch (Error & e) {
+                        e.addTrace(
+                            state.positions[a->pos],
+                            HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
+                        throw;
+                    }
+                }
+                return obj;
+            });
         break;
     }
 
