@@ -1,0 +1,5 @@
+error: attempt to call something which is not a function but a string: "not a function"
+       at /pwd/lang/eval-fail-toString-not-function.nix:1:2:
+            1| "${{ __toString = "not a function"; }}"
+             |  ^
+            2|

@@ -1,0 +1,1 @@
+{ outPathDeadEnd = "{\"a\":1,\"b\":2}"; outPathInt = "42"; outPathList = "[\"1\",{\"a\":1,\"b\":[\"/nix/store/m1a49k28kbvny5dnbkymp1nia4b403q8-a.nix\"]},42,[\"42\"],\"hello\"]"; outPathNested = "\"nested\""; outPathString = "\"hello\""; plainAttrs = "{\"a\":1,\"b\":\"two\"}"; toStringPrecedes = "\"won\""; toStringReturnsPeelableAttrs = "\"deep\""; }
