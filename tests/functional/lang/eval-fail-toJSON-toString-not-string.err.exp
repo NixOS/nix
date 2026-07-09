@@ -6,5 +6,13 @@ error:
             2|
 
        … while evaluating the result of the `__toString` attribute
+         at /pwd/lang/eval-fail-toJSON-toString-not-string.nix:1:19:
+            1| builtins.toJSON { __toString = self: 42; }
+             |                   ^
+            2|
 
-       error: cannot coerce an integer to a string: 42
+       error: `__toString` must return a string, but got an integer: 42
+       at /pwd/lang/eval-fail-toJSON-toString-not-string.nix:1:19:
+            1| builtins.toJSON { __toString = self: 42; }
+             |                   ^
+            2|

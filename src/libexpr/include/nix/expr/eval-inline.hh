@@ -161,4 +161,74 @@ inline CallDepth EvalState::addCallDepth(const PosIdx pos)
     return CallDepth(callDepth);
 };
 
+template<typename Cb>
+std::invoke_result_t<Cb, Value *, bool>
+EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringReturn, Cb && cb)
+{
+    using R = std::invoke_result_t<Cb, Value *, bool>;
+    bool cameThroughToString = false;
+
+    auto peel = [&, &state = *this](this const auto & peel, const PosIdx pos, Value & v) -> R {
+        state.forceValue(v, pos);
+        if (v.type() != nAttrs) {
+            /* String and path terminate happily; external delegates its
+               serialisation to the caller (`printValueAsJSON` routes into
+               `ExternalValueBase::printValueAsJSON`, `coerceToString` into
+               `ExternalValueBase::coerceToString`) so we let it through
+               too. Everything else violates the "`__toString` returns a
+               string" contract. */
+            if (checkToStringReturn && cameThroughToString && v.type() != nString && v.type() != nPath
+                && v.type() != nExternal)
+                state
+                    .error<TypeError>(
+                        "`__toString` must return a string, but got %1%: %2%",
+                        showType(v),
+                        ValuePrinter(state, v, errorPrintOptions))
+                    .atPos(pos)
+                    .debugThrow();
+            return std::forward<Cb>(cb)(&v, cameThroughToString);
+        }
+        if (auto i = v.attrs()->get(state.s.toString)) {
+            Value * v1 = state.allocValue();
+            try {
+                state.callFunction(*i->value, v, *v1, i->pos);
+            } catch (Error & e) {
+                e.addTrace(state.positions[i->pos], "while calling the `__toString` attribute");
+                throw;
+            }
+            cameThroughToString = true;
+            try {
+                auto _level = state.addCallDepth(pos);
+                return peel(i->pos, *v1);
+            } catch (Error & e) {
+                e.addTrace(state.positions[i->pos], "while evaluating the result of the `__toString` attribute");
+                throw;
+            }
+        }
+        if (auto i = v.attrs()->get(state.s.outPath)) {
+            try {
+                state.forceValue(*i->value, i->pos);
+            } catch (Error & e) {
+                e.addTrace(state.positions[i->pos], "while evaluating the `outPath` attribute");
+                throw;
+            }
+            auto _level = state.addCallDepth(pos);
+            return peel(i->pos, *i->value);
+        }
+        /* Can't peel more. (no `__toString`, no `outPath`).
+           If we came through a `__toString` call at any depth, this violates
+           the string-return contract. (usually not enforced) */
+        if (checkToStringReturn && cameThroughToString)
+            state
+                .error<TypeError>(
+                    "`__toString` must return a string, but got %1%: %2%",
+                    showType(v),
+                    ValuePrinter(state, v, errorPrintOptions))
+                .atPos(pos)
+                .debugThrow();
+        return std::forward<Cb>(cb)(&v, cameThroughToString);
+    };
+    return peel(pos, v);
+}
+
 } // namespace nix
