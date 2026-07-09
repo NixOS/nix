@@ -9,27 +9,41 @@ The batch size is settable via the GC_MALLOC_MANY_BLOCKS environment
 variable (1..64); the compile-time default is GC_MANY_BLOCKS_DEFAULT
 (1 = upstream behavior, overridden in packaging/dependencies.nix).
 
-diff -ur a/mallocx.c b/mallocx.c
---- a/mallocx.c	2026-07-03 12:56:51.389341768 +0200
-+++ b/mallocx.c	2026-07-03 13:01:54.873023343 +0200
-@@ -300,6 +300,16 @@
- /* since the collector would not retain the entire list if it were      */
- /* invoked just as we were returning.                                   */
- /* Note that the client should usually clear the link field.            */
+diff -ur a/include/private/gc_priv.h b/include/private/gc_priv.h
+--- a/include/private/gc_priv.h	2026-07-03 12:56:51.388341746 +0200
++++ b/include/private/gc_priv.h	2026-07-09 20:00:13.787169270 +0200
+@@ -1767,6 +1767,17 @@
+ 
+ GC_EXTERN unsigned GC_n_kinds;
+ 
 +/* Number of heap blocks worth of objects to hand out per allocation    */
-+/* lock acquisition.  Larger values reduce contention on the            */
-+/* allocation lock when many threads allocate small objects heavily.    */
-+/* Settable via the GC_MALLOC_MANY_BLOCKS environment variable.         */
++/* lock acquisition in GC_generic_malloc_many().  Larger values reduce  */
++/* contention on the allocation lock when many threads allocate small   */
++/* objects heavily.  Settable at runtime via the GC_MALLOC_MANY_BLOCKS  */
++/* environment variable (clamped to [1, GC_MANY_BLOCKS_MAX]).           */
 +#ifndef GC_MANY_BLOCKS_DEFAULT
 +# define GC_MANY_BLOCKS_DEFAULT 1
 +#endif
 +#define GC_MANY_BLOCKS_MAX 64
-+int GC_many_blocks = GC_MANY_BLOCKS_DEFAULT;
++GC_EXTERN int GC_many_blocks;
++
+ GC_EXTERN size_t GC_page_size;
+ 
+ /* Round up allocation size to a multiple of a page size.       */
+diff -ur a/mallocx.c b/mallocx.c
+--- a/mallocx.c	2026-07-03 12:56:51.389341768 +0200
++++ b/mallocx.c	2026-07-09 20:00:13.787169270 +0200
+@@ -300,6 +300,9 @@
+ /* since the collector would not retain the entire list if it were      */
+ /* invoked just as we were returning.                                   */
+ /* Note that the client should usually clear the link field.            */
++/* See the description in gc_priv.h. */
++GC_INNER int GC_many_blocks = GC_MANY_BLOCKS_DEFAULT;
 +
  GC_API void GC_CALL GC_generic_malloc_many(size_t lb, int k, void **result)
  {
      void *op;
-@@ -433,7 +443,7 @@
+@@ -433,7 +436,7 @@
          my_bytes_allocd = 0;
          for (p = op; p != 0; p = obj_link(p)) {
            my_bytes_allocd += lb;
@@ -38,7 +52,7 @@ diff -ur a/mallocx.c b/mallocx.c
              *opp = obj_link(p);
              obj_link(p) = 0;
              break;
-@@ -442,12 +452,24 @@
+@@ -442,12 +445,24 @@
          GC_bytes_allocd += my_bytes_allocd;
          goto out;
        }
@@ -67,7 +81,7 @@ diff -ur a/mallocx.c b/mallocx.c
  #         ifdef PARALLEL_MARK
              if (GC_parallel) {
                GC_acquire_mark_lock();
-@@ -455,8 +477,10 @@
+@@ -455,8 +470,10 @@
                UNLOCK();
                GC_release_mark_lock();
  
@@ -80,7 +94,7 @@ diff -ur a/mallocx.c b/mallocx.c
  
                *result = op;
                GC_acquire_mark_lock();
-@@ -467,7 +491,10 @@
+@@ -467,7 +484,10 @@
                return;
              }
  #         endif
@@ -94,16 +108,15 @@ diff -ur a/mallocx.c b/mallocx.c
      }
 diff -ur a/misc.c b/misc.c
 --- a/misc.c	2026-07-03 12:56:51.390341791 +0200
-+++ b/misc.c	2026-07-03 13:01:54.874023365 +0200
-@@ -1157,6 +1157,15 @@
++++ b/misc.c	2026-07-09 20:00:13.788169293 +0200
+@@ -1157,6 +1157,14 @@
        }
      }
      {
-+        extern int GC_many_blocks;
 +        char * many_blocks_string = GETENV("GC_MALLOC_MANY_BLOCKS");
 +        if (many_blocks_string != NULL) {
 +          int many_blocks = atoi(many_blocks_string);
-+          if (many_blocks > 0 && many_blocks <= 64)
++          if (many_blocks > 0 && many_blocks <= GC_MANY_BLOCKS_MAX)
 +            GC_many_blocks = many_blocks;
 +        }
 +    }
@@ -111,3 +124,31 @@ diff -ur a/misc.c b/misc.c
          char * space_divisor_string = GETENV("GC_FREE_SPACE_DIVISOR");
          if (space_divisor_string != NULL) {
            int space_divisor = atoi(space_divisor_string);
+diff -ur a/os_dep.c b/os_dep.c
+--- a/os_dep.c	2026-07-03 12:56:51.390341791 +0200
++++ b/os_dep.c	2026-07-04 01:00:23.191858912 +0200
+@@ -2286,6 +2286,24 @@
+     if (((word)result % HBLKSIZE) != 0)
+       ABORT(
+        "GC_unix_get_mem: Memory returned by mmap is not aligned to HBLKSIZE.");
++#   if defined(LINUX) && defined(MADV_HUGEPAGE)
++      /* Optionally ask for transparent huge pages.  The heap is large    */
++      /* and densely touched, so 2 MiB pages greatly reduce first-touch   */
++      /* page-fault and TLB overhead.  However, under the "madvise" THP   */
++      /* policy, faults in a MADV_HUGEPAGE region perform synchronous     */
++      /* memory compaction, which can stall for a long time when          */
++      /* physical memory is fragmented.  Hence this is opt-in via the     */
++      /* GC_MADVISE_HUGEPAGES environment variable; setting the system    */
++      /* THP policy to "always" (which takes huge pages opportunistically */
++      /* without direct compaction) is generally preferable.              */
++      {
++        static int use_hugepages = -1;
++        if (use_hugepages < 0)
++          use_hugepages = GETENV("GC_MADVISE_HUGEPAGES") != NULL;
++        if (use_hugepages)
++          (void)madvise(result, bytes, MADV_HUGEPAGE);
++      }
++#   endif
+     return((ptr_t)result);
+   }
+ # endif  /* !MSWIN_XBOX1 */
