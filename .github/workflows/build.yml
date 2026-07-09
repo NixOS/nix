@@ -63,6 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.default .#packages.${{ inputs.system }}.binaryTarball --no-link -L
       - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.binaryTarball --out-link tarball
@@ -89,6 +92,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix build ${{ inputs.flake }}#packages.${{ inputs.system }}.nix-cli-static --no-link -L
 
@@ -102,6 +108,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: nix flake check --keep-going ${{ inputs.flake }} -L --system ${{ inputs.system }}
 
@@ -112,6 +121,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           nix build -L \
@@ -128,6 +140,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - run: |
           tests=$(nix flake show --json \
@@ -201,6 +216,9 @@ jobs:
           repository: NixOS/flake-regressions-data
           path: flake-regressions/tests
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - name: Run flake regression tests
         env:
@@ -247,6 +265,9 @@ jobs:
       - name: Checkout nix
         uses: actions/checkout@v4
       - uses: DeterminateSystems/determinate-nix-action@main
+        with:
+          extra-conf: |
+            extra-experimental-features = provenance
       - uses: DeterminateSystems/flakehub-cache-action@main
       - name: Build manual
         if: inputs.system == 'x86_64-linux'
