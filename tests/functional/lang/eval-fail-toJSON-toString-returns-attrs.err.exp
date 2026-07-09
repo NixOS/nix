@@ -1,0 +1,11 @@
+error:
+       … while calling the 'toJSON' builtin
+         at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:4:1:
+            3| # string, so serialisation fails.
+            4| builtins.toJSON { __toString = self: { a = 1; }; }
+             | ^
+            5|
+
+       … while evaluating the result of the `__toString` attribute
+
+       error: cannot coerce a set to a string: { a = 1; }

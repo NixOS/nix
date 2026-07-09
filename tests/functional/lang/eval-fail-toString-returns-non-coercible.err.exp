@@ -1,0 +1,9 @@
+error:
+       … while evaluating the result of the `__toString` attribute
+         at /pwd/lang/eval-fail-toString-returns-non-coercible.nix:6:2:
+            5| # attribute" trace is added because the walk went through `__toString`.
+            6| "${{ __toString = self: null; }}"
+             |  ^
+            7|
+
+       error: cannot coerce null to a string: null

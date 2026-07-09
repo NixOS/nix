@@ -47,6 +47,41 @@ expectStderr 0 nix-instantiate --expr "$hackyExpr" --eval --strict | grepQuiet "
 hacky=$(nix-instantiate --expr "$hackyExpr")
 nix derivation show "$hacky" | jq --exit-status '.derivations."'"$(basename "$hacky")"'".structuredAttrs | . == {"a": 1}'
 
+# Quirk:
+# A path reached through a `__toString` call inside `__structuredAttrs` must
+# NOT be copied to the store: the JSON keeps the path in its raw string form
+# and the derivation gains no `srcs` reference. Any change that starts copying
+# would alter the drv hash and add a dependency to every derivation using this
+# pattern.
+#
+# This is the unfortunate consequence of a lack of proper `__toString` return
+# value checking in previous releases.
+# We could emit a warning about this, but the benefit would be marginal.
+#
+# This behavior is due to any `__toString` regardless of `outPath` attributes,
+# so check both nesting orders.
+toStringPathDir=$TEST_ROOT/toString-path-src
+mkdir -p "$toStringPathDir"
+for myPath in \
+    "{ __toString = self: $toStringPathDir; }" \
+    "{ outPath = { __toString = self: $toStringPathDir; }; }" \
+    "{ __toString = self: { outPath = $toStringPathDir; }; }"; do
+    drv=$(nix-instantiate --expr "
+      derivation {
+        name = \"toString-path\";
+        system = \"foo\";
+        builder = \"/bin/sh\";
+        __structuredAttrs = true;
+        myPath = $myPath;
+      }
+    ")
+    nix derivation show "$drv" | jq --exit-status \
+        --arg raw "$toStringPathDir" \
+        '.derivations[].structuredAttrs.myPath == $raw'
+    nix derivation show "$drv" | jq --exit-status \
+        '.derivations[].inputs.srcs == []'
+done
+
 if isDaemonNewer "2.34pre"; then
     # Test warning for non-object exportReferencesGraph in structured attrs
     # shellcheck disable=SC2016
