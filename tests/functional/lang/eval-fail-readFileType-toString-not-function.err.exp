@@ -1,0 +1,8 @@
+error:
+       … while calling the 'readFileType' builtin
+         at /pwd/lang/eval-fail-readFileType-toString-not-function.nix:1:1:
+            1| builtins.readFileType { __toString = "not a function"; }
+             | ^
+            2|
+
+       error: attempt to call something which is not a function but a string: "not a function"
