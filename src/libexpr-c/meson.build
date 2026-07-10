@@ -50,7 +50,6 @@ subdir('nix-meson-build-support/windows-version')
 this_library = library(
   'nixexprc',
   sources,
-  soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,

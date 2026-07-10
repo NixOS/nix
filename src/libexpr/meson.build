@@ -253,7 +253,6 @@ this_library = library(
   parser_tab[1],
   lexer_tab[1],
   generated_headers,
-  soversion : nix_soversion,
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags + link_args,

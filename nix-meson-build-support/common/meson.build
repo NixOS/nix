@@ -76,9 +76,6 @@ if is_using_libstdcxx
   add_project_arguments('-D_GLIBCXX_USE_TBB_PAR_BACKEND=0', language : 'cpp')
 endif
 
-# Darwin ld doesn't like "X.Y.ZpreABCD+W"
-nix_soversion = meson.project_version().split('+')[0].split('pre')[0]
-
 cxx = meson.get_compiler('cpp')
 
 # Clang does not support prelinking on static builds
