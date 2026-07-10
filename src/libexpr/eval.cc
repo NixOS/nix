@@ -2613,34 +2613,18 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    try {
-        forceValue(v, pos);
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-
-    /* Handle path values directly, without coercing to a string. */
-    if (v.type() == nPath)
-        return v.path();
-
-    /* Similarly, handle __toString where the result may be a path
-       value. */
-    if (v.type() == nAttrs) {
-        auto i = v.attrs()->get(s.toString);
-        if (i) {
-            Value v1;
-            callFunction(*i->value, v, v1, pos);
-            return coerceToPath(pos, v1, context, errorCtx);
-        }
-    }
-
-    /* Any other value should be coercible to a string, interpreted
-       relative to the root filesystem. */
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (path == "" || path[0] != '/')
-        error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    const bool checkToStringReturn = false; // Historical quirk
+    return peelToStringOutPath(pos, v, checkToStringReturn, [&](Value * peeled, bool) -> SourcePath {
+        Value & effective = *peeled;
+        if (effective.type() == nPath)
+            return effective.path();
+        auto path = coerceToString(pos, effective, context, errorCtx, false, false, true).toOwned();
+        if (path == "" || path[0] != '/')
+            error<EvalError>("string '%1%' doesn't represent an absolute path", path)
+                .withTrace(pos, errorCtx)
+                .debugThrow();
+        return rootPath(CanonPath(path));
+    });
 }
 
 StorePath

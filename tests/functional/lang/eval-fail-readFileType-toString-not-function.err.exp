@@ -5,4 +5,14 @@ error:
              | ^
             2|
 
+       … while calling the `__toString` attribute
+         at /pwd/lang/eval-fail-readFileType-toString-not-function.nix:1:25:
+            1| builtins.readFileType { __toString = "not a function"; }
+             |                         ^
+            2|
+
        error: attempt to call something which is not a function but a string: "not a function"
+       at /pwd/lang/eval-fail-readFileType-toString-not-function.nix:1:25:
+            1| builtins.readFileType { __toString = "not a function"; }
+             |                         ^
+            2|
