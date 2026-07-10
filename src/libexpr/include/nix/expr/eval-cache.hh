@@ -45,7 +45,7 @@ public:
 private:
     typedef fun<Value *()> RootLoader;
     RootLoader rootLoader;
-    UniqueRootValue value;
+    RootValue value;
 
     Value * getRootValue();
 
@@ -112,7 +112,7 @@ public:
 private:
     using Parent = std::optional<std::pair<ref<AttrCursor>, Symbol>>;
     const Parent parent;
-    UniqueRootValue _value;
+    RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
     AttrKey getKey();

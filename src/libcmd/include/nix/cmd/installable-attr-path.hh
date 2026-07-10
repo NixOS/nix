@@ -27,7 +27,7 @@ namespace nix {
 class InstallableAttrPath : public InstallableValue
 {
     SourceExprCommand & cmd;
-    UniqueRootValue v;
+    RootValue v;
     std::string attrPath;
     ExtendedOutputsSpec extendedOutputsSpec;
 

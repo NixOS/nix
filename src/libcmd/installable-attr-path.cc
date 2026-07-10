@@ -32,7 +32,7 @@ InstallableAttrPath::InstallableAttrPath(
     ExtendedOutputsSpec extendedOutputsSpec)
     : InstallableValue(state)
     , cmd(cmd)
-    , v(UniqueRootValue(v))
+    , v(RootValue(v))
     , attrPath(attrPath)
     , extendedOutputsSpec(std::move(extendedOutputsSpec))
 {

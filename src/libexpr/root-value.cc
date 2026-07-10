@@ -36,7 +36,7 @@ static auto & freeSlots = *new Sync<Slot *>{nullptr};
 
 #endif
 
-Value ** allocRootValueSlot(Value * v)
+RootValue::RootValue(Value * v)
 {
 #if NIX_USE_BOEHMGC
     Slot * slot;
@@ -58,13 +58,13 @@ Value ** allocRootValueSlot(Value * v)
 
     slot->value = v;
 
-    return &slot->value;
+    this->slot = &slot->value;
 #else
-    return new Value *(v);
+    this->slot = new Value *(v);
 #endif
 }
 
-void freeRootValueSlot(Value ** slot)
+void RootValue::freeRootValueSlot()
 {
 #if NIX_USE_BOEHMGC
     /* Note: writing `nextFree` overwrites the `Value *`, so this also
@@ -76,11 +76,7 @@ void freeRootValueSlot(Value ** slot)
 #else
     delete slot;
 #endif
-}
-
-RootValue allocRootValue(Value * v)
-{
-    return RootValue(allocRootValueSlot(v), freeRootValueSlot);
+    slot = nullptr;
 }
 
 } // namespace nix

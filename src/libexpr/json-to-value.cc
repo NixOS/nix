@@ -18,7 +18,7 @@ class JSONSax : nlohmann::json_sax<json>
     {
     protected:
         std::unique_ptr<JSONState> parent;
-        UniqueRootValue v;
+        RootValue v;
     public:
         virtual std::unique_ptr<JSONState> resolve(EvalState &)
         {
@@ -31,7 +31,7 @@ class JSONSax : nlohmann::json_sax<json>
         }
 
         explicit JSONState(Value * v)
-            : v(UniqueRootValue(v))
+            : v(RootValue(v))
         {
         }
 
@@ -40,7 +40,7 @@ class JSONSax : nlohmann::json_sax<json>
         Value & value(EvalState & state)
         {
             if (!v)
-                v = UniqueRootValue(state.allocValue());
+                v = RootValue(state.allocValue());
             return **v;
         }
 
