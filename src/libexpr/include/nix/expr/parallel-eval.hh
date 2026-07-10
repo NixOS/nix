@@ -21,6 +21,7 @@ namespace nix {
 
 struct Executor
 {
+    // FIXME: support std::moveable_function.
     using work_t = std::function<void()>;
 
     struct Item
