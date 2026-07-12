@@ -90,6 +90,17 @@ scope: {
           ;
       };
 
+  sqlite =
+    if !stdenv.hostPlatform.isWindows then
+      pkgs.sqlite
+    else
+      pkgs.sqlite.overrideAttrs (prevAttrs: {
+        nativeBuildInputs = lib.filter (x: !(x.pname == "tcl")) prevAttrs.nativeBuildInputs or [ ];
+        configureFlags = (lib.filter (x: !(lib.hasPrefix "--with-tcl" x)) prevAttrs.configureFlags) ++ [
+          "--disable-tcl"
+        ];
+      });
+
   libgit2 =
     if lib.versionAtLeast pkgs.libgit2.version "1.9.4" then
       pkgs.libgit2
