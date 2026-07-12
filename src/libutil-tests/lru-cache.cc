@@ -90,6 +90,40 @@ TEST(LRUCache, overwriteOldestWhenCapacityIsReached)
     ASSERT_EQ(c.get("another").value(), "whatever");
 }
 
+TEST(LRUCache, upsertReturnValue)
+{
+    LRUCache<std::string, std::string> c(10);
+    ASSERT_EQ(c.upsert("one", "eins"), true);
+    ASSERT_EQ(c.upsert("two", "zwei"), true);
+    ASSERT_EQ(c.upsert("one", "uno"), false);
+    ASSERT_EQ(c.upsert("two", "dos"), false);
+    ASSERT_EQ(c.upsert("three", "drei"), true);
+}
+
+TEST(LRUCache, upsertReturnValueEdgeCases)
+{
+    LRUCache<std::string, std::string> c(3);
+    ASSERT_EQ(c.upsert("one", "eins"), true);
+    ASSERT_EQ(c.upsert("two", "zwei"), true);
+    ASSERT_EQ(c.upsert("three", "drei"), true);
+
+    /* does not exceed capacity */
+    ASSERT_EQ(c.upsert("one", "uno"), false);
+
+    /* exceeds capacity */
+    ASSERT_EQ(c.upsert("another", "whatever"), true);
+
+    /* retired */
+    ASSERT_EQ(c.upsert("two", "dos"), true);
+}
+
+TEST(LRUCache, upsertReturnValueZeroCapacity)
+{
+    LRUCache<std::string, std::string> c(0);
+    ASSERT_EQ(c.upsert("one", "eins"), true);
+    ASSERT_EQ(c.upsert("one", "uno"), true);
+}
+
 /* ----------------------------------------------------------------------------
  * clear
  * --------------------------------------------------------------------------*/
