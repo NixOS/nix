@@ -13,6 +13,7 @@ suites += {
     'follow-paths.sh',
     'bundle.sh',
     'check.sh',
+    'check-store.sh',
     'unlocked-override.sh',
     'absolute-paths.sh',
     'absolute-attr-paths.sh',
