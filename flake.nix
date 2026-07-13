@@ -31,7 +31,7 @@
     let
       inherit (nixpkgs) lib;
 
-      officialRelease = false;
+      officialRelease = true;
 
       linux32BitSystems = [ "i686-linux" ];
       linux64BitSystems = [
