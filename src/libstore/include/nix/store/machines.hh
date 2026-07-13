@@ -23,6 +23,7 @@ struct Machine
     const StringSet supportedFeatures;
     const StringSet mandatoryFeatures;
     const std::string sshPublicHostKey;
+    const bool forceLocal;
     bool enabled = true;
 
     /**
@@ -50,7 +51,8 @@ struct Machine
         decltype(speedFactor) speedFactor,
         decltype(supportedFeatures) supportedFeatures,
         decltype(mandatoryFeatures) mandatoryFeatures,
-        decltype(sshPublicHostKey) sshPublicHostKey);
+        decltype(sshPublicHostKey) sshPublicHostKey,
+        decltype(forceLocal) forceLocal);
 
     /**
      * Elaborate `storeUri` into a complete store reference,
