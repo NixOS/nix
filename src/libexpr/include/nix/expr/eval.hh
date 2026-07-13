@@ -1086,23 +1086,21 @@ public:
     Counter nrSpuriousWakeups;
 
 private:
-    bool countCalls;
+    const bool countCalls;
 
-    // FIXME: make thread-safe.
-    typedef boost::unordered_flat_map<std::string, size_t, StringViewHash, std::equal_to<>> PrimOpCalls;
-    PrimOpCalls primOpCalls;
+    typedef boost::concurrent_flat_map<std::string, size_t, StringViewHash, std::equal_to<>> PrimOpCalls;
+    const ref<PrimOpCalls> primOpCalls;
 
-    typedef boost::unordered_flat_map<ExprLambda *, size_t> FunctionCalls;
-    FunctionCalls functionCalls;
+    typedef boost::concurrent_flat_map<ExprLambda *, size_t> FunctionCalls;
+    const ref<FunctionCalls> functionCalls;
 
     /** Evaluation/call profiler. */
     MultiEvalProfiler profiler;
 
     void incrFunctionCall(ExprLambda * fun);
 
-    // FIXME: make thread-safe.
-    typedef boost::unordered_flat_map<PosIdx, size_t, std::hash<PosIdx>> AttrSelects;
-    AttrSelects attrSelects;
+    typedef boost::concurrent_flat_map<PosIdx, size_t, std::hash<PosIdx>> AttrSelects;
+    const ref<AttrSelects> attrSelects;
 
     friend struct ExprOpUpdate;
     friend struct ExprOpConcatLists;
