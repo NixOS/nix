@@ -33,6 +33,7 @@ You generally do not need to run this command manually.
 - [`--read-log`](./nix-store/read-log.md)
 - [`--dump-db`](./nix-store/dump-db.md)
 - [`--load-db`](./nix-store/load-db.md)
+- [`--register-validity`](./nix-store/register-validity.md)
 - [`--print-env`](./nix-store/print-env.md)
 - [`--generate-binary-cache-key`](./nix-store/generate-binary-cache-key.md)
 
