@@ -42,7 +42,7 @@ void setCurActivity(const ActivityId activityId)
  */
 Logger * logger = makeSimpleLogger(true).release();
 
-void Logger::warn(const std::string & msg)
+void Logger::warn(const std::string & msg) noexcept
 {
     log(lvlWarn, ANSI_WARNING "warning:" ANSI_NORMAL " " + msg);
 }
@@ -86,7 +86,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         if (lvl > verbosity)
             return;
@@ -124,7 +124,7 @@ public:
         writeToStderr(prefix + filterANSIEscapes(s, !tty) + "\n");
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
@@ -138,13 +138,13 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent) noexcept override
     {
         if (lvl <= verbosity && !s.empty())
             log(lvl, s + "...");
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields) noexcept override
     {
         if (type == resBuildLogLine && printBuildLogs) {
             auto lastLine = fields[0].s;
@@ -158,7 +158,7 @@ public:
 
 Verbosity verbosity = lvlInfo;
 
-static void writeFullLogging(Descriptor fd, std::string_view s)
+static void writeFullLogging(Descriptor fd, std::string_view s) noexcept
 {
     try {
         writeFull(fd, s, false);
@@ -170,7 +170,7 @@ static void writeFullLogging(Descriptor fd, std::string_view s)
     }
 }
 
-void writeToStderr(std::string_view s)
+void writeToStderr(std::string_view s) noexcept
 {
     writeFullLogging(getStandardError(), s);
 }
@@ -289,7 +289,7 @@ struct JSONLogger : Logger
         }
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         nlohmann::json json;
         json["action"] = "msg";
@@ -298,7 +298,7 @@ struct JSONLogger : Logger
         write(std::move(json));
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         std::ostringstream oss;
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
@@ -331,7 +331,7 @@ struct JSONLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent) noexcept override
     {
         nlohmann::json json;
         json["action"] = "start";
@@ -344,7 +344,7 @@ struct JSONLogger : Logger
         write(std::move(json));
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act) noexcept override
     {
         nlohmann::json json;
         json["action"] = "stop";
@@ -352,7 +352,7 @@ struct JSONLogger : Logger
         write(std::move(json));
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields) noexcept override
     {
         nlohmann::json json;
         json["action"] = "result";
@@ -362,7 +362,7 @@ struct JSONLogger : Logger
         write(std::move(json));
     }
 
-    void result(ActivityId act, ResultType type, const nlohmann::json & j) override
+    void result(ActivityId act, ResultType type, const nlohmann::json & j) noexcept override
     {
         nlohmann::json json;
         json["action"] = "result";

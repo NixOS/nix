@@ -225,13 +225,9 @@ struct curlFileTransfer : public FileTransfer
                     curl_multi_remove_handle(fileTransfer.curlm.get(), req);
                 curl_easy_cleanup(req);
             }
-            try {
-                if (!done && enqueued)
-                    fail(FileTransferError(
-                        Interrupted, {}, "%s of '%s' was interrupted", Uncolored(request.noun()), request.uri));
-            } catch (...) {
-                ignoreExceptionInDestructor();
-            }
+            if (!done && enqueued)
+                fail(FileTransferError(
+                    Interrupted, {}, "%s of '%s' was interrupted", Uncolored(request.noun()), request.uri));
         }
 
         void failEx(std::exception_ptr ex) noexcept

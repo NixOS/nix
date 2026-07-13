@@ -141,22 +141,27 @@ public:
         return false;
     }
 
-    virtual void log(Verbosity lvl, std::string_view s) = 0;
+    /* Note: logging functions must be noexcept, since they're often
+       called in contexts where exceptions cannot be handled (such as
+       in completion callbacks or destructors). Implementations should
+       handle failure to write the message (e.g. by ignoring it or
+       disabling the logger). */
+    virtual void log(Verbosity lvl, std::string_view s) noexcept = 0;
 
-    void log(std::string_view s)
+    void log(std::string_view s) noexcept
     {
         log(lvlInfo, s);
     }
 
-    virtual void logEI(const ErrorInfo & ei) = 0;
+    virtual void logEI(const ErrorInfo & ei) noexcept = 0;
 
-    void logEI(Verbosity lvl, ErrorInfo ei)
+    void logEI(Verbosity lvl, ErrorInfo ei) noexcept
     {
         ei.level = lvl;
         logEI(ei);
     }
 
-    virtual void warn(const std::string & msg);
+    virtual void warn(const std::string & msg) noexcept;
 
     virtual void startActivity(
         ActivityId act,
@@ -164,13 +169,13 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) {};
+        ActivityId parent) noexcept {};
 
-    virtual void stopActivity(ActivityId act) {};
+    virtual void stopActivity(ActivityId act) noexcept {};
 
-    virtual void result(ActivityId act, ResultType type, const Fields & fields) {};
+    virtual void result(ActivityId act, ResultType type, const Fields & fields) noexcept {};
 
-    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) {};
+    virtual void result(ActivityId act, ResultType type, const nlohmann::json & json) noexcept {};
 
     virtual void writeToStdout(std::string_view s);
 
@@ -375,6 +380,6 @@ inline void warn(const std::string & fs, const Args &... args)
         warn(args);                   \
     }
 
-void writeToStderr(std::string_view s);
+void writeToStderr(std::string_view s) noexcept;
 
 } // namespace nix

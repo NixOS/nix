@@ -29,13 +29,13 @@ struct TeeLogger : Logger
             logger->resume();
     };
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         for (auto & logger : loggers)
             logger->log(lvl, s);
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         for (auto & logger : loggers)
             logger->logEI(ei);
@@ -47,25 +47,25 @@ struct TeeLogger : Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent) noexcept override
     {
         for (auto & logger : loggers)
             logger->startActivity(act, lvl, type, s, fields, parent);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act) noexcept override
     {
         for (auto & logger : loggers)
             logger->stopActivity(act);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields) noexcept override
     {
         for (auto & logger : loggers)
             logger->result(act, type, fields);
     }
 
-    void result(ActivityId act, ResultType type, const nlohmann::json & json) override
+    void result(ActivityId act, ResultType type, const nlohmann::json & json) noexcept override
     {
         for (auto & logger : loggers)
             logger->result(act, type, json);
