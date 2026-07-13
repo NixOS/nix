@@ -33,7 +33,7 @@ public:
             vtable.destroy(userdata);
     }
 
-    void log(nix::Verbosity lvl, std::string_view s) override
+    void log(nix::Verbosity lvl, std::string_view s) noexcept override
     {
         if (!vtable.log)
             return;
@@ -41,7 +41,7 @@ public:
         vtable.log(userdata, static_cast<nix_verbosity>(lvl), buf.c_str());
     }
 
-    void logEI(const nix::ErrorInfo & ei) override
+    void logEI(const nix::ErrorInfo & ei) noexcept override
     {
         if (!vtable.log)
             return;
@@ -57,7 +57,7 @@ public:
         nix::ActivityType type,
         const std::string & s,
         const Fields & /*fields*/,
-        nix::ActivityId parent) override
+        nix::ActivityId parent) noexcept override
     {
         if (!vtable.start_activity)
             return;
@@ -65,13 +65,13 @@ public:
             userdata, act, static_cast<nix_verbosity>(lvl), static_cast<nix_activity_type>(type), s.c_str(), parent);
     }
 
-    void stopActivity(nix::ActivityId act) override
+    void stopActivity(nix::ActivityId act) noexcept override
     {
         if (vtable.stop_activity)
             vtable.stop_activity(userdata, act);
     }
 
-    void result(nix::ActivityId act, nix::ResultType type, const Fields & fields) override
+    void result(nix::ActivityId act, nix::ResultType type, const Fields & fields) noexcept override
     {
         if (!vtable.result_string)
             return;
