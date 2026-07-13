@@ -298,6 +298,8 @@ std::string runProgram(std::filesystem::path program, bool lookupPath, const OsS
     return res.second;
 }
 
+#ifndef __linux__
+
 void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
@@ -358,6 +360,8 @@ void runProgram2(const RunOptions & options)
     if (status)
         throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }
+
+#endif // __linux__
 
 //////////////////////////////////////////////////////////////////////
 
