@@ -1099,12 +1099,12 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
             try {
                 return readLine(builderOut.get());
             } catch (Error & e) {
-                auto status = pid.wait();
+                auto status = pid != -1 ? pid.wait() : 0;
                 e.addTrace(
                     {},
                     "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     store.printStorePath(drvPath),
-                    statusToString(status),
+                    status ? statusToString(status) : "no status",
                     concatStringsSep("\n", msgs));
                 throw;
             }
