@@ -129,7 +129,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , reservedPath(dbDir / "reserved")
     , schemaPath(dbDir / "schema")
     , tempRootsDir(config->stateDir.get() / "temproots")
-    , fnTempRoots(makeTempPath(tempRootsDir, "temproots"))
+    , fnTempRoots(tempRootsDir / std::to_string(getpid()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
