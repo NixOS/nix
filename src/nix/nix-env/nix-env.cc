@@ -1391,7 +1391,7 @@ static void opDeleteGenerations(Globals & globals, Strings opFlags, Strings opAr
     }
 }
 
-static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
+[[noreturn]] static void opVersion(Globals & globals, Strings opFlags, Strings opArgs)
 {
     printVersion("nix-env");
 }
@@ -1508,23 +1508,25 @@ static int main_nix_env(int argc, char ** argv)
         if (!op)
             throw UsageError("no operation specified");
 
-        auto store = openStore();
+        if (op != opVersion) {
+            auto store = openStore();
 
-        globals.state =
-            std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
-        globals.state->repair = myArgs.repair;
+            globals.state =
+                std::shared_ptr<EvalState>(new EvalState(myArgs.lookupPath, store, fetchSettings, evalSettings));
+            globals.state->repair = myArgs.repair;
 
-        globals.instSource.nixExprPath = std::make_shared<SourcePath>(
-            file != "" ? lookupFileArg(*globals.state, file)
-                       : globals.state->rootPath(CanonPath(nixExprPath.string())));
+            globals.instSource.nixExprPath = std::make_shared<SourcePath>(
+                file != "" ? lookupFileArg(*globals.state, file)
+                           : globals.state->rootPath(CanonPath(nixExprPath.string())));
 
-        globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
+            globals.instSource.autoArgs = myArgs.getAutoArgs(*globals.state);
 
-        if (globals.profile == "")
-            globals.profile = getEnv("NIX_PROFILE").value_or("");
+            if (globals.profile == "")
+                globals.profile = getEnv("NIX_PROFILE").value_or("");
 
-        if (globals.profile == "")
-            globals.profile = getDefaultProfile(settings.getProfileDirsOptions()).string();
+            if (globals.profile == "")
+                globals.profile = getDefaultProfile(settings.getProfileDirsOptions()).string();
+        }
 
         op(globals, std::move(opFlags), std::move(opArgs));
 
