@@ -359,11 +359,12 @@ EvalCache::EvalCache(
 
 Value * EvalCache::getRootValue()
 {
-    if (!value) {
+    auto value(this->value.lock());
+    if (!*value) {
         debug("getting root value");
-        value = RootValue(rootLoader());
+        *value = RootValue(rootLoader());
     }
-    return *value;
+    return **value;
 }
 
 ref<AttrCursor> EvalCache::getRoot()
@@ -378,7 +379,7 @@ AttrCursor::AttrCursor(
     , cachedValue(std::move(cachedValue))
 {
     if (value)
-        _value = RootValue(value);
+        *_value.lock() = RootValue(value);
 }
 
 AttrKey AttrCursor::getKey()
@@ -394,18 +395,23 @@ AttrKey AttrCursor::getKey()
 
 Value & AttrCursor::getValue()
 {
-    if (!_value) {
+    /* Note: this lock is held while the value is being evaluated,
+       so concurrent calls block until the value is available. Lock
+       ordering is strictly child -> parent, so this cannot
+       deadlock. */
+    auto value(_value.lock());
+    if (!*value) {
         if (parent) {
             auto & vParent = parent->first->getValue();
             root->state.forceAttrs(vParent, noPos, "while searching for an attribute");
             auto attr = vParent.attrs()->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
-            _value = RootValue(attr->value);
+            *value = RootValue(attr->value);
         } else
-            _value = RootValue(root->getRootValue());
+            *value = RootValue(root->getRootValue());
     }
-    return **_value;
+    return ***value;
 }
 
 void AttrCursor::fetchCachedValue()
