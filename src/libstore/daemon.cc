@@ -137,6 +137,8 @@ struct TunnelLogger : public Logger
         else {
             if (clientVersion >= WorkerProto::Version{.number = {1, 26}}) {
                 to << STDERR_ERROR << *ex;
+                if (clientVersion.features.contains(WorkerProto::featureErrorStatus))
+                    to << ex->info().status;
             } else {
                 to << STDERR_ERROR << ex->what() << ex->info().status;
             }
