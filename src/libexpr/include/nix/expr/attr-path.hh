@@ -12,7 +12,7 @@ MakeError(AttrPathNotFound, Error);
 MakeError(NoPositionInfo, Error);
 
 std::pair<Value *, PosIdx>
-findAlongAttrPath(EvalState & state, const std::string & attrPath, Bindings & autoArgs, Value & vIn);
+findAlongAttrPath(EvalState & state, const std::string & attrPath, const Bindings & autoArgs, Value & vIn);
 
 /**
  * Heuristic to find the filename and lineno or a nix value.

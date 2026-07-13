@@ -294,12 +294,7 @@ struct curlFileTransfer : public FileTransfer
             }
             try {
                 if (!done && enqueued)
-                    fail(FileTransferError(
-                        Interrupted,
-                        {},
-                        "%s of '%s' was interrupted",
-                        Uncolored(request.noun()),
-                        request.displayUri()));
+                    failInterruptedOrCancelled();
             } catch (...) {
                 ignoreExceptionInDestructor();
             }
@@ -326,6 +321,18 @@ struct curlFileTransfer : public FileTransfer
         void fail(T && e) noexcept
         {
             failEx(std::make_exception_ptr(std::forward<T>(e)));
+        }
+
+        void failInterruptedOrCancelled()
+        {
+            HintFmt fmt("%s of '%s' was interrupted", Uncolored(request.noun()), request.displayUri());
+
+            /* Technically, we don't really have per-transfer cancellation currently,
+               but it's nice to distinguish between the two in the future. */
+            if (getInterrupted())
+                fail(nix::Interrupted(std::move(fmt)));
+            else
+                fail(nix::Cancelled(std::move(fmt)));
         }
 
         LambdaSink finalSink;
@@ -872,13 +879,14 @@ struct curlFileTransfer : public FileTransfer
                 std::optional<std::string> response;
                 if (errorSink)
                     response = std::move(errorSink->s);
-                auto exc = code == CURLE_ABORTED_BY_CALLBACK && getInterrupted() ? FileTransferError(
-                                                                                       Interrupted,
-                                                                                       std::move(response),
-                                                                                       "%s of '%s' was interrupted",
-                                                                                       Uncolored(request.noun()),
-                                                                                       request.displayUri())
-                           : httpStatus != 0
+
+                /* TODO: Also support per-transfer cancellations. */
+                if (code == CURLE_ABORTED_BY_CALLBACK && getInterrupted()) {
+                    failInterruptedOrCancelled();
+                    return;
+                }
+
+                auto exc = httpStatus != 0
                                ? FileTransferError(
                                      err,
                                      std::move(response),

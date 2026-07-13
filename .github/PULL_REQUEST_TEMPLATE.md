@@ -13,6 +13,7 @@ so you understand the process and the expectations.
 - what information to include in commit messages
 - proper attribution
 - volunteering contributions effectively
+- AI/automation policy
 - how to get help and our review process.
 
 PR stuck in review? We have two Nix team meetings per week online that are open for everyone in a jitsi conference:

@@ -53,6 +53,7 @@ sources = files(
   'json.cc',
   'lazy-fetcher-attr.cc',
   'main.cc',
+  'nix_api_eval.cc',
   'nix_api_expr.cc',
   'nix_api_external.cc',
   'nix_api_value.cc',

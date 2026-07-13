@@ -249,6 +249,10 @@ void ignoreExceptionExceptInterrupt(Verbosity lvl)
         throw;
     } catch (const Interrupted & e) {
         throw;
+    } catch (const Cancelled & e) {
+        /* Morally the same as Interrupted, just not triggered by a user but some other
+           cancellation. */
+        throw;
     } catch (Error & e) {
         printMsg(lvl, ANSI_RED "error (ignored):" ANSI_NORMAL " %s", e.info().msg);
     } catch (std::exception & e) {

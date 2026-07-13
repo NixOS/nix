@@ -112,7 +112,7 @@ void getDerivations(
     EvalState & state,
     Value & v,
     const std::string & pathPrefix,
-    Bindings & autoArgs,
+    const Bindings & autoArgs,
     PackageInfos & drvs,
     bool ignoreAssertionFailures);
 

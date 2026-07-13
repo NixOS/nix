@@ -15,13 +15,13 @@ class PosIdx
 private:
     uint32_t id;
 
-    explicit PosIdx(uint32_t id)
+    constexpr explicit PosIdx(uint32_t id)
         : id(id)
     {
     }
 
 public:
-    PosIdx()
+    constexpr PosIdx()
         : id(0)
     {
     }

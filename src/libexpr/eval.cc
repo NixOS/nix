@@ -1359,7 +1359,11 @@ void ExprAttrs::eval(EvalState & state, Env & env, Value & v)
         sort = true;
     }
 
-    bindings.bindings->pos = pos;
+    /* FIXME: Currently we can't track the positions of empty bindings. A way
+       to fix this is to store the position in the Value storage with more
+       clever bitpacking (we have spare 32 bits in the Bindings * variant). */
+    if (bindings.bindings != &Bindings::emptyBindings)
+        bindings.bindings->pos = pos;
 
     v.mkAttrs(sort ? bindings.finish() : bindings.alreadySorted());
 }

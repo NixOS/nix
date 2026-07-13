@@ -505,7 +505,7 @@ struct PayloadTypeToInternalType
     MACRO(ValueBase::StringWithContext, string, tString)            \
     MACRO(ValueBase::Path, path, tPath)                             \
     MACRO(ValueBase::Null, null_, tNull)                            \
-    MACRO(Bindings *, attrs, tAttrs)                                \
+    MACRO(const Bindings *, attrs, tAttrs)                          \
     MACRO(ValueBase::List, bigList, tListN)                         \
     MACRO(ValueBase::SmallList, smallList, tListSmall)              \
     MACRO(ValueBase::ClosureThunk, thunk, tThunk)                   \
@@ -900,7 +900,7 @@ protected:
         primOp = std::bit_cast<PrimOp *>(payload[1]);
     }
 
-    void getStorage(Bindings *& attrs) const noexcept
+    void getStorage(const Bindings *& attrs) const noexcept
     {
         Payload payload = loadPayload();
         attrs = std::bit_cast<Bindings *>(payload[1]);
@@ -963,7 +963,7 @@ protected:
         setSingleDWordPayload<tPrimOp>(std::bit_cast<PackedPointer>(primOp));
     }
 
-    void setStorage(Bindings * bindings) noexcept
+    void setStorage(const Bindings * bindings) noexcept
     {
         setSingleDWordPayload<tAttrs>(std::bit_cast<PackedPointer>(bindings));
     }
@@ -1361,7 +1361,7 @@ public:
         setStorage(Null{});
     }
 
-    inline void mkAttrs(Bindings * a) noexcept
+    inline void mkAttrs(const Bindings * a) noexcept
     {
         setStorage(a);
     }
@@ -1487,7 +1487,7 @@ public:
 
     const Bindings * attrs() const noexcept
     {
-        return getStorage<Bindings *>();
+        return getStorage<const Bindings *>();
     }
 
     const PrimOp * primOp() const noexcept
