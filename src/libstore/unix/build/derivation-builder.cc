@@ -339,9 +339,22 @@ protected:
     }
 
     /**
-     * Open the slave side of the pseudoterminal and use it as stderr.
+     * Open the slave side of the pseudoterminal.
      */
-    void openSlave();
+    AutoCloseFD openSlaveNoDup();
+
+    /**
+     * Open the slave side of the pseudoterminal and use it as stderr.
+     * FIXME: This is called in the child. It should really be called in the parent (except for the dup to stderr),
+     * since if the child fails before opening the slave, the parent will hang forever reading from the master. However,
+     * opening the slave in the parent causes random failures on macOS. See c536e00c9deeac58bc4b3299dbc702604c32adbe.
+     */
+    void openSlave()
+    {
+        auto builderOut = openSlaveNoDup();
+        if (dup2(builderOut.get(), STDERR_FILENO) == -1)
+            throw SysError("cannot pipe standard error into log file");
+    }
 
     /**
      * Called by prepareBuild() to start the child process for the
@@ -1029,7 +1042,7 @@ void DerivationBuilderImpl::prepareSandbox()
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
-void DerivationBuilderImpl::openSlave()
+AutoCloseFD DerivationBuilderImpl::openSlaveNoDup()
 {
     std::string slaveName = getPtsName(builderOut.get());
 
@@ -1047,8 +1060,7 @@ void DerivationBuilderImpl::openSlave()
     if (tcsetattr(builderOut.get(), TCSANOW, &term))
         throw SysError("putting pseudoterminal into raw mode");
 
-    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
+    return builderOut;
 }
 
 #if NIX_WITH_AWS_AUTH
