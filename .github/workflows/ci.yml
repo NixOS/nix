@@ -65,6 +65,10 @@ jobs:
       run_vm_tests: false
       run_regression_tests: false
       upload_artifacts: false
+    secrets:
+      sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      sentry_org: ${{ secrets.SENTRY_ORG }}
+      sentry_project: ${{ secrets.SENTRY_PROJECT }}
 
   build_aarch64-linux:
     uses: ./.github/workflows/build.yml
