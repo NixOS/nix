@@ -5,9 +5,31 @@
 #include <stdexcept>
 #include <typeinfo>
 #include <cstring>
+#include <cstdio>
 
 #ifndef CXA_THROW_ON_LOGIC_ERROR
 #  define CXA_THROW_ON_LOGIC_ERROR() abort()
+#endif
+
+#include <cxxabi.h>
+
+#ifndef __GLIBCXX__
+/* libc++abi implements the Itanium ABI RTTI classes but, unlike
+   libstdc++, doesn't declare them in <cxxabi.h>. Their layout is
+   fixed by the ABI, so declare what we need. */
+namespace __cxxabiv1 {
+class __class_type_info : public std::type_info
+{
+public:
+    ~__class_type_info() override;
+};
+
+class __si_class_type_info : public __class_type_info
+{
+public:
+    const __class_type_info * __base_type;
+};
+} // namespace __cxxabiv1
 #endif
 
 static bool is_logic_error(const std::type_info * tinfo)
