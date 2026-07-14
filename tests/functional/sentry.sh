@@ -27,7 +27,7 @@ waitForCrashDump() {
     return 1
 }
 
-for type in segfault assert logic-error panic terminate; do
+for type in segfault assert logic-error panic terminate abort; do
     if [[ $type = logic-error && $(uname) = Darwin ]]; then continue; fi
 
     rm -rf "$sentryDir"

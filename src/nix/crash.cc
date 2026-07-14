@@ -51,6 +51,11 @@ struct CmdCrash : Command
             panic("test panic");
         }
 
+        else if (type == "abort") {
+            printError("Triggering an abort...");
+            std::abort();
+        }
+
         else if (type == "terminate") {
             printError("Triggering an std::terminate...");
 
