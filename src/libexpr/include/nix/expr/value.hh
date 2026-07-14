@@ -4,6 +4,8 @@
 #include <bit>
 #include <cassert>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <memory_resource>
@@ -1427,7 +1429,40 @@ public:
 
     inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
     {
-        setStorage(new Value::Failed(e, recovery));
+        try {
+            setStorage(new Value::Failed(e, recovery));
+        } catch (...) {
+            /* Most likely a std::bad_alloc from the GC heap.
+               This is called while handling an evaluation error,
+               and recording that failure is itself what just failed,
+               so there is no way to recover.
+               Report and bail out, using only static strings to avoid touching the heap again. */
+            std::fputs("error: failed to record an evaluation error", stderr);
+            try {
+                throw;
+            } catch (const std::exception & allocEx) {
+                std::fputs(": ", stderr);
+                std::fputs(allocEx.what(), stderr);
+            } catch (...) {
+            }
+            std::fputc('\n', stderr);
+
+            /* Best effort: show the evaluation error that was being recorded.
+               Formatting it (e.g. BaseError::what) may itself allocate and terminate on failure,
+               hence printing the message above first. */
+            try {
+                std::rethrow_exception(e);
+            } catch (const std::exception & evalEx) {
+                std::fputs("the evaluation error was: ", stderr);
+                std::fputs(evalEx.what(), stderr);
+                std::fputc('\n', stderr);
+            } catch (...) {
+                std::fputs("the evaluation error was of an unknown type\n", stderr);
+            }
+
+            // Abort not exception but function.
+            std::abort();
+        }
     }
 
     bool isList() const noexcept
