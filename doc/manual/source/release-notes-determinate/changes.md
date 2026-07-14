@@ -1,6 +1,6 @@
 # Changes between Nix and Determinate Nix
 
-This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.5.<!-- differences -->
+This section lists the differences between upstream Nix 2.34 and Determinate Nix 3.21.6.<!-- differences -->
 
 * In Determinate Nix, flakes are stable. You no longer need to enable the `flakes` experimental feature.
 
@@ -216,3 +216,35 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 <!-- Determinate Nix version 3.21.4 -->
 
 <!-- Determinate Nix version 3.21.5 -->
+
+<!-- Determinate Nix version 3.21.6 -->
+
+* libutil: Fix GCC build with -Wchanges-meaning by @edolstra in [DeterminateSystems/nix-src#549](https://github.com/DeterminateSystems/nix-src/pull/549)
+
+* fixup: build non-dsp nix on tags as well by @cole-h in [DeterminateSystems/nix-src#550](https://github.com/DeterminateSystems/nix-src/pull/550)
+
+* build.yml: Enable provenance by @edolstra in [DeterminateSystems/nix-src#552](https://github.com/DeterminateSystems/nix-src/pull/552)
+
+* Add initial CLAUDE.md by @edolstra in [DeterminateSystems/nix-src#551](https://github.com/DeterminateSystems/nix-src/pull/551)
+
+* boehmgc: Batch GC_generic_malloc_many() block allocation by @edolstra in [DeterminateSystems/nix-src#547](https://github.com/DeterminateSystems/nix-src/pull/547)
+
+* Root values cleanup by @edolstra in [DeterminateSystems/nix-src#554](https://github.com/DeterminateSystems/nix-src/pull/554)
+
+* Drop soversion by @edolstra in [DeterminateSystems/nix-src#555](https://github.com/DeterminateSystems/nix-src/pull/555)
+
+* Restore uploading of debug symbols for build_x86_64-linux_no_dsp by @edolstra in [DeterminateSystems/nix-src#556](https://github.com/DeterminateSystems/nix-src/pull/556)
+
+* Fix data race initializing AttrCursor::_value by @edolstra in [DeterminateSystems/nix-src#557](https://github.com/DeterminateSystems/nix-src/pull/557)
+
+* Fix assertion failure in processSandboxSetupMessages() by @edolstra in [DeterminateSystems/nix-src#558](https://github.com/DeterminateSystems/nix-src/pull/558)
+
+* On Linux, don't hang if the sandbox helper dies before opening the pty slave by @edolstra in [DeterminateSystems/nix-src#559](https://github.com/DeterminateSystems/nix-src/pull/559)
+
+* Don't run OPENSSL_cleanup() at exit by @edolstra in [DeterminateSystems/nix-src#560](https://github.com/DeterminateSystems/nix-src/pull/560)
+
+* Make logging functions noexcept by @edolstra in [DeterminateSystems/nix-src#561](https://github.com/DeterminateSystems/nix-src/pull/561)
+
+* Make NIX_COUNT_CALLS thread-safe by @edolstra in [DeterminateSystems/nix-src#562](https://github.com/DeterminateSystems/nix-src/pull/562)
+
+* Fix terminateHandler() on macOS      by @edolstra in [DeterminateSystems/nix-src#563](https://github.com/DeterminateSystems/nix-src/pull/563)
