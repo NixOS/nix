@@ -31,10 +31,12 @@ void logFatal(std::string const & s)
 #endif
 }
 
+} // namespace
+
 void onTerminate()
 {
     logFatal(
-        "Determinate Nix crashed. This is a bug. Please report this at https://github.com/DeterminateSystems/nix-src/issues with the following information included:\n");
+        "\nDeterminate Nix crashed. This is a bug. Please report this at https://github.com/DeterminateSystems/nix-src/issues with the following information included:\n");
     try {
         std::exception_ptr eptr = std::current_exception();
         if (eptr) {
@@ -55,7 +57,6 @@ void onTerminate()
 
     std::abort();
 }
-} // namespace
 
 void registerCrashHandler()
 {

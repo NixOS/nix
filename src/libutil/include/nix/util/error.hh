@@ -460,6 +460,12 @@ void throwExceptionSelfCheck();
 void panic(std::string_view msg);
 
 /**
+ * Log the current exception (if any) and call abort().
+ */
+[[noreturn]]
+void onTerminate();
+
+/**
  * Run a function, printing an error and returning on exception.
  * Useful for wrapping a `main` function that may throw
  *
