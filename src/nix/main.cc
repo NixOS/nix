@@ -406,9 +406,7 @@ static void terminateHandler()
         }
     }
 
-    // Call the original terminate handler.
-    std::set_terminate(nullptr);
-    std::terminate();
+    onTerminate();
 }
 
 void mainWrapped(int argc, char ** argv)
