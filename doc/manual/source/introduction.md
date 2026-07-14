@@ -140,7 +140,7 @@ otherwise, it would fall back to building from source.
 
 ## Nix Packages collection
 
-We provide a large set of Nix expressions containing hundreds of
+We provide a large set of Nix expressions containing more than 140 000
 existing Unix packages, the _Nix Packages collection_ (Nixpkgs).
 
 ## Managing build environments
