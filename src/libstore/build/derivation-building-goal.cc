@@ -1123,7 +1123,6 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
 
     ProcessOptions processOptions;
-    processOptions.allowVfork = false;
 
     state->pid = startProcess(
         [&] {
