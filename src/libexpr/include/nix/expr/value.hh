@@ -17,6 +17,7 @@
 
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/util/checked-arithmetic.hh"
@@ -1432,36 +1433,32 @@ public:
         try {
             setStorage(new Value::Failed(e, recovery));
         } catch (...) {
-            /* Most likely a std::bad_alloc from the GC heap.
+            /* Most likely a `std::bad_alloc` from the GC heap.
                This is called while handling an evaluation error,
                and recording that failure is itself what just failed,
                so there is no way to recover.
-               Report and bail out, using only static strings to avoid touching the heap again. */
-            std::fputs("error: failed to record an evaluation error", stderr);
-            try {
-                throw;
-            } catch (const std::exception & allocEx) {
-                std::fputs(": ", stderr);
-                std::fputs(allocEx.what(), stderr);
-            } catch (...) {
-            }
-            std::fputc('\n', stderr);
 
-            /* Best effort: show the evaluation error that was being recorded.
-               Formatting it (e.g. BaseError::what) may itself allocate and terminate on failure,
-               hence printing the message above first. */
+               Static context first: formatting the evaluation error below
+               (e.g. `BaseError::what`) may itself allocate and terminate. */
+            std::fputs("\nerror: allocation failed while recording an evaluation error\n", stderr);
+
+            /* This is a best-effort attempt,
+               because `BaseError::what` may allocate and terminate. */
             try {
                 std::rethrow_exception(e);
             } catch (const std::exception & evalEx) {
                 std::fputs("the evaluation error was: ", stderr);
-                std::fputs(evalEx.what(), stderr);
+                std::fputs(evalEx.what(), stderr); // may allocate
                 std::fputc('\n', stderr);
             } catch (...) {
                 std::fputs("the evaluation error was of an unknown type\n", stderr);
             }
 
-            // Abort not exception but function.
-            std::abort();
+            /* `panic()` writes without touching the heap,
+               and the `std::terminate()` it calls reports
+               the allocation failure still active in this catch block,
+               along with a stack trace. */
+            panic("failed to record an evaluation error");
         }
     }
 
