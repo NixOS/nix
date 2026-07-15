@@ -8,10 +8,10 @@ summary_rl_next = custom_target(
     'pipefail',
     '-c',
     '''
-      if [ -e "@INPUT@" ]; then
+      if [ '@0@' = 'false' ]; then
         echo '  - [Upcoming release](release-notes/rl-next.md)'
       fi
-    ''',
+    '''.format(official_release),
   ],
   input : [
     rl_next_generated,
