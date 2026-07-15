@@ -21,6 +21,10 @@ namespace nix {
 
 void initLibUtil()
 {
+    static std::atomic_flag done = ATOMIC_FLAG_INIT;
+    if (done.test_and_set())
+        return;
+
     // Check that exception handling works. Exception handling has been observed
     // not to work on darwin when the linker flags aren't quite right.
     // In this case we don't want to expose the user to some unrelated uncaught

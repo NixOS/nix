@@ -422,6 +422,9 @@ void mainWrapped(int argc, char ** argv)
     }
 #endif
 
+    /* This must be called before Sentry since both initialize OpenSSL. */
+    initLibUtil();
+
     bool sentryEnabled = false;
 
 #if HAVE_SENTRY
