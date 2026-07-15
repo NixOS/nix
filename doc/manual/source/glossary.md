@@ -172,7 +172,7 @@
 - [hermetic]{#gloss-hermetic}
 
   An evaluation or build process is hermetic when one can mechanically identify the set of all inputs that may affect it.
-  At the build level this is achieved by sandboxing; at the evaluation level by restricting impure access (as in [pure evaluation](@docroot@/command-ref/conf-file.md#conf-pure-eval)) together with [locking](#gloss-locking) or [pinning](#gloss-pinning) of the fetched inputs, taken transitively over pure fetches.
+  At the build level this is achieved by sandboxing; at the evaluation level by restricting impure access (as in [pure evaluation](@docroot@/command-ref/conf-file.md#conf-pure-eval)) together with [locking](#gloss-locking) or [pinning](#gloss-pinning) of the fetched inputs, taken transitively over [pure fetches](@docroot@/command-ref/conf-file.md#pure-fetch).
 
 - [IFD]{#gloss-ifd}
 
