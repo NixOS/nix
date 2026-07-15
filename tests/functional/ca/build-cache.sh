@@ -2,6 +2,8 @@
 
 source common.sh
 
+needLocalStore "Daemon not configured to sign build traces, would cause signature errors"
+
 # The substituters didn't work prior to this time.
 requireDaemonNewerThan "2.18.0pre20230808"
 

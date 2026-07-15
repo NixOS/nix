@@ -100,7 +100,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     trace("output path substituted");
 
                     if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id}, NoCheckSigs);
+                        worker.store.registerDrvOutput({*g->outputInfo, id}, CheckSigs);
                     else
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
