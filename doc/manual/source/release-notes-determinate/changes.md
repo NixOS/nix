@@ -220,7 +220,3 @@ This section lists the differences between upstream Nix 2.34 and Determinate Nix
 <!-- Determinate Nix version 3.21.6 -->
 
 <!-- Determinate Nix version 3.21.7 -->
-
-* nix search: Reduce evaluator worker starvation by @edolstra in [DeterminateSystems/nix-src#564](https://github.com/DeterminateSystems/nix-src/pull/564)
-
-* Fix disabling OpenSSL's atexit handler by @edolstra in [DeterminateSystems/nix-src#566](https://github.com/DeterminateSystems/nix-src/pull/566)
