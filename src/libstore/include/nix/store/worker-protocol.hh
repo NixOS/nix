@@ -256,6 +256,9 @@ enum struct WorkerProto::Op : uint64_t {
     AddBuildLog = 45,
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
+    // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
+    // AddTempRoots = 49, // reserved for https://github.com/NixOS/nix/pull/16113
+    // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
 };
 
 struct WorkerProto::ClientHandshakeInfo
