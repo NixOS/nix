@@ -190,6 +190,22 @@ void copyContext(
 std::string printValue(EvalState & state, Value & v);
 std::ostream & operator<<(std::ostream & os, const ValueType t);
 
+/**
+ * Trace-message stage marker for "we tried to reach a usable value
+ * from `v` but failed".
+ * Renders as `using` when it has evaluated to a proper value, and
+ * `evaluating` otherwise.
+ *
+ * Use in a `%s` in `addTrace`, e.g.:
+ * `"while %s the result of the %s attribute"`.
+ */
+struct WhileTryingToUse
+{
+    const Value * v;
+};
+
+std::ostream & operator<<(std::ostream & os, WhileTryingToUse w);
+
 struct RegexCache;
 
 ref<RegexCache> makeRegexCache();

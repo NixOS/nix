@@ -5,7 +5,7 @@ error:
              | ^
             2|
 
-       … while evaluating the result of the `__toString` attribute
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-toJSON-toString-not-string.nix:1:19:
             1| builtins.toJSON { __toString = self: 42; }
              |                   ^

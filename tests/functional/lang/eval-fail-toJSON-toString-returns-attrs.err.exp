@@ -6,7 +6,7 @@ error:
              | ^
             3|
 
-       … while evaluating the result of the `__toString` attribute
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-toJSON-toString-returns-attrs.nix:2:19:
             1| # toJSON checks the return type of __toString
             2| builtins.toJSON { __toString = self: { a = 1; }; }

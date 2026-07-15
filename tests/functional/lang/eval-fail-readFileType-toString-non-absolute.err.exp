@@ -5,7 +5,7 @@ error:
              | ^
             2|
 
-       … while evaluating the result of the `__toString` attribute
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-readFileType-toString-non-absolute.nix:1:25:
             1| builtins.readFileType { __toString = self: "not-absolute"; }
              |                         ^

@@ -1,5 +1,5 @@
 error:
-       … while evaluating the result of the `__toString` attribute
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-toString-returns-non-coercible.nix:2:6:
             1| # interpolation checks the return type of __toString
             2| "${{ __toString = self: null; }}"

@@ -201,19 +201,20 @@ auto EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStr
                 auto _level = state.addCallDepth(pos);
                 return peel(i->pos, *v1);
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while evaluating the result of the `__toString` attribute");
+                e.addTrace(
+                    state.positions[i->pos], "while %s the result of the `__toString` attribute", WhileTryingToUse{v1});
                 throw;
             }
         }
         if (auto i = v.attrs()->get(state.s.outPath)) {
             try {
                 state.forceValue(*i->value, i->pos);
+                auto _level = state.addCallDepth(pos);
+                return peel(i->pos, *i->value);
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while evaluating the `outPath` attribute");
+                e.addTrace(state.positions[i->pos], "while %s the `outPath` attribute", WhileTryingToUse{i->value});
                 throw;
             }
-            auto _level = state.addCallDepth(pos);
-            return peel(i->pos, *i->value);
         }
         /* Dead-end attrs: no `__toString`, no `outPath`. If we came through
            a `__toString` call at some depth, this violates the string-

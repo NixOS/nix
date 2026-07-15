@@ -116,6 +116,13 @@ std::ostream & operator<<(std::ostream & os, const ValueType t)
     return os;
 }
 
+std::ostream & operator<<(std::ostream & os, WhileTryingToUse w)
+{
+    /* Reset color first: `HintFmt` wraps arguments in `Magenta` by
+       default, but this word is sentence structure, not a value. */
+    return os << ANSI_NORMAL << ((w.v->isThunk() || w.v->isFailed() || w.v->type() == nThunk) ? "evaluating" : "using");
+}
+
 std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;

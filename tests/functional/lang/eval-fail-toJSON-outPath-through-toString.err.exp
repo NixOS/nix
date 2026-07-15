@@ -6,7 +6,14 @@ error:
              | ^
             5|   outPath = {
 
-       … while evaluating the result of the `__toString` attribute
+       … while using the `outPath` attribute
+         at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:5:3:
+            4| builtins.toJSON {
+            5|   outPath = {
+             |   ^
+            6|     __toString = self: 42;
+
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:6:5:
             5|   outPath = {
             6|     __toString = self: 42;
