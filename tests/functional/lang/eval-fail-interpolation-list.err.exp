@@ -1,5 +1,5 @@
 error:
-       … while evaluating the result of the `__toString` attribute
+       … while using the result of the `__toString` attribute
          at /pwd/lang/eval-fail-interpolation-list.nix:3:3:
             2| "${{
             3|   __toString = self: [
