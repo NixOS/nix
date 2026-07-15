@@ -3,6 +3,8 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
 
+#include "linux-namespaces-private.hh"
+
 #include <mutex>
 #include <sys/resource.h>
 
@@ -89,9 +91,9 @@ bool mountAndPidNamespacesSupported()
 
 //////////////////////////////////////////////////////////////////////
 
-static AutoCloseFD fdSavedMountNamespace;
-static AutoCloseFD fdSavedRoot;
-static bool havePrivateMountNs = false;
+AutoCloseFD fdSavedMountNamespace;
+AutoCloseFD fdSavedRoot;
+bool havePrivateMountNs = false;
 
 /* Save the current mount namespace so restoreMountNamespace() can return
    to it later. Ignored if called more than once. */
