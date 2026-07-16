@@ -144,7 +144,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 
 std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
 {
-    return {&getCursor(state)->forceValue(), noPos};
+    return {&getCursor(state)->getValue(), noPos};
 }
 
 std::vector<AttrPath> InstallableFlake::getAttrPaths(bool useDefaultAttrPath, ref<eval_cache::AttrCursor> inventory)
