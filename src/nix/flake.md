@@ -312,22 +312,25 @@ Currently the `type` attribute can be one of the following:
   The URL syntax for `github` flakes is:
 
   ```
-  github:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?
+  github:<owner>/<repo>(\?<params>)?
+  github://<host>/<owner>/<repo>(\?<params>)?
   ```
 
-  `<rev-or-ref>` specifies the name of a branch or tag (`ref`), or a
-  commit hash (`rev`). Note that unlike Git, GitHub allows fetching by
-  commit hash without specifying a branch or tag.
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. Note that unlike Git, GitHub allows fetching by commit hash
+  without specifying a branch or tag. The old path form
+  `github:<owner>/<repo>/<rev-or-ref>` is still accepted for compatibility,
+  but new URLs should use `?ref=` or `?rev=`.
 
-  You can also specify `host` as a parameter, to point to a custom GitHub
-  Enterprise server.
+  You can also specify a custom GitHub Enterprise server as the URL authority.
+  The older `host` query parameter is still accepted for compatibility.
 
   Some examples:
 
   * `github:edolstra/dwarffs`
-  * `github:edolstra/dwarffs/unstable`
-  * `github:edolstra/dwarffs/d3f2baba8f425779026c6ec04021b2e927f61e31`
-  * `github:internal/project?host=company-github.example.org`
+  * `github:edolstra/dwarffs?ref=unstable`
+  * `github:edolstra/dwarffs?rev=d3f2baba8f425779026c6ec04021b2e927f61e31`
+  * `github://company-github.example.org/internal/project`
 
 * `gitlab`: Similar to `github`, is a more efficient way to fetch
   GitLab repositories. The following attributes are required:
@@ -340,25 +343,33 @@ Currently the `type` attribute can be one of the following:
 
   The URL syntax for `gitlab` flakes is:
 
-  `gitlab:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+  ```
+  gitlab:<owner-or-namespace>/<repo>(\?<params>)?
+  gitlab://<host>/<owner-or-namespace>/<repo>(\?<params>)?
+  ```
 
-  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
-  (`ref`), or a commit hash (`rev`) can be specified.
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The old path form `gitlab:<owner>/<repo>/<rev-or-ref>` is still
+  accepted for compatibility when no URL authority and no `ref`/`rev` query
+  parameter are present.
 
-  Since GitLab allows for self-hosting, you can specify `host` as
-  a parameter, to point to any instances other than `gitlab.com`.
+  Since GitLab allows for self-hosting, you can specify instances other than
+  `gitlab.com` as the URL authority. The older `host` query parameter is still
+  accepted for compatibility.
 
   Some examples:
 
   * `gitlab:veloren/veloren`
-  * `gitlab:veloren/veloren/master`
-  * `gitlab:veloren/veloren/80a4d7f13492d916e47d6195be23acae8001985a`
-  * `gitlab:openldap/openldap?host=git.openldap.org`
+  * `gitlab:veloren/veloren?ref=master`
+  * `gitlab:veloren/veloren?rev=80a4d7f13492d916e47d6195be23acae8001985a`
+  * `gitlab://git.openldap.org/openldap/openldap`
 
-  When accessing a project in a (nested) subgroup, make sure to URL-encode any
-  slashes, i.e. replace `/` with `%2F`:
+  Nested GitLab groups can be written directly in the path when using the
+  URL-authority form, or when using a `ref`/`rev` query parameter:
 
-  * `gitlab:veloren%2Fdev/rfcs`
+  * `gitlab://gitlab.com/veloren/dev/rfcs`
+  * `gitlab:veloren/dev/rfcs?ref=main`
+  * `gitlab://gitlab.example.org/org/group/subgroup/project?ref=main`
 
 * `sourcehut`: Similar to `github`, is a more efficient way to fetch
   SourceHut repositories. The following attributes are required:
@@ -371,13 +382,18 @@ Currently the `type` attribute can be one of the following:
 
   The URL syntax for `sourcehut` flakes is:
 
-  `sourcehut:<owner>/<repo>(/<rev-or-ref>)?(\?<params>)?`
+  ```
+  sourcehut:<owner>/<repo>(\?<params>)?
+  sourcehut://<host>/<owner>/<repo>(\?<params>)?
+  ```
 
-  `<rev-or-ref>` works the same as `github`. Either a branch or tag name
-  (`ref`), or a commit hash (`rev`) can be specified.
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The old path form `sourcehut:<owner>/<repo>/<rev-or-ref>` is
+  still accepted for compatibility.
 
-  Since SourceHut allows for self-hosting, you can specify `host` as
-  a parameter, to point to any instances other than `git.sr.ht`.
+  Since SourceHut allows for self-hosting, you can specify instances other than
+  `git.sr.ht` as the URL authority. The older `host` query parameter is still
+  accepted for compatibility.
 
   Currently, `ref` name resolution only works for Git repositories.
   You can refer to Mercurial repositories by simply changing `host` to
@@ -387,10 +403,123 @@ Currently the `type` attribute can be one of the following:
   Some examples:
 
   * `sourcehut:~misterio/nix-colors`
-  * `sourcehut:~misterio/nix-colors/main`
-  * `sourcehut:~misterio/nix-colors?host=git.example.org`
-  * `sourcehut:~misterio/nix-colors/182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
-  * `sourcehut:~misterio/nix-colors/21c1a380a6915d890d408e9f22203436a35bb2de?host=hg.sr.ht`
+  * `sourcehut:~misterio/nix-colors?ref=main`
+  * `sourcehut://git.example.org/~misterio/nix-colors`
+  * `sourcehut:~misterio/nix-colors?rev=182b4b8709b8ffe4e9774a4c5d6877bf6bb9a21c`
+  * `sourcehut://hg.sr.ht/~misterio/nix-colors?rev=21c1a380a6915d890d408e9f22203436a35bb2de`
+
+* `codeberg`: Similar to `github`, is a more efficient way to fetch
+  Codeberg repositories through the Gitea-compatible archive fetcher.
+  The following attributes are required:
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  These are downloaded as tarball archives.
+
+  The URL syntax for `codeberg` flakes is:
+
+  ```
+  codeberg:<owner>/<repo>(\?<params>)?
+  ```
+
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The old path form `codeberg:<owner>/<repo>/<rev-or-ref>` is
+  still accepted for compatibility.
+
+  The `codeberg` scheme always targets `codeberg.org`. For another
+  Gitea/Forgejo-compatible host, use the `gitea` or `forgejo` URL authority
+  schemes, for example `gitea://git.example.org/owner/repo?ref=main` or
+  `forgejo://git.example.org/owner/repo?ref=main`.
+
+  Some examples:
+
+  * `codeberg:forgejo/forgejo`
+  * `codeberg:forgejo/forgejo?ref=v1.22.0`
+  * `gitea://git.example.org/internal/project?ref=main`
+
+* `gitea` and `forgejo`: Similar to `codeberg`, these are more efficient
+  ways to fetch repositories from Gitea-compatible and Forgejo-compatible
+  hosts. The following attributes are required:
+
+  * `host`: The Gitea or Forgejo instance host.
+
+  * `owner`: The owner of the repository.
+
+  * `repo`: The name of the repository.
+
+  These are downloaded as tarball archives.
+
+  The URL syntax for `gitea` and `forgejo` flakes is:
+
+  ```
+  gitea://<host>/<owner>/<repo>(\?<params>)?
+  forgejo://<host>/<owner>/<repo>(\?<params>)?
+  ```
+
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The repository host must be written as the URL authority.
+
+  Some examples:
+
+  * `gitea://git.example.org/owner/repo`
+  * `gitea://git.example.org/owner/repo?ref=main`
+  * `forgejo://git.example.org/owner/repo?rev=d3f2baba8f425779026c6ec04021b2e927f61e31`
+
+* `cgit`: Similar to `sourcehut`, this is a more efficient way to fetch
+  repositories from cgit hosts. The following attributes are required:
+
+  * `host`: The cgit instance host.
+
+  * `owner`: The repository path prefix, if any.
+
+  * `repo`: The final repository path segment.
+
+  These are downloaded as tarball archives.
+
+  The URL syntax for `cgit` flakes is:
+
+  ```
+  cgit://<host>/<repo>(\?<params>)?
+  cgit://<host>/<path-prefix>/<repo>(\?<params>)?
+  ```
+
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The repository host must be written as the URL authority.
+  Repository paths may span multiple path segments.
+
+  Some examples:
+
+  * `cgit://git.qyliss.net/pr-tracker?ref=main`
+  * `cgit://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git?ref=master`
+  * `cgit://git.savannah.gnu.org/cgit/hello.git?rev=d3f2baba8f425779026c6ec04021b2e927f61e31`
+
+* `bitbucket`: Similar to `github`, is a more efficient way to fetch
+  Bitbucket Cloud repositories through archive downloads. The following
+  attributes are required:
+
+  * `owner`: The workspace containing the repository.
+
+  * `repo`: The repository slug.
+
+  These are downloaded as tarball archives.
+
+  The URL syntax for `bitbucket` flakes is:
+
+  ```
+  bitbucket:<owner>/<repo>(\?<params>)?
+  bitbucket://<host>/<owner>/<repo>(\?<params>)?
+  ```
+
+  Branch or tag names are specified with `ref`; commit hashes are specified
+  with `rev`. The old path form `bitbucket:<owner>/<repo>/<rev-or-ref>` is
+  still accepted for compatibility.
+
+  Some examples:
+
+  * `bitbucket:workspace/project`
+  * `bitbucket:workspace/project?ref=main`
 
 # Flake format
 

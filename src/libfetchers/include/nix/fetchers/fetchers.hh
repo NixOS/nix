@@ -277,7 +277,7 @@ struct InputScheme
 
 void registerInputScheme(std::shared_ptr<InputScheme> && fetcher);
 
-using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
+using InputSchemeMap = std::map<std::string, std::shared_ptr<InputScheme>, std::less<>>;
 
 /**
  * Use this for docs, not for finding a specific scheme

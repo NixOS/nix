@@ -463,7 +463,14 @@ void EvalState::checkURI(const std::string & uri0)
 
     try {
         ParsedURL uri = parseURL(uri0);
-        if (uri.scheme == "file") {
+        if (parseUrlScheme(uri.scheme).transport == "file") {
+            auto fileUri = ParsedURL{
+                .scheme = "file",
+                .authority = ParsedURL::Authority{},
+                .path = uri.path,
+            };
+            if (isAllowedURI(fileUri.to_string(), settings.allowedUris.get()))
+                return;
             if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>())
                 rootFS2->checkAccess(CanonPath(urlPathToPath(uri.path).string()));
             return;

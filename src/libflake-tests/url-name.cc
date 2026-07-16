@@ -42,6 +42,13 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("sourcehut:NixOS/nix")), "nix");
     ASSERT_EQ(getNameFromURL(parseURL("sourcehut:cachix/devenv/main#packages.x86_64-linux.default")), "devenv");
 
+    ASSERT_EQ(getNameFromURL(parseURL("codeberg:forgejo/forgejo?ref=v1.22.0")), "forgejo");
+    ASSERT_EQ(getNameFromURL(parseURL("forgejo://git.example.org/owner/project?ref=main")), "project");
+    ASSERT_EQ(getNameFromURL(parseURL("gitea://git.example.org/owner/project?ref=main")), "project");
+    ASSERT_EQ(
+        getNameFromURL(parseURL("cgit://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git?ref=master")),
+        "linux.git");
+
     ASSERT_EQ(getNameFromURL(parseURL("git://github.com/edolstra/dwarffs")), "dwarffs");
     ASSERT_EQ(getNameFromURL(parseURL("git://github.com/edolstra/nix-warez?dir=blender")), "blender");
     ASSERT_EQ(getNameFromURL(parseURL("git+file:///home/user/project")), "project");

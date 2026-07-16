@@ -16,8 +16,6 @@
 
 namespace nix::fetchers {
 
-using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
-
 static InputSchemeMap & inputSchemes()
 {
     static InputSchemeMap inputSchemeMap;
@@ -26,7 +24,7 @@ static InputSchemeMap & inputSchemes()
 
 void registerInputScheme(std::shared_ptr<InputScheme> && inputScheme)
 {
-    auto schemeName = inputScheme->schemeName();
+    auto schemeName = std::string{inputScheme->schemeName()};
     if (!inputSchemes().emplace(schemeName, std::move(inputScheme)).second)
         throw Error("Input scheme with name %s already registered", schemeName);
 }

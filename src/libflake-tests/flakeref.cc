@@ -98,6 +98,21 @@ TEST(parseFlakeRef, GitArchiveInput)
     }
 }
 
+TEST(parseFlakeRef, GitArchiveInputKnownSchemeBadURLDoesNotFallBackToPath)
+{
+    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+
+    fetchers::Settings fetchSettings;
+
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "github://git.example.org/owner/repo/main"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "codeberg://git.example.org/owner/repo?ref=main"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "github://git.example.org/owner/repo?host=other.example.org"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "cgit://git.example.org?ref=main"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "cgit:///repo?ref=main"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "gitea:///owner/repo?ref=main"), Error);
+    EXPECT_THROW(parseFlakeRef(fetchSettings, "forgejo:///owner/repo?ref=main"), Error);
+}
+
 struct InputFromURLTestCase
 {
     std::string url;
@@ -255,6 +270,54 @@ INSTANTIATE_TEST_SUITE_P(
                 },
             .description = "github_ref_slashes_in_path_everywhere",
             .expectedUrl = "github:ownerB/repoA/branchC",
+        },
+        InputFromURLTestCase{
+            .url = "github://github.com/owner/repo?ref=main",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("owner")},
+                    {"repo", Attr("repo")},
+                    {"ref", Attr("main")},
+                },
+            .description = "github_default_authority_canonicalizes_to_legacy_path_ref",
+            .expectedUrl = "github:owner/repo/main",
+        },
+        InputFromURLTestCase{
+            .url = "gitlab://gitlab.com/org/repo?ref=main",
+            .attrs =
+                {
+                    {"type", Attr("gitlab")},
+                    {"owner", Attr("org")},
+                    {"repo", Attr("repo")},
+                    {"ref", Attr("main")},
+                },
+            .description = "gitlab_default_authority_canonicalizes_to_legacy_path_ref",
+            .expectedUrl = "gitlab:org/repo/main",
+        },
+        InputFromURLTestCase{
+            .url = "sourcehut://git.sr.ht/~user/repo?ref=main",
+            .attrs =
+                {
+                    {"type", Attr("sourcehut")},
+                    {"owner", Attr("~user")},
+                    {"repo", Attr("repo")},
+                    {"ref", Attr("main")},
+                },
+            .description = "sourcehut_default_authority_canonicalizes_to_legacy_path_ref",
+            .expectedUrl = "sourcehut:~user/repo/main",
+        },
+        InputFromURLTestCase{
+            .url = "bitbucket://bitbucket.org/workspace/repo?ref=main",
+            .attrs =
+                {
+                    {"type", Attr("bitbucket")},
+                    {"owner", Attr("workspace")},
+                    {"repo", Attr("repo")},
+                    {"ref", Attr("main")},
+                },
+            .description = "bitbucket_default_authority_canonicalizes_to_shorthand_query_ref",
+            .expectedUrl = "bitbucket:workspace/repo?ref=main",
         },
         InputFromURLTestCase{
             // FIXME: Subgroups in gitlab URLs are busted. This double-encoding

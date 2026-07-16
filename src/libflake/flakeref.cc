@@ -248,8 +248,16 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     const std::optional<std::filesystem::path> & baseDir,
     bool isFlake)
 {
+    ParsedURL parsed;
     try {
-        auto parsed = parseURL(url, /*lenient=*/true);
+        parsed = parseURL(url, /*lenient=*/true);
+    } catch (BadURL &) {
+        return std::nullopt;
+    }
+
+    const bool hasInputScheme = fetchers::getAllInputSchemes().contains(parsed.scheme);
+
+    try {
         if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
             /* Here we know that the path must not contain encoded '/' or NUL bytes. */
             auto path = urlPathToPath(parsed.path);
@@ -258,6 +266,8 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
         }
         return fromParsedURL(fetchSettings, std::move(parsed), isFlake);
     } catch (BadURL &) {
+        if (hasInputScheme)
+            throw;
         return std::nullopt;
     }
 }
