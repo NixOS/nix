@@ -168,4 +168,16 @@ scope: {
     # Required for configuration detection for getsockname (for automatic port allocation for `nix serve`)
     __darwinAllowLocalNetworking = true;
   });
+
+  libgit2 = pkgs.libgit2.overrideAttrs (old: {
+    separateDebugInfo = true;
+
+    patches = old.patches or [ ] ++ [
+      # Fix a use-after-free crash when `git_thread_create` fails during
+      # pack building (e.g. with EAGAIN under thread pressure), leaving
+      # orphaned delta-search worker threads running while the
+      # packbuilder is freed.
+      ./patches/libgit2-packbuilder-dont-fail-on-thread-create-error.patch
+    ];
+  });
 }

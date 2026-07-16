@@ -1,0 +1,133 @@
+Don't abort pack building when worker thread creation fails.
+
+Previously, if `git_thread_create` failed in `ll_find_deltas` (e.g. with
+EAGAIN due to transient resource exhaustion), it returned an error while
+the already-created worker threads were still running. The caller
+(`git_packbuilder_write_buf`) would then propagate the error and the
+packbuilder would typically be freed, causing the orphaned workers to
+crash on freed memory (observed as SIGSEGV in `git_odb_read` →
+`git_cache_get_raw` → `pthread_rwlock_rdlock`).
+
+Instead, continue with however many threads were successfully created.
+The work-stealing loop redistributes the work of partitions that have no
+thread (`started == false`) to the running threads; such partitions are
+stolen from regardless of size, and in their entirety, so every object
+is still searched for deltas. If no threads could be created at all,
+fall back to the single-threaded delta search.
+
+Also turn the per-thread mutex lock failure in the work-stealing loop
+into a GIT_ASSERT, consistent with the neighboring progress lock/unlock
+checks. In particular it must not free the `thread_params` array, since
+running worker threads still reference it.
+
+Upstream: https://github.com/libgit2/libgit2 (present on main as of 2026-07-16)
+--- a/src/libgit2/pack-objects.c
++++ b/src/libgit2/pack-objects.c
+@@ -1137,6 +1137,9 @@
+ 	/* A pb->progress_cb can stop the packing process by returning an error.
+ 	   When that happens, all threads observe the error and stop voluntarily. */
+ 	bool stopped;
++
++	/* Whether the worker thread for this partition was created. */
++	bool started;
+ };
+ 
+ static void *threaded_find_deltas(void *arg)
+@@ -1186,6 +1189,8 @@
+ 			  size_t list_size, size_t window, size_t depth)
+ {
+ 	struct thread_params *p;
++	git_pobject **whole_list = list;
++	size_t whole_list_size = list_size;
+ 	size_t i;
+ 	int ret, active_threads = 0;
+ 
+@@ -1213,6 +1218,7 @@
+ 		p[i].working = 1;
+ 		p[i].data_ready = 0;
+ 		p[i].stopped = 0;
++		p[i].started = 0;
+ 
+ 		/* try to split chunks on "path" boundaries */
+ 		while (sub_size && sub_size < list_size &&
+@@ -1239,13 +1245,37 @@
+ 		ret = git_thread_create(&p[i].thread,
+ 					threaded_find_deltas, &p[i]);
+ 		if (ret) {
+-			git_error_set(GIT_ERROR_THREAD, "unable to create thread");
+-			return -1;
++			/*
++			 * Thread creation may fail due to transient resource
++			 * exhaustion (e.g. EAGAIN). Proceed with the threads
++			 * created so far: this partition keeps `working` set,
++			 * so it is never picked as a work-stealing target, and
++			 * the loop below hands all of its work to the running
++			 * threads (`started` remains false).
++			 *
++			 * Returning an error here instead would leave the
++			 * already-created threads running while the caller
++			 * frees the packbuilder, resulting in a use-after-free.
++			 */
++			git_cond_free(&p[i].cond);
++			git_mutex_free(&p[i].mutex);
++			continue;
+ 		}
++		p[i].started = 1;
+ 		active_threads++;
+ 	}
+ 
+ 	/*
++	 * If no worker threads could be created, fall back to doing the
++	 * delta search inline. No thread has consumed any work at this
++	 * point, so the whole object list is still intact.
++	 */
++	if (!active_threads) {
++		git__free(p);
++		return find_deltas(pb, whole_list, &whole_list_size, window, depth);
++	}
++
++	/*
+ 	 * Now let's wait for work completion.  Each time a thread is done
+ 	 * with its work, we steal half of the remaining work from the
+ 	 * thread with the largest number of unprocessed objects and give
+@@ -1274,16 +1304,23 @@
+ 
+ 		/* At this point we hold the progress lock and have located
+ 		 * a thread to receive more work. We still need to locate a
+-		 * thread from which to steal work (the victim). */
++		 * thread from which to steal work (the victim). A partition
++		 * whose thread could not be created has nothing consuming
++		 * it, so it may be stolen from regardless of its size. */
+ 		for (i = 0; i < pb->nr_threads; i++)
+-			if (p[i].remaining > 2*window &&
++			if (p[i].remaining > (p[i].started ? 2*window : 0) &&
+ 			    (!victim || victim->remaining < p[i].remaining))
+ 				victim = &p[i];
+ 
+ 		if (victim && !target->stopped) {
+-			sub_size = victim->remaining / 2;
++			/* Steal half of the victim's work, or all of it if
++			 * the victim has no thread consuming it. In the
++			 * latter case there is also no point in splitting on
++			 * a "path" boundary, since the partition is not
++			 * shared with another thread. */
++			sub_size = victim->remaining / (victim->started ? 2 : 1);
+ 			list = victim->list + victim->list_size - sub_size;
+-			while (sub_size && list[0]->hash &&
++			while (victim->started && sub_size && list[0]->hash &&
+ 			       list[0]->hash == list[-1]->hash) {
+ 				list++;
+ 				sub_size--;
+@@ -1307,11 +1344,7 @@
+ 		target->working = 1; /* even when target->stopped, so that we don't process this thread again */
+ 		GIT_ASSERT(git_packbuilder__progress_unlock(pb) == 0);
+ 
+-		if (git_mutex_lock(&target->mutex)) {
+-			git_error_set(GIT_ERROR_THREAD, "unable to lock packfile condition mutex");
+-			git__free(p);
+-			return -1;
+-		}
++		GIT_ASSERT(git_mutex_lock(&target->mutex) == 0);
+ 
+ 		target->data_ready = 1;
+ 		git_cond_signal(&target->cond);
