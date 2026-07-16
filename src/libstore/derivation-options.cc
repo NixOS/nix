@@ -536,11 +536,11 @@ template struct DerivationOptions<SingleDerivedPath>;
 
 namespace nlohmann {
 
-using namespace nix;
-
 template<typename Inputs>
-static DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
+static nix::DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json & json_)
 {
+    using namespace nix;
+
     auto & json = getObject(json_);
 
     return {
@@ -576,8 +576,10 @@ static DerivationOptions<Inputs> derivationOptionsFromJson(const nlohmann::json 
 }
 
 template<typename Inputs>
-static void derivationOptionsToJson(nlohmann::json & json, const DerivationOptions<Inputs> & o)
+static void derivationOptionsToJson(nlohmann::json & json, const nix::DerivationOptions<Inputs> & o)
 {
+    using namespace nix;
+
     json["outputChecks"] = std::visit(
         overloaded{
             [&](const OutputChecks<Inputs> & checks) {
@@ -609,8 +611,10 @@ static void derivationOptionsToJson(nlohmann::json & json, const DerivationOptio
 }
 
 template<typename Inputs>
-static OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
+static nix::OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
 {
+    using namespace nix;
+
     auto & json = getObject(json_);
 
     return {
@@ -625,7 +629,7 @@ static OutputChecks<Inputs> outputChecksFromJson(const nlohmann::json & json_)
 }
 
 template<typename Inputs>
-static void outputChecksToJson(nlohmann::json & json, const OutputChecks<Inputs> & c)
+static void outputChecksToJson(nlohmann::json & json, const nix::OutputChecks<Inputs> & c)
 {
     json["ignoreSelfRefs"] = c.ignoreSelfRefs;
     json["maxSize"] = c.maxSize;
@@ -636,45 +640,51 @@ static void outputChecksToJson(nlohmann::json & json, const OutputChecks<Inputs>
     json["disallowedRequisites"] = c.disallowedRequisites;
 }
 
-DerivationOptions<SingleDerivedPath> adl_serializer<DerivationOptions<SingleDerivedPath>>::from_json(const json & json_)
+nix::DerivationOptions<nix::SingleDerivedPath>
+adl_serializer<nix::DerivationOptions<nix::SingleDerivedPath>>::from_json(const json & json_)
 {
-    return derivationOptionsFromJson<SingleDerivedPath>(json_);
+    return derivationOptionsFromJson<nix::SingleDerivedPath>(json_);
 }
 
-void adl_serializer<DerivationOptions<SingleDerivedPath>>::to_json(
-    json & json, const DerivationOptions<SingleDerivedPath> & o)
+void adl_serializer<nix::DerivationOptions<nix::SingleDerivedPath>>::to_json(
+    json & json, const nix::DerivationOptions<nix::SingleDerivedPath> & o)
 {
-    derivationOptionsToJson<SingleDerivedPath>(json, o);
+    derivationOptionsToJson<nix::SingleDerivedPath>(json, o);
 }
 
-DerivationOptions<StorePath> adl_serializer<DerivationOptions<StorePath>>::from_json(const json & json_)
+nix::DerivationOptions<nix::StorePath>
+adl_serializer<nix::DerivationOptions<nix::StorePath>>::from_json(const json & json_)
 {
-    return derivationOptionsFromJson<StorePath>(json_);
+    return derivationOptionsFromJson<nix::StorePath>(json_);
 }
 
-void adl_serializer<DerivationOptions<StorePath>>::to_json(json & json, const DerivationOptions<StorePath> & o)
+void adl_serializer<nix::DerivationOptions<nix::StorePath>>::to_json(
+    json & json, const nix::DerivationOptions<nix::StorePath> & o)
 {
-    derivationOptionsToJson<StorePath>(json, o);
+    derivationOptionsToJson<nix::StorePath>(json, o);
 }
 
-OutputChecks<SingleDerivedPath> adl_serializer<OutputChecks<SingleDerivedPath>>::from_json(const json & json_)
+nix::OutputChecks<nix::SingleDerivedPath>
+adl_serializer<nix::OutputChecks<nix::SingleDerivedPath>>::from_json(const json & json_)
 {
-    return outputChecksFromJson<SingleDerivedPath>(json_);
+    return outputChecksFromJson<nix::SingleDerivedPath>(json_);
 }
 
-void adl_serializer<OutputChecks<SingleDerivedPath>>::to_json(json & json, const OutputChecks<SingleDerivedPath> & c)
+void adl_serializer<nix::OutputChecks<nix::SingleDerivedPath>>::to_json(
+    json & json, const nix::OutputChecks<nix::SingleDerivedPath> & c)
 {
-    outputChecksToJson<SingleDerivedPath>(json, c);
+    outputChecksToJson<nix::SingleDerivedPath>(json, c);
 }
 
-OutputChecks<StorePath> adl_serializer<OutputChecks<StorePath>>::from_json(const json & json_)
+nix::OutputChecks<nix::StorePath> adl_serializer<nix::OutputChecks<nix::StorePath>>::from_json(const json & json_)
 {
-    return outputChecksFromJson<StorePath>(json_);
+    return outputChecksFromJson<nix::StorePath>(json_);
 }
 
-void adl_serializer<OutputChecks<StorePath>>::to_json(json & json, const OutputChecks<StorePath> & c)
+void adl_serializer<nix::OutputChecks<nix::StorePath>>::to_json(
+    json & json, const nix::OutputChecks<nix::StorePath> & c)
 {
-    outputChecksToJson<StorePath>(json, c);
+    outputChecksToJson<nix::StorePath>(json, c);
 }
 
 } // namespace nlohmann

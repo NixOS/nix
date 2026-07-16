@@ -57,13 +57,10 @@ TEST(HttpBinaryCacheStore, constructConfigWithParamsAndUrlWithParams)
 using testing::HttpsBinaryCacheStoreMtlsTest;
 using testing::HttpsBinaryCacheStoreTest;
 
-using namespace std::string_view_literals;
-using namespace std::string_literals;
-
 TEST_F(HttpsBinaryCacheStoreTest, queryPathInfo)
 {
     auto store = openStore(makeConfig());
-    StringSource dump{"test"sv};
+    StringSource dump{std::string_view("test")};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
     EXPECT_NO_THROW(store->queryPathInfo(path));
 }
@@ -74,7 +71,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, queryPathInfo)
     config->tlsCert = clientCert;
     config->tlsKey = clientKey;
     auto store = openStore(config);
-    StringSource dump{"test"sv};
+    StringSource dump{std::string_view("test")};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
     EXPECT_NO_THROW(store->queryPathInfo(path));
 }
@@ -104,7 +101,7 @@ TEST_F(HttpsBinaryCacheStoreMtlsTest, rejectsWrongClientCert)
 
 TEST_F(HttpsBinaryCacheStoreMtlsTest, doesNotSendCertOnRedirectToDifferentAuthority)
 {
-    StringSource dump{"test"sv};
+    StringSource dump{std::string_view("test")};
     auto path = localCacheStore->addToStoreFromDump(dump, "test-name", FileSerialisationMethod::Flat);
 
     for (auto & entry : DirectoryIterator{cacheDir})

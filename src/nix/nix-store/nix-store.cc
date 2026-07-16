@@ -40,7 +40,7 @@
 
 namespace nix_store {
 
-using namespace nix;
+using namespace nix; // NOLINT(nix-using-namespace)
 
 typedef void (*Operation)(Strings opFlags, Strings opArgs);
 

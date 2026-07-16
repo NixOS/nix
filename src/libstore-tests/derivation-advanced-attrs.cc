@@ -12,8 +12,6 @@
 
 namespace nix {
 
-using namespace nlohmann;
-
 class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>, public LibStoreTest
 {
 protected:
@@ -83,6 +81,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
 #define TEST_ATERM_JSON(STEM, NAME)                                                                      \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_json)                           \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->readTest(NAME ".json", [&](const auto & encoded_) {                                        \
             auto encoded = json::parse(encoded_);                                                        \
             /* Use DRV file instead of C++ literal as source of truth. */                                \
@@ -95,6 +94,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
                                                                                                          \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_to_json)                             \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->writeTest(                                                                                 \
             NAME ".json",                                                                                \
             [&]() -> json {                                                                              \
@@ -108,6 +108,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
                                                                                                          \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_aterm)                          \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->readTest(NAME ".drv", [&](auto encoded) {                                                  \
             /* Use JSON file instead of C++ literal as source of truth. */                               \
             auto j = json::parse(readFile(this->goldenMaster(NAME ".json")));                            \

@@ -304,20 +304,19 @@ Hash ContentAddressWithReferences::getHash() const
 
 namespace nlohmann {
 
-using namespace nix;
-
-ContentAddressMethod adl_serializer<ContentAddressMethod>::from_json(const json & json)
+nix::ContentAddressMethod adl_serializer<nix::ContentAddressMethod>::from_json(const json & json)
 {
-    return ContentAddressMethod::parse(getString(json));
+    return nix::ContentAddressMethod::parse(nix::getString(json));
 }
 
-void adl_serializer<ContentAddressMethod>::to_json(json & json, const ContentAddressMethod & m)
+void adl_serializer<nix::ContentAddressMethod>::to_json(json & json, const nix::ContentAddressMethod & m)
 {
     json = m.render();
 }
 
-ContentAddress adl_serializer<ContentAddress>::from_json(const json & json)
+nix::ContentAddress adl_serializer<nix::ContentAddress>::from_json(const json & json)
 {
+    using namespace nix;
     auto obj = getObject(json);
     return {
         .method = adl_serializer<ContentAddressMethod>::from_json(valueAt(obj, "method")),
@@ -325,7 +324,7 @@ ContentAddress adl_serializer<ContentAddress>::from_json(const json & json)
     };
 }
 
-void adl_serializer<ContentAddress>::to_json(json & json, const ContentAddress & ca)
+void adl_serializer<nix::ContentAddress>::to_json(json & json, const nix::ContentAddress & ca)
 {
     json = {
         {"method", ca.method},

@@ -306,30 +306,29 @@ UnkeyedValidPathInfo UnkeyedValidPathInfo::fromJSON(const StoreDirConfig * store
 
 namespace nlohmann {
 
-using namespace nix;
-
-PathInfoJsonFormat adl_serializer<PathInfoJsonFormat>::from_json(const json & json)
+nix::PathInfoJsonFormat adl_serializer<nix::PathInfoJsonFormat>::from_json(const json & json)
 {
-    return parsePathInfoJsonFormat(getUnsigned(json));
+    return nix::parsePathInfoJsonFormat(nix::getUnsigned(json));
 }
 
-void adl_serializer<PathInfoJsonFormat>::to_json(json & json, const PathInfoJsonFormat & format)
+void adl_serializer<nix::PathInfoJsonFormat>::to_json(json & json, const nix::PathInfoJsonFormat & format)
 {
     json = static_cast<int>(format);
 }
 
-UnkeyedValidPathInfo adl_serializer<UnkeyedValidPathInfo>::from_json(const json & json)
+nix::UnkeyedValidPathInfo adl_serializer<nix::UnkeyedValidPathInfo>::from_json(const json & json)
 {
-    return UnkeyedValidPathInfo::fromJSON(nullptr, json);
+    return nix::UnkeyedValidPathInfo::fromJSON(nullptr, json);
 }
 
-void adl_serializer<UnkeyedValidPathInfo>::to_json(json & json, const UnkeyedValidPathInfo & c)
+void adl_serializer<nix::UnkeyedValidPathInfo>::to_json(json & json, const nix::UnkeyedValidPathInfo & c)
 {
-    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V3);
+    json = c.toJSON(nullptr, true, nix::PathInfoJsonFormat::V3);
 }
 
-ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)
+nix::ValidPathInfo adl_serializer<nix::ValidPathInfo>::from_json(const json & json0)
 {
+    using namespace nix;
     auto json = getObject(json0);
 
     return ValidPathInfo{
@@ -338,8 +337,9 @@ ValidPathInfo adl_serializer<ValidPathInfo>::from_json(const json & json0)
     };
 }
 
-void adl_serializer<ValidPathInfo>::to_json(json & json, const ValidPathInfo & v)
+void adl_serializer<nix::ValidPathInfo>::to_json(json & json, const nix::ValidPathInfo & v)
 {
+    using namespace nix;
     adl_serializer<UnkeyedValidPathInfo>::to_json(json, v);
     json["path"] = v.path;
 }

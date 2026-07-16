@@ -202,16 +202,14 @@ UnkeyedNarInfo UnkeyedNarInfo::fromJSON(const StoreDirConfig * store, const nloh
 
 namespace nlohmann {
 
-using namespace nix;
-
-UnkeyedNarInfo adl_serializer<UnkeyedNarInfo>::from_json(const json & json)
+nix::UnkeyedNarInfo adl_serializer<nix::UnkeyedNarInfo>::from_json(const json & json)
 {
-    return UnkeyedNarInfo::fromJSON(nullptr, json);
+    return nix::UnkeyedNarInfo::fromJSON(nullptr, json);
 }
 
-void adl_serializer<UnkeyedNarInfo>::to_json(json & json, const UnkeyedNarInfo & c)
+void adl_serializer<nix::UnkeyedNarInfo>::to_json(json & json, const nix::UnkeyedNarInfo & c)
 {
-    json = c.toJSON(nullptr, true, PathInfoJsonFormat::V2);
+    json = c.toJSON(nullptr, true, nix::PathInfoJsonFormat::V2);
 }
 
 } // namespace nlohmann
