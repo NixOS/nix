@@ -168,4 +168,8 @@ scope: {
     # Required for configuration detection for getsockname (for automatic port allocation for `nix serve`)
     __darwinAllowLocalNetworking = true;
   });
+
+  libgit2 = pkgs.libgit2.overrideAttrs {
+    separateDebugInfo = true;
+  };
 }
