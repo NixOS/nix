@@ -316,4 +316,34 @@ static RegisterPrimOp r_parallel({
     .experimentalFeature = Xp::ParallelEval,
 });
 
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+
+void EvalState::forceValueDeepParallel(Value & v, PosIdx pos)
+{
+    forceValue(v, pos);
+
+    Executor::WorkItems work;
+
+    switch (v.type()) {
+
+    case nAttrs: {
+        NixStringContext context;
+        if (tryAttrsToString(pos, v, context, false, false))
+            return;
+        if (v.attrs()->get(s.outPath))
+            return;
+        for (auto & a : *v.attrs())
+            addWork(work, 0, [value(std::make_shared<RootValue>(a.value)), pos(a.pos), this]() {
+                forceValueDeepParallel(***value, pos);
+            });
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    executor->spawn(std::move(work));
+}
+
 } // namespace nix

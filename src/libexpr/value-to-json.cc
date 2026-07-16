@@ -12,42 +12,12 @@ namespace nix {
 
 using json = nlohmann::json;
 
-#pragma GCC diagnostic ignored "-Wswitch-enum"
-
-static void parallelForceDeep(EvalState & state, Value & v, PosIdx pos)
-{
-    state.forceValue(v, pos);
-
-    Executor::WorkItems work;
-
-    switch (v.type()) {
-
-    case nAttrs: {
-        NixStringContext context;
-        if (state.tryAttrsToString(pos, v, context, false, false))
-            return;
-        if (v.attrs()->get(state.s.outPath))
-            return;
-        for (auto & a : *v.attrs())
-            state.addWork(work, 0, [value(std::make_shared<RootValue>(a.value)), pos(a.pos), &state]() {
-                parallelForceDeep(state, ***value, pos);
-            });
-        break;
-    }
-
-    default:
-        break;
-    }
-
-    state.executor->spawn(std::move(work));
-}
-
 // TODO: rename. It doesn't print.
 json printValueAsJSON(
     EvalState & state, bool strict, Value & v, const PosIdx pos, NixStringContext & context, bool copyToStore)
 {
     if (strict && state.executor->enabled && !Executor::amWorkerThread)
-        parallelForceDeep(state, v, pos);
+        state.forceValueDeepParallel(v, pos);
 
     auto recurse = [&](this const auto & recurse, json & res, Value & v, PosIdx pos) -> void {
         checkInterrupt();

@@ -664,6 +664,8 @@ public:
      */
     void forceValueDeep(Value & v);
 
+    void forceValueDeepParallel(Value & v, PosIdx pos);
+
     /**
      * Force `v`, and then verify that it has the expected type.
      */
