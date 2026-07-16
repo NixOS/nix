@@ -2,7 +2,7 @@
 
 source common.sh
 
-needLocalStore "Daemon not configured to sign build traces, would cause signature errors"
+signIfNeeded
 
 nix-store --generate-binary-cache-key cache1.example.org "$TEST_ROOT/sk1" "$TEST_ROOT/pk1"
 pk1=$(cat "$TEST_ROOT/pk1")

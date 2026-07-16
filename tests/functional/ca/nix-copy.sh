@@ -2,7 +2,7 @@
 
 source common.sh
 
-needLocalStore "Daemon not configured to sign build traces, would cause signature errors"
+signIfNeeded
 
 export REMOTE_STORE="file://$cacheDir"
 
