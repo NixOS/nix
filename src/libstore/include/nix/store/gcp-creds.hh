@@ -60,13 +60,6 @@ public:
 ref<GcpCredentialProvider> makeGcpCredentialsProvider();
 
 /**
- * Process-wide singleton wrapping `makeGcpCredentialsProvider()`.
- * Tests may override it via `setGcpCredentialsProviderForTesting()`.
- */
-ref<GcpCredentialProvider> getGcpCredentialsProvider();
-void setGcpCredentialsProviderForTesting(ref<GcpCredentialProvider> provider);
-
-/**
  * Implementation details exposed for unit testing only.
  * Not part of the stable API; may change without notice.
  */

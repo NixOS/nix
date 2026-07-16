@@ -356,31 +356,11 @@ public:
     }
 };
 
-Sync<std::shared_ptr<GcpCredentialProvider>> & providerSlot()
-{
-    static Sync<std::shared_ptr<GcpCredentialProvider>> slot;
-    return slot;
-}
-
 } // anonymous namespace
 
 ref<GcpCredentialProvider> makeGcpCredentialsProvider()
 {
     return make_ref<GcpCredentialProviderImpl>();
-}
-
-ref<GcpCredentialProvider> getGcpCredentialsProvider()
-{
-    auto slot(providerSlot().lock());
-    if (!*slot)
-        *slot = makeGcpCredentialsProvider().get_ptr();
-    return ref(*slot);
-}
-
-void setGcpCredentialsProviderForTesting(ref<GcpCredentialProvider> provider)
-{
-    auto slot(providerSlot().lock());
-    *slot = provider.get_ptr();
 }
 
 } // namespace nix
