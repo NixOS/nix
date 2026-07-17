@@ -168,6 +168,7 @@ suites = [
       'short-path-literals.sh',
       'signing.sh',
       'simple.sh',
+      'source-accessor-traverse-only.sh',
       'ssh-relay.sh',
       'store-info.sh',
       'store-print-env.sh',
