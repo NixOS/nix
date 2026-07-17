@@ -5,9 +5,9 @@
 
 namespace nix {
 
-struct CmdRealisation : NixMultiCommand
+struct CmdBuildTrace : NixMultiCommand
 {
-    CmdRealisation()
+    CmdBuildTrace()
         : NixMultiCommand("build-trace", RegisterCommand::getCommandsFor({"store", "build-trace"}))
     {
     }
@@ -23,9 +23,9 @@ struct CmdRealisation : NixMultiCommand
     }
 };
 
-static auto rCmdRealisation = registerCommand2<CmdRealisation>({"store", "build-trace"});
+static auto rCmdBuildTrace = registerCommand2<CmdBuildTrace>({"store", "build-trace"});
 
-struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
+struct CmdBuildTraceInfo : BuiltPathsCommand, MixJSON
 {
     std::string description() override
     {
@@ -77,6 +77,6 @@ struct CmdRealisationInfo : BuiltPathsCommand, MixJSON
     }
 };
 
-static auto rCmdBuildTraceInfo = registerCommand2<CmdRealisationInfo>({"store", "build-trace", "info"});
+static auto rCmdBuildTraceInfo = registerCommand2<CmdBuildTraceInfo>({"store", "build-trace", "info"});
 
 } // namespace nix
