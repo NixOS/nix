@@ -187,10 +187,11 @@ bool RemoteStore::isValidPathUncached(const StorePath & path)
     return readInt(conn->from);
 }
 
-StorePathSet RemoteStore::queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute)
+StorePathSet RemoteStore::queryValidPaths(
+    const StorePathSet & paths, SubstituteFlag maybeSubstitute, AddTempRootsFlag maybeAddTempRoots)
 {
     auto conn(getConnection());
-    return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute);
+    return conn->queryValidPaths(*this, &conn.daemonException, paths, maybeSubstitute, maybeAddTempRoots);
 }
 
 StorePathSet RemoteStore::queryAllValidPaths()
@@ -668,10 +669,13 @@ void RemoteStore::ensurePath(const StorePath & path)
     readInt(conn->from);
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
     auto conn(getConnection());
-    conn->addTempRoot(*this, &conn.daemonException, path);
+
+    /* Unclear if adding a new operation would be worthwhile */
+    for (auto & path : paths)
+        conn->addTempRoot(*this, &conn.daemonException, path);
 }
 
 Roots RemoteStore::findRoots(bool censor)

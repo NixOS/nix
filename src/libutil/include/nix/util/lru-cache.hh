@@ -54,14 +54,17 @@ public:
 
     /**
      * Insert or upsert an item in the cache.
+     *
+     * @returns true iff the key was not in the cache previously
      */
     template<typename K>
-    void upsert(const K & key, const Value & value)
+    bool upsert(const K & key, const Value & value)
     {
+        /* As if inserted and immediately retired */
         if (capacity == 0)
-            return;
+            return true;
 
-        erase(key);
+        bool existing = erase(key);
 
         if (data.size() >= capacity) {
             /**
@@ -79,6 +82,8 @@ public:
         auto j = lru.insert(lru.end(), i);
 
         i->second.first.it = j;
+
+        return !existing;
     }
 
     template<typename K>
