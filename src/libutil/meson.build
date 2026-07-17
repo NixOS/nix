@@ -133,6 +133,7 @@ subdir('nix-meson-build-support/common')
 sources = [ config_priv_h ] + files(
   'archive.cc',
   'args.cc',
+  'auth.cc',
   'base-n.cc',
   'base-nix-32.cc',
   'bump-memory-resource.cc',

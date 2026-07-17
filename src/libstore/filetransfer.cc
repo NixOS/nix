@@ -6,6 +6,7 @@
 #include "nix/util/callback.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
+#include "nix/util/auth.hh"
 
 #include "nix/store/s3-url.hh"
 #include <optional>
@@ -147,6 +148,14 @@ struct curlFileTransfer : public FileTransfer
 {
     const FileTransferSettings & settings;
 
+    /**
+     * Consulted for HTTP credentials when a request has no explicit
+     * `usernameAuth`. Owned here (rather than as a global) so its
+     * lifetime is bound to the transfer instance and tests can inject
+     * their own.
+     */
+    const ref<auth::Authenticator> authenticator;
+
     const bool http3Supported = curlSupportsHttp3();
 
     curlMulti curlm;
@@ -210,6 +219,13 @@ struct curlFileTransfer : public FileTransfer
          * (cleared) by maybeRetry() so it applies to at most one retry attempt.
          */
         std::optional<uint32_t> retryAfterMs;
+
+        /**
+         * Credentials resolved via the authenticator for this transfer,
+         * kept so they can be dropped from the cache if the server
+         * returns 401.
+         */
+        std::optional<auth::AuthData> authData;
 
         curl_off_t writtenToSink = 0;
 
@@ -716,7 +732,9 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_ERRORBUFFER, errbuf);
             errbuf[0] = 0;
 
-            // Set up username/password authentication if provided
+            // Set up username/password authentication if provided. Credentials
+            // from the authenticator are resolved into `usernameAuth` by
+            // enqueueFileTransfer() before the transfer is enqueued.
             if (request.usernameAuth) {
                 curl_easy_setopt(req, CURLOPT_USERNAME, request.usernameAuth->username.c_str());
                 if (request.usernameAuth->password) {
@@ -824,6 +842,11 @@ struct curlFileTransfer : public FileTransfer
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
+                    /* Server (401) rejected our credentials; don't reuse them. A
+                       407 is the proxy's failure, not the server's, so leave the
+                       server credentials alone. */
+                    if (httpStatus == HttpStatus::Unauthorized && authData)
+                        fileTransfer.authenticator->reject(*authData);
                     err = Unauthorized;
                 } else if (httpStatus == HttpStatus::Forbidden) {
                     // Don't retry on authentication/authorization failures.
@@ -1020,8 +1043,10 @@ struct curlFileTransfer : public FileTransfer
 
     const size_t maxQueueSize;
 
-    curlFileTransfer(const FileTransferSettings & settings)
+    curlFileTransfer(
+        const FileTransferSettings & settings, ref<auth::Authenticator> authenticator = auth::getAuthenticator())
         : settings(settings)
+        , authenticator(std::move(authenticator))
         , mt19937(rd())
         , maxQueueSize([&]() -> std::size_t {
             if (settings.httpConnections.get())
@@ -1218,16 +1243,54 @@ struct curlFileTransfer : public FileTransfer
         return ItemHandle(item.get_ptr());
     }
 
+    /**
+     * Resolve credentials for `request` via the authenticator into
+     * `request.usernameAuth`, unless they were set explicitly (e.g. S3
+     * access keys). Returns the resolved data so the transfer can drop
+     * it from the cache on 401.
+     */
+    std::optional<auth::AuthData> resolveAuth(FileTransferRequest & request)
+    {
+        if (request.usernameAuth)
+            return std::nullopt;
+        try {
+            auto url = request.uri.parsed();
+            if (!url.authority)
+                return std::nullopt;
+            auto & auth = *url.authority;
+            /* git-credential's `host` field is `host[:port]`. */
+            auto authData = authenticator->fill(
+                {
+                    .protocol = url.scheme,
+                    .host = auth.port ? fmt("%s:%d", auth.host, *auth.port) : auth.host,
+                    .path = request.authPath.value_or(renderUrlPathNoPctEncoding(url.path)),
+                    .userName = auth.user,
+                },
+                request.requireAuth);
+            if (authData)
+                request.usernameAuth = UsernameAuth{
+                    .username = authData->userName.value_or(""),
+                    .password = authData->password,
+                };
+            return authData;
+        } catch (nix::Error & e) {
+            debug("not authenticating '%s': %s", request.displayUri(), e.msg());
+            return std::nullopt;
+        }
+    }
+
     ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
+        auto modifiedRequest = request;
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
-        if (request.uri.scheme() == "s3") {
-            auto modifiedRequest = request;
+        if (modifiedRequest.uri.scheme() == "s3")
             modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
-        }
-
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        /* Resolve credentials on the enqueueing thread, since it may
+           execute credential helpers or prompt the user. */
+        auto authData = resolveAuth(modifiedRequest);
+        auto item = make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback));
+        item->authData = std::move(authData);
+        return enqueueItem(item);
     }
 
     void unpauseTransfer(std::weak_ptr<Item> item)

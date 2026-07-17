@@ -306,6 +306,12 @@ struct FileTransferRequest
      * When provided, these credentials will be used with curl's CURLOPT_USERNAME/PASSWORD option.
      */
     std::optional<UsernameAuth> usernameAuth;
+
+    /// Path used for credential matching instead of `uri`'s path.
+    std::optional<std::string> authPath;
+
+    /// Whether the authenticator may prompt the user for credentials.
+    bool requireAuth = false;
 #if NIX_WITH_AWS_AUTH
     /**
      * Pre-resolved AWS session token for S3 requests.
