@@ -135,6 +135,13 @@ public:
      * Perform a garbage collection.
      */
     virtual void collectGarbage(const GCOptions & options, GCResults & results) = 0;
+
+    /**
+     * Delete build trace entries (realisations) from the store's database.
+     *
+     * The entries are specified by their key (the build trace is a map).
+     */
+    virtual void deleteBuildTraces(const std::set<DrvOutput> & keys) = 0;
 };
 
 } // namespace nix

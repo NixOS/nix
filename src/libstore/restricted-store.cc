@@ -140,6 +140,8 @@ public:
 
     void collectGarbage(const GCOptions & options, GCResults & results) override {}
 
+    void deleteBuildTraces(const std::set<DrvOutput> & keys) override {}
+
     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override
     {
         unsupported("addSignatures");
