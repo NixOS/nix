@@ -131,6 +131,15 @@ struct ContentAddressMethod
      * for hashing file systeme objects.
      */
     FileIngestionMethod getFileIngestionMethod() const;
+
+    /**
+     * The FileSerialisationMethod that is recommended for this content addressing method.
+     * In some circumstances, other methods are also valid.
+     * Note that `Git` is mapped to `NixArchive`, even though it could represent a single file.
+     * There is no support for flat serialisation of merkle objects; and even if there were,
+     * it would be unable to represent executable files.
+     */
+    FileSerialisationMethod getFileSerialisationMethod() const;
 };
 
 /*
