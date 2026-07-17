@@ -135,4 +135,4 @@ NIX_DECLARE_CONFIG_SERIALISER(std::set<StoreReference>)
 
 } // namespace nix
 
-JSON_IMPL(StoreReference)
+JSON_IMPL(nix::StoreReference)

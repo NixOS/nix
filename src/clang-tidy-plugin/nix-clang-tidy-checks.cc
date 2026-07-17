@@ -13,22 +13,19 @@
 #include <clang-tidy/ClangTidyModule.h>
 #include <clang-tidy/ClangTidyModuleRegistry.h>
 
+#include "nix-using-namespace.hh"
+
 namespace nix::clang_tidy {
 
-using namespace clang;
-using namespace clang::tidy;
-
-class NixClangTidyChecks : public ClangTidyModule
+class NixClangTidyChecks : public clang::tidy::ClangTidyModule
 {
 public:
-    void addCheckFactories([[maybe_unused]] ClangTidyCheckFactories & CheckFactories) override
+    void addCheckFactories([[maybe_unused]] clang::tidy::ClangTidyCheckFactories & CheckFactories) override
     {
-        // Custom checks will be registered here.
-        // Example:
-        // CheckFactories.registerCheck<MyCustomCheck>("nix-my-custom-check");
+        CheckFactories.registerCheck<UsingNamespaceInNamespaceScopeCheck>("nix-using-namespace");
     }
 };
 
-static ClangTidyModuleRegistry::Add<NixClangTidyChecks> X("nix-module", "Adds Nix-specific checks");
+static clang::tidy::ClangTidyModuleRegistry::Add<NixClangTidyChecks> X("nix-module", "Adds Nix-specific checks");
 
 } // namespace nix::clang_tidy

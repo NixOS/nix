@@ -31,8 +31,6 @@
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
 
-using namespace std::string_literals;
-
 extern char ** environ __attribute__((weak));
 
 namespace nix {
@@ -636,6 +634,9 @@ static void main_nix_build(int argc, char ** argv)
         auto rcfile = (tmpDir.path() / "rc").string();
         auto tz = getEnv("TZ");
         auto tzExport = tz ? "export TZ=" + escapeShellArgAlways(*tz) + "; " : "";
+
+        using namespace std::string_literals;
+
         std::string rc = fmt(
                 (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
                   "trap _nix_shell_clean_tmpdir EXIT; "

@@ -36,8 +36,6 @@ TEST_P(BuildResultJsonTest, to_json)
     writeJsonTest(name, value);
 }
 
-using namespace std::literals::chrono_literals;
-
 INSTANTIATE_TEST_SUITE_P(
     BuildResultJSON,
     BuildResultJsonTest,
@@ -89,8 +87,8 @@ INSTANTIATE_TEST_SUITE_P(
                 .timesBuilt = 3,
                 .startTime = 30,
                 .stopTime = 50,
-                .cpuUser = std::chrono::microseconds(500s),
-                .cpuSystem = std::chrono::microseconds(604s),
+                .cpuUser = std::chrono::seconds(500),
+                .cpuSystem = std::chrono::seconds(604),
             },
         }));
 

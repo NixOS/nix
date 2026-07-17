@@ -443,14 +443,13 @@ OutputPathMap resolveDerivedPath(Store & store, const DerivedPath::Built & bfd)
 
 namespace nlohmann {
 
-using namespace nix;
-
-TrustedFlag adl_serializer<TrustedFlag>::from_json(const json & json)
+nix::TrustedFlag adl_serializer<nix::TrustedFlag>::from_json(const json & json)
 {
+    using namespace nix;
     return getBoolean(json) ? TrustedFlag::Trusted : TrustedFlag::NotTrusted;
 }
 
-void adl_serializer<TrustedFlag>::to_json(json & json, const TrustedFlag & trustedFlag)
+void adl_serializer<nix::TrustedFlag>::to_json(json & json, const nix::TrustedFlag & trustedFlag)
 {
     json = static_cast<bool>(trustedFlag);
 }

@@ -133,21 +133,21 @@ bool OutputsSpec::isSubsetOf(const OutputsSpec & that) const
 
 namespace nlohmann {
 
-using namespace nix;
-
 #ifndef DOXYGEN_SKIP
 
-OutputsSpec adl_serializer<OutputsSpec>::from_json(const json & json)
+nix::OutputsSpec adl_serializer<nix::OutputsSpec>::from_json(const json & json)
 {
-    auto names = json.get<StringSet>();
+    using namespace nix;
+    auto names = json.get<nix::StringSet>();
     if (names == StringSet({"*"}))
         return OutputsSpec::All{};
     else
         return OutputsSpec::Names{std::move(names)};
 }
 
-void adl_serializer<OutputsSpec>::to_json(json & json, const OutputsSpec & t)
+void adl_serializer<nix::OutputsSpec>::to_json(json & json, const nix::OutputsSpec & t)
 {
+    using namespace nix;
     std::visit(
         overloaded{
             [&](const OutputsSpec::All &) { json = std::vector<std::string>({"*"}); },
@@ -156,8 +156,9 @@ void adl_serializer<OutputsSpec>::to_json(json & json, const OutputsSpec & t)
         t.raw);
 }
 
-ExtendedOutputsSpec adl_serializer<ExtendedOutputsSpec>::from_json(const json & json)
+nix::ExtendedOutputsSpec adl_serializer<nix::ExtendedOutputsSpec>::from_json(const json & json)
 {
+    using namespace nix;
     if (json.is_null())
         return ExtendedOutputsSpec::Default{};
     else {
@@ -165,8 +166,9 @@ ExtendedOutputsSpec adl_serializer<ExtendedOutputsSpec>::from_json(const json & 
     }
 }
 
-void adl_serializer<ExtendedOutputsSpec>::to_json(json & json, const ExtendedOutputsSpec & t)
+void adl_serializer<nix::ExtendedOutputsSpec>::to_json(json & json, const nix::ExtendedOutputsSpec & t)
 {
+    using namespace nix;
     std::visit(
         overloaded{
             [&](const ExtendedOutputsSpec::Default &) { json = nullptr; },

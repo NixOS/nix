@@ -176,16 +176,17 @@ bool verifyDetached(std::string_view data, const Signature & sig, const PublicKe
 } // namespace nix
 
 namespace nlohmann {
-void adl_serializer<Signature>::to_json(json & j, const Signature & s)
+void adl_serializer<nix::Signature>::to_json(json & j, const nix::Signature & s)
 {
     j = {
         {"keyName", s.keyName},
-        {"sig", base64::encode(std::as_bytes(std::span<const char>{s.sig}))},
+        {"sig", nix::base64::encode(std::as_bytes(std::span<const char>{s.sig}))},
     };
 }
 
-Signature adl_serializer<Signature>::from_json(const json & j)
+nix::Signature adl_serializer<nix::Signature>::from_json(const json & j)
 {
+    using namespace nix;
     if (j.is_string())
         return Signature::parse(getString(j));
     auto obj = getObject(j);

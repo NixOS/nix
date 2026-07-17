@@ -80,7 +80,7 @@ Checks:
   - cppcoreguidelines-missing-std-forward
   - android-cloexec-open
   - android-cloexec-pipe2
-  # Custom nix checks (when added)
+  # Custom nix checks
   - nix-*
 
 CheckOptions:

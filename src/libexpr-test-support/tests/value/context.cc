@@ -4,10 +4,10 @@
 #include "nix/expr/tests/value/context.hh"
 
 namespace rc {
-using namespace nix;
 
-Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arbitrary()
+Gen<nix::NixStringContextElem::DrvDeep> Arbitrary<nix::NixStringContextElem::DrvDeep>::arbitrary()
 {
+    using namespace nix;
     return gen::map(gen::arbitrary<StorePath>(), [](StorePath drvPath) {
         return NixStringContextElem::DrvDeep{
             .drvPath = drvPath,
@@ -15,8 +15,9 @@ Gen<NixStringContextElem::DrvDeep> Arbitrary<NixStringContextElem::DrvDeep>::arb
     });
 }
 
-Gen<NixStringContextElem> Arbitrary<NixStringContextElem>::arbitrary()
+Gen<nix::NixStringContextElem> Arbitrary<nix::NixStringContextElem>::arbitrary()
 {
+    using namespace nix;
     return gen::mapcat(
         gen::inRange<uint8_t>(0, std::variant_size_v<NixStringContextElem::Raw>),
         [](uint8_t n) -> Gen<NixStringContextElem> {

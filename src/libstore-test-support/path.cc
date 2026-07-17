@@ -55,7 +55,7 @@ Gen<nix::StorePathName> Arbitrary<nix::StorePathName>::arbitrary()
         }));
 }
 
-Gen<StorePath> Arbitrary<nix::StorePath>::arbitrary()
+Gen<nix::StorePath> Arbitrary<nix::StorePath>::arbitrary()
 {
     return gen::construct<nix::StorePath>(
         gen::arbitrary<nix::Hash>(),

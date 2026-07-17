@@ -145,10 +145,10 @@ std::strong_ordering BuildError::operator<=>(const BuildError & other) const noe
 
 namespace nlohmann {
 
-using namespace nix;
-
-void adl_serializer<BuildResult>::to_json(json & res, const BuildResult & br)
+void adl_serializer<nix::BuildResult>::to_json(json & res, const nix::BuildResult & br)
 {
+    using namespace nix;
+
     res = json::object();
 
     // Common fields
@@ -181,8 +181,10 @@ void adl_serializer<BuildResult>::to_json(json & res, const BuildResult & br)
         br.inner);
 }
 
-BuildResult adl_serializer<BuildResult>::from_json(const json & _json)
+nix::BuildResult adl_serializer<nix::BuildResult>::from_json(const json & _json)
 {
+    using namespace nix;
+
     auto & json = getObject(_json);
 
     BuildResult br;
@@ -219,8 +221,10 @@ BuildResult adl_serializer<BuildResult>::from_json(const json & _json)
     return br;
 }
 
-KeyedBuildResult adl_serializer<KeyedBuildResult>::from_json(const json & json0)
+nix::KeyedBuildResult adl_serializer<nix::KeyedBuildResult>::from_json(const json & json0)
 {
+    using namespace nix;
+
     auto json = getObject(json0);
 
     return KeyedBuildResult{
@@ -229,8 +233,9 @@ KeyedBuildResult adl_serializer<KeyedBuildResult>::from_json(const json & json0)
     };
 }
 
-void adl_serializer<KeyedBuildResult>::to_json(json & json, const KeyedBuildResult & kbr)
+void adl_serializer<nix::KeyedBuildResult>::to_json(json & json, const nix::KeyedBuildResult & kbr)
 {
+    using namespace nix;
     adl_serializer<BuildResult>::to_json(json, kbr);
     json["path"] = kbr.path;
 }
