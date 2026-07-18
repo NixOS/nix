@@ -143,6 +143,7 @@
     - [`.narinfo` Format](protocols/binary-cache/narinfo.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
   - [Nix32 Encoding](protocols/nix32.md)
+  - [Derivation Builder Protocol](protocols/derivation-builder/index.md)
 - [C API](c-api.md)
 - [Glossary](glossary.md)
 - [Development](development/index.md)

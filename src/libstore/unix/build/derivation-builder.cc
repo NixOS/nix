@@ -18,6 +18,7 @@
 #include "nix/store/user-lock.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/build/derivation-builder-varlink.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
 
@@ -211,8 +212,9 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
        root. */
     killSandbox(true);
 
-    /* Terminate the recursive Nix daemon. */
-    stopDaemon();
+    /* Terminate the recursive Nix daemons. */
+    stopWorkerProtoDaemon();
+    stopVarlinkDaemon();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
         debug(
@@ -239,9 +241,14 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
         };
     }
 
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs = registerOutputs();
+    SingleDrvOutputs builtOutputs;
+    if (this->usingSubmitted) {
+        builtOutputs = checkSubmittedOutputs();
+    } else {
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        builtOutputs = registerOutputs();
+    }
 
     cleanupBuild(true);
 
@@ -469,8 +476,12 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
-        startDaemon();
+    auto requiredFeatures = drvOptions.getRequiredSystemFeatures(drv);
+    if (requiredFeatures.count("recursive-nix"))
+        startWorkerProtoDaemon();
+    this->usingSubmitted = requiredFeatures.count("builder-rpc-v1");
+    if (this->usingSubmitted)
+        startVarlinkDaemon();
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
@@ -782,7 +793,7 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::startDaemon()
+void DerivationBuilderImpl::startWorkerProtoDaemon()
 {
     experimentalFeatureSettings.require(Xp::RecursiveNix);
 
@@ -825,7 +836,7 @@ void DerivationBuilderImpl::startDaemon()
 
             unix::closeOnExec(remote.get());
 
-            debug("received daemon connection");
+            debug("received worker protocol daemon connection");
 
             auto doneFlag = make_ref<std::atomic_flag>();
 
@@ -833,9 +844,9 @@ void DerivationBuilderImpl::startDaemon()
                 try {
                     daemon::processConnection(
                         store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
-                    debug("terminated daemon connection");
+                    debug("terminated worker protocol daemon connection");
                 } catch (const Interrupted &) {
-                    debug("interrupted daemon connection");
+                    debug("interrupted worker protocol daemon connection");
                 } catch (...) {
                     /* Swallow all exceptions to avoid crashing the the process (exceptions that escape from the thread
                      * trigger std::terminate()). */
@@ -864,11 +875,11 @@ void DerivationBuilderImpl::startDaemon()
             }
         }
 
-        debug("daemon shutting down");
+        debug("worker protocol daemon shutting down");
     });
 }
 
-void DerivationBuilderImpl::stopDaemon()
+void DerivationBuilderImpl::stopWorkerProtoDaemon()
 {
     if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
         // According to the POSIX standard, the 'shutdown' function should
@@ -883,7 +894,7 @@ void DerivationBuilderImpl::stopDaemon()
         if (errno == ENOTCONN) {
             daemonSocket.close();
         } else {
-            throw SysError("shutting down daemon socket");
+            throw SysError("shutting down worker protocol daemon socket");
         }
     }
 
@@ -898,7 +909,94 @@ void DerivationBuilderImpl::stopDaemon()
     daemonSocket.close();
 }
 
+void DerivationBuilderImpl::startVarlinkDaemon()
+{
+    experimentalFeatureSettings.require(Xp::BuilderRpc);
+
+    auto store = makeRestrictedStore(
+        [&] {
+            auto config = make_ref<LocalStore::Config>(*this->store.config);
+            config->pathInfoCacheSize = 0;
+            config->stateDir = "/no-such-path";
+            config->logDir = "/no-such-path";
+            return config;
+        }(),
+        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
+        *this);
+
+    auto socketName = ".nix-varlink-socket";
+    auto socketPath = tmpDir + "/" + socketName;
+    env["NIX_VARLINK_REMOTE"] = (tmpDirInSandbox() / socketName).string();
+
+    varlinkSocket = createUnixDomainSocket(socketPath, 0600);
+
+    chownToBuilder(socketPath);
+
+    varlinkThread = std::thread([this, store]() {
+        while (true) {
+
+            /* Accept a connection. */
+            struct sockaddr_un remoteAddr;
+            socklen_t remoteAddrLen = sizeof(remoteAddr);
+
+            AutoCloseFD remote = accept(varlinkSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
+            if (!remote) {
+                if (errno == EINTR || errno == EAGAIN)
+                    continue;
+                if (errno == EINVAL || errno == ECONNABORTED)
+                    break;
+                throw SysError("accepting Varlink connection");
+            }
+
+            unix::closeOnExec(remote.get());
+
+            debug("received Varlink daemon connection");
+
+            auto workerThread = std::thread(
+                [store, drvPath{this->drvPath}, submittedOutputs{this->submittedOutputs}, remote{std::move(remote)}]() {
+                    try {
+                        FdSource from(remote.get());
+                        FdSink to(remote.get());
+                        processVarlinkConnection(*store, drvPath, submittedOutputs, from, to);
+                        debug("terminated Varlink daemon connection");
+                    } catch (const Interrupted &) {
+                        debug("interrupted Varlink daemon connection");
+                    } catch (SystemError &) {
+                        ignoreExceptionExceptInterrupt();
+                    }
+                });
+
+            varlinkWorkerThreads.push_back(std::move(workerThread));
+        }
+
+        debug("Varlink daemon shutting down");
+    });
+}
+
 void DerivationBuilderImpl::addDependencyImpl(const StorePath & path) {}
+
+void DerivationBuilderImpl::stopVarlinkDaemon()
+{
+    if (varlinkSocket && shutdown(varlinkSocket.get(), SHUT_RDWR) == -1) {
+        if (errno == ENOTCONN) {
+            varlinkSocket.close();
+        } else {
+            throw SysError("shutting down Varlink daemon socket");
+        }
+    }
+
+    if (varlinkThread.joinable())
+        varlinkThread.join();
+
+    // FIXME: should prune worker threads more quickly.
+    // FIXME: shutdown the client socket to speed up worker termination.
+    for (auto & thread : varlinkWorkerThreads)
+        thread.join();
+    varlinkWorkerThreads.clear();
+
+    // release the socket.
+    varlinkSocket.close();
+}
 
 void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
@@ -1669,6 +1767,78 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             store.registerDrvOutput(thisRealisation);
         }
         builtOutputs.emplace(outputName, thisRealisation);
+    }
+
+    return builtOutputs;
+}
+
+SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
+{
+    // Submitted outputs from the varlink daemon.
+    // It's fine to lock here since all other threads with the reference have been shut down.
+    auto submittedOutputs(this->submittedOutputs->lock());
+
+    SingleDrvOutputs builtOutputs;
+
+    // Technically this could be done more efficiently, but use two iterations for better error messages
+    for (auto & [outputName, _] : *submittedOutputs) {
+        if (!this->drv.outputs.contains(outputName)) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for '%s' attempted to register an output named '%s', but it was not declared in the derivation",
+                store.printStorePath(drvPath),
+                outputName);
+        }
+    }
+
+    for (auto & [outputName, output] : this->drv.outputs) {
+        if (!submittedOutputs->contains(outputName)) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for '%s' failed to submit output path for '%s'",
+                store.printStorePath(drvPath),
+                outputName);
+        }
+
+        auto caOutput = std::get_if<DerivationOutput::CAFloating>(&output.raw);
+        if (caOutput == nullptr) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for non-CAFloating derivation '%s' tried to submit output for '%s'",
+                store.printStorePath(drvPath),
+                outputName);
+        }
+
+        auto submittedPath = get(*submittedOutputs, outputName);
+
+        ValidPathInfo pathInfo(*this->store.queryPathInfo(*submittedPath));
+
+        if (!pathInfo.isContentAddressed(this->store)) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for '%s' tried to submit non-CA path '%s' for output '%s'",
+                store.printStorePath(drvPath),
+                store.printStorePath(*submittedPath),
+                outputName);
+        }
+
+        // No need to sign CA outputs, only the realisation matters
+
+        auto realisation = Realisation{
+            {
+                .outPath = *submittedPath,
+            },
+            DrvOutput{
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
+        };
+
+        store.signRealisation(realisation);
+        store.registerDrvOutput(realisation);
+        builtOutputs.emplace(outputName, realisation);
+
+        // TODO: handle --check
     }
 
     return builtOutputs;
