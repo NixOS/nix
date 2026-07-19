@@ -176,40 +176,15 @@ endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
 
-subdir('nix-meson-build-support/generate-header')
-
-generated_headers = []
-foreach header : [
-  'schema.sql',
-  'ca-specific-schema.sql',
-]
-  generated_headers += gen_header.process(header)
-endforeach
-
 busybox = find_program(get_option('sandbox-shell'), required : false)
-
-configdata_priv.set(
-  'HAVE_EMBEDDED_SANDBOX_SHELL',
-  get_option('embedded-sandbox-shell').to_int(),
-)
 
 if get_option('embedded-sandbox-shell')
   configdata_priv.set_quoted('SANDBOX_SHELL', '__embedded_sandbox_shell__')
+  configdata_priv.set_quoted('EMBEDDED_SANDBOX_SHELL_PATH', busybox.full_path())
+  configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 1)
 elif busybox.found()
   configdata_priv.set_quoted('SANDBOX_SHELL', busybox.full_path())
-endif
-
-if get_option('embedded-sandbox-shell')
-  hexdump = find_program('hexdump', native : true)
-  embedded_sandbox_shell_gen = custom_target(
-    'embedded-sandbox-shell.gen.hh',
-    command : [ hexdump, '-v', '-e', '1/1 "0x%x," "\n"' ],
-    input : busybox.full_path(),
-    output : 'embedded-sandbox-shell.gen.hh',
-    capture : true,
-    feed : true,
-  )
-  generated_headers += embedded_sandbox_shell_gen
+  configdata_priv.set('HAVE_EMBEDDED_SANDBOX_SHELL', 0)
 endif
 
 fs = import('fs')
@@ -391,7 +366,6 @@ subdir('nix-meson-build-support/windows-version')
 
 this_library = library(
   'nixstore',
-  generated_headers,
   sources,
   config_priv_h,
   soversion : nix_soversion,

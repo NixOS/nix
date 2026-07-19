@@ -916,8 +916,9 @@ static ref<SourceAccessor> makeInternalFS()
     internalFS->setPathDisplay("«flakes-internal»", "");
     internalFS->addFile(
         CanonPath("call-flake.nix"),
-#include "call-flake.nix.gen.hh" // IWYU pragma: keep
-    );
+        {
+#embed "call-flake.nix"
+        });
     return internalFS;
 }
 

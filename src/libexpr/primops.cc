@@ -251,7 +251,7 @@ void derivationToValue(
     state.evalFile(state.importedDrvToDerivation, *vImportedDrvToDerivation); // has caching
 
     v.mkApp(vImportedDrvToDerivation, w);
-    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix");
 }
 
 /**
