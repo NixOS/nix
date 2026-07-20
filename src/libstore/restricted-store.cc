@@ -283,8 +283,10 @@ void RestrictedStore::queryRealisationUncached(
 // XXX: This should probably be allowed if the realisation corresponds to
 // an allowed derivation
 {
-    if (!goal.isAllowed(id))
+    if (!goal.isAllowed(id)) {
         callback(nullptr);
+        return;
+    }
     next->queryRealisation(id, std::move(callback));
 }
 
