@@ -7,6 +7,8 @@
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
+#include "nix/store/gcp-creds.hh"
+#include "nix/store/gcs-url.hh"
 #include "nix/store/s3-url.hh"
 #include <optional>
 #if NIX_WITH_AWS_AUTH
@@ -27,6 +29,7 @@
 #include <cstring>
 #include <queue>
 #include <random>
+#include <future>
 #include <thread>
 #include <utility>
 #include <regex>
@@ -204,6 +207,10 @@ struct curlFileTransfer : public FileTransfer
          */
         bool hasContentEncoding:1 = false;
 
+        bool bearerRefreshed:1 = false;
+
+        std::optional<std::future<std::optional<std::string>>> pendingBearerRefresh;
+
         /**
          * Server-provided minimum retry delay, parsed from the `Retry-After`
          * response header. Reset on each new HTTP status line, and consumed
@@ -275,14 +282,19 @@ struct curlFileTransfer : public FileTransfer
             })
         {
             result.urls.push_back(request.uri.to_string());
+        }
 
+        void buildRequestHeaders()
+        {
+            requestHeaders.reset();
             if (!request.expectedETag.empty())
                 appendHeaders("If-None-Match: " + request.expectedETag);
             if (!request.mimeType.empty())
                 appendHeaders("Content-Type: " + request.mimeType);
-            for (auto it = request.headers.begin(); it != request.headers.end(); ++it) {
-                appendHeaders(fmt("%s: %s", it->first, it->second));
-            }
+            for (const auto & [name, value] : request.headers)
+                appendHeaders(fmt("%s: %s", name, value));
+            if (request.bearerToken)
+                appendHeaders("Authorization: Bearer " + *request.bearerToken);
         }
 
         ~TransferItem()
@@ -588,6 +600,15 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_reset(req);
 
+            if (pendingBearerRefresh
+                && pendingBearerRefresh->wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                if (auto t = pendingBearerRefresh->get())
+                    request.bearerToken = std::move(t);
+                pendingBearerRefresh.reset();
+                bearerRefreshed = true;
+            }
+            buildRequestHeaders();
+
             if (verbosity >= lvlVomit) {
                 curl_easy_setopt(req, CURLOPT_VERBOSE, 1);
                 curl_easy_setopt(req, CURLOPT_DEBUGFUNCTION, TransferItem::debugCallback);
@@ -824,7 +845,7 @@ struct curlFileTransfer : public FileTransfer
                     // The file is definitely not there
                     err = NotFound;
                 } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
-                    err = Unauthorized;
+                    err = (request.refreshBearerToken && !bearerRefreshed) ? Transient : Unauthorized;
                 } else if (httpStatus == HttpStatus::Forbidden) {
                     // Don't retry on authentication/authorization failures.
                     // Note: the only reason we treat this differently from 401/407 is S3 returns 403 if a file doesn't
@@ -945,6 +966,25 @@ struct curlFileTransfer : public FileTransfer
             if (!canRetry) {
                 fail(std::move(exc));
                 return;
+            }
+
+            if (httpStatus == HttpStatus::Unauthorized && request.refreshBearerToken && !bearerRefreshed
+                && !pendingBearerRefresh) {
+                try {
+                    auto promise = std::make_shared<std::promise<std::optional<std::string>>>();
+                    std::thread([refresh = request.refreshBearerToken, promise] {
+                        try {
+                            promise->set_value(refresh());
+                        } catch (...) {
+                            try {
+                                promise->set_value(std::nullopt);
+                            } catch (...) {
+                            }
+                        }
+                    }).detach();
+                    pendingBearerRefresh = promise->get_future();
+                } catch (const std::system_error &) {
+                }
             }
 
             auto delay = computeRetryDelayMs(
@@ -1203,7 +1243,7 @@ struct curlFileTransfer : public FileTransfer
     ItemHandle enqueueItem(ref<TransferItem> item)
     {
         if (item->request.data && item->request.uri.scheme() != "http" && item->request.uri.scheme() != "https"
-            && item->request.uri.scheme() != "s3")
+            && item->request.uri.scheme() != "s3" && item->request.uri.scheme() != "gs")
             throw nix::Error("uploading to '%s' is not supported", item->request.displayUri());
 
         {
@@ -1220,10 +1260,15 @@ struct curlFileTransfer : public FileTransfer
 
     ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
     {
-        /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
+        /* Handle s3:// and gs:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
+            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+        }
+        if (request.uri.scheme() == "gs") {
+            auto modifiedRequest = request;
+            modifiedRequest.setupForGCS();
             return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
         }
 
@@ -1318,6 +1363,41 @@ void FileTransferRequest::setupForS3()
 #else
     // When built without AWS support, just try as public bucket
     debug("S3 request without authentication (built without AWS support)");
+#endif
+}
+
+void FileTransferRequest::setupForGCS()
+{
+    auto parsed = ParsedGCSURL::parse(uri.parsed());
+    uri = parsed.toHttpsUrl();
+
+    /* Requester-pays buckets reject requests without a billing project. */
+    if (parsed.userProject)
+        headers.emplace_back("x-goog-user-project", *parsed.userProject);
+
+    if (preResolvedGcpAccessToken) {
+        bearerToken = *preResolvedGcpAccessToken;
+        return;
+    }
+
+    /* Parent already resolved (to nothing). Don't consult the provider. */
+    if (gcpCredentialsPreResolved)
+        return;
+
+#if NIX_WITH_GCS_AUTH
+    if (gcpCredentialProvider) {
+        if (auto creds = gcpCredentialProvider->maybeGetCredentials())
+            bearerToken = creds->accessToken;
+        refreshBearerToken = [p = gcpCredentialProvider]() -> std::optional<std::string> {
+            p->invalidate();
+            if (auto creds = p->maybeGetCredentials())
+                return creds->accessToken;
+            return std::nullopt;
+        };
+    } else
+        debug("GCS request without credential provider");
+#else
+    debug("GCS request without authentication (built without GCS auth support)");
 #endif
 }
 

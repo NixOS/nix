@@ -99,7 +99,7 @@ With bucket policies and authentication set up as described above, uploading wor
 
   ```console
   $ nix copy nixpkgs.hello --to \
-    's3://example-nix-cache?profile=cache-upload&scheme=https&endpoint=minio.example.com'
+    's3://example-nix-cache?profile=cache-upload&endpoint=https://minio.example.com'
   ```
 
 )"

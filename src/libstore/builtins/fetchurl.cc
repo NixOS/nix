@@ -54,6 +54,19 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             }
 #endif
 
+#if NIX_WITH_GCS_AUTH
+            if (request.uri.scheme() == "gs") {
+                /* Trust the parent's resolution.
+                 * never run the ADC chain in the forked child.
+                 * Empty token => anonymous (public bucket).
+                 */
+                request.gcpCredentialsPreResolved = true;
+                request.preResolvedGcpAccessToken = ctx.gcpAccessToken;
+                if (ctx.gcpAccessToken)
+                    debug("[pid=%d] Using pre-resolved GCP access token from parent process", getpid());
+            }
+#endif
+
             auto decompressor = makeDecompressionSink(
                 unpack && hasSuffix(mainUrl, ".xz") ? CompressionAlgo::xz : CompressionAlgo::none, sink);
             fileTransfer->download(std::move(request), *decompressor);
