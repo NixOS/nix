@@ -6,8 +6,6 @@
 
 namespace nix {
 
-using namespace testing;
-
 struct ValuePrintingTests : LibExprTest
 {
     template<class... A>

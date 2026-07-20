@@ -14,8 +14,6 @@
 #include <sys/time.h>
 #include <variant>
 
-using namespace std::string_literals;
-
 namespace nix::fetchers {
 
 static RunOptions hgOptions(OsStrings args)
@@ -226,6 +224,8 @@ struct MercurialInputScheme : InputScheme
                     warn("Mercurial tree '%s' is unclean", PathFmt{localPath});
 
                 input.attrs.insert_or_assign("ref", chomp(runHg({OS_STR("branch"), OS_STR("-R"), localPath.native()})));
+
+                using namespace std::string_literals;
 
                 auto files = tokenizeString<StringSet>(
                     runHg({

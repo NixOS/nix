@@ -136,6 +136,11 @@ struct WorkerProto
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
 
     /**
+     * Feature for enabling the `AddToStoreScanning` operation
+     */
+    static constexpr std::string_view featureAddToStoreScanning = "add-to-store-scanning";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */
@@ -259,6 +264,7 @@ enum struct WorkerProto::Op : uint64_t {
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
     // AddTempRoots = 49, // reserved for https://github.com/NixOS/nix/pull/16113
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
+    AddToStoreScanning = 1001,
 };
 
 struct WorkerProto::ClientHandshakeInfo

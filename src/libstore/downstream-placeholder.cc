@@ -53,11 +53,11 @@ DownstreamPlaceholder DownstreamPlaceholder::fromSingleDerivedPathBuilt(
 
 namespace nlohmann {
 
-using namespace nix;
-
 template<typename Item>
-DrvRef<Item> adl_serializer<DrvRef<Item>>::from_json(const json & json)
+nix::DrvRef<Item> adl_serializer<nix::DrvRef<Item>>::from_json(const json & json)
 {
+    using namespace nix;
+
     // OutputName case: { "drvPath": "self", "output": <output> }
     if (json.type() == nlohmann::json::value_t::object) {
         auto & obj = getObject(json);
@@ -74,8 +74,10 @@ DrvRef<Item> adl_serializer<DrvRef<Item>>::from_json(const json & json)
 }
 
 template<typename Item>
-void adl_serializer<DrvRef<Item>>::to_json(json & json, const DrvRef<Item> & ref)
+void adl_serializer<nix::DrvRef<Item>>::to_json(json & json, const nix::DrvRef<Item> & ref)
 {
+    using namespace nix;
+
     std::visit(
         overloaded{
             [&](const OutputName & outputName) {
@@ -88,7 +90,7 @@ void adl_serializer<DrvRef<Item>>::to_json(json & json, const DrvRef<Item> & ref
         ref);
 }
 
-template struct adl_serializer<nix::DrvRef<StorePath>>;
-template struct adl_serializer<nix::DrvRef<SingleDerivedPath>>;
+template struct adl_serializer<nix::DrvRef<nix::StorePath>>;
+template struct adl_serializer<nix::DrvRef<nix::SingleDerivedPath>>;
 
 } // namespace nlohmann

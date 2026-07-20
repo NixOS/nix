@@ -20,6 +20,7 @@ llvm_dep = dependency('LLVM', version : '>= 16', required : true)
 
 sources = files(
   'nix-clang-tidy-checks.cc',
+  'nix-using-namespace.cc',
 )
 
 # Build as a shared module (plugin) that can be loaded by clang-tidy --load

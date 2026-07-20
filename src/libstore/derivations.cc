@@ -15,8 +15,6 @@
 
 namespace nix {
 
-using namespace std::literals::string_view_literals;
-
 BasicDerivation::~BasicDerivation() {}
 
 Derivation::~Derivation() {}
@@ -316,6 +314,8 @@ static DerivationOutput parseDerivationOutput(
     std::string_view hashS,
     const ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace std::literals::string_view_literals;
+
     if (!hashAlgoStr.empty()) {
         ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
         if (method == ContentAddressMethod::Raw::Text)
@@ -395,6 +395,8 @@ enum struct DerivationATermVersion {
 static DerivedPathMap<StringSet>::ChildNode
 parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, DerivationATermVersion version)
 {
+    using namespace std::literals::string_view_literals;
+
     DerivedPathMap<StringSet>::ChildNode node;
 
     auto parseNonDynamic = [&]() { node.value = parseStrings(str, false); };
@@ -440,6 +442,8 @@ Derivation parseDerivation(
     std::string_view name,
     const ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace std::literals::string_view_literals;
+
     Derivation drv;
     drv.name = name;
 
@@ -600,6 +604,8 @@ static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIt
 static void unparseDerivedPathMapNode(
     const StoreDirConfig & store, std::string & s, const DerivedPathMap<StringSet>::ChildNode & node)
 {
+    using namespace std::literals::string_view_literals;
+
     s += ',';
     if (node.childMap.empty()) {
         printUnquotedStrings(s, node.value.begin(), node.value.end());
@@ -643,6 +649,8 @@ static bool hasDynamicDrvDep(const Derivation & drv)
 std::string Derivation::unparse(
     const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const
 {
+    using namespace std::literals::string_view_literals;
+
     std::string s;
     s.reserve(65536);
 
@@ -790,6 +798,8 @@ bool isDerivation(std::string_view fileName)
 
 std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 {
+    using namespace std::literals::string_view_literals;
+
     std::string res{drvName};
     if (outputName != "out"sv) {
         res += '-';
@@ -800,6 +810,8 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 
 DerivationType BasicDerivation::type() const
 {
+    using namespace std::literals::string_view_literals;
+
     std::optional<HashAlgorithm> floatingHashAlgo;
     std::optional<DerivationType> ty;
 
@@ -1435,10 +1447,9 @@ const Hash impureOutputHash = hashString(HashAlgorithm::SHA256, "impure");
 
 namespace nlohmann {
 
-using namespace nix;
-
-void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutput & o)
+void adl_serializer<nix::DerivationOutput>::to_json(json & res, const nix::DerivationOutput & o)
 {
+    using namespace nix;
     res = nlohmann::json::object();
     std::visit(
         overloaded{
@@ -1466,9 +1477,10 @@ void adl_serializer<DerivationOutput>::to_json(json & res, const DerivationOutpu
         o.raw);
 }
 
-DerivationOutput
-adl_serializer<DerivationOutput>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+nix::DerivationOutput adl_serializer<nix::DerivationOutput>::from_json(
+    const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
     std::set<std::string_view> keys;
     auto & json = getObject(_json);
 
@@ -1532,15 +1544,16 @@ adl_serializer<DerivationOutput>::from_json(const json & _json, const Experiment
     }
 }
 
-static void inputSrcsToJson(json & res, const StorePathSet & inputSrcs)
+static void inputSrcsToJson(json & res, const nix::StorePathSet & inputSrcs)
 {
     res = nlohmann::json::array();
     for (auto & input : inputSrcs)
         res.emplace_back(input);
 }
 
-static void basicDerivationToJson(json & res, const BasicDerivation & d)
+static void basicDerivationToJson(json & res, const nix::BasicDerivation & d)
 {
+    using namespace nix;
     res = nlohmann::json::object();
 
     res["name"] = d.name;
@@ -1562,15 +1575,17 @@ static void basicDerivationToJson(json & res, const BasicDerivation & d)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
 }
 
-void adl_serializer<BasicDerivation>::to_json(json & res, const BasicDerivation & d)
+void adl_serializer<nix::BasicDerivation>::to_json(json & res, const nix::BasicDerivation & d)
 {
     basicDerivationToJson(res, d);
 
     inputSrcsToJson(res["inputs"], d.inputSrcs);
 }
 
-void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
+void adl_serializer<nix::Derivation>::to_json(json & res, const nix::Derivation & d)
 {
+    using namespace nix;
+
     basicDerivationToJson(res, d);
 
     {
@@ -1598,16 +1613,18 @@ void adl_serializer<Derivation>::to_json(json & res, const Derivation & d)
     }
 }
 
-static void inputSrcsFromJson(const json & inputSrcsJson, StorePathSet & inputSrcs)
+static void inputSrcsFromJson(const json & inputSrcsJson, nix::StorePathSet & inputSrcs)
 {
-    auto arr = getArray(inputSrcsJson);
+    auto arr = nix::getArray(inputSrcsJson);
     for (auto & input : arr)
         inputSrcs.insert(input);
 }
 
 static void basicDerivationFromJson(
-    const json::object_t & json, BasicDerivation & res, const ExperimentalFeatureSettings & xpSettings)
+    const json::object_t & json, nix::BasicDerivation & res, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
+
     res.name = getString(valueAt(json, "name"));
 
     {
@@ -1645,9 +1662,11 @@ static void basicDerivationFromJson(
         res.structuredAttrs = StructuredAttrs{*structuredAttrs};
 }
 
-BasicDerivation
-adl_serializer<BasicDerivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+nix::BasicDerivation
+adl_serializer<nix::BasicDerivation>::from_json(const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
+
     BasicDerivation res;
     auto & json = getObject(_json);
     basicDerivationFromJson(json, res, xpSettings);
@@ -1662,8 +1681,11 @@ adl_serializer<BasicDerivation>::from_json(const json & _json, const Experimenta
     return res;
 }
 
-Derivation adl_serializer<Derivation>::from_json(const json & _json, const ExperimentalFeatureSettings & xpSettings)
+nix::Derivation
+adl_serializer<nix::Derivation>::from_json(const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
+
     Derivation res;
     auto & json = getObject(_json);
     basicDerivationFromJson(json, res, xpSettings);

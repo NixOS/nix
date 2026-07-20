@@ -544,7 +544,13 @@ void mainWrapped(int argc, char ** argv)
     if (!args.command)
         throw UsageError("no subcommand specified");
 
-    experimentalFeatureSettings.require(args.command->second->experimentalFeature());
+    {
+        MultiCommand * command = &args;
+        while (command && command->command) {
+            experimentalFeatureSettings.require(command->command->second->experimentalFeature());
+            command = dynamic_cast<MultiCommand *>(&*command->command->second);
+        }
+    }
 
     if (args.useNet && !haveInternet()) {
         warn("you don't have Internet access; disabling some network-dependent features");

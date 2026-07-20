@@ -53,6 +53,7 @@ suites = [
     'tests' : [
       'absolute-path-literals.sh',
       'add.sh',
+      'add-scanning.sh',
       'bash-profile.sh',
       'binary-cache-build-remote.sh',
       'binary-cache-compression.sh',

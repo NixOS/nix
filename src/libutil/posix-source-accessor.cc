@@ -383,8 +383,20 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
     }
 
     try {
-        AutoCloseFD parentFdOwning =
-            openFileEnsureBeneathNoSymlinks(startFd, relPath, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0, std::move(cb));
+        AutoCloseFD parentFdOwning = openFileEnsureBeneathNoSymlinks(
+            startFd,
+            relPath,
+#  ifdef O_PATH
+            /* As to not require read permissions on the directory. */
+            O_PATH |
+#  else
+            /* Sadly this will require read permissison for path resolution,
+               but without O_PATH that's unavoidable. */
+            O_RDONLY |
+#  endif
+                O_DIRECTORY | O_CLOEXEC,
+            0,
+            std::move(cb));
         return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
     } catch (SymlinkNotAllowed & e) {
         /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */

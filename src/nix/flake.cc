@@ -1269,7 +1269,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
             auto attrPathS = attrPath.resolve(*state);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPath.to_string(*state)));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating '%s'", attrPath.to_string(*state)));
 
             try {
                 auto recurse = [&]() {

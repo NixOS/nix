@@ -5,14 +5,14 @@
 
 namespace nix {
 
-using namespace testing;
-
 // Testing eval of PrimOp's
 class ErrorTraceTest : public LibExprTest
 {};
 
 TEST_F(ErrorTraceTest, TraceBuilder)
 {
+    using namespace testing;
+
     ASSERT_THROW(state.error<EvalError>("puppy").debugThrow(), EvalError);
 
     ASSERT_THROW(state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow(), EvalError);

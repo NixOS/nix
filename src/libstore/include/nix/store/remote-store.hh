@@ -6,6 +6,7 @@
 #include <string>
 
 #include "nix/store/store-api.hh"
+#include "nix/store/submit-store.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
@@ -46,7 +47,7 @@ public:
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore
+struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore, public virtual SubmitStore
 {
 private:
     void anchor() override;
@@ -113,6 +114,13 @@ public:
 
     void registerDrvOutput(const Realisation & info) override;
 
+    ref<const ValidPathInfo> addToStoreScanning(
+        Source & dump,
+        std::string_view name,
+        FileSerialisationMethod dumpMethod,
+        ContentAddressMethod hashMethod,
+        HashAlgorithm hashAlgo) override;
+
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
@@ -131,6 +139,12 @@ public:
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;
+
+    void deleteBuildTraces(const std::set<DrvOutput> & keys) override
+    {
+        // TODO support this in the protocol someday
+        unsupported("deleteBuildTraces");
+    };
 
     void optimiseStore() override;
 

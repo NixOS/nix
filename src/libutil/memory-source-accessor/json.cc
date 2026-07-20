@@ -6,22 +6,22 @@
 
 namespace nlohmann {
 
-using namespace nix;
-
 // fso::Regular<RegularContents>
 template<>
-MemorySourceAccessor::File::Regular adl_serializer<MemorySourceAccessor::File::Regular>::from_json(const json & json)
+nix::MemorySourceAccessor::File::Regular
+adl_serializer<nix::MemorySourceAccessor::File::Regular>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
-    return MemorySourceAccessor::File::Regular{
+    return {
         .executable = getBoolean(valueAt(obj, "executable")),
         .contents = getString(valueAt(obj, "contents")),
     };
 }
 
 template<>
-void adl_serializer<MemorySourceAccessor::File::Regular>::to_json(
-    json & json, const MemorySourceAccessor::File::Regular & r)
+void adl_serializer<nix::MemorySourceAccessor::File::Regular>::to_json(
+    json & json, const nix::MemorySourceAccessor::File::Regular & r)
 {
     json = {
         {"executable", r.executable},
@@ -30,8 +30,9 @@ void adl_serializer<MemorySourceAccessor::File::Regular>::to_json(
 }
 
 template<>
-NarListing::Regular adl_serializer<NarListing::Regular>::from_json(const json & json)
+nix::NarListing::Regular adl_serializer<nix::NarListing::Regular>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
     auto * execPtr = optionalValueAt(obj, "executable");
     auto * sizePtr = optionalValueAt(obj, "size");
@@ -47,7 +48,7 @@ NarListing::Regular adl_serializer<NarListing::Regular>::from_json(const json & 
 }
 
 template<>
-void adl_serializer<NarListing::Regular>::to_json(json & j, const NarListing::Regular & r)
+void adl_serializer<nix::NarListing::Regular>::to_json(json & j, const nix::NarListing::Regular & r)
 {
     if (r.contents.fileSize)
         j["size"] = *r.contents.fileSize;
@@ -57,30 +58,32 @@ void adl_serializer<NarListing::Regular>::to_json(json & j, const NarListing::Re
 }
 
 template<typename Child>
-void adl_serializer<fso::DirectoryT<Child>>::to_json(json & j, const fso::DirectoryT<Child> & d)
+void adl_serializer<nix::fso::DirectoryT<Child>>::to_json(json & j, const nix::fso::DirectoryT<Child> & d)
 {
     j["entries"] = d.entries;
 }
 
 template<typename Child>
-fso::DirectoryT<Child> adl_serializer<fso::DirectoryT<Child>>::from_json(const json & json)
+nix::fso::DirectoryT<Child> adl_serializer<nix::fso::DirectoryT<Child>>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
-    return fso::DirectoryT<Child>{
+    return {
         .entries = valueAt(obj, "entries"),
     };
 }
 
 // fso::Symlink
-fso::Symlink adl_serializer<fso::Symlink>::from_json(const json & json)
+nix::fso::Symlink adl_serializer<nix::fso::Symlink>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
-    return fso::Symlink{
+    return {
         .target = getString(valueAt(obj, "target")),
     };
 }
 
-void adl_serializer<fso::Symlink>::to_json(json & json, const fso::Symlink & s)
+void adl_serializer<nix::fso::Symlink>::to_json(json & json, const nix::fso::Symlink & s)
 {
     json = {
         {"target", s.target},
@@ -88,21 +91,22 @@ void adl_serializer<fso::Symlink>::to_json(json & json, const fso::Symlink & s)
 }
 
 // fso::Opaque
-fso::Opaque adl_serializer<fso::Opaque>::from_json(const json &)
+nix::fso::Opaque adl_serializer<nix::fso::Opaque>::from_json(const json &)
 {
-    return fso::Opaque{};
+    return {};
 }
 
-void adl_serializer<fso::Opaque>::to_json(json & j, const fso::Opaque &)
+void adl_serializer<nix::fso::Opaque>::to_json(json & j, const nix::fso::Opaque &)
 {
     j = nlohmann::json::object();
 }
 
 // fso::VariantT<RegularContents, recur> - generic implementation
 template<typename RegularContents, bool recur>
-void adl_serializer<fso::VariantT<RegularContents, recur>>::to_json(
-    json & j, const fso::VariantT<RegularContents, recur> & val)
+void adl_serializer<nix::fso::VariantT<RegularContents, recur>>::to_json(
+    json & j, const nix::fso::VariantT<RegularContents, recur> & val)
 {
+    using namespace nix;
     using Variant = fso::VariantT<RegularContents, recur>;
     j = nlohmann::json::object();
     std::visit(
@@ -124,9 +128,10 @@ void adl_serializer<fso::VariantT<RegularContents, recur>>::to_json(
 }
 
 template<typename RegularContents, bool recur>
-fso::VariantT<RegularContents, recur>
-adl_serializer<fso::VariantT<RegularContents, recur>>::from_json(const json & json)
+nix::fso::VariantT<RegularContents, recur>
+adl_serializer<nix::fso::VariantT<RegularContents, recur>>::from_json(const json & json)
 {
+    using namespace nix;
     using Variant = fso::VariantT<RegularContents, recur>;
     auto & obj = getObject(json);
     auto type = getString(valueAt(obj, "type"));
@@ -141,19 +146,19 @@ adl_serializer<fso::VariantT<RegularContents, recur>>::from_json(const json & js
 }
 
 // Explicit instantiations for VariantT types we use
-template struct adl_serializer<MemorySourceAccessor::File>;
-template struct adl_serializer<NarListing>;
-template struct adl_serializer<ShallowNarListing>;
+template struct adl_serializer<nix::MemorySourceAccessor::File>;
+template struct adl_serializer<nix::NarListing>;
+template struct adl_serializer<nix::ShallowNarListing>;
 
 // MemorySourceAccessor
-MemorySourceAccessor adl_serializer<MemorySourceAccessor>::from_json(const json & json)
+nix::MemorySourceAccessor adl_serializer<nix::MemorySourceAccessor>::from_json(const json & json)
 {
-    MemorySourceAccessor res;
+    nix::MemorySourceAccessor res;
     res.root = json;
     return res;
 }
 
-void adl_serializer<MemorySourceAccessor>::to_json(json & json, const MemorySourceAccessor & val)
+void adl_serializer<nix::MemorySourceAccessor>::to_json(json & json, const nix::MemorySourceAccessor & val)
 {
     json = val.root;
 }

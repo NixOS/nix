@@ -189,14 +189,12 @@ std::pair<std::string, StoreReference::Params> splitUriAndParams(const std::stri
 
 namespace nlohmann {
 
-using namespace nix;
-
-StoreReference adl_serializer<StoreReference>::from_json(const json & json)
+nix::StoreReference adl_serializer<nix::StoreReference>::from_json(const json & json)
 {
-    return StoreReference::parse(json.get<std::string>());
+    return nix::StoreReference::parse(json.get<std::string>()); // FIXME: getString
 }
 
-void adl_serializer<StoreReference>::to_json(json & json, const StoreReference & ref)
+void adl_serializer<nix::StoreReference>::to_json(json & json, const nix::StoreReference & ref)
 {
     json = ref.render();
 }
