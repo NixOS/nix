@@ -82,7 +82,7 @@ struct MixPrintJSON : virtual Args
      * to avoid mistakenly passing an already serialized JSON to this function.
      *
      * It is not recommended to print a JSON string - see the data modeling guidelines
-     * about extensibility, https://nix.dev/manual/nix/development/development/data-modeling.html -
+     * about extensibility, https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/development/data-modeling.html -
      * but you _can_ print a sole JSON string by explicitly coercing it to
      * `nlohmann::json` first.
      */

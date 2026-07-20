@@ -83,7 +83,7 @@ private:
 };
 
 /**
- * @param baseDir Optional [base directory](https://nix.dev/manual/nix/development/glossary#gloss-base-directory)
+ * @param baseDir Optional [base directory](https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/glossary#gloss-base-directory)
  */
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir = nullptr);
 

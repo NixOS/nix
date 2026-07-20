@@ -41,9 +41,9 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
    There are many open pull requests that might already do what you intend to work on.
    You can use [labels](https://github.com/NixOS/nix/labels) to filter for relevant topics.
 
-3. Check the [Nix reference manual](https://nix.dev/manual/nix/development/development/building.html) for information on building Nix and running its tests.
+3. Check the [Nix reference manual](https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/development/building.html) for information on building Nix and running its tests.
 
-   For contributions to the command line interface, please check the [CLI guidelines](https://nix.dev/manual/nix/development/development/cli-guideline.html).
+   For contributions to the command line interface, please check the [CLI guidelines](https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/development/cli-guideline.html).
 
 4. Make your change!
 
@@ -84,7 +84,7 @@ Check out the [security policy](https://github.com/NixOS/nix/security/policy).
    - [ ] API documentation in header files
    - [ ] Code and comments are self-explanatory
    - [ ] Commit message explains **why** the change was made
-   - [ ] New feature or incompatible change: [add a release note](https://nix.dev/manual/nix/development/development/contributing.html#add-a-release-note)
+   - [ ] New feature or incompatible change: [add a release note](https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/development/contributing.html#add-a-release-note)
 
 7. If you need additional feedback or help to getting pull request into shape, ask other contributors using [@mentions](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#mentioning-people-and-teams).
 
@@ -153,7 +153,7 @@ The following situations are fully or partially exempt:
 The Nix reference manual is hosted on https://nix.dev/manual/nix.
 The underlying source files are located in [`doc/manual/source`](./doc/manual/source).
 For small changes you can [use GitHub to edit these files](https://docs.github.com/en/repositories/working-with-files/managing-files/editing-files)
-For larger changes see the [Nix reference manual](https://nix.dev/manual/nix/development/development/contributing.html).
+For larger changes see the [Nix reference manual](https://hydra.nixos.org/job/nix/master/manual/latest/download-by-type/doc/manual/development/contributing.html).
 
 You're encouraged to add line breaks at semantic boundaries, per [sembr](https://sembr.org).
 
