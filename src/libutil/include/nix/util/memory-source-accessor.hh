@@ -144,6 +144,10 @@ public:
      */
     File * open(const CanonPath & path, std::optional<File> create);
 
+    /**
+     * @brief Insert a new regular file into with the specified @p contents.
+     * @todo Have a way to insert "borrowed" std::string_view without copying.
+     */
     SourcePath addFile(CanonPath path, std::string && contents);
 };
 

@@ -220,9 +220,9 @@ struct BuildEnvironment
     }
 };
 
-const static std::string getEnvSh =
-#include "get-env.sh.gen.hh"
-    ;
+static constexpr char getEnvSh[] = {
+#embed "get-env.sh"
+};
 
 /**
  * Given an existing derivation, return the shell environment as
@@ -240,7 +240,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         throw Error("'nix develop' only works on derivations that use 'bash' as their builder");
 
     auto getEnvShPath = ({
-        StringSource source{getEnvSh};
+        StringSource source{std::string_view(getEnvSh, sizeof(getEnvSh))};
         evalStore->addToStoreFromDump(
             source,
             "get-env.sh",

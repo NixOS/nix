@@ -815,11 +815,10 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     for (auto & i : pathsInChroot) {
         if (i.second.source == "/proc")
             continue; // backwards compatibility
-
 #if HAVE_EMBEDDED_SANDBOX_SHELL
         if (i.second.source == "__embedded_sandbox_shell__") {
-            static unsigned char sh[] = {
-#  include "embedded-sandbox-shell.gen.hh"
+            static constexpr unsigned char sh[] = {
+#  embed EMBEDDED_SANDBOX_SHELL_PATH
             };
             auto dst = chrootRootDir / i.first.relative_path();
             createDirs(dst.parent_path());

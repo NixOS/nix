@@ -585,10 +585,9 @@ void LocalStore::openDB(State & state, bool create)
 
     /* Initialise the database schema, if necessary. */
     if (create) {
-        static const char schema[] =
-#include "schema.sql.gen.hh"
-            ;
-        db.exec(schema);
+        db.exec({
+#embed "schema.sql"
+        });
     }
 }
 
@@ -642,11 +641,13 @@ bool LocalStore::upgradeDBSchema(State & state, bool dryRun)
         schemaMigrations.insert(migrationName);
     };
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         maybeUpgrade(
             "20251017-ca-derivations",
-#include "ca-specific-schema.sql.gen.hh"
-        );
+            {
+#embed "ca-specific-schema.sql"
+            });
+    }
 
     maybeUpgrade("20260309-drop-redundant-indexreferrer", "drop index if exists IndexReferrer");
 

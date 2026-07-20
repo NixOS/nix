@@ -296,12 +296,14 @@ EvalState::EvalState(
     , internalFS(make_ref<MemorySourceAccessor>())
     , derivationInternal{internalFS->addFile(
           CanonPath("derivation-internal.nix"),
-#include "primops/derivation.nix.gen.hh"
-          )}
+          {
+#embed "primops/derivation.nix"
+          })}
     , importedDrvToDerivation{internalFS->addFile(
           CanonPath("imported-drv-to-derivation.nix"),
-#include "imported-drv-to-derivation.nix.gen.hh"
-          )}
+          {
+#embed "imported-drv-to-derivation.nix"
+          })}
     , store(store)
     , buildStore(buildStore ? buildStore : store)
     , inputCache(fetchers::InputCache::create())
@@ -363,8 +365,9 @@ EvalState::EvalState(
 
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
-#include "fetchurl.nix.gen.hh"
-    );
+        {
+#embed "fetchurl.nix"
+        });
 
     createBaseEnv(settings);
 
