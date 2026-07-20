@@ -201,7 +201,7 @@ std::ostream & operator<<(std::ostream & os, const ValueType t);
  */
 struct WhileTryingToUse
 {
-    const Value * v;
+    const Value & v;
 };
 
 std::ostream & operator<<(std::ostream & os, WhileTryingToUse w);
