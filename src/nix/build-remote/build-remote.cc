@@ -21,6 +21,7 @@
 #include "nix/util/strings.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/build.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/util/experimental-features.hh"
 #include "nix/store/globals.hh"
@@ -338,7 +339,7 @@ static int main_build_remote(int argc, char ** argv)
             //    output ids, which break CA derivations
             if (!drv.inputDrvs.map.empty())
                 drv.inputSrcs = store->parseStorePathSet(inputs);
-            optResult = sshStore->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
+            optResult = sshStore->getBuilder()->buildDerivation(*drvPath, static_cast<const BasicDerivation &>(drv));
             auto & result = *optResult;
             if (auto * failureP = result.tryGetFailure()) {
                 if (settings.keepFailed) {
@@ -353,7 +354,7 @@ static int main_build_remote(int argc, char ** argv)
             }
         } else {
             copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);
-            auto res = sshStore->buildPathsWithResults({DerivedPath::Built{
+            auto res = sshStore->getBuilder()->buildPathsWithResults({DerivedPath::Built{
                 .drvPath = makeConstantStorePathRef(*drvPath),
                 .outputs = OutputsSpec::All{},
             }});

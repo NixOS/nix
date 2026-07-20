@@ -124,15 +124,7 @@ public:
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
-    void
-    buildPaths(const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
-
-    std::vector<KeyedBuildResult> buildPathsWithResults(
-        const std::vector<DerivedPath> & paths, BuildMode buildMode, std::shared_ptr<Store> evalStore) override;
-
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
-
-    void ensurePath(const StorePath & path) override;
+    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -149,19 +141,6 @@ public:
     void optimiseStore() override;
 
     bool verifyStore(bool checkContents, RepairFlag repair) override;
-
-    /**
-     * The default instance would schedule the work on the client side, but
-     * for consistency with `buildPaths` and `buildDerivation` it should happen
-     * on the remote side.
-     *
-     * We make this fail for now so we can add implement this properly later
-     * without it being a breaking change.
-     */
-    void repairPath(const StorePath & path) override
-    {
-        unsupported("repairPath");
-    }
 
     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
@@ -230,7 +209,7 @@ private:
      */
     Sync<std::set<Descriptor>> connectionFds;
 
-    void copyDrvsFromEvalStore(const std::vector<DerivedPath> & paths, std::shared_ptr<Store> evalStore);
+    friend struct RemoteBuilder;
 };
 
 } // namespace nix

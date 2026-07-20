@@ -26,6 +26,7 @@
 #include "nix/util/finally.hh"
 #include "nix/cmd/markdown.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/store/build.hh"
 #include "nix/expr/print.hh"
 #include "nix/util/ref.hh"
 #include "nix/expr/value.hh"
@@ -548,7 +549,7 @@ ProcessLineResult NixRepl::processLine(std::string line)
         std::string drvPathRaw = state->store->printStorePath(drvPath);
 
         if (command == ":b" || command == ":bl") {
-            state->store->buildPaths({
+            state->store->getBuilder()->buildPaths({
                 DerivedPath::Built{
                     .drvPath = makeConstantStorePathRef(drvPath),
                     .outputs = OutputsSpec::All{},

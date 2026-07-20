@@ -15,6 +15,7 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/main/shared.hh"
 #include "nix/flake/flake.hh"
 #include "nix/expr/eval-cache.hh"
@@ -631,7 +632,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
         if (settings.printMissing)
             printMissing(store, pathsToBuild, lvlInfo);
 
-        auto buildResults = store->buildPathsWithResults(pathsToBuild, bMode, evalStore);
+        auto buildResults = store->getBuilder(evalStore)->buildPathsWithResults(pathsToBuild, bMode);
         throwBuildErrors(buildResults, *store);
         for (auto & buildResult : buildResults) {
             for (auto & aux : backmap[buildResult.path]) {

@@ -1,3 +1,4 @@
+#include "nix/store/build/worker.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signature/local-keys.hh"
 #include "nix/util/source-accessor.hh"
@@ -6,6 +7,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/outputs-query.hh"
 #include "nix/util/util.hh"
@@ -45,6 +47,8 @@ void SubstituterDisabled::anchor() {}
 void InvalidStoreReference::anchor() {}
 
 void StoreConfigBase::anchor() {}
+
+void Builder::anchor() {}
 
 static std::string canonStoreDir(std::string path)
 {
@@ -140,6 +144,13 @@ std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view pat
         return {parseStorePath(path), CanonPath::root};
     else
         return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
+}
+
+ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore)
+{
+    auto store = ref<Store>(shared_from_this());
+    auto evalStoreRef = evalStore ? ref<Store>(std::move(evalStore)) : store;
+    return make_ref<LocalBuilder>(store, evalStoreRef);
 }
 
 std::filesystem::path Store::followLinksToStore(std::string_view _path) const
@@ -734,7 +745,7 @@ void Store::substitutePaths(const StorePathSet & paths)
             std::vector<DerivedPath> subs;
             for (auto & p : missing.willSubstitute)
                 subs.emplace_back(DerivedPath::Opaque{p});
-            buildPaths(subs);
+            getBuilder()->buildPaths(subs, bmNormal);
         } catch (Error & e) {
             logWarning(e.info());
         }
@@ -1176,7 +1187,7 @@ decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashR
 
 Derivation Store::derivationFromPath(const StorePath & drvPath)
 {
-    ensurePath(drvPath);
+    getBuilder()->ensurePath(drvPath);
     return readDerivation(drvPath);
 }
 
