@@ -781,7 +781,8 @@ StorePath AttrCursor::forceDerivation()
     drvPath.requireDerivation();
     if (!root->state.store->isValidPath(drvPath) && !settings.readOnlyMode) {
         /* The eval cache contains 'drvPath', but the actual path has
-           been garbage-collected. So force it to be regenerated. */
+           been garbage-collected. So force it to be regenerated. FIXME: we don't need to do this if the output paths
+           are already valid or can be substituted. */
         aDrvPath->forceValue();
         root->state.waitForPath(drvPath);
         if (!root->state.store->isValidPath(drvPath))

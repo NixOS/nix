@@ -1392,6 +1392,9 @@ static void prim_derivationStrictGeneric(EvalState & state, const PosIdx pos, Va
 
     auto attrs = args[0]->attrs();
 
+    /* If parallel eval is enabled, then start evaluating the entire drv graph in the background. */
+    state.forceValueDeepParallel(*args[0], noPos);
+
     /* Figure out the name first (for stack backtraces). */
     auto nameAttr =
         state.getAttr(state.s.name, attrs, "in the attrset passed as argument to builtins.derivationStrict");

@@ -3,6 +3,8 @@
 #include "nix/store/globals.hh"
 #include "nix/expr/primops.hh"
 
+#include <boost/unordered/concurrent_flat_set.hpp>
+
 namespace nix {
 
 // cache line alignment to prevent false sharing
@@ -103,8 +105,9 @@ void Executor::worker()
                 return;
             }
             if (!state->queue.empty()) {
-                item = std::move(state->queue.begin()->second);
-                state->queue.erase(state->queue.begin());
+                auto i = state->queue.begin();
+                item = std::move(i->second);
+                state->queue.erase(i);
                 break;
             }
             state.wait(wakeup);
@@ -318,32 +321,77 @@ static RegisterPrimOp r_parallel({
 
 #pragma GCC diagnostic ignored "-Wswitch-enum"
 
-void EvalState::forceValueDeepParallel(Value & v, PosIdx pos)
+void EvalState::forceValueDeepParallel(Value & vRoot, PosIdx pos)
 {
-    forceValue(v, pos);
+    if (!executor->enabled)
+        return;
+
+    // FIXME: the pointers in this set can refer to values that been GCed and then reallocated. That's not a problem for
+    // correctness, since at worst it prevents background evaluation of some values. But we should probably register a
+    // GC hook to clear this set at GC time.
+    static boost::concurrent_flat_set<Value *> seen;
 
     Executor::WorkItems work;
 
-    switch (v.type()) {
+    auto recurse = [&](this const auto & recurse, EvalState & state, Value & v, PosIdx pos) -> void {
+        auto type = v.type();
+        if (type == nString || type == nPath || type == nNull || type == nInt || type == nFloat || type == nBool
+            || type == nFailed || type == nExternal)
+            return;
 
-    case nAttrs: {
-        NixStringContext context;
-        if (tryAttrsToString(pos, v, context, false, false))
+        if (!seen.insert(&v) && &v != &vRoot)
             return;
-        if (v.attrs()->get(s.outPath))
-            return;
-        for (auto & a : *v.attrs())
-            addWork(work, 0, [value(std::make_shared<RootValue>(a.value)), pos(a.pos), this]() {
-                forceValueDeepParallel(***value, pos);
+
+        if (type == nThunk) {
+            state.addWork(work, 0, [v(std::make_shared<RootValue>(&v)), pos, &state]() {
+                state.forceValueDeepParallel(***v, pos);
             });
-        break;
-    }
+            return;
+        }
 
-    default:
-        break;
-    }
+        switch (v.type()) {
 
-    executor->spawn(std::move(work));
+        case nAttrs: {
+
+            NixStringContext context;
+            if (state.tryAttrsToString(pos, v, context, false, false))
+                return;
+
+            if (auto aDrvPath = v.attrs()->get(s.drvPath)) {
+                if (aDrvPath->value->isFinished())
+                    return;
+
+                if (auto aDrvAttrs = v.attrs()->get(s.drvAttrs))
+                    recurse(state, *aDrvAttrs->value, aDrvAttrs->pos);
+
+            } else {
+                for (auto & a : *v.attrs())
+                    recurse(state, *a.value, a.pos);
+            }
+
+            break;
+        }
+
+        case nList: {
+            for (const auto & elem : v.listView())
+                recurse(state, *elem, pos);
+            break;
+        }
+
+        default:
+            break;
+        }
+    };
+
+    forceValue(vRoot, pos);
+
+    recurse(*this, vRoot, pos);
+
+    if (work.size() == 1)
+        // Only one work item, so we may as well do it on the current thread right away.
+        work[0].first();
+    else
+        executor->spawn(std::move(work));
 }
 
 } // namespace nix
