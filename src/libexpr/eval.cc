@@ -2517,27 +2517,31 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nAttrs) {
-        const bool checkToStringReturn = false; // Historical quirk
-        return peelToStringOutPath(pos, v, checkToStringReturn, [&](Value * peeled, bool) -> BackedStringView {
-            if (peeled->type() == nAttrs) {
-                error<TypeError>(
-                    "cannot coerce %1% to a string: %2%",
-                    showType(*peeled),
-                    ValuePrinter(*this, *peeled, errorPrintOptions))
-                    .withTrace(pos, errorCtx)
-                    .debugThrow();
-            }
-            /* `canonicalizePath=false` is `ExprConcat`'s hack for
-               preserving the trailing slash on source-parsed path
-               literals like the `/foo/` in `/foo/${x}`. Any attrset
-               in that slot is a computed value with no
-               source-fidelity intent — the peeled path came from
-               user code, not from the interpolation syntax. Force
-               canonicalisation on the peel result regardless of
-               which peel path (`__toString` or `outPath`) got us
-               here. */
-            return coerceToString(pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true);
-        });
+        return peelToStringOutPath(
+            pos,
+            v,
+            /*checkToStringReturn=*/false, // Historical quirk
+            [&](Value * peeled, bool) -> BackedStringView {
+                if (peeled->type() == nAttrs) {
+                    error<TypeError>(
+                        "cannot coerce %1% to a string: %2%",
+                        showType(*peeled),
+                        ValuePrinter(*this, *peeled, errorPrintOptions))
+                        .withTrace(pos, errorCtx)
+                        .debugThrow();
+                }
+                /* `canonicalizePath=false` is `ExprConcat`'s hack for
+                   preserving the trailing slash on source-parsed path
+                   literals like the `/foo/` in `/foo/${x}`. Any attrset
+                   in that slot is a computed value with no
+                   source-fidelity intent — the peeled path came from
+                   user code, not from the interpolation syntax. Force
+                   canonicalisation on the peel result regardless of
+                   which peel path (`__toString` or `outPath`) got us
+                   here. */
+                return coerceToString(
+                    pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true);
+            });
     }
 
     if (v.type() == nExternal) {
@@ -2616,18 +2620,21 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    const bool checkToStringReturn = false; // Historical quirk
-    return peelToStringOutPath(pos, v, checkToStringReturn, [&](Value * peeled, bool) -> SourcePath {
-        Value & effective = *peeled;
-        if (effective.type() == nPath)
-            return effective.path();
-        auto path = coerceToString(pos, effective, context, errorCtx, false, false, true).toOwned();
-        if (path == "" || path[0] != '/')
-            error<EvalError>("string '%1%' doesn't represent an absolute path", path)
-                .withTrace(pos, errorCtx)
-                .debugThrow();
-        return rootPath(CanonPath(path));
-    });
+    return peelToStringOutPath(
+        pos,
+        v,
+        /*checkToStringReturn=*/false, // Historical quirk
+        [&](Value * peeled, bool) -> SourcePath {
+            Value & effective = *peeled;
+            if (effective.type() == nPath)
+                return effective.path();
+            auto path = coerceToString(pos, effective, context, errorCtx, false, false, true).toOwned();
+            if (path == "" || path[0] != '/')
+                error<EvalError>("string '%1%' doesn't represent an absolute path", path)
+                    .withTrace(pos, errorCtx)
+                    .debugThrow();
+            return rootPath(CanonPath(path));
+        });
 }
 
 StorePath
