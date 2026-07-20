@@ -2,16 +2,16 @@
 ///@file
 
 #include "nix/store/config.hh"
-#include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/s3-url.hh"
+#include "nix/store/s3-compat-binary-cache-store.hh"
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
+struct S3BinaryCacheStoreConfig : S3CompatBinaryCacheStoreConfig
 {
     S3BinaryCacheStoreConfig(const Params & params)
         : StoreConfig(params, FilePathType::Unix)
-        , HttpBinaryCacheStoreConfig(params)
+        , S3CompatBinaryCacheStoreConfig(params)
     {
     }
 
@@ -43,6 +43,9 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
         "https",
         "scheme",
         R"(
+          Deprecated: specify the scheme as part of the `endpoint` URL
+          instead, e.g. `endpoint=http://localhost:9000`.
+
           The scheme used for S3 requests, `https` (default) or `http`. This
           option allows you to disable HTTPS for binary caches which don't
           support it.
@@ -60,7 +63,8 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
         R"(
           The S3 endpoint to use. When empty (default), uses AWS S3 with
           region-specific endpoints. For S3-compatible services such as
-          MinIO, set this to your service's endpoint.
+          MinIO, set this to your service's endpoint as a full URL,
+          e.g. `https://minio.example.com` or `http://localhost:9000`.
         )"};
 
     Setting<S3AddressingStyle> addressingStyle{
@@ -75,38 +79,6 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           forces path-style addressing (deprecated by AWS). `virtual`
           forces virtual-hosted-style addressing (bucket names must not
           contain dots).
-        )"};
-
-    Setting<bool> multipartUpload{
-        this,
-        false,
-        "multipart-upload",
-        R"(
-          Whether to use multipart uploads for large files. When enabled,
-          files exceeding the multipart threshold will be uploaded in
-          multiple parts, which is required for files larger than 5 GiB and
-          can improve performance and reliability for large uploads.
-        )"};
-
-    Setting<uint64_t> multipartChunkSize{
-        this,
-        5 * 1024 * 1024,
-        "multipart-chunk-size",
-        R"(
-          The size (in bytes) of each part in multipart uploads. Must be
-          at least 5 MiB (AWS S3 requirement). Larger chunk sizes reduce the
-          number of requests but use more memory. Default is 5 MiB.
-        )",
-        {"buffer-size"}};
-
-    Setting<uint64_t> multipartThreshold{
-        this,
-        100 * 1024 * 1024,
-        "multipart-threshold",
-        R"(
-          The minimum file size (in bytes) for using multipart uploads.
-          Files smaller than this threshold will use regular PUT requests.
-          Default is 100 MiB. Only takes effect when multipart-upload is enabled.
         )"};
 
     Setting<std::optional<std::string>> storageClass{

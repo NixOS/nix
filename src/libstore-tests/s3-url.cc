@@ -106,6 +106,16 @@ INSTANTIATE_TEST_SUITE_P(
             "with_absolute_endpoint_uri",
         },
         ParsedS3URLTestCase{
+            /* Bare host:port must parse as an authority. */
+            "s3://bucket/key?endpoint=localhost:9000",
+            {
+                .bucket = "bucket",
+                .key = {"key"},
+                .endpoint = ParsedURL::Authority{.host = "localhost", .port = 9000},
+            },
+            "bare_host_port_endpoint",
+        },
+        ParsedS3URLTestCase{
             "s3://bucket/key?addressing-style=virtual",
             {
                 .bucket = "bucket",
