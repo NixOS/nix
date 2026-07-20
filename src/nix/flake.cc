@@ -822,10 +822,27 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
                     });
             }
 
+            /* Derivations whose outputs the store could not determine —
+               typically because the store is remote and does not have the
+               freshly evaluated .drv files yet — cannot be assumed
+               substitutable, so they must be built rather than skipped. */
+            for (auto & path : missing.unknown) {
+                if (path.isDerivation()) {
+                    toBuild.emplace_back(
+                        DerivedPath::Built{
+                            .drvPath = makeConstantStorePathRef(path),
+                            .outputs = OutputsSpec::All{},
+                        });
+                }
+            }
+
             Activity act(*logger, lvlInfo, actUnknown, fmt("running %d flake checks", toBuild.size()));
 
             // once we get rid of the temporary hack above, this tenary operator will also go away
-            results = store->buildPathsWithResults((printOutputPaths || outLink) ? drvPaths : toBuild);
+            /* Pass the eval store so that the .drv closures are copied to
+               the build store if they are not already there. */
+            results = store->buildPathsWithResults(
+                (printOutputPaths || outLink) ? drvPaths : toBuild, bmNormal, getEvalStore());
 
             // Report build failures with attribute paths
             for (auto & result : results) {
