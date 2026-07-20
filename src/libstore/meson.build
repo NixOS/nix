@@ -176,6 +176,17 @@ endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
 
+gcs_auth = get_option('gcs-auth')
+# JWT RS256 signing for service-account credentials needs OpenSSL. It is
+# already a private dep of libutil but must be declared here too so libstore
+# links it directly when GCS auth is enabled.
+openssl = dependency('libcrypto', 'openssl', required : gcs_auth)
+gcs_auth = gcs_auth.require(openssl.found())
+if gcs_auth.allowed()
+  deps_private += openssl
+endif
+configdata_pub.set('NIX_WITH_GCS_AUTH', gcs_auth.allowed().to_int())
+
 subdir('nix-meson-build-support/generate-header')
 
 generated_headers = []
@@ -312,6 +323,7 @@ sources = files(
   'export-import.cc',
   'filetransfer.cc',
   'gc.cc',
+  'gcs-url.cc',
   'globals.cc',
   'http-binary-cache-store.cc',
   'indirect-root-store.cc',
@@ -365,6 +377,11 @@ sources = files(
 # AWS credentials code requires AWS CRT, so only compile when enabled
 if s3_aws_auth.enabled()
   sources += files('aws-creds.cc')
+endif
+
+# GCP credentials code requires OpenSSL, so only compile when enabled
+if gcs_auth.allowed()
+  sources += files('gcp-creds.cc')
 endif
 
 subdir('include/nix/store')

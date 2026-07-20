@@ -45,6 +45,7 @@ mkMesonExecutable (finalAttrs: {
 
   buildInputs = [
     sqlite
+    openssl
     rapidcheck
     gtest
     nix-store
