@@ -11,7 +11,7 @@ error:
        … while evaluating attribute 'outputs' of derivation 'foo'
          at /pwd/lang/eval-fail-derivationStrict-11.nix:5:3:
             4|   system = 1;
-            5|   outputs = "drvPath";
+            5|   outputs = [ "drvPath" ];
              |   ^
             6| }
 

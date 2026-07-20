@@ -1539,15 +1539,19 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
 
+        // A trace with the derivation's position and name.
+        auto drvTrace = [&]() -> Trace {
+            return {.pos = state.positions[pos], .hint = HintFmt{"while evaluating derivation '%1%'", drvName}};
+        };
+
         // Like `warn`, but with the position of the attribute and the derivation name as an added trace.
         auto warnAttr = [&](HintFmt msg) {
-            ErrorInfo info{
+            logWarning({
                 .level = lvlWarn,
                 .msg = std::move(msg),
                 .pos = state.positions[i->pos],
-            };
-            info.traces.push_back(Trace{.hint = HintFmt{"while evaluating derivation '%1%'", drvName}});
-            logWarning(info);
+                .traces = {drvTrace()},
+            });
         };
 
         auto handleHashMode = [&](const std::string_view s) {
@@ -1697,13 +1701,50 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
 
-                    /* Re-interpret the attribute's value as a list of
-                       strings.
+                    /* Force the attribute's value as a list of strings.
 
-                       We may wish to warn here better future-compat
-                       later, e.g. requiring that it be a list of
-                       strings without spaces to begin with. */
-                    auto forceStringList = [&] { return tokenizeString<Strings>(s); };
+                       For backwards compatability, either a list or a
+                       space-separated string is accepted */
+                    auto forceStringList = [&] {
+                        if (i->value->type() == nList) {
+                            Strings ss;
+                            for (auto elem : i->value->listView()) {
+                                /* An element's own position is only known while
+                                   it is still an unevaluated thunk; grab it
+                                   before forcing. */
+                                auto elemPos = elem->isThunk() ? elem->thunk().expr->getPos() : noPos;
+                                // no need to use the main context because we've already processed this attribute
+                                NixStringContext scratchContext;
+                                auto elemS = state.forceString(*elem, scratchContext, pos, context_below);
+                                auto tokens = tokenizeString<Strings>(elemS);
+                                if (tokens.size() != 1)
+                                    logWarning({
+                                        .level = lvlWarn,
+                                        .msg = HintFmt(
+                                            "the item '%s' in the '%s' attribute list will be split into multiple elements. "
+                                            "This behaviour is deprecated, and may change in a future version of Nix; split into separate list items instead.",
+                                            elemS,
+                                            key),
+                                        /* No fallback: the attribute's position
+                                           is in the trace below already. */
+                                        .pos = elemPos ? std::shared_ptr<const Pos>{state.positions[elemPos]} : nullptr,
+                                        .traces{
+                                            drvTrace(),
+                                            Trace{
+                                                .pos = state.positions[i->pos],
+                                                .hint = HintFmt{"while evaluating the derivation attribute '%s'", key},
+                                            },
+                                        },
+                                    });
+                                ss.splice(ss.end(), tokens);
+                            }
+                            return ss;
+                        }
+                        warnAttr(HintFmt(
+                            "setting the '%s' attribute to a space-separated string is deprecated, and may be disallowed in future versions of Nix. Set it to a list of strings instead.",
+                            key));
+                        return tokenizeString<Strings>(s);
+                    };
 
                     if (i->name == state.s.json) {
                         warnAttr(HintFmt(
