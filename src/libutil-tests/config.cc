@@ -325,4 +325,12 @@ TEST(Config, applyConfigInvalidThrows)
     ASSERT_THROW(config.applyConfig("value == key"), UsageError);
     ASSERT_THROW(config.applyConfig("value "), UsageError);
 }
+
+TEST(Config, toKeyValue)
+{
+    Config config;
+    Setting<std::string> foo{&config, "default", "name-of-the-setting", "description", {"alias-of-the-setting"}};
+    ASSERT_EQ(config.toKeyValue(), "name-of-the-setting = default\n");
+}
+
 } // namespace nix
