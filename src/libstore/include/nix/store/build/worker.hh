@@ -306,8 +306,8 @@ public:
     /**
      * @ref DerivationBuildingGoal "derivation building goal"
      */
-    std::shared_ptr<DerivationBuildingGoal> makeDerivationBuildingGoal(
-        const StorePath & drvPath, ref<const Derivation> drv, BuildMode buildMode, bool storeDerivation);
+    std::shared_ptr<DerivationBuildingGoal>
+    makeDerivationBuildingGoal(const StorePath & drvPath, ref<const BasicDerivation> drv, BuildMode buildMode);
 
     /**
      * @ref PathSubstitutionGoal "substitution goal"

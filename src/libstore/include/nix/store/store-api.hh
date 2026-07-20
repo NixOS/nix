@@ -36,8 +36,11 @@ struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
 
-struct BasicDerivation;
-struct Derivation;
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using BasicDerivation = DerivationT<StorePathSet>;
+using Derivation = DerivationT<FullInputs>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;
@@ -1107,7 +1110,7 @@ OutputPathMap resolveDerivedPath(Store &, const DerivedPath::Built &, Store * ev
 std::optional<ValidPathInfo>
 decodeValidPathInfo(const Store & store, std::istream & str, std::optional<HashResult> hashGiven = std::nullopt);
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv);
+const ContentAddress * getDerivationCA(const Derivation & drv);
 
 template<>
 struct json_avoids_null<TrustedFlag> : std::true_type

@@ -34,20 +34,11 @@ struct DerivationBuildingGoal : public Goal
     friend class Worker;
 
     /**
-     * @param storeDerivation Whether to store the derivation in
-     * `worker.store`. This is useful for newly-resolved derivations. In this
-     * case, the derivation was not created a priori, e.g. purely (or close
-     * enough) from evaluation of the Nix language, but also depends on the
-     * exact content produced by upstream builds. It is strongly advised to
-     * have a permanent record of such a resolved derivation in order to
-     * faithfully reconstruct the build history.
+     * @param drv The derivation to build, with the outputs of its input
+     * derivations already added to its input sources.
      */
     DerivationBuildingGoal(
-        const StorePath & drvPath,
-        ref<const Derivation> drv,
-        Worker & worker,
-        BuildMode buildMode,
-        bool storeDerivation);
+        const StorePath & drvPath, ref<const BasicDerivation> drv, Worker & worker, BuildMode buildMode);
     ~DerivationBuildingGoal();
 
 private:
@@ -56,9 +47,9 @@ private:
     const StorePath drvPath;
 
     /**
-     * The derivation stored at drvPath.
+     * The derivation to build.
      */
-    const ref<const Derivation> drv;
+    const ref<const BasicDerivation> drv;
 
     /**
      * The remainder is state held during the build.
@@ -79,7 +70,7 @@ private:
     /**
      * The states.
      */
-    Co gaveUpOnSubstitution(bool storeDerivation);
+    Co gaveUpOnSubstitution();
     Co tryToBuild(StorePathSet inputPaths);
     Co buildWithHook(
         StorePathSet inputPaths,

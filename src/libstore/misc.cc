@@ -75,7 +75,7 @@ void Store::computeFSClosure(
     computeFSClosure(paths, paths_, flipDirection, includeOutputs, includeDerivers);
 }
 
-const ContentAddress * getDerivationCA(const BasicDerivation & drv)
+const ContentAddress * getDerivationCA(const Derivation & drv)
 {
     auto out = drv.outputs.find("out");
     if (out == drv.outputs.end())
@@ -184,7 +184,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
 
     auto mustBuildDrv = [&](const StorePath & drvPath, const Derivation & drv, std::set<DerivedPath> & edges) {
         res.willBuild.insert(drvPath);
-        for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+        for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
             collectDerivedPaths(edges, makeConstantStorePathRef(inputDrv), inputNode);
     };
 
@@ -231,7 +231,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                         // FIXME: this is a lot of work just to get the value
                         // of `allowSubstitutes`.
                         drvOptions = derivationOptionsFromStructuredAttrs(
-                            *this, drv->inputDrvs, drv->env, get(drv->structuredAttrs));
+                            *this, drv->inputs.drvs, drv->env, get(drv->structuredAttrs));
                     } catch (Error & e) {
                         e.addTrace({}, "while parsing derivation '%s'", printStorePath(drvPath));
                         throw;

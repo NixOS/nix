@@ -31,14 +31,17 @@
     JSON_IMPL_INNER(TYPE); \
     }
 
-#define JSON_IMPL_WITH_XP_FEATURES(TYPE)                                                             \
-    namespace nlohmann {                                                                             \
-    template<>                                                                                       \
+#define JSON_IMPL_WITH_XP_FEATURES_INNER(TYPE)                                                       \
     struct adl_serializer<TYPE>                                                                      \
     {                                                                                                \
         static TYPE from_json(                                                                       \
             const json & json,                                                                       \
             const nix::ExperimentalFeatureSettings & xpSettings = nix::experimentalFeatureSettings); \
         static void to_json(json & json, const TYPE & t);                                            \
-    };                                                                                               \
+    }
+
+#define JSON_IMPL_WITH_XP_FEATURES(TYPE)    \
+    namespace nlohmann {                    \
+    template<>                              \
+    JSON_IMPL_WITH_XP_FEATURES_INNER(TYPE); \
     }

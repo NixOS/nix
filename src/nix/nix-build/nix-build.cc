@@ -511,7 +511,7 @@ static void main_nix_build(int argc, char ** argv)
         };
 
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
+        for (const auto & [inputDrv0, inputNode] : drv.inputs.drvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
@@ -522,7 +522,7 @@ static void main_nix_build(int argc, char ** argv)
                 pathsToCopy.insert(inputDrv);
             }
         }
-        for (const auto & src : drv.inputSrcs) {
+        for (const auto & src : drv.inputs.srcs) {
             pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
@@ -545,7 +545,7 @@ static void main_nix_build(int argc, char ** argv)
             auto resolvedDrv = drv.tryResolve(*store);
             if (!resolvedDrv)
                 throw Error("failed to resolve derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            drv = *resolvedDrv;
+            drv = resolvedDrv->unresolve();
         }
 
         // Set the environment.
@@ -611,7 +611,7 @@ static void main_nix_build(int argc, char ** argv)
                     }
                 };
 
-            for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+            for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
             auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);

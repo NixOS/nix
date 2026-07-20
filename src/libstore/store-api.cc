@@ -1230,7 +1230,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // resolved derivation, so we need to get it first
         auto resolvedDrv = drv.tryResolve(*this);
         if (resolvedDrv)
-            return nix::computeStorePath(*this, Derivation{*resolvedDrv});
+            return nix::computeStorePath(*this, resolvedDrv->unresolve());
     }
 
     return path;

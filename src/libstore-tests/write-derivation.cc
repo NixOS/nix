@@ -31,15 +31,13 @@ protected:
 
 TEST_F(WriteDerivationTest, addToStoreFromDumpCalledOnce)
 {
-    auto drv = []() {
-        Derivation drv;
-        drv.name = "simple-derivation";
-        drv.platform = "system";
-        drv.builder = "foo";
-        drv.args = {"bar", "baz"};
-        drv.env = StringPairs{{"BIG_BAD", "WOLF"}};
-        return drv;
-    }();
+    Derivation drv{
+        .platform = "system",
+        .builder = "foo",
+        .args = {"bar", "baz"},
+        .env = {{"BIG_BAD", "WOLF"}},
+        .name = "simple-derivation",
+    };
 
     auto path1 = store->writeDerivation(drv, NoRepair);
     config->readOnly = true;
