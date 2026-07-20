@@ -170,15 +170,15 @@ auto EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStr
 
     auto peel = [&, &state = *this](this const auto & peel, const PosIdx pos, Value & v) -> R {
         state.forceValue(v, pos);
-        if (v.type() != nAttrs) {
+        auto vType = v.type();
+        if (vType != nAttrs) {
             /* String and path terminate happily; external delegates its
                serialisation to the caller (`printValueAsJSON` routes into
                `ExternalValueBase::printValueAsJSON`, `coerceToString` into
                `ExternalValueBase::coerceToString`) so we let it through
                too. Everything else violates the "`__toString` returns a
                string" contract. */
-            if (checkToStringReturn && cameThroughToString && v.type() != nString && v.type() != nPath
-                && v.type() != nExternal)
+            if (checkToStringReturn && cameThroughToString && vType != nString && vType != nPath && vType != nExternal)
                 state
                     .error<TypeError>(
                         "`__toString` must return a string, but got %1%: %2%",
