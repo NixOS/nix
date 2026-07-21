@@ -189,7 +189,7 @@ using ExportReferencesMap = decltype(DerivationOptions<SingleDerivedPath>::expor
 
 static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
         },
     .unsafeDiscardReferences = {},
@@ -237,7 +237,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 {
     DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            DerivationOptions<SingleDerivedPath>::OutputChecks{
+            derivation::OutputChecks<SingleDerivedPath>{
                 .ignoreSelfRefs = true,
             },
         .unsafeDiscardReferences = {},
@@ -262,7 +262,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
         EXPECT_TRUE(!got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        options.outputChecks = DerivationOptions<SingleDerivedPath>::OutputChecks{.ignoreSelfRefs = true};
+        options.outputChecks = derivation::OutputChecks<SingleDerivedPath>{.ignoreSelfRefs = true};
         options.exportReferencesGraph = {};
 
         EXPECT_EQ(options, expected);
@@ -274,7 +274,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
@@ -304,7 +304,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
@@ -333,7 +333,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 };
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{},
+    .outputChecks = std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{},
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph = {},
@@ -379,9 +379,9 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 {
     DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+            std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
                 {"dev",
-                 DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 derivation::OutputChecks<SingleDerivedPath>{
                      .maxSize = 789,
                      .maxClosureSize = 5909,
                  }},
@@ -412,7 +412,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         {
             // Delete all keys but "dev" in options.outputChecks
             auto * outputChecksMapP =
-                std::get_if<std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>>(
+                std::get_if<std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>>(
                     &options.outputChecks);
             ASSERT_TRUE(outputChecksMapP);
             auto & outputChecksMap = *outputChecksMapP;
@@ -433,19 +433,19 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
             {"out",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
                  .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
              }},
             {"dev",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -475,19 +475,19 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
             {"out",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
                  .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
              }},
             {"dev",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -545,7 +545,7 @@ static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
     .outputChecks =
-        DerivationOptions<StorePath>::OutputChecks{
+        derivation::OutputChecks<StorePath>{
             .ignoreSelfRefs = true,
         },
     .unsafeDiscardReferences = {},
@@ -563,7 +563,7 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
     .outputChecks =
-        DerivationOptions<StorePath>::OutputChecks{
+        derivation::OutputChecks<StorePath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
             .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
@@ -587,7 +587,7 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
 };
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{},
+    .outputChecks = std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{},
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph = {},
@@ -603,19 +603,19 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{
             {"out",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
                  .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
              }},
             {"dev",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
