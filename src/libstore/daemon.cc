@@ -182,6 +182,13 @@ struct TunnelLogger : public Logger
         buf << STDERR_RESULT << act << type << fields;
         enqueueMsg(buf.s);
     }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        /* We reference the daemon connection's sink, which isn't
+           meaningful to keep writing to from a forked child. */
+        return makeSimpleLogger();
+    }
 };
 
 struct TunnelSource : BufferedSource

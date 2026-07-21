@@ -236,13 +236,14 @@ static int childEntry(void * arg)
 
 pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 {
-    auto newLogger = makeSimpleLogger().release();
+    auto newLogger = logger->cloneForChild().release();
     ChildWrapperFunction wrapper = [&] {
         if (!options.allowVfork) {
-            /* Set a simple logger, while leaking (not destroying)
-               the parent logger. We don't want to run the parent
-               logger's destructor since that will crash (e.g. when
-               ~ProgressBar() tries to join a thread that doesn't
+            /* Install a fresh logger of the same kind as the parent's
+               (see `Logger::cloneForChild()`), while leaking (not
+               destroying) the parent logger. We don't want to run the
+               parent logger's destructor since that will crash (e.g.
+               when ~ProgressBar() tries to join a thread that doesn't
                exist. */
             logger = newLogger;
         }

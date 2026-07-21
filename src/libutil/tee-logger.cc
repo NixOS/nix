@@ -95,6 +95,14 @@ public:
         for (auto & logger : loggers)
             logger->setPrintBuildLogs(printBuildLogs);
     }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        std::vector<std::unique_ptr<Logger>> cloned;
+        for (auto & logger : loggers)
+            cloned.push_back(logger->cloneForChild());
+        return std::make_unique<TeeLogger>(std::move(cloned));
+    }
 };
 
 } // namespace

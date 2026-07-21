@@ -712,6 +712,14 @@ public:
     {
         this->printBuildLogs = printBuildLogs;
     }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        /* We own a background thread and terminal state that cannot be
+           safely inherited or reconstructed across a fork; fall back
+           to a plain logger in the child. */
+        return makeSimpleLogger(printBuildLogs);
+    }
 };
 
 } // namespace

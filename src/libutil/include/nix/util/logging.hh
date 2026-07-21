@@ -176,6 +176,17 @@ public:
     }
 
     virtual void setPrintBuildLogs(bool printBuildLogs) {}
+
+    /**
+     * Create a fresh logger to install in a child process just after
+     * `fork()`. Loggers that can be faithfully reconstructed (e.g. a
+     * JSON logger writing to a file descriptor) should return another
+     * logger of the same kind. Loggers that own resources which cannot
+     * be safely inherited or reconstructed across a fork (e.g.
+     * background threads) must return something simpler instead, such
+     * as `makeSimpleLogger()`.
+     */
+    virtual std::unique_ptr<Logger> cloneForChild() const = 0;
 };
 
 /**
