@@ -1,6 +1,7 @@
 #include "nix/store/serve-protocol-connection.hh"
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 
 namespace nix {

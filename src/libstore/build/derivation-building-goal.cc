@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-building-goal.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/daemon.hh"

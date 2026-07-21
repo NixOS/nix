@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/path.hh"
+#include "nix/store/derivation/output.hh"
 #include "nix/util/types.hh"
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
@@ -22,135 +23,6 @@ namespace nix {
 static constexpr std::string_view drvFeatureBuilderRpcV0 = "builder-rpc-v0";
 
 struct StoreDirConfig;
-
-/* Abstract syntax of derivations. */
-
-/**
- * A single output of a BasicDerivation (and Derivation).
- */
-struct DerivationOutput
-{
-    /**
-     * The traditional non-fixed-output derivation type.
-     */
-    struct InputAddressed
-    {
-        StorePath path;
-
-        bool operator==(const InputAddressed &) const = default;
-        auto operator<=>(const InputAddressed &) const = default;
-    };
-
-    /**
-     * Fixed-output derivations, whose output paths are content
-     * addressed according to that fixed output.
-     */
-    struct CAFixed
-    {
-        /**
-         * Method and hash used for expected hash computation.
-         *
-         * References are not allowed by fiat.
-         */
-        ContentAddress ca;
-
-        /**
-         * Return the \ref StorePath "store path" corresponding to this output
-         *
-         * @param drvName The name of the derivation this is an output of, without the `.drv`.
-         * @param outputName The name of this output.
-         */
-        StorePath path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
-
-        bool operator==(const CAFixed &) const = default;
-        auto operator<=>(const CAFixed &) const = default;
-    };
-
-    /**
-     * Floating-output derivations, whose output paths are content
-     * addressed, but not fixed, and so are dynamically calculated from
-     * whatever the output ends up being.
-     * */
-    struct CAFloating
-    {
-        /**
-         * How the file system objects will be serialized for hashing
-         */
-        ContentAddressMethod method;
-
-        /**
-         * How the serialization will be hashed
-         */
-        HashAlgorithm hashAlgo;
-
-        bool operator==(const CAFloating &) const = default;
-        auto operator<=>(const CAFloating &) const = default;
-    };
-
-    /**
-     * Input-addressed output which depends on a (CA) derivation whose hash
-     * isn't known yet.
-     */
-    struct Deferred
-    {
-        bool operator==(const Deferred &) const = default;
-        auto operator<=>(const Deferred &) const = default;
-    };
-
-    /**
-     * Impure output which is moved to a content-addressed location (like
-     * CAFloating) but isn't registered as a realization.
-     */
-    struct Impure
-    {
-        /**
-         * How the file system objects will be serialized for hashing
-         */
-        ContentAddressMethod method;
-
-        /**
-         * How the serialization will be hashed
-         */
-        HashAlgorithm hashAlgo;
-
-        bool operator==(const Impure &) const = default;
-        auto operator<=>(const Impure &) const = default;
-    };
-
-    typedef std::variant<InputAddressed, CAFixed, CAFloating, Deferred, Impure> Raw;
-
-    Raw raw;
-
-    bool operator==(const DerivationOutput &) const = default;
-    auto operator<=>(const DerivationOutput &) const = default;
-
-    MAKE_WRAPPER_CONSTRUCTOR(DerivationOutput);
-
-    /**
-     * Force choosing a variant
-     */
-    DerivationOutput() = delete;
-
-    /**
-     * \note when you use this function you should make sure that you're
-     * passing the right derivation name. When in doubt, you should use
-     * the safer interface provided by
-     * BasicDerivation::outputsAndOptPaths
-     */
-    std::optional<StorePath>
-    path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
-};
-
-template<typename Output = DerivationOutput>
-using DerivationOutputs = std::map<std::string, Output>;
-
-/**
- * These are analogues to the previous DerivationOutputs data type,
- * but they also contains, for each output, the (optional) store
- * path in which it would be written. To calculate values of these
- * types, see the corresponding functions in BasicDerivation.
- */
-typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>> DerivationOutputsAndOptPaths;
 
 /**
  * For inputs that are sub-derivations, we specify exactly which
@@ -509,102 +381,11 @@ void Derivation::checkInvariants(Store & store) const;
 StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
 
 /**
- * Read a derivation from a file.
- */
-Derivation parseDerivation(
-    const StoreDirConfig & store,
-    std::string && s,
-    std::string_view name,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-
-/**
  * \todo Remove.
  *
  * Use Path::isDerivation instead.
  */
 bool isDerivation(std::string_view fileName);
-
-/**
- * Calculate the name that will be used for the store path for this
- * output.
- *
- * This is usually <drv-name>-<output-name>, but is just <drv-name> when
- * the output name is "out".
- */
-std::string outputPathName(std::string_view drvName, OutputNameView outputName);
-
-/**
- * The hashes modulo of a derivation.
- *
- * Each output is given a hash, although in practice only the content-addressed
- * derivations (fixed-output or not) will have a different hash for each
- * output.
- */
-struct DrvHashModulo
-{
-    /**
-     * Single hash for the derivation
-     *
-     * This is for an input-addressed derivation that doesn't
-     * transitively depend on any floating-CA derivations.
-     */
-    using DrvHash = Hash;
-
-    /**
-     * Known CA drv's output hashes, for fixed-output derivations whose
-     * output hashes are always known since they are fixed up-front.
-     */
-    using CaOutputHashes = std::map<std::string, Hash>;
-
-    /**
-     * This derivation doesn't yet have known output hashes.
-     *
-     * Either because itself is floating CA, or it (transtively) depends
-     * on a floating CA derivation.
-     */
-    using DeferredDrv = std::monostate;
-
-    using Raw = std::variant<DrvHash, CaOutputHashes, DeferredDrv>;
-
-    Raw raw;
-
-    bool operator==(const DrvHashModulo &) const = default;
-    // auto operator <=> (const DrvHashModulo &) const = default;
-
-    MAKE_WRAPPER_CONSTRUCTOR(DrvHashModulo);
-};
-
-/**
- * Returns hashes with the details of fixed-output subderivations
- * expunged.
- *
- * A fixed-output derivation is a derivation whose outputs have a
- * specified content hash and hash algorithm. (Currently they must have
- * exactly one output (`out`), which is specified using the `outputHash`
- * and `outputHashAlgo` attributes, but the algorithm doesn't assume
- * this.) We don't want changes to such derivations to propagate upwards
- * through the dependency graph, changing output paths everywhere.
- *
- * For instance, if we change the url in a call to the `fetchurl`
- * function, we do not want to rebuild everything depending on it---after
- * all, (the hash of) the file being downloaded is unchanged.  So the
- * *output paths* should not change. On the other hand, the *derivation
- * paths* should change to reflect the new dependency graph.
- *
- * For fixed-output derivations, this returns a map from the name of
- * each output to its hash, unique up to the output's contents.
- *
- * For regular derivations, it returns a single hash of the derivation
- * ATerm, after subderivations have been likewise expunged from that
- * derivation.
- *
- * When the derivation is itself, or (transitively) depends on, a
- * content-addressing derivation without a content address fixed in
- * advance (`CAFloating` or `Impure`), `DrvHashModulo::DeferredDrv` is
- * returned indicating we cannot yet compute an input address, because
- * we don't yet know what all the inputs are.
- */
-DrvHashModulo hashInputDerivationModulo(Store & store, const Derivation & drv);
 
 /**
  * If a derivation is input addressed and doesn't yet have its input
@@ -615,30 +396,6 @@ DrvHashModulo hashInputDerivationModulo(Store & store, const Derivation & drv);
  * and is not yet ready (and must stay deferred).
  */
 void resolveInputAddressed(Store & store, Derivation & drv);
-
-struct DrvHashFct
-{
-    using is_avalanching = std::true_type;
-
-    std::size_t operator()(const StorePath & path) const noexcept
-    {
-        return std::hash<std::string_view>{}(path.to_string());
-    }
-};
-
-/**
- * Memoisation of hashInputDerivationModulo().
- */
-typedef boost::concurrent_flat_map<StorePath, DrvHashModulo, DrvHashFct> DrvHashes;
-
-// FIXME: global, though at least thread-safe.
-extern DrvHashes drvHashes;
-
-struct Source;
-struct Sink;
-
-Source & readDerivation(Source & in, const StoreDirConfig & store, BasicDerivation & drv, std::string_view name);
-void writeDerivation(Sink & out, const StoreDirConfig & store, const BasicDerivation & drv);
 
 /**
  * This creates an opaque and almost certainly unique string
@@ -658,7 +415,6 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 
 } // namespace nix
 
-JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
 
 namespace nlohmann {
 template<typename Inputs>

@@ -2,7 +2,7 @@
 #include "nix/store/outputs-query.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/derivation/full-inputs.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/nar-info.hh"

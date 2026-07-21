@@ -5,6 +5,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"

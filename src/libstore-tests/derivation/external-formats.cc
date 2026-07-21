@@ -1,6 +1,7 @@
 #include <nlohmann/json.hpp>
 #include <gtest/gtest.h>
 
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"

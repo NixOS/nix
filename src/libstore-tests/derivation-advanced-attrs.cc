@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/derived-path.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/types.hh"

@@ -1,3 +1,4 @@
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"

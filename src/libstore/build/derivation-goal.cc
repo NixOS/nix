@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"

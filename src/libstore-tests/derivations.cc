@@ -2,7 +2,7 @@
 #include <nlohmann/json.hpp>
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/tests/libstore.hh"

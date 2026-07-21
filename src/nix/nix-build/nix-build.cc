@@ -10,7 +10,7 @@
 
 #include "nix/util/current-process.hh"
 #include "nix/store/parsed-derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/globals.hh"
