@@ -80,6 +80,7 @@ in
           nix.buildMachines = [
             {
               hostName = "builder1" + (lib.optionalString supportsCustomPort ":2222");
+              protocol = "ssh-ng";
               sshUser = "root";
               sshKey = "/root/.ssh/id_ed25519";
               system = "i686-linux";
@@ -87,6 +88,7 @@ in
             }
             {
               hostName = "builder2";
+              protocol = "ssh-ng";
               sshUser = "root";
               sshKey = "/root/.ssh/id_ed25519";
               system = "i686-linux";

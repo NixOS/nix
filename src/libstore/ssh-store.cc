@@ -6,6 +6,7 @@
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/util/pool.hh"
 #include "nix/store/ssh.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/store-registration.hh"
 
 namespace nix {
@@ -89,13 +90,40 @@ protected:
 
     SSHMaster master;
 
-    void setOptions(RemoteStore::Connection & conn) override {
-        /* TODO Add a way to explicitly ask for some options to be
+    void setOptions(RemoteStore::Connection & conn) override
+    {
+        /* Normally, we deliberately forward *no* settings to the
+           remote side, since they are per-machine configuration and
+           our local values would clobber the remote's own.
+
+           TODO Add a way to explicitly ask for some options to be
            forwarded. One option: A way to query the daemon for its
            settings, and then a series of params to SSHStore like
            forward-cores or forward-overridden-cores that only
            override the requested settings.
-        */
+
+           However, `keep-failed` is per-request rather than
+           per-machine configuration, so the remote side should honor
+           ours. (The legacy `nix-store --serve` protocol forwarded it
+           with every build request.) The `SetOptions` message cannot
+           express forwarding just one setting, so as a stop-gap hack,
+           send it only when `keep-failed` is set, with an empty
+           overrides map. Note that this also forwards our values of
+           the other fixed fields of that message (verbosity,
+           `max-jobs`, etc.) for such connections. */
+        if (settings.keepFailed) {
+            conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
+                    << settings.getWorkerSettings().tryFallback << verbosity
+                    << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
+                    << (settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
+                    << 0 /* obsolete print build trace */
+                    << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes
+                    << 0 /* no overridden settings */;
+
+            auto ex = conn.processStderrReturn();
+            if (ex)
+                std::rethrow_exception(ex);
+        }
     };
 };
 

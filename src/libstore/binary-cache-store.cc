@@ -425,7 +425,7 @@ void BinaryCacheStore::addMultipleToStore(
 
                         /* Make sure the Source object is destroyed when
                            we're done, e.g. to release the connection
-                           lock held by LegacySSHStore::narFromPath(). */
+                           lock held by a remote store's `narFromPath()`. */
                         auto source = std::move(source_);
 
                         if (repair || !isValidPath(info.path)) {

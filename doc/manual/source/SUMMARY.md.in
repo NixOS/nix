@@ -87,7 +87,6 @@
       - [nix-store --realise](command-ref/nix-store/realise.md)
       - [nix-store --repair-path](command-ref/nix-store/repair-path.md)
       - [nix-store --restore](command-ref/nix-store/restore.md)
-      - [nix-store --serve](command-ref/nix-store/serve.md)
       - [nix-store --verify-path](command-ref/nix-store/verify-path.md)
       - [nix-store --verify](command-ref/nix-store/verify.md)
     - [nix-env](command-ref/nix-env.md)

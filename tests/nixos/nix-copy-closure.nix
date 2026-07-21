@@ -90,7 +90,7 @@ in
 
       # Copy the closure of package C via the SSH substituter.
       client.fail("nix-store -r ${pkgC}")
-      client.succeed("nix-store --substituters ssh://root@server?trusted=1 -r ${pkgC} >&2")
+      client.succeed("nix-store --substituters ssh-ng://root@server?trusted=1 -r ${pkgC} >&2")
       client.succeed("nix-store --check-validity ${pkgC}")
 
       # Copy the derivation of package D from the client to the server.

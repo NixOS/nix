@@ -23,9 +23,9 @@ TEST(machines, getMachinesWithEmptyBuilders)
 
 TEST(machines, getMachinesUriOnly)
 {
-    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl");
+    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "ssh-ng://nix@scratchy.labs.cs.uu.nl");
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh-ng://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq(std::nullopt)));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
@@ -37,17 +37,17 @@ TEST(machines, getMachinesUriOnly)
 
 TEST(machines, getMachinesUriWithPort)
 {
-    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl:2222");
+    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "ssh-ng://nix@scratchy.labs.cs.uu.nl:2222");
     ASSERT_THAT(actual, SizeIs(1));
     EXPECT_THAT(
-        actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl:2222"))));
+        actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh-ng://nix@scratchy.labs.cs.uu.nl:2222"))));
 }
 
 TEST(machines, getMachinesDefaults)
 {
-    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "nix@scratchy.labs.cs.uu.nl - - - - - - -");
+    auto actual = Machine::parseConfig({"TEST_ARCH-TEST_OS"}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - - - - - -");
     ASSERT_THAT(actual, SizeIs(1));
-    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh://nix@scratchy.labs.cs.uu.nl"))));
+    EXPECT_THAT(actual[0], Field(&Machine::storeUri, Eq(StoreReference::parse("ssh-ng://nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual[0], Field(&Machine::systemTypes, ElementsAre("TEST_ARCH-TEST_OS")));
     EXPECT_THAT(actual[0], Field(&Machine::sshKey, Eq(std::nullopt)));
     EXPECT_THAT(actual[0], Field(&Machine::maxJobs, Eq(1)));
@@ -68,7 +68,7 @@ MATCHER_P(AuthorityMatches, authority, "")
 
 TEST(machines, getMachinesWithNewLineSeparator)
 {
-    auto actual = Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl\nnix@itchy.labs.cs.uu.nl");
+    auto actual = Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl\nssh-ng://nix@itchy.labs.cs.uu.nl");
     ASSERT_THAT(actual, SizeIs(2));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
@@ -76,7 +76,7 @@ TEST(machines, getMachinesWithNewLineSeparator)
 
 TEST(machines, getMachinesWithSemicolonSeparator)
 {
-    auto actual = Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl");
+    auto actual = Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl ; ssh-ng://nix@itchy.labs.cs.uu.nl");
     EXPECT_THAT(actual, SizeIs(2));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
@@ -87,9 +87,9 @@ TEST(machines, getMachinesWithCommentsAndSemicolonSeparator)
     auto actual = Machine::parseConfig(
         {},
         "# This is a comment ; this is still that comment\n"
-        "nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl\n"
+        "ssh-ng://nix@scratchy.labs.cs.uu.nl ; ssh-ng://nix@itchy.labs.cs.uu.nl\n"
         "# This is also a comment ; this also is still that comment\n"
-        "nix@scabby.labs.cs.uu.nl\n");
+        "ssh-ng://nix@scabby.labs.cs.uu.nl\n");
     EXPECT_THAT(actual, SizeIs(3));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
@@ -101,11 +101,11 @@ TEST(machines, getMachinesWithFunnyWhitespace)
     auto actual = Machine::parseConfig(
         {},
         "        # comment ; comment\n"
-        "   nix@scratchy.labs.cs.uu.nl ; nix@itchy.labs.cs.uu.nl   \n"
+        "   ssh-ng://nix@scratchy.labs.cs.uu.nl ; ssh-ng://nix@itchy.labs.cs.uu.nl   \n"
         "\n    \n"
         "\n ;;; \n"
         "\n ; ; \n"
-        "nix@scabby.labs.cs.uu.nl\n\n");
+        "ssh-ng://nix@scabby.labs.cs.uu.nl\n\n");
     EXPECT_THAT(actual, SizeIs(3));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@scratchy.labs.cs.uu.nl"))));
     EXPECT_THAT(actual, Contains(Field(&Machine::storeUri, AuthorityMatches("nix@itchy.labs.cs.uu.nl"))));
@@ -116,7 +116,7 @@ TEST(machines, getMachinesWithCorrectCompleteSingleBuilder)
 {
     auto actual = Machine::parseConfig(
         {},
-        "nix@scratchy.labs.cs.uu.nl     i686-linux      "
+        "ssh-ng://nix@scratchy.labs.cs.uu.nl     i686-linux      "
         "/home/nix/.ssh/id_scratchy_auto        8 3 kvm "
         "benchmark SSH+HOST+PUBLIC+KEY+BASE64+ENCODED==");
     ASSERT_THAT(actual, SizeIs(1));
@@ -134,7 +134,7 @@ TEST(machines, getMachinesWithCorrectCompleteSingleBuilderWithTabColumnDelimiter
 {
     auto actual = Machine::parseConfig(
         {},
-        "nix@scratchy.labs.cs.uu.nl\ti686-linux\t/home/nix/.ssh/"
+        "ssh-ng://nix@scratchy.labs.cs.uu.nl\ti686-linux\t/home/nix/.ssh/"
         "id_scratchy_auto\t8\t3\tkvm\tbenchmark\tSSH+HOST+PUBLIC+"
         "KEY+BASE64+ENCODED==");
     ASSERT_THAT(actual, SizeIs(1));
@@ -152,7 +152,7 @@ TEST(machines, getMachinesWithMultiOptions)
 {
     auto actual = Machine::parseConfig(
         {},
-        "nix@scratchy.labs.cs.uu.nl Arch1,Arch2 - - - "
+        "ssh-ng://nix@scratchy.labs.cs.uu.nl Arch1,Arch2 - - - "
         "SupportedFeature1,SupportedFeature2 "
         "MandatoryFeature1,MandatoryFeature2");
     ASSERT_THAT(actual, SizeIs(1));
@@ -162,13 +162,18 @@ TEST(machines, getMachinesWithMultiOptions)
     EXPECT_THAT(actual[0], Field(&Machine::mandatoryFeatures, ElementsAre("MandatoryFeature1", "MandatoryFeature2")));
 }
 
+TEST(machines, getMachinesWithImplicitSsh)
+{
+    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl"), UsageError);
+}
+
 TEST(machines, getMachinesWithIncorrectFormat)
 {
-    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - eight"), FormatError);
-    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - -1"), FormatError);
-    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 three"), FormatError);
-    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 -3"), UsageError);
-    EXPECT_THROW(Machine::parseConfig({}, "nix@scratchy.labs.cs.uu.nl - - 8 3 - - BAD_BASE64"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - eight"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - -1"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - 8 three"), FormatError);
+    EXPECT_THROW(Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - 8 -3"), UsageError);
+    EXPECT_THROW(Machine::parseConfig({}, "ssh-ng://nix@scratchy.labs.cs.uu.nl - - 8 3 - - BAD_BASE64"), FormatError);
 }
 
 TEST(machines, getMachinesWithCorrectFileReference)

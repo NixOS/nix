@@ -47,7 +47,6 @@ nix-env --rollback --help
 
 nix-store --help
 nix-store --realise --help
-nix-store --serve --help
 nix-store --gc --help
 nix-store --delete --help
 nix-store --query --help

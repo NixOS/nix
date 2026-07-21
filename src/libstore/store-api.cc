@@ -265,7 +265,7 @@ void Store::addMultipleToStore(PathsSource && pathsToCopy, Activity & act, Repai
                we're done. In particular, a SinkToSource object must
                be destroyed to ensure that the destructors on its
                stack frame are run; this includes
-               LegacySSHStore::narFromPath()'s connection lock. */
+               a remote store's `narFromPath()` connection lock. */
             auto source = std::move(source_);
 
             if (!isValidPath(info.path)) {

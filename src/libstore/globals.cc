@@ -607,7 +607,8 @@ void initLibStore(bool loadConfig)
 #ifdef __APPLE__
     /* On macOS, don't use the per-session TMPDIR (as set e.g. by
        sshd). This breaks build users because they don't have access
-       to the TMPDIR, in particular in ‘nix-store --serve’. */
+       to the TMPDIR, in particular when Nix is invoked via sshd
+       (e.g. `nix-daemon --stdio` for `ssh-ng://` stores). */
     if (hasPrefix(defaultTempDir().string(), "/var/folders/"))
         unsetenv("TMPDIR");
 #endif

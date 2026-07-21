@@ -16,7 +16,6 @@ You generally do not need to run this command manually.
 `nix-store` takes exactly one *operation* flag which indicates the subcommand to be performed. The following operations are available:
 
 - [`--realise`](./nix-store/realise.md)
-- [`--serve`](./nix-store/serve.md)
 - [`--gc`](./nix-store/gc.md)
 - [`--delete`](./nix-store/delete.md)
 - [`--query`](./nix-store/query.md)

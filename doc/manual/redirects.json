@@ -117,7 +117,6 @@
         "rsec-nix-store-gc": "command-ref/nix-store/gc.html",
         "rsec-nix-store-generate-binary-cache-key": "command-ref/nix-store/generate-binary-cache-key.html",
         "rsec-nix-store-realise": "command-ref/nix-store/realise.html",
-        "rsec-nix-store-serve": "command-ref/nix-store/serve.html",
         "sec-nix-store": "command-ref/nix-store.html",
         "opt-I": "command-ref/opt-common.html#opt-I",
         "opt-attr": "command-ref/opt-common.html#opt-attr",
