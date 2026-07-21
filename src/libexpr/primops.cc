@@ -1536,6 +1536,17 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
 
+        // Like `warn`, but with the position of the attribute and the derivation name as an added trace.
+        auto warnAttr = [&](HintFmt msg) {
+            ErrorInfo info{
+                .level = lvlWarn,
+                .msg = std::move(msg),
+                .pos = state.positions[i->pos],
+            };
+            info.traces.push_back(Trace{.hint = HintFmt{"while evaluating derivation '%1%'", drvName}});
+            logWarning(info);
+        };
+
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") {
                 // back compat, new name is "nar"
@@ -1651,34 +1662,14 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
                     switch (i->name.getId()) {
                     case EvalState::s.allowedReferences.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead",
-                            drvName);
-                        break;
                     case EvalState::s.allowedRequisites.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead",
-                            drvName);
-                        break;
                     case EvalState::s.disallowedReferences.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead",
-                            drvName);
-                        break;
                     case EvalState::s.disallowedRequisites.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead",
-                            drvName);
-                        break;
                     case EvalState::s.maxSize.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead",
-                            drvName);
-                        break;
                     case EvalState::s.maxClosureSize.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead",
-                            drvName);
+                        warnAttr(HintFmt(
+                            "'structuredAttrs' disables the effect of the derivation attribute '%1%'; use 'outputChecks.<output>.%1%' instead",
+                            key));
                         break;
                     default:
                         break;
@@ -1687,9 +1678,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
                     if (i->name == state.s.json) {
-                        warn(
-                            "In derivation '%s': setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead.",
-                            drvName);
+                        warnAttr(HintFmt(
+                            "setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead."));
                         drv.structuredAttrs = StructuredAttrs::parse(s);
                     } else {
                         drv.env.emplace(key, s);
