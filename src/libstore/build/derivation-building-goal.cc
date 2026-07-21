@@ -886,7 +886,11 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 }
 
                 void processDaemonConnection(
-                    ref<Store> store, FdSource && from, FdSink && to, RestrictionContext & context) override
+                    ref<Store> store,
+                    FdSource && from,
+                    FdSink && to,
+                    RestrictionContext & context,
+                    daemon::RecursiveFlag recursiveFlag) override
                 {
                     /**
                      * TODO: We create a fresh Worker here because the
@@ -898,7 +902,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                     Worker freshWorker{goal.worker.store, goal.worker.evalStore};
                     auto builder = makeRestrictedBuilder(freshWorker, context);
                     daemon::processConnection(
-                        store, std::move(from), std::move(to), NotTrusted, daemon::Recursive, builder.get_ptr());
+                        store, std::move(from), std::move(to), NotTrusted, recursiveFlag, builder.get_ptr());
                 }
             };
 

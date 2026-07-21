@@ -114,6 +114,8 @@ public:
 
     void registerDrvOutput(const Realisation & info) override;
 
+    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
+
     ref<const ValidPathInfo> addToStoreScanning(
         Source & dump,
         std::string_view name,

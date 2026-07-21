@@ -120,6 +120,12 @@ struct WorkerProto
     static const Version minimum;
 
     /**
+     * Static version for the `builder-rpc-v0` feature.
+     * Should never change, as any modification would be derivation-visible.
+     */
+    static const Version builderRpcV0;
+
+    /**
      * Feature for transmitting `UnkeyedRealisation` and `DrvOutput`
      * using drvPath (store path) instead of the old hash-based JSON format.
      */
@@ -139,6 +145,11 @@ struct WorkerProto
      * Feature for enabling the `AddToStoreScanning` operation
      */
     static constexpr std::string_view featureAddToStoreScanning = "add-to-store-scanning";
+
+    /**
+     * Feature for enabling the `SubmitOutput` operation
+     */
+    static constexpr std::string_view featureSubmitOutput = "submit-output";
 
     /**
      * A unidirectional read connection, to be used by the read half of the
@@ -264,6 +275,7 @@ enum struct WorkerProto::Op : uint64_t {
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
     // AddTempRoots = 49, // reserved for https://github.com/NixOS/nix/pull/16113
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
+    SubmitOutput = 1000, // Only used within derivations with feature
     AddToStoreScanning = 1001,
 };
 
@@ -333,6 +345,8 @@ inline std::ostream & operator<<(std::ostream & s, WorkerProto::Op op)
 
 template<>
 DECLARE_WORKER_SERIALISER(DerivedPath);
+template<>
+DECLARE_WORKER_SERIALISER(SingleDerivedPath);
 template<>
 DECLARE_WORKER_SERIALISER(BuildResult);
 template<>
