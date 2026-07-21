@@ -138,7 +138,8 @@ static void inputsToJson(json & res, const nix::derivation::FullInputs & inputs)
 
 static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & inputs)
 {
-    inputsToJson(res, nix::derivation::FullInputs::fromSet(inputs));
+    using namespace nix::derivation;
+    inputsToJson(res, FullInputs::fromSet(inputs));
 }
 
 template<typename Inputs>
@@ -187,9 +188,10 @@ nix::derivation::FullInputs inputsFromJson<nix::derivation::FullInputs>(
     const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
+    using namespace derivation;
 
     auto inputsObj = getObject(inputsJson);
-    derivation::FullInputs inputs;
+    FullInputs inputs;
 
     try {
         for (auto & input : getArray(valueAt(inputsObj, "srcs")))
@@ -225,7 +227,8 @@ template<>
 std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>>(
     const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
 {
-    return inputsFromJson<nix::derivation::FullInputs>(inputsJson, xpSettings).toSet();
+    using namespace nix::derivation;
+    return inputsFromJson<FullInputs>(inputsJson, xpSettings).toSet();
 }
 
 template<typename Inputs>
@@ -233,6 +236,7 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
     const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
+    using namespace derivation;
 
     auto & json = getObject(_json);
     {
@@ -247,7 +251,7 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
     return derivation::Derivation<Inputs>{
         .outputs =
             [&] {
-                derivation::Outputs<> outputs;
+                Outputs<> outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(
