@@ -150,7 +150,7 @@ void checkOutputs(
             return std::make_pair(std::move(pathsDone), closureSize);
         };
 
-        auto applyChecks = [&](const DerivationOptions<StorePath>::OutputChecks & checks) {
+        auto applyChecks = [&](const derivation::OutputChecks<StorePath> & checks) {
             if (checks.maxSize && info.narSize > *checks.maxSize)
                 throw BuildError(
                     BuildResult::Failure::OutputRejected,
@@ -248,9 +248,8 @@ void checkOutputs(
 
         std::visit(
             overloaded{
-                [&](const DerivationOptions<StorePath>::OutputChecks & checks) { applyChecks(checks); },
-                [&](const std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> &
-                        checksPerOutput) {
+                [&](const derivation::OutputChecks<StorePath> & checks) { applyChecks(checks); },
+                [&](const std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>> & checksPerOutput) {
                     if (auto outputChecks = get(checksPerOutput, outputName))
 
                         applyChecks(*outputChecks);
