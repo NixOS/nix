@@ -65,7 +65,7 @@ TEST(sourceToSink, forcedUnwindUcaughtExceptions)
     // Without the fix std::uncaught_exceptions() *misreports* 0 while there's stack unwinding in progress.
     // The issue only surfaces with libstdc++ and fcontext when boost.context
     // uses fiber-specific exception states and messes with __cxa_get_globals().
-    ASSERT_EQ(uncaughtExceptions, 0);
+    ASSERT_EQ(uncaughtExceptions, 1);
 }
 
 } // namespace nix
