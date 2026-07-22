@@ -1,0 +1,102 @@
+From 5883212311535a0046031d74d1568ae173c1e35b Mon Sep 17 00:00:00 2001
+From: Sergei Zimmerman <sergei@zimmerman.foo>
+Date: Tue, 21 Jul 2026 21:15:51 +0000
+Subject: [PATCH] Fix uncaught_exceptions() not accounting for forced_unwind
+
+Unwound fibers would see std::uncaught_exceptions() == 0, while a
+forced_unwind exception is in "flight". This goes against the contract
+of std::uncaught_exceptions() that scope guards rely upon. Failing
+to report the correct number of uncaught exceptions (especially
+misreporting zero) will lead to scope guards to misbehave badly and skip
+running cleanup code which branches on whether the destructor is called
+during stack unwinding or not.
+
+This is because the "throw" would happen before the destructor is run on
+the fiber stack being switched to, but the increment would be clobbered
+by the destructor of manage_exception_state.
+
+I'm not sure what the contract of run ontop_fcontext is wrt to whether
+the the caller provided function can throw or not, but in my best
+understanding the forced_unwind mechanism is mostly internal and so is
+throwing from ontop_fcontext in the switched-to fiber. Thus, I've kept
+the catch block scoped to detail::forced_unwind.
+---
+ include/boost/context/fiber_fcontext.hpp | 37 +++++++++++++++++-------
+ test/test_fiber.cpp                      | 24 +++++++++++++++
+ 2 files changed, 51 insertions(+), 10 deletions(-)
+
+diff --git a/include/boost/context/fiber_fcontext.hpp b/include/boost/context/fiber_fcontext.hpp
+index 543ba6c..38476c9 100644
+--- a/boost/context/fiber_fcontext.hpp
++++ b/boost/context/fiber_fcontext.hpp
+@@ -70,7 +70,9 @@ namespace context {
+ namespace detail {
+ 
+ // manage_exception_state is a dummy struct unless we have specific support
+-struct manage_exception_state {};
++struct manage_exception_state {
++    void from_forced_unwind() noexcept {}
++};
+ 
+ } // namespace detail
+ } // namespace context
+@@ -90,6 +92,11 @@ public:
+     manage_exception_state() {
+         exception_state_ = *__cxa_get_globals();
+     }
++    // Hack to account for the forced_unwind exception thrown in fiber_unwind
++    // that's run ontop before the destructor.
++    void from_forced_unwind() noexcept {
++        exception_state_.uncaughtExceptions += 1;
++    }
+     ~manage_exception_state() {
+         *__cxa_get_globals() = exception_state_;
+     }
+@@ -376,13 +383,18 @@ public:
+         BOOST_ASSERT( nullptr != fctx_);
+         detail::manage_exception_state exstate;
+         boost::ignore_unused(exstate);
+-        return { detail::jump_fcontext(
++        try {
++            return { detail::jump_fcontext(
+ #if defined(BOOST_NO_CXX14_STD_EXCHANGE)
+-                    detail::exchange( fctx_, nullptr),
++                        detail::exchange( fctx_, nullptr),
+ #else
+-                    std::exchange( fctx_, nullptr),
++                        std::exchange( fctx_, nullptr),
+ #endif
+-                    nullptr).fctx };
++                        nullptr).fctx };
++        } catch ( detail::forced_unwind const& ) {
++            exstate.from_forced_unwind();
++            throw;
++        }
+     }
+ 
+     template< typename Fn >
+@@ -391,14 +403,19 @@ public:
+         detail::manage_exception_state exstate;
+         boost::ignore_unused(exstate);
+         auto p = std::forward< Fn >( fn);
+-        return { detail::ontop_fcontext(
++        try {
++            return { detail::ontop_fcontext(
+ #if defined(BOOST_NO_CXX14_STD_EXCHANGE)
+-                    detail::exchange( fctx_, nullptr),
++                        detail::exchange( fctx_, nullptr),
+ #else
+-                    std::exchange( fctx_, nullptr),
++                        std::exchange( fctx_, nullptr),
+ #endif
+-                    & p,
+-                    detail::fiber_ontop< fiber, decltype(p) >).fctx };
++                        & p,
++                        detail::fiber_ontop< fiber, decltype(p) >).fctx };
++        } catch ( detail::forced_unwind const& ) {
++            exstate.from_forced_unwind();
++            throw;
++        }
+     }
+ 
+     explicit operator bool() const noexcept {
