@@ -6,6 +6,7 @@
 #include <array>
 #include <cctype>
 
+#include <openssl/crypto.h>
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>
 #include <stdint.h>
@@ -22,6 +23,10 @@ bad_ref_cast::~bad_ref_cast() {}
 
 void initLibUtil()
 {
+    static std::atomic_flag done = ATOMIC_FLAG_INIT;
+    if (done.test_and_set())
+        return;
+
     // Check that exception handling works. Exception handling has been observed
     // not to work on darwin when the linker flags aren't quite right.
     // In this case we don't want to expose the user to some unrelated uncaught
@@ -43,6 +48,21 @@ void initLibUtil()
 
     if (sodium_init() == -1)
         throw Error("could not initialise libsodium");
+
+    /* Prevent OpenSSL from registering its atexit() handler
+       (OPENSSL_cleanup()). If we exit() while other threads that use
+       OpenSSL are still running, OPENSSL_cleanup() frees OpenSSL's
+       thread-local state handlers; when those threads then exit, their
+       thread-specific-data destructors (init_thread_stop()) crash on
+       the freed state. This happens in particular in nix-daemon
+       connection children, where library destructors run by _dl_fini()
+       (e.g. aws-crt-cpp's) stop their worker threads *after*
+       OPENSSL_cleanup() has already run. Since we're exiting anyway,
+       skipping the cleanup is harmless. This must run before any other
+       use of OpenSSL, since only the first initialisation takes
+       effect. */
+    if (OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr) != 1)
+        throw Error("could not initialise OpenSSL");
 }
 
 //////////////////////////////////////////////////////////////////////

@@ -386,6 +386,9 @@ void mainWrapped(int argc, char ** argv)
     }
 #endif
 
+    /* This must be called before Sentry since both initialize OpenSSL. */
+    initLibUtil();
+
     /* Set the build hook location
 
        For builds we perform a self-invocation, so Nix has to be
