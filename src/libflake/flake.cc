@@ -600,12 +600,15 @@ LockedFlake lockFlake(
                     };
 
                     /* Do we have an entry in the existing lock file?
-                       And the input is not in inputSpec? */
+                       And the input is not excluded? */
                     std::shared_ptr<LockedNode> oldLock;
 
                     updatesUsed.insert(inputAttrPath);
 
-                    if (oldNode && !lockFlags.inputSpec.count(nonEmptyInputAttrPath))
+                    bool listed = lockFlags.inputSpec.count(nonEmptyInputAttrPath);
+                    auto keepOldLock = lockFlags.exclude ? listed : !listed;
+
+                    if (oldNode && keepOldLock)
                         if (auto oldLock2 = get(oldNode->inputs, id))
                             if (auto oldLock3 = std::get_if<0>(&*oldLock2))
                                 oldLock = *oldLock3;
@@ -622,12 +625,16 @@ LockedFlake lockFlake(
 
                         node->inputs.insert_or_assign(id, childNode);
 
-                        /* If we have this input in inputSpec, then we
-                           must fetch the flake to update it. */
-                        auto lb = lockFlags.inputSpec.lower_bound(nonEmptyInputAttrPath);
+                        bool mustRefetch = false;
 
-                        auto mustRefetch = lb != lockFlags.inputSpec.end() && lb->get().size() > inputAttrPath.size()
-                                           && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->get().begin());
+                        if (!lockFlags.exclude) {
+                            /* If we have this input in inputSpec, then we
+                           must fetch the flake to update it. */
+                            auto lb = lockFlags.inputSpec.lower_bound(nonEmptyInputAttrPath);
+
+                            mustRefetch = lb != lockFlags.inputSpec.end() && lb->get().size() > inputAttrPath.size()
+                                          && std::equal(inputAttrPath.begin(), inputAttrPath.end(), lb->get().begin());
+                        }
 
                         FlakeInputs fakeInputs;
 
