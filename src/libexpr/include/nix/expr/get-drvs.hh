@@ -32,6 +32,7 @@ private:
      */
     bool failed = false;
 
+    // FIXME: make this a RootValue.
     const Bindings *attrs = nullptr, *meta = nullptr;
 
     const Bindings * getMeta();
