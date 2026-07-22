@@ -6,6 +6,7 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
@@ -156,23 +157,6 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  * output IDs we are interested in.
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
-
-/**
- * Inputs for full Derivation - both source and derivation inputs
- */
-struct FullInputs
-{
-    /**
-     * inputs that are sources
-     */
-    StorePathSet srcs;
-    /**
-     * inputs that are sub-derivations
-     */
-    DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
-
-    bool operator==(const FullInputs &) const = default;
-};
 
 struct DerivationType
 {
@@ -345,10 +329,7 @@ struct DerivationT
     /**
      * Print a derivation (only meaningful for full Derivation).
      */
-    std::string unparse(
-        const StoreDirConfig & store,
-        bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
+    std::string unparse(const StoreDirConfig & store) const
         requires std::is_same_v<Inputs, FullInputs>;
 
     /**
@@ -492,8 +473,7 @@ struct DerivationT
 class Store;
 
 template<>
-std::string DerivationT<FullInputs>::unparse(
-    const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const;
+std::string DerivationT<FullInputs>::unparse(const StoreDirConfig & store) const;
 template<>
 bool DerivationT<FullInputs>::shouldResolve() const;
 template<>
@@ -611,7 +591,7 @@ struct DrvHashModulo
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
  */
-DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv);
 
 /**
  * If a derivation is input addressed and doesn't yet have its input
