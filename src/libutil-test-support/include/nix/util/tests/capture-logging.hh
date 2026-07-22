@@ -18,12 +18,12 @@ public:
         return oss.str();
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         oss << s << std::endl;
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
     }
