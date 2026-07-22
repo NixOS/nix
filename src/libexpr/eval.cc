@@ -116,6 +116,13 @@ std::ostream & operator<<(std::ostream & os, const ValueType t)
     return os;
 }
 
+std::ostream & operator<<(std::ostream & os, WhileTryingToUse w)
+{
+    /* Reset color first: `HintFmt` wraps arguments in `Magenta` by
+       default, but this word is sentence structure, not a value. */
+    return os << ANSI_NORMAL << (w.v.isWHNF() ? "using" : "evaluating");
+}
+
 std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;
@@ -2482,26 +2489,6 @@ bool EvalState::isDerivation(Value & v)
     return i->value->string_view().compare("derivation") == 0;
 }
 
-std::optional<std::string>
-EvalState::tryAttrsToString(const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore, bool copyToStore)
-{
-    auto i = v.attrs()->get(s.toString);
-    if (i) {
-        Value v1;
-        callFunction(*i->value, v, v1, pos);
-        return coerceToString(
-                   pos,
-                   v1,
-                   context,
-                   "while evaluating the result of the `__toString` attribute",
-                   coerceMore,
-                   copyToStore)
-            .toOwned();
-    }
-
-    return {};
-}
-
 BackedStringView EvalState::coerceToString(
     const PosIdx pos,
     Value & v,
@@ -2533,17 +2520,35 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nAttrs) {
-        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
-        if (maybeString)
-            return std::move(*maybeString);
-        auto i = v.attrs()->get(s.outPath);
-        if (!i) {
-            error<TypeError>(
-                "cannot coerce %1% to a string: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
-                .withTrace(pos, errorCtx)
-                .debugThrow();
-        }
-        return coerceToString(pos, *i->value, context, errorCtx, coerceMore, copyToStore, canonicalizePath);
+        return peelToStringOutPath(
+            pos,
+            v,
+            /*checkToStringReturn=*/false, // Historical quirk
+            [&](Value * peeled, bool) -> BackedStringView {
+                if (peeled->type() == nAttrs) {
+                    /* Dead-end attrs — matches master's "cannot coerce a
+                       set" error, but reports the peel *leaf*'s attrs
+                       value (e.g. for `{ outPath = { a = 1; }; }` we
+                       error on the inner `{ a = 1; }`, not the outer). */
+                    error<TypeError>(
+                        "cannot coerce %1% to a string: %2%",
+                        showType(*peeled),
+                        ValuePrinter(*this, *peeled, errorPrintOptions))
+                        .withTrace(pos, errorCtx)
+                        .debugThrow();
+                }
+                /* `canonicalizePath=false` is `ExprConcat`'s hack for
+                   preserving the trailing slash on source-parsed path
+                   literals like the `/foo/` in `/foo/${x}`. Any attrset
+                   in that slot is a computed value with no
+                   source-fidelity intent — the peeled path came from
+                   user code, not from the interpolation syntax. Force
+                   canonicalisation on the peel result regardless of
+                   which peel path (`__toString` or `outPath`) got us
+                   here. */
+                return coerceToString(
+                    pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true);
+            });
     }
 
     if (v.type() == nExternal) {
@@ -2622,34 +2627,21 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    try {
-        forceValue(v, pos);
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-
-    /* Handle path values directly, without coercing to a string. */
-    if (v.type() == nPath)
-        return v.path();
-
-    /* Similarly, handle __toString where the result may be a path
-       value. */
-    if (v.type() == nAttrs) {
-        auto i = v.attrs()->get(s.toString);
-        if (i) {
-            Value v1;
-            callFunction(*i->value, v, v1, pos);
-            return coerceToPath(pos, v1, context, errorCtx);
-        }
-    }
-
-    /* Any other value should be coercible to a string, interpreted
-       relative to the root filesystem. */
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (path == "" || path[0] != '/')
-        error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    return peelToStringOutPath(
+        pos,
+        v,
+        /*checkToStringReturn=*/false, // Historical quirk
+        [&](Value * peeled, bool) -> SourcePath {
+            Value & effective = *peeled;
+            if (effective.type() == nPath)
+                return effective.path();
+            auto path = coerceToString(pos, effective, context, errorCtx, false, false, true).toOwned();
+            if (path == "" || path[0] != '/')
+                error<EvalError>("string '%1%' doesn't represent an absolute path", path)
+                    .withTrace(pos, errorCtx)
+                    .debugThrow();
+            return rootPath(CanonPath(path));
+        });
 }
 
 StorePath

@@ -190,6 +190,22 @@ void copyContext(
 std::string printValue(EvalState & state, Value & v);
 std::ostream & operator<<(std::ostream & os, const ValueType t);
 
+/**
+ * Trace-message stage marker for "we tried to reach a usable value
+ * from `v` but failed".
+ * Renders as `using` when it has evaluated to a proper value, and
+ * `evaluating` otherwise.
+ *
+ * Use in a `%s` in `addTrace`, e.g.:
+ * `"while %s the result of the %s attribute"`.
+ */
+struct WhileTryingToUse
+{
+    const Value & v;
+};
+
+std::ostream & operator<<(std::ostream & os, WhileTryingToUse w);
+
 struct RegexCache;
 
 ref<RegexCache> makeRegexCache();
@@ -731,8 +747,35 @@ public:
      */
     bool isDerivation(Value & v);
 
-    std::optional<std::string> tryAttrsToString(
-        const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore = false, bool copyToStore = true);
+    /**
+     * Force `v` and peel through `__toString` and `outPath` attributes
+     * repeatedly until reaching a terminal value: either a non-attrset,
+     * or an attrset that has neither attribute. Invoke
+     * `cb(peeled, cameThroughToString)` on that terminal value.
+     *
+     * `cb` runs while the peel's call stack is still live, so errors it
+     * raises carry a trace reflecting which `__toString` and `outPath`
+     * attributes were traversed to reach `peeled`. Relying on the stack
+     * to preserve that context avoids the cost and complexity of
+     * tracking provenance in the hot path at runtime.
+     *
+     * `__toString` takes precedence over a sibling `outPath` at each
+     * step, matching string-interpolation coercion in the language.
+     *
+     * `peeled` is always a valid, forced Value; in the terminal-attrset
+     * case it is that attrset.
+     *
+     * `cameThroughToString` is true iff the peel invoked at least one
+     * `__toString`.
+     *
+     * With `checkToStringReturn`, if any `__toString` was traversed the
+     * terminal value must be a string, path, or external value;
+     * otherwise a `TypeError` is thrown before `cb` runs. Pure `outPath`
+     * peels are exempt.
+     */
+    template<typename Cb>
+    auto peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringReturn, Cb && cb)
+        -> std::invoke_result_t<Cb, Value *, bool>;
 
     enum class CopyLazyPaths : bool {
         PreserveLazy = false,

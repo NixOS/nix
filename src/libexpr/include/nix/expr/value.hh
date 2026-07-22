@@ -1323,6 +1323,38 @@ public:
         return !isa<tUninitialized>();
     }
 
+    /**
+     * Whether the value has been evaluated to WHNF, i.e. non-deep successful
+     * evaluation result, or successful "root of a value".
+     * See https://nix.dev/manual/nix/latest/language/evaluation.html?highlight=whnf#values
+     */
+    inline bool isWHNF() const noexcept
+    {
+        switch (getInternalType()) {
+        case tUninitialized:
+        case tFailed:
+        case tApp:
+        case tThunk:
+            return false;
+        case tInt:
+        case tBool:
+        case tNull:
+        case tFloat:
+        case tExternal:
+        case tPrimOp:
+        case tAttrs:
+        case tListSmall:
+        case tPrimOpApp: // primop-app is known to be a function, which is WHNF
+        case tLambda:
+        case tListN:
+        case tString:
+        case tPath:
+            return true;
+        case tNumberOfInternalTypes:
+            unreachable();
+        }
+    }
+
     inline void mkInt(NixInt::Inner n) noexcept
     {
         mkInt(NixInt{n});

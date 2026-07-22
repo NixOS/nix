@@ -1,0 +1,1 @@
+{ outPathDeadEnd = "{\"a\":1,\"b\":2}"; outPathInt = "42"; outPathNested = "\"nested\""; outPathString = "\"hello\""; plainAttrs = "{\"a\":1,\"b\":\"two\"}"; toStringPrecedes = "\"won\""; toStringReturnsPeelableAttrs = "\"deep\""; }

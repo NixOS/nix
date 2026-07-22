@@ -1,0 +1,1 @@
+"${{ outPath = abort "some failure"; }}"
