@@ -117,7 +117,7 @@ MixFlakeOptions::MixFlakeOptions()
             if (!path)
                 throw UsageError(
                     "--update-input was passed a zero-length input path, which would refer to the flake itself, not an input");
-            lockFlags.inputUpdates.insert(*path);
+            lockFlags.inputSpec.insert(*path);
         }},
         .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
             completeFlakeInputAttrPath(completions, getEvalState(), getFlakeRefsForCompletion(), prefix);
