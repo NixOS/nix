@@ -4,6 +4,8 @@
 #include <bit>
 #include <cassert>
 #include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
 #include <memory_resource>
@@ -15,6 +17,7 @@
 
 #include "nix/expr/eval-gc.hh"
 #include "nix/expr/value/context.hh"
+#include "nix/util/error.hh"
 #include "nix/util/source-path.hh"
 #include "nix/expr/print-options.hh"
 #include "nix/util/checked-arithmetic.hh"
@@ -1427,7 +1430,36 @@ public:
 
     inline void mkFailed(std::exception_ptr e, Value * recovery) noexcept
     {
-        setStorage(new Value::Failed(e, recovery));
+        try {
+            setStorage(new Value::Failed(e, recovery));
+        } catch (...) {
+            /* Most likely a `std::bad_alloc` from the GC heap.
+               This is called while handling an evaluation error,
+               and recording that failure is itself what just failed,
+               so there is no way to recover.
+
+               Static context first: formatting the evaluation error below
+               (e.g. `BaseError::what`) may itself allocate and terminate. */
+            std::fputs("\nerror: allocation failed while recording an evaluation error\n", stderr);
+
+            /* This is a best-effort attempt,
+               because `BaseError::what` may allocate and terminate. */
+            try {
+                std::rethrow_exception(e);
+            } catch (const std::exception & evalEx) {
+                std::fputs("the evaluation error was: ", stderr);
+                std::fputs(evalEx.what(), stderr); // may allocate
+                std::fputc('\n', stderr);
+            } catch (...) {
+                std::fputs("the evaluation error was of an unknown type\n", stderr);
+            }
+
+            /* `panic()` writes without touching the heap,
+               and the `std::terminate()` it calls reports
+               the allocation failure still active in this catch block,
+               along with a stack trace. */
+            panic("failed to record an evaluation error");
+        }
     }
 
     bool isList() const noexcept
