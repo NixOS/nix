@@ -1,72 +1,13 @@
 #include "nix/util/fs-sink.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <rapidcheck/gtest.h>
 
 namespace nix {
-
-MATCHER_P2(HasContents, path, expected, "")
-{
-    auto stat = arg->maybeLstat(path);
-    if (!stat) {
-        *result_listener << arg->showPath(path) << " does not exist";
-        return false;
-    }
-    if (stat->type != SourceAccessor::tRegular) {
-        *result_listener << arg->showPath(path) << " is not a regular file";
-        return false;
-    }
-    auto actual = arg->readFile(path);
-    if (actual != expected) {
-        *result_listener << arg->showPath(path) << " has contents " << ::testing::PrintToString(actual);
-        return false;
-    }
-    return true;
-}
-
-MATCHER_P2(HasSymlink, path, target, "")
-{
-    auto stat = arg->maybeLstat(path);
-    if (!stat) {
-        *result_listener << arg->showPath(path) << " does not exist";
-        return false;
-    }
-    if (stat->type != SourceAccessor::tSymlink) {
-        *result_listener << arg->showPath(path) << " is not a symlink";
-        return false;
-    }
-    auto actual = arg->readLink(path);
-    if (actual != target) {
-        *result_listener << arg->showPath(path) << " points to " << ::testing::PrintToString(actual);
-        return false;
-    }
-    return true;
-}
-
-MATCHER_P2(HasDirectory, path, dirents, "")
-{
-    auto stat = arg->maybeLstat(path);
-    if (!stat) {
-        *result_listener << arg->showPath(path) << " does not exist";
-        return false;
-    }
-    if (stat->type != SourceAccessor::tDirectory) {
-        *result_listener << arg->showPath(path) << " is not a directory";
-        return false;
-    }
-    auto actual = arg->readDirectory(path);
-    std::set<std::string> actualKeys, expectedKeys(dirents.begin(), dirents.end());
-    for (auto & [k, _] : actual)
-        actualKeys.insert(k);
-    if (actualKeys != expectedKeys) {
-        *result_listener << arg->showPath(path) << " has entries " << ::testing::PrintToString(actualKeys);
-        return false;
-    }
-    return true;
-}
 
 class FSSourceAccessorTest : public ::testing::Test
 {
@@ -105,17 +46,19 @@ TEST_F(FSSourceAccessorTest, works)
         sink.createSymlink(CanonPath("a/dirlink"), "../subdir");
     }
 
-    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), HasContents(CanonPath::root, "content1"));
-    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "rootlink"), HasSymlink(CanonPath::root, "target"));
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "file1"), testing::HasContents(CanonPath::root, "content1"));
+    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "rootlink"), testing::HasSymlink(CanonPath::root, "target"));
     EXPECT_THAT(
         makeFSSourceAccessor(tmpDir),
-        HasDirectory(CanonPath::root, std::set<std::string>{"file1", "subdir", "rootlink", "a"}));
-    EXPECT_THAT(makeFSSourceAccessor(tmpDir / "subdir"), HasDirectory(CanonPath::root, std::set<std::string>{"file2"}));
+        testing::HasDirectory(CanonPath::root, std::set<std::string>{"file1", "subdir", "rootlink", "a"}));
+    EXPECT_THAT(
+        makeFSSourceAccessor(tmpDir / "subdir"),
+        testing::HasDirectory(CanonPath::root, std::set<std::string>{"file2"}));
 
     {
         auto accessor = makeFSSourceAccessor(tmpDir);
-        EXPECT_THAT(accessor, HasContents(CanonPath("file1"), "content1"));
-        EXPECT_THAT(accessor, HasContents(CanonPath("subdir/file2"), "content2"));
+        EXPECT_THAT(accessor, testing::HasContents(CanonPath("file1"), "content1"));
+        EXPECT_THAT(accessor, testing::HasContents(CanonPath("subdir/file2"), "content2"));
 
         EXPECT_TRUE(accessor->pathExists(CanonPath("file1")));
         EXPECT_FALSE(accessor->pathExists(CanonPath("nonexistent")));
@@ -159,9 +102,9 @@ TEST_F(FSSourceAccessorTest, invalidateCacheDropsStaleDirFds)
 
     EXPECT_FALSE(accessor->pathExists(CanonPath("a/b/f")));
     EXPECT_TRUE(accessor->pathExists(CanonPath("a/b/g")));
-    EXPECT_THAT(accessor, HasContents(CanonPath("a/b/g"), "new"));
-    EXPECT_THAT(accessor, HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
-    EXPECT_THAT(accessor, HasSymlink(CanonPath("a/b/l"), "g"));
+    EXPECT_THAT(accessor, testing::HasContents(CanonPath("a/b/g"), "new"));
+    EXPECT_THAT(accessor, testing::HasDirectory(CanonPath("a/b"), (std::set<std::string>{"g", "l"})));
+    EXPECT_THAT(accessor, testing::HasSymlink(CanonPath("a/b/l"), "g"));
 }
 
 /* ----------------------------------------------------------------------------
@@ -178,7 +121,7 @@ TEST_F(FSSourceAccessorTest, RestoreSinkRegularFileAtRoot)
         sink.createRegularFile(CanonPath::root, [](CreateRegularFileSink & crf) { crf("root content"); });
     }
 
-    EXPECT_THAT(makeFSSourceAccessor(filePath), HasContents(CanonPath::root, "root content"));
+    EXPECT_THAT(makeFSSourceAccessor(filePath), testing::HasContents(CanonPath::root, "root content"));
 }
 
 TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
@@ -194,7 +137,7 @@ TEST_F(FSSourceAccessorTest, RestoreSinkSymlinkAtRoot)
         sink.createSymlink(CanonPath::root, "symlink_target");
     }
 
-    EXPECT_THAT(makeFSSourceAccessor(linkPath), HasSymlink(CanonPath::root, "symlink_target"));
+    EXPECT_THAT(makeFSSourceAccessor(linkPath), testing::HasSymlink(CanonPath::root, "symlink_target"));
 }
 
 } // namespace nix
