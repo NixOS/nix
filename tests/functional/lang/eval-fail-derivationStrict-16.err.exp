@@ -10,7 +10,7 @@ error:
 
        … while evaluating attribute '__contentAddressed' of derivation 'foo'
          at /pwd/lang/eval-fail-derivationStrict-16.nix:6:3:
-            5|   outputs = "out";
+            5|   outputs = [ "out" ];
             6|   __contentAddressed = "true";
              |   ^
             7| }
