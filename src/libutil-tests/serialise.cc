@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/config.hh"
 
 #include <boost/context/detail/exception.hpp>
 #include <gtest/gtest.h>
@@ -38,6 +39,13 @@ TEST(readPadding, works)
     }
 }
 
+// The following test catches the bug only under fcontext backend,
+// but Boost.Coroutine2 stack switching when abandoning confuses the
+// hell out of ASan. The workaround to getting ASan working isn't
+// immediately useful because it works only with ucontext implementation.
+// https://www.boost.org/doc/libs/1_89_0/libs/coroutine2/doc/html/coroutine2/stack/sanitizers.html
+#if !NIX_ASAN_ENABLED
+
 TEST(sourceToSink, forcedUnwindUcaughtExceptions)
 {
     int uncaughtExceptions = 42;
@@ -67,5 +75,7 @@ TEST(sourceToSink, forcedUnwindUcaughtExceptions)
     // uses fiber-specific exception states and messes with __cxa_get_globals().
     ASSERT_EQ(uncaughtExceptions, 1);
 }
+
+#endif
 
 } // namespace nix
