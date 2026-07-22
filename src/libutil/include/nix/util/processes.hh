@@ -97,7 +97,6 @@ struct ProcessOptions
     std::string errorPrefix = "";
     bool dieWithParent = true;
     bool runExitHandlers = false;
-    bool allowVfork = false;
     /**
      * use clone() with the specified flags (Linux only)
      */
