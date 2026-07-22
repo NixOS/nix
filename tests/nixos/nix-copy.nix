@@ -90,7 +90,7 @@ in
       # Copy the closure of package A from the client to the server using password authentication,
       # and check that all prompts are visible
       server.fail("nix-store --check-validity ${pkgA}")
-      client.send_chars("nix copy --to ssh://server ${pkgA} >&2; echo -n do; echo ne\n")
+      client.send_chars("nix copy --to ssh-ng://server ${pkgA} >&2; echo -n do; echo ne\n")
       client.wait_for_text("continue connecting")
       client.send_chars("yes\n")
       client.wait_for_text("Password:")
@@ -99,7 +99,7 @@ in
       server.succeed("nix-store --check-validity ${pkgA}")
 
       # Check that ControlMaster is working
-      client.send_chars("nix copy --to ssh://server ${pkgA} >&2; echo done\n")
+      client.send_chars("nix copy --to ssh-ng://server ${pkgA} >&2; echo done\n")
       client.wait_for_text("done")
 
       client.copy_from_host("key", "/root/.ssh/id_ed25519")
@@ -116,7 +116,7 @@ in
       # Check that an explicit master will work
       client.succeed(f"ssh -MNfS /tmp/master {server.name}")
       client.succeed(f"ssh -S /tmp/master -O check {server.name}")
-      client.succeed("NIX_SSHOPTS='-oControlPath=/tmp/master' nix copy --to ssh://server ${pkgA} >&2")
+      client.succeed("NIX_SSHOPTS='-oControlPath=/tmp/master' nix copy --to ssh-ng://server ${pkgA} >&2")
       client.succeed(f"ssh -S /tmp/master -O exit {server.name}")
 
       # Copy the closure of package B from the server to the client, using ssh-ng.
@@ -128,7 +128,7 @@ in
 
       # Copy the derivation of package D's derivation from the client to the server.
       server.fail("nix-store --check-validity ${pkgD.drvPath}")
-      client.succeed("nix copy --derivation --to ssh://server ${pkgD.drvPath} >&2")
+      client.succeed("nix copy --derivation --to ssh-ng://server ${pkgD.drvPath} >&2")
       server.succeed("nix-store --check-validity ${pkgD.drvPath}")
     '';
 }

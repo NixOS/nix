@@ -8,8 +8,6 @@
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/log-store.hh"
 #include "nix/store/local-store.hh"
-#include "nix/store/serve-protocol.hh"
-#include "nix/store/serve-protocol-connection.hh"
 #include "nix/main/shared.hh"
 #include "graphml.hh"
 #include "nix/cmd/legacy.hh"
@@ -25,10 +23,6 @@
 
 #include "man-pages.hh"
 
-#ifndef _WIN32 // TODO implement on Windows or provide allowed-to-noop interface
-#  include "nix/util/monitor-fd.hh"
-#endif
-
 #include <iostream>
 #include <algorithm>
 
@@ -37,7 +31,6 @@
 #include <fcntl.h>
 
 #include "nix/util/exit.hh"
-#include "nix/store/serve-protocol-impl.hh"
 
 namespace nix_store {
 
@@ -876,221 +869,6 @@ static void opOptimise(Strings opFlags, Strings opArgs)
     store->optimiseStore();
 }
 
-/* Serve the nix store in a way usable by a restricted ssh user. */
-static void opServe(Strings opFlags, Strings opArgs)
-{
-    bool writeAllowed = false;
-    for (auto & i : opFlags)
-        if (i == "--write")
-            writeAllowed = true;
-        else
-            throw UsageError("unknown flag '%1%'", i);
-
-    if (!opArgs.empty())
-        throw UsageError("no arguments expected");
-
-    FdSource in(STDIN_FILENO);
-    FdSink out(getStandardOutput());
-
-    /* Exchange the greeting. */
-    ServeProto::Version clientVersion = ServeProto::BasicServerConnection::handshake(out, in, ServeProto::latest);
-
-    ServeProto::ReadConn rconn{
-        .from = in,
-        .version = clientVersion,
-    };
-    ServeProto::WriteConn wconn{
-        .to = out,
-        .version = clientVersion,
-    };
-
-    auto getBuildSettings = [&]() {
-        // FIXME: changing options here doesn't work if we're
-        // building through the daemon.
-        verbosity = lvlError;
-        settings.getLogFileSettings().keepLog = false;
-        settings.getWorkerSettings().useSubstitutes = false;
-
-        auto options = ServeProto::Serialise<ServeProto::BuildOptions>::read(*store, rconn);
-
-        // Only certain fields get initialized based on the protocol
-        // version. This is why not all the code below is unconditional.
-        // See how the serialization logic in
-        // `ServeProto::Serialise<ServeProto::BuildOptions>` matches
-        // these conditions.
-        settings.getWorkerSettings().maxSilentTime = options.maxSilentTime;
-        settings.getWorkerSettings().buildTimeout = options.buildTimeout;
-        if (clientVersion >= ServeProto::Version{2, 2})
-            settings.getWorkerSettings().maxLogSize = options.maxLogSize;
-        if (clientVersion >= ServeProto::Version{2, 3}) {
-            if (options.nrRepeats != 0) {
-                throw Error("client requested repeating builds, but this is not currently implemented");
-            }
-            // Ignore 'options.enforceDeterminism'.
-            //
-            // It used to be true by default, but also only never had
-            // any effect when `nrRepeats == 0`.  We have already
-            // checked that `nrRepeats` in fact is 0, so we can safely
-            // ignore this without doing something other than what the
-            // client asked for.
-            settings.getLocalSettings().runDiffHook = true;
-        }
-        if (clientVersion >= ServeProto::Version{2, 7}) {
-            settings.keepFailed = options.keepFailed;
-        }
-    };
-
-    while (true) {
-        ServeProto::Command cmd;
-        try {
-            cmd = (ServeProto::Command) readInt(in);
-        } catch (EndOfFile & e) {
-            break;
-        }
-
-        switch (cmd) {
-
-        case ServeProto::Command::QueryValidPaths: {
-            bool lock = readInt(in);
-            bool substitute = readInt(in);
-            auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
-            if (lock && writeAllowed)
-                for (auto & path : paths)
-                    store->addTempRoot(path);
-
-            if (substitute && writeAllowed) {
-                store->substitutePaths(paths);
-            }
-
-            ServeProto::write(*store, wconn, store->queryValidPaths(paths));
-            break;
-        }
-
-        case ServeProto::Command::QueryPathInfos: {
-            auto paths = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
-            // !!! Maybe we want a queryPathInfos?
-            for (auto & i : paths) {
-                try {
-                    auto info = store->queryPathInfo(i);
-                    out << store->printStorePath(info->path);
-                    ServeProto::write(*store, wconn, static_cast<const UnkeyedValidPathInfo &>(*info));
-                } catch (InvalidPath &) {
-                }
-            }
-            out << "";
-            break;
-        }
-
-        case ServeProto::Command::DumpStorePath:
-            store->narFromPath(store->parseStorePath(readString(in)), out);
-            break;
-
-        case ServeProto::Command::ImportPaths: {
-            if (!writeAllowed)
-                throw Error("importing paths is not allowed");
-            // FIXME: should we skip sig checking?
-            importPaths(*store, in, NoCheckSigs);
-            // indicate success
-            out << 1;
-            break;
-        }
-
-        case ServeProto::Command::BuildPaths: {
-
-            if (!writeAllowed)
-                throw Error("building paths is not allowed");
-
-            std::vector<StorePathWithOutputs> paths;
-            for (auto & s : readStrings<Strings>(in))
-                paths.push_back(parsePathWithOutputs(*store, s));
-
-            getBuildSettings();
-
-            try {
-#ifndef _WIN32 // TODO figure out if Windows needs something similar
-                MonitorFdHup monitor(in.fd);
-#endif
-                store->getBuilder()->buildPaths(toDerivedPaths(paths));
-                out << 0;
-            } catch (Error & e) {
-                assert(e.info().status);
-                out << e.info().status << e.msg();
-            }
-            break;
-        }
-
-        case ServeProto::Command::BuildDerivation: { /* Used by hydra-queue-runner. */
-
-            if (!writeAllowed)
-                throw Error("building paths is not allowed");
-
-            auto drvPath = store->parseStorePath(readString(in));
-            BasicDerivation drv;
-            readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
-
-            getBuildSettings();
-
-#ifndef _WIN32 // TODO figure out if Windows needs something similar
-            MonitorFdHup monitor(in.fd);
-#endif
-            auto status = store->getBuilder()->buildDerivation(drvPath, drv);
-
-            ServeProto::write(*store, wconn, status);
-            break;
-        }
-
-        case ServeProto::Command::QueryClosure: {
-            bool includeOutputs = readInt(in);
-            StorePathSet closure;
-            store->computeFSClosure(
-                ServeProto::Serialise<StorePathSet>::read(*store, rconn), closure, false, includeOutputs);
-            ServeProto::write(*store, wconn, closure);
-            break;
-        }
-
-        case ServeProto::Command::AddToStoreNar: {
-            if (!writeAllowed)
-                throw Error("importing paths is not allowed");
-
-            auto path = readString(in);
-            auto deriver = readString(in);
-            ValidPathInfo info{
-                store->parseStorePath(path),
-                {
-                    *store,
-                    Hash::parseAny(readString(in), HashAlgorithm::SHA256),
-                },
-            };
-            if (deriver != "")
-                info.deriver = store->parseStorePath(deriver);
-            info.references = ServeProto::Serialise<StorePathSet>::read(*store, rconn);
-            in >> info.registrationTime >> info.narSize >> info.ultimate;
-            info.sigs = ServeProto::Serialise<std::set<Signature>>::read(*store, rconn);
-            info.ca = ContentAddress::parseOpt(readString(in));
-
-            if (info.narSize == 0)
-                throw Error("narInfo is too old and missing the narSize field");
-
-            SizedSource sizedSource(in, info.narSize);
-
-            store->addToStore(info, sizedSource, NoRepair, NoCheckSigs);
-
-            // consume all the data that has been sent before continuing.
-            sizedSource.drainAll();
-
-            out << 1; // indicate success
-
-            break;
-        }
-
-        default:
-            throw Error("unknown serve command %1%", cmd);
-        }
-
-        out.flush();
-    }
-}
-
 static void opGenerateBinaryCacheKey(Strings opFlags, Strings opArgs)
 {
     for (auto & i : opFlags)
@@ -1196,8 +974,8 @@ static int main_nix_store(int argc, char ** argv)
                 op = opOptimise;
                 opName = "-optimise";
             } else if (*arg == "--serve") {
-                op = opServe;
-                opName = arg->substr(1);
+                throw UsageError(
+                    "`nix-store --serve` is no longer supported; use `ssh-ng://` stores (which use `nix-daemon --stdio`) instead");
             } else if (*arg == "--generate-binary-cache-key") {
                 op = opGenerateBinaryCacheKey;
                 opName = arg->substr(1);
@@ -1216,7 +994,7 @@ static int main_nix_store(int argc, char ** argv)
             } else
                 opArgs.push_back(*arg);
 
-            if (readFromStdIn && op != opImport && op != opRestore && op != opServe) {
+            if (readFromStdIn && op != opImport && op != opRestore) {
                 std::string word;
                 while (std::cin >> word) {
                     opArgs.emplace_back(std::move(word));

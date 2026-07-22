@@ -16,15 +16,15 @@ Machine::Machine(
     decltype(mandatoryFeatures) mandatoryFeatures,
     decltype(sshPublicHostKey) sshPublicHostKey)
     : storeUri(
+          // There was previously some backwards compatibility to
+          // automatically add ssh://, but now legacy SSH stores are
+          // gone, so just require and explicit URL.
           StoreReference::parse(
-              // Backwards compatibility: if the URI is schemeless, is not a path,
-              // and is not one of the special store connection words, prepend
-              // ssh://.
               storeUri.find("://") != std::string::npos || storeUri.find("/") != std::string::npos || storeUri == "auto"
                       || storeUri == "daemon" || storeUri == "local" || hasPrefix(storeUri, "auto?")
                       || hasPrefix(storeUri, "daemon?") || hasPrefix(storeUri, "local?") || hasPrefix(storeUri, "?")
                   ? storeUri
-                  : "ssh://" + storeUri))
+                  : throw UsageError("Implicit \"ssh://\" in machine files is no longer supported")))
     , systemTypes(systemTypes)
     , sshKey(sshKey)
     , maxJobs(maxJobs)
@@ -62,12 +62,7 @@ StoreReference Machine::completeStoreReference() const
 
     auto * generic = std::get_if<StoreReference::Specified>(&storeUri.variant);
 
-    if (generic && generic->scheme == "ssh") {
-        storeUri.params["max-connections"] = "1";
-        storeUri.params["log-fd"] = "4";
-    }
-
-    if (generic && (generic->scheme == "ssh" || generic->scheme == "ssh-ng")) {
+    if (generic && generic->scheme == "ssh-ng") {
         if (sshKey)
             storeUri.params["ssh-key"] = sshKey->string();
         if (sshPublicHostKey != "")

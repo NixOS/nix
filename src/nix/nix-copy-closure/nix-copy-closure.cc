@@ -1,6 +1,6 @@
 #include "nix/main/shared.hh"
 #include "nix/store/realisation.hh"
-#include "nix/store/legacy-ssh-store.hh"
+#include "nix/store/ssh-store.hh"
 #include "nix/store/store-open.hh"
 #include "nix/cmd/legacy.hh"
 #include "man-pages.hh"
@@ -53,7 +53,7 @@ static int main_nix_copy_closure(int argc, char ** argv)
             /* FIXME: This doesn't go through the back-compat machinery for IPv6 unbracketed URLs that
                is in StoreReference::parse. TODO: Maybe add a authority parsing function specifically
                for SSH reference parsing? */
-            make_ref<LegacySSHStoreConfig>(ParsedURL::Authority::parse(sshHost), LegacySSHStoreConfig::Params{});
+            make_ref<SSHStoreConfig>(ParsedURL::Authority::parse(sshHost), SSHStoreConfig::Params{});
         remoteConfig->compress |= gzip;
         auto to = toMode ? remoteConfig->openStore() : openStore();
         auto from = toMode ? openStore() : remoteConfig->openStore();

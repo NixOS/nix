@@ -24,12 +24,8 @@ struct WorkerProto::BasicConnection
     WorkerProto::Version protoVersion;
 
     /**
-     * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
-     * factored out serve protocol serializers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
+     * Coercion to `WorkerProto::ReadConn`, which is unidirectional,
+     * unlike this type.
      */
     operator WorkerProto::ReadConn()
     {
@@ -40,12 +36,8 @@ struct WorkerProto::BasicConnection
     }
 
     /**
-     * Coercion to `WorkerProto::WriteConn`. This makes it easy to use the
-     * factored out serve protocol serializers with a
-     * `LegacySSHStore::Connection`.
-     *
-     * The serve protocol connection types are unidirectional, unlike
-     * this type.
+     * Coercion to `WorkerProto::WriteConn`, which is unidirectional,
+     * unlike this type.
      */
     operator WorkerProto::WriteConn()
     {
