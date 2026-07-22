@@ -154,6 +154,11 @@ public:
             printError("post-build-hook: " + lastLine);
         }
     }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        return makeSimpleLogger(printBuildLogs);
+    }
 };
 
 } // namespace
@@ -352,6 +357,11 @@ struct JSONLogger : Logger
         json["type"] = type;
         addFields(json, fields);
         write(json);
+    }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        return std::make_unique<JSONLogger>(fd, includeNixPrefix);
     }
 };
 

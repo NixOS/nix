@@ -27,6 +27,12 @@ public:
     {
         showErrorInfo(oss, ei, loggerSettings.showTrace.get());
     }
+
+    std::unique_ptr<Logger> cloneForChild() const override
+    {
+        /* Not expected to be forked across; a plain logger is fine. */
+        return makeSimpleLogger();
+    }
 };
 
 class CaptureLogging
