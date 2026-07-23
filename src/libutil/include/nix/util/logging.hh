@@ -28,6 +28,16 @@ typedef enum {
     actPostBuildHook = 110,
     actBuildWaiting = 111,
     actFetchTree = 112,
+    /* A source path is being copied into the store, or (in dry-run mode) hashed
+       to compute its store path, via `fetchToStore()`. This backs eval-time path
+       coercion (`"${./file}"`, `src = ./.`), `builtins.path`, and similar. The
+       activity brackets the operation. Fields:
+         [0] = source path (string)
+         [1] = whether the path is only being hashed in a dry run rather than
+               actually copied (1 = hashing, 0 = copying) (int)
+       The resulting store path is only known once the operation completes and is
+       delivered via a resFetchToStore result. */
+    actFetchToStore = 113,
 } ActivityType;
 
 typedef enum {
@@ -40,6 +50,9 @@ typedef enum {
     resSetExpected = 106,
     resPostBuildLogLine = 107,
     resFetchStatus = 108,
+    /* The resulting store path of an actFetchToStore activity, emitted once the
+       operation completes. Fields: [0] = store path (string). */
+    resFetchToStore = 109,
 } ResultType;
 
 typedef uint64_t ActivityId;
