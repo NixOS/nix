@@ -4,7 +4,17 @@
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
 
+#include <fcntl.h>
+
 namespace nix {
+
+static void trySetPipeSize(Descriptor fd, size_t size)
+{
+#ifdef F_SETPIPE_SZ
+    assert(size <= INT_MAX);
+    fcntl(fd, F_SETPIPE_SZ, (int) size);
+#endif
+}
 
 HookInstance::HookInstance(const Strings & _buildHook)
 {
@@ -41,6 +51,16 @@ HookInstance::HookInstance(const Strings & _buildHook)
 
     /* Create a pipe to get the output of the builder. */
     builderOut.create();
+
+    /* Enlarge the pipe buffers (best effort) so the hook can keep making
+       progress even while we are blocked in another goal's tryBuildHook
+       and not draining these pipes: the hook logs to `fromHook` and
+       writes the build log to `builderOut`, and we write the input
+       closure into `toHook` before the hook necessarily reads it. */
+    size_t pipeSize = 1024 * 1024;
+    trySetPipeSize(fromHook.readSide.get(), pipeSize);
+    trySetPipeSize(toHook.writeSide.get(), pipeSize);
+    trySetPipeSize(builderOut.readSide.get(), pipeSize);
 
     /* Fork the hook. */
     pid = startProcess([&]() {
