@@ -96,6 +96,19 @@ TEST(parseFlakeRef, GitArchiveInput)
         ASSERT_EQ(fragment, "\"name.with.dot\"");
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar");
     }
+
+    // Both ref and rev can be specified together (https://github.com/NixOS/nix/issues/8226)
+    {
+        auto s = "github:foo/bar/branch?rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch?rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    }
+
+    {
+        auto s = "github:foo/bar?ref=branch&rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        auto flakeref = parseFlakeRef(fetchSettings, s);
+        ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch?rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    }
 }
 
 struct InputFromURLTestCase
@@ -255,6 +268,18 @@ INSTANTIATE_TEST_SUITE_P(
                 },
             .description = "github_ref_slashes_in_path_everywhere",
             .expectedUrl = "github:ownerB/repoA/branchC",
+        },
+        InputFromURLTestCase{
+            .url = "github:foo/bar/v1.0?rev=2aae6c35c94fcfb415dbe95f408b9ce91ee846ed",
+            .attrs =
+                {
+                    {"type", Attr("github")},
+                    {"owner", Attr("foo")},
+                    {"repo", Attr("bar")},
+                    {"ref", Attr("v1.0")},
+                    {"rev", Attr("2aae6c35c94fcfb415dbe95f408b9ce91ee846ed")},
+                },
+            .description = "github_ref_and_rev",
         },
         InputFromURLTestCase{
             // FIXME: Subgroups in gitlab URLs are busted. This double-encoding
