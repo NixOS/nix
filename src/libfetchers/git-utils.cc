@@ -20,6 +20,7 @@
 #include <git2/branch.h>
 #include <git2/commit.h>
 #include <git2/config.h>
+#include <git2/credential.h>
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
@@ -1669,6 +1670,91 @@ bool isLegalRefName(const std::string & refName)
     }
 
     return false;
+}
+
+/**
+ * Set up libgit2 remote callbacks that authenticate using a token
+ * via x-access-token basic auth. The token string must outlive the
+ * returned callbacks struct.
+ */
+static git_remote_callbacks makeTokenCallbacks(const std::string & token)
+{
+    git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+    callbacks.payload = const_cast<void *>(static_cast<const void *>(&token));
+    callbacks.credentials = [](git_credential ** out,
+                               const char *,
+                               const char * username_from_url,
+                               unsigned int allowed_types,
+                               void * payload) -> int {
+        auto * tok = static_cast<const std::string *>(payload);
+        /* HTTPS: authenticate with the access token via basic auth. */
+        if (!tok->empty() && (allowed_types & GIT_CREDENTIAL_USERPASS_PLAINTEXT))
+            return git_credential_userpass_plaintext_new(out, "x-access-token", tok->c_str());
+        /* SSH: a `url.<base>.insteadOf` rewrite can turn the HTTPS URL into an
+           SSH one (e.g. ssh://git@github.com/). Authenticate via the user's
+           ssh-agent, the same way git/ssh would, instead of failing with
+           "authentication required but no callback set" (#2842). */
+        const char * username = username_from_url ? username_from_url : "git";
+        if (allowed_types & GIT_CREDENTIAL_SSH_KEY)
+            return git_credential_ssh_key_from_agent(out, username);
+        if (allowed_types & GIT_CREDENTIAL_USERNAME)
+            return git_credential_username_new(out, username);
+        return GIT_PASSTHROUGH;
+    };
+    return callbacks;
+}
+
+Hash resolveRemoteRef(const std::string & url, const std::string & ref, const std::string & token)
+{
+    initLibGit2();
+
+    Remote remote;
+    if (git_remote_create_detached(Setter(remote), url.c_str()))
+        throw GitError("creating detached remote for '%s'", url);
+
+    auto callbacks = makeTokenCallbacks(token);
+
+    if (git_remote_connect(remote.get(), GIT_DIRECTION_FETCH, &callbacks, nullptr, nullptr))
+        throw GitError("connecting to remote '%s'", url);
+
+    const git_remote_head ** refs;
+    size_t refCount;
+    if (git_remote_ls(&refs, &refCount, remote.get()))
+        throw GitError("listing remote refs for '%s'", url);
+
+    auto findRef = [&](const std::string & refName, bool preferPeeled) -> std::optional<Hash> {
+        if (preferPeeled) {
+            auto peeledRef = refName + "^{}";
+            for (size_t i = 0; i < refCount; i++) {
+                if (std::string_view(refs[i]->name) == peeledRef)
+                    return toHash(refs[i]->oid);
+            }
+        }
+
+        for (size_t i = 0; i < refCount; i++) {
+            if (std::string_view(refs[i]->name) == refName)
+                return toHash(refs[i]->oid);
+        }
+
+        return std::nullopt;
+    };
+
+    std::vector<std::pair<std::string, bool>> candidates;
+    if (ref == "HEAD") {
+        candidates.push_back({"HEAD", false});
+    } else if (hasPrefix(ref, "refs/")) {
+        candidates.push_back({ref, hasPrefix(ref, "refs/tags/")});
+    } else {
+        candidates.push_back({"refs/" + ref, hasPrefix(ref, "tags/")});
+        candidates.push_back({"refs/tags/" + ref, true});
+        candidates.push_back({"refs/heads/" + ref, false});
+    }
+
+    for (auto & [candidate, preferPeeled] : candidates)
+        if (auto resolved = findRef(candidate, preferPeeled))
+            return *resolved;
+
+    throw Error("could not find ref '%s' in remote '%s'", ref, url);
 }
 
 } // namespace nix
