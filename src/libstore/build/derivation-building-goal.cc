@@ -465,13 +465,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (tryBuildHook(drvOptions, inputPaths, initialOutputs)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 valid = true;
-                co_return buildWithHook(
-                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                co_return buildWithHook(std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
             case rpDecline:
                 // We should do it ourselves.
                 co_return Return{};
@@ -498,7 +497,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (tryBuildHook(drvOptions, inputPaths, initialOutputs)) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
                        EOF from the hook. */
@@ -520,8 +519,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         if (valid) {
             co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
         } else {
-            co_return buildWithHook(
-                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            co_return buildWithHook(std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
         }
     };
 
@@ -585,15 +583,15 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 }
 
 Goal::Co DerivationBuildingGoal::buildWithHook(
-    StorePathSet inputPaths,
-    std::map<std::string, InitialOutput> initialOutputs,
-    DerivationOptions<StorePath> drvOptions,
-    PathLocks outputLocks)
+    std::map<std::string, InitialOutput> initialOutputs, DerivationOptions<StorePath> drvOptions, PathLocks outputLocks)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     unreachable();
 #else
     std::unique_ptr<HookInstance> hook = std::move(worker.hook);
+
+    hook->sink = FdSink();
+    hook->toHook.writeSide.close();
 
     /* Set up callback so childTerminated is called if the hook is
        destroyed (e.g., during failure cascades). */
@@ -607,28 +605,6 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
             throw;
         }
     }();
-
-    CommonProto::WriteConn conn{hook->sink};
-
-    /* Tell the hook all the inputs that have to be copied to the
-       remote system. */
-    CommonProto::write(worker.store, conn, inputPaths);
-
-    /* Tell the hooks the missing outputs that have to be copied back
-       from the remote system. */
-    {
-        StringSet missingOutputs;
-        for (auto & [outputName, status] : initialOutputs) {
-            // XXX: Does this include known CA outputs?
-            if (buildMode != bmCheck && status.known && status.known->isValid())
-                continue;
-            missingOutputs.insert(outputName);
-        }
-        CommonProto::write(worker.store, conn, missingOutputs);
-    }
-
-    hook->sink = FdSink();
-    hook->toHook.writeSide.close();
 
     /* Create the log file and pipe. */
     std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
@@ -1148,7 +1124,10 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook(
+    const DerivationOptions<StorePath> & drvOptions,
+    StorePathSet inputPaths,
+    std::map<std::string, InitialOutput> initialOutputs)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1167,6 +1146,31 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
                           << drv->platform << worker.store.printStorePath(drvPath)
                           << drvOptions.getRequiredSystemFeatures(*drv);
+        worker.hook->sink.flush();
+
+        /* Optimistically send inputPaths and missingOutputs so that the hook
+           can immediately start making progress, otherwise accepted hooks can
+           be blocked by a later hook taking a long time to accept. */
+
+        CommonProto::WriteConn conn{worker.hook->sink};
+
+        /* Tell the hook all the inputs that have to be copied to the
+        remote system. */
+        CommonProto::write(worker.store, conn, inputPaths);
+
+        /* Tell the hooks the missing outputs that have to be copied back
+        from the remote system. */
+        {
+            StringSet missingOutputs;
+            for (auto & [outputName, status] : initialOutputs) {
+                // XXX: Does this include known CA outputs?
+                if (buildMode != bmCheck && status.known && status.known->isValid())
+                    continue;
+                missingOutputs.insert(outputName);
+            }
+            CommonProto::write(worker.store, conn, missingOutputs);
+        }
+
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating

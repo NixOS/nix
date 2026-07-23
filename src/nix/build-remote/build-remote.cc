@@ -122,6 +122,9 @@ static int main_build_remote(int argc, char ** argv)
         std::optional<StorePath> drvPath;
         std::string storeUri;
 
+        StringSet inputs;
+        StringSet wantedOutputs;
+
         while (true) {
 
             try {
@@ -136,6 +139,9 @@ static int main_build_remote(int argc, char ** argv)
             auto neededSystem = readString(source);
             drvPath = store->parseStorePath(readString(source));
             auto requiredFeatures = readStrings<StringSet>(source);
+
+            inputs = readStrings<StringSet>(source);
+            wantedOutputs = readStrings<StringSet>(source);
 
             /* It would be possible to build locally after some builds clear out,
                so don't show the warning now: */
@@ -270,9 +276,6 @@ static int main_build_remote(int argc, char ** argv)
         assert(sshStore);
 
         std::cerr << "# accept\n" << storeUri << "\n";
-
-        auto inputs = readStrings<StringSet>(source);
-        auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock;
         {

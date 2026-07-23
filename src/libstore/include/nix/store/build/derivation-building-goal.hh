@@ -73,7 +73,6 @@ private:
     Co gaveUpOnSubstitution();
     Co tryToBuild(StorePathSet inputPaths);
     Co buildWithHook(
-        StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
@@ -87,7 +86,10 @@ private:
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
+    HookReply tryBuildHook(
+        const DerivationOptions<StorePath> & drvOptions,
+        StorePathSet inputPaths,
+        std::map<std::string, InitialOutput> initialOutputs);
 
     Done doneFailureLogTooLong(BuildLog & buildLog);
 
