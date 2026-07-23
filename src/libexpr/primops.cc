@@ -3344,6 +3344,34 @@ static RegisterPrimOp primop_removeAttrs({
    "nameN"; value = valueN;}] is transformed to {name1 = value1;
    ... nameN = valueN;}.  In case of duplicate occurrences of the same
    name, the first takes precedence. */
+static Symbol forceStringSymbol(EvalState & state, const PosIdx pos, Value & v, std::string_view errorMsg)
+{
+    auto name = state.forceStringNoCtx(v, pos, errorMsg);
+    return state.symbols.create(name);
+}
+
+template<typename GetAttrValue>
+static void
+finalizeBindings(EvalState & state, Bindings & bindings, size_t listSize, Value & v, GetAttrValue && getAttrValue)
+{
+    Symbol prev;
+    for (size_t n = 0; n < listSize; n++) {
+        auto attr = bindings[n];
+        if (prev == attr.name) {
+            continue;
+        }
+        prev = attr.name;
+        auto [val, pos] = getAttrValue(attr);
+        bindings.push_back({prev, val, pos});
+    }
+
+    // help GC and clear end of allocated array
+    for (size_t n = bindings.size(); n < listSize; n++) {
+        bindings[n] = Attr{};
+    }
+    v.mkAttrs(&bindings);
+}
+
 static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
     state.forceList(*args[0], pos, "while evaluating the argument passed to builtins.listToAttrs");
@@ -3351,6 +3379,12 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
     // Step 1. Sort the name-value attrsets in place using the memory we allocate for the result
     auto listView = args[0]->listView();
     size_t listSize = listView.size();
+
+    if (listSize == 0) {
+        v.mkAttrs(&Bindings::emptyBindings);
+        return;
+    }
+
     auto & bindings = *state.mem.allocBindings(listSize);
     using ElemPtr = decltype(&bindings[0].value);
 
@@ -3359,11 +3393,11 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
 
         auto j = state.getAttr(state.s.name, v2->attrs(), "in a {name=...; value=...;} pair");
 
-        auto name = state.forceStringNoCtx(
-            *j->value,
+        auto sym = forceStringSymbol(
+            state,
             j->pos,
+            *j->value,
             "while evaluating the `name` attribute of an element of the list passed to builtins.listToAttrs");
-        auto sym = state.symbols.create(name);
 
         // (ab)use Attr to store a Value * * instead of a Value *, so that we can stabilize the sort using the Value * *
         bindings[n] = Attr(sym, std::bit_cast<Value *>(&v2));
@@ -3375,24 +3409,12 @@ static void prim_listToAttrs(EvalState & state, const PosIdx pos, Value ** args,
     });
 
     // Step 2. Unpack the bindings in place and skip name-value pairs with duplicate names
-    Symbol prev;
-    for (size_t n = 0; n < listSize; n++) {
-        auto attr = bindings[n];
-        if (prev == attr.name) {
-            continue;
-        }
+    finalizeBindings(state, bindings, listSize, v, [&](const Attr & attr) {
         // Note that .value is actually a Value * *; see earlier comments
         Value * v2 = *std::bit_cast<ElemPtr>(attr.value);
-
         auto j = state.getAttr(state.s.value, v2->attrs(), "in a {name=...; value=...;} pair");
-        prev = attr.name;
-        bindings.push_back({prev, j->value, j->pos});
-    }
-    // help GC and clear end of allocated array
-    for (size_t n = bindings.size(); n < listSize; n++) {
-        bindings[n] = Attr{};
-    }
-    v.mkAttrs(&bindings);
+        return std::pair{j->value, j->pos};
+    });
 }
 
 static RegisterPrimOp primop_listToAttrs({
@@ -3426,6 +3448,59 @@ static RegisterPrimOp primop_listToAttrs({
       Has `O(n log n)` time complexity, where `n` is size of the list.
     )",
     .impl = prim_listToAttrs,
+});
+
+static void prim_listToAttrsWithValue(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+{
+    state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.listToAttrsWithValue");
+
+    auto listView = args[1]->listView();
+    size_t listSize = listView.size();
+
+    if (listSize == 0) {
+        v.mkAttrs(&Bindings::emptyBindings);
+        return;
+    }
+
+    auto & bindings = *state.mem.allocBindings(listSize);
+
+    size_t idx = 0;
+    for (auto v2 : listView) {
+        auto sym =
+            forceStringSymbol(state, pos, *v2, "while evaluating an element of the list passed to builtins.listToAttrsWithValue");
+        bindings[idx++] = Attr(sym, nullptr);
+    }
+
+    std::sort(&bindings[0], &bindings[listSize]);
+
+    finalizeBindings(state, bindings, listSize, v, [&](const Attr & attr) { return std::pair{args[0], pos}; });
+}
+
+static RegisterPrimOp primop_listToAttrsWithValue({
+    .name = "__listToAttrsWithValue",
+    .args = {"value", "list"},
+    .doc = R"(
+      Construct an attribute set from a list of strings where every attribute in the
+      result set has its value set to the given `value`.
+
+      In case of duplicate occurrences of the same name, only one attribute
+      is created.
+
+      Example:
+
+      ```nix
+      builtins.listToAttrsWithValue true [ "foo" "bar" "foo" ]
+      ```
+
+      evaluates to
+
+      ```nix
+      { foo = true; bar = true; }
+      ```
+
+      Has `O(n log n)` time complexity, where `n` is size of the list.
+    )",
+    .impl = prim_listToAttrsWithValue,
 });
 
 static void prim_intersectAttrs(EvalState & state, const PosIdx pos, Value ** args, Value & v)
