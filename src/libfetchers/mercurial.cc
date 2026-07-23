@@ -1,4 +1,6 @@
 #include "nix/fetchers/fetchers.hh"
+
+#include "fetchers-config-private.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/fmt.hh"
 #include "nix/util/os-string.hh"
@@ -44,6 +46,11 @@ struct MercurialInputScheme : InputScheme
     {
         if (url.scheme != "hg+http" && url.scheme != "hg+https" && url.scheme != "hg+ssh" && url.scheme != "hg+file")
             return {};
+
+#if !ENABLE_MERCURIAL
+        throw Error(
+            "cannot fetch '%s': Mercurial support is not included in this build of Nix", url.to_string());
+#endif
 
         auto url2(url);
         url2.scheme = std::string(url2.scheme, 3);
@@ -108,6 +115,11 @@ struct MercurialInputScheme : InputScheme
 
     std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
     {
+#if !ENABLE_MERCURIAL
+        throw Error(
+            "cannot fetch Mercurial input '%s': Mercurial support is not included in this build of Nix",
+            getStrAttr(attrs, "url"));
+#endif
         parseURL(getStrAttr(attrs, "url"));
 
         if (auto ref = maybeGetStrAttr(attrs, "ref")) {

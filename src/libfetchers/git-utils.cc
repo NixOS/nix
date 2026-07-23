@@ -1,4 +1,6 @@
 #include "nix/fetchers/git-utils.hh"
+
+#include "fetchers-config-private.hh"
 #include "nix/fetchers/git-lfs-fetch.hh"
 #include "nix/fetchers/cache.hh"
 #include "nix/fetchers/fetch-settings.hh"
@@ -716,7 +718,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         gitArgs.push_back(string_to_os_string(url));
         gitArgs.push_back(string_to_os_string(refspec));
 
-        auto status = runProgram({.program = "git", .args = gitArgs, .isInteractive = true}).first;
+        auto status = runProgram({.program = GIT_PROGRAM, .args = gitArgs, .isInteractive = true}).first;
 
         if (status > 0)
             throw Error("Failed to fetch git repository '%s'", url);
@@ -757,7 +759,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         // Run verification command
         auto [status, output] = runProgram({
-            .program = "git",
+            .program = GIT_PROGRAM,
             .args{
                 OS_STR("-c"),
                 OS_STR("gpg.ssh.allowedSignersFile=") + allowedSignersFile.native(),
@@ -1669,6 +1671,12 @@ bool isLegalRefName(const std::string & refName)
     }
 
     return false;
+}
+
+const std::string & gitProgram()
+{
+    static const std::string program = GIT_PROGRAM;
+    return program;
 }
 
 } // namespace nix
