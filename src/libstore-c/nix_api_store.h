@@ -12,6 +12,7 @@
  */
 
 #include "nix_api_util.h"
+#include "nix_api_store/fwd.h"
 #include "nix_api_store/store_path.h"
 #include "nix_api_store/derivation.h"
 #include <stdbool.h>
@@ -20,9 +21,6 @@
 extern "C" {
 #endif
 // cffi start
-
-/** @brief Reference to a Nix store */
-typedef struct Store Store;
 
 /**
  * @brief Initializes the Nix store library
