@@ -638,6 +638,18 @@ LockedFlake lockFlake(
                                those. */
                             for (auto & i : oldLock->inputs) {
                                 if (auto lockedNode = std::get_if<0>(&i.second)) {
+                                    /* A relative path input (e.g. 'path:./foo')
+                                       can only be resolved against the source
+                                       tree of *this* flake. In the lazy path we
+                                       don't have that tree, so the input would
+                                       be resolved against the parent flake's
+                                       tree instead -- wrong when this flake is
+                                       itself a nested input. Refetch so we get
+                                       the correct source path. See #14762. */
+                                    if ((*lockedNode)->lockedRef.input.isRelative()) {
+                                        mustRefetch = true;
+                                        break;
+                                    }
                                     fakeInputs.emplace(
                                         i.first,
                                         FlakeInput{
