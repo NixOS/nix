@@ -565,16 +565,42 @@ class MixProfileElementMatchers : virtual Args, virtual StoreCommand, public vir
 
     void completeProfileElements(AddCompletions & completions, std::string_view prefix)
     {
-        auto * evalCmd = dynamic_cast<EvalCommand *>(this);
-        if (!evalCmd)
+        if (!profile)
             return;
 
-        auto evalState = evalCmd->getEvalState();
-        ProfileManifest manifest(*evalState, *profile);
+        // Read the manifest JSON directly to avoid the cost of
+        // initialising an EvalState, which is prohibitively slow
+        // in an interactive completion context.
+        try {
+            auto manifestPath = *profile / "manifest.json";
+            if (!std::filesystem::exists(manifestPath))
+                return;
 
-        for (auto & [name, element] : manifest.elements)
-            if (name.starts_with(prefix))
-                completions.add(name, element.identifier());
+            auto json = nlohmann::json::parse(readFile(manifestPath.string()));
+            auto elems = json["elements"];
+            if (!elems.is_object())
+                return;
+
+            for (auto & elem : elems.items()) {
+                auto name = elem.key();
+                if (!name.starts_with(prefix))
+                    continue;
+
+                // Build a human-readable description from the JSON
+                // without parsing flake refs or store paths.
+                std::string description;
+                auto & e = elem.value();
+                auto url = e.value("originalUrl", e.value("originalUri", ""));
+                auto attrPath = e.value("attrPath", "");
+                if (!url.empty())
+                    description = url + "#" + attrPath;
+
+                completions.add(name, description);
+            }
+        } catch (...) {
+            // If anything goes wrong reading the manifest, silently
+            // skip completions rather than breaking the shell.
+        }
     }
 
 public:
