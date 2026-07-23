@@ -683,8 +683,7 @@ public:
     {
         auto state(state_.lock());
         if (state->active) {
-            invalidateRedrawCache();
-            std::cerr << "\r\e[K";
+            clearProgressDisplay();
             Logger::writeToStdout(s);
             draw(*state);
         } else {
