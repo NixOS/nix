@@ -23,8 +23,3 @@ error:
             7| in
 
        error: stack overflow; max-call-depth exceeded
-       at /pwd/lang/eval-fail-toJSON-stack-overflow.nix:6:62:
-            5|   long = builtins.genList (x: x) 100000;
-            6|   reverseLinkedList = builtins.foldl' (tail: head: { inherit head tail; }) null long;
-             |                                                              ^
-            7| in

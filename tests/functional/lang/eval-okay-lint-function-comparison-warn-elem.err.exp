@@ -1,0 +1,6 @@
+warning: function comparison is unreliable; it may return true or false depending on structure and evaluation order (lint-function-comparison)
+         at /pwd/lang/eval-okay-lint-function-comparison-warn-elem.nix:2:1:
+              1| # builtins.elem uses eqValues internally, so the lint fires here too.
+              2| builtins.elem (x: x) [ (a: a) ]
+               | ^
+              3|

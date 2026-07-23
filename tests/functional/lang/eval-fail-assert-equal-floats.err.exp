@@ -6,6 +6,10 @@ error:
             2| abort "unreachable"
 
        … while comparing attribute 'b'
+         at /pwd/lang/eval-fail-assert-equal-floats.nix:1:21:
+            1| assert { b = 1.0; } == { b = 1.01; };
+             |                     ^
+            2| abort "unreachable"
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-equal-floats.nix:1:10:

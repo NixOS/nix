@@ -6,6 +6,11 @@ error:
             2|   {
 
        … while comparing attribute 'foo'
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:8:5:
+            7|     };
+            8|   } == {
+             |     ^
+            9|     foo = {
 
        … where left hand side is
          at /pwd/lang/eval-fail-assert-equal-derivations.nix:3:5:
@@ -22,5 +27,10 @@ error:
            10|       type = "derivation";
 
        … while comparing a derivation by its 'outPath' attribute
+         at /pwd/lang/eval-fail-assert-equal-derivations.nix:8:5:
+            7|     };
+            8|   } == {
+             |     ^
+            9|     foo = {
 
        error: string '"/nix/store/0"' is not equal to string '"/nix/store/1"'
