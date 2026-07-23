@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr name="a">
+      <string value="foo" />
+    </attr>
+    <attr name="at">
+      <function>
+        <attrspat name="args">
+          <attr name="x" />
+          <attr name="y" />
+          <attr name="z" />
+        </attrspat>
+      </function>
+    </attr>
+    <attr name="b">
+      <string value="bar" />
+    </attr>
+    <attr name="c">
+      <string value="foobar" />
+    </attr>
+    <attr name="ellipsis">
+      <function>
+        <attrspat ellipsis="1">
+          <attr name="x" />
+          <attr name="y" />
+          <attr name="z" />
+        </attrspat>
+      </function>
+    </attr>
+    <attr name="f">
+      <function>
+        <attrspat>
+          <attr name="x" />
+          <attr name="y" />
+          <attr name="z" />
+        </attrspat>
+      </function>
+    </attr>
+    <attr name="id">
+      <function>
+        <varpat name="x" />
+      </function>
+    </attr>
+    <attr name="x">
+      <int value="123" />
+    </attr>
+    <attr name="y">
+      <float value="567.89" />
+    </attr>
+  </attrs>
+</expr>

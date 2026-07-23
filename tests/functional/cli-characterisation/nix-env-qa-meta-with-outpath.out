@@ -1,0 +1,16 @@
+{
+  "": {
+    "meta": {
+      "bad": null,
+      "description": "Has outPath in meta"
+    },
+    "name": "meta-with-outpath-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "meta-with-outpath",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}

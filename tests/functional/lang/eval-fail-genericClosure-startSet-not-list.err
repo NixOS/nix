@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-startSet-not-list.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = "not a list";
+
+       … while evaluating the 'startSet' attribute passed as argument to builtins.genericClosure
+
+       error: expected a list but found a string: "not a list"

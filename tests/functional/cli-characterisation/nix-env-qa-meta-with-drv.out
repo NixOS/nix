@@ -1,0 +1,15 @@
+{
+  "": {
+    "meta": {
+      "someDrv": null
+    },
+    "name": "meta-with-drv-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "meta-with-drv",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}

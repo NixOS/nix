@@ -1,0 +1,9 @@
+bad-drvpath-1.0           
+bad-output-specified-1.0  
+deep-meta-1.0             Has deeply nested meta
+ghost-outpath-1.0         
+ghost-output-1.0          
+infinite-meta-1.0         Has infinite recursion in meta
+no-system-1.0             
+normal-1.0                A normal package
+simple-1.0                

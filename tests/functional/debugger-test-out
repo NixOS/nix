@@ -1,0 +1,15 @@
+Env level 0
+static: [35;1m_ [0m
+
+Env level 1
+static: [35;1m[0m
+with: [35;1ma [0m
+
+Env level 2
+static: [35;1mx [0m
+
+Env level 3
+[35;1mbuiltins true false null scopedImport import isNull break abort throw derivationStrict placeholder baseNameOf dirOf removeAttrs map toString fetchMercurial fetchTree fetchTarball fetchGit fromTOML derivation [0m
+
+
+

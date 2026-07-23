@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<items>
+  <item attrPath="bad-drvpath" name="bad-drvpath-1.0" outputName="" pname="bad-drvpath" system="unknown" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="bad-output-specified" name="bad-output-specified-1.0" outputName="nonexistent" pname="bad-output-specified" system="unknown" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="deep-meta" name="deep-meta-1.0" outputName="out" pname="deep-meta" system="SYSTEM" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="ghost-outpath" name="ghost-outpath-1.0" outputName="" pname="ghost-outpath" system="unknown" version="1.0">
+    <output name="ghost" />
+    <output name="out" />
+  </item>
+  <item attrPath="ghost-output" name="ghost-output-1.0" outputName="" pname="ghost-output" system="unknown" version="1.0">
+    <output name="ghost" />
+    <output name="out" />
+  </item>
+  <item attrPath="infinite-meta" name="infinite-meta-1.0" outputName="out" pname="infinite-meta" system="SYSTEM" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="no-system" name="no-system-1.0" outputName="" pname="no-system" system="unknown" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="normal" name="normal-1.0" outputName="out" pname="normal" system="SYSTEM" version="1.0">
+    <output name="out" />
+  </item>
+  <item attrPath="simple" name="simple-1.0" outputName="out" pname="simple" system="SYSTEM" version="1.0">
+    <output name="out" />
+  </item>
+</items>

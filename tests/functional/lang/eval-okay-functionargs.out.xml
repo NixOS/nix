@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <list>
+    <string value="stdenv" />
+    <string value="fetchurl" />
+    <string value="aterm-stdenv" />
+    <string value="aterm-stdenv2" />
+    <string value="libX11" />
+    <string value="libXv" />
+    <string value="mplayer-stdenv2.libXv-libX11" />
+    <string value="mplayer-stdenv2.libXv-libX11_2" />
+    <string value="nix-stdenv-aterm-stdenv" />
+    <string value="nix-stdenv2-aterm2-stdenv2" />
+  </list>
+</expr>
