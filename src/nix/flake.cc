@@ -492,15 +492,16 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
             }
         };
 
-        auto checkModule = [&](std::string_view attrPath, Value & v, const PosIdx pos) {
-            try {
-                Activity act(*logger, lvlInfo, actUnknown, fmt("checking NixOS module '%s'", attrPath));
-                state->forceValue(v, pos);
-            } catch (Error & e) {
-                e.addTrace(resolve(pos), HintFmt("while checking the NixOS module '%s'", attrPath));
-                reportError(e);
-            }
-        };
+        auto checkModule =
+            [&](std::string_view attrPath, Value & v, const PosIdx pos, std::string_view label = "NixOS module") {
+                try {
+                    Activity act(*logger, lvlInfo, actUnknown, fmt("checking %s '%s'", label, attrPath));
+                    state->forceValue(v, pos);
+                } catch (Error & e) {
+                    e.addTrace(resolve(pos), HintFmt("while checking the %s '%s'", label, attrPath));
+                    reportError(e);
+                }
+            };
 
         std::function<void(std::string_view attrPath, Value & v, const PosIdx pos)> checkHydraJobs;
 
@@ -538,6 +539,23 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
                     throw Error("attribute 'config.system.build.toplevel' is not a derivation");
             } catch (Error & e) {
                 e.addTrace(resolve(pos), HintFmt("while checking the NixOS configuration '%s'", attrPath));
+                reportError(e);
+            }
+        };
+
+        // FIXME: The attribute path 'config.build.toplevel' is a proposed convention.
+        // We should decide on standardizing this path and update downstream projects
+        // (nixpkgs, home-manager, nix-darwin, etc.) to expose it before this stabilizes.
+        auto checkConfiguration = [&](const std::string & attrPath, Value & v, const PosIdx pos) {
+            try {
+                Activity act(*logger, lvlInfo, actUnknown, fmt("checking configuration '%s'", attrPath));
+                Bindings & bindings = Bindings::emptyBindings;
+                auto vToplevel = findAlongAttrPath(*state, "config.build.toplevel", bindings, v).first;
+                state->forceValue(*vToplevel, pos);
+                if (!state->isDerivation(*vToplevel))
+                    throw Error("attribute 'config.build.toplevel' is not a derivation");
+            } catch (Error & e) {
+                e.addTrace(resolve(pos), HintFmt("while checking the configuration '%s'", attrPath));
                 reportError(e);
             }
         };
@@ -732,11 +750,42 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
                             checkModule(fmt("%s.%s", name, state->symbols[attr.name]), *attr.value, attr.pos);
                     }
 
+                    else if (name == "modules") {
+                        state->forceAttrs(vOutput, pos, "");
+                        for (auto & kindAttr : *vOutput.attrs()) {
+                            state->forceAttrs(*kindAttr.value, kindAttr.pos, "");
+                            for (auto & moduleAttr : *kindAttr.value->attrs())
+                                checkModule(
+                                    fmt("%s.%s.%s",
+                                        name,
+                                        state->symbols[kindAttr.name],
+                                        state->symbols[moduleAttr.name]),
+                                    *moduleAttr.value,
+                                    moduleAttr.pos,
+                                    "module");
+                        }
+                    }
+
                     else if (name == "nixosConfigurations") {
                         state->forceAttrs(vOutput, pos, "");
                         for (auto & attr : *vOutput.attrs())
                             checkNixOSConfiguration(
                                 fmt("%s.%s", name, state->symbols[attr.name]), *attr.value, attr.pos);
+                    }
+
+                    else if (name == "configurations") {
+                        state->forceAttrs(vOutput, pos, "");
+                        for (auto & kindAttr : *vOutput.attrs()) {
+                            state->forceAttrs(*kindAttr.value, kindAttr.pos, "");
+                            for (auto & configAttr : *kindAttr.value->attrs())
+                                checkConfiguration(
+                                    fmt("%s.%s.%s",
+                                        name,
+                                        state->symbols[kindAttr.name],
+                                        state->symbols[configAttr.name]),
+                                    *configAttr.value,
+                                    configAttr.pos);
+                        }
                     }
 
                     else if (name == "hydraJobs")
@@ -1223,7 +1272,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 
             try {
                 if ((attrPathS[0] == "apps" || attrPathS[0] == "checks" || attrPathS[0] == "devShells"
-                     || attrPathS[0] == "legacyPackages" || attrPathS[0] == "packages")
+                     || attrPathS[0] == "legacyPackages" || attrPathS[0] == "packages" || attrPathS[0] == "modules"
+                     || attrPathS[0] == "configurations")
                     && (attrPathS.size() == 1 || attrPathS.size() == 2)) {
                     for (const auto & subAttr : visitor2->getAttrs()) {
                         if (hasContent(*visitor2, attrPath2, subAttr)) {
@@ -1332,7 +1382,8 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                             || attrPathS[0] == "templates" || attrPathS[0] == "overlays"))
                     || ((attrPath.size() == 1 || attrPath.size() == 2)
                         && (attrPathS[0] == "checks" || attrPathS[0] == "packages" || attrPathS[0] == "devShells"
-                            || attrPathS[0] == "apps"))) {
+                            || attrPathS[0] == "apps" || attrPathS[0] == "modules"
+                            || attrPathS[0] == "configurations"))) {
                     recurse();
                 }
 
@@ -1470,6 +1521,10 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                                                : (attrPath.size() == 1 && attrPathS[0] == "nixosModule")
                                                        || (attrPath.size() == 2 && attrPathS[0] == "nixosModules")
                                                    ? std::make_pair("nixos-module", "NixOS module")
+                                               : attrPath.size() == 3 && attrPathS[0] == "configurations"
+                                                   ? std::make_pair("configuration", "configuration")
+                                               : attrPath.size() == 3 && attrPathS[0] == "modules"
+                                                   ? std::make_pair("module", "module")
                                                    : std::make_pair("unknown", "unknown");
                     if (json) {
                         j.emplace("type", type);
