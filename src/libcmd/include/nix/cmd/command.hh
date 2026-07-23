@@ -152,6 +152,7 @@ struct SourceExprCommand : virtual Args, MixFlakeOptions
 {
     std::optional<std::filesystem::path> file;
     std::optional<std::string> expr;
+    std::optional<std::string> tree;
 
     SourceExprCommand();
 

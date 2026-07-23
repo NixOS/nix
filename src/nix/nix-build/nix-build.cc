@@ -132,6 +132,7 @@ static void main_nix_build(int argc, char ** argv)
     auto interactive = isatty(STDIN_FILENO) && isatty(STDERR_FILENO);
     Strings attrPaths;
     Strings remainingArgs;
+    std::optional<std::string> treeRef;
     BuildMode buildMode = bmNormal;
     bool readStdin = false;
 
@@ -252,6 +253,9 @@ static void main_nix_build(int argc, char ** argv)
         else if (*arg == "--expr" || *arg == "-E")
             fromArgs = true;
 
+        else if (*arg == "--tree")
+            treeRef = getArg(*arg, arg, end);
+
         else if (*arg == "--pure")
             pure = true;
         else if (*arg == "--impure")
@@ -317,6 +321,17 @@ static void main_nix_build(int argc, char ** argv)
     if (packages && fromArgs)
         throw UsageError("'-p' and '-E' are mutually exclusive");
 
+    if (treeRef) {
+        if (fromArgs)
+            throw UsageError("'--tree' and '--expr' are mutually exclusive");
+        if (packages)
+            throw UsageError("'--tree' and '-p' are mutually exclusive");
+        if (!remainingArgs.empty())
+            throw UsageError("'--tree' cannot be combined with positional file arguments");
+        if (readStdin)
+            throw UsageError("'--tree' and '-' (read from stdin) are mutually exclusive");
+    }
+
     auto store = openStore();
     auto evalStore = myArgs.evalStoreUrl ? openStore(StoreReference{*myArgs.evalStoreUrl}) : store;
 
@@ -376,7 +391,11 @@ static void main_nix_build(int argc, char ** argv)
 
     if (readStdin)
         exprs = {state->parseStdin()};
-    else
+    else if (treeRef) {
+        auto sourcePath = fetchTreeArg(*state, *treeRef, absPath(myArgs.getCommandBaseDir()));
+        auto resolvedPath = isNixShell ? resolveShellExprPath(sourcePath) : resolveExprPath(sourcePath);
+        exprs.push_back(state->parseExprFromFile(resolvedPath));
+    } else
         for (auto i : remainingArgs) {
             auto shebangBaseDir = absPath(script.parent_path());
             if (fromArgs) {
