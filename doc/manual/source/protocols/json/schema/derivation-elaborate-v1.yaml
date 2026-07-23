@@ -1,5 +1,5 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-options-v1.json"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-elaborate-v1.json"
 title: Derivation Options
 description: |
   JSON representation of Nix's `DerivationOptions` type.

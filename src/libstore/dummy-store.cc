@@ -1,3 +1,4 @@
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/callback.hh"
@@ -371,7 +372,7 @@ public:
                 /* compute path info on demand */
                 auto res2 = make_ref<MemorySourceAccessor>();
                 res2->root = MemorySourceAccessor::File::Regular{
-                    .contents = kv.second.unparse(*this, false),
+                    .contents = kv.second.unparse(*this),
                 };
                 res = std::move(res2).get_ptr();
             });

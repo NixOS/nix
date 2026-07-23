@@ -15,9 +15,23 @@
     "srcs": []
   },
   "name": "advanced-attributes-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
-      "path": "1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults"
+      "checks": null,
+      "path": "1qsc7svv43m4dw2prh6mvyf7cai5czji-advanced-attributes-defaults",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "my-system",

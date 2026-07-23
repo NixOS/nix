@@ -10,8 +10,23 @@
     "srcs": []
   },
   "name": "filled-in-deferred-empty-env-var",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
-    "out": {}
+    "out": {
+      "checks": null,
+      "unsafeDiscardReferences": false
+    }
   },
   "system": "x86_64-linux",
   "version": 4

@@ -1,5 +1,6 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/outputs-query.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
@@ -90,7 +91,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
         std::set<std::filesystem::path> outputs;
         for (auto & j : path.outputs) {
             /* Match outputs of a store path with outputs of the derivation that produces it. */
-            DerivationOutputs::iterator i = drv.outputs.find(j);
+            auto i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'", store2->printStorePath(path.path), j);
             auto outPath = outputPaths.at(i->first);
@@ -441,11 +442,11 @@ static void opQuery(Strings opFlags, Strings opArgs)
         for (auto & i : opArgs) {
             auto path = useDeriver(store->followLinksToStorePath(i));
             Derivation drv = store->derivationFromPath(path);
-            StringPairs::iterator j = drv.env.find(bindingName);
+            auto j = drv.env.find(bindingName);
             if (j == drv.env.end())
                 throw Error(
                     "derivation '%s' has no environment binding named '%s'", store->printStorePath(path), bindingName);
-            std::cout << fmt("%s\n", j->second);
+            std::cout << fmt("%s\n", j->second.value);
         }
         break;
 
@@ -531,7 +532,7 @@ static void opPrintEnv(Strings opFlags, Strings opArgs)
     /* Print each environment variable in the derivation in a format
      * that can be sourced by the shell. */
     for (auto & i : drv.env)
-        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second));
+        logger->cout("export %1%; %1%=%2%\n", i.first, escapeShellArgAlways(i.second.value));
 
     /* Also output the arguments. */
     std::string argsStr = concatStringsSep(" ", drv.args);
@@ -1026,7 +1027,11 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             auto drvPath = store->parseStorePath(readString(in));
             BasicDerivation drv;
-            readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
+            {
+                BasicDerivationATerm drvATerm;
+                readDerivation(in, *store, drvATerm, Derivation::nameFromPath(drvPath));
+                drv = drvATerm.elaborate(*store, Derivation::nameFromPath(drvPath));
+            }
 
             getBuildSettings();
 

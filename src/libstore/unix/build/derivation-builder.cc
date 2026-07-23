@@ -474,7 +474,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    auto requiredFeatures = drvOptions.getRequiredSystemFeatures(drv);
+    auto requiredFeatures = drv.getRequiredSystemFeatures();
 
     usingSubmitted = requiredFeatures.count(drvFeatureBuilderRpcV0);
 
@@ -489,7 +489,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
     printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
     for (auto & i : drv.env)
-        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second.value);
 
     /* Create the log file. */
     miscMethods->openLogFile();
@@ -542,7 +542,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     auto allowedPaths = localSettings.allowedImpureHostPrefixes.get();
 
     /* This works like the above, except on a per-derivation level */
-    auto impurePaths = drvOptions.impureHostDeps;
+    auto impurePaths = drv.options.impureHostDeps;
 
     for (auto & i : impurePaths) {
         bool found = false;
@@ -564,7 +564,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
                 store.printStorePath(drvPath),
                 i);
 
-        /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
+        /* Allow files in drv.options.impureHostDeps to be missing; e.g.
            macOS 11+ has no /usr/lib/libSystem*.dylib */
         pathsInChroot[i] = {i, true};
     }
@@ -605,7 +605,7 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
 
 void DerivationBuilderImpl::prepareSandbox()
 {
-    if (drvOptions.useUidRange(drv))
+    if (drv.useUidRange())
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
@@ -638,7 +638,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
         auto url = drv.env.find("url");
         if (url != drv.env.end()) {
             try {
-                auto parsedUrl = parseURL(url->second);
+                auto parsedUrl = parseURL(url->second.value);
                 if (parsedUrl.scheme == "s3") {
                     debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
                     auto s3Url = ParsedS3URL::parse(parsedUrl);
@@ -776,7 +776,7 @@ void DerivationBuilderImpl::initEnv()
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
-        for (auto & i : drvOptions.impureEnvVars) {
+        for (auto & i : drv.options.impureEnvVars) {
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
@@ -1196,8 +1196,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             inodesSeen);
 
         bool discardReferences = false;
-        if (auto udr = get(drvOptions.unsafeDiscardReferences, outputName)) {
-            discardReferences = *udr;
+        if (auto * outputWithOpts = get(drv.outputs, outputName)) {
+            discardReferences = outputWithOpts->options.unsafeDiscardReferences;
         }
 
         StorePathSet references;
@@ -1500,7 +1500,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 },
 
             },
-            output->raw);
+            output->output.raw);
 
         /* FIXME: set proper permissions in restorePath() so
             we don't have to do another traversal. */
@@ -1524,7 +1524,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(store, drv.name, outputName);
+        auto optFixedPath = output->output.path(store, drv.name, outputName);
         if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
 
@@ -1541,7 +1541,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     PathFmt(store.toRealPath(newInfo.path)));
                 deletePath(actualPath);
                 /* Trigger the hash-mismatch error. */
-                checkCAOutput(store, drvPath, *output, newInfo, outputName);
+                checkCAOutput(store, drvPath, output->output, newInfo, outputName);
                 unreachable();
             }
         }
@@ -1652,7 +1652,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(store, drvPath, drv, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -1714,7 +1714,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
 
     // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
     // more verification steps needed afterward
-    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(store, drvPath, drv, infos);
 
     for (auto & [outputName, output] : drv.outputs) {
         // For some reason cannot be moved to checkOutputs, needs debugging
@@ -1730,8 +1730,8 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
         // and that the outputs of a content-addressing derivation is content-addressed in checkOutputs.
         // Add an assert here just in case, but it should never trigger.
         assert(
-            std::get_if<DerivationOutput::CAFloating>(&output.raw)
-            || std::get_if<DerivationOutput::CAFixed>(&output.raw));
+            std::get_if<DerivationOutput::CAFloating>(&output.output.raw)
+            || std::get_if<DerivationOutput::CAFixed>(&output.output.raw));
 
         // No need to sign CA outputs, only the realisation matters
         auto realisation = Realisation{
@@ -1837,13 +1837,13 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     /* Are we doing a sandboxed build? */
     {
         if (localSettings.sandboxMode == smEnabled) {
-            if (params.drvOptions.noChroot)
+            if (params.drv.options.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'",
                     store.printStorePath(params.drvPath));
 #ifdef __APPLE__
-            if (params.drvOptions.additionalSandboxProfile != "")
+            if (params.drv.options.additionalSandboxProfile != "")
                 throw Error(
                     "derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'",
@@ -1854,7 +1854,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = false;
         else if (localSettings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
-            useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
+            useSandbox = params.drv.type().isSandboxed() && !params.drv.options.noChroot;
     }
 
     if (store.storeDir != store.config->realStoreDir.get()) {
@@ -1876,7 +1876,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
 
 #endif
 
-    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drv.useUidRange())
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__

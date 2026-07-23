@@ -14,6 +14,18 @@
         "srcs": []
       },
       "name": "foo",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allOutputChecks": null,
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": []
+      },
       "outputs": {},
       "system": "",
       "version": 4

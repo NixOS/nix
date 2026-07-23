@@ -1,7 +1,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 
 #include <nlohmann/json.hpp>
 #include <regex>
@@ -99,22 +99,19 @@ static nlohmann::json pathInfoToJSON(Store & store, const StorePathSet & storePa
 }
 
 nlohmann::json::object_t StructuredAttrs::prepareStructuredAttrs(
-    Store & store,
-    const DerivationOptions<StorePath> & drvOptions,
-    const StorePathSet & inputPaths,
-    const DerivationOutputs & outputs) const
+    Store & store, const BasicDerivation & drv, const StorePathSet & inputPaths, const StringSet & outputNames) const
 {
     /* Copy to then modify */
     auto json = structuredAttrs;
 
     /* Add an "outputs" object containing the output paths. */
     nlohmann::json outputsJson;
-    for (auto & i : outputs)
-        outputsJson[i.first] = hashPlaceholder(i.first);
+    for (auto & outputName : outputNames)
+        outputsJson[outputName] = hashPlaceholder(outputName);
     json["outputs"] = std::move(outputsJson);
 
     /* Handle exportReferencesGraph. */
-    for (auto & [key, storePaths] : drvOptions.exportReferencesGraph) {
+    for (auto & [key, storePaths] : drv.options.exportReferencesGraph) {
         json[key] = pathInfoToJSON(store, store.exportReferences(storePaths, inputPaths));
     }
 

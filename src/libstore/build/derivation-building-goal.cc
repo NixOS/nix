@@ -53,8 +53,8 @@ std::string DerivationBuildingGoal::key()
     return "dd$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType> & drv)
+template<typename InputType>
+std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputType, DerivationOutput> & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
@@ -69,8 +69,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<Inp
     return msg;
 }
 
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<FullInputs> & drv);
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<StorePathSet> & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const BasicDerivation & drv);
 
 namespace {
 
@@ -303,14 +303,6 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
-    auto drvOptions = [&] {
-        try {
-            return derivationOptionsFromStructuredAttrs(worker.store, drv->env, get(drv->structuredAttrs));
-        } catch (Error & e) {
-            e.addTrace({}, "while parsing derivation '%s'", worker.store.printStorePath(drvPath));
-            throw;
-        }
-    }();
 
     std::map<std::string, InitialOutput> initialOutputs;
 
@@ -366,7 +358,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             wrongStore.badPlatform = WrongLocalStore::Pair<std::string>{drv->platform, settings.thisSystem.get()};
 
         {
-            auto required = drvOptions.getRequiredSystemFeatures(*drv);
+            auto required = drv->getRequiredSystemFeatures();
             auto & available = worker.store.config.systemFeatures.get();
             if (std::ranges::any_of(required, [&](const std::string & f) { return !available.count(f); }))
                 wrongStore.missingFeatures = WrongLocalStore::Pair<StringSet>{required, available};
@@ -465,13 +457,12 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (tryBuildHook()) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 valid = true;
-                co_return buildWithHook(
-                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                co_return buildWithHook(std::move(inputPaths), std::move(initialOutputs), std::move(outputLocks));
             case rpDecline:
                 // We should do it ourselves.
                 co_return Return{};
@@ -498,7 +489,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (tryBuildHook()) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
                        EOF from the hook. */
@@ -520,8 +511,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         if (valid) {
             co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
         } else {
-            co_return buildWithHook(
-                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            co_return buildWithHook(std::move(inputPaths), std::move(initialOutputs), std::move(outputLocks));
         }
     };
 
@@ -533,8 +523,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
             valid = true;
-            co_return buildLocally(
-                *cap, std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            co_return buildLocally(*cap, std::move(inputPaths), std::move(initialOutputs), std::move(outputLocks));
         }
 
         co_return Return{};
@@ -547,7 +536,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         co_await tryBuildLocally(valid);
         if (valid)
             co_return Return{};
-    } else if (drvOptions.preferLocalBuild) {
+    } else if (drv->options.preferLocalBuild) {
         // Local is preferred, so try it first. If it's not available, fall back to the hook.
         {
             bool valid = false;
@@ -585,10 +574,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 }
 
 Goal::Co DerivationBuildingGoal::buildWithHook(
-    StorePathSet inputPaths,
-    std::map<std::string, InitialOutput> initialOutputs,
-    DerivationOptions<StorePath> drvOptions,
-    PathLocks outputLocks)
+    StorePathSet inputPaths, std::map<std::string, InitialOutput> initialOutputs, PathLocks outputLocks)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     unreachable();
@@ -804,7 +790,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
-    DerivationOptions<StorePath> drvOptions,
     PathLocks outputLocks)
 {
     co_await yield();
@@ -928,7 +913,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             }
 
             try {
-                desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
+                desugaredEnv = DesugaredEnv::create(worker.store, *drv, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
                 co_return doneFailure(std::move(e));
@@ -938,7 +923,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 .drvPath = drvPath,
                 .buildResult = buildResult,
                 .drv = *drv,
-                .drvOptions = drvOptions,
                 .inputPaths = inputPaths,
                 .initialOutputs = initialOutputs,
                 .buildMode = buildMode,
@@ -1148,7 +1132,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook()
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1165,8 +1149,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 
         /* Send the request to the hook. */
         worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
-                          << drv->platform << worker.store.printStorePath(drvPath)
-                          << drvOptions.getRequiredSystemFeatures(*drv);
+                          << drv->platform << worker.store.printStorePath(drvPath) << drv->getRequiredSystemFeatures();
         worker.hook->sink.flush();
 
         /* Read the first line of input, which should be a word indicating
@@ -1282,7 +1265,7 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
        we do best-effort with static information. */
     std::map<std::string, std::optional<StorePath>> res;
     for (auto & [name, output] : drv->outputs)
-        res.insert_or_assign(name, output.path(worker.store, drv->name, name));
+        res.insert_or_assign(name, output.output.path(worker.store, drv->name, name));
     return res;
 }
 

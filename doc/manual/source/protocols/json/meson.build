@@ -17,7 +17,7 @@ schemas = [
   'store-object-info-v3',
   'derivation-v4',
   'derivation-resolved-v4',
-  'derivation-options-v1',
+  'derivation-elaborate-v1',
   'deriving-path-v1',
   'build-trace-entry-v3',
   'build-result-v1',

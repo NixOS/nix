@@ -16,6 +16,7 @@
 #include "nix/store/path-with-outputs.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
@@ -626,7 +627,11 @@ static void performOp(
          * it cannot be trusted that its outPath was calculated
          * correctly.
          */
-        readDerivation(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
+        {
+            BasicDerivationATerm drvATerm;
+            readDerivation(conn.from, *store, drvATerm, Derivation::nameFromPath(drvPath));
+            drv = drvATerm.elaborate(*store, Derivation::nameFromPath(drvPath));
+        }
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 

@@ -10,9 +10,23 @@
     "srcs": []
   },
   "name": "filled-in-deferred-no-env-var",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
-      "path": "wpk9qrgg77fyswhailap0gicgw98izx9-filled-in-deferred-no-env-var"
+      "checks": null,
+      "path": "wpk9qrgg77fyswhailap0gicgw98izx9-filled-in-deferred-no-env-var",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-linux",

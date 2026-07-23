@@ -1039,7 +1039,7 @@ std::string EvalState::mkSingleDerivedPathStringRaw(const SingleDerivedPath & p)
                                     "derivation '%s' does not have output '%s'",
                                     b.drvPath->to_string(*store),
                                     b.output);
-                            return i->second.path(*store, drv.name, b.output);
+                            return i->second.output.path(*store, drv.name, b.output);
                         },
                         [&](const SingleDerivedPath::Built & o) -> std::optional<StorePath> { return std::nullopt; },
                     },

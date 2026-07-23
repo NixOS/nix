@@ -30,19 +30,20 @@ protected:
     StorePath makeCAFloatingDependency(std::string_view name)
     {
         Derivation depDrv{
+            .name = std::string{name},
             .outputs{
                 {
                     "out",
-                    DerivationOutput{DerivationOutput::CAFloating{
-                        .method = ContentAddressMethod::Raw::NixArchive,
-                        .hashAlgo = HashAlgorithm::SHA256,
-                    }},
+                    {.output =
+                         DerivationOutput::CAFloating{
+                             .method = ContentAddressMethod::Raw::NixArchive,
+                             .hashAlgo = HashAlgorithm::SHA256,
+                         }},
                 },
             },
             .platform = "x86_64-linux",
             .builder = "/bin/sh",
-            .env = {{"out", ""}},
-            .name = std::string{name},
+            .env = {{"out", {}}},
         };
 
         // Fill in the dependency derivation's output paths
@@ -65,11 +66,11 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_emptyStringEnvVar)
 
     // Before: Derivation with deferred output
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .name = "filled-in-deferred-empty-env-var",
+        .outputs = {{"out", {.output = DerivationOutput::Deferred{}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Fill in deferred output with empty env var"}, {"out", ""}},
-        .name = "filled-in-deferred-empty-env-var",
+        .env = {{"__doc", {.value = "Fill in deferred output with empty env var"}}, {"out", {}}},
     };
 
     // Serialize before state
@@ -81,12 +82,12 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_emptyStringEnvVar)
     checkpointJson("filled-in-deferred-empty-env-var-post", drv);
 
     // After: Should have been converted to InputAddressed
-    auto * outputP = std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").raw);
+    auto * outputP = std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").output.raw);
     ASSERT_TRUE(outputP);
     auto & output = *outputP;
 
     // Environment variable should be filled in
-    EXPECT_EQ(drv.env.at("out"), store->printStorePath(output.path));
+    EXPECT_EQ(drv.env.at("out").value, store->printStorePath(output.path));
 }
 
 TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_empty_string_var)
@@ -95,11 +96,11 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_empty_string_var)
 
     // Before: Derivation with deferred output
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .name = "filled-in-deferred-no-env-var",
+        .outputs = {{"out", {.output = DerivationOutput::Deferred{}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Fill in deferred with missing env var"}},
-        .name = "filled-in-deferred-no-env-var",
+        .env = {{"__doc", {.value = "Fill in deferred with missing env var"}}},
     };
 
     // Serialize before state
@@ -111,12 +112,12 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_empty_string_var)
     checkpointJson("filled-in-deferred-no-env-var-post", drv);
 
     // After: Should have been converted to InputAddressed
-    auto * outputP = std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").raw);
+    auto * outputP = std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").output.raw);
     ASSERT_TRUE(outputP);
     auto & output = *outputP;
 
     // Environment variable should be filled in
-    EXPECT_EQ(drv.env.at("out"), store->printStorePath(output.path));
+    EXPECT_EQ(drv.env.at("out").value, store->printStorePath(output.path));
 }
 
 TEST_F(FillInOutputPathsTest, preservesInputAddressedOutputs)
@@ -124,11 +125,13 @@ TEST_F(FillInOutputPathsTest, preservesInputAddressedOutputs)
     auto expectedPath = StorePath{"w4bk7hpyxzgy2gx8fsa8f952435pll3i-filled-in-already"};
 
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::InputAddressed{.path = expectedPath}}}},
+        .name = "filled-in-already",
+        .outputs = {{"out", {.output = DerivationOutput{DerivationOutput::InputAddressed{.path = expectedPath}}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Correct path stays unchanged"}, {"out", store->printStorePath(expectedPath)}},
-        .name = "filled-in-already",
+        .env =
+            {{"__doc", {.value = "Correct path stays unchanged"}},
+             {"out", {.value = store->printStorePath(expectedPath)}}},
     };
 
     // Serialize before state
@@ -147,11 +150,13 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectInputAddressedPath)
     auto wrongPath = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"};
 
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::InputAddressed{.path = wrongPath}}}},
+        .name = "bad-path",
+        .outputs = {{"out", {.output = DerivationOutput{DerivationOutput::InputAddressed{.path = wrongPath}}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Wrong InputAddressed path throws error"}, {"out", store->printStorePath(wrongPath)}},
-        .name = "bad-path",
+        .env =
+            {{"__doc", {.value = "Wrong InputAddressed path throws error"}},
+             {"out", {.value = store->printStorePath(wrongPath)}}},
     };
 
     // Serialize before state
@@ -166,11 +171,11 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
     auto wrongPath = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"};
 
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .name = "bad-env-var",
+        .outputs = {{"out", {.output = DerivationOutput{DerivationOutput::Deferred{}}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Wrong env var value throws error"}, {"out", store->printStorePath(wrongPath)}},
-        .name = "bad-env-var",
+        .env = {{"__doc", {.value = "Wrong env var value throws error"}}, {"out", {.value = store->printStorePath(wrongPath)}}},
     };
 
     // Serialize before state
@@ -189,12 +194,19 @@ TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 
     // Create a derivation that depends on the dependency
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .name = "depends-on-drv",
+        .outputs{
+            {"out", {.output = DerivationOutput::Deferred{}}},
+        },
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Deferred stays deferred with CA dependencies"}, {"out", ""}},
-        .name = "depends-on-drv",
+        .env = {{"__doc", {.value = "Deferred stays deferred with CA dependencies"}}, {"out", {}}},
     };
 
     // Serialize before state
@@ -220,12 +232,22 @@ TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeffered)
 
     // Create a derivation that depends on the dependency
     Derivation drv{
-        .outputs = {{"out", DerivationOutput{DerivationOutput::InputAddressed{.path = wrongPath}}}},
-        .inputs = {.drvs = {.map = {{depDrvPath, {.value = {"out"}}}}}},
+        .name = "depends-on-drv",
+        .outputs{
+            {"out",
+             {.output = DerivationOutput{DerivationOutput::InputAddressed{
+                  .path = wrongPath,
+              }}}},
+        },
+        .inputs{
+            SingleDerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(depDrvPath),
+                .output = "out",
+            },
+        },
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "InputAddressed throws when should be deferred"}, {"out", ""}},
-        .name = "depends-on-drv",
+        .env = {{"__doc", {.value = "InputAddressed throws when should be deferred"}}, {"out", {}}},
     };
 
     // Serialize before state

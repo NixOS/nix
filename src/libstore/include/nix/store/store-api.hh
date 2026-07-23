@@ -37,11 +37,12 @@ struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
 
-template<typename Inputs>
+struct DerivationOutput;
+
+template<typename Input, typename Output>
 struct DerivationT;
-struct FullInputs;
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+using BasicDerivation = DerivationT<StorePath, DerivationOutput>;
+using Derivation = DerivationT<SingleDerivedPath, DerivationOutput>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

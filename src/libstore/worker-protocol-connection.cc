@@ -1,6 +1,7 @@
 #include "nix/store/worker-protocol-connection.hh"
 #include "nix/store/worker-protocol-impl.hh"
 #include "nix/store/build-result.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivations.hh"
 
 namespace nix {
@@ -293,7 +294,7 @@ void WorkerProto::BasicClientConnection::putBuildDerivationRequest(
     BuildMode buildMode)
 {
     to << WorkerProto::Op::BuildDerivation << store.printStorePath(drvPath);
-    writeDerivation(to, store, drv);
+    writeDerivation(to, store, BasicDerivationATerm::lower(drv), drv.name);
     to << buildMode;
 }
 
