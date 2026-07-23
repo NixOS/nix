@@ -460,7 +460,7 @@ void ExprList::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> &
 
 void ExprLambda::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & env)
 {
-    if (es.debugRepl)
+    if (es.debugRepl || experimentalFeatureSettings.isEnabled(Xp::FunctionSerialization))
         es.exprEnvs.insert(std::make_pair(this, env));
 
     auto newEnv =
