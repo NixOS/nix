@@ -56,6 +56,8 @@ std::filesystem::path getUserRegistryPath();
 
 Registries getRegistries(const Settings & settings, Store & store);
 
+Registries getRegistries(const Settings & settings, Store & store, const std::shared_ptr<Registry> & customRegistry);
+
 void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs);
 
 enum class UseRegistries : int {
@@ -65,10 +67,15 @@ enum class UseRegistries : int {
 };
 
 /**
- * Rewrite a flakeref using the registries. If `filter` is set, only
- * use the registries for which the filter function returns true.
+ * Rewrite a flakeref using the registries selected by `useRegistries`.
+ * If `customRegistry` is set, it is inserted between the flag and
+ * user registries in precedence order.
  */
-std::pair<Input, Attrs>
-lookupInRegistries(const Settings & settings, Store & store, const Input & input, UseRegistries useRegistries);
+std::pair<Input, Attrs> lookupInRegistries(
+    const Settings & settings,
+    Store & store,
+    const Input & input,
+    UseRegistries useRegistries,
+    const std::shared_ptr<Registry> & customRegistry = {});
 
 } // namespace nix::fetchers

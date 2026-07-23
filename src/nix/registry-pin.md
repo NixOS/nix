@@ -27,9 +27,8 @@ R""(
 * Pin `nixpkgs` in a custom registry to its most recent Git revision:
 
   ```console
-  # nix registry pin --registry ./custom-flake-registry.json nixpkgs
+  # nix registry pin --file ./flake-registry.json nixpkgs
   ```
-
 
 # Description
 
