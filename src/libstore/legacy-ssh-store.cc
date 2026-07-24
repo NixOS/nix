@@ -9,6 +9,7 @@
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/store-open.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/ssh.hh"
 #include "nix/store/derivations.hh"
@@ -46,6 +47,27 @@ public:
     buildPathsWithResults(const std::vector<DerivedPath> & reqs, BuildMode buildMode) override;
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
+
+    BuildResult buildDerivation(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StorePathSet & inputs,
+        BuildMode buildMode) override
+    {
+        auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
+        auto srcStore = openStore();
+        copyPaths(*srcStore, *store, inputs, NoRepair, NoCheckSigs, substitute);
+        return buildDerivation(drvPath, drv, buildMode);
+    }
+
+    std::vector<KeyedBuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode) override
+    {
+        auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
+        auto srcStore = openStore();
+        copyPaths(*srcStore, *store, inputs, NoRepair, NoCheckSigs, substitute);
+        return buildPathsWithResults(reqs, buildMode);
+    }
 
     /**
      * Note, the returned function must only be called once, or we'll

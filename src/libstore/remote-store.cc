@@ -2,6 +2,7 @@
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/file-content-address.hh"
+#include "nix/store/store-open.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/util.hh"
 #include "nix/store/path-with-outputs.hh"
@@ -599,6 +600,15 @@ public:
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
 
+    BuildResult buildDerivation(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StorePathSet & inputs,
+        BuildMode buildMode) override;
+
+    std::vector<KeyedBuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode) override;
+
     void ensurePath(const StorePath & path) override;
 
     /**
@@ -722,6 +732,24 @@ BuildResult RemoteBuilder::buildDerivation(const StorePath & drvPath, const Basi
     conn->putBuildDerivationRequest(*store, &conn.daemonException, drvPath, drv, buildMode);
     conn.processStderr();
     return WorkerProto::Serialise<BuildResult>::read(*store, *conn);
+}
+
+BuildResult RemoteBuilder::buildDerivation(
+    const StorePath & drvPath, const BasicDerivation & drv, const StorePathSet & inputs, BuildMode buildMode)
+{
+    auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
+    auto srcStore = openStore();
+    copyPaths(*srcStore, *store, inputs, NoRepair, NoCheckSigs, substitute);
+    return buildDerivation(drvPath, drv, buildMode);
+}
+
+std::vector<KeyedBuildResult> RemoteBuilder::buildPathsWithResults(
+    const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode)
+{
+    auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
+    auto srcStore = openStore();
+    copyPaths(*srcStore, *store, inputs, NoRepair, NoCheckSigs, substitute);
+    return buildPathsWithResults(reqs, buildMode);
 }
 
 void RemoteBuilder::ensurePath(const StorePath & path)
