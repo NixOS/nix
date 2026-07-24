@@ -6,6 +6,8 @@
 #include <string>
 #include <future>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include "nix/util/logging.hh"
 #include "nix/util/types.hh"
 #include "nix/util/ref.hh"
@@ -501,5 +503,8 @@ public:
     template<typename... Args>
     FileTransferError(FileTransfer::Error error, std::optional<std::string> response, const Args &... args);
 };
+
+/** Runtime versions of the libraries the file transfer layer links against. */
+nlohmann::json linkedLibraryVersions();
 
 } // namespace nix

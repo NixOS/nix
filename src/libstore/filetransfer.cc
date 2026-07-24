@@ -21,6 +21,7 @@
 #include <fcntl.h>
 
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -1482,6 +1483,11 @@ FileTransferError::FileTransferError(
         err.msg = HintFmt("%1%\n\nresponse body:\n\n%2%", Uncolored(hf.str()), chomp(*response));
     else
         err.msg = hf;
+}
+
+nlohmann::json linkedLibraryVersions()
+{
+    return {{"libcurl", curl_version_info(CURLVERSION_NOW)->version}};
 }
 
 } // namespace nix

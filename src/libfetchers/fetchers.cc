@@ -13,9 +13,17 @@
 #include "nix/util/environment-variables.hh"
 
 #include <thread>
+#include <git2/global.h>
 #include <nlohmann/json.hpp>
 
 namespace nix::fetchers {
+
+nlohmann::json linkedLibraryVersions()
+{
+    int major = 0, minor = 0, rev = 0;
+    git_libgit2_version(&major, &minor, &rev);
+    return {{"libgit2", fmt("%d.%d.%d", major, minor, rev)}};
+}
 
 using InputSchemeMap = std::map<std::string_view, std::shared_ptr<InputScheme>>;
 
