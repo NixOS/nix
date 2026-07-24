@@ -1902,7 +1902,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        auto h = hashDerivationModulo(*state.store, drv, false);
+        auto h = hashInputDerivationModulo(*state.store, drv);
         drvHashes.insert_or_assign(drvPath, std::move(h));
     }
 

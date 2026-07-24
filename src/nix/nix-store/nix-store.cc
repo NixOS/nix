@@ -90,7 +90,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
         std::set<std::filesystem::path> outputs;
         for (auto & j : path.outputs) {
             /* Match outputs of a store path with outputs of the derivation that produces it. */
-            DerivationOutputs::iterator i = drv.outputs.find(j);
+            auto i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'", store2->printStorePath(path.path), j);
             auto outPath = outputPaths.at(i->first);

@@ -6,6 +6,7 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
@@ -141,7 +142,8 @@ struct DerivationOutput
     path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 };
 
-typedef std::map<std::string, DerivationOutput> DerivationOutputs;
+template<typename Output = DerivationOutput>
+using DerivationOutputs = std::map<std::string, Output>;
 
 /**
  * These are analogues to the previous DerivationOutputs data type,
@@ -156,23 +158,6 @@ typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePat
  * output IDs we are interested in.
  */
 typedef std::map<StorePath, StringSet> DerivationInputs;
-
-/**
- * Inputs for full Derivation - both source and derivation inputs
- */
-struct FullInputs
-{
-    /**
-     * inputs that are sources
-     */
-    StorePathSet srcs;
-    /**
-     * inputs that are sub-derivations
-     */
-    DerivedPathMap<std::set<OutputName, std::less<>>> drvs;
-
-    bool operator==(const FullInputs &) const = default;
-};
 
 struct DerivationType
 {
@@ -285,19 +270,19 @@ struct DerivationType
     bool hasKnownOutputPaths() const;
 };
 
-template<typename Inputs>
+template<typename Inputs, typename Output = DerivationOutput>
 struct DerivationT;
 
 using BasicDerivation = DerivationT<StorePathSet>;
 using Derivation = DerivationT<FullInputs>;
 
-template<typename Inputs>
+template<typename Inputs, typename Output>
 struct DerivationT
 {
     /**
      * keyed on symbolic IDs
      */
-    DerivationOutputs outputs;
+    DerivationOutputs<Output> outputs;
     Inputs inputs;
     std::string platform;
     /**
@@ -315,24 +300,28 @@ struct DerivationT
 
     bool operator==(const DerivationT &) const = default;
 
-    bool isBuiltin() const;
+    bool isBuiltin() const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Return true iff this is a fixed-output derivation.
      */
-    DerivationType type() const;
+    DerivationType type() const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Return the output names of a derivation.
      */
-    StringSet outputNames() const;
+    StringSet outputNames() const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Calculates the maps that contains all the DerivationOutputs, but
      * augmented with knowledge of the Store paths they would be written
      * into.
      */
-    DerivationOutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
+    DerivationOutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
@@ -340,16 +329,14 @@ struct DerivationT
      * Apply string rewrites to the `env`, `args` and `builder`
      * fields.
      */
-    void applyRewrites(const StringMap & rewrites);
+    void applyRewrites(const StringMap & rewrites)
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Print a derivation (only meaningful for full Derivation).
      */
-    std::string unparse(
-        const StoreDirConfig & store,
-        bool maskOutputs,
-        DerivedPathMap<StringSet>::ChildNode::Map * actualInputs = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs>;
+    std::string unparse(const StoreDirConfig & store) const
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Determine whether this derivation should be resolved before building.
@@ -363,7 +350,7 @@ struct DerivationT
      * - Any input derivations have outputs from dynamic derivations
      */
     bool shouldResolve() const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Return the underlying basic derivation but with these changes:
@@ -375,7 +362,7 @@ struct DerivationT
      *    paths.
      */
     std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Like the above, but instead of querying the Nix database for
@@ -386,7 +373,7 @@ struct DerivationT
         Store & store,
         fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
             queryResolutionChain) const
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Convert a BasicDerivation to a full Derivation.
@@ -394,13 +381,13 @@ struct DerivationT
      * is already resolved.
      */
     Derivation unresolve() const
-        requires std::is_same_v<Inputs, StorePathSet>;
+        requires std::is_same_v<Inputs, StorePathSet> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Return a derivation identical to this one, but with the inputs transformed by `f`.
      */
     template<typename F>
-    DerivationT<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
+    DerivationT<std::invoke_result_t<F, const Inputs &>, Output> mapInputs(F f) const
     {
         return {
             .outputs = outputs,
@@ -428,7 +415,8 @@ struct DerivationT
      *
      * @param store The store to use for validation
      */
-    void checkInvariants(Store & store) const;
+    void checkInvariants(Store & store) const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * This overload does everything the base `checkInvariants` does,
@@ -438,7 +426,8 @@ struct DerivationT
      * @param store The store to use for validation
      * @param drvPath The path to this derivation
      */
-    void checkInvariants(Store & store, const StorePath & drvPath) const;
+    void checkInvariants(Store & store, const StorePath & drvPath) const
+        requires std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Fill in output paths as needed.
@@ -462,7 +451,7 @@ struct DerivationT
      * @param drvName The derivation name (without .drv extension)
      */
     void fillInOutputPaths(Store & store)
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 
     /**
      * Parse a derivation from JSON, and also perform various
@@ -486,14 +475,13 @@ struct DerivationT
      * @throws Error if parsing fails, output paths can't be computed, or validation fails
      */
     static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json)
-        requires std::is_same_v<Inputs, FullInputs>;
+        requires std::is_same_v<Inputs, FullInputs> && std::is_same_v<Output, DerivationOutput>;
 };
 
 class Store;
 
 template<>
-std::string DerivationT<FullInputs>::unparse(
-    const StoreDirConfig & store, bool maskOutputs, DerivedPathMap<StringSet>::ChildNode::Map * actualInputs) const;
+std::string DerivationT<FullInputs>::unparse(const StoreDirConfig & store) const;
 template<>
 bool DerivationT<FullInputs>::shouldResolve() const;
 template<>
@@ -610,15 +598,21 @@ struct DrvHashModulo
  * For regular derivations, it returns a single hash of the derivation
  * ATerm, after subderivations have been likewise expunged from that
  * derivation.
+ *
+ * When the derivation is itself, or (transitively) depends on, a
+ * content-addressing derivation without a content address fixed in
+ * advance (`CAFloating` or `Impure`), `DrvHashModulo::DeferredDrv` is
+ * returned indicating we cannot yet compute an input address, because
+ * we don't yet know what all the inputs are.
  */
-DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool maskOutputs);
+DrvHashModulo hashInputDerivationModulo(Store & store, const Derivation & drv);
 
 /**
  * If a derivation is input addressed and doesn't yet have its input
- * addressed (is deferred) try using `hashDerivationModulo`.
+ * addressed (is deferred) try using `hashInputDerivationModulo`.
  *
  * Does nothing if not deferred input-addressed, or
- * `hashDerivationModulo` indicates it is missing inputs' output paths
+ * `hashInputDerivationModulo` indicates it is missing inputs' output paths
  * and is not yet ready (and must stay deferred).
  */
 void resolveInputAddressed(Store & store, Derivation & drv);
@@ -634,7 +628,7 @@ struct DrvHashFct
 };
 
 /**
- * Memoisation of hashDerivationModulo().
+ * Memoisation of hashInputDerivationModulo().
  */
 typedef boost::concurrent_flat_map<StorePath, DrvHashModulo, DrvHashFct> DrvHashes;
 
