@@ -317,6 +317,7 @@ sources = files(
   'profiles.cc',
   'realisation.cc',
   'references.cc',
+  'register-library-versions.cc',
   'remote-fs-accessor.cc',
   'remote-store.cc',
   'restricted-store.cc',
