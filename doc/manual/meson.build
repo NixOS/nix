@@ -355,6 +355,7 @@ nix3_manpages = [
   'nix3-store-sign',
   'nix3-store-verify',
   'nix3-upgrade-nix',
+  'nix3-version',
   'nix3-why-depends',
 ]
 

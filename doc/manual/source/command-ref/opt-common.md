@@ -14,6 +14,9 @@ Most Nix commands accept the following command-line options:
 
   Prints out the Nix version number on standard output and exits.
 
+  For machine-readable output, and for the versions of the libraries Nix
+  links against, see the [`nix version`](@docroot@/command-ref/new-cli/nix3-version.md) command.
+
 - <span id="opt-verbose">[`--verbose`](#opt-verbose)</span> / `-v`
 
   Increases the level of verbosity of diagnostic messages printed on standard error.
