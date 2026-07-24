@@ -78,9 +78,8 @@ static void removeChannel(const std::string & name)
     channels.erase(name);
     writeChannels();
 
-    runProgram(
-        getNixBin("nix-env"),
-        true,
+    runNixBin(
+        "nix-env",
         {
             OS_STR("--profile"),
             profile.native(),
@@ -140,9 +139,8 @@ static void update(const StringSet & channelNames)
 
             bool unpacked = false;
             if (std::regex_search(std::string{result.storePath.to_string()}, std::regex("\\.tar\\.(gz|bz2|xz)$"))) {
-                runProgram(
-                    getNixBin("nix-build"),
-                    false,
+                runNixBin(
+                    "nix-build",
                     {
                         OS_STR("--no-out-link"),
                         OS_STR("--expr"),
@@ -184,7 +182,7 @@ static void update(const StringSet & channelNames)
     for (auto & expr : exprs)
         envArgs.push_back(string_to_os_string(std::move(expr)));
     envArgs.push_back(OS_STR("--quiet"));
-    runProgram(getNixBin("nix-env"), false, envArgs);
+    runNixBin("nix-env", envArgs);
 
     // Make the channels appear in nix-env.
     PosixStat st;
@@ -278,9 +276,8 @@ static int main_nix_channel(int argc, char ** argv)
         case cListGenerations:
             if (!args.empty())
                 throw UsageError("'--list-generations' expects no arguments");
-            std::cout << runProgram(
-                getNixBin("nix-env"),
-                false,
+            std::cout << runNixBin(
+                "nix-env",
                 {
                     OS_STR("--profile"),
                     profile.native(),
@@ -297,7 +294,7 @@ static int main_nix_channel(int argc, char ** argv)
             } else {
                 envArgs.push_back(OS_STR("--rollback"));
             }
-            runProgram(getNixBin("nix-env"), false, envArgs);
+            runNixBin("nix-env", envArgs);
             break;
         }
 
