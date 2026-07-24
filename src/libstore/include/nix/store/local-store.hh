@@ -4,6 +4,7 @@
 #include "nix/store/sqlite.hh"
 
 #include "nix/store/pathlocks.hh"
+#include "nix/store/build-control-store.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/indirect-root-store.hh"
 #include "nix/util/sync.hh"
@@ -179,7 +180,7 @@ public:
 
 MakeError(PathInUse, Error);
 
-class LocalStore : public virtual IndirectRootStore, public virtual GcStore
+class LocalStore : public virtual IndirectRootStore, public virtual GcStore, public virtual BuildControlStore
 {
     void anchor() override;
 
@@ -274,6 +275,8 @@ public:
     StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
+
+    std::optional<uint64_t> killBuild(const StorePath & path) override;
 
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;

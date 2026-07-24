@@ -358,6 +358,8 @@ static void daemonLoop(
                     [&, storeConfig, closeListeners = std::move(closeListeners)]() {
                         closeListeners();
 
+                        unix::startSignalHandlerThreadAfterFork();
+
                         // Background the daemon.
                         if (setsid() == -1)
                             throw SysError("creating a new session");

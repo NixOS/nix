@@ -39,6 +39,7 @@ mkMesonExecutable (finalAttrs: {
     ./.version
     ./meson.build
     ./meson.options
+    ../libstore/pathlocks-internal.hh
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];

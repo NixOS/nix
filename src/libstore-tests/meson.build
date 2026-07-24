@@ -81,6 +81,7 @@ sources = files(
   'outputs-spec.cc',
   'path-info.cc',
   'path.cc',
+  'pathlocks.cc',
   'realisation.cc',
   'references.cc',
   's3-binary-cache-store.cc',
@@ -95,7 +96,7 @@ sources = files(
   'write-derivation.cc',
 )
 
-include_dirs = [ include_directories('.') ]
+include_dirs = [ include_directories('.', '../libstore') ]
 
 
 this_exe = executable(
