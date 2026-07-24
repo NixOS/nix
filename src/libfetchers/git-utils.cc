@@ -391,7 +391,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         auto packFilesPath = std::filesystem::path(git_repository_path(repo.get())) / "objects/pack";
 
         Indexer indexer;
-        if (git_indexer_new(Setter(indexer), packFilesPath.c_str(), 0, nullptr, nullptr))
+        if (git_indexer_new(Setter(indexer), packFilesPath.string().c_str(), 0, nullptr, nullptr))
             throw GitError("creating git packfile indexer");
 
         struct State

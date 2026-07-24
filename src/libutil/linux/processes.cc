@@ -249,7 +249,9 @@ void runProgram2(const RunOptions & options)
 
     /* Prepare arguments and environment for the child. */
     Strings args_(options.args);
-    args_.push_front(options.program.native());
+    /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
+       trickery. */
+    args_.push_front(options.argv0.value_or(options.program.native()));
     const Strings env_ = options.environment ? prepareEnvironmentStrings(*options.environment) : Strings{};
     const auto env = stringsToCharPtrs(env_);
     const auto args = stringsToCharPtrs(args_);
