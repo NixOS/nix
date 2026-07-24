@@ -95,7 +95,7 @@ struct CmdSearch : InstallableValueCommand, MixJSON
             auto attrPathS = state->symbols.resolve({attrPath});
             auto attrPathStr = attrPath.to_string(*state);
 
-            Activity act(*logger, lvlInfo, actUnknown, fmt("evaluating '%s'", attrPathStr));
+            Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating '%s'", attrPathStr));
             try {
                 auto recurse = [&]() {
                     for (const auto & attr : cursor.getAttrs()) {

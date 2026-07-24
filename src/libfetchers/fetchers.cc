@@ -1,6 +1,7 @@
 #include "nix/fetchers/fetchers.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/store/build.hh"
 #include "nix/util/source-path.hh"
 #include "nix/fetchers/fetch-to-store.hh"
 #include "nix/util/json-utils.hh"
@@ -124,6 +125,9 @@ std::optional<std::string> Input::getFingerprint(Store & store) const
         return *cachedFingerprint;
 
     auto fingerprint = scheme->getFingerprint(store, *this);
+
+    if (fingerprint)
+        fingerprint = std::string(scheme->schemeName()) + ":" + *fingerprint;
 
     cachedFingerprint = fingerprint;
 
@@ -321,7 +325,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
 
             store.addTempRoot(storePath);
 
-            store.ensurePath(storePath);
+            store.getBuilder()->ensurePath(storePath);
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store.printStorePath(storePath));
 
@@ -525,12 +529,11 @@ std::string publicKeys_to_string(const std::vector<PublicKey> & publicKeys)
 
 namespace nlohmann {
 
-using namespace nix;
-
 #ifndef DOXYGEN_SKIP
 
-fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & json)
+nix::fetchers::PublicKey adl_serializer<nix::fetchers::PublicKey>::from_json(const json & json)
 {
+    using namespace nix;
     fetchers::PublicKey res = {};
     auto & obj = getObject(json);
     if (auto * type = optionalValueAt(obj, "type"))
@@ -541,7 +544,7 @@ fetchers::PublicKey adl_serializer<fetchers::PublicKey>::from_json(const json & 
     return res;
 }
 
-void adl_serializer<fetchers::PublicKey>::to_json(json & json, const fetchers::PublicKey & p)
+void adl_serializer<nix::fetchers::PublicKey>::to_json(json & json, const nix::fetchers::PublicKey & p)
 {
     json["type"] = p.type;
     json["key"] = p.key;

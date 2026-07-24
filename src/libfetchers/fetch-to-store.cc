@@ -82,6 +82,7 @@ std::pair<StorePath, Hash> fetchToStore2(
                     path,
                     store.printStorePath(storePath),
                     hash.to_string(HashFormat::SRI, true));
+                settings.srcToStore->cache.insert_or_assign(srcToStoreKey, std::make_tuple(storePath, hash, mode));
                 return {storePath, hash};
             }
             debug("source path '%s' not in store", path);

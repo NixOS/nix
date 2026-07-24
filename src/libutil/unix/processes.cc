@@ -14,7 +14,6 @@
 #include <future>
 #include <iostream>
 #include <atomic>
-using namespace std::chrono_literals;
 
 #include <grp.h>
 #include <sys/types.h>
@@ -79,6 +78,8 @@ int Pid::kill(bool allowInterrupts)
     debug("killing process %1%", pid);
 
     std::atomic<bool> killed = false;
+
+    using namespace std::chrono_literals;
 
     if (killTimeout > 0ms && killSignal != SIGKILL)
         killThread = std::thread([&]() {
@@ -207,17 +208,9 @@ void killUser(uid_t uid)
 
 using ChildWrapperFunction = fun<void()>;
 
-/* Wrapper around vfork to prevent the child process from clobbering
-   the caller's stack frame in the parent. */
-static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun) __attribute__((noinline));
-
-static pid_t doFork(bool allowVfork, ChildWrapperFunction & fun)
+static pid_t doFork(ChildWrapperFunction & fun)
 {
-#ifdef __linux__
-    pid_t pid = allowVfork ? vfork() : fork();
-#else
     pid_t pid = fork();
-#endif
     if (pid != 0)
         return pid;
     fun();
@@ -237,14 +230,12 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 {
     auto newLogger = makeSimpleLogger().release();
     ChildWrapperFunction wrapper = [&] {
-        if (!options.allowVfork) {
-            /* Set a simple logger, while leaking (not destroying)
-               the parent logger. We don't want to run the parent
-               logger's destructor since that will crash (e.g. when
-               ~ProgressBar() tries to join a thread that doesn't
-               exist. */
-            logger = newLogger;
-        }
+        /* Set a simple logger, while leaking (not destroying)
+           the parent logger. We don't want to run the parent
+           logger's destructor since that will crash (e.g. when
+           ~ProgressBar() tries to join a thread that doesn't
+           exist. */
+        logger = newLogger;
         try {
 #ifdef __linux__
             if (options.dieWithParent && prctl(PR_SET_PDEATHSIG, SIGKILL) == -1)
@@ -284,7 +275,7 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
         throw Error("clone flags are only supported on Linux");
 #endif
     } else
-        pid = doFork(options.allowVfork, wrapper);
+        pid = doFork(wrapper);
 
     if (pid == -1)
         throw SysError("unable to fork");
@@ -308,6 +299,8 @@ std::string runProgram(std::filesystem::path program, bool lookupPath, const OsS
     return res.second;
 }
 
+#ifndef __linux__
+
 void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
@@ -318,10 +311,6 @@ void runProgram2(const RunOptions & options)
         out.create();
 
     ProcessOptions processOptions;
-    // vfork implies that the environment of the main process and the fork will
-    // be shared (technically this is undefined, but in practice that's the
-    // case), so we can't use it if we alter the environment
-    processOptions.allowVfork = !options.environment;
 
     auto suspension = logger->suspendIf(options.isInteractive);
 
@@ -372,6 +361,8 @@ void runProgram2(const RunOptions & options)
     if (status)
         throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }
+
+#endif // __linux__
 
 //////////////////////////////////////////////////////////////////////
 

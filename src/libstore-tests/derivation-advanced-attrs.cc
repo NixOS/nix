@@ -12,8 +12,6 @@
 
 namespace nix {
 
-using namespace nlohmann;
-
 class DerivationAdvancedAttrsTest : public JsonCharacterizationTest<Derivation>, public LibStoreTest
 {
 protected:
@@ -39,7 +37,7 @@ public:
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+                *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
         });
     }
@@ -55,7 +53,7 @@ public:
         this->readTest(fileName, [&](auto encoded) {
             auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
-                *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+                *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
             EXPECT_EQ(options, expected);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedSystemFeatures);
@@ -83,6 +81,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
 #define TEST_ATERM_JSON(STEM, NAME)                                                                      \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_json)                           \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->readTest(NAME ".json", [&](const auto & encoded_) {                                        \
             auto encoded = json::parse(encoded_);                                                        \
             /* Use DRV file instead of C++ literal as source of truth. */                                \
@@ -95,6 +94,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
                                                                                                          \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_to_json)                             \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->writeTest(                                                                                 \
             NAME ".json",                                                                                \
             [&]() -> json {                                                                              \
@@ -108,6 +108,7 @@ TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
                                                                                                          \
     TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_aterm)                          \
     {                                                                                                    \
+        using namespace nlohmann;                                                                        \
         this->readTest(NAME ".drv", [&](auto encoded) {                                                  \
             /* Use JSON file instead of C++ literal as source of truth. */                               \
             auto j = json::parse(readFile(this->goldenMaster(NAME ".json")));                            \
@@ -184,7 +185,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
@@ -228,7 +229,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(!got.structuredAttrs);
 
@@ -324,7 +325,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_d
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 
@@ -373,7 +374,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         auto got = parseDerivation(*this->store, std::move(encoded), "foo", this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
-            *this->store, got.inputDrvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
+            *this->store, got.inputs.drvs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
         EXPECT_TRUE(got.structuredAttrs);
 

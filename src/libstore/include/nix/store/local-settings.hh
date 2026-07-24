@@ -736,7 +736,7 @@ public:
      * Finds the first external derivation builder that supports this
      * derivation, or else returns a null pointer.
      */
-    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const Derivation & drv);
+    const ExternalBuilder * findExternalDerivationBuilderIfSupported(const BasicDerivation & drv);
 };
 
 template<>

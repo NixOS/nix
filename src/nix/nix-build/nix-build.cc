@@ -28,10 +28,9 @@
 #include "nix/util/users.hh"
 #include "nix/cmd/network-proxy.hh"
 #include "nix/cmd/compatibility-settings.hh"
+#include "nix/store/build.hh"
 #include "nix/util/fun.hh"
 #include "man-pages.hh"
-
-using namespace std::string_literals;
 
 extern char ** environ __attribute__((weak));
 
@@ -451,7 +450,7 @@ static void main_nix_build(int argc, char ** argv)
             printMissing(ref<Store>(store), paths);
 
         if (!dryRun)
-            store->buildPaths(paths, buildMode, evalStore);
+            store->getBuilder(evalStore)->buildPaths(paths, buildMode);
     };
 
     if (isNixShell) {
@@ -512,7 +511,7 @@ static void main_nix_build(int argc, char ** argv)
         };
 
         // Build or fetch all dependencies of the derivation.
-        for (const auto & [inputDrv0, inputNode] : drv.inputDrvs.map) {
+        for (const auto & [inputDrv0, inputNode] : drv.inputs.drvs.map) {
             // To get around lambda capturing restrictions in the
             // standard.
             const auto & inputDrv = inputDrv0;
@@ -523,7 +522,7 @@ static void main_nix_build(int argc, char ** argv)
                 pathsToCopy.insert(inputDrv);
             }
         }
-        for (const auto & src : drv.inputSrcs) {
+        for (const auto & src : drv.inputs.srcs) {
             pathsToBuild.emplace_back(DerivedPath::Opaque{src});
             pathsToCopy.insert(src);
         }
@@ -546,7 +545,7 @@ static void main_nix_build(int argc, char ** argv)
             auto resolvedDrv = drv.tryResolve(*store);
             if (!resolvedDrv)
                 throw Error("failed to resolve derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            drv = *resolvedDrv;
+            drv = resolvedDrv->unresolve();
         }
 
         // Set the environment.
@@ -612,7 +611,7 @@ static void main_nix_build(int argc, char ** argv)
                     }
                 };
 
-            for (const auto & [inputDrv, inputNode] : drv.inputDrvs.map)
+            for (const auto & [inputDrv, inputNode] : drv.inputs.drvs.map)
                 accumInputClosure(inputDrv, inputNode);
 
             auto json = drv.structuredAttrs->prepareStructuredAttrs(*store, drvOptions, inputs, drv.outputs);
@@ -636,6 +635,9 @@ static void main_nix_build(int argc, char ** argv)
         auto rcfile = (tmpDir.path() / "rc").string();
         auto tz = getEnv("TZ");
         auto tzExport = tz ? "export TZ=" + escapeShellArgAlways(*tz) + "; " : "";
+
+        using namespace std::string_literals;
+
         std::string rc = fmt(
                 (R"(_nix_shell_clean_tmpdir() { command rm -rf %1%; };)"s
                   "trap _nix_shell_clean_tmpdir EXIT; "

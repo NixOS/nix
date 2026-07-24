@@ -5,6 +5,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 #include "nix/store/build-result.hh"
+#include "nix/store/daemon.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/derivations.hh"
@@ -140,6 +141,17 @@ struct DerivationBuilderCallbacks
      * @todo this should be reworked
      */
     virtual void childTerminated() = 0;
+
+    /**
+     * Process a recursive Nix daemon connection, using a builder
+     * that enforces the restrictions of the given context.
+     */
+    virtual void processDaemonConnection(
+        ref<Store> store,
+        FdSource && from,
+        FdSink && to,
+        RestrictionContext & context,
+        daemon::RecursiveFlag recursiveFlag) = 0;
 };
 
 /**

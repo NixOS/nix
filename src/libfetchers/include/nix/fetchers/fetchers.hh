@@ -296,4 +296,4 @@ std::string publicKeys_to_string(const std::vector<PublicKey> &);
 
 } // namespace nix::fetchers
 
-JSON_IMPL(fetchers::PublicKey)
+JSON_IMPL(nix::fetchers::PublicKey)

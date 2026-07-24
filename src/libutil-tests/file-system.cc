@@ -5,8 +5,6 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
-using namespace std::string_view_literals;
-
 #ifdef _WIN32
 #  define FS_SEP L"\\"
 #  define FS_ROOT_NO_TRAILING_SLASH L"C:" // Need a mounted one, C drive is likely
@@ -111,6 +109,8 @@ TEST(canonPath, removesDots2)
 
 TEST(canonPath, requiresAbsolutePath)
 {
+    using namespace std::string_view_literals;
+
     ASSERT_ANY_THROW(canonPath("."sv));
     ASSERT_ANY_THROW(canonPath(".."sv));
     ASSERT_ANY_THROW(canonPath("../"sv));

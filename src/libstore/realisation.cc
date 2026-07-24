@@ -97,10 +97,9 @@ MissingRealisation::MissingRealisation(
 
 namespace nlohmann {
 
-using namespace nix;
-
-DrvOutput adl_serializer<DrvOutput>::from_json(const json & json)
+nix::DrvOutput adl_serializer<nix::DrvOutput>::from_json(const json & json)
 {
+    using namespace nix;
     auto obj = getObject(json);
 
     return {
@@ -109,7 +108,7 @@ DrvOutput adl_serializer<DrvOutput>::from_json(const json & json)
     };
 }
 
-void adl_serializer<DrvOutput>::to_json(json & json, const DrvOutput & drvOutput)
+void adl_serializer<nix::DrvOutput>::to_json(json & json, const nix::DrvOutput & drvOutput)
 {
     json = {
         {"drvPath", drvOutput.drvPath},
@@ -117,8 +116,9 @@ void adl_serializer<DrvOutput>::to_json(json & json, const DrvOutput & drvOutput
     };
 }
 
-UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & json0)
+nix::UnkeyedRealisation adl_serializer<nix::UnkeyedRealisation>::from_json(const json & json0)
 {
+    using namespace nix;
     auto json = getObject(json0);
 
     return UnkeyedRealisation{
@@ -131,7 +131,7 @@ UnkeyedRealisation adl_serializer<UnkeyedRealisation>::from_json(const json & js
     };
 }
 
-void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedRealisation & r)
+void adl_serializer<nix::UnkeyedRealisation>::to_json(json & json, const nix::UnkeyedRealisation & r)
 {
     json = {
         {"outPath", r.outPath},
@@ -139,8 +139,9 @@ void adl_serializer<UnkeyedRealisation>::to_json(json & json, const UnkeyedReali
     };
 }
 
-Realisation adl_serializer<Realisation>::from_json(const json & json)
+nix::Realisation adl_serializer<nix::Realisation>::from_json(const json & json)
 {
+    using namespace nix;
     auto obj = getObject(json);
 
     return {
@@ -149,11 +150,11 @@ Realisation adl_serializer<Realisation>::from_json(const json & json)
     };
 }
 
-void adl_serializer<Realisation>::to_json(json & json, const Realisation & r)
+void adl_serializer<nix::Realisation>::to_json(json & json, const nix::Realisation & r)
 {
     json = {
         {"key", r.id},
-        {"value", static_cast<const UnkeyedRealisation &>(r)},
+        {"value", static_cast<const nix::UnkeyedRealisation &>(r)},
     };
 }
 

@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-builder.hh"
+#include "nix/util/configuration.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
@@ -8,7 +9,6 @@
 #include "nix/util/util.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/git.hh"
-#include "nix/store/daemon.hh"
 #include "nix/util/topo-sort.hh"
 #include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
@@ -211,7 +211,7 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
        root. */
     killSandbox(true);
 
-    /* Terminate the recursive Nix daemon. */
+    /* Terminate the recursive Nix daemons. */
     stopDaemon();
 
     if (buildResult.cpuUser && buildResult.cpuSystem) {
@@ -239,9 +239,14 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
         };
     }
 
-    /* Compute the FS closure of the outputs and register them as
-       being valid. */
-    auto builtOutputs = registerOutputs();
+    SingleDrvOutputs builtOutputs;
+    if (usingSubmitted) {
+        builtOutputs = checkSubmittedOutputs();
+    } else {
+        /* Compute the FS closure of the outputs and register them as
+           being valid. */
+        builtOutputs = registerOutputs();
+    }
 
     cleanupBuild(true);
 
@@ -469,7 +474,15 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+    auto requiredFeatures = drvOptions.getRequiredSystemFeatures(drv);
+
+    usingSubmitted = requiredFeatures.count(drvFeatureBuilderRpcV0);
+
+    if (usingSubmitted && !drv.type().isCA()) {
+        throw Error("The builder-rpc-v0 feature may only be used with content-addressing derivations");
+    }
+
+    if (usingSubmitted || requiredFeatures.count("recursive-nix"))
         startDaemon();
 
     /* Run the builder. */
@@ -666,12 +679,12 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
             try {
                 return readLine(builderOut.get());
             } catch (Error & e) {
-                auto status = pid.wait();
+                auto status = pid != -1 ? pid.wait() : 0;
                 e.addTrace(
                     {},
                     "while waiting for the build environment for '%s' to initialize (%s, previous messages: %s)",
                     store.printStorePath(drvPath),
-                    statusToString(status),
+                    status ? statusToString(status) : "no status",
                     concatStringsSep("|", msgs));
                 throw;
             }
@@ -784,7 +797,11 @@ void DerivationBuilderImpl::initEnv()
 
 void DerivationBuilderImpl::startDaemon()
 {
-    experimentalFeatureSettings.require(Xp::RecursiveNix);
+    if (usingSubmitted) {
+        experimentalFeatureSettings.require(Xp::DynamicDerivations);
+    } else {
+        experimentalFeatureSettings.require(Xp::RecursiveNix);
+    }
 
     auto store = makeRestrictedStore(
         [&] {
@@ -807,7 +824,14 @@ void DerivationBuilderImpl::startDaemon()
 
     chownToBuilder(socketPath);
 
-    daemonThread = std::thread([this, store]() {
+    daemon::RecursiveFlag recursiveFlag;
+    if (usingSubmitted) {
+        recursiveFlag = daemon::RecursiveFlag::RecursiveSubmitted;
+    } else {
+        recursiveFlag = daemon::RecursiveFlag::Recursive;
+    }
+
+    daemonThread = std::thread([this, store, recursiveFlag]() {
         while (true) {
 
             /* Accept a connection. */
@@ -829,10 +853,10 @@ void DerivationBuilderImpl::startDaemon()
 
             auto doneFlag = make_ref<std::atomic_flag>();
 
-            auto workerThread = std::thread([doneFlag, store, remote{std::move(remote)}]() {
+            auto workerThread = std::thread([this, doneFlag, store, remote{std::move(remote)}, recursiveFlag]() {
                 try {
-                    daemon::processConnection(
-                        store, FdSource(remote.get()), FdSink(remote.get()), NotTrusted, daemon::Recursive);
+                    miscMethods->processDaemonConnection(
+                        store, FdSource(remote.get()), FdSink(remote.get()), *this, recursiveFlag);
                     debug("terminated daemon connection");
                 } catch (const Interrupted &) {
                     debug("interrupted daemon connection");
@@ -1517,7 +1541,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                     PathFmt(store.toRealPath(newInfo.path)));
                 deletePath(actualPath);
                 /* Trigger the hash-mismatch error. */
-                checkCAFixedOutput(store, drvPath, *output, newInfo);
+                checkCAOutput(store, drvPath, *output, newInfo, outputName);
                 unreachable();
             }
         }
@@ -1628,7 +1652,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(store, drvPath, drv.outputs, drvOptions.outputChecks, infos);
+    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -1669,6 +1693,62 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             store.registerDrvOutput(thisRealisation);
         }
         builtOutputs.emplace(outputName, thisRealisation);
+    }
+
+    return builtOutputs;
+}
+
+SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
+{
+    // Submitted outputs from the recursive nix daemon
+    // It's fine to lock here since all other threads with the reference have been shut down.
+    auto submittedOutputs(this->submittedOutputs.lock());
+
+    SingleDrvOutputs builtOutputs;
+
+    std::map<std::string, ValidPathInfo> infos;
+
+    for (auto & [outputName, outputPath] : *submittedOutputs) {
+        infos.emplace(outputName, *store.queryPathInfo(outputPath));
+    }
+
+    // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
+    // more verification steps needed afterward
+    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+
+    for (auto & [outputName, output] : drv.outputs) {
+        // For some reason cannot be moved to checkOutputs, needs debugging
+        if (!submittedOutputs->contains(outputName)) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for '%s' failed to submit output path for '%s'",
+                store.printStorePath(drvPath),
+                outputName);
+        }
+
+        // We should have already checked that the derivation is content-addressing in startBuild
+        // and that the outputs of a content-addressing derivation is content-addressed in checkOutputs.
+        // Add an assert here just in case, but it should never trigger.
+        assert(
+            std::get_if<DerivationOutput::CAFloating>(&output.raw)
+            || std::get_if<DerivationOutput::CAFixed>(&output.raw));
+
+        // No need to sign CA outputs, only the realisation matters
+        auto realisation = Realisation{
+            {
+                .outPath = *get(*submittedOutputs, outputName),
+            },
+            DrvOutput{
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
+        };
+
+        store.signRealisation(realisation);
+        store.registerDrvOutput(realisation);
+        builtOutputs.emplace(outputName, realisation);
+
+        // TODO: handle --check
     }
 
     return builtOutputs;

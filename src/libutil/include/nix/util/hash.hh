@@ -265,4 +265,4 @@ inline std::size_t hash_value(const Hash & hash)
 
 } // namespace nix
 
-JSON_IMPL_WITH_XP_FEATURES(Hash)
+JSON_IMPL_WITH_XP_FEATURES(nix::Hash)

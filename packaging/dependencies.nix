@@ -126,6 +126,9 @@ scope: {
         "--with-iostreams"
         "--with-url"
       ];
+      patches = [
+        ./patches/0001-Fix-uncaught_exceptions-not-accounting-for-forced_un.patch
+      ];
       enableIcu = false;
     }).overrideAttrs
       (old: {

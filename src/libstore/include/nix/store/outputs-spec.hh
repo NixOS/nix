@@ -140,5 +140,5 @@ struct ExtendedOutputsSpec
 
 } // namespace nix
 
-JSON_IMPL(OutputsSpec)
-JSON_IMPL(ExtendedOutputsSpec)
+JSON_IMPL(nix::OutputsSpec)
+JSON_IMPL(nix::ExtendedOutputsSpec)

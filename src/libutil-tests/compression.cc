@@ -29,8 +29,9 @@ TEST_P(CompressionDecompressionTest, roundtrip)
 TEST_P(CompressionDecompressionTest, empty)
 {
     auto compressed = compress(GetParam(), "");
-    if (GetParam() != CompressionAlgo::none)
+    if (GetParam() != CompressionAlgo::none) {
         ASSERT_FALSE(compressed.empty());
+    }
     auto o = decompress(GetParam(), compressed);
     ASSERT_EQ(o, "");
 }

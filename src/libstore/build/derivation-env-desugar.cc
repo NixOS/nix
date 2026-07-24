@@ -19,7 +19,7 @@ std::string & DesugaredEnv::atFileEnvPair(std::string_view name, std::string fil
 
 DesugaredEnv DesugaredEnv::create(
     Store & store,
-    const Derivation & drv,
+    const BasicDerivation & drv,
     const DerivationOptions<StorePath> & drvOptions,
     const StorePathSet & inputPaths)
 {

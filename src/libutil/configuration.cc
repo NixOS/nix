@@ -216,7 +216,7 @@ std::string Config::toKeyValue()
 {
     std::string res;
     for (const auto & s : _settings)
-        if (s.second.isAlias)
+        if (!s.second.isAlias)
             res += fmt("%s = %s\n", s.first, s.second.setting->to_string());
     return res;
 }

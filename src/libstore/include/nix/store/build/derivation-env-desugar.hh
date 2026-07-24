@@ -7,7 +7,13 @@
 namespace nix {
 
 class Store;
-struct Derivation;
+
+template<typename Inputs>
+struct DerivationT;
+struct FullInputs;
+using Derivation = DerivationT<FullInputs>;
+using BasicDerivation = DerivationT<StorePathSet>;
+
 template<typename Input>
 struct DerivationOptions;
 
@@ -79,7 +85,7 @@ struct DesugaredEnv
      */
     static DesugaredEnv create(
         Store & store,
-        const Derivation & drv,
+        const BasicDerivation & drv,
         const DerivationOptions<StorePath> & drvOptions,
         const StorePathSet & inputPaths);
 };

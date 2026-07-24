@@ -11,7 +11,6 @@ namespace nix {
 
 namespace memory_source_accessor {
 
-using namespace std::literals;
 using File = MemorySourceAccessor::File;
 
 ref<MemorySourceAccessor> exampleSimple()
@@ -26,6 +25,7 @@ ref<MemorySourceAccessor> exampleSimple()
 
 ref<MemorySourceAccessor> exampleComplex()
 {
+    using namespace std::literals;
     auto files = make_ref<MemorySourceAccessor>();
     files->root = File::Directory{
         .entries{

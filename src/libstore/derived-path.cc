@@ -224,17 +224,17 @@ const StorePath & DerivedPath::getBaseStorePath() const
 
 namespace nlohmann {
 
-void adl_serializer<SingleDerivedPath::Opaque>::to_json(json & json, const SingleDerivedPath::Opaque & o)
+void adl_serializer<nix::SingleDerivedPath::Opaque>::to_json(json & json, const nix::SingleDerivedPath::Opaque & o)
 {
     json = o.path;
 }
 
-SingleDerivedPath::Opaque adl_serializer<SingleDerivedPath::Opaque>::from_json(const json & json)
+nix::SingleDerivedPath::Opaque adl_serializer<nix::SingleDerivedPath::Opaque>::from_json(const json & json)
 {
-    return SingleDerivedPath::Opaque{json};
+    return {json};
 }
 
-void adl_serializer<SingleDerivedPath::Built>::to_json(json & json, const SingleDerivedPath::Built & sdpb)
+void adl_serializer<nix::SingleDerivedPath::Built>::to_json(json & json, const nix::SingleDerivedPath::Built & sdpb)
 {
     json = {
         {"drvPath", *sdpb.drvPath},
@@ -242,7 +242,7 @@ void adl_serializer<SingleDerivedPath::Built>::to_json(json & json, const Single
     };
 }
 
-void adl_serializer<DerivedPath::Built>::to_json(json & json, const DerivedPath::Built & dbp)
+void adl_serializer<nix::DerivedPath::Built>::to_json(json & json, const nix::DerivedPath::Built & dbp)
 {
     json = {
         {"drvPath", *dbp.drvPath},
@@ -250,9 +250,10 @@ void adl_serializer<DerivedPath::Built>::to_json(json & json, const DerivedPath:
     };
 }
 
-SingleDerivedPath::Built
-adl_serializer<SingleDerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
+nix::SingleDerivedPath::Built adl_serializer<nix::SingleDerivedPath::Built>::from_json(
+    const json & json0, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
     auto & json = getObject(json0);
     auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
     drvRequireExperiment(*drvPath, xpSettings);
@@ -262,9 +263,10 @@ adl_serializer<SingleDerivedPath::Built>::from_json(const json & json0, const Ex
     };
 }
 
-DerivedPath::Built
-adl_serializer<DerivedPath::Built>::from_json(const json & json0, const ExperimentalFeatureSettings & xpSettings)
+nix::DerivedPath::Built adl_serializer<nix::DerivedPath::Built>::from_json(
+    const json & json0, const nix::ExperimentalFeatureSettings & xpSettings)
 {
+    using namespace nix;
     auto & json = getObject(json0);
     auto drvPath = make_ref<SingleDerivedPath>(static_cast<SingleDerivedPath>(valueAt(json, "drvPath")));
     drvRequireExperiment(*drvPath, xpSettings);
@@ -274,31 +276,32 @@ adl_serializer<DerivedPath::Built>::from_json(const json & json0, const Experime
     };
 }
 
-void adl_serializer<SingleDerivedPath>::to_json(json & json, const SingleDerivedPath & sdp)
+void adl_serializer<nix::SingleDerivedPath>::to_json(json & json, const nix::SingleDerivedPath & sdp)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
 
-void adl_serializer<DerivedPath>::to_json(json & json, const DerivedPath & sdp)
+void adl_serializer<nix::DerivedPath>::to_json(json & json, const nix::DerivedPath & sdp)
 {
     std::visit([&](const auto & buildable) { json = buildable; }, sdp.raw());
 }
 
-SingleDerivedPath
-adl_serializer<SingleDerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
+nix::SingleDerivedPath adl_serializer<nix::SingleDerivedPath>::from_json(
+    const json & json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     if (json.is_string())
-        return static_cast<SingleDerivedPath::Opaque>(json);
+        return static_cast<nix::SingleDerivedPath::Opaque>(json);
     else
-        return adl_serializer<SingleDerivedPath::Built>::from_json(json, xpSettings);
+        return adl_serializer<nix::SingleDerivedPath::Built>::from_json(json, xpSettings);
 }
 
-DerivedPath adl_serializer<DerivedPath>::from_json(const json & json, const ExperimentalFeatureSettings & xpSettings)
+nix::DerivedPath
+adl_serializer<nix::DerivedPath>::from_json(const json & json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     if (json.is_string())
-        return static_cast<DerivedPath::Opaque>(json);
+        return static_cast<nix::DerivedPath::Opaque>(json);
     else
-        return adl_serializer<DerivedPath::Built>::from_json(json, xpSettings);
+        return adl_serializer<nix::DerivedPath::Built>::from_json(json, xpSettings);
 }
 
 } // namespace nlohmann

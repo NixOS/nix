@@ -404,10 +404,9 @@ static RegisterStoreImplementation<DummyStore::Config> regDummyStore;
 
 namespace nlohmann {
 
-using namespace nix;
-
-DummyStore::PathInfoAndContents adl_serializer<DummyStore::PathInfoAndContents>::from_json(const json & json)
+nix::DummyStore::PathInfoAndContents adl_serializer<nix::DummyStore::PathInfoAndContents>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
     return DummyStore::PathInfoAndContents{
         .info = valueAt(obj, "info"),
@@ -415,7 +414,8 @@ DummyStore::PathInfoAndContents adl_serializer<DummyStore::PathInfoAndContents>:
     };
 }
 
-void adl_serializer<DummyStore::PathInfoAndContents>::to_json(json & json, const DummyStore::PathInfoAndContents & val)
+void adl_serializer<nix::DummyStore::PathInfoAndContents>::to_json(
+    json & json, const nix::DummyStore::PathInfoAndContents & val)
 {
     json = {
         {"info", val.info},
@@ -423,8 +423,9 @@ void adl_serializer<DummyStore::PathInfoAndContents>::to_json(json & json, const
     };
 }
 
-ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(const json & json)
+nix::ref<nix::DummyStoreConfig> adl_serializer<nix::ref<nix::DummyStore::Config>>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
     auto cfg = make_ref<DummyStore::Config>(DummyStore::Config::Params{});
     cfg->storeDir_.set(getString(valueAt(obj, "store")));
@@ -432,15 +433,16 @@ ref<DummyStoreConfig> adl_serializer<ref<DummyStore::Config>>::from_json(const j
     return cfg;
 }
 
-void adl_serializer<DummyStoreConfig>::to_json(json & json, const DummyStoreConfig & val)
+void adl_serializer<nix::DummyStoreConfig>::to_json(json & json, const nix::DummyStoreConfig & val)
 {
     json = {
         {"store", val.storeDir},
     };
 }
 
-ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
+nix::ref<nix::DummyStore> adl_serializer<nix::ref<nix::DummyStore>>::from_json(const json & json)
 {
+    using namespace nix;
     auto & obj = getObject(json);
     ref<DummyStore> res = adl_serializer<ref<DummyStoreConfig>>::from_json(valueAt(obj, "config"))->openDummyStore();
     for (auto & [k, v] : getObject(valueAt(obj, "contents")))
@@ -457,8 +459,9 @@ ref<DummyStore> adl_serializer<ref<DummyStore>>::from_json(const json & json)
     return res;
 }
 
-void adl_serializer<DummyStore>::to_json(json & json, const DummyStore & val)
+void adl_serializer<nix::DummyStore>::to_json(json & json, const nix::DummyStore & val)
 {
+    using namespace nix;
     json = {
         {"config", *val.config},
         {"contents",

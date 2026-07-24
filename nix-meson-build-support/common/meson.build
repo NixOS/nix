@@ -26,6 +26,8 @@ warning_flags = [
   '-Werror=non-virtual-dtor',
   '-Wignored-qualifiers',
   '-Wimplicit-fallthrough',
+  # Clang complains about #embed even though it's now standard in C23. In C++ it's an extension, but meh.
+  '-Wno-c23-extensions',
   '-Wno-deprecated-declarations',
   '-Wno-interference-size', # Used for C++ ABI only. We don't provide any guarantees about different march tunings.
   '-Wno-subobject-linkage', # GCC doesn't like unity builds.

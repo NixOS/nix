@@ -4,8 +4,6 @@
 #include "nix/util/util.hh"
 #include "nix/util/base-n.hh"
 
-using namespace std::literals;
-
 namespace nix {
 
 constexpr static const std::array<char, 16> base16Chars = "0123456789abcdef"_arrayNoNull;

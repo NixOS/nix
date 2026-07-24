@@ -1,5 +1,7 @@
 #include "nix/store/local-store.hh"
+#include "nix/store/build.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/path-references.hh"
 #include "nix/util/git.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/pathlocks.hh"
@@ -31,6 +33,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <time.h>
+#include <variant>
 
 #ifndef _WIN32
 #  include <grp.h>
@@ -112,6 +115,7 @@ struct LocalStore::State::Stmts
     SQLiteStmt AddDerivationOutput;
     SQLiteStmt RegisterRealisedOutput;
     SQLiteStmt UpdateRealisedOutput;
+    SQLiteStmt DeleteRealisedOutputByName;
     SQLiteStmt QueryValidDerivers;
     SQLiteStmt QueryDerivationOutputs;
     SQLiteStmt QueryRealisedOutput;
@@ -129,7 +133,7 @@ LocalStore::LocalStore(ref<const Config> config)
     , reservedPath(dbDir / "reserved")
     , schemaPath(dbDir / "schema")
     , tempRootsDir(config->stateDir.get() / "temproots")
-    , fnTempRoots(makeTempPath(tempRootsDir, "temproots"))
+    , fnTempRoots(tempRootsDir / std::to_string(getpid()))
 {
     auto state(_state->lock());
     state->stmts = std::make_unique<State::Stmts>();
@@ -389,6 +393,15 @@ LocalStore::LocalStore(ref<const Config> config)
                     outputName = ?
                 ;
             )");
+        state->stmts->DeleteRealisedOutputByName.create(
+            state->db,
+            R"(
+                delete from BuildTraceV3
+                where
+                    drvPath = ? and
+                    outputName = ?
+                ;
+            )");
         state->stmts->QueryRealisedOutput.create(
             state->db,
             R"(
@@ -572,10 +585,9 @@ void LocalStore::openDB(State & state, bool create)
 
     /* Initialise the database schema, if necessary. */
     if (create) {
-        static const char schema[] =
-#include "schema.sql.gen.hh"
-            ;
-        db.exec(schema);
+        db.exec({
+#embed "schema.sql"
+        });
     }
 }
 
@@ -629,11 +641,13 @@ bool LocalStore::upgradeDBSchema(State & state, bool dryRun)
         schemaMigrations.insert(migrationName);
     };
 
-    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations))
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations)) {
         maybeUpgrade(
             "20251017-ca-derivations",
-#include "ca-specific-schema.sql.gen.hh"
-        );
+            {
+#embed "ca-specific-schema.sql"
+            });
+    }
 
     maybeUpgrade("20260309-drop-redundant-indexreferrer", "drop index if exists IndexReferrer");
 
@@ -693,6 +707,19 @@ void LocalStore::registerDrvOutput(const Realisation & info)
                 .apply(concatStringsSep(" ", Signature::toStrings(info.signatures)))
                 .exec();
         }
+    });
+}
+
+void LocalStore::deleteBuildTraces(const std::set<DrvOutput> & keys)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
+    retrySQLite<void>([&]() {
+        auto state(_state->lock());
+        SQLiteTxn txn(state->db);
+        for (const auto & key : keys) {
+            state->stmts->DeleteRealisedOutputByName.use().apply(key.drvPath.to_string()).apply(key.outputName).exec();
+        }
+        txn.commit();
     });
 }
 
@@ -1157,9 +1184,29 @@ StorePath LocalStore::addToStoreFromDump(
     const StorePathSet & references,
     RepairFlag repair)
 {
+    return addToStoreFromDump(source0, name, dumpMethod, hashMethod, hashAlgo, references, repair, false);
+}
+
+StorePath LocalStore::addToStoreFromDump(
+    Source & source0,
+    std::string_view name,
+    FileSerialisationMethod dumpMethod,
+    ContentAddressMethod hashMethod,
+    HashAlgorithm hashAlgo,
+    const StorePathSet & originalReferences,
+    RepairFlag repair,
+    bool filterReferences)
+{
     /* For computing the store path. */
-    auto hashSink = std::make_unique<HashSink>(hashAlgo);
-    TeeSource source{source0, *hashSink};
+    auto hashSink = std::make_shared<HashSink>(hashAlgo);
+    std::shared_ptr<Sink> sink = hashSink;
+    std::optional<PathRefScanSink> refSink = std::nullopt;
+    if (filterReferences) {
+        // Only scan if we really need to, since it's slower.
+        refSink = PathRefScanSink::fromPaths(originalReferences);
+        sink = std::make_shared<TeeSink>(*hashSink, *refSink);
+    }
+    TeeSource source{source0, *sink};
     const LocalSettings & localSettings = config->getLocalSettings();
 
     /* Read the source path into memory, but only if it's up to
@@ -1212,8 +1259,9 @@ StorePath LocalStore::addToStoreFromDump(
     bool methodsMatch = static_cast<FileIngestionMethod>(dumpMethod) == hashMethod.getFileIngestionMethod();
 
     /* If the methods don't match, our streaming hash of the dump is the
-       wrong sort, and we need to rehash. */
-    bool inMemoryAndDontNeedRestore = inMemory && methodsMatch;
+       wrong sort, and we need to rehash.
+       References are also in store path, if scanning we will need to move */
+    bool inMemoryAndDontNeedRestore = inMemory && methodsMatch && !filterReferences;
 
     if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
@@ -1231,6 +1279,13 @@ StorePath LocalStore::addToStoreFromDump(
     }
 
     auto [dumpHash, size] = hashSink->finish();
+
+    StorePathSet references;
+    if (refSink.has_value()) {
+        references = refSink->getResultPaths();
+    } else {
+        references = originalReferences;
+    }
 
     auto desc = ContentAddressWithReferences::fromParts(
         hashMethod,
@@ -1419,7 +1474,7 @@ bool LocalStore::verifyStore(bool checkContents, RepairFlag repair)
                         info->narHash.to_string(HashFormat::Nix32, true),
                         current.hash.to_string(HashFormat::Nix32, true));
                     if (repair)
-                        repairPath(i);
+                        getBuilder()->repairPath(i);
                     else
                         errors = true;
                 } else {
@@ -1533,7 +1588,7 @@ void LocalStore::verifyPath(
             printError("path '%s' disappeared, but it still has valid referrers!", pathS);
             if (repair)
                 try {
-                    repairPath(path);
+                    getBuilder()->repairPath(path);
                 } catch (Error & e) {
                     logWarning(e.info());
                     errors = true;

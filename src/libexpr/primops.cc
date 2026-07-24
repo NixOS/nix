@@ -10,7 +10,10 @@
 #include "nix/store/names.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/configuration.hh"
 #include "nix/util/mounted-source-accessor.hh"
+#include "nix/store/build.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/util.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
@@ -126,7 +129,7 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
     buildReqs.reserve(drvs.size());
     for (auto & d : drvs)
         buildReqs.emplace_back(DerivedPath{d});
-    buildStore->buildPaths(buildReqs, bmNormal, store);
+    buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
 
     StorePathSet outputsToCopyAndAllow;
 
@@ -251,7 +254,7 @@ void derivationToValue(
     state.evalFile(state.importedDrvToDerivation, *vImportedDrvToDerivation); // has caching
 
     v.mkApp(vImportedDrvToDerivation, w);
-    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix.gen.hh");
+    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix");
 }
 
 /**
@@ -1514,13 +1517,15 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             "passed to builtins.derivationStrict");
 
     /* Build the derivation expression by processing the attributes. */
-    Derivation drv;
-    drv.name = drvName;
+    Derivation drv{
+        .name = std::string{drvName},
+    };
 
     NixStringContext context;
 
     bool contentAddressed = false;
     bool isImpure = false;
+    bool isSubmittingOutputs = false;
     std::optional<std::string> outputHash;
     std::optional<HashAlgorithm> outputHashAlgo;
     std::optional<ContentAddressMethod> ingestionMethod;
@@ -1533,6 +1538,17 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             continue;
         auto key = state.symbols[i->name];
         vomit("processing attribute '%1%'", key);
+
+        // Like `warn`, but with the position of the attribute and the derivation name as an added trace.
+        auto warnAttr = [&](HintFmt msg) {
+            ErrorInfo info{
+                .level = lvlWarn,
+                .msg = std::move(msg),
+                .pos = state.positions[i->pos],
+            };
+            info.traces.push_back(Trace{.hint = HintFmt{"while evaluating derivation '%1%'", drvName}});
+            logWarning(info);
+        };
 
         auto handleHashMode = [&](const std::string_view s) {
             if (s == "recursive") {
@@ -1643,40 +1659,36 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                         handleOutputs(ss);
                         break;
                     }
+                    case EvalState::s.requiredSystemFeatures.getId(): {
+                        /* Only parsed to detect `builder-rpc-v0`; skip
+                           entirely unless the experimental feature is
+                           enabled. */
+                        if (!experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations))
+                            break;
+                        state.forceList(*i->value, pos, context_below);
+                        for (auto elem : i->value->listView()) {
+                            auto name = state.forceString(*elem, context, pos, context_below);
+                            if (name == drvFeatureBuilderRpcV0) {
+                                isSubmittingOutputs = true;
+                                break;
+                            }
+                        }
+                        break;
+                    }
                     default:
                         break;
                     }
 
                     switch (i->name.getId()) {
                     case EvalState::s.allowedReferences.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedReferences'; use 'outputChecks.<output>.allowedReferences' instead",
-                            drvName);
-                        break;
                     case EvalState::s.allowedRequisites.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'allowedRequisites'; use 'outputChecks.<output>.allowedRequisites' instead",
-                            drvName);
-                        break;
                     case EvalState::s.disallowedReferences.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedReferences'; use 'outputChecks.<output>.disallowedReferences' instead",
-                            drvName);
-                        break;
                     case EvalState::s.disallowedRequisites.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'disallowedRequisites'; use 'outputChecks.<output>.disallowedRequisites' instead",
-                            drvName);
-                        break;
                     case EvalState::s.maxSize.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxSize'; use 'outputChecks.<output>.maxSize' instead",
-                            drvName);
-                        break;
                     case EvalState::s.maxClosureSize.getId():
-                        warn(
-                            "In a derivation named '%s', 'structuredAttrs' disables the effect of the derivation attribute 'maxClosureSize'; use 'outputChecks.<output>.maxClosureSize' instead",
-                            drvName);
+                        warnAttr(HintFmt(
+                            "'structuredAttrs' disables the effect of the derivation attribute '%1%'; use 'outputChecks.<output>.%1%' instead",
+                            key));
                         break;
                     default:
                         break;
@@ -1684,10 +1696,18 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
                 } else {
                     auto s = state.coerceToString(pos, *i->value, context, context_below, true).toOwned();
+
+                    /* Re-interpret the attribute's value as a list of
+                       strings.
+
+                       We may wish to warn here better future-compat
+                       later, e.g. requiring that it be a list of
+                       strings without spaces to begin with. */
+                    auto forceStringList = [&] { return tokenizeString<Strings>(s); };
+
                     if (i->name == state.s.json) {
-                        warn(
-                            "In derivation '%s': setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead.",
-                            drvName);
+                        warnAttr(HintFmt(
+                            "setting structured attributes via '__json' is deprecated, and may be disallowed in future versions of Nix. Set '__structuredAttrs = true' instead."));
                         drv.structuredAttrs = StructuredAttrs::parse(s);
                     } else {
                         drv.env.emplace(key, s);
@@ -1708,8 +1728,22 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                             handleHashMode(s);
                             break;
                         case EvalState::s.outputs.getId():
-                            handleOutputs(tokenizeString<Strings>(s));
+                            handleOutputs(forceStringList());
                             break;
+                        case EvalState::s.requiredSystemFeatures.getId(): {
+                            /* Only parsed to detect `builder-rpc-v0`; skip
+                               entirely unless the experimental feature is
+                               enabled. */
+                            if (!experimentalFeatureSettings.isEnabled(Xp::DynamicDerivations))
+                                break;
+                            for (auto & name : forceStringList()) {
+                                if (name == drvFeatureBuilderRpcV0) {
+                                    isSubmittingOutputs = true;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
                         default:
                             break;
                         }
@@ -1748,18 +1782,18 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputSrcs.insert(j);
+                        drv.inputs.srcs.insert(j);
                         if (j.isDerivation()) {
-                            drv.inputDrvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            drv.inputs.drvs.map[j].value = state.store->readDerivation(j).outputNames();
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputDrvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.drvs.ensureSlot(*b.drvPath).value.insert(b.output);
                 },
                 [&](const NixStringContextElem::Opaque & o) {
                     state.ensureLazyPathCopied(o.path);
-                    drv.inputSrcs.insert(o.path);
+                    drv.inputs.srcs.insert(o.path);
                 },
             },
             c.raw);
@@ -1806,7 +1840,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                 },
         };
 
-        drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
+        if (!isSubmittingOutputs)
+            drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
         drv.outputs.insert_or_assign("out", std::move(dof));
     }
 
@@ -1818,7 +1853,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         auto method = ingestionMethod.value_or(ContentAddressMethod::Raw::NixArchive);
 
         for (auto & i : outputs) {
-            drv.env[i] = hashPlaceholder(i);
+            if (!isSubmittingOutputs)
+                drv.env[i] = hashPlaceholder(i);
             if (isImpure)
                 drv.outputs.insert_or_assign(
                     i,
@@ -1973,7 +2009,7 @@ static void prim_storePath(EvalState & state, const PosIdx pos, Value ** args, V
         state.error<EvalError>("path '%1%' is not in the Nix store", sourcePath).atPos(pos).debugThrow();
     auto storePath = state.store->toStorePath(sourcePath.path.abs()).first;
     if (!state.storeFS->getMount(CanonPath(state.store->printStorePath(storePath))) && !settings.readOnlyMode)
-        state.store->ensurePath(storePath);
+        state.store->getBuilder()->ensurePath(storePath);
     context.insert(NixStringContextElem::Opaque{.path = storePath});
     v.mkString(sourcePath.path.abs(), context, state.mem);
 }

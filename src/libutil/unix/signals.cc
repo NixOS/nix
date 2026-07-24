@@ -5,6 +5,8 @@
 #include "nix/util/sync.hh"
 #include "nix/util/terminal.hh"
 
+#include "unix/signals-private.hh"
+
 #include <thread>
 
 namespace nix {
@@ -101,8 +103,8 @@ void unix::triggerInterrupt()
     }
 }
 
-static sigset_t savedSignalMask;
-static bool savedSignalMaskIsSet = false;
+sigset_t unix::savedSignalMask;
+bool unix::savedSignalMaskIsSet = false;
 
 void unix::saveSignalMask()
 {

@@ -3,6 +3,7 @@
 include_dirs = [ include_directories('../../..') ]
 
 headers = files(
+  'capture-logging.hh',
   'characterization.hh',
   'gmock-matchers.hh',
   'gtest-with-params.hh',
