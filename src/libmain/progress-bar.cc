@@ -203,7 +203,7 @@ public:
         return printBuildLogs;
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         if (lvl > verbosity)
             return;
@@ -211,7 +211,7 @@ public:
         log(*state, lvl, s);
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         auto state(state_.lock());
 
@@ -221,7 +221,7 @@ public:
         log(*state, ei.level, oss.view());
     }
 
-    void log(State & state, Verbosity lvl, std::string_view s)
+    void log(State & state, Verbosity lvl, std::string_view s) noexcept
     {
         if (state.active) {
             invalidateRedrawCache();
@@ -238,7 +238,7 @@ public:
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent) noexcept override
     {
         auto state(state_.lock());
 
@@ -257,12 +257,6 @@ public:
             auto machineName = getS(fields, 1);
             if (machineName != "")
                 i->s += fmt(" on " ANSI_BOLD "%s" ANSI_NORMAL, machineName);
-
-            // Used to be curRound and nrRounds, but the
-            // implementation was broken for a long time.
-            if (getI(fields, 2) != 1 || getI(fields, 3) != 1) {
-                throw Error("log message indicated repeating builds, but this is not currently implemented");
-            }
             i->name = DrvName(name).name;
         }
 
@@ -310,7 +304,7 @@ public:
         return false;
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act) noexcept override
     {
         auto state(state_.lock());
 
@@ -332,7 +326,7 @@ public:
         update(*state);
     }
 
-    void result(ActivityId act, ResultType type, const std::vector<Field> & fields) override
+    void result(ActivityId act, ResultType type, const std::vector<Field> & fields) noexcept override
     {
         auto state(state_.lock());
 
@@ -411,7 +405,7 @@ public:
         }
     }
 
-    void update(State & state)
+    void update(State & state) noexcept
     {
         state.haveUpdate = true;
         updateCV.notify_one();
@@ -424,7 +418,7 @@ public:
      * with text selection in some terminals, including libvte-based terminal
      * emulators.
      */
-    void redraw(std::string newOutput)
+    void redraw(std::string newOutput) noexcept
     {
         auto lastOutput(lastOutput_.lock());
         if (newOutput != *lastOutput) {
@@ -444,7 +438,7 @@ public:
         writeToStderr("\r\e[K");
     }
 
-    std::chrono::milliseconds draw(State & state)
+    std::chrono::milliseconds draw(State & state) noexcept
     {
         auto nextWakeup = std::chrono::milliseconds::max();
 
@@ -508,7 +502,7 @@ public:
         return nextWakeup;
     }
 
-    std::string getStatus(State & state)
+    std::string getStatus(State & state) noexcept
     {
         std::string res;
 
