@@ -82,11 +82,11 @@ static void resolvedAttrToValue(EvalState & state, Value & v, const fetchers::Re
 /**
  * internal primop: Force a LazyFetcherAttr external value.
  */
-static void prim_forceLazyFetcherAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_forceLazyFetcherAttr(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
     Value & arg = *args[0];
 
-    state.forceValue(arg, pos);
+    state.forceValue(arg, noPos);
     // We only construct this primop with LazyFetcherAttr preapplied.
     assert(arg.type() == nExternal);
     auto * ext = dynamic_cast<LazyFetcherAttr *>(args[0]->external());
@@ -180,7 +180,7 @@ struct FetchTreeParams
 };
 
 static void fetchTree(
-    EvalState & state, const PosIdx pos, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
+    EvalState & state, CallSite callSite, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
 {
     fetchers::Input input{};
     NixStringContext context;
@@ -189,20 +189,20 @@ static void fetchTree(
     if (params.isFetchGit)
         type = "git";
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], noPos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos, fmt("while evaluating the argument passed to '%s'", fetcher));
+        state.forceAttrs(*args[0], noPos, fmt("while evaluating the argument passed to '%s'", fetcher));
 
         fetchers::Attrs attrs;
 
         if (auto aType = args[0]->attrs()->get(state.s.type)) {
             if (type)
-                state.error<EvalError>("unexpected argument 'type'").atPos(pos).debugThrow();
+                state.error<EvalError>("unexpected argument 'type'").atPos(noPos).debugThrow();
             type = state.forceStringNoCtx(
                 *aType->value, aType->pos, fmt("while evaluating the `type` argument passed to '%s'", fetcher));
         } else if (!type)
-            state.error<EvalError>("argument 'type' is missing in call to '%s'", fetcher).atPos(pos).debugThrow();
+            state.error<EvalError>("argument 'type' is missing in call to '%s'", fetcher).atPos(noPos).debugThrow();
 
         attrs.emplace("type", type.value());
 
@@ -227,14 +227,14 @@ static void fetchTree(
                             fetcher,
                             state.symbols[attr.name],
                             intValue)
-                        .atPos(pos)
+                        .atPos(noPos)
                         .debugThrow();
 
                 attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
             } else if (state.symbols[attr.name] == "publicKeys") {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
                 attrs.emplace(
-                    state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
+                    state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, noPos, context).dump());
             } else
                 state
                     .error<TypeError>(
@@ -258,14 +258,14 @@ static void fetchTree(
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>("argument 'name' isn’t supported in call to '%s'", fetcher)
-                    .atPos(pos)
+                    .atPos(noPos)
                     .debugThrow();
 
         input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state
                        .coerceToString(
-                           pos,
+                           noPos,
                            *args[0],
                            context,
                            fmt("while evaluating the first argument passed to '%s'", fetcher),
@@ -287,7 +287,7 @@ static void fetchTree(
                 state
                     .error<EvalError>(
                         "passing a string argument to '%s' requires the 'flakes' experimental feature", fetcher)
-                    .atPos(pos)
+                    .atPos(noPos)
                     .debugThrow();
             input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
@@ -306,7 +306,7 @@ static void fetchTree(
             state
                 .error<EvalError>(
                     "in pure evaluation mode, '%s' doesn't fetch unlocked input '%s'", fetcher, input.to_string())
-                .atPos(pos)
+                .atPos(noPos)
                 .debugThrow();
     }
 
@@ -327,9 +327,9 @@ static void fetchTree(
     emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchTree(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetchTree(state, pos, args, v, {});
+    fetchTree(state, callSite, args, v, {});
 }
 
 static RegisterPrimOp primop_fetchTree({
@@ -460,9 +460,9 @@ static RegisterPrimOp primop_fetchTree({
     .experimentalFeature = Xp::FetchTree,
 });
 
-void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+void prim_fetchFinalTree(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetchTree(state, pos, args, v, {.isFinal = true});
+    fetchTree(state, callSite, args, v, {.isFinal = true});
 }
 
 static RegisterPrimOp primop_fetchFinalTree({
@@ -484,7 +484,7 @@ static void fetch(
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], noPos);
 
     bool isArgAttrs = args[0]->type() == nAttrs;
     bool nameAttrPassed = false;
@@ -505,13 +505,13 @@ static void fetch(
                 name = state.forceStringNoCtx(
                     *attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             } else
-                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(pos).debugThrow();
+                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(noPos).debugThrow();
         }
 
         if (!url)
-            state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
+            state.error<EvalError>("'url' argument required").atPos(noPos).debugThrow();
     } else
-        url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
+        url = state.forceStringNoCtx(*args[0], noPos, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
         url = state.settings.resolvePseudoUrl(*url);
@@ -543,13 +543,13 @@ static void fetch(
                 *url,
                 Uncolored(e.message()),
                 Uncolored(resolution.str()))
-            .atPos(pos)
+            .atPos(noPos)
             .debugThrow();
     }
 
     if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who)
-            .atPos(pos)
+            .atPos(noPos)
             .debugThrow();
 
     // early exit if pinned and already in the store
@@ -611,9 +611,9 @@ static void fetch(
     }
 }
 
-static void prim_fetchurl(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchurl(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchurl", false, "");
+    fetch(state, noPos, args, v, "fetchurl", false, "");
 }
 
 static RegisterPrimOp primop_fetchurl({
@@ -637,9 +637,9 @@ static RegisterPrimOp primop_fetchurl({
     .impl = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchTarball(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchTarball", true, "source");
+    fetch(state, noPos, args, v, "fetchTarball", true, "source");
 }
 
 static RegisterPrimOp primop_fetchTarball({
@@ -687,10 +687,14 @@ static RegisterPrimOp primop_fetchTarball({
     .impl = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchGit(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
     fetchTree(
-        state, pos, args, v, FetchTreeParams{.emptyRevFallback = true, .allowNameArgument = true, .isFetchGit = true});
+        state,
+        callSite,
+        args,
+        v,
+        FetchTreeParams{.emptyRevFallback = true, .allowNameArgument = true, .isFetchGit = true});
 }
 
 static RegisterPrimOp primop_fetchGit({
