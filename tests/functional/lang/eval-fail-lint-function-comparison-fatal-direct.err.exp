@@ -1,0 +1,6 @@
+error: function comparison is unreliable; it may return true or false depending on structure and evaluation order (lint-function-comparison)
+       at /pwd/lang/eval-fail-lint-function-comparison-fatal-direct.nix:2:8:
+            1| # Direct comparison of two functions should be a fatal error when lint is fatal.
+            2| (x: x) == (x: x)
+             |        ^
+            3|
