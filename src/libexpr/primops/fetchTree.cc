@@ -119,6 +119,7 @@ static void emitLazyAttrThunk(EvalState & state, const fetchers::LazyAttr & lazy
 
 void emitTreeAttrs(
     EvalState & state,
+    PosIdx callPos,
     const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
@@ -127,44 +128,46 @@ void emitTreeAttrs(
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.s.outPath));
+    state.mkStorePathString(storePath, attrs.alloc(state.s.outPath, callPos));
 
     // FIXME: support arbitrary input attributes.
 
     if (auto narHash = input.getNarHash())
-        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
+        attrs.alloc("narHash", callPos).mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
 
     if (input.getType() == "git")
-        attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        attrs.alloc("submodules", callPos)
+            .mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
-            attrs.alloc("rev").mkString(rev->gitRev(), state.mem);
-            attrs.alloc("shortRev").mkString(rev->gitShortRev(), state.mem);
+            attrs.alloc("rev", callPos).mkString(rev->gitRev(), state.mem);
+            attrs.alloc("shortRev", callPos).mkString(rev->gitShortRev(), state.mem);
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(HashAlgorithm::SHA1);
-            attrs.alloc("rev").mkString(emptyHash.gitRev(), state.mem);
-            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev(), state.mem);
+            attrs.alloc("rev", callPos).mkString(emptyHash.gitRev(), state.mem);
+            attrs.alloc("shortRev", callPos).mkString(emptyHash.gitShortRev(), state.mem);
         }
 
         if (auto revCount = maybeGetLazyAttr(input.attrs, "revCount"))
-            emitLazyAttrThunk(state, *revCount, attrs.alloc("revCount"));
+            emitLazyAttrThunk(state, *revCount, attrs.alloc("revCount", callPos));
         else if (auto revCount = input.getRevCount())
-            attrs.alloc("revCount").mkInt(*revCount);
+            attrs.alloc("revCount", callPos).mkInt(*revCount);
         else if (emptyRevFallback)
-            attrs.alloc("revCount").mkInt(0);
+            attrs.alloc("revCount", callPos).mkInt(0);
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
-        attrs.alloc("dirtyRev").mkString(*dirtyRev, state.mem);
-        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
+        attrs.alloc("dirtyRev", callPos).mkString(*dirtyRev, state.mem);
+        attrs.alloc("dirtyShortRev", callPos)
+            .mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
     }
 
     if (auto lastModified = input.getLastModified()) {
-        attrs.alloc("lastModified").mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate")
+        attrs.alloc("lastModified", callPos).mkInt(*lastModified);
+        attrs.alloc("lastModifiedDate", callPos)
             .mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")), state.mem);
     }
 
@@ -324,7 +327,7 @@ static void fetchTree(
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, callSite.pos, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
 static void prim_fetchTree(EvalState & state, CallSite callSite, Value ** args, Value & v)
