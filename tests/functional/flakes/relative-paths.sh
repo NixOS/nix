@@ -171,3 +171,43 @@ EOF
   nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
   nix eval --json .#nestedFlake1.nestedFlake2 --no-eval-cache
 )
+
+# A flake input is some location defined by the input plus a subdir (where
+# `flake.nix` should be in that location). Subdir composes uniformly across
+# schemes: `github:foo/bar?dir=x`, `path:/abs?dir=x`, and `path:./rel?dir=x`
+# all locate the flake at `<exposed-source>/x/flake.nix`. So the flake for
+# `path:./sub?dir=inner` lives at `<parent>/sub/inner`, despite the quirk
+# described in https://github.com/NixOS/nix/issues/16214
+mkdir -p "$TEST_ROOT/reldir/sub/inner" "$TEST_ROOT/reldir/alt/deep"
+(
+  initGitRepo "$TEST_ROOT/reldir"
+  cd "$TEST_ROOT/reldir"
+  cat >sub/inner/flake.nix <<EOF
+{
+  outputs = { ... }: { tag = "correct"; };
+}
+EOF
+  cat >flake.nix <<EOF
+{
+  inputs.sub.url = "path:./sub?dir=inner";
+  outputs = { sub, ... }: { tag = sub.tag; };
+}
+EOF
+  git add flake.nix sub/inner/flake.nix
+  nix flake lock
+  [[ $(nix eval --raw .#tag) = "correct" ]]
+
+  # The subdir must also compose when the input is replaced via
+  # --override-input by a ref that itself carries a `?dir=` subdir. This
+  # exercises the `hasOverride` branch of call-flake.nix, where the subdir
+  # comes from the override's `dir` attribute rather than the lock file.
+  # We can't produce a relative path through the CLI yet, so we only test the
+  # `--override-input` with an absolute path here.
+  cat >alt/deep/flake.nix <<EOF
+{
+  outputs = { ... }: { tag = "overridden"; };
+}
+EOF
+  git add alt/deep/flake.nix
+  [[ $(nix eval --raw --override-input sub "path:$TEST_ROOT/reldir/alt?dir=deep" .#tag) = "overridden" ]]
+)
