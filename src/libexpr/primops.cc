@@ -182,7 +182,7 @@ SourcePath EvalState::realisePath(
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
-        e.addTrace(positions[noPos], "while realising the context of path '%s'", path);
+        e.addTrace(nullptr, "while realising the context of path '%s'", path);
         throw;
     }
 }
@@ -519,13 +519,13 @@ void prim_exec(EvalState & state, CallSite callSite, Value ** args, Value & v)
     try {
         parsed = state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));
     } catch (Error & e) {
-        e.addTrace(state.positions[noPos], "while parsing the output from '%1%'", program);
+        e.addTrace(nullptr, "while parsing the output from '%1%'", program);
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addTrace(state.positions[noPos], "while evaluating the output from '%1%'", program);
+        e.addTrace(nullptr, "while evaluating the output from '%1%'", program);
         throw;
     }
 }
@@ -974,6 +974,10 @@ static RegisterPrimOp primop_break(
                  ErrorInfo{
                      .level = lvlInfo,
                      .msg = HintFmt("breakpoint reached"),
+                     // A non-null but empty pos, so that the debugger doesn't fall back to
+                     // the call site (see EvalState::runDebugRepl). The call site is already
+                     // shown by the enclosing "while calling a function" trace, so repeating
+                     // it on the breakpoint frame would just be noise.
                      .pos = state.positions[noPos],
                  });
 
@@ -1353,7 +1357,6 @@ static void prim_warn(EvalState & state, CallSite callSite, Value ** args, Value
         ErrorInfo info{
             .level = lvlWarn,
             .msg = HintFmt(std::string(msgStr)),
-            .pos = state.positions[noPos],
             .isFromExpr = true,
         };
         logWarning(info);
@@ -2711,7 +2714,7 @@ static void prim_fromJSON(EvalState & state, CallSite callSite, Value ** args, V
     try {
         parseJSON(state, s, v);
     } catch (JSONParseError & e) {
-        e.addTrace(state.positions[noPos], "while decoding a JSON string");
+        e.addTrace(nullptr, "while decoding a JSON string");
         throw;
     }
 }
@@ -2942,7 +2945,7 @@ static void addPath(
         } else
             state.allowAndSetStorePathString(*expectedStorePath, v);
     } catch (Error & e) {
-        e.addTrace(state.positions[noPos], "while adding path '%s'", path);
+        e.addTrace(nullptr, "while adding path '%s'", path);
         throw;
     }
 }
