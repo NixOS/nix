@@ -22,8 +22,6 @@ public:
     virtual std::optional<std::string> getBuildLogExact(const StorePath & path) = 0;
 
     virtual void addBuildLog(const StorePath & path, std::string_view log) = 0;
-
-    static LogStore & require(Store & store);
 };
 
 } // namespace nix
