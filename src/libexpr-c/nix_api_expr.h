@@ -230,6 +230,21 @@ nix_err nix_eval_state_builder_set_lookup_path(
     nix_c_context * context, nix_eval_state_builder * builder, const char ** lookupPath);
 
 /**
+ * @brief Set an evaluator setting on the builder
+ * @ingroup libexpr_init
+ *
+ * Sets a single evaluator setting (as documented in the Nix manual) on the builder.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] builder The builder to modify.
+ * @param[in] key The setting name.
+ * @param[in] value The setting value.
+ * @return NIX_OK if successful, NIX_ERR_KEY if the setting does not exist, an error code otherwise.
+ */
+nix_err nix_eval_state_builder_set_setting(
+    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value);
+
+/**
  * @brief Create a new Nix language evaluator state
  * @ingroup libexpr_init
  *

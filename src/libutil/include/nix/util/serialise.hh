@@ -466,16 +466,12 @@ class LambdaSink : public Sink
     void anchor() override;
 
 public:
-    typedef fun<void(std::string_view data)> data_t;
-    typedef fun<void()> cleanup_t;
+    typedef fun<void(std::string_view data)> lambda_t;
 
-    data_t dataFun;
-    cleanup_t cleanupFun;
+    lambda_t lambda;
 
-    LambdaSink(
-        const data_t & dataFun, const cleanup_t & cleanupFun = []() {})
-        : dataFun(dataFun)
-        , cleanupFun(cleanupFun)
+    LambdaSink(const lambda_t & lambda)
+        : lambda(lambda)
     {
     }
 
@@ -483,15 +479,11 @@ public:
     LambdaSink(const LambdaSink &) = delete;
     LambdaSink & operator=(LambdaSink &&) = delete;
     LambdaSink & operator=(const LambdaSink &) = delete;
-
-    ~LambdaSink()
-    {
-        cleanupFun();
-    }
+    ~LambdaSink() = default;
 
     void operator()(std::string_view data) override
     {
-        dataFun(data);
+        lambda(data);
     }
 };
 

@@ -152,6 +152,18 @@ nix_err nix_eval_state_builder_set_lookup_path(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_eval_state_builder_set_setting(
+    nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        if (!builder->settings.set(key, value))
+            return nix_set_err_msg(context, NIX_ERR_KEY, "Setting not found");
+    }
+    NIXC_CATCH_ERRS
+}
+
 EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder)
 {
     if (context)
