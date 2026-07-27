@@ -56,11 +56,17 @@ let
 
       subdir = overrides.${key}.dir or node.locked.dir or "";
 
-      outPath =
+      /**
+        The path before appending the `?subdir` value.
+        Usually a source root, except when it's a relative `path:` input.
+      */
+      subdirBase =
         if !hasOverride && isRelative then
           parentNode.outPath + (if node.locked.path == "" then "" else "/" + node.locked.path)
         else
-          sourceInfo.outPath + (if subdir == "" then "" else "/" + subdir);
+          sourceInfo.outPath;
+
+      outPath = subdirBase + (if subdir == "" then "" else "/" + subdir);
 
       flake = import (outPath + "/flake.nix");
 
