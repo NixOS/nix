@@ -326,8 +326,7 @@ public:
         bool respectTimeouts);
 
     /**
-     * Unregisters a running child process. Wakes at most a single goal that is
-     * awaiting on the corresponding build slot type (building or substitution).
+     * Unregisters a running child process.
      *
      * This overload requires `goal` to point to a fully constructed,
      * valid goal object, as it calls `goal->jobCategory()`.
