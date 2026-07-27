@@ -375,7 +375,11 @@ static void daemonLoop(
                         auto store = storeConfig->openStore();
                         store->init();
                         processConnection(
-                            store, FdSource(remote.get()), FdSink(remote.get()), trusted, RecursiveFlag::NotRecursive);
+                            std::move(store),
+                            FdSource(remote.get()),
+                            FdSink(remote.get()),
+                            trusted,
+                            RecursiveFlag::NotRecursive);
 
                         exit(0);
                     },
