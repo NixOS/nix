@@ -946,25 +946,6 @@ public:
      */
     virtual StorePaths topoSortPaths(const StorePathSet & paths);
 
-    struct Stats
-    {
-        std::atomic<uint64_t> narInfoRead{0};
-        std::atomic<uint64_t> narInfoReadAverted{0};
-        std::atomic<uint64_t> narInfoMissing{0};
-        std::atomic<uint64_t> narInfoWrite{0};
-        std::atomic<uint64_t> pathInfoCacheSize{0};
-        std::atomic<uint64_t> narRead{0};
-        std::atomic<uint64_t> narReadBytes{0};
-        std::atomic<uint64_t> narReadCompressedBytes{0};
-        std::atomic<uint64_t> narWrite{0};
-        std::atomic<uint64_t> narWriteAverted{0};
-        std::atomic<uint64_t> narWriteBytes{0};
-        std::atomic<uint64_t> narWriteCompressedBytes{0};
-        std::atomic<uint64_t> narWriteCompressionTimeMs{0};
-    };
-
-    const Stats & getStats();
-
     /**
      * Computes the full closure of of a set of store-paths for e.g.
      * derivations that need this information for `exportReferencesGraph`.
@@ -1023,8 +1004,6 @@ public:
     }
 
 protected:
-
-    Stats stats;
 
     /**
      * Helper for methods that are not unsupported: this is used for
