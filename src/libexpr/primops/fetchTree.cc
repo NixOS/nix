@@ -475,14 +475,7 @@ static RegisterPrimOp primop_fetchFinalTree({
     .internal = true,
 });
 
-static void fetch(
-    EvalState & state,
-    const PosIdx pos,
-    Value ** args,
-    Value & v,
-    const std::string & who,
-    bool unpack,
-    std::string name)
+static void fetch(EvalState & state, Value ** args, Value & v, const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -616,7 +609,7 @@ static void fetch(
 
 static void prim_fetchurl(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetch(state, noPos, args, v, "fetchurl", false, "");
+    fetch(state, args, v, "fetchurl", false, "");
 }
 
 static RegisterPrimOp primop_fetchurl({
@@ -642,7 +635,7 @@ static RegisterPrimOp primop_fetchurl({
 
 static void prim_fetchTarball(EvalState & state, CallSite callSite, Value ** args, Value & v)
 {
-    fetch(state, noPos, args, v, "fetchTarball", true, "source");
+    fetch(state, args, v, "fetchTarball", true, "source");
 }
 
 static RegisterPrimOp primop_fetchTarball({

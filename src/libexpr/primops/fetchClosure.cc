@@ -17,7 +17,6 @@ namespace nix {
  */
 static void runFetchClosureWithRewrite(
     EvalState & state,
-    const PosIdx pos,
     Store & fromStore,
     const StorePath & fromPath,
     const std::optional<StorePath> & toPathMaybe,
@@ -70,8 +69,8 @@ static void runFetchClosureWithRewrite(
 /**
  * Fetch the closure and make sure it's content addressed.
  */
-static void runFetchClosureWithContentAddressedPath(
-    EvalState & state, const PosIdx pos, Store & fromStore, const StorePath & fromPath, Value & v)
+static void
+runFetchClosureWithContentAddressedPath(EvalState & state, Store & fromStore, const StorePath & fromPath, Value & v)
 {
     state.store->addTempRoot(fromPath);
 
@@ -99,8 +98,8 @@ static void runFetchClosureWithContentAddressedPath(
 /**
  * Fetch the closure and make sure it's input addressed.
  */
-static void runFetchClosureWithInputAddressedPath(
-    EvalState & state, const PosIdx pos, Store & fromStore, const StorePath & fromPath, Value & v)
+static void
+runFetchClosureWithInputAddressedPath(EvalState & state, Store & fromStore, const StorePath & fromPath, Value & v)
 {
     state.store->addTempRoot(fromPath);
 
@@ -200,11 +199,11 @@ static void prim_fetchClosure(EvalState & state, CallSite callSite, Value ** arg
     auto fromStore = openStore(std::move(storeRef));
 
     if (toPath)
-        runFetchClosureWithRewrite(state, noPos, *fromStore, *fromPath, *toPath, v);
+        runFetchClosureWithRewrite(state, *fromStore, *fromPath, *toPath, v);
     else if (inputAddressed)
-        runFetchClosureWithInputAddressedPath(state, noPos, *fromStore, *fromPath, v);
+        runFetchClosureWithInputAddressedPath(state, *fromStore, *fromPath, v);
     else
-        runFetchClosureWithContentAddressedPath(state, noPos, *fromStore, *fromPath, v);
+        runFetchClosureWithContentAddressedPath(state, *fromStore, *fromPath, v);
 }
 
 static RegisterPrimOp primop_fetchClosure({

@@ -225,8 +225,7 @@ static void mkOutputString(
  * @param storePath The path to the `.drv` to import.
  * @param v Return value
  */
-void derivationToValue(
-    EvalState & state, const PosIdx pos, const SourcePath & path, const StorePath & storePath, Value & v)
+void derivationToValue(EvalState & state, const SourcePath & path, const StorePath & storePath, Value & v)
 {
     auto path2 = path.path.abs();
     Derivation drv = state.store->readDerivation(storePath);
@@ -254,7 +253,7 @@ void derivationToValue(
     state.evalFile(state.importedDrvToDerivation, *vImportedDrvToDerivation); // has caching
 
     v.mkApp(vImportedDrvToDerivation, w);
-    state.forceAttrs(v, pos, "while calling imported-drv-to-derivation.nix");
+    state.forceAttrs(v, noPos, "while calling imported-drv-to-derivation.nix");
 }
 
 /**
@@ -266,9 +265,9 @@ void derivationToValue(
  * @param vScope The base scope to use for the import.
  * @param v Return value
  */
-static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path, Value * vScope, Value & v)
+static void scopedImport(EvalState & state, SourcePath & path, Value * vScope, Value & v)
 {
-    state.forceAttrs(*vScope, pos, "while evaluating the first argument passed to builtins.scopedImport");
+    state.forceAttrs(*vScope, noPos, "while evaluating the first argument passed to builtins.scopedImport");
 
     Env * env = &state.mem.allocEnv(vScope->attrs()->size());
     env->up = &state.baseEnv;
@@ -292,9 +291,9 @@ static void scopedImport(EvalState & state, const PosIdx pos, SourcePath & path,
 
 /* Load and evaluate an expression from path specified by the
    argument. */
-static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * vScope, Value & v)
+static void import(EvalState & state, Value & vPath, Value * vScope, Value & v)
 {
-    auto path = state.realisePath(pos, vPath, std::nullopt);
+    auto path = state.realisePath(noPos, vPath, std::nullopt);
     auto path2 = path.path.abs();
 
     // FIXME
@@ -308,9 +307,9 @@ static void import(EvalState & state, const PosIdx pos, Value & vPath, Value * v
     };
 
     if (auto storePath = isValidDerivationInStore()) {
-        derivationToValue(state, pos, path, *storePath, v);
+        derivationToValue(state, path, *storePath, v);
     } else if (vScope) {
-        scopedImport(state, pos, path, vScope, v);
+        scopedImport(state, path, vScope, v);
     } else {
         state.evalFile(path, v);
     }
@@ -360,7 +359,7 @@ static RegisterPrimOp primop_scopedImport(
       Evaluation aborts if the file doesn't exist or contains an invalid Nix expression.
     )",
      .impl = [](EvalState & state, CallSite callSite, Value ** args, Value & v) {
-         import(state, noPos, *args[1], args[0], v);
+         import(state, *args[1], args[0], v);
      }});
 
 static RegisterPrimOp primop_import(
@@ -435,7 +434,7 @@ static RegisterPrimOp primop_import(
       >  The function argument doesn’t have to be called `x` in `foo.nix`; any name would work.
     )",
      .impl = [](EvalState & state, CallSite callSite, Value ** args, Value & v) {
-         import(state, noPos, *args[0], nullptr, v);
+         import(state, *args[0], nullptr, v);
      }});
 
 #ifndef _WIN32 // TODO implement via DLL loading on Windows
@@ -2882,7 +2881,6 @@ bool EvalState::callPathFilter(Value * filterFun, const SourcePath & path, PosId
 
 static void addPath(
     EvalState & state,
-    const PosIdx pos,
     std::string_view name,
     SourcePath path,
     Value * filterFun,
@@ -2910,7 +2908,7 @@ static void addPath(
         if (filterFun)
             filter = std::make_unique<PathFilter>([&](const std::string & p) {
                 auto p2 = CanonPath(p);
-                return state.callPathFilter(filterFun, {path.accessor, p2}, pos);
+                return state.callPathFilter(filterFun, {path.accessor, p2}, noPos);
             });
 
         std::optional<StorePath> expectedStorePath;
@@ -2960,8 +2958,7 @@ static void prim_filterSource(EvalState & state, CallSite callSite, Value ** arg
         "while evaluating the second argument (the path to filter) passed to 'builtins.filterSource'");
     state.forceFunction(*args[0], noPos, "while evaluating the first argument passed to builtins.filterSource");
 
-    addPath(
-        state, noPos, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
+    addPath(state, path.baseName(), path, args[0], ContentAddressMethod::Raw::NixArchive, std::nullopt, v, context);
 }
 
 static RegisterPrimOp primop_filterSource({
@@ -3063,7 +3060,7 @@ static void prim_path(EvalState & state, CallSite callSite, Value ** args, Value
     if (name.empty())
         name = path->baseName();
 
-    addPath(state, noPos, name, *path, filterFun, method, expectedHash, v, context);
+    addPath(state, name, *path, filterFun, method, expectedHash, v, context);
 }
 
 static RegisterPrimOp primop_path({
