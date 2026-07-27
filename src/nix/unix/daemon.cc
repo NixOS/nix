@@ -351,7 +351,12 @@ static void daemonLoop(ref<const StoreConfig> storeConfig, std::optional<Trusted
                         // Handle the connection.
                         auto store = storeConfig->openStore();
                         store->init();
-                        processConnection(store, FdSource(remote.get()), FdSink(remote.get()), trusted, NotRecursive);
+                        processConnection(
+                            std::move(store),
+                            FdSource(remote.get()),
+                            FdSink(remote.get()),
+                            trusted,
+                            RecursiveFlag::NotRecursive);
 
                         exit(0);
                     },
