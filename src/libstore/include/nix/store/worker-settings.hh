@@ -132,6 +132,12 @@ public:
           > Change this setting only if you really know what you’re doing.
         )"};
 
+    Setting<uint32_t> buildHookKillTimeout{
+        this,
+        500,
+        "build-hook-kill-timeout",
+        "How long to wait in milliseconds for build hooks to exit on interrupt before sending SIGKILL."};
+
     Setting<std::string> builders{
         this,
         "@" + (nixConfDir() / "machines").string(),

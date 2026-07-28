@@ -20,6 +20,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/current-process.hh"
 
+#include <chrono>
 #include <algorithm>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -1159,7 +1160,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>(worker.settings.buildHook);
+        worker.hook = std::make_unique<HookInstance>(
+            worker.settings.buildHook, std::chrono::milliseconds(worker.settings.buildHookKillTimeout));
 
     try {
 
