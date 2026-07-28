@@ -43,6 +43,9 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
         "https",
         "scheme",
         R"(
+          Deprecated: specify the scheme as part of the `endpoint` URL
+          instead, e.g. `endpoint=http://localhost:9000`.
+
           The scheme used for S3 requests, `https` (default) or `http`. This
           option allows you to disable HTTPS for binary caches which don't
           support it.
@@ -60,7 +63,8 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
         R"(
           The S3 endpoint to use. When empty (default), uses AWS S3 with
           region-specific endpoints. For S3-compatible services such as
-          MinIO, set this to your service's endpoint.
+          MinIO, set this to your service's endpoint as a full URL,
+          e.g. `https://minio.example.com` or `http://localhost:9000`.
         )"};
 
     Setting<S3AddressingStyle> addressingStyle{
