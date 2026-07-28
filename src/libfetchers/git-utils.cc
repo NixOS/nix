@@ -1021,7 +1021,7 @@ public:
 
             auto path2 = *parent;
             path2.push(entryName);
-            lookupCache.emplace(path2, std::move(copy)).first->second.get();
+            lookupCache.emplace(path2, std::move(copy));
         }
 
         return res;
