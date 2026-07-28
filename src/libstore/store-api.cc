@@ -410,7 +410,10 @@ StringSet Store::Config::getDefaultSystemFeatures()
 Store::Store(const Store::Config & config)
     : StoreDirConfig{config}
     , config{config}
-    , pathInfoCache(make_ref<decltype(pathInfoCache)::element_type>((size_t) config.pathInfoCacheSize))
+    , pathInfoCache(
+          config.pathInfoCacheSize
+              ? std::make_shared<decltype(pathInfoCache)::element_type>((size_t) config.pathInfoCacheSize)
+              : nullptr)
 {
     assertLibStoreInitialized();
 }
@@ -435,7 +438,8 @@ bool Store::PathInfoCacheValue::isKnownNow(const NarInfoDiskCacheSettings & sett
 
 void Store::invalidatePathInfoCacheFor(const StorePath & path)
 {
-    pathInfoCache->lock()->erase(path);
+    if (pathInfoCache)
+        pathInfoCache->lock()->erase(path);
 }
 
 std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivationOutputMap(const StorePath & path)
@@ -533,9 +537,11 @@ StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
 
 bool Store::isValidPath(const StorePath & storePath)
 {
-    auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings()))
-        return res->didExist();
+    if (pathInfoCache) {
+        auto res = pathInfoCache->lock()->get(storePath);
+        if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings()))
+            return res->didExist();
+    }
 
     if (diskCache) {
         auto res = diskCache->lookupNarInfo(
@@ -596,21 +602,25 @@ std::optional<std::shared_ptr<const ValidPathInfo>> Store::queryPathInfoFromClie
 {
     auto hashPart = std::string(storePath.hashPart());
 
-    auto res = pathInfoCache->lock()->get(storePath);
-    if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
-        if (res->didExist())
-            return std::make_optional(res->value);
-        else
-            return std::make_optional(nullptr);
+    if (pathInfoCache) {
+        auto res = pathInfoCache->lock()->get(storePath);
+        if (res && res->isKnownNow(settings.getNarInfoDiskCacheSettings())) {
+            if (res->didExist())
+                return std::make_optional(res->value);
+            else
+                return std::make_optional(nullptr);
+        }
     }
 
     if (diskCache) {
         auto res = diskCache->lookupNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart);
         if (res.first != NarInfoDiskCache::oUnknown) {
-            pathInfoCache->lock()->upsert(
-                storePath,
-                res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
-                                                        : PathInfoCacheValue{.value = res.second});
+            if (pathInfoCache)
+                pathInfoCache->lock()->upsert(
+                    storePath,
+                    res.first == NarInfoDiskCache::oInvalid ? PathInfoCacheValue{}
+                                                            : PathInfoCacheValue{.value = res.second});
+
             if (res.first == NarInfoDiskCache::oInvalid || !goodStorePath(storePath, res.second->path))
                 return std::make_optional(nullptr);
             assert(res.second);
@@ -648,7 +658,8 @@ void Store::queryPathInfo(const StorePath & storePath, Callback<ref<const ValidP
                 if (diskCache)
                     diskCache->upsertNarInfo(config.getReference().render(/*FIXME withParams=*/false), hashPart, info);
 
-                pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
+                if (pathInfoCache)
+                    pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
 
                 if (!info || !goodStorePath(storePath, info->path))
                     throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
