@@ -975,8 +975,7 @@ void callFlake(EvalState & state, const LockedFlake & lockedFlake, Value & vRes)
     auto vFetchFinalTree = get(state.internalPrimOps, "fetchFinalTree");
     assert(vFetchFinalTree);
 
-    Value * args[] = {vLocks, &vOverrides, *vFetchFinalTree};
-    state.callFunction(*vCallFlake, args, vRes, noPos);
+    state.callFunction(*vCallFlake, std::to_array({vLocks, &vOverrides, *vFetchFinalTree}), vRes, noPos);
 }
 
 std::optional<Fingerprint> LockedFlake::getFingerprint(Store & store, const fetchers::Settings & fetchSettings) const
