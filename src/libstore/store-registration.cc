@@ -100,6 +100,10 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     if (implem.uriSchemes.count(g.scheme))
                         return implem.parseConfig(g.scheme, g.authority, params);
 
+                if (g.scheme == "ssh")
+                    throw Error(
+                        "the 'ssh://' store type (the \"legacy\" SSH store, based on `nix-store --serve`) is no longer supported; use 'ssh-ng://' instead");
+
                 throw Error("don't know how to open Nix store with scheme '%s'", g.scheme);
             },
         },

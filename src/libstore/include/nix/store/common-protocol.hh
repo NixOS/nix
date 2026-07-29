@@ -20,8 +20,7 @@ enum struct BuildResultSuccessStatus : uint8_t;
 enum struct BuildResultFailureStatus : uint8_t;
 
 /**
- * Shared serializers between the worker protocol, serve protocol, and a
- * few others.
+ * Shared serializers between the worker protocol and a few others.
  *
  * This `struct` is basically just a `namespace`; We use a type rather
  * than a namespace just so we can use it as a template argument.

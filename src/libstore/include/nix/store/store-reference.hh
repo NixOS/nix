@@ -36,8 +36,8 @@ namespace nix {
  * - `s3://<path>`: A writable binary cache stored on Amazon's Simple
  *   Storage Service.
  *
- * - `ssh://[user@]<host>`: A remote Nix store accessed by running
- *   `nix-store --serve` via SSH.
+ * - `ssh-ng://[user@]<host>`: A remote Nix store accessed by running
+ *   `nix-daemon --stdio` via SSH.
  *
  * You can pass parameters to the store type by appending
  * `?key=value&key=value&...` to the URI.

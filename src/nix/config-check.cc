@@ -3,7 +3,6 @@
 #include "nix/cmd/command.hh"
 #include "nix/util/exit.hh"
 #include "nix/util/logging.hh"
-#include "nix/store/serve-protocol.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
@@ -148,10 +147,7 @@ struct CmdConfigCheck : StoreCommand
 
     bool checkStoreProtocol(unsigned int storeProto)
     {
-        auto storeVersion = WorkerProto::Version::Number::fromWire(storeProto);
-        unsigned int clientProto = (storeVersion.major == ServeProto::latest.major)
-                                       ? ServeProto::latest.toWire()
-                                       : WorkerProto::latest.number.toWire();
+        unsigned int clientProto = WorkerProto::latest.number.toWire();
 
         if (clientProto != storeProto) {
             std::ostringstream ss;

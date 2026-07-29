@@ -6,7 +6,7 @@ automatically fetching any store paths in Firefox’s closure if they are
 available on the server `avalon`:
 
 ```console
-$ nix-env --install --attr nixpkgs.firefox --substituters ssh://alice@avalon
+$ nix-env --install --attr nixpkgs.firefox --substituters ssh-ng://alice@avalon
 ```
 
 This works similar to the binary cache substituter that Nix usually
@@ -26,7 +26,7 @@ into your profile, e.g.
 
 ```console
 $ nix-store --realise /nix/store/m85bxg…-firefox-34.0.5 --substituters
-ssh://alice@avalon
+ssh-ng://alice@avalon
 ```
 
 This is essentially equivalent to doing
@@ -47,7 +47,7 @@ to `sshd_config` to restrict the user `nix-ssh`:
       PermitTTY no
       PermitTunnel no
       X11Forwarding no
-      ForceCommand nix-store --serve
+      ForceCommand nix-daemon --stdio
     Match All
 
 On NixOS, you can accomplish the same by adding the following to your
@@ -55,6 +55,7 @@ On NixOS, you can accomplish the same by adding the following to your
 
 ```nix
 nix.sshServe.enable = true;
+nix.sshServe.protocol = "ssh-ng";
 nix.sshServe.keys = [ "ssh-dss AAAAB3NzaC1k... bob@example.org" ];
 ```
 
