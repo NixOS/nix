@@ -80,6 +80,12 @@
       """)
 
       machine.succeed("""
+        set -x
+        su --login bob -c '(! nix store kill-build ${pathFour} 2>&1)' | tee diag 1>&2
+        grep -F "you are not privileged to terminate builds" diag
+      """)
+
+      machine.succeed("""
           set -x
           su --login mallory -c '
             nix-store --generate-binary-cache-key cache1.example.org sk1 pk1

@@ -119,6 +119,7 @@ nix_sources = [ config_priv_h ] + files(
   'store-delete.cc',
   'store-gc.cc',
   'store-info.cc',
+  'store-kill-build.cc',
   'store-repair.cc',
   'store-submit-output.cc',
   'store.cc',

@@ -1,4 +1,5 @@
 sources += files(
+  'local-build-control.cc',
   'pathlocks.cc',
 )
 

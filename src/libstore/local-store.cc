@@ -1088,7 +1088,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                from a build hook (whose parent process already acquired a
                lock on this path). */
             if (!locksHeld.count(printStorePath(info.path)))
-                outputLock.lockPaths({realPath});
+                outputLock.lockPaths({realPath}, "", true, LockOwnerTracking::Yes);
 
             /* The path may have been created by another process in the meantime, so check again. */
             if (repair || !isValidPathUncached(info.path)) {
@@ -1308,7 +1308,7 @@ StorePath LocalStore::addToStoreFromDump(
 
         auto realPath = toRealPath(dstPath);
 
-        PathLocks outputLock({realPath});
+        PathLocks outputLock({realPath}, "", LockOwnerTracking::Yes);
 
         /* The path may have been created by another process in the meantime, so check again. */
         if (repair || !isValidPathUncached(dstPath)) {

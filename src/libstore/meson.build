@@ -99,7 +99,11 @@ configdata_pub.set(
 
 if host_machine.system() == 'darwin'
   sandbox = cxx.find_library('sandbox')
-  deps_other += [ sandbox ]
+  bsm = cxx.find_library('bsm')
+  deps_other += [
+    sandbox,
+    bsm,
+  ]
 endif
 
 if host_machine.system() == 'windows'
@@ -257,6 +261,7 @@ subdir('nix-meson-build-support/common')
 
 sources = files(
   'binary-cache-store.cc',
+  'build-control-store.cc',
   'build-result.cc',
   'build/build-log.cc',
   'build/derivation-builder.cc',

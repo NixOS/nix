@@ -20,6 +20,8 @@
 #include "nix/store/globals.hh"
 #include "nix/util/current-process.hh"
 
+#include "../pathlocks-internal.hh"
+
 #include <algorithm>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -400,18 +402,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             /* FIXME: find some way to lock for scheduling for the other stores so
                a forking daemon with --store still won't farm out redundant builds.
                */
-            for (auto & i : drv->outputsAndOptPaths(worker.store)) {
-                if (i.second.second)
-                    lockFiles.insert(localStore->toRealPath(*i.second.second));
-                else {
-                    auto lockPath = localStore->toRealPath(drvPath);
-                    lockPath += "." + i.first;
-                    lockFiles.insert(std::move(lockPath));
-                }
-            }
+            lockFiles = getDerivationOutputLockPaths(*localStore, drvPath, drv->outputsAndOptPaths(worker.store));
         }
 
-        if (!outputLocks.lockPaths(lockFiles, "", false)) {
+        if (!outputLocks.lockPaths(lockFiles, "", false, LockOwnerTracking::Yes)) {
             Activity act(
                 *logger,
                 lvlWarn,
@@ -423,7 +417,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                boolean is true). */
             do {
                 co_await waitForAWhile();
-            } while (!outputLocks.lockPaths(lockFiles, "", false));
+            } while (!outputLocks.lockPaths(lockFiles, "", false, LockOwnerTracking::Yes));
         }
 
         /* Now check again whether the outputs are valid.  This is because

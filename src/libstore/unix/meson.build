@@ -4,6 +4,7 @@ sources += files(
   'build/derivation-builder.cc',
   'build/external-derivation-builder.cc',
   'build/hook-instance.cc',
+  'local-build-control.cc',
   'pathlocks.cc',
   'user-lock.cc',
 )

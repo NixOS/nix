@@ -1531,7 +1531,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* Don't wait on lock for the hash-mismatching fixed-output
                derivation case, to avoid a deadlock in the case where a build
                with the correct hash is in progress. */
-            bool locked = dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)}, "", !optFixedPath);
+            bool locked = dynamicOutputLock.lockPaths(
+                {store.toRealPath(newInfo.path)}, "", !optFixedPath, LockOwnerTracking::Yes);
 
             /* If we can't lock the correct path, clean up and bail now. */
             if (!locked) {

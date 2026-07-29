@@ -8,6 +8,7 @@
 #include "unix/signals-private.hh"
 
 #include <thread>
+#include <unistd.h>
 
 namespace nix {
 
@@ -51,13 +52,30 @@ InterruptCallback::~InterruptCallback() {}
 
 /* Required to avoid static initialization order fiasco. This allows global
    objects to safely register callbacks. */
-static Sync<InterruptCallbacks> & getInterruptCallbacks()
+static Sync<InterruptCallbacks> *& getInterruptCallbacksStorage()
 {
     /* Intentionally leak, according to the Construct On First Use Idiom.
        An alternative is to use the Nifty Counter Idiom, but
        InterruptCallbacks' destructor is not very important. */
     static Sync<InterruptCallbacks> * _interruptCallbacks = new Sync<InterruptCallbacks>();
-    return *_interruptCallbacks;
+    return _interruptCallbacks;
+}
+
+static Sync<InterruptCallbacks> & getInterruptCallbacks()
+{
+    return *getInterruptCallbacksStorage();
+}
+
+static sigset_t getSignalSet()
+{
+    sigset_t set;
+    sigemptyset(&set);
+    sigaddset(&set, SIGINT);
+    sigaddset(&set, SIGTERM);
+    sigaddset(&set, SIGHUP);
+    sigaddset(&set, SIGPIPE);
+    sigaddset(&set, SIGWINCH);
+    return set;
 }
 
 static void signalHandlerThread(sigset_t set)
@@ -120,13 +138,22 @@ void unix::startSignalHandlerThread()
 
     saveSignalMask();
 
-    sigset_t set;
-    sigemptyset(&set);
-    sigaddset(&set, SIGINT);
-    sigaddset(&set, SIGTERM);
-    sigaddset(&set, SIGHUP);
-    sigaddset(&set, SIGPIPE);
-    sigaddset(&set, SIGWINCH);
+    auto set = getSignalSet();
+    if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
+        throw SysError("blocking signals");
+
+    std::thread(signalHandlerThread, set).detach();
+}
+
+void unix::startSignalHandlerThreadAfterFork()
+{
+    /* Mutexes and callbacks inherited from other threads are unusable in the
+       child. Leave that state allocated for the parent and start afresh. */
+    getInterruptCallbacksStorage() = new Sync<InterruptCallbacks>();
+    _isInterrupted = false;
+    interruptCheck = {};
+
+    auto set = getSignalSet();
     if (pthread_sigmask(SIG_BLOCK, &set, nullptr))
         throw SysError("blocking signals");
 
@@ -159,9 +186,11 @@ namespace {
 struct InterruptCallbackImpl : InterruptCallback
 {
     InterruptCallbacks::Token token;
+    pid_t creatorPid;
 
     InterruptCallbackImpl(InterruptCallbacks::Token token)
         : token(token)
+        , creatorPid(getpid())
     {
     }
 
@@ -172,6 +201,8 @@ struct InterruptCallbackImpl : InterruptCallback
 
     ~InterruptCallbackImpl() override
     {
+        if (creatorPid != getpid())
+            return;
         auto interruptCallbacks(getInterruptCallbacks().lock());
         interruptCallbacks->callbacks.erase(token);
     }

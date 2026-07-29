@@ -12,6 +12,7 @@ config_pub_h = configure_file(
 headers = [ config_pub_h ] + files(
   'aws-creds.hh',
   'binary-cache-store.hh',
+  'build-control-store.hh',
   'build-result.hh',
   'build.hh',
   'build/build-log.hh',

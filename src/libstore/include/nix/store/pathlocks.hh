@@ -2,6 +2,7 @@
 ///@file
 
 #include <filesystem>
+#include <set>
 
 #include "nix/util/file-descriptor.hh"
 
@@ -23,19 +24,30 @@ enum LockType { ltRead, ltWrite, ltNone };
 
 bool lockFile(Descriptor desc, LockType lockType, bool wait);
 
+enum struct LockOwnerTracking { Yes, No };
+
 class PathLocks
 {
 private:
     typedef std::pair<Descriptor, std::filesystem::path> FDPair;
     std::list<FDPair> fds;
+#ifdef __APPLE__
+    std::list<FDPair> ownerFds;
+#endif
     bool deletePaths;
 
 public:
     PathLocks();
-    PathLocks(const std::set<std::filesystem::path> & paths, const std::string & waitMsg = "");
+    PathLocks(
+        const std::set<std::filesystem::path> & paths,
+        const std::string & waitMsg = "",
+        LockOwnerTracking trackOwner = LockOwnerTracking::No);
 
     PathLocks(PathLocks && other) noexcept
         : fds(std::exchange(other.fds, {}))
+#ifdef __APPLE__
+        , ownerFds(std::exchange(other.ownerFds, {}))
+#endif
         , deletePaths(other.deletePaths)
     {
     }
@@ -43,13 +55,20 @@ public:
     PathLocks & operator=(PathLocks && other) noexcept
     {
         fds = std::exchange(other.fds, {});
+#ifdef __APPLE__
+        ownerFds = std::exchange(other.ownerFds, {});
+#endif
         deletePaths = other.deletePaths;
         return *this;
     }
 
     PathLocks(const PathLocks &) = delete;
     PathLocks & operator=(const PathLocks &) = delete;
-    bool lockPaths(const std::set<std::filesystem::path> & _paths, const std::string & waitMsg = "", bool wait = true);
+    bool lockPaths(
+        const std::set<std::filesystem::path> & _paths,
+        const std::string & waitMsg = "",
+        bool wait = true,
+        LockOwnerTracking trackOwner = LockOwnerTracking::No);
     ~PathLocks();
     void unlock();
     void setDeletion(bool deletePaths);

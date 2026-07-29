@@ -7,6 +7,7 @@
 
 #include "nix/store/store-api.hh"
 #include "nix/store/submit-store.hh"
+#include "nix/store/build-control-store.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/store/gc-store.hh"
@@ -47,7 +48,11 @@ public:
  * \todo RemoteStore is a misnomer - should be something like
  * DaemonStore.
  */
-struct RemoteStore : public virtual Store, public virtual GcStore, public virtual LogStore, public virtual SubmitStore
+struct RemoteStore : public virtual Store,
+                     public virtual GcStore,
+                     public virtual LogStore,
+                     public virtual SubmitStore,
+                     public virtual BuildControlStore
 {
 private:
     void anchor() override;
@@ -66,6 +71,8 @@ public:
     StorePathSet queryValidPaths(const StorePathSet & paths, SubstituteFlag maybeSubstitute = NoSubstitute) override;
 
     StorePathSet queryAllValidPaths() override;
+
+    std::optional<uint64_t> killBuild(const StorePath & path) override;
 
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
