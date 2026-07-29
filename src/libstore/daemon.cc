@@ -70,7 +70,7 @@ struct TunnelLogger : public Logger
     {
     }
 
-    void enqueueMsg(const std::string & s)
+    void enqueueMsg(const std::string & s) noexcept
     {
         auto state(state_.lock());
 
@@ -81,15 +81,18 @@ struct TunnelLogger : public Logger
                 to.flush();
             } catch (...) {
                 /* Write failed; that means that the other side is
-                   gone. */
+                   gone, so stop sending it messages. Note that we
+                   don't propagate the error, since logging must not
+                   throw. The client's death will be detected
+                   elsewhere (e.g. by `MonitorFdHup` or by the next
+                   protocol read/write). */
                 state->canSendStderr = false;
-                throw;
             }
         } else
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         if (lvl > verbosity)
             return;
@@ -99,7 +102,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         if (ei.level > verbosity)
             return;
@@ -152,7 +155,7 @@ struct TunnelLogger : public Logger
         ActivityType type,
         const std::string & s,
         const Fields & fields,
-        ActivityId parent) override
+        ActivityId parent) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20}) {
             if (!s.empty())
@@ -165,7 +168,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
@@ -174,7 +177,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, const Fields & fields) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
