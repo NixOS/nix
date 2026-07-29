@@ -7,7 +7,7 @@
 
 namespace nix {
 
-static void prim_unsafeDiscardStringContext(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_unsafeDiscardStringContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
     auto s = state.coerceToString(
@@ -24,7 +24,7 @@ static RegisterPrimOp primop_unsafeDiscardStringContext({
     .impl = prim_unsafeDiscardStringContext,
 });
 
-static void prim_hasContext(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_hasContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
     state.forceString(*args[0], context, noPos, "while evaluating the argument passed to builtins.hasContext");
@@ -54,7 +54,7 @@ static RegisterPrimOp primop_hasContext(
     )",
      .impl = prim_hasContext});
 
-static void prim_unsafeDiscardOutputDependency(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_unsafeDiscardOutputDependency(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
     auto s = state.coerceToString(
@@ -95,7 +95,7 @@ static RegisterPrimOp primop_unsafeDiscardOutputDependency(
     )",
      .impl = prim_unsafeDiscardOutputDependency});
 
-static void prim_addDrvOutputDependencies(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_addDrvOutputDependencies(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
     auto s = state.coerceToString(
@@ -179,7 +179,7 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
    Note that for a given path any combination of the above attributes
    may be present.
 */
-static void prim_getContext(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_getContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     struct ContextInfo
     {
@@ -257,7 +257,7 @@ static RegisterPrimOp primop_getContext(
    See the commentary above getContext for details of the
    context representation.
 */
-static void prim_appendContext(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_appendContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
     auto orig = state.forceString(

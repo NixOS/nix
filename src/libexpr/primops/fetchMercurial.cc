@@ -6,7 +6,7 @@
 
 namespace nix {
 
-static void prim_fetchMercurial(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchMercurial(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     std::string url;
     std::optional<Hash> rev;

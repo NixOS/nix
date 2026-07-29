@@ -1698,7 +1698,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     primOpCalls[fn->name]++;
 
                 try {
-                    fn->impl(*this, CallSite{pos}, const_cast<Value **>(args.data()), vCur);
+                    fn->impl(*this, CallSite{pos}, args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);

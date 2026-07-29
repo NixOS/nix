@@ -123,7 +123,7 @@ runFetchClosureWithInputAddressedPath(EvalState & state, Store & fromStore, cons
 
 typedef std::optional<StorePath> StorePathOrGap;
 
-static void prim_fetchClosure(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchClosure(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.fetchClosure");
 

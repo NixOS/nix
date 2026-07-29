@@ -30,7 +30,7 @@ namespace nix::flake::primops {
 
 PrimOp getFlake(const Settings & settings)
 {
-    auto prim_getFlake = [&settings](EvalState & state, CallSite callSite, Value ** args, Value & v) {
+    auto prim_getFlake = [&settings](EvalState & state, CallSite callSite, Value * const * args, Value & v) {
         state.forceValue(*args[0], noPos);
 
         LockFlags lockFlags{
@@ -96,7 +96,7 @@ PrimOp getFlake(const Settings & settings)
     };
 }
 
-static void prim_parseFlakeRef(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_parseFlakeRef(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     std::string flakeRefS(
         state.forceStringNoCtx(*args[0], noPos, "while evaluating the argument passed to builtins.parseFlakeRef"));
@@ -138,7 +138,7 @@ nix::PrimOp parseFlakeRef({
     .experimentalFeature = Xp::Flakes,
 });
 
-static void prim_flakeRefToString(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_flakeRefToString(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.flakeRefToString");
     fetchers::Attrs attrs;

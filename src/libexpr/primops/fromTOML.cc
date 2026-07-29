@@ -87,7 +87,7 @@ static void normalizeDatetimeFormat(toml::value & t)
 
 #endif
 
-static void prim_fromTOML(EvalState & state, CallSite callSite, Value ** args, Value & val)
+static void prim_fromTOML(EvalState & state, CallSite callSite, Value * const * args, Value & val)
 {
     auto toml = state.forceStringNoCtx(*args[0], noPos, "while evaluating the argument passed to builtins.fromTOML");
 

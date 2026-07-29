@@ -12,7 +12,7 @@ MySettings mySettings;
 
 static GlobalConfig::Register rs(&mySettings);
 
-static void prim_anotherNull(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_anotherNull(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     if (mySettings.settingSet)
         v.mkNull();

@@ -42,7 +42,7 @@ static void nix_c_primop_wrapper(
     int arity,
     nix::EvalState & state,
     nix::CallSite callSite,
-    nix::Value ** args,
+    nix::Value * const * args,
     nix::Value & v)
 {
     nix_c_context ctx;

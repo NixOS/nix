@@ -101,9 +101,8 @@ struct CallSite
 
 /**
  * Function that implements a primop.
- * FIXME: `args` should be `Value * const *` instead of `Value **`, but that would be a big tedious diff.
  */
-using PrimOpFun = void(EvalState & state, CallSite callSite, Value ** args, Value & v);
+using PrimOpFun = void(EvalState & state, CallSite callSite, Value * const * args, Value & v);
 
 /**
  * Info about a primitive operation, and its implementation
@@ -1156,9 +1155,9 @@ private:
     friend struct ExprFloat;
     friend struct ExprPath;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, CallSite callSite, Value ** args, Value & v);
-    friend void prim_match(EvalState & state, CallSite callSite, Value ** args, Value & v);
-    friend void prim_split(EvalState & state, CallSite callSite, Value ** args, Value & v);
+    friend void prim_getAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v);
+    friend void prim_match(EvalState & state, CallSite callSite, Value * const * args, Value & v);
+    friend void prim_split(EvalState & state, CallSite callSite, Value * const * args, Value & v);
 
     friend struct Value;
     friend class ListBuilder;

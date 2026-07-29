@@ -82,7 +82,7 @@ static void resolvedAttrToValue(EvalState & state, Value & v, const fetchers::Re
 /**
  * internal primop: Force a LazyFetcherAttr external value.
  */
-static void prim_forceLazyFetcherAttr(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_forceLazyFetcherAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     Value & arg = *args[0];
 
@@ -183,7 +183,11 @@ struct FetchTreeParams
 };
 
 static void fetchTree(
-    EvalState & state, CallSite callSite, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
+    EvalState & state,
+    CallSite callSite,
+    Value * const * args,
+    Value & v,
+    const FetchTreeParams & params = FetchTreeParams{})
 {
     fetchers::Input input{};
     NixStringContext context;
@@ -330,7 +334,7 @@ static void fetchTree(
     emitTreeAttrs(state, callSite.pos, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchTree(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetchTree(state, callSite, args, v, {});
 }
@@ -463,7 +467,7 @@ static RegisterPrimOp primop_fetchTree({
     .experimentalFeature = Xp::FetchTree,
 });
 
-void prim_fetchFinalTree(EvalState & state, CallSite callSite, Value ** args, Value & v)
+void prim_fetchFinalTree(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetchTree(state, callSite, args, v, {.isFinal = true});
 }
@@ -475,7 +479,8 @@ static RegisterPrimOp primop_fetchFinalTree({
     .internal = true,
 });
 
-static void fetch(EvalState & state, Value ** args, Value & v, const std::string & who, bool unpack, std::string name)
+static void
+fetch(EvalState & state, Value * const * args, Value & v, const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
@@ -607,7 +612,7 @@ static void fetch(EvalState & state, Value ** args, Value & v, const std::string
     }
 }
 
-static void prim_fetchurl(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchurl(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetch(state, args, v, "fetchurl", false, "");
 }
@@ -633,7 +638,7 @@ static RegisterPrimOp primop_fetchurl({
     .impl = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchTarball(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetch(state, args, v, "fetchTarball", true, "source");
 }
@@ -683,7 +688,7 @@ static RegisterPrimOp primop_fetchTarball({
     .impl = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState & state, CallSite callSite, Value ** args, Value & v)
+static void prim_fetchGit(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetchTree(
         state,
