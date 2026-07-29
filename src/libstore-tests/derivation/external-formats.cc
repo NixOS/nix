@@ -147,34 +147,34 @@ INSTANTIATE_TEST_SUITE_P(
 
 #undef MAKE_OUTPUT_JSON_TEST_P
 
-#define MAKE_TEST_P(FIXTURE)                                                                       \
-    TEST_P(FIXTURE, from_json)                                                                     \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        readJsonTest(drv.name, drv, mockXpSettings);                                               \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, to_json)                                                                       \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        writeJsonTest(drv.name, drv);                                                              \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, from_aterm)                                                                    \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        readTest(drv.name + ".drv", [&](auto encoded) {                                            \
-            auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings);      \
-            using nlohmann::json;                                                                  \
-            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                             \
-            ASSERT_EQ(got, drv);                                                                   \
-        });                                                                                        \
-    }                                                                                              \
-                                                                                                   \
-    TEST_P(FIXTURE, to_aterm)                                                                      \
-    {                                                                                              \
-        const auto & drv = GetParam();                                                             \
-        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store, false); }); \
+#define MAKE_TEST_P(FIXTURE)                                                                  \
+    TEST_P(FIXTURE, from_json)                                                                \
+    {                                                                                         \
+        const auto & drv = GetParam();                                                        \
+        readJsonTest(drv.name, drv, mockXpSettings);                                          \
+    }                                                                                         \
+                                                                                              \
+    TEST_P(FIXTURE, to_json)                                                                  \
+    {                                                                                         \
+        const auto & drv = GetParam();                                                        \
+        writeJsonTest(drv.name, drv);                                                         \
+    }                                                                                         \
+                                                                                              \
+    TEST_P(FIXTURE, from_aterm)                                                               \
+    {                                                                                         \
+        const auto & drv = GetParam();                                                        \
+        readTest(drv.name + ".drv", [&](auto encoded) {                                       \
+            auto got = parseDerivation(*store, std::move(encoded), drv.name, mockXpSettings); \
+            using nlohmann::json;                                                             \
+            ASSERT_EQ(static_cast<json>(got), static_cast<json>(drv));                        \
+            ASSERT_EQ(got, drv);                                                              \
+        });                                                                                   \
+    }                                                                                         \
+                                                                                              \
+    TEST_P(FIXTURE, to_aterm)                                                                 \
+    {                                                                                         \
+        const auto & drv = GetParam();                                                        \
+        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store); });   \
     }
 
 struct DerivationJsonAtermTest : DerivationTest,

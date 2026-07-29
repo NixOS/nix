@@ -43,7 +43,7 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
             };
             drv.fillInOutputPaths(*localStore);
 
-            auto drvContents = drv.unparse(*localStore, /*maskOutputs=*/false);
+            auto drvContents = drv.unparse(*localStore);
 
             /* Create an on-disk store object without registering it
                in the SQLite DB. LocalFSStore::getFSAccessor(path, false)

@@ -34,6 +34,7 @@ headers = [ config_pub_h ] + files(
   'content-address.hh',
   'daemon.hh',
   'derivation-options.hh',
+  'derivation/full-inputs.hh',
   'derivations.hh',
   'derived-path-map.hh',
   'derived-path.hh',
