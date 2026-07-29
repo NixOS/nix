@@ -107,6 +107,10 @@ if host_machine.system() != 'windows'
   subdir('unix')
 endif
 
+if host_machine.system() == 'linux'
+  subdir('linux')
+endif
+
 include_dirs = [ include_directories('.') ]
 
 

@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <filesystem>
+#include <string_view>
 
 #include "nix/util/types.hh"
 #include "nix/util/canon-path.hh"
@@ -23,6 +24,24 @@ struct CgroupStats
  * Read statistics from the given cgroup.
  */
 CgroupStats getCgroupStats(const std::filesystem::path & cgroup);
+
+/**
+ * Given the contents of a cgroup's `cgroup.controllers`, compute the line to
+ * write to its `cgroup.subtree_control` that enables every controller we use
+ * for per-build accounting (`cpu`, `memory`, `io`, `pids`) that is actually
+ * available. Returns `std::nullopt` when none of them are available.
+ */
+std::optional<std::string> subtreeControlEnableLine(std::string_view availableControllers);
+
+/**
+ * Delegate resource controllers to the children of `cgroup` by enabling them
+ * in its `cgroup.subtree_control`, so that per-build sub-cgroups expose
+ * `memory.peak`, `io.stat` and `memory.events` rather than only the
+ * always-present `cpu.stat`. The cgroup must have no member processes (the
+ * cgroup-v2 "no internal process" rule), so the caller must first move its own
+ * process into a leaf sub-cgroup. Throws on failure.
+ */
+void delegateCgroupControllers(const std::filesystem::path & cgroup);
 
 /**
  * Destroy the cgroup denoted by 'path'. The postcondition is that
