@@ -786,10 +786,12 @@ struct CompareValues
     }
 };
 
-typedef std::list<Value *, gc_allocator<Value *>> ValueList;
-
 static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
+    /* The values are rooted via RootValue, so the lists themselves
+       don't need to be visible to the GC. */
+    using ValueList = std::list<RootValue>;
+
     state.forceAttrs(*args[0], noPos, "while evaluating the first argument passed to builtins.genericClosure");
 
     /* Get the start set. */
@@ -803,7 +805,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
 
     ValueList workSet;
     for (auto elem : startSet->value->listView())
-        workSet.push_back(elem);
+        workSet.push_back(RootValue(elem));
 
     if (startSet->value->listSize() == 0) {
         v = *startSet->value;
@@ -824,7 +826,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
     auto cmp = CompareValues(state, noPos, "");
     std::map<Value *, Value *, decltype(cmp)> keyToElem(cmp);
     while (!workSet.empty()) {
-        Value * e = *(workSet.begin());
+        Value * e = **workSet.begin();
         workSet.pop_front();
 
         try {
@@ -869,7 +871,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
             }
             throw;
         }
-        res.push_back(e);
+        res.push_back(RootValue(e));
 
         /* Call the `operator' function with `e' as argument. */
         Value newElements;
@@ -884,7 +886,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
             for (auto elem : newElements.listView()) {
                 state.forceValue(*elem, noPos); // "while evaluating one one of the elements returned by the `operator`
                                                 // passed to builtins.genericClosure");
-                workSet.push_back(elem);
+                workSet.push_back(RootValue(elem));
             }
         } catch (Error & err) {
             err.addTrace(
@@ -899,7 +901,7 @@ static void prim_genericClosure(EvalState & state, const PosIdx pos, Value ** ar
     /* Create the result list. */
     auto list = state.buildList(res.size());
     for (const auto & [n, i] : enumerate(res))
-        list[n] = i;
+        list[n] = *i;
     v.mkList(list);
 }
 

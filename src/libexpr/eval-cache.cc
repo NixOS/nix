@@ -363,7 +363,7 @@ Value * EvalCache::getRootValue()
 {
     if (!value) {
         debug("getting root value");
-        value = allocRootValue(rootLoader());
+        value = RootValue(rootLoader());
     }
     return *value;
 }
@@ -380,7 +380,7 @@ AttrCursor::AttrCursor(
     , cachedValue(std::move(cachedValue))
 {
     if (value)
-        _value = allocRootValue(value);
+        _value = RootValue(value);
 }
 
 AttrKey AttrCursor::getKey()
@@ -403,9 +403,9 @@ Value & AttrCursor::getValue()
             auto attr = vParent.attrs()->get(parent->second);
             if (!attr)
                 throw Error("attribute '%s' is unexpectedly missing", getAttrPathStr());
-            _value = allocRootValue(attr->value);
+            _value = RootValue(attr->value);
         } else
-            _value = allocRootValue(root->getRootValue());
+            _value = RootValue(root->getRootValue());
     }
     return **_value;
 }
