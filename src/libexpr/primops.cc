@@ -3629,54 +3629,67 @@ static RegisterPrimOp primop_mapAttrs({
 
 static void prim_zipAttrsWith(EvalState & state, const PosIdx pos, Value ** args, Value & v)
 {
-    // we will first count how many values are present for each given key.
-    // we then allocate a single attrset and pre-populate it with lists of
-    // appropriate sizes, stash the pointers to the list elements of each,
-    // and populate the lists. after that we replace the list in the every
-    // attribute with the merge function application. this way we need not
-    // use (slightly slower) temporary storage the GC does not know about.
+    // We collect all (name, value) pairs into a vector and group them by
+    // stable-sorting on the name, which yields the same attribute order and
+    // per-attribute value order as inserting into a std::map<Symbol, ...>.
+    // Note that it's fine that the vector is invisible to the GC: the values
+    // it points to are kept alive by the attrsets in *args[1], which is
+    // reachable for the duration of this function. This avoids allocating
+    // GC-visible (uncollectable) storage for temporaries, which is expensive
+    // and a source of GC allocation lock contention during parallel
+    // evaluation.
 
-    struct Item
+    struct NameValue
     {
-        size_t size = 0;
-        size_t pos = 0;
-        std::optional<ListBuilder> list;
+        Symbol name;
+        Value * value;
     };
-
-    std::map<Symbol, Item, std::less<Symbol>, traceable_allocator<std::pair<const Symbol, Item>>> attrsSeen;
 
     state.forceFunction(*args[0], pos, "while evaluating the first argument passed to builtins.zipAttrsWith");
     state.forceList(*args[1], pos, "while evaluating the second argument passed to builtins.zipAttrsWith");
     const auto listItems = args[1]->listView();
 
+    size_t nrAttrs = 0;
     for (auto & vElem : listItems) {
         state.forceAttrs(
             *vElem, noPos, "while evaluating a value of the list passed as second argument to builtins.zipAttrsWith");
+        nrAttrs += vElem->attrs()->size();
+    }
+
+    std::vector<NameValue> attrsSeen;
+    attrsSeen.reserve(nrAttrs);
+
+    for (auto & vElem : listItems)
         for (auto & attr : *vElem->attrs())
-            attrsSeen.try_emplace(attr.name).first->second.size++;
-    }
+            attrsSeen.push_back({attr.name, attr.value});
 
-    for (auto & [sym, elem] : attrsSeen)
-        elem.list.emplace(state.buildList(elem.size));
+    std::stable_sort(
+        attrsSeen.begin(), attrsSeen.end(), [](const NameValue & a, const NameValue & b) { return a.name < b.name; });
 
-    for (auto & vElem : listItems) {
-        for (auto & attr : *vElem->attrs()) {
-            auto & item = attrsSeen.at(attr.name);
-            (*item.list)[item.pos++] = attr.value;
-        }
-    }
+    size_t nrNames = 0;
+    for (size_t i = 0; i < attrsSeen.size(); ++i)
+        if (i == 0 || attrsSeen[i - 1].name != attrsSeen[i].name)
+            nrNames++;
 
-    auto attrs = state.buildBindings(attrsSeen.size());
+    auto attrs = state.buildBindings(nrNames);
 
-    for (auto & [sym, elem] : attrsSeen) {
+    for (size_t i = 0; i < attrsSeen.size();) {
+        auto sym = attrsSeen[i].name;
+        size_t j = i;
+        while (j < attrsSeen.size() && attrsSeen[j].name == sym)
+            j++;
+        auto list = state.buildList(j - i);
+        for (size_t k = i; k < j; ++k)
+            list[k - i] = attrsSeen[k].value;
         auto name = Value::toPtr(state.symbols[sym]);
         auto call1 = state.allocValue();
         call1->mkApp(args[0], name);
         auto call2 = state.allocValue();
         auto arg = state.allocValue();
-        arg->mkList(*elem.list);
+        arg->mkList(list);
         call2->mkApp(call1, arg);
         attrs.insert(sym, call2);
+        i = j;
     }
 
     v.mkAttrs(attrs.alreadySorted());
