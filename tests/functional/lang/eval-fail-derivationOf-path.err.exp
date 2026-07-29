@@ -1,0 +1,8 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-path.nix:1:1:
+            1| builtins.derivationOf /tmp/foo
+             | ^
+            2|
+
+       error: '/tmp/foo' is not a valid store path

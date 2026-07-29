@@ -1,0 +1,8 @@
+error:
+       … while calling the 'derivationOf' builtin
+         at /pwd/lang/eval-fail-derivationOf-no-context.nix:1:1:
+            1| builtins.derivationOf "foo"
+             | ^
+            2|
+
+       error: 'foo' is not a valid store path
