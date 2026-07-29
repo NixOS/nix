@@ -444,9 +444,9 @@ protected:
 
     void invalidatePathInfoCacheFor(const StorePath & path);
 
-    // Note: this is a `ref` to avoid false sharing with immutable
+    // Note: this is a `shared_ptr` to avoid false sharing with immutable
     // bits of `Store`.
-    ref<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
+    std::shared_ptr<SharedSync<LRUCache<StorePath, PathInfoCacheValue>>> pathInfoCache;
 
     std::shared_ptr<NarInfoDiskCache> diskCache;
 
@@ -965,7 +965,8 @@ public:
      */
     void clearPathInfoCache()
     {
-        pathInfoCache->lock()->clear();
+        if (pathInfoCache)
+            pathInfoCache->lock()->clear();
     }
 
     /**
