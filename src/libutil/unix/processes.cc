@@ -336,7 +336,9 @@ void runProgram2(const RunOptions & options)
                 throw SysError("setuid failed");
 
             Strings args_(options.args);
-            args_.push_front(options.program.native());
+            /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
+               trickery. */
+            args_.push_front(options.argv0.value_or(options.program.native()));
 
             restoreProcessContext();
 
