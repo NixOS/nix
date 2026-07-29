@@ -805,7 +805,7 @@ void RemoteStore::collectGarbage(const GCOptions & options, GCResults & results)
     results.bytesFreed = readLongLong(conn->from);
     readLongLong(conn->from); // obsolete
 
-    pathInfoCache->lock()->clear();
+    clearPathInfoCache();
 }
 
 void RemoteStore::optimiseStore()

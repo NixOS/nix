@@ -9,6 +9,7 @@ struct CmdStore : NixMultiCommand
     {
         aliases = {
             {"ping", {AliasStatus::Deprecated, {"info"}}},
+            {"optimize", {AliasStatus::LinguisticVariation, {"optimise"}}},
         };
     }
 
