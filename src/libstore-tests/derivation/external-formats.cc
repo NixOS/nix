@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 

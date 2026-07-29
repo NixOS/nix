@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/file-system.hh"

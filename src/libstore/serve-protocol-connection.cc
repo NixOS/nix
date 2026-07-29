@@ -2,6 +2,7 @@
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 
 namespace nix {
 
