@@ -249,19 +249,6 @@ void Worker::childTerminated(Goal * goal, JobCategory jobCategory)
     }
 
     children.erase(i);
-    auto & waiting = jobCategory == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild;
-
-    /* Wake up goals waiting for a build slot. Wake at most one waiter to avoid
-       starting unnecessary work (that is accompanied by coroutine frame allocation). */
-    auto it = waiting.begin();
-    while (it != waiting.end()) {
-        if (auto goal = it->lock()) {
-            waiting.erase(it);
-            wakeUp(goal);
-            break;
-        }
-        it = waiting.erase(it);
-    }
 }
 
 void Worker::waitForBuildSlot(GoalPtr goal)
@@ -337,6 +324,22 @@ void Worker::run(const Goals & _topGoals)
                 if (topGoals.empty())
                     break; // stuff may have been cancelled
             }
+
+            auto wakeSlotWaiters = [this](WeakGoals & waiting, size_t running, size_t limit) {
+                auto it = waiting.begin();
+                while (it != waiting.end() && running < limit) {
+                    auto goal = it->lock();
+                    it = waiting.erase(it);
+                    if (!goal)
+                        continue;
+                    wakeUp(goal);
+                    ++running;
+                }
+            };
+
+            wakeSlotWaiters(
+                wantingToSubstitute, getNrSubstitutions(), std::max<std::size_t>(1, settings.maxSubstitutionJobs));
+            wakeSlotWaiters(wantingToBuild, getNrLocalBuilds(), settings.maxBuildJobs);
         }
 
         if (topGoals.empty())
@@ -365,6 +368,7 @@ void Worker::run(const Goals & _topGoals)
        --keep-going *is* set, then they must all be finished now. */
     assert(!settings.keepGoing || awake.empty());
     assert(!settings.keepGoing || wantingToBuild.empty());
+    assert(!settings.keepGoing || wantingToSubstitute.empty());
     assert(!settings.keepGoing || children.empty());
 }
 
