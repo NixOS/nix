@@ -22,7 +22,7 @@ namespace nix {
 
 namespace {
 
-void logFatal(std::string const & s)
+void logFatal(const std::string & s)
 {
     writeToStderr(s + "\n");
     // std::string for guaranteed null termination

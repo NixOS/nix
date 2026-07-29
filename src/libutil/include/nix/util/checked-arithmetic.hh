@@ -41,18 +41,18 @@ struct Checked
 
     Checked() = default;
 
-    explicit Checked(T const value)
+    explicit Checked(const T value)
         : value{value}
     {
     }
 
-    Checked(Checked<T> const & other) = default;
+    Checked(const Checked<T> & other) = default;
     Checked(Checked<T> && other) = default;
-    Checked<T> & operator=(Checked<T> const & other) = default;
+    Checked<T> & operator=(const Checked<T> & other) = default;
 
-    std::strong_ordering operator<=>(Checked<T> const & other) const = default;
+    std::strong_ordering operator<=>(const Checked<T> & other) const = default;
 
-    std::strong_ordering operator<=>(T const & other) const
+    std::strong_ordering operator<=>(const T & other) const
     {
         return value <=> other;
     }
@@ -124,43 +124,43 @@ struct Checked
         }
     };
 
-    Result operator+(Checked<T> const other) const
+    Result operator+(const Checked<T> other) const
     {
         return (*this) + other.value;
     }
 
-    Result operator+(T const other) const
+    Result operator+(const T other) const
     {
         T result;
         bool overflowed = __builtin_add_overflow(value, other, &result);
         return Result{result, overflowed};
     }
 
-    Result operator-(Checked<T> const other) const
+    Result operator-(const Checked<T> other) const
     {
         return (*this) - other.value;
     }
 
-    Result operator-(T const other) const
+    Result operator-(const T other) const
     {
         T result;
         bool overflowed = __builtin_sub_overflow(value, other, &result);
         return Result{result, overflowed};
     }
 
-    Result operator*(Checked<T> const other) const
+    Result operator*(const Checked<T> other) const
     {
         return (*this) * other.value;
     }
 
-    Result operator*(T const other) const
+    Result operator*(const T other) const
     {
         T result;
         bool overflowed = __builtin_mul_overflow(value, other, &result);
         return Result{result, overflowed};
     }
 
-    Result operator/(Checked<T> const other) const
+    Result operator/(const Checked<T> other) const
     {
         return (*this) / other.value;
     }
@@ -171,9 +171,9 @@ struct Checked
      * If the right hand side is zero, the result is marked as a DivByZero and
      * valueWrapping will throw.
      */
-    Result operator/(T const other) const
+    Result operator/(const T other) const
     {
-        constexpr T const minV = std::numeric_limits<T>::min();
+        constexpr const T minV = std::numeric_limits<T>::min();
 
         // It's only possible to overflow with signed division since doing so
         // requires crossing the two's complement limits by MIN / -1 (since

@@ -378,7 +378,7 @@ static RegisterPrimOp primop_fetchTree({
           `type` or an attribute like `builtins.fetchTree.git`! -->
         )");
 
-        auto indentString = [](std::string const & str, std::string const & indent) {
+        auto indentString = [](const std::string & str, const std::string & indent) {
             std::string result;
             std::istringstream stream(str);
             std::string line;
