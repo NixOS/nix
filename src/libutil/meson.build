@@ -44,6 +44,12 @@ configdata_pub.set(
   description : 'Whether nix has been built with UBSan enabled',
 )
 
+configdata_pub.set(
+  'NIX_ASAN_ENABLED',
+  ('address' in get_option('b_sanitize')).to_int(),
+  description : 'Whether nix has been built with ASan enabled',
+)
+
 subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'
