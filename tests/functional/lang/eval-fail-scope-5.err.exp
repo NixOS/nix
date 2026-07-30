@@ -1,5 +1,11 @@
 error:
        … while evaluating the attribute 'body'
+         at /pwd/lang/eval-fail-scope-5.nix:1:1:
+            1| let {
+             | ^
+            2|
+
+       … from the definition of 'body'
          at /pwd/lang/eval-fail-scope-5.nix:13:3:
            12|
            13|   body = f { };

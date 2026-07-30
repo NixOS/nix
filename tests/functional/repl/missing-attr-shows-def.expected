@@ -6,11 +6,13 @@ nix-repl> s = { a = { }; }
 nix-repl> s.a.b
 error:
        … while evaluating the attribute 'a.b'
+         at «string»:1:1:
+            1| s.a.b
+             | ^
+
+       … from the definition of 'a'
          at «string»:1:7:
             1| s = { a = { }; }
              |       ^
 
        error: attribute 'b' missing
-       at «string»:1:1:
-            1| s.a.b
-             | ^

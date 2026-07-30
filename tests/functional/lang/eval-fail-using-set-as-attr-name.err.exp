@@ -1,4 +1,11 @@
 error:
+       … while evaluating the attribute '"${key}"'
+         at /pwd/lang/eval-fail-using-set-as-attr-name.nix:7:1:
+            6| in
+            7| attr.${key}
+             | ^
+            8|
+
        … while evaluating an attribute name
          at /pwd/lang/eval-fail-using-set-as-attr-name.nix:7:8:
             6| in
