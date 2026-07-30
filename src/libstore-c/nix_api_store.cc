@@ -285,7 +285,7 @@ nix_derivation * nix_derivation_from_json(nix_c_context * context, Store * store
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        return new nix_derivation{nix::Derivation::parseJsonAndValidate(*store->ptr, nlohmann::json::parse(json))};
+        return new nix_derivation{nix::derivation::parseJsonAndValidate(*store->ptr, nlohmann::json::parse(json))};
     }
     NIXC_CATCH_ERRS_NULL
 }

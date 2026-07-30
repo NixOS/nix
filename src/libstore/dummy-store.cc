@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/derivation/aterm.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -371,7 +372,7 @@ public:
                 /* compute path info on demand */
                 auto res2 = make_ref<MemorySourceAccessor>();
                 res2->root = MemorySourceAccessor::File::Regular{
-                    .contents = kv.second.unparse(*this),
+                    .contents = unparse(kv.second, *this),
                 };
                 res = std::move(res2).get_ptr();
             });

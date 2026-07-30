@@ -17,10 +17,13 @@ class Store;
 
 struct StoreDirConfig;
 
+namespace derivation {
 template<typename Inputs>
-struct DerivationT;
+struct Derivation;
 struct FullInputs;
-using BasicDerivation = DerivationT<StorePathSet>;
+} // namespace derivation
+
+using BasicDerivation = derivation::Derivation<StorePathSet>;
 
 struct StructuredAttrs;
 
@@ -44,8 +47,10 @@ struct DerivedPathMap;
  * separately. That would be nice to separate concerns, and not make any
  * environment variable names magical.
  */
+namespace derivation {
+
 template<typename Input>
-struct DerivationOptions
+struct Options
 {
     struct OutputChecks
     {
@@ -180,7 +185,7 @@ struct DerivationOptions
      */
     bool allowSubstitutes = true;
 
-    bool operator==(const DerivationOptions &) const = default;
+    bool operator==(const Options &) const = default;
 
     /**
      * @param drv Must be the same derivation we parsed this from. In
@@ -188,7 +193,7 @@ struct DerivationOptions
      * `DerivationOptions` instead.
      */
     template<typename Inputs>
-    StringSet getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const;
+    StringSet getRequiredSystemFeatures(const Derivation<Inputs> & drv) const;
 
     bool substitutesAllowed(const WorkerSettings & workerSettings) const;
 
@@ -196,13 +201,16 @@ struct DerivationOptions
      * @param drv See note on `getRequiredSystemFeatures`
      */
     template<typename Inputs>
-    bool useUidRange(const DerivationT<Inputs> & drv) const;
+    bool useUidRange(const Derivation<Inputs> & drv) const;
 };
 
-extern template struct DerivationOptions<StorePath>;
-extern template struct DerivationOptions<SingleDerivedPath>;
+extern template struct Options<StorePath>;
+extern template struct Options<SingleDerivedPath>;
 
-struct DerivationOutput;
+} // namespace derivation
+
+template<typename Input>
+using DerivationOptions = derivation::Options<Input>;
 
 /**
  * Parse this information from its legacy encoding as part of the
@@ -225,6 +233,8 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
     bool shouldWarn = true,
     const ExperimentalFeatureSettings & mockXpSettings = experimentalFeatureSettings);
 
+namespace derivation {
+
 /**
  * This is the counterpart of `Derivation::tryResolve`. In particular,
  * it takes the same sort of callback, which is used to reolve
@@ -234,10 +244,12 @@ DerivationOptions<StorePath> derivationOptionsFromStructuredAttrs(
  * this as part of that if/when `Derivation` includes
  * `DerivationOptions`
  */
-std::optional<DerivationOptions<StorePath>> tryResolve(
-    const DerivationOptions<SingleDerivedPath> & drvOptions,
+std::optional<Options<StorePath>> tryResolve(
+    const Options<SingleDerivedPath> & drvOptions,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain);
+
+} // namespace derivation
 
 }; // namespace nix
 

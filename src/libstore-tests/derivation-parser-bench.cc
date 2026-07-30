@@ -1,5 +1,6 @@
 #include <benchmark/benchmark.h>
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/tests/test-data.hh"
 #include "nix/store/store-open.hh"
@@ -41,7 +42,7 @@ static void BM_UnparseRealDerivationFile(benchmark::State & state, const std::st
     auto drv = parseDerivation(*store, std::string(content), "test", xpSettings);
 
     for (auto _ : state) {
-        auto unparsed = drv.unparse(*store);
+        auto unparsed = unparse(drv, *store);
         benchmark::DoNotOptimize(unparsed);
         assert(unparsed.size() == content.size());
     }

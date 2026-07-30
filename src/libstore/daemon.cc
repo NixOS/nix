@@ -17,6 +17,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
@@ -683,7 +684,7 @@ static void performOp(
                paths. */
             assert(drvType.isCA());
 
-            drvPath = store->writeDerivation(drv.unresolve());
+            drvPath = store->writeDerivation(unresolve(drv));
         }
 
         auto res = builder.buildDerivation(drvPath, drv, buildMode);

@@ -164,7 +164,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         auto resolvedDrvGoal = worker.makeDerivationGoal(
             pathResolved,
-            make_ref<const Derivation>(drvResolved.unresolve()),
+            make_ref<const Derivation>(unresolve(drvResolved)),
             wantedOutput,
             buildMode,
             /*storeDerivation=*/true);
@@ -233,7 +233,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     /* Project down to the `BasicDerivation` the builder consumes,
        adding the outputs of the input derivations to the input
        sources. */
-    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const FullInputs & inputs) {
+    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const derivation::FullInputs & inputs) {
         auto srcs = inputs.srcs;
         for (auto & [depDrvPath, depNode] : inputs.drvs.map) {
             for (auto & outputName : depNode.value) {
@@ -274,7 +274,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
-        worker.store.writeDerivation(resolvedDrv->unresolve());
+        worker.store.writeDerivation(unresolve(*resolvedDrv));
     }
 
     auto g = worker.makeDerivationBuildingGoal(drvPath, resolvedDrv, buildMode);

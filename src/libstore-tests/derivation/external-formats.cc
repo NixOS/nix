@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 
@@ -174,7 +175,7 @@ INSTANTIATE_TEST_SUITE_P(
     TEST_P(FIXTURE, to_aterm)                                                                 \
     {                                                                                         \
         const auto & drv = GetParam();                                                        \
-        writeTest(drv.name + ".drv", [&]() -> std::string { return drv.unparse(*store); });   \
+        writeTest(drv.name + ".drv", [&]() -> std::string { return unparse(drv, *store); });  \
     }
 
 struct DerivationJsonAtermTest : DerivationTest,

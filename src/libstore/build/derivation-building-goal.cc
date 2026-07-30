@@ -55,7 +55,7 @@ std::string DerivationBuildingGoal::key()
 }
 
 template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType> & drv)
+std::string showKnownOutputs(const StoreDirConfig & store, const derivation::Derivation<InputsType> & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
@@ -70,8 +70,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<Inp
     return msg;
 }
 
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<FullInputs> & drv);
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<StorePathSet> & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const BasicDerivation & drv);
 
 namespace {
 

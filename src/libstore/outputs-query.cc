@@ -88,12 +88,13 @@ static std::pair<Derivation, StorePath> resolveDerivation(
     auto & evalStore = evalStore_ ? *evalStore_ : store;
 
     Derivation drv = evalStore.readInvalidDerivation(drvPath);
-    if (drv.shouldResolve()) {
+    if (shouldResolve(drv)) {
         /* Without a custom queryRealisation, we could just use
-           drv.tryResolve(store, &evalStore). But we need to use the
+           tryResolve(drv, store, &evalStore). But we need to use the
            callback variant to ensure all realisation queries go
            through queryRealisation. */
-        auto resolvedDrv = drv.tryResolve(
+        auto resolvedDrv = tryResolve(
+            drv,
             store,
             [&](ref<const SingleDerivedPath> depDrvPath,
                 const std::string & depOutputName) -> std::optional<StorePath> {
@@ -105,7 +106,7 @@ static std::pair<Derivation, StorePath> resolveDerivation(
                     store, *concreteDrvPath, depOutputName, evalStore_, queryRealisation, cache, resCache);
             });
         if (resolvedDrv)
-            drv = resolvedDrv->unresolve();
+            drv = unresolve(*resolvedDrv);
     }
 
     auto resolvedDrvPath = computeStorePath(store, drv);

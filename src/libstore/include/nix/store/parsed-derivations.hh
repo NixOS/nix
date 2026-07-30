@@ -9,11 +9,13 @@
 namespace nix {
 
 class Store;
-template<typename Input>
-struct DerivationOptions;
-struct DerivationOutput;
 
-typedef std::map<std::string, DerivationOutput> DerivationOutputs;
+namespace derivation {
+template<typename Input>
+struct Options;
+struct Output;
+typedef std::map<std::string, Output> Outputs;
+} // namespace derivation
 
 struct StructuredAttrs
 {
@@ -48,9 +50,9 @@ struct StructuredAttrs
 
     nlohmann::json::object_t prepareStructuredAttrs(
         Store & store,
-        const DerivationOptions<StorePath> & drvOptions,
+        const derivation::Options<StorePath> & drvOptions,
         const StorePathSet & inputPaths,
-        const DerivationOutputs & outputs) const;
+        const derivation::Outputs & outputs) const;
 
     /**
      * As a convenience to bash scripts, write a shell file that

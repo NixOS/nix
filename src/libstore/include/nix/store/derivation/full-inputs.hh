@@ -6,7 +6,7 @@
 
 #include <set>
 
-namespace nix {
+namespace nix::derivation {
 
 /**
  * Inputs for full Derivation - both source and derivation inputs
@@ -25,4 +25,4 @@ struct FullInputs
     bool operator==(const FullInputs &) const = default;
 };
 
-} // namespace nix
+} // namespace nix::derivation

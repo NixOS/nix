@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
@@ -1884,7 +1885,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
         }
 
-        drv.fillInOutputPaths(*state.store);
+        fillInOutputPaths(drv, *state.store);
     }
 
     /* Write the resulting term into the Nix store directory.
