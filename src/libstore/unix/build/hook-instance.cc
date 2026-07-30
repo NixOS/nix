@@ -66,7 +66,7 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
         if (dup2(builderOut.readSide.get(), 5) == -1)
             throw SysError("dupping builder's stdout/stderr");
 
-        execv(buildHook.native().c_str(), stringsToCharPtrs(args).data());
+        execv(requireCString(buildHook.native()), stringsToCharPtrs(args).data());
 
         throw SysError("executing %s", PathFmt(buildHook));
     });

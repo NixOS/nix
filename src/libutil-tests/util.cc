@@ -1,8 +1,13 @@
 #include "nix/util/util.hh"
 #include "nix/util/types.hh"
+#include "nix/util/tests/gmock-matchers.hh"
 
 #include <limits.h>
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#include <string>
+#include <string_view>
 
 namespace nix {
 
@@ -415,6 +420,19 @@ TEST(markLast, mutateThroughReference)
         if (last)
             x = 99;
     ASSERT_EQ(v, (std::vector<int>{1, 2, 99}));
+}
+
+/* ----------------------------------------------------------------------------
+ * stringsToCharPtrs
+ * --------------------------------------------------------------------------*/
+
+TEST(stringsToCharPtrs, rejectsNulBytes)
+{
+    using namespace std::string_literals;
+    ASSERT_THAT(
+        [&]() { stringsToCharPtrs({"aaa\0bbb"s}); },
+        ::testing::ThrowsMessage<nix::Error>(
+            testing::HasSubstrIgnoreANSIMatcher("string 'aaa␀bbb' with null (␀) bytes used where it's not allowed"s)));
 }
 
 } // namespace nix

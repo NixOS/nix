@@ -50,9 +50,9 @@ void initLibUtil()
 std::vector<char *> stringsToCharPtrs(const Strings & ss)
 {
     std::vector<char *> res;
-    for (auto & s : ss)
-        res.push_back((char *) s.c_str());
-    res.push_back(0);
+    for (const auto & s : ss)
+        res.push_back(const_cast<char *>(requireCString(s)));
+    res.push_back(nullptr);
     return res;
 }
 

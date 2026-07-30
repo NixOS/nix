@@ -83,6 +83,7 @@ void execProgramInStore(
         for (auto & arg : args)
             helperArgs.push_back(arg);
 
+        /* TODO: Gate this behind __linux__ and just exec /proc/self/exe. */
         execve(getSelfExe().value_or("nix").string().c_str(), stringsToCharPtrs(helperArgs).data(), envp);
 
         throw SysError("could not execute chroot helper");
@@ -99,9 +100,9 @@ void execProgramInStore(
     if (useLookupPath == UseLookupPath::Use) {
         // We have to set `environ` by hand because there is no `execvpe` on macOS.
         environ = envp;
-        execvp(program.c_str(), stringsToCharPtrs(args).data());
+        execvp(requireCString(program), stringsToCharPtrs(args).data());
     } else
-        execve(program.c_str(), stringsToCharPtrs(args).data(), envp);
+        execve(requireCString(program), stringsToCharPtrs(args).data(), envp);
 
     throw SysError("unable to execute '%s'", program);
 }
@@ -252,7 +253,7 @@ void chrootHelper(int argc, char ** argv)
         });
 #  endif
 
-    execvp(cmd.c_str(), stringsToCharPtrs(args).data());
+    execvp(requireCString(cmd), stringsToCharPtrs(args).data());
 
     throw SysError("unable to exec '%s'", cmd);
 

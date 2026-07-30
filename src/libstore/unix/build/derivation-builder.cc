@@ -1087,7 +1087,7 @@ void DerivationBuilderImpl::setUser()
 
 void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & envStrs)
 {
-    execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    execve(requireCString(drv.builder), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
