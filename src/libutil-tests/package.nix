@@ -92,6 +92,7 @@ mkMesonExecutable (finalAttrs: {
                 enosys \
                   --syscall openat2 \
                   --syscall fchmodat2 \
+                  --syscall close_range \
                   -- ${lib.getExe finalAttrs.finalPackage}
                 touch $out
               '';
