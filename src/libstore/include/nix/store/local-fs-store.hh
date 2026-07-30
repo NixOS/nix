@@ -99,7 +99,7 @@ public:
 
     inline static std::string operationName = "Local Filesystem Store";
 
-    const static std::filesystem::path drvsLogDir;
+    static const std::filesystem::path drvsLogDir;
 
     LocalFSStore(const Config & params);
 

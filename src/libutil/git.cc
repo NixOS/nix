@@ -327,7 +327,7 @@ TreeEntry dumpHash(HashAlgorithm ha, const SourcePath & path, PathFilter & filte
 
 std::optional<LsRemoteRefLine> parseLsRemoteLine(std::string_view line)
 {
-    const static std::regex line_regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$");
+    static const std::regex line_regex("^(ref: *)?([^\\s]+)(?:\\t+(.*))?$");
     std::match_results<std::string_view::const_iterator> match;
     if (!std::regex_match(line.cbegin(), line.cend(), match, line_regex))
         return std::nullopt;

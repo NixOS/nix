@@ -22,7 +22,7 @@ struct DownloadUrl
 };
 
 // A github, gitlab, or sourcehut host
-const static std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
+static const std::string hostRegexS = "[a-zA-Z0-9.-]*"; // FIXME: check
 std::regex hostRegex(hostRegexS, std::regex::ECMAScript);
 
 struct GitArchiveInputScheme : InputScheme

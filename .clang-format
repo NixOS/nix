@@ -33,3 +33,4 @@ PPIndentWidth: 2
 BinPackArguments: false
 BreakBeforeTernaryOperators: true
 SeparateDefinitionBlocks: Always
+QualifierAlignment: Left

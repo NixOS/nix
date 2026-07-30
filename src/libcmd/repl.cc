@@ -67,7 +67,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     Strings loadedFlakes;
     fun<AnnotatedValues()> getValues;
 
-    const static int envSize = 32768;
+    static const int envSize = 32768;
     std::shared_ptr<StaticEnv> staticEnv;
     std::optional<Value> lastLoaded;
     Env * env;

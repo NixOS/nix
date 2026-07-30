@@ -224,7 +224,7 @@ public:
         return *this;
     }
 
-    HintFmt & operator=(HintFmt const & rhs) = default;
+    HintFmt & operator=(const HintFmt & rhs) = default;
 
     std::string str() const
     {
