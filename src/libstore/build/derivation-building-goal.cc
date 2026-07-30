@@ -1099,11 +1099,14 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
             Strings args_;
             args_.push_front(hook);
 
+            /* FIXME: This will also close the mountns descriptor, and
+               restoreProcessContext() will silently swallow the error. Should
+               be the other way around. */
             unix::closeExtraFDs();
 
             restoreProcessContext();
 
-            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
+            execvp(requireCString(hook), stringsToCharPtrs(args_).data());
 
             throw SysError("executing %s", PathFmt(hook));
         },
