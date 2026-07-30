@@ -184,6 +184,8 @@ void restoreMountNamespace()
         if (chdir(savedCwd.c_str()) == -1)
             throw SysError("restoring cwd");
     } catch (Error & e) {
+        /* TODO: Why are we swallowing errors? This can trivially lead to bugs like
+           https://github.com/NixOS/nix/issues/16246. Can we stop doing this?? */
         debug(e.msg());
     }
 }

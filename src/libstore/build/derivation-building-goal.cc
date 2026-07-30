@@ -1100,12 +1100,11 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
             Strings args_;
             args_.push_front(hook);
 
-            /* FIXME: This will also close the mountns descriptor, and
-               restoreProcessContext() will silently swallow the error. Should
-               be the other way around. */
-            unix::closeExtraFDs();
-
             restoreProcessContext();
+
+            /* On Linux, it's crucial that this is done after restoreProcessContext() since
+               that needs an open mountns file descriptor (fdSavedMountNamespace). */
+            unix::closeExtraFDs();
 
             execvp(requireCString(hook), stringsToCharPtrs(args_).data());
 
