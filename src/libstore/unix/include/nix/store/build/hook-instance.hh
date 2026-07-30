@@ -5,6 +5,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/processes.hh"
 
+#include <chrono>
 #include <functional>
 
 namespace nix {
@@ -49,7 +50,7 @@ struct HookInstance
      */
     std::function<void()> onKillChild;
 
-    HookInstance(const Strings & buildHook);
+    HookInstance(const Strings & buildHook, std::chrono::milliseconds timeout);
 
     ~HookInstance();
 };
