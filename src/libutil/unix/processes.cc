@@ -342,6 +342,12 @@ void runProgram2(const RunOptions & options)
 
             restoreProcessContext();
 
+            /* Unlike the Linux case, it doesn't matter much that we are closing
+               the FDs before or after restoreProcessContext(), but on Linux
+               it's crucial that it happens *after* restoreProcessContext() call
+               because that re-enters the saved mountns. */
+            unix::closeExtraFDs();
+
             if (options.lookupPath)
                 execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
             // This allows you to refer to a program with a pathname relative
