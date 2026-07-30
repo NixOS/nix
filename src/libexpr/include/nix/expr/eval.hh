@@ -324,6 +324,14 @@ public:
     EvalMemory & operator=(EvalMemory &&) = delete;
 
     inline void * allocBytes(size_t n);
+
+    /**
+     * Allocates @p count * sizeof(T) + N contiguous bytes.
+     * @throws bad_alloc if the computation would overflow.
+     */
+    template<typename T, std::size_t N = 0>
+    inline void * allocBytes(size_t count);
+
     inline Value * allocValue();
     inline Env & allocEnv(size_t size);
 
