@@ -371,7 +371,7 @@ public:
                 /* compute path info on demand */
                 auto res2 = make_ref<MemorySourceAccessor>();
                 res2->root = MemorySourceAccessor::File::Regular{
-                    .contents = kv.second.unparse(*this),
+                    .contents = unparse(kv.second, *this),
                 };
                 res = std::move(res2).get_ptr();
             });

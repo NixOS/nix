@@ -34,7 +34,7 @@ struct CmdAddDerivation : MixDryRun, StoreCommand
     {
         auto json = nlohmann::json::parse(drainFD(STDIN_FILENO));
 
-        auto drv = Derivation::parseJsonAndValidate(*store, json);
+        auto drv = derivation::parseJsonAndValidate(*store, json);
 
         auto drvPath =
             (dryRun || settings.readOnlyMode) ? computeStorePath(*store, drv) : store->writeDerivation(drv, NoRepair);

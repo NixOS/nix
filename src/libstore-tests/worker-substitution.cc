@@ -337,7 +337,8 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     auto rootDrvPath = dummyStore->writeDerivation(rootDrv);
 
     // Resolve the root derivation using a callback that returns the dep output path
-    auto resolvedRootDrv = rootDrv.tryResolve(
+    auto resolvedRootDrv = tryResolve(
+        rootDrv,
         *substituter,
         [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
             EXPECT_EQ(*drvPath, SingleDerivedPath::Opaque{depDrvPath});
@@ -347,7 +348,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(resolvedRootDrv);
 
     // Write the resolved derivation to the substituter
-    auto resolvedRootDrvPath = substituter->writeDerivation(resolvedRootDrv->unresolve());
+    auto resolvedRootDrvPath = substituter->writeDerivation(unresolve(*resolvedRootDrv));
 
     // Snapshot the destination store before
     checkpointJson("issue-11928/store-before", dummyStore);

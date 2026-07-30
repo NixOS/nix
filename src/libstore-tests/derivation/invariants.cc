@@ -46,7 +46,7 @@ protected:
         };
 
         // Fill in the dependency derivation's output paths
-        depDrv.fillInOutputPaths(*store);
+        fillInOutputPaths(depDrv, *store);
 
         // Write the dependency to the store
         return store->writeDerivation(depDrv, NoRepair);
@@ -75,7 +75,7 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_emptyStringEnvVar)
     // Serialize before state
     checkpointJson("filled-in-deferred-empty-env-var-pre", drv);
 
-    drv.fillInOutputPaths(*store);
+    fillInOutputPaths(drv, *store);
 
     // Serialize after state
     checkpointJson("filled-in-deferred-empty-env-var-post", drv);
@@ -105,7 +105,7 @@ TEST_F(FillInOutputPathsTest, fillsDeferredOutputs_empty_string_var)
     // Serialize before state
     checkpointJson("filled-in-deferred-no-env-var-pre", drv);
 
-    drv.fillInOutputPaths(*store);
+    fillInOutputPaths(drv, *store);
 
     // Serialize after state
     checkpointJson("filled-in-deferred-no-env-var-post", drv);
@@ -136,7 +136,7 @@ TEST_F(FillInOutputPathsTest, preservesInputAddressedOutputs)
 
     auto drvBefore = drv;
 
-    drv.fillInOutputPaths(*store);
+    fillInOutputPaths(drv, *store);
 
     // Should still be no change
     EXPECT_EQ(drv, drvBefore);
@@ -157,7 +157,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectInputAddressedPath)
     // Serialize before state
     checkpointJson("bad-path", drv);
 
-    ASSERT_THROW(drv.fillInOutputPaths(*store), Error);
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
 }
 
 #if 0
@@ -176,7 +176,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
     // Serialize before state
     checkpointJson("bad-env-var", drv);
 
-    ASSERT_THROW(drv.fillInOutputPaths(*store), Error);
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
 }
 #endif
 
@@ -203,7 +203,7 @@ TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
     auto drvBefore = drv;
 
     // Apply fillInOutputPaths
-    drv.fillInOutputPaths(*store);
+    fillInOutputPaths(drv, *store);
 
     // Derivation should be unchanged
     EXPECT_EQ(drv, drvBefore);
@@ -232,7 +232,7 @@ TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeffered)
     checkpointJson("bad-depends-on-drv-pre", drv);
 
     // Apply fillInOutputPaths
-    ASSERT_THROW(drv.fillInOutputPaths(*store), Error);
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
 }
 
 } // namespace nix

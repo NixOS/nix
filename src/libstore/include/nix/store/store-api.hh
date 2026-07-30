@@ -37,11 +37,14 @@ struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
 
+namespace derivation {
 template<typename Inputs>
-struct DerivationT;
+struct Derivation;
 struct FullInputs;
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+} // namespace derivation
+
+using BasicDerivation = derivation::Derivation<StorePathSet>;
+using Derivation = derivation::Derivation<derivation::FullInputs>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

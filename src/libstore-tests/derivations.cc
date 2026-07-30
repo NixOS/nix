@@ -88,7 +88,7 @@ protected:
         nix::checkpointJson(*this, std::string{stem} + "-before", drv);
         nix::checkpointJson(*this, std::string{stem} + "-buildTrace", buildTrace);
 
-        auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
+        auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
         ASSERT_TRUE(resolved);
 
         nix::checkpointJson(*this, std::string{stem} + "-after", *resolved);
@@ -161,7 +161,7 @@ TEST_F(TryResolveTest, withInputs)
     auto placeholder1Dev = DownstreamPlaceholder::unknownCaOutput(dep1DrvPath, "dev").render();
     auto placeholder2Out = DownstreamPlaceholder::unknownCaOutput(dep2DrvPath, "out").render();
 
-    DerivationOutputs multiOutputs = {
+    derivation::Outputs multiOutputs = {
         {"out", caFloatingOutput()},
         {"dev", caFloatingOutput()},
     };
@@ -251,7 +251,7 @@ TEST_F(TryResolveTest, resolutionFailure)
     checkpointJson(*this, "resolution-failure-before", drv);
     checkpointJson(*this, "resolution-failure-buildTrace", buildTrace);
 
-    auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
+    auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
     EXPECT_FALSE(resolved);
 }
 
@@ -302,7 +302,7 @@ void TryResolveTest::exportRefGraphSubpathTest(
 
     nix::checkpointJson(*this, std::string{stem} + "-buildTrace", buildTrace);
 
-    auto resolved = drv.tryResolve(*store, makeCallback(buildTrace));
+    auto resolved = tryResolve(drv, *store, makeCallback(buildTrace));
     ASSERT_TRUE(resolved);
 
     nix::checkpointJson(*this, std::string{stem} + "-resolved", *resolved);

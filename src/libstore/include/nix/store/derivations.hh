@@ -23,13 +23,16 @@ namespace nix {
 static constexpr std::string_view drvFeatureBuilderRpcV0 = "builder-rpc-v0";
 
 struct StoreDirConfig;
+class Store;
 
 /* Abstract syntax of derivations. */
 
+namespace derivation {
+
 /**
- * A single output of a BasicDerivation (and Derivation).
+ * A single output of a `Basic` (and `Full`) derivation.
  */
-struct DerivationOutput
+struct Output
 {
     /**
      * The traditional non-fixed-output derivation type.
@@ -122,15 +125,15 @@ struct DerivationOutput
 
     Raw raw;
 
-    bool operator==(const DerivationOutput &) const = default;
-    auto operator<=>(const DerivationOutput &) const = default;
+    bool operator==(const Output &) const = default;
+    auto operator<=>(const Output &) const = default;
 
-    MAKE_WRAPPER_CONSTRUCTOR(DerivationOutput);
+    MAKE_WRAPPER_CONSTRUCTOR(Output);
 
     /**
      * Force choosing a variant
      */
-    DerivationOutput() = delete;
+    Output() = delete;
 
     /**
      * \note when you use this function you should make sure that you're
@@ -142,23 +145,23 @@ struct DerivationOutput
     path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 };
 
-typedef std::map<std::string, DerivationOutput> DerivationOutputs;
+typedef std::map<std::string, Output> Outputs;
 
 /**
- * These are analogues to the previous DerivationOutputs data type,
- * but they also contains, for each output, the (optional) store
- * path in which it would be written. To calculate values of these
- * types, see the corresponding functions in BasicDerivation.
+ * These are analogues to the previous `Outputs` data type, but they
+ * also contains, for each output, the (optional) store path in which
+ * it would be written. To calculate values of these types, see the
+ * corresponding functions in `Basic`.
  */
-typedef std::map<std::string, std::pair<DerivationOutput, std::optional<StorePath>>> DerivationOutputsAndOptPaths;
+typedef std::map<std::string, std::pair<Output, std::optional<StorePath>>> OutputsAndOptPaths;
 
 /**
  * For inputs that are sub-derivations, we specify exactly which
  * output IDs we are interested in.
  */
-typedef std::map<StorePath, StringSet> DerivationInputs;
+typedef std::map<StorePath, StringSet> Inputs;
 
-struct DerivationType
+struct Type
 {
     /**
      * Input-addressed derivation types
@@ -218,15 +221,15 @@ struct DerivationType
 
     Raw raw;
 
-    bool operator==(const DerivationType &) const = default;
-    auto operator<=>(const DerivationType &) const = default;
+    bool operator==(const Type &) const = default;
+    auto operator<=>(const Type &) const = default;
 
-    MAKE_WRAPPER_CONSTRUCTOR(DerivationType);
+    MAKE_WRAPPER_CONSTRUCTOR(Type);
 
     /**
      * Force choosing a variant
      */
-    DerivationType() = delete;
+    Type() = delete;
 
     /**
      * Do the outputs of the derivation have paths calculated from their
@@ -270,18 +273,18 @@ struct DerivationType
 };
 
 template<typename Inputs>
-struct DerivationT;
+struct Derivation;
 
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+using Basic = Derivation<StorePathSet>;
+using Full = Derivation<FullInputs>;
 
 template<typename Inputs>
-struct DerivationT
+struct Derivation
 {
     /**
      * keyed on symbolic IDs
      */
-    DerivationOutputs outputs;
+    Outputs outputs;
     Inputs inputs;
     std::string platform;
     /**
@@ -297,14 +300,14 @@ struct DerivationT
 
     std::string name;
 
-    bool operator==(const DerivationT &) const = default;
+    bool operator==(const Derivation &) const = default;
 
     bool isBuiltin() const;
 
     /**
      * Return true iff this is a fixed-output derivation.
      */
-    DerivationType type() const;
+    Type type() const;
 
     /**
      * Return the output names of a derivation.
@@ -312,11 +315,11 @@ struct DerivationT
     StringSet outputNames() const;
 
     /**
-     * Calculates the maps that contains all the DerivationOutputs, but
+     * Calculates the maps that contains all the `Outputs`, but
      * augmented with knowledge of the Store paths they would be written
      * into.
      */
-    DerivationOutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
+    OutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
@@ -327,61 +330,10 @@ struct DerivationT
     void applyRewrites(const StringMap & rewrites);
 
     /**
-     * Print a derivation (only meaningful for full Derivation).
-     */
-    std::string unparse(const StoreDirConfig & store) const
-        requires std::is_same_v<Inputs, FullInputs>;
-
-    /**
-     * Determine whether this derivation should be resolved before building.
-     *
-     * Resolution is needed when:
-     * - Input-addressed derivations are deferred (depend on CA derivations)
-     * - Content-addressed derivations have input drvs and are either:
-     *   - Floating (non-fixed), which must always be resolved
-     *   - Fixed, which can optionally be resolved when ca-derivations is enabled
-     * - Impure derivations always need resolution
-     * - Any input derivations have outputs from dynamic derivations
-     */
-    bool shouldResolve() const
-        requires std::is_same_v<Inputs, FullInputs>;
-
-    /**
-     * Return the underlying basic derivation but with these changes:
-     *
-     * 1. Input drvs are emptied, but the outputs of them that were used
-     *    are added directly to input sources.
-     *
-     * 2. Input placeholders are replaced with realized input store
-     *    paths.
-     */
-    std::optional<BasicDerivation> tryResolve(Store & store, Store * evalStore = nullptr) const
-        requires std::is_same_v<Inputs, FullInputs>;
-
-    /**
-     * Like the above, but instead of querying the Nix database for
-     * realisations, uses a given mapping from input derivation paths +
-     * output names to actual output store paths.
-     */
-    std::optional<BasicDerivation> tryResolve(
-        Store & store,
-        fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-            queryResolutionChain) const
-        requires std::is_same_v<Inputs, FullInputs>;
-
-    /**
-     * Convert a BasicDerivation to a full Derivation.
-     * The resulting Derivation has empty inputDrvs since BasicDerivation
-     * is already resolved.
-     */
-    Derivation unresolve() const
-        requires std::is_same_v<Inputs, StorePathSet>;
-
-    /**
      * Return a derivation identical to this one, but with the inputs transformed by `f`.
      */
     template<typename F>
-    DerivationT<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
+    Derivation<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
     {
         return {
             .outputs = outputs,
@@ -420,79 +372,110 @@ struct DerivationT
      * @param drvPath The path to this derivation
      */
     void checkInvariants(Store & store, const StorePath & drvPath) const;
-
-    /**
-     * Fill in output paths as needed.
-     *
-     * For input-addressed derivations (ready or deferred), it computes
-     * the derivation hash modulo and based on the result:
-     *
-     * - If `Regular`: converts `Deferred` outputs to `InputAddressed`,
-     *   and ensures all `InputAddressed` outputs (whether preexisting
-     *   or newly computed) have the right computed paths. Likewise
-     *   defines (if absent or the empty string) or checks (if
-     *   preexisting and non-empty) environment variables for each
-     *   output with their path.
-     *
-     * - If `Deferred`: converts `InputAddressed` to `Deferred`.
-     *
-     * Also for fixed-output content-addressed derivations, likewise
-     * updates output paths in env vars.
-     *
-     * @param store The store to use for path computation
-     * @param drvName The derivation name (without .drv extension)
-     */
-    void fillInOutputPaths(Store & store)
-        requires std::is_same_v<Inputs, FullInputs>;
-
-    /**
-     * Parse a derivation from JSON, and also perform various
-     * conveniences such as:
-     *
-     * 1. Filling in output paths in as needed/required.
-     *
-     * 2. Checking invariants in general.
-     *
-     * In the future it might also do things like:
-     *
-     * - assist with the migration from older JSON formats.
-     *
-     * - (a somewhat example of the above) initialize
-     *   `DerivationOptions` from their traditional encoding inside the
-     *   `env` and `structuredAttrs`.
-     *
-     * @param store The store to use for path computation and validation
-     * @param json The JSON representation of the derivation
-     * @return A validated derivation with output paths filled in
-     * @throws Error if parsing fails, output paths can't be computed, or validation fails
-     */
-    static Derivation parseJsonAndValidate(Store & store, const nlohmann::json & json)
-        requires std::is_same_v<Inputs, FullInputs>;
 };
 
-class Store;
+template<>
+void Basic::checkInvariants(Store & store) const;
+template<>
+void Full::checkInvariants(Store & store) const;
 
-template<>
-std::string DerivationT<FullInputs>::unparse(const StoreDirConfig & store) const;
-template<>
-bool DerivationT<FullInputs>::shouldResolve() const;
-template<>
-std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(Store & store, Store * evalStore) const;
-template<>
-std::optional<BasicDerivation> DerivationT<FullInputs>::tryResolve(
+/**
+ * Print a derivation.
+ */
+std::string unparse(const Full & drv, const StoreDirConfig & store);
+
+/**
+ * Determine whether this derivation should be resolved before building.
+ *
+ * Resolution is needed when:
+ * - Input-addressed derivations are deferred (depend on CA derivations)
+ * - Content-addressed derivations have input drvs and are either:
+ *   - Floating (non-fixed), which must always be resolved
+ *   - Fixed, which can optionally be resolved when ca-derivations is enabled
+ * - Impure derivations always need resolution
+ * - Any input derivations have outputs from dynamic derivations
+ */
+bool shouldResolve(const Full & drv);
+
+/**
+ * Return the underlying basic derivation but with these changes:
+ *
+ * 1. Input drvs are emptied, but the outputs of them that were used
+ *    are added directly to input sources.
+ *
+ * 2. Input placeholders are replaced with realized input store
+ *    paths.
+ */
+std::optional<Basic> tryResolve(const Full & drv, Store & store, Store * evalStore = nullptr);
+
+/**
+ * Like the above, but instead of querying the Nix database for
+ * realisations, uses a given mapping from input derivation paths +
+ * output names to actual output store paths.
+ */
+std::optional<Basic> tryResolve(
+    const Full & drv,
     Store & store,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
-        queryResolutionChain) const;
-template<>
-void DerivationT<FullInputs>::fillInOutputPaths(Store & store);
-template<>
-Derivation DerivationT<FullInputs>::parseJsonAndValidate(Store & store, const nlohmann::json & json);
-template<>
-Derivation DerivationT<StorePathSet>::unresolve() const;
-template<>
-void DerivationT<StorePathSet>::checkInvariants(Store & store) const;
-template<>
-void DerivationT<FullInputs>::checkInvariants(Store & store) const;
+        queryResolutionChain);
+
+/**
+ * Convert a `Basic` derivation to a `Full` derivation.
+ * The resulting derivation has empty input drvs since a `Basic`
+ * derivation is already resolved.
+ */
+Full unresolve(const Basic & drv);
+
+/**
+ * Fill in output paths as needed.
+ *
+ * For input-addressed derivations (ready or deferred), it computes
+ * the derivation hash modulo and based on the result:
+ *
+ * - If `Regular`: converts `Deferred` outputs to `InputAddressed`,
+ *   and ensures all `InputAddressed` outputs (whether preexisting
+ *   or newly computed) have the right computed paths. Likewise
+ *   defines (if absent or the empty string) or checks (if
+ *   preexisting and non-empty) environment variables for each
+ *   output with their path.
+ *
+ * - If `Deferred`: converts `InputAddressed` to `Deferred`.
+ *
+ * Also for fixed-output content-addressed derivations, likewise
+ * updates output paths in env vars.
+ *
+ * @param store The store to use for path computation
+ */
+void fillInOutputPaths(Full & drv, Store & store);
+
+/**
+ * Parse a derivation from JSON, and also perform various
+ * conveniences such as:
+ *
+ * 1. Filling in output paths in as needed/required.
+ *
+ * 2. Checking invariants in general.
+ *
+ * In the future it might also do things like:
+ *
+ * - assist with the migration from older JSON formats.
+ *
+ * - (a somewhat example of the above) initialize
+ *   `DerivationOptions` from their traditional encoding inside the
+ *   `env` and `structuredAttrs`.
+ *
+ * @param store The store to use for path computation and validation
+ * @param json The JSON representation of the derivation
+ * @return A validated derivation with output paths filled in
+ * @throws Error if parsing fails, output paths can't be computed, or validation fails
+ */
+Full parseJsonAndValidate(Store & store, const nlohmann::json & json);
+
+} // namespace derivation
+
+using BasicDerivation = derivation::Basic;
+using Derivation = derivation::Full;
+using DerivationOutput = derivation::Output;
 
 /**
  * Compute the store path that would be used for a derivation without writing it.
@@ -649,5 +632,5 @@ JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
 
 namespace nlohmann {
 template<typename Inputs>
-JSON_IMPL_WITH_XP_FEATURES_INNER(nix::DerivationT<Inputs>);
+JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Inputs>);
 } // namespace nlohmann

@@ -541,11 +541,11 @@ static void main_nix_build(int argc, char ** argv)
             shell = store->printStorePath(*outPath) + "/bin/bash";
         }
 
-        if (drv.shouldResolve()) {
-            auto resolvedDrv = drv.tryResolve(*store);
+        if (shouldResolve(drv)) {
+            auto resolvedDrv = tryResolve(drv, *store);
             if (!resolvedDrv)
                 throw Error("failed to resolve derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            drv = resolvedDrv->unresolve();
+            drv = unresolve(*resolvedDrv);
         }
 
         // Set the environment.

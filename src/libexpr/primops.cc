@@ -1884,7 +1884,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
         }
 
-        drv.fillInOutputPaths(*state.store);
+        fillInOutputPaths(drv, *state.store);
     }
 
     /* Write the resulting term into the Nix store directory.

@@ -101,7 +101,7 @@ protected:
      *
      * Just a cached value, computed from `drv`.
      */
-    const DerivationType derivationType;
+    const derivation::Type derivationType;
 
     typedef StringMap Environment;
     Environment env;

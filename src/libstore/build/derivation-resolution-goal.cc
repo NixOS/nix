@@ -96,13 +96,14 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
     {
         auto & fullDrv = *drv;
 
-        if (fullDrv.shouldResolve()) {
+        if (shouldResolve(fullDrv)) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
 
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a
                stub goal aliasing that resolved derivation goal. */
-            std::optional attempt = fullDrv.tryResolve(
+            std::optional attempt = tryResolve(
+                fullDrv,
                 worker.store,
                 [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
                     auto mEntry = get(inputGoals, drvPath);
@@ -129,11 +130,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                    inputDrvOutputs statefully, sometimes it gets out of sync with
                    the real source of truth (store). So we query the store
                    directly if there's a problem. */
-                attempt = fullDrv.tryResolve(worker.store, &worker.evalStore);
+                attempt = tryResolve(fullDrv, worker.store, &worker.evalStore);
             }
             assert(attempt);
 
-            auto pathResolved = computeStorePath(worker.store, attempt->unresolve());
+            auto pathResolved = computeStorePath(worker.store, unresolve(*attempt));
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",
