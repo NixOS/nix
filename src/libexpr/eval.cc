@@ -890,7 +890,7 @@ static const char ** encodeContext(const NixStringContext & context)
 {
     if (!context.empty()) {
         size_t n = 0;
-        auto ctx = (const char **) allocBytes((context.size() + 1) * sizeof(char *));
+        auto ctx = (const char **) allocBytes<char *>(context.size() + 1);
         for (auto & i : context) {
             ctx[n++] = makeImmutableString({i.to_string()});
         }
@@ -950,7 +950,7 @@ inline Value * EvalState::lookupVar(Env * env, const ExprVar & var, bool noEval)
 
 ListBuilder::ListBuilder(EvalState & state, size_t size)
     : size(size)
-    , elems(size <= 2 ? inlineElems : (Value **) allocBytes(size * sizeof(Value *)))
+    , elems(size <= 2 ? inlineElems : (Value **) allocBytes<Value *>(size))
 {
     state.nrListElems += size;
 }

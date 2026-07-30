@@ -25,6 +25,21 @@ inline void * allocBytes(size_t n)
     return p;
 }
 
+template<typename T, std::size_t N = 0>
+[[gnu::always_inline]]
+inline void * allocBytes(size_t count)
+{
+    size_t res = 0;
+
+    if (__builtin_mul_overflow(count, sizeof(T), &res)) [[unlikely]]
+        throw std::bad_alloc();
+
+    if (__builtin_add_overflow(res, N, &res)) [[unlikely]]
+        throw std::bad_alloc();
+
+    return allocBytes(res);
+}
+
 [[gnu::always_inline]]
 Value * EvalState::allocValue()
 {
@@ -75,7 +90,7 @@ Env & EvalState::allocEnv(size_t size)
         env = (Env *) p;
     } else
 #endif
-        env = (Env *) allocBytes(sizeof(Env) + size * sizeof(Value *));
+        env = (Env *) allocBytes<Value *, sizeof(Env)>(size);
 
     /* We assume that env->values has been cleared by the allocator; maybeThunk() and lookupVar fromWith expect this. */
 
