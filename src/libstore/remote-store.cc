@@ -747,7 +747,10 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
 void RemoteStore::addTempRoot(const StorePath & path)
 {
     auto conn(getConnection());
+    if (conn->tempRootsPinned.get(path))
+        return;
     conn->addTempRoot(*this, &conn.daemonException, path);
+    conn->tempRootsPinned.upsert(path, true);
 }
 
 Roots RemoteStore::findRoots(bool censor)
