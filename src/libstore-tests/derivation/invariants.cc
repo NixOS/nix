@@ -185,6 +185,57 @@ TEST_F(FillInOutputPathsTest, warnsOnIncorrectEnvVarForDeferred)
     EXPECT_EQ(drv.env.at("out"), store->printStorePath(wrongPath));
 }
 
+TEST_F(FillInOutputPathsTest, skipsEnvVarsWithBuilderRpc)
+{
+    Derivation drv{
+        .outputs =
+            {{"out",
+              DerivationOutput{DerivationOutput::CAFixed{
+                  .ca =
+                      ContentAddress{
+                          .method = ContentAddressMethod::Raw::NixArchive,
+                          .hash = hashString(HashAlgorithm::SHA256, "foo"),
+                      },
+              }}}},
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env =
+            {{"__doc", "builder-rpc-v0 derivations have no output env vars"},
+             {"requiredSystemFeatures", "builder-rpc-v0"}},
+        .name = "rpc-outputs",
+    };
+
+    auto drvBefore = drv;
+
+    /* With `builder-rpc-v0`, outputs are communicated to the builder
+       over RPC, so there is deliberately no `out` env var: fill-in must
+       not invent one, and validation must not demand one. */
+    fillInOutputPaths(drv, *store);
+    EXPECT_EQ(drv, drvBefore);
+
+    EXPECT_NO_THROW(checkInvariants(drv, *store));
+}
+
+TEST_F(FillInOutputPathsTest, rejectsBuilderRpcForInputAddressed)
+{
+    Derivation drv{
+        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env =
+            {{"__doc", "builder-rpc-v0 requires content addressing"},
+             {"requiredSystemFeatures", "builder-rpc-v0"},
+             {"out", ""}},
+        .name = "rpc-input-addressed",
+    };
+
+    /* `builder-rpc-v0` may only be used with content-addressing
+       derivations; input-addressed (including deferred) derivations
+       claiming it are rejected. */
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    ASSERT_THROW(checkInvariants(drv, *store), Error);
+}
+
 TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 {
     using nlohmann::json;

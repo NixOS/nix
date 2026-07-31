@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -477,8 +478,36 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
         return *hashModulo_;
     };
 
+    /* With the `builder-rpc-v0` experimental feature, outputs are
+       communicated to the builder over RPC rather than via environment
+       variables, so there are no environment variables named after
+       outputs to fill in or validate. Parsing the full
+       `derivation::Options` here also has the nice side effect that
+       validation catches malformed options. When the derivation has
+       input derivations, they must be passed along so that output
+       placeholders in path-valued options (e.g.
+       `exportReferencesGraph`) are recognized. */
+    bool rpcOutputs = [&] {
+        auto * parsed = get(drv.structuredAttrs);
+        if constexpr (requires { drv.inputs.drvs; })
+            return derivationOptionsFromStructuredAttrs(store, drv.inputs.drvs, drv.env, parsed, /*shouldWarn=*/false)
+                       .requiredSystemFeatures.count(std::string{drvFeatureBuilderRpcV0})
+                   != 0;
+        else
+            return derivationOptionsFromStructuredAttrs(store, drv.env, parsed, /*shouldWarn=*/false)
+                       .requiredSystemFeatures.count(std::string{drvFeatureBuilderRpcV0})
+                   != 0;
+    }();
+
+    if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(type(drv).raw))
+        throw Error(
+            "derivation uses the '%s' feature, which may only be used with content-addressing derivations",
+            drvFeatureBuilderRpcV0);
+
     for (auto & [outputName, output] : drv.outputs) {
         auto envHasRightPath = [&](const StorePath & actual, bool isDeferred = false) {
+            if (rpcOutputs)
+                return;
             if constexpr (fillIn) {
                 auto j = drv.env.find(outputName);
                 /* Fill in mode: fill in missing or empty environment
