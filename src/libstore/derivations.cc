@@ -530,7 +530,11 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                                 output = Output::InputAddressed{
                                     .path = outPath,
                                 };
-                                envHasRightPath(outPath);
+                                /* A pre-existing incorrect env var for a
+                                   formerly-deferred output only warns, for
+                                   compatibility with derivations produced by
+                                   older versions of Nix. */
+                                envHasRightPath(outPath, /*isDeferred=*/true);
                             } else {
                                 /* Validation mode: deferred outputs
                                    should have been filled in */

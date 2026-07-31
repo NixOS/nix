@@ -160,8 +160,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectInputAddressedPath)
     ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
 }
 
-#if 0
-TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
+TEST_F(FillInOutputPathsTest, warnsOnIncorrectEnvVarForDeferred)
 {
     auto wrongPath = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"};
 
@@ -169,16 +168,22 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
         .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Wrong env var value throws error"}, {"out", store->printStorePath(wrongPath)}},
+        .env = {{"__doc", "Wrong env var for deferred output only warns"}, {"out", store->printStorePath(wrongPath)}},
         .name = "bad-env-var",
     };
 
-    // Serialize before state
-    checkpointJson("bad-env-var", drv);
+    /* An incorrect pre-existing env var for a formerly-deferred output
+       only warns, for compatibility with derivations produced by older
+       versions of Nix. This will become an error in future versions of
+       Nix; then this test should `ASSERT_THROW` instead. */
+    fillInOutputPaths(drv, *store);
 
-    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    // The output itself is still filled in...
+    ASSERT_TRUE(std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").raw));
+
+    // ...but the incorrect env var is left as it was.
+    EXPECT_EQ(drv.env.at("out"), store->printStorePath(wrongPath));
 }
-#endif
 
 TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 {
