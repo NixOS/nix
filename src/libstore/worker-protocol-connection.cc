@@ -15,18 +15,22 @@ WorkerProto::BasicClientConnection::~BasicClientConnection()
     }
 }
 
-static Logger::Fields readFields(Source & from)
+static auto readFields(Source & from)
 {
-    Logger::Fields fields;
+    std::vector<Logger::Field> fields;
     size_t size = readInt(from);
     for (size_t n = 0; n < size; n++) {
-        auto type = (decltype(Logger::Field::type)) readInt(from);
-        if (type == Logger::Field::tInt)
+        auto type = readInt(from);
+        switch (type) {
+        case 0:
             fields.push_back(readNum<uint64_t>(from));
-        else if (type == Logger::Field::tString)
+            break;
+        case 1:
             fields.push_back(readString(from));
-        else
+            break;
+        default:
             throw Error("got unsupported field type %x from Nix daemon", (int) type);
+        }
     }
     return fields;
 }

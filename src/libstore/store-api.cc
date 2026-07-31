@@ -25,6 +25,8 @@
 #include "store-config-private.hh"
 
 #include <filesystem>
+#include <array>
+
 #include <nlohmann/json.hpp>
 
 #ifdef _WIN32
@@ -931,7 +933,7 @@ void copyStorePath(
         lvlInfo,
         actCopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
-        {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
+        std::to_array<Logger::Field>({storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()}));
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -1088,7 +1090,7 @@ std::map<StorePath, StorePath> copyPaths(
                 lvlInfo,
                 actCopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),
-                {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
+                std::to_array<Logger::Field>({storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()}));
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {

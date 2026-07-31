@@ -4,6 +4,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <array>
+
 namespace nix {
 
 DerivationResolutionGoal::DerivationResolutionGoal(
@@ -145,10 +147,10 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 lvlInfo,
                 actBuildWaiting,
                 msg,
-                Logger::Fields{
+                std::to_array<Logger::Field>({
                     worker.store.printStorePath(drvPath),
                     worker.store.printStorePath(pathResolved),
-                });
+                }));
 
             resolvedDrv =
                 std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), *std::move(attempt));

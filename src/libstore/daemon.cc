@@ -31,17 +31,21 @@
 
 namespace nix::daemon {
 
-Sink & operator<<(Sink & sink, const Logger::Fields & fields)
+Sink & operator<<(Sink & sink, std::span<const Logger::Field> fields)
 {
     sink << fields.size();
     for (auto & f : fields) {
-        sink << f.type;
-        if (f.type == Logger::Field::tInt)
-            sink << f.i;
-        else if (f.type == Logger::Field::tString)
-            sink << f.s;
-        else
-            unreachable();
+        std::visit(
+            overloaded{
+                [&sink](uint64_t i) {
+                    sink << 0;
+                    sink << i;
+                },
+                [&sink](const std::string & s) {
+                    sink << 1;
+                    sink << s;
+                }},
+            f);
     }
     return sink;
 }
@@ -155,7 +159,7 @@ struct TunnelLogger : public Logger
         Verbosity lvl,
         ActivityType type,
         const std::string & s,
-        const Fields & fields,
+        std::span<const Field> fields,
         ActivityId parent) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20}) {
@@ -178,7 +182,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) noexcept override
+    void result(ActivityId act, ResultType type, std::span<const Field> fields) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;

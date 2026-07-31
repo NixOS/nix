@@ -22,6 +22,8 @@
 
 #include <chrono>
 #include <algorithm>
+#include <array>
+
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -127,7 +129,7 @@ struct PostBuildHookState
               lvlTalkative,
               actPostBuildHook,
               fmt("running post-build-hook '%s'", hook),
-              Logger::Fields{drvPath})
+              std::to_array<Logger::Field>({drvPath}))
         , out(std::make_unique<Pipe>())
     {
         out->create();
@@ -651,7 +653,11 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
         worker.settings.logLines,
         std::make_unique<Activity>(
-            *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), machineName, 1, 1}));
+            *logger,
+            lvlInfo,
+            actBuild,
+            msg,
+            std::to_array<Logger::Field>({worker.store.printStorePath(drvPath), machineName, 1, 1})));
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 
@@ -831,7 +837,11 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         buildLog = std::make_unique<BuildLog>(
             worker.settings.logLines,
             std::make_unique<Activity>(
-                *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
+                *logger,
+                lvlInfo,
+                actBuild,
+                msg,
+                std::to_array<Logger::Field>({worker.store.printStorePath(drvPath), "", 1, 1})));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
