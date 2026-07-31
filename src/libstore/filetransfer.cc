@@ -472,7 +472,7 @@ struct curlFileTransfer : public FileTransfer
                     lvlTalkative,
                     actFileTransfer,
                     fmt("%s '%s'", request.verb(/*continuous=*/true), request.displayUri()),
-                    Logger::Fields{request.displayUri()},
+                    std::to_array<Logger::Field>({request.displayUri()}),
                     request.parentAct);
                 // Reset the start time to when we actually started the download.
                 startTime = std::chrono::steady_clock::now();

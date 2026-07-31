@@ -7,6 +7,8 @@
 #include "nix/util/signals.hh"
 #include "nix/util/callback.hh"
 
+#include <array>
+
 namespace nix {
 
 PathSubstitutionGoal::PathSubstitutionGoal(
@@ -230,7 +232,8 @@ Goal::Co PathSubstitutionGoal::tryToRun(
             Activity act(
                 *logger,
                 actSubstitute,
-                Logger::Fields{workerStore->printStorePath(storePath), sub->config.getHumanReadableURI()});
+                std::to_array<Logger::Field>(
+                    {workerStore->printStorePath(storePath), sub->config.getHumanReadableURI()}));
             PushActivity pact(act.id);
 
             copyStorePath(*sub, *workerStore, subPath, repair, sub->config.isTrusted ? NoCheckSigs : CheckSigs);

@@ -10,11 +10,10 @@
  */
 #define FORCE_DEFAULT_CONSTRUCTORS(CLASS_NAME)            \
     CLASS_NAME(const CLASS_NAME &) = default;             \
-    CLASS_NAME(CLASS_NAME &) = default;                   \
     CLASS_NAME(CLASS_NAME &&) = default;                  \
                                                           \
     CLASS_NAME & operator=(const CLASS_NAME &) = default; \
-    CLASS_NAME & operator=(CLASS_NAME &) = default;
+    CLASS_NAME & operator=(CLASS_NAME &&) = default;
 
 /**
  * Make a wrapper constructor. All args are forwarded to the
