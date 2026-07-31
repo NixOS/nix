@@ -247,6 +247,38 @@ rec {
       ) (forAllSystems (system: components.${system}.${pkgName}))
     );
 
+  /**
+    Config with the fewest libraries, so that dependency optionality doesn't regress.
+  */
+  buildMinimal =
+    let
+      components = forAllSystems (
+        system:
+        nixpkgsFor.${system}.native.nixComponents2.overrideScope (
+          self: super: {
+            # No Boehm GC (libgc).
+            nix-expr = super.nix-expr.override { enableGC = false; };
+            # No Markdown rendering (lowdown).
+            nix-cmd = super.nix-cmd.override { enableMarkdown = false; };
+            # No S3 auth (aws-crt-cpp).
+            nix-store = super.nix-store.override { withAWS = false; };
+            # No mimalloc, no plugin C API.
+            nix-cli = super.nix-cli.override {
+              withMimalloc = false;
+              withPluginCApi = false;
+            };
+          }
+        )
+      );
+    in
+    forAllPackages (
+      pkgName:
+      lib.filterAttrs (
+        system: _do_not_touch:
+        pkgName == "nix-nswrapper" -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux
+      ) (forAllSystems (system: components.${system}.${pkgName}))
+    );
+
   # Binary tarball for various platforms, containing a Nix store
   # with the closure of 'nix' package, and the second half of
   # the installation script.
