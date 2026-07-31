@@ -125,7 +125,7 @@ TEST_F(ValuePrintingTests, vLambda)
 TEST_F(ValuePrintingTests, vPrimOp)
 {
     Value vPrimOp;
-    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, const PosIdx, Value **, Value &) {}};
+    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, CallSite, Value * const *, Value &) {}};
     vPrimOp.mkPrimOp(&primOp);
 
     test(vPrimOp, "«primop puppy»");
@@ -133,7 +133,7 @@ TEST_F(ValuePrintingTests, vPrimOp)
 
 TEST_F(ValuePrintingTests, vPrimOpApp)
 {
-    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, const PosIdx, Value **, Value &) {}};
+    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, CallSite, Value * const *, Value &) {}};
     Value vPrimOp;
     vPrimOp.mkPrimOp(&primOp);
 
@@ -529,7 +529,7 @@ TEST_F(ValuePrintingTests, ansiColorsLambda)
 
 TEST_F(ValuePrintingTests, ansiColorsPrimOp)
 {
-    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, const PosIdx, Value **, Value &) {}};
+    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, CallSite, Value * const *, Value &) {}};
     Value v;
     v.mkPrimOp(&primOp);
 
@@ -538,7 +538,7 @@ TEST_F(ValuePrintingTests, ansiColorsPrimOp)
 
 TEST_F(ValuePrintingTests, ansiColorsPrimOpApp)
 {
-    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, const PosIdx, Value **, Value &) {}};
+    PrimOp primOp{.name = "puppy", .impl = [](EvalState &, CallSite, Value * const *, Value &) {}};
     Value vPrimOp;
     vPrimOp.mkPrimOp(&primOp);
 

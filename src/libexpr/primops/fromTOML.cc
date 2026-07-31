@@ -87,9 +87,9 @@ static void normalizeDatetimeFormat(toml::value & t)
 
 #endif
 
-static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Value & val)
+static void prim_fromTOML(EvalState & state, CallSite callSite, Value * const * args, Value & val)
 {
-    auto toml = state.forceStringNoCtx(*args[0], pos, "while evaluating the argument passed to builtins.fromTOML");
+    auto toml = state.forceStringNoCtx(*args[0], noPos, "while evaluating the argument passed to builtins.fromTOML");
 
     std::istringstream tomlStream(std::string{toml});
 
@@ -166,7 +166,7 @@ static void prim_fromTOML(EvalState & state, const PosIdx pos, Value ** args, Va
 #endif
                 ));
     } catch (std::exception & e) { // TODO: toml::syntax_error
-        state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(pos).debugThrow();
+        state.error<EvalError>("while parsing TOML: %s", e.what()).atPos(noPos).debugThrow();
     }
 }
 

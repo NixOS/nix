@@ -78,10 +78,31 @@ public:
 };
 
 /**
- * Function that implements a primop.
- * FIXME: `args` should be `Value * const *` instead of `Value **`, but that would be a big tedious diff.
+ * A position at which a primop is invoked (`noPos` or presumably an `ExprCall` location).
+ *
+ * If you're about to pass your primop call position to a different function that
+ * runs in your primop implementation, then stop, because that position has
+ * already been printed in the trace. Just don't pass a pos, or pass `noPos`.
+ *
+ * Nonetheless, we pass the call site to the primop so that it can be used
+ * in other contexts than the usual `try`/`catch`/`addTrace` flow, and
+ * specifically as extra context in delayed computations that may fail.
+ *
+ * Alternatively, a primop registration can set `PrimOp::addTrace = false`, so
+ * that the otherwise redundant trace item is suppressed, and the primop becomes
+ * responsible for printing its call site location, allowing for some
+ * customization of the trace.
  */
-using PrimOpFun = void(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+struct CallSite
+{
+    /** An already printed pos! Don't make it noisy. Read the `CallSite` comment. */
+    PosIdx pos;
+};
+
+/**
+ * Function that implements a primop.
+ */
+using PrimOpFun = void(EvalState & state, CallSite callSite, Value * const * args, Value & v);
 
 /**
  * Info about a primitive operation, and its implementation
@@ -1134,9 +1155,9 @@ private:
     friend struct ExprFloat;
     friend struct ExprPath;
     friend struct ExprSelect;
-    friend void prim_getAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v);
-    friend void prim_match(EvalState & state, const PosIdx pos, Value ** args, Value & v);
-    friend void prim_split(EvalState & state, const PosIdx pos, Value ** args, Value & v);
+    friend void prim_getAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v);
+    friend void prim_match(EvalState & state, CallSite callSite, Value * const * args, Value & v);
+    friend void prim_split(EvalState & state, CallSite callSite, Value * const * args, Value & v);
 
     friend struct Value;
     friend class ListBuilder;

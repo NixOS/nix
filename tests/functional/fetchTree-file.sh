@@ -116,5 +116,36 @@ EOF
 EOF
 }
 
+# attrPos is fetchTree call pos
+test_fetch_file_attr_pos () {
+    echo pos_content > pos_input
+
+    cat > pos_test.nix <<EOF
+let
+  tree = builtins.fetchTree {
+    type = "file";
+    url = "file://$PWD/pos_input";
+  };
+  checkAttr = name:
+    builtins.addErrorContext "while checking the position of attribute '\${name}'" (
+      let
+        pos = builtins.unsafeGetAttrPos name tree;
+      in
+        assert pos != null;
+        assert pos.line == 2;
+        assert pos.file == "$PWD/pos_test.nix";
+        true
+    );
+in
+  assert tree?narHash; # sanity
+  assert tree?outPath; # sanity
+  assert builtins.all checkAttr (builtins.attrNames tree);
+  true
+EOF
+
+    [[ $(nix eval --impure --file pos_test.nix) == "true" ]]
+}
+
 test_fetch_file
 test_file_flake_input
+test_fetch_file_attr_pos

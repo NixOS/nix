@@ -24,7 +24,7 @@ TEST_F(LazyFetcherAttrTest, nonLazyAttrProducesImmediateValue)
     input.attrs.insert_or_assign("revCount", uint64_t(5));
 
     Value v;
-    emitTreeAttrs(state, dummyPath(), input, v, false, false);
+    emitTreeAttrs(state, noPos, dummyPath(), input, v, false, false);
     state.forceValue(v, noPos);
 
     auto * rcAttr = v.attrs()->get(state.symbols.create("revCount"));
@@ -48,7 +48,7 @@ TEST_F(LazyFetcherAttrTest, lazyAttrProducesThunk)
                 }})));
 
     Value v;
-    emitTreeAttrs(state, dummyPath(), input, v, false, false);
+    emitTreeAttrs(state, noPos, dummyPath(), input, v, false, false);
     state.forceValue(v, noPos);
 
     auto * rcAttr = v.attrs()->get(state.symbols.create("revCount"));
@@ -79,7 +79,7 @@ TEST_F(LazyFetcherAttrTest, lazyFunctionOnlyCalledOnAccess)
                 }})));
 
     Value v;
-    emitTreeAttrs(state, dummyPath(), input, v, false, false);
+    emitTreeAttrs(state, noPos, dummyPath(), input, v, false, false);
     state.forceValue(v, noPos);
 
     // Access lastModified, so should not trigger lazy revCount

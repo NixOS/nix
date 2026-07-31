@@ -1698,7 +1698,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     primOpCalls[fn->name]++;
 
                 try {
-                    fn->impl(*this, vCur.determinePos(noPos), const_cast<Value **>(args.data()), vCur);
+                    fn->impl(*this, CallSite{pos}, args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1748,7 +1748,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2
                     // etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->impl(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->impl(*this, CallSite{pos}, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
