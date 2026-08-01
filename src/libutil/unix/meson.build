@@ -22,6 +22,10 @@ check_funcs_unix = [
     'For closing many file descriptors after forking.',
   ],
   [
+    'closefrom',
+    'For closing many file descriptors after forking.',
+  ],
+  [
     'lutimes',
     'Optionally used for changing the mtime of symlinks.',
   ],

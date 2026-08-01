@@ -92,7 +92,8 @@ void HttpsBinaryCacheStoreTest::SetUp()
 void HttpsBinaryCacheStoreTest::TearDown()
 {
 #ifndef _WIN32 /* FIXME: Can't yet start background processes on windows */
-    serverPid.kill();
+    if (serverPid != -1)
+        serverPid.kill();
 #endif
     delTmpDir.reset();
     testFileTransferSettings.reset();
