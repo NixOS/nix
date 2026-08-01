@@ -30,7 +30,7 @@ subdir('nix-meson-build-support/windows-version')
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
 
-gtest = dependency('gtest', main : true)
+gtest = dependency('gtest', main : false)
 deps_private += gtest
 
 gmock = dependency('gmock')
@@ -81,6 +81,7 @@ sources = files(
   'local-keys.cc',
   'logging.cc',
   'lru-cache.cc',
+  'main.cc',
   'memo.cc',
   'memory-source-accessor.cc',
   'monitorfdhup.cc',
