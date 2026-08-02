@@ -172,16 +172,18 @@ EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringRe
         state.forceValue(v, pos);
         auto vType = v.type();
         if (vType != nAttrs) {
-            /* String and path terminate happily; external delegates its
-               serialisation to the caller (`printValueAsJSON` routes into
-               `ExternalValueBase::printValueAsJSON`, `coerceToString` into
-               `ExternalValueBase::coerceToString`) so we let it through
-               too. Everything else violates the "`__toString` returns a
-               string" contract. */
+            /* Trivially string-coercible types (i.e. coerceMore = false compatible)
+               get to return happily.
+               String and path terminate happily. External needs to be handled
+               by caller. E.g. `printValueAsJSON` routes to `ExternalValueBase::printValueAsJSON`,
+               `coerceToString` to `ExternalValueBase::coerceToString`).
+               Everything else violates the "`__toString` returns a
+               string" contract.
+               */
             if (checkToStringReturn && cameThroughToString && vType != nString && vType != nPath && vType != nExternal)
                 state
                     .error<TypeError>(
-                        "`__toString` must return a string, but got %1%: %2%",
+                        "`__toString` should return a string, but got %1%: %2%",
                         showType(v),
                         ValuePrinter(state, v, errorPrintOptions))
                     .atPos(pos)

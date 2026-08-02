@@ -20,7 +20,7 @@ error:
              |     ^
             7|   };
 
-       error: `__toString` must return a string, but got an integer: 42
+       error: `__toString` should return a string, but got an integer: 42
        at /pwd/lang/eval-fail-toJSON-outPath-through-toString.nix:6:5:
             5|   outPath = {
             6|     __toString = self: 42;
