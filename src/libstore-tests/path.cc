@@ -139,6 +139,15 @@ RC_GTEST_FIXTURE_PROP(StorePathTest, prop_check_regex_eq_parse, ())
     RC_ASSERT(parsed == std::regex_match(std::string{name}, nameRegex));
 }
 
+TEST_F(StorePathTest, mustBeDashAfterHashPart)
+{
+    std::string hashPart = "575s52sh487i0ylmbs9pvi606ljdszr0";
+    for (char c : {'_', '\0'}) {
+        EXPECT_THROW(StorePath(hashPart + c + "name"), BadStorePath);
+    }
+    EXPECT_NO_THROW(StorePath(hashPart + "-" + "name"));
+}
+
 /* ----------------------------------------------------------------------------
  * JSON
  * --------------------------------------------------------------------------*/
