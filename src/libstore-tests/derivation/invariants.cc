@@ -181,8 +181,10 @@ TEST_F(FillInOutputPathsTest, warnsOnIncorrectEnvVarForDeferred)
     // The output itself is still filled in...
     ASSERT_TRUE(std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").raw));
 
-    // ...but the incorrect env var is left as it was.
-    EXPECT_EQ(drv.env.at("out"), store->printStorePath(wrongPath));
+    // ...and the env var is corrected so later validation passes.
+    auto & filled = std::get<DerivationOutput::InputAddressed>(drv.outputs.at("out").raw);
+    EXPECT_EQ(drv.env.at("out"), store->printStorePath(filled.path));
+    ASSERT_NO_THROW(checkInvariants(drv, *store));
 }
 
 TEST_F(FillInOutputPathsTest, throwsOnMixedOutputTypes)
