@@ -530,13 +530,17 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     outputName,
                     store.printStorePath(actual));
             if (j->second != store.printStorePath(actual)) {
-                if (isDeferred)
+                if (isDeferred) {
                     warn(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
                         outputName,
                         store.printStorePath(actual),
                         j->second);
-                else
+                    /* Fix the env var so a later `checkInvariants`
+                       doesn't reject it. */
+                    if constexpr (fillIn)
+                        j->second = store.printStorePath(actual);
+                } else
                     throw Error(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
                         outputName,
