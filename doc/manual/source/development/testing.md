@@ -303,6 +303,50 @@ Because these tests are expensive and require more than what the standard github
 
 You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-build -A hydraJobs.tests.{testName}`.
 
+## Fuzzing
+
+The project utilises [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
+The harnesses reside in corresponding `-tests` subprojects (e.g. `src/libutil-tests/fuzz`).
+In order to correctly utilise them, the whole project needs to be built with correct flags to ensure that all libraries are instrumented.
+
+```shell
+nix develop .#native-clangStdenv
+appendToVar mesonFlags "-Db_sanitize=address,undefined,fuzzer-no-link"
+appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Because Boehm doesn't play well with ASan
+configurePhase
+buildPhase
+```
+
+If you want to collect coverage metrics you also need to specify the following compiler flags before running the `configurePhase`:
+
+```shell
+export CXXFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+export CCFLAGS="-fprofile-instr-generate -fcoverage-mapping"
+```
+
+For now, the testbenches are mostly rudimentary and are supposed to catch memory safety bugs, but fuzzing is also crucial for validating invariants.
+Contributions improving harnesses and corpus/dictionaries are welcome.
+
+To run the harness (e.g. for NAR deserialisation) you can execute the following:
+
+```shell
+export LLVM_PROFILE_FILE="default.%p.profraw"
+mkdir /tmp/parse-dump
+build/src/libutil-tests/fuzz/harnesses/fuzz-parse-dump -runs=1000000 -max_len=65536 -dict=./src/libutil-tests/fuzz/data/nars.dict /tmp/parse-dump ./src/libutil-tests/fuzz/data/nars
+```
+
+Note that to achieve better results, tuning `libFuzzer` parameters or improvements to the initial corpus and dictionaries is likely required. For further information consult the [libFuzzer manual](https://llvm.org/docs/LibFuzzer.html).
+
+If you want to inspect the coverage, wait for the harness to run to completion (interrupting it won't produce a non-empty `.profraw` file) and assemble the final coverage report:
+
+```
+llvm-profdata merge -sparse *.profraw -o default.profdata
+llvm-cov show build/src/libutil/libnixutil.so -instr-profile=default.profdata -format=html -output-dir cov-html
+xdg-open cov-html/index.html
+```
+
+If you have found a memory safety issue using fuzzing, consider reporting it [privately](https://github.com/NixOS/nix/security/) if you deem the issue to be security relevant.
+
 ## Installer tests
 
 GitHub Actions CI in the Nix repository also tests the installer on PRs. It does not require additional setup and utilises [GHA Artifacts](https://docs.github.com/en/actions/tutorials/store-and-share-data) and can be run in any Nix repository fork.
