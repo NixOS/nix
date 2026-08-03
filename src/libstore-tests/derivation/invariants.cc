@@ -185,6 +185,29 @@ TEST_F(FillInOutputPathsTest, warnsOnIncorrectEnvVarForDeferred)
     EXPECT_EQ(drv.env.at("out"), store->printStorePath(wrongPath));
 }
 
+TEST_F(FillInOutputPathsTest, throwsOnMixedOutputTypes)
+{
+    Derivation drv{
+        .outputs =
+            {
+                {"dev",
+                 DerivationOutput{DerivationOutput::CAFloating{
+                     .method = ContentAddressMethod::Raw::NixArchive,
+                     .hashAlgo = HashAlgorithm::SHA256,
+                 }}},
+                {"out", DerivationOutput{DerivationOutput::Deferred{}}},
+            },
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env = {{"__doc", "Mixed output types are a catchable error, not an abort"}, {"out", ""}, {"dev", ""}},
+        .name = "mixed-output-types",
+    };
+
+    // Must throw, not panic (std::terminate) inside hashModulo.
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    ASSERT_THROW(checkInvariants(drv, *store), Error);
+}
+
 TEST_F(FillInOutputPathsTest, skipsEnvVarsWithBuilderRpc)
 {
     Derivation drv{
