@@ -51,6 +51,8 @@ rec {
     final: prev: {
       withASan = withSanitizers;
       withUBSan = withSanitizers;
+      # So that this stuff is at least built in CI.
+      withFuzzer = withSanitizers;
 
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.

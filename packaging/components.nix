@@ -220,7 +220,8 @@ let
       sanitizers =
         lib.optional scope.withASan "address"
         ++ lib.optional scope.withUBSan "undefined"
-        ++ lib.optional scope.withTSan "thread";
+        ++ lib.optional scope.withTSan "thread"
+        ++ lib.optional scope.withFuzzer "fuzzer-no-link";
     in
     # Thread sanitizer can't be used with ASan or UBSan
     assert scope.withTSan -> !(scope.withASan || scope.withUBSan);
@@ -318,6 +319,11 @@ in
     Whether meson components are built with [ThreadSanitizer](https://clang.llvm.org/docs/ThreadSanitizer.html).
   */
   withTSan = false;
+
+  /**
+    Whether meson components are built with [libFuzzer instrumentation](https://llvm.org/docs/LibFuzzer.html).
+  */
+  withFuzzer = false;
 
   /**
     Whether meson components are checked with [clang-tidy](https://clang.llvm.org/extra/clang-tidy/).

@@ -1,0 +1,11 @@
+# Magic
+"Derive(["
+"DrvWithVersion(\"xp-dyn-drv\",[],"
+# Some real looking store paths
+"/nix/store/dhq26kjp9jx56820yzzibv82nzj8zwck-bash-5.2-p15.drv"
+"/nix/store/ci7m13j1yv5p91l6f4xffj4m14papka0-hello-2.12.1"
+# Beginning of structured attrs
+"[(\"__json\",\""
+# Some common attributes
+"builder"
+"args"
