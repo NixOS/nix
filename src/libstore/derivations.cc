@@ -499,7 +499,11 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                    != 0;
     }();
 
-    if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(type(drv).raw))
+    /* Throws on invalid output combinations. Must run before
+       `hashModulo`, which would panic instead. */
+    auto drvType = type(drv);
+
+    if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(drvType.raw))
         throw Error(
             "derivation uses the '%s' feature, which may only be used with content-addressing derivations",
             drvFeatureBuilderRpcV0);
@@ -608,10 +612,6 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             output.raw);
     }
 
-    /* Don't need the answer, but do this anyways to assert is proper
-       combination. The code above is more general and naturally allows
-       combinations that are currently prohibited. */
-    type(drv);
 }
 
 template<typename Inputs>
