@@ -342,7 +342,7 @@ public:
         return readDerivation(drvPath);
     }
 
-    void registerDrvOutput(const Realisation & output) override
+    void registerDrvOutputUnchecked(const Realisation & output) override
     {
         buildTrace.insert_or_visit({output.id.drvPath, {{output.id.outputName, output}}}, [&](auto & kv) {
             kv.second.insert_or_assign(output.id.outputName, output);

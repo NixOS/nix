@@ -669,13 +669,13 @@ void LocalStore::registerDrvOutput(const Realisation & info, CheckSigsFlag check
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
     if (checkSigs == NoCheckSigs || !realisationIsUntrusted(info))
-        registerDrvOutput(info);
+        registerDrvOutputUnchecked(info);
     else
         throw Error(
             "cannot register realisation '%s' because it lacks a signature by a trusted key", info.outPath.to_string());
 }
 
-void LocalStore::registerDrvOutput(const Realisation & info)
+void LocalStore::registerDrvOutputUnchecked(const Realisation & info)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
     retrySQLite<void>([&]() {

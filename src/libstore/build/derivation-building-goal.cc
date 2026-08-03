@@ -1342,7 +1342,8 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                             .outPath = info.known->path,
                         },
                         drvOutput,
-                    });
+                    },
+                    NoCheckSigs);
             }
         }
         if (info.known && info.known->isValid())

@@ -679,7 +679,7 @@ void BinaryCacheStore::queryRealisationUncached(
     getFile(outputInfoFilePath, std::move(newCallback));
 }
 
-void BinaryCacheStore::registerDrvOutput(const Realisation & info)
+void BinaryCacheStore::registerDrvOutputUnchecked(const Realisation & info)
 {
     if (diskCache)
         diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);
