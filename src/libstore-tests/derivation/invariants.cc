@@ -160,8 +160,7 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectInputAddressedPath)
     ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
 }
 
-#if 0
-TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
+TEST_F(FillInOutputPathsTest, warnsOnIncorrectEnvVarForDeferred)
 {
     auto wrongPath = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"};
 
@@ -169,16 +168,98 @@ TEST_F(FillInOutputPathsTest, throwsOnIncorrectEnvVar)
         .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
         .platform = "x86_64-linux",
         .builder = "/bin/sh",
-        .env = {{"__doc", "Wrong env var value throws error"}, {"out", store->printStorePath(wrongPath)}},
+        .env = {{"__doc", "Wrong env var for deferred output only warns"}, {"out", store->printStorePath(wrongPath)}},
         .name = "bad-env-var",
     };
 
-    // Serialize before state
-    checkpointJson("bad-env-var", drv);
+    /* An incorrect pre-existing env var for a formerly-deferred output
+       only warns, for compatibility with derivations produced by older
+       versions of Nix. This will become an error in future versions of
+       Nix; then this test should `ASSERT_THROW` instead. */
+    fillInOutputPaths(drv, *store);
 
-    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    // The output itself is still filled in...
+    ASSERT_TRUE(std::get_if<DerivationOutput::InputAddressed>(&drv.outputs.at("out").raw));
+
+    // ...and the env var is corrected so later validation passes.
+    auto & filled = std::get<DerivationOutput::InputAddressed>(drv.outputs.at("out").raw);
+    EXPECT_EQ(drv.env.at("out"), store->printStorePath(filled.path));
+    ASSERT_NO_THROW(checkInvariants(drv, *store));
 }
-#endif
+
+TEST_F(FillInOutputPathsTest, throwsOnMixedOutputTypes)
+{
+    Derivation drv{
+        .outputs =
+            {
+                {"dev",
+                 DerivationOutput{DerivationOutput::CAFloating{
+                     .method = ContentAddressMethod::Raw::NixArchive,
+                     .hashAlgo = HashAlgorithm::SHA256,
+                 }}},
+                {"out", DerivationOutput{DerivationOutput::Deferred{}}},
+            },
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env = {{"__doc", "Mixed output types are a catchable error, not an abort"}, {"out", ""}, {"dev", ""}},
+        .name = "mixed-output-types",
+    };
+
+    // Must throw, not panic (std::terminate) inside hashModulo.
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    ASSERT_THROW(checkInvariants(drv, *store), Error);
+}
+
+TEST_F(FillInOutputPathsTest, skipsEnvVarsWithBuilderRpc)
+{
+    Derivation drv{
+        .outputs =
+            {{"out",
+              DerivationOutput{DerivationOutput::CAFixed{
+                  .ca =
+                      ContentAddress{
+                          .method = ContentAddressMethod::Raw::NixArchive,
+                          .hash = hashString(HashAlgorithm::SHA256, "foo"),
+                      },
+              }}}},
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env =
+            {{"__doc", "builder-rpc-v0 derivations have no output env vars"},
+             {"requiredSystemFeatures", "builder-rpc-v0"}},
+        .name = "rpc-outputs",
+    };
+
+    auto drvBefore = drv;
+
+    /* With `builder-rpc-v0`, outputs are communicated to the builder
+       over RPC, so there is deliberately no `out` env var: fill-in must
+       not invent one, and validation must not demand one. */
+    fillInOutputPaths(drv, *store);
+    EXPECT_EQ(drv, drvBefore);
+
+    EXPECT_NO_THROW(checkInvariants(drv, *store));
+}
+
+TEST_F(FillInOutputPathsTest, rejectsBuilderRpcForInputAddressed)
+{
+    Derivation drv{
+        .outputs = {{"out", DerivationOutput{DerivationOutput::Deferred{}}}},
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .env =
+            {{"__doc", "builder-rpc-v0 requires content addressing"},
+             {"requiredSystemFeatures", "builder-rpc-v0"},
+             {"out", ""}},
+        .name = "rpc-input-addressed",
+    };
+
+    /* `builder-rpc-v0` may only be used with content-addressing
+       derivations; input-addressed (including deferred) derivations
+       claiming it are rejected. */
+    ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
+    ASSERT_THROW(checkInvariants(drv, *store), Error);
+}
 
 TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
 {

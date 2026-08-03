@@ -131,7 +131,8 @@ struct Output
     path(const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName) const;
 };
 
-typedef std::map<std::string, Output> Outputs;
+template<typename Out = Output>
+using Outputs = std::map<std::string, Out>;
 
 /**
  * These are analogues to the previous `Outputs` data type, but they

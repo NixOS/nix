@@ -229,7 +229,7 @@ public:
         if (info.path.isDerivation()) {
             warn("back compat supporting `addToStore` for inserting derivations in dummy store");
             writeDerivation(
-                parseDerivation(*this, accessor->readFile(CanonPath::root), Derivation::nameFromPath(info.path)));
+                derivation::parse(*this, accessor->readFile(CanonPath::root), Derivation::nameFromPath(info.path)));
             return;
         }
 

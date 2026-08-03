@@ -234,7 +234,7 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
     return derivation::Derivation<Inputs>{
         .outputs =
             [&] {
-                derivation::Outputs outputs;
+                derivation::Outputs<> outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(

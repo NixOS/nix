@@ -22,7 +22,7 @@ static void BM_ParseRealDerivationFile(benchmark::State & state, const std::stri
     ExperimentalFeatureSettings xpSettings;
 
     for (auto _ : state) {
-        auto drv = parseDerivation(*store, std::string(content), "test", xpSettings);
+        auto drv = derivation::parse(*store, std::string(content), "test", xpSettings);
         benchmark::DoNotOptimize(drv);
     }
     state.SetBytesProcessed(state.iterations() * content.size());
@@ -39,7 +39,7 @@ static void BM_UnparseRealDerivationFile(benchmark::State & state, const std::st
 
     auto store = openStore("dummy://");
     ExperimentalFeatureSettings xpSettings;
-    auto drv = parseDerivation(*store, std::string(content), "test", xpSettings);
+    auto drv = derivation::parse(*store, std::string(content), "test", xpSettings);
 
     for (auto _ : state) {
         auto unparsed = unparse(drv, *store);

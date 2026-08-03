@@ -327,7 +327,7 @@ static int main_build_remote(int argc, char ** argv)
         //
         // This condition mirrors that: that code enforces the "rules" outlined there;
         // we do the best we can given those "rules".
-        if (trustedOrLegacy || drv.type().isCA()) {
+        if (trustedOrLegacy || type(drv).isCA()) {
             BasicDerivation resolvedDrv{
                 .outputs = drv.outputs,
                 // Hijack the inputs paths of the derivation to include
@@ -373,7 +373,7 @@ static int main_build_remote(int argc, char ** argv)
 
         std::set<Realisation> missingRealisations;
         StorePathSet missingPaths;
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().hasKnownOutputPaths()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !type(drv).hasKnownOutputPaths()) {
             for (auto & outputName : wantedOutputs) {
                 auto thisOutputId = DrvOutput{*drvPath, outputName};
                 if (!store->queryRealisation(thisOutputId)) {
@@ -391,7 +391,7 @@ static int main_build_remote(int argc, char ** argv)
                 }
             }
         } else {
-            auto outputPaths = drv.outputsAndOptPaths(*store);
+            auto outputPaths = outputsAndOptPaths(drv, *store);
             for (auto & [outputName, hopefullyOutputPath] : outputPaths) {
                 assert(hopefullyOutputPath.second);
                 if (!store->isValidPath(*hopefullyOutputPath.second))

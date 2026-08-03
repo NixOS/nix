@@ -73,7 +73,7 @@ void ServeProto::BasicClientConnection::putBuildDerivationRequest(
     const ServeProto::BuildOptions & options)
 {
     to << ServeProto::Command::BuildDerivation << store.printStorePath(drvPath);
-    writeDerivation(to, store, drv);
+    derivation::write(to, store, drv);
 
     ServeProto::write(store, *this, options);
 

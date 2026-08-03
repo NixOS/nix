@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -79,8 +80,8 @@ bool Type::isImpure() const
         raw);
 }
 
-template<typename InputsType>
-bool Derivation<InputsType>::isBuiltin() const
+template<typename Inputs, typename Out>
+bool Derivation<Inputs, Out>::isBuiltin() const
 {
     return builder.substr(0, 8) == "builtin:";
 }
@@ -160,8 +161,8 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName)
 
 namespace derivation {
 
-template<typename InputsType>
-Type Derivation<InputsType>::type() const
+template<typename Inputs>
+Type type(const Derivation<Inputs, Output> & drv)
 {
     using namespace std::literals::string_view_literals;
 
@@ -178,7 +179,7 @@ Type Derivation<InputsType>::type() const
             throw Error("only one fixed output is allowed for now");
     };
 
-    for (auto & i : outputs) {
+    for (auto & i : drv.outputs) {
         std::visit(
             overloaded{
                 [&](const Output::InputAddressed &) {
@@ -224,12 +225,15 @@ Type Derivation<InputsType>::type() const
     return ty.value();
 }
 
+template Type type(const Basic & drv);
+template Type type(const Full & drv);
+
 } // namespace derivation
 
 namespace derivation {
 
-template<typename InputsType>
-StringSet Derivation<InputsType>::outputNames() const
+template<typename Inputs, typename Out>
+StringSet Derivation<Inputs, Out>::outputNames() const
 {
     StringSet names;
     for (auto & i : outputs)
@@ -237,18 +241,21 @@ StringSet Derivation<InputsType>::outputNames() const
     return names;
 }
 
-template<typename InputsType>
-OutputsAndOptPaths Derivation<InputsType>::outputsAndOptPaths(const StoreDirConfig & store) const
+template<typename Inputs>
+OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store)
 {
     OutputsAndOptPaths outsAndOptPaths;
-    for (auto & [outputName, output] : outputs)
+    for (auto & [outputName, output] : drv.outputs)
         outsAndOptPaths.insert(
-            std::make_pair(outputName, std::make_pair(output, output.path(store, name, outputName))));
+            std::make_pair(outputName, std::make_pair(output, output.path(store, drv.name, outputName))));
     return outsAndOptPaths;
 }
 
-template<typename InputsType>
-std::string_view Derivation<InputsType>::nameFromPath(const StorePath & drvPath)
+template OutputsAndOptPaths outputsAndOptPaths(const Basic & drv, const StoreDirConfig & store);
+template OutputsAndOptPaths outputsAndOptPaths(const Full & drv, const StoreDirConfig & store);
+
+template<typename Inputs, typename Out>
+std::string_view Derivation<Inputs, Out>::nameFromPath(const StorePath & drvPath)
 {
     drvPath.requireDerivation();
     auto nameWithSuffix = drvPath.name();
@@ -268,8 +275,8 @@ std::string hashPlaceholder(const OutputNameView outputName)
 
 namespace derivation {
 
-template<typename InputsType>
-void Derivation<InputsType>::applyRewrites(const StringMap & rewrites)
+template<typename Inputs, typename Out>
+void Derivation<Inputs, Out>::applyRewrites(const StringMap & rewrites)
 {
     if (rewrites.empty())
         return;
@@ -310,7 +317,7 @@ bool shouldResolve(const Full & drv)
     if (drv.inputs.drvs.map.empty())
         return false;
 
-    auto drvType = drv.type();
+    auto drvType = type(drv);
 
     bool typeNeedsResolve = std::visit(
         overloaded{
@@ -429,7 +436,7 @@ std::optional<Basic> tryResolve(
 
     resolved.applyRewrites(inputRewrites);
 
-    processDerivationOutputPaths</*maskOutputs=*/true>(store, resolved, resolved.name);
+    processDerivationOutputPaths</*fillIn=*/true>(store, resolved, resolved.name);
 
     return resolved;
 }
@@ -458,23 +465,53 @@ std::optional<Basic> tryResolve(
 template<bool fillIn>
 static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
 {
-    std::optional<DrvHashModulo> hashModulo_;
+    /* output optional is for whether we set it yet. Inner optional is
+       for whether the input-addressed derivation has an input address
+       now or is deferred --- can only calculate input address later. */
+    std::optional<std::optional<Hash>> hashModulo_;
 
-    auto hashModulo = [&]() -> const auto & {
+    auto hashModulo = [&]() -> const std::optional<Hash> & {
         if (!hashModulo_) {
             // somewhat expensive so we do lazily
-            // Note that we do *not* recur with `fillIn`
-            if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, Full>) {
-                hashModulo_ = hashDerivationModuloImpl</*maskOutputs=*/true>(store, drv);
-            } else {
-                hashModulo_ = hashDerivationModuloImpl</*maskOutputs=*/true>(store, unresolve(drv));
-            }
+            hashModulo_ = derivation::hashModulo(store, drv);
         }
         return *hashModulo_;
     };
 
+    /* With the `builder-rpc-v0` experimental feature, outputs are
+       communicated to the builder over RPC rather than via environment
+       variables, so there are no environment variables named after
+       outputs to fill in or validate. Parsing the full
+       `derivation::Options` here also has the nice side effect that
+       validation catches malformed options. When the derivation has
+       input derivations, they must be passed along so that output
+       placeholders in path-valued options (e.g.
+       `exportReferencesGraph`) are recognized. */
+    bool rpcOutputs = [&] {
+        auto * parsed = get(drv.structuredAttrs);
+        if constexpr (requires { drv.inputs.drvs; })
+            return derivationOptionsFromStructuredAttrs(store, drv.inputs.drvs, drv.env, parsed, /*shouldWarn=*/false)
+                       .requiredSystemFeatures.count(std::string{drvFeatureBuilderRpcV0})
+                   != 0;
+        else
+            return derivationOptionsFromStructuredAttrs(store, drv.env, parsed, /*shouldWarn=*/false)
+                       .requiredSystemFeatures.count(std::string{drvFeatureBuilderRpcV0})
+                   != 0;
+    }();
+
+    /* Throws on invalid output combinations. Must run before
+       `hashModulo`, which would panic instead. */
+    auto drvType = type(drv);
+
+    if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(drvType.raw))
+        throw Error(
+            "derivation uses the '%s' feature, which may only be used with content-addressing derivations",
+            drvFeatureBuilderRpcV0);
+
     for (auto & [outputName, output] : drv.outputs) {
         auto envHasRightPath = [&](const StorePath & actual, bool isDeferred = false) {
+            if (rpcOutputs)
+                return;
             if constexpr (fillIn) {
                 auto j = drv.env.find(outputName);
                 /* Fill in mode: fill in missing or empty environment
@@ -493,13 +530,17 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
                     outputName,
                     store.printStorePath(actual));
             if (j->second != store.printStorePath(actual)) {
-                if (isDeferred)
+                if (isDeferred) {
                     warn(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
                         outputName,
                         store.printStorePath(actual),
                         j->second);
-                else
+                    /* Fix the env var so a later `checkInvariants`
+                       doesn't reject it. */
+                    if constexpr (fillIn)
+                        j->second = store.printStorePath(actual);
+                } else
                     throw Error(
                         "derivation has incorrect environment variable '%s', should be '%s' but is actually '%s'",
                         outputName,
@@ -508,64 +549,60 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             }
         };
         auto hash = [&]<typename Out>(const Out & outputVariant) {
-            std::visit(
-                overloaded{
-                    [&](const DrvHashModulo::DrvHash & drvHash) {
-                        auto outPath = store.makeOutputPath(outputName, drvHash, drvName);
+            auto & drvHash = hashModulo();
+            if (drvHash) {
+                auto outPath = store.makeOutputPath(outputName, *drvHash, drvName);
 
-                        if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
-                            if (outputVariant.path == outPath) {
-                                envHasRightPath(outPath);
-                                return; // Correct case
-                            }
-                            /* Error case, an explicitly wrong path is
-                               always an error. */
-                            throw Error(
-                                "derivation has incorrect output '%s', should be '%s'",
-                                store.printStorePath(outputVariant.path),
-                                store.printStorePath(outPath));
-                        } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
-                            if constexpr (fillIn) {
-                                /* Fill in output path for Deferred outputs */
-                                output = Output::InputAddressed{
-                                    .path = outPath,
-                                };
-                                envHasRightPath(outPath);
-                            } else {
-                                /* Validation mode: deferred outputs
-                                   should have been filled in */
-                                warn(
-                                    "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
-                                    store.printStorePath(outPath));
-                            }
-                        } else {
-                            /* Will never happen, based on where
-                               `hash` is called. */
-                            static_assert(false);
-                        }
-                    },
-                    [&](const DrvHashModulo::CaOutputHashes &) {
-                        /* Shouldn't happen as the original output is
-                           input-addressed (or deferred waiting to be). */
-                        assert(false);
-                    },
-                    [&](const DrvHashModulo::DeferredDrv &) {
-                        if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
-                            /* Error case, an explicitly wrong path is
-                               always an error. */
-                            throw Error(
-                                "derivation has incorrect output '%s', should be deferred",
-                                store.printStorePath(outputVariant.path));
-                        } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
-                            /* Correct: Deferred output with Deferred hash kind. */
-                        } else {
-                            /* Will never happen, based on where
-                               `hash` is called. */
-                            static_assert(false);
-                        }
-                    },
-                },
-                hashModulo().raw);
+                if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
+                    if (outputVariant.path == outPath) {
+                        envHasRightPath(outPath);
+                        return; // Correct case
+                    }
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be '%s'",
+                        store.printStorePath(outputVariant.path),
+                        store.printStorePath(outPath));
+                } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
+                    if constexpr (fillIn) {
+                        /* Fill in output path for Deferred outputs */
+                        output = Output::InputAddressed{
+                            .path = outPath,
+                        };
+                        /* A pre-existing incorrect env var for a
+                           formerly-deferred output only warns, for
+                           compatibility with derivations produced by
+                           older versions of Nix. */
+                        envHasRightPath(outPath, /*isDeferred=*/true);
+                    } else {
+                        /* Validation mode: deferred outputs
+                           should have been filled in */
+                        warn(
+                            "derivation has incorrect deferred output, should be '%s'.\nThis will be an error in future versions of Nix; compatibility of CA derivations will be broken.",
+                            store.printStorePath(outPath));
+                    }
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+            } else {
+                /* Deferred --- hash not yet known. */
+                if constexpr (std::is_same_v<Out, Output::InputAddressed>) {
+                    /* Error case, an explicitly wrong path is
+                       always an error. */
+                    throw Error(
+                        "derivation has incorrect output '%s', should be deferred",
+                        store.printStorePath(outputVariant.path));
+                } else if constexpr (std::is_same_v<Out, Output::Deferred>) {
+                    /* Correct: Deferred output with Deferred hash kind. */
+                } else {
+                    /* Will never happen, based on where
+                       `hash` is called. */
+                    static_assert(false);
+                }
+            }
         };
         std::visit(
             overloaded{
@@ -578,42 +615,39 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
             },
             output.raw);
     }
-
-    /* Don't need the answer, but do this anyways to assert is proper
-       combination. The code above is more general and naturally allows
-       combinations that are currently prohibited. */
-    drv.type();
 }
 
-template<typename InputsType>
-void Derivation<InputsType>::checkInvariants(Store & store, const StorePath & drvPath) const
+template<typename Inputs>
+void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
     drvName = drvName.substr(0, drvName.size() - drvExtension.size());
 
-    if (drvName != name) {
-        throw Error("derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), name);
+    if (drvName != drv.name) {
+        throw Error(
+            "derivation '%s' has name '%s' which does not match its path", store.printStorePath(drvPath), drv.name);
     }
 
     try {
-        checkInvariants(store);
+        checkInvariants(drv, store);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
         throw;
     }
 }
 
-template<>
-void Basic::checkInvariants(Store & store) const
+template void checkInvariants(const Basic & drv, Store & store, const StorePath & drvPath);
+template void checkInvariants(const Full & drv, Store & store, const StorePath & drvPath);
+
+void checkInvariants(const Basic & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, *this, name);
+    processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 
-template<>
-void Full::checkInvariants(Store & store) const
+void checkInvariants(const Full & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, *this, name);
+    processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 
 void fillInOutputPaths(Full & drv, Store & store)
@@ -628,7 +662,7 @@ Full parseJsonAndValidate(Store & store, const nlohmann::json & json)
     fillInOutputPaths(drv, store);
 
     try {
-        drv.checkInvariants(store);
+        checkInvariants(drv, store);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
         throw;

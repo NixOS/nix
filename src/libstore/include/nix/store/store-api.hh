@@ -38,13 +38,14 @@ struct RealisedPath;
 struct DrvOutput;
 
 namespace derivation {
-template<typename Inputs>
+template<typename Inputs, typename Out>
 struct Derivation;
 struct FullInputs;
+struct Output;
 } // namespace derivation
 
-using BasicDerivation = derivation::Derivation<StorePathSet>;
-using Derivation = derivation::Derivation<derivation::FullInputs>;
+using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
+using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

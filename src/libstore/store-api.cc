@@ -449,7 +449,7 @@ std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivat
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
-    for (auto & [outputName, output] : drv.outputsAndOptPaths(*this)) {
+    for (auto & [outputName, output] : outputsAndOptPaths(drv, *this)) {
         outputs.emplace(outputName, output.second);
     }
     return outputs;
@@ -459,7 +459,7 @@ std::optional<StorePath>
 Store::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
 {
     auto drv = readInvalidDerivation(path);
-    auto outputs = drv.outputsAndOptPaths(*this);
+    auto outputs = outputsAndOptPaths(drv, *this);
     auto it = outputs.find(outputName);
     if (it == outputs.end())
         throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
@@ -873,7 +873,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     for (auto & j : paths2) {
         if (j.isDerivation()) {
             Derivation drv = derivationFromPath(j);
-            for (auto & k : drv.outputsAndOptPaths(*this)) {
+            for (auto & k : outputsAndOptPaths(drv, *this)) {
                 if (!k.second.second)
                     /* FIXME: I am confused why we are calling
                        `computeFSClosure` on the output path, rather than
@@ -1207,7 +1207,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
         if (contents.empty())
             throw FormatError("file is empty (possible filesystem corruption)");
 
-        return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
+        return derivation::parse(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.message());
     }
@@ -1231,7 +1231,7 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         return path;
 
     auto drv = readDerivation(path);
-    if (!drv.type().hasKnownOutputPaths()) {
+    if (!type(drv).hasKnownOutputPaths()) {
         // The build log is actually attached to the corresponding
         // resolved derivation, so we need to get it first
         auto resolvedDrv = tryResolve(drv, *this);

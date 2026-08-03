@@ -148,19 +148,19 @@ struct Type
     bool hasKnownOutputPaths() const;
 };
 
-template<typename Inputs>
+template<typename Inputs, typename Out = Output>
 struct Derivation;
 
 using Basic = Derivation<StorePathSet>;
 using Full = Derivation<FullInputs>;
 
-template<typename Inputs>
+template<typename Inputs, typename Out>
 struct Derivation
 {
     /**
      * keyed on symbolic IDs
      */
-    Outputs outputs;
+    Outputs<Out> outputs;
     Inputs inputs;
     std::string platform;
     /**
@@ -181,21 +181,9 @@ struct Derivation
     bool isBuiltin() const;
 
     /**
-     * Return true iff this is a fixed-output derivation.
-     */
-    Type type() const;
-
-    /**
      * Return the output names of a derivation.
      */
     StringSet outputNames() const;
-
-    /**
-     * Calculates the maps that contains all the `Outputs`, but
-     * augmented with knowledge of the Store paths they would be written
-     * into.
-     */
-    OutputsAndOptPaths outputsAndOptPaths(const StoreDirConfig & store) const;
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
@@ -209,7 +197,7 @@ struct Derivation
      * Return a derivation identical to this one, but with the inputs transformed by `f`.
      */
     template<typename F>
-    Derivation<std::invoke_result_t<F, const Inputs &>> mapInputs(F f) const
+    Derivation<std::invoke_result_t<F, const Inputs &>, Out> mapInputs(F f) const
     {
         return {
             .outputs = outputs,
@@ -224,36 +212,41 @@ struct Derivation
     }
 
     /**
-     * Check that the derivation is valid and does not present any
-     * illegal states.
-     *
-     * This is mainly a matter of checking the outputs, where our C++
-     * representation supports all sorts of combinations we do not yet
-     * allow.
-     *
-     * This overload does not validate the derivation name or add path
-     * context to errors. Use this when you don't have a `StorePath` or
-     * when you want to handle error context yourself.
-     *
-     * @param store The store to use for validation
+     * Return a derivation identical to this one, but with each output
+     * transformed by `f`.
      */
-    void checkInvariants(Store & store) const;
-
-    /**
-     * This overload does everything the base `checkInvariants` does,
-     * but also validates that the derivation name matches the path, and
-     * improves any error messages that occur using the derivation path.
-     *
-     * @param store The store to use for validation
-     * @param drvPath The path to this derivation
-     */
-    void checkInvariants(Store & store, const StorePath & drvPath) const;
+    template<typename F>
+    Derivation<Inputs, std::invoke_result_t<F, const Out &>> mapOutputs(F f) const
+    {
+        Outputs<std::invoke_result_t<F, const Out &>> newOutputs;
+        for (const auto & [name, output] : outputs)
+            newOutputs.insert_or_assign(name, f(output));
+        return {
+            .outputs = std::move(newOutputs),
+            .inputs = inputs,
+            .platform = platform,
+            .builder = builder,
+            .args = args,
+            .env = env,
+            .structuredAttrs = structuredAttrs,
+            .name = name,
+        };
+    }
 };
 
-template<>
-void Basic::checkInvariants(Store & store) const;
-template<>
-void Full::checkInvariants(Store & store) const;
+/**
+ * Return true iff this is a fixed-output derivation.
+ */
+template<typename Inputs>
+Type type(const Derivation<Inputs, Output> & drv);
+
+/**
+ * Calculates the maps that contains all the `Outputs`, but
+ * augmented with knowledge of the Store paths they would be written
+ * into.
+ */
+template<typename Inputs>
+OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store);
 
 /**
  * Determine whether this derivation should be resolved before building.
@@ -296,6 +289,34 @@ std::optional<Basic> tryResolve(
  * derivation is already resolved.
  */
 Full unresolve(const Basic & drv);
+
+/**
+ * Check that the derivation is valid and does not present any
+ * illegal states.
+ *
+ * This is mainly a matter of checking the outputs, where our C++
+ * representation supports all sorts of combinations we do not yet
+ * allow.
+ *
+ * This overload does not validate the derivation name or add path
+ * context to errors. Use this when you don't have a `StorePath` or
+ * when you want to handle error context yourself.
+ *
+ * @param store The store to use for validation
+ */
+void checkInvariants(const Basic & drv, Store & store);
+void checkInvariants(const Full & drv, Store & store);
+
+/**
+ * This overload does everything the base `checkInvariants` does,
+ * but also validates that the derivation name matches the path, and
+ * improves any error messages that occur using the derivation path.
+ *
+ * @param store The store to use for validation
+ * @param drvPath The path to this derivation
+ */
+template<typename Inputs>
+void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath);
 
 /**
  * Fill in output paths as needed.

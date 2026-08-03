@@ -478,7 +478,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     usingSubmitted = requiredFeatures.count(drvFeatureBuilderRpcV0);
 
-    if (usingSubmitted && !drv.type().isCA()) {
+    if (usingSubmitted && !type(drv).isCA()) {
         throw Error("The builder-rpc-v0 feature may only be used with content-addressing derivations");
     }
 
@@ -1688,7 +1688,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 .outputName = outputName,
             },
         };
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !type(drv).isImpure()) {
             store.signRealisation(thisRealisation);
             store.registerDrvOutput(thisRealisation, NoCheckSigs);
         }
@@ -1854,7 +1854,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = false;
         else if (localSettings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
-            useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
+            useSandbox = type(params.drv).isSandboxed() && !params.drvOptions.noChroot;
     }
 
     if (store.storeDir != store.config->realStoreDir.get()) {
