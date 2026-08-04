@@ -35,6 +35,12 @@
 #include "nix/util/processes.hh"
 #include "nix/util/strings.hh"
 
+#include <editline.h>
+#include "cmd-config-private.hh"
+#include "nix/util/memory-source-accessor.hh"
+
+#include <fstream>
+
 namespace nix {
 
 /**
@@ -83,6 +89,7 @@ struct NixRepl : AbstractNixRepl, detail::ReplCompleterMixin, gc
     NixRepl(const LookupPath & lookupPath, ref<EvalState> state, fun<AnnotatedValues()> getValues, RunNix * runNix);
     virtual ~NixRepl() = default;
 
+    void registerBinds();
     ReplExitStatus mainLoop() override;
     void initEnv() override;
 
@@ -182,9 +189,11 @@ static bool isIncompleteInput(const ParseError & e)
 void IncompleteReplExpr::anchor() {}
 
 static bool isFirstRepl = true;
+std::string input;
 
 ReplExitStatus NixRepl::mainLoop()
 {
+
     if (isFirstRepl) {
         std::string_view debuggerNotice = "";
         if (state->debugRepl) {
@@ -199,7 +208,7 @@ ReplExitStatus NixRepl::mainLoop()
 
     auto _guard = interacter->init(static_cast<detail::ReplCompleterMixin *>(this));
 
-    std::string input;
+    registerBinds();
 
     while (true) {
         // Hide the progress bar while waiting for user input, so that it won't interfere.
@@ -929,6 +938,62 @@ void NixRepl::runNix(const std::string & program, OsStrings args)
         throw Error(
             "Cannot run '%s' because no method of calling the Nix CLI was provided. This is a configuration problem pertaining to how this program was built. See Nix 2.25 release notes",
             program);
+}
+
+/**
+ * Opens the active buffer in an editor, allowing for a better UX, including potential LSP support, and more.
+ * Unfortunately due to how editline operates, several tradeoffs had to be made, including poor history support,
+ * having to immediately evaluate upon return, and having to leave the previous buffer as is in the scrollback buffer.
+ */
+el_status_t bufferEditor(void)
+{
+    { // Moving input to rl_line_buffer, so library functions account for it.
+        std::string rlBuffer = rl_line_buffer;
+        rl_line_buffer =
+            strdup((input + rlBuffer)
+                       .c_str()); // Why is rlBuffer and input backwards? They're appending in reverse. Why? Dunno.
+        input.clear();
+    }
+    auto memorySourceAccessor = make_ref<MemorySourceAccessor>();
+    memorySourceAccessor->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+        .executable = false,
+        .contents = rl_line_buffer,
+    }};
+    SourcePath source_path{
+        [memorySourceAccessor] { return memorySourceAccessor; }(),
+    };
+    auto [args, tempFd, delTemp] = editorFor(source_path, 0, false);
+    auto program = args.front();
+    args.pop_front(); // dropping the binary arg, it's in `program` now.
+
+    runProgram2(
+        RunOptions{
+            .program = program,
+            .lookupPath = true,
+            .args = args,
+            .isInteractive = true,
+        });
+
+    std::ifstream file(args.front());
+    std::stringstream stringBuf;
+    stringBuf << file.rdbuf();
+    std::string string = trim(stringBuf.str());
+
+    rl_line_buffer = strdup(string.c_str());
+    // We print the buffer we're actually evaluating back for end-user clarity on what is being evaluated here.
+    std::cout << '\n'
+              << string
+              << '\n'; // For whatever reason I have to put a newline on both sides, or it behaves very unpredictably...
+    return CSdone;
+}
+
+void NixRepl::registerBinds()
+{
+#if USE_READLINE
+    rl_bind_keyseq("\\C-o", bufferEditor);
+#else
+    el_bind_key(CTL('O'), bufferEditor);
+#endif
 }
 
 std::unique_ptr<AbstractNixRepl> AbstractNixRepl::create(
