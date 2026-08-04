@@ -25,7 +25,7 @@ R""(
   registry:
 
   ```console
-  nix registry add --registry ./custom-flake-registry.json nixpkgs github:nixos/nixpkgs
+  nix registry add --file ./flake-registry.json nixpkgs github:nixos/nixpkgs
   ```
 
 # Description

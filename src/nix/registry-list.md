@@ -13,6 +13,13 @@ R""(
   …
   ```
 
+* Show the contents of a custom registry file:
+
+  ```console
+  # nix registry list --file ./flake-registry.json
+  custom flake:nixpkgs github:NixOS/nixpkgs
+  ```
+
 # Description
 
 This command displays the contents of all registries on standard
@@ -23,6 +30,7 @@ output. Each line represents one registry entry in the format *type*
 * `user`: the user registry.
 * `system`: the system registry.
 * `global`: the global registry.
+* `custom`: the registry file specified via `--file`.
 
 See the [`nix registry` manual page](./nix3-registry.md) for more details.
 
