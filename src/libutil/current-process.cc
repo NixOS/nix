@@ -10,6 +10,10 @@
 
 #ifndef _WIN32
 #  include "unix/current-process-private.hh"
+#else
+#  define WIN32_LEAN_AND_MEAN
+#  include "nix/util/os-string.hh"
+#  include <windows.h>
 #endif
 
 #ifdef __APPLE__
@@ -118,6 +122,13 @@ std::optional<std::filesystem::path> getSelfExe()
         path.pop_back();
 
         return std::string(path.begin(), path.end());
+#elif defined(_WIN32)
+        std::vector<OsChar> buf(32 * 1024);
+        DWORD size = buf.size();
+        if (!::QueryFullProcessImageNameW(
+                ::GetCurrentProcess(), /*dwFlags=*/0, /*lpExeName=*/buf.data(), /*lpdwSize=*/&size))
+            return std::nullopt;
+        return std::filesystem::path{OsString{buf.data(), size}};
 #else
         return std::nullopt;
 #endif

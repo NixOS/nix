@@ -336,9 +336,17 @@ void runProgram2(const RunOptions & options)
                 throw SysError("setuid failed");
 
             Strings args_(options.args);
-            args_.push_front(options.program.native());
+            /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
+               trickery. */
+            args_.push_front(options.argv0.value_or(options.program.native()));
 
             restoreProcessContext();
+
+            /* Unlike the Linux case, it doesn't matter much that we are closing
+               the FDs before or after restoreProcessContext(), but on Linux
+               it's crucial that it happens *after* restoreProcessContext() call
+               because that re-enters the saved mountns. */
+            unix::closeExtraFDs();
 
             if (options.lookupPath)
                 execvp(options.program.c_str(), stringsToCharPtrs(args_).data());

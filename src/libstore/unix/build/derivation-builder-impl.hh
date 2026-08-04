@@ -45,7 +45,7 @@ public:
         : DerivationBuilderParams{std::move(params)}
         , store{store}
         , miscMethods{miscMethods}
-        , derivationType{drv.type()}
+        , derivationType{derivation::type(drv)}
     {
     }
 
@@ -101,7 +101,7 @@ protected:
      *
      * Just a cached value, computed from `drv`.
      */
-    const DerivationType derivationType;
+    const derivation::Type derivationType;
 
     typedef StringMap Environment;
     Environment env;
@@ -138,7 +138,7 @@ protected:
      */
     Sync<OutputPathMap> submittedOutputs;
 
-    const static std::filesystem::path homeDir;
+    static const std::filesystem::path homeDir;
 
     /**
      * The recursive Nix daemon socket.

@@ -56,7 +56,7 @@ static constexpr HASHINFO dbFlags = {
 // Version 4 has been current since 2003
 static const uint8_t dbVersion = 4;
 
-static void serializeString(std::vector<uint8_t> & buf, std::string const & str)
+static void serializeString(std::vector<uint8_t> & buf, const std::string & str)
 {
     buf.insert(buf.end(), str.begin(), str.end());
     buf.push_back(0);
@@ -71,7 +71,7 @@ static void serializeInt(std::vector<uint8_t> & buf, uint32_t num)
     buf.push_back((num >> 0) & 0xff);
 }
 
-static std::vector<uint8_t> byNameKey(std::string const & name)
+static std::vector<uint8_t> byNameKey(const std::string & name)
 {
     std::vector<uint8_t> buf{_PW_VERSIONED(_PW_KEYBYNAME, dbVersion)};
     buf.reserve(1 + name.size());

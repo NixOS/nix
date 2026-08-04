@@ -1,6 +1,7 @@
 #include <benchmark/benchmark.h>
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/store-open.hh"
 #include "nix/util/file-system.hh"
@@ -41,9 +42,9 @@ static void BM_RegisterValidPathsDerivations(benchmark::State & state)
                 .env = {{"out", ""}},
                 .name = drvName,
             };
-            drv.fillInOutputPaths(*localStore);
+            fillInOutputPaths(drv, *localStore);
 
-            auto drvContents = drv.unparse(*localStore, /*maskOutputs=*/false);
+            auto drvContents = unparse(drv, *localStore);
 
             /* Create an on-disk store object without registering it
                in the SQLite DB. LocalFSStore::getFSAccessor(path, false)

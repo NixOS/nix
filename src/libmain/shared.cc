@@ -1,6 +1,7 @@
 #include "nix/store/globals.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/library-versions.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/store-open.hh"
@@ -354,6 +355,10 @@ void printVersion(const std::string & programName)
         std::cout << "Store directory: " << resolveStoreConfig(StoreReference{settings.storeUri.get()})->storeDir
                   << "\n";
         std::cout << "State directory: " << os_string_to_string(settings.nixStateDir.native()) << "\n";
+        Strings libs;
+        for (auto & [name, version] : getLinkedLibraryVersions())
+            libs.push_back(fmt("%s %s", name, version));
+        std::cout << "Linked libraries: " << concatStringsSep(", ", libs) << "\n";
     }
     throw Exit();
 }

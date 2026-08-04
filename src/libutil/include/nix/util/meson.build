@@ -58,6 +58,7 @@ headers = [ config_pub_h ] + files(
   'json-impls.hh',
   'json-non-null.hh',
   'json-utils.hh',
+  'library-versions.hh',
   'logging.hh',
   'lru-cache.hh',
   'memo.hh',

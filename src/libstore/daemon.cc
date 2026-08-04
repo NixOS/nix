@@ -17,6 +17,7 @@
 #include "nix/util/finally.hh"
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
@@ -30,17 +31,21 @@
 
 namespace nix::daemon {
 
-Sink & operator<<(Sink & sink, const Logger::Fields & fields)
+Sink & operator<<(Sink & sink, std::span<const Logger::Field> fields)
 {
     sink << fields.size();
     for (auto & f : fields) {
-        sink << f.type;
-        if (f.type == Logger::Field::tInt)
-            sink << f.i;
-        else if (f.type == Logger::Field::tString)
-            sink << f.s;
-        else
-            unreachable();
+        std::visit(
+            overloaded{
+                [&sink](uint64_t i) {
+                    sink << 0;
+                    sink << i;
+                },
+                [&sink](const std::string & s) {
+                    sink << 1;
+                    sink << s;
+                }},
+            f);
     }
     return sink;
 }
@@ -70,7 +75,7 @@ struct TunnelLogger : public Logger
     {
     }
 
-    void enqueueMsg(const std::string & s)
+    void enqueueMsg(const std::string & s) noexcept
     {
         auto state(state_.lock());
 
@@ -81,15 +86,18 @@ struct TunnelLogger : public Logger
                 to.flush();
             } catch (...) {
                 /* Write failed; that means that the other side is
-                   gone. */
+                   gone, so stop sending it messages. Note that we
+                   don't propagate the error, since logging must not
+                   throw. The client's death will be detected
+                   elsewhere (e.g. by `MonitorFdHup` or by the next
+                   protocol read/write). */
                 state->canSendStderr = false;
-                throw;
             }
         } else
             state->pendingMsgs.push_back(s);
     }
 
-    void log(Verbosity lvl, std::string_view s) override
+    void log(Verbosity lvl, std::string_view s) noexcept override
     {
         if (lvl > verbosity)
             return;
@@ -99,7 +107,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void logEI(const ErrorInfo & ei) override
+    void logEI(const ErrorInfo & ei) noexcept override
     {
         if (ei.level > verbosity)
             return;
@@ -151,8 +159,8 @@ struct TunnelLogger : public Logger
         Verbosity lvl,
         ActivityType type,
         const std::string & s,
-        const Fields & fields,
-        ActivityId parent) override
+        std::span<const Field> fields,
+        ActivityId parent) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20}) {
             if (!s.empty())
@@ -165,7 +173,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void stopActivity(ActivityId act) override
+    void stopActivity(ActivityId act) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
@@ -174,7 +182,7 @@ struct TunnelLogger : public Logger
         enqueueMsg(buf.s);
     }
 
-    void result(ActivityId act, ResultType type, const Fields & fields) override
+    void result(ActivityId act, ResultType type, std::span<const Field> fields) noexcept override
     {
         if (clientVersion.number < WorkerProto::Version::Number{1, 20})
             return;
@@ -620,17 +628,17 @@ static void performOp(
         /*
          * Note: unlike wopEnsurePath, this operation reads a
          * derivation-to-be-realized from the client with
-         * readDerivation(Source,Store) rather than reading it from
+         * derivation::read(Source,Store) rather than reading it from
          * the local store with Store::readDerivation().  Since the
          * derivation-to-be-realized is not registered in the store
          * it cannot be trusted that its outPath was calculated
          * correctly.
          */
-        readDerivation(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
+        derivation::read(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 
-        auto drvType = drv.type();
+        auto drvType = type(drv);
 
         /* Content-addressing derivations are trustless because their output paths
            are verified by their content alone, so any derivation is free to
@@ -680,7 +688,7 @@ static void performOp(
                paths. */
             assert(drvType.isCA());
 
-            drvPath = store->writeDerivation(drv.unresolve());
+            drvPath = store->writeDerivation(unresolve(drv));
         }
 
         auto res = builder.buildDerivation(drvPath, drv, buildMode);
@@ -1008,7 +1016,7 @@ static void performOp(
     case WorkerProto::Op::RegisterDrvOutput: {
         logger->startWork();
         auto realisation = WorkerProto::Serialise<Realisation>::read(*store, rconn);
-        store->registerDrvOutput(realisation);
+        store->registerDrvOutput(realisation, CheckSigs);
         logger->stopWork();
         break;
     }

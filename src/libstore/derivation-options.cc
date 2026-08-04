@@ -357,42 +357,44 @@ DerivationOptions<SingleDerivedPath> derivationOptionsFromStructuredAttrs(
     };
 }
 
+namespace derivation {
+
 template<typename Input>
 template<typename Inputs>
-StringSet DerivationOptions<Input>::getRequiredSystemFeatures(const DerivationT<Inputs> & drv) const
+StringSet Options<Input>::getRequiredSystemFeatures(const Derivation<Inputs, Output> & drv) const
 {
     // FIXME: cache this?
     StringSet res;
     for (auto & i : requiredSystemFeatures)
         res.insert(i);
-    if (!drv.type().hasKnownOutputPaths())
+    if (!type(drv).hasKnownOutputPaths())
         res.insert("ca-derivations");
     return res;
 }
 
 template<typename Input>
-bool DerivationOptions<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
+bool Options<Input>::substitutesAllowed(const WorkerSettings & workerSettings) const
 {
     return workerSettings.alwaysAllowSubstitutes ? true : allowSubstitutes;
 }
 
 template<typename Input>
 template<typename Inputs>
-bool DerivationOptions<Input>::useUidRange(const DerivationT<Inputs> & drv) const
+bool Options<Input>::useUidRange(const Derivation<Inputs, Output> & drv) const
 {
     return getRequiredSystemFeatures(drv).count("uid-range");
 }
 
 // Explicit instantiations for member function templates
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const BasicDerivation &) const;
-template StringSet DerivationOptions<StorePath>::getRequiredSystemFeatures(const Derivation &) const;
-template StringSet DerivationOptions<SingleDerivedPath>::getRequiredSystemFeatures(const Derivation &) const;
+template StringSet Options<StorePath>::getRequiredSystemFeatures(const Basic &) const;
+template StringSet Options<StorePath>::getRequiredSystemFeatures(const Full &) const;
+template StringSet Options<SingleDerivedPath>::getRequiredSystemFeatures(const Full &) const;
 
-template bool DerivationOptions<StorePath>::useUidRange(const BasicDerivation &) const;
-template bool DerivationOptions<SingleDerivedPath>::useUidRange(const Derivation &) const;
+template bool Options<StorePath>::useUidRange(const Basic &) const;
+template bool Options<SingleDerivedPath>::useUidRange(const Full &) const;
 
-std::optional<DerivationOptions<StorePath>> tryResolve(
-    const DerivationOptions<SingleDerivedPath> & drvOptions,
+std::optional<Options<StorePath>> tryResolve(
+    const Options<SingleDerivedPath> & drvOptions,
     fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
         queryResolutionChain)
 {
@@ -429,8 +431,8 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     };
 
     // Helper function to try resolving OutputChecks using functional style
-    auto tryResolveOutputChecks = [&](const DerivationOptions<SingleDerivedPath>::OutputChecks & checks)
-        -> std::optional<DerivationOptions<StorePath>::OutputChecks> {
+    auto tryResolveOutputChecks = [&](const Options<SingleDerivedPath>::OutputChecks & checks)
+        -> std::optional<Options<StorePath>::OutputChecks> {
         std::optional<std::set<DrvRef<StorePath>>> resolvedAllowedReferences;
         if (checks.allowedReferences) {
             resolvedAllowedReferences = tryResolveRefSet(*checks.allowedReferences);
@@ -453,7 +455,7 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
         if (!resolvedDisallowedRequisites)
             return std::nullopt;
 
-        return DerivationOptions<StorePath>::OutputChecks{
+        return Options<StorePath>::OutputChecks{
             .ignoreSelfRefs = checks.ignoreSelfRefs,
             .maxSize = checks.maxSize,
             .maxClosureSize = checks.maxClosureSize,
@@ -485,23 +487,22 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     // Resolve outputChecks using functional style with std::visit
     auto resolvedOutputChecks = std::visit(
         overloaded{
-            [&](const DerivationOptions<SingleDerivedPath>::OutputChecks & checks)
+            [&](const Options<SingleDerivedPath>::OutputChecks & checks)
                 -> std::optional<std::variant<
-                    DerivationOptions<StorePath>::OutputChecks,
-                    std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>>> {
+                    Options<StorePath>::OutputChecks,
+                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>> {
                 auto resolved = tryResolveOutputChecks(checks);
                 if (!resolved)
                     return std::nullopt;
                 return std::variant<
-                    DerivationOptions<StorePath>::OutputChecks,
-                    std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>>(*resolved);
+                    Options<StorePath>::OutputChecks,
+                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>(*resolved);
             },
-            [&](const std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>> &
-                    checksMap)
+            [&](const std::map<std::string, Options<SingleDerivedPath>::OutputChecks, std::less<>> & checksMap)
                 -> std::optional<std::variant<
-                    DerivationOptions<StorePath>::OutputChecks,
-                    std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>>> {
-                std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>> resolvedMap;
+                    Options<StorePath>::OutputChecks,
+                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>> {
+                std::map<std::string, Options<StorePath>::OutputChecks, std::less<>> resolvedMap;
                 for (const auto & [outputName, checks] : checksMap) {
                     auto resolved = tryResolveOutputChecks(checks);
                     if (!resolved)
@@ -509,8 +510,8 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
                     resolvedMap.emplace(outputName, *resolved);
                 }
                 return std::variant<
-                    DerivationOptions<StorePath>::OutputChecks,
-                    std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>>(resolvedMap);
+                    Options<StorePath>::OutputChecks,
+                    std::map<std::string, Options<StorePath>::OutputChecks, std::less<>>>(resolvedMap);
             }},
         drvOptions.outputChecks);
 
@@ -522,8 +523,8 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     if (!resolvedExportGraph)
         return std::nullopt;
 
-    // Return resolved DerivationOptions using designated initializers
-    return DerivationOptions<StorePath>{
+    // Return resolved Options using designated initializers
+    return Options<StorePath>{
         .outputChecks = *resolvedOutputChecks,
         .unsafeDiscardReferences = drvOptions.unsafeDiscardReferences,
         .passAsFile = drvOptions.passAsFile,
@@ -539,8 +540,10 @@ std::optional<DerivationOptions<StorePath>> tryResolve(
     };
 }
 
-template struct DerivationOptions<StorePath>;
-template struct DerivationOptions<SingleDerivedPath>;
+template struct Options<StorePath>;
+template struct Options<SingleDerivedPath>;
+
+} // namespace derivation
 
 } // namespace nix
 

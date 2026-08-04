@@ -1,0 +1,16 @@
+error:
+       … while using the result of the `__toString` attribute
+         at /pwd/lang/eval-fail-interpolation-list.nix:3:3:
+            2| "${{
+            3|   __toString = self: [
+             |   ^
+            4|     "1"
+
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail-interpolation-list.nix:2:2:
+            1| # Interpolation does weak coercion after peeling.
+            2| "${{
+             |  ^
+            3|   __toString = self: [
+
+       error: cannot coerce a list to a string: [ "1" "2" ]

@@ -1,0 +1,14 @@
+error:
+       … while evaluating the `outPath` attribute
+         at /pwd/lang/eval-fail-outPath-abort.nix:1:6:
+            1| "${{ outPath = abort "some failure"; }}"
+             |      ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-outPath-abort.nix:1:16:
+            1| "${{ outPath = abort "some failure"; }}"
+             |                ^
+            2|
+
+       error: evaluation aborted with the following error message: 'some failure'

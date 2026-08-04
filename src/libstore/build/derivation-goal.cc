@@ -59,16 +59,16 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
     }();
 
-    if (!drv->type().hasKnownOutputPaths())
+    if (!type(*drv).hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    for (auto & i : drv->outputsAndOptPaths(worker.store))
+    for (auto & i : outputsAndOptPaths(*drv, worker.store))
         if (i.second.second)
             worker.store.addTempRoot(*i.second.second);
 
     /* We don't yet have any safe way to cache an impure derivation at
        this step. */
-    if (drv->type().isImpure()) {
+    if (type(*drv).isImpure()) {
         experimentalFeatureSettings.require(Xp::ImpureDerivations);
     } else {
         /* Check what outputs paths are not already valid. */
@@ -100,7 +100,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
                     trace("output path substituted");
 
                     if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id});
+                        worker.store.registerDrvOutput({*g->outputInfo, id}, CheckSigs);
                     else
                         debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
                 }
@@ -119,7 +119,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         trace("all outputs substituted (maybe)");
 
-        assert(!drv->type().isImpure());
+        assert(!type(*drv).isImpure());
 
         if (nrFailed > 0 && nrFailed > nrNoSubstituters && !worker.settings.tryFallback) {
             co_return doneFailure(BuildError(
@@ -164,7 +164,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
         auto resolvedDrvGoal = worker.makeDerivationGoal(
             pathResolved,
-            make_ref<const Derivation>(drvResolved.unresolve()),
+            make_ref<const Derivation>(unresolve(drvResolved)),
             wantedOutput,
             buildMode,
             /*storeDerivation=*/true);
@@ -233,7 +233,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     /* Project down to the `BasicDerivation` the builder consumes,
        adding the outputs of the input derivations to the input
        sources. */
-    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const FullInputs & inputs) {
+    auto resolvedDrv = make_ref<const BasicDerivation>(drv->mapInputs([&](const derivation::FullInputs & inputs) {
         auto srcs = inputs.srcs;
         for (auto & [depDrvPath, depNode] : inputs.drvs.map) {
             for (auto & outputName : depNode.value) {
@@ -274,7 +274,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
         }
         /* Store the resolved derivation, as part of the record of
            what we're actually building */
-        worker.store.writeDerivation(resolvedDrv->unresolve());
+        worker.store.writeDerivation(unresolve(*resolvedDrv));
     }
 
     auto g = worker.makeDerivationBuildingGoal(drvPath, resolvedDrv, buildMode);
@@ -323,7 +323,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
 
 Goal::Co DerivationGoal::repairClosure()
 {
-    assert(!drv->type().isImpure());
+    assert(!type(*drv).isImpure());
 
     /* If we're repairing, we now know that our own outputs are valid.
        Now check whether the other paths in the outputs closure are
@@ -337,7 +337,7 @@ Goal::Co DerivationGoal::repairClosure()
                 return deepQueryDerivationOutputMap(worker.store, drvPath, drvStore);
 
         OutputPathMap res;
-        for (auto & [name, output] : drv->outputsAndOptPaths(worker.store))
+        for (auto & [name, output] : outputsAndOptPaths(*drv, worker.store))
             res.insert_or_assign(name, *output.second);
         return res;
     }();
@@ -407,7 +407,7 @@ Goal::Co DerivationGoal::repairClosure()
 
 std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPathValidity()
 {
-    if (drv->type().isImpure())
+    if (type(*drv).isImpure())
         return std::nullopt;
 
     auto drvOutput = DrvOutput{drvPath, wantedOutput};
@@ -453,7 +453,8 @@ std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPa
                         .drvPath = drvPath,
                         .outputName = wantedOutput,
                     },
-                });
+                },
+                NoCheckSigs);
         }
 
         return {{*mRealisation, status}};

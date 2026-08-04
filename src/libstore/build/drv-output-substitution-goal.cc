@@ -41,6 +41,15 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         if (!outputInfo)
             continue;
 
+        if (!sub->config.isTrusted && worker.store.realisationIsUntrusted(Realisation{*outputInfo, this->id})) {
+            warn(
+                "ignoring substitute for build trace '%s' -> '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
+                this->id.render(worker.store),
+                worker.store.printStorePath(outputInfo->outPath),
+                sub->config.getHumanReadableURI());
+            continue;
+        }
+
         trace("finished");
         co_return amDone(ecSuccess);
     }

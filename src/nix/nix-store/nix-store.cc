@@ -1,5 +1,6 @@
 #include "nix/util/archive.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/outputs-query.hh"
 #include "dotgraph.hh"
 #include "nix/store/globals.hh"
@@ -90,7 +91,7 @@ static std::set<std::filesystem::path> realisePath(StorePathWithOutputs path, bo
         std::set<std::filesystem::path> outputs;
         for (auto & j : path.outputs) {
             /* Match outputs of a store path with outputs of the derivation that produces it. */
-            DerivationOutputs::iterator i = drv.outputs.find(j);
+            auto i = drv.outputs.find(j);
             if (i == drv.outputs.end())
                 throw Error("derivation '%s' does not have an output named '%s'", store2->printStorePath(path.path), j);
             auto outPath = outputPaths.at(i->first);
@@ -261,7 +262,7 @@ static StorePathSet maybeUseOutputs(const StorePath & storePath, bool useOutput,
         StorePathSet outputs;
         if (forceRealise)
             return store->queryDerivationOutputs(storePath);
-        for (auto & i : drv.outputsAndOptPaths(*store)) {
+        for (auto & i : outputsAndOptPaths(drv, *store)) {
             if (!i.second.second)
                 throw UsageError(
                     "Cannot use output path of floating content-addressing derivation until we know what it is (e.g. by building it)");
@@ -1026,7 +1027,7 @@ static void opServe(Strings opFlags, Strings opArgs)
 
             auto drvPath = store->parseStorePath(readString(in));
             BasicDerivation drv;
-            readDerivation(in, *store, drv, Derivation::nameFromPath(drvPath));
+            derivation::read(in, *store, drv, Derivation::nameFromPath(drvPath));
 
             getBuildSettings();
 

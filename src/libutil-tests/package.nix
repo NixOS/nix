@@ -31,11 +31,11 @@ mkMesonExecutable (finalAttrs: {
   fileset = fileset.unions [
     ../../nix-meson-build-support
     ./nix-meson-build-support
+    ./fuzz/harnesses
     ../../.version
     ./.version
-    ./meson.build
-    ./unix/meson.build
     # ./meson.options
+    (fileset.fileFilter (file: file.name == "meson.build") ./.)
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];
@@ -92,6 +92,7 @@ mkMesonExecutable (finalAttrs: {
                 enosys \
                   --syscall openat2 \
                   --syscall fchmodat2 \
+                  --syscall close_range \
                   -- ${lib.getExe finalAttrs.finalPackage}
                 touch $out
               '';

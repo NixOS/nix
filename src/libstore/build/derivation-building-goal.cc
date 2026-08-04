@@ -20,7 +20,10 @@
 #include "nix/store/globals.hh"
 #include "nix/util/current-process.hh"
 
+#include <chrono>
 #include <algorithm>
+#include <array>
+
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -54,11 +57,12 @@ std::string DerivationBuildingGoal::key()
 }
 
 template<typename InputsType>
-std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<InputsType> & drv)
+std::string
+showKnownOutputs(const StoreDirConfig & store, const derivation::Derivation<InputsType, derivation::Output> & drv)
 {
     std::string msg;
     StorePathSet expectedOutputPaths;
-    for (auto & i : drv.outputsAndOptPaths(store))
+    for (auto & i : outputsAndOptPaths(drv, store))
         if (i.second.second)
             expectedOutputPaths.insert(*i.second.second);
     if (!expectedOutputPaths.empty()) {
@@ -69,8 +73,8 @@ std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<Inp
     return msg;
 }
 
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<FullInputs> & drv);
-template std::string showKnownOutputs(const StoreDirConfig & store, const DerivationT<StorePathSet> & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const Derivation & drv);
+template std::string showKnownOutputs(const StoreDirConfig & store, const BasicDerivation & drv);
 
 namespace {
 
@@ -126,7 +130,7 @@ struct PostBuildHookState
               lvlTalkative,
               actPostBuildHook,
               fmt("running post-build-hook '%s'", hook),
-              Logger::Fields{drvPath})
+              std::to_array<Logger::Field>({drvPath}))
         , out(std::make_unique<Pipe>())
     {
         out->create();
@@ -324,7 +328,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         /* TODO we might want to also allow randomizing the paths
            for regular CA derivations, e.g. for sake of checking
            determinism. */
-        if (drv->type().isImpure()) {
+        if (type(*drv).isImpure()) {
             v.known = InitialOutputStatus{
                 .path = StorePath::random(outputPathName(drv->name, outputName)),
                 .status = PathStatus::Absent,
@@ -400,7 +404,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
             /* FIXME: find some way to lock for scheduling for the other stores so
                a forking daemon with --store still won't farm out redundant builds.
                */
-            for (auto & i : drv->outputsAndOptPaths(worker.store)) {
+            for (auto & i : outputsAndOptPaths(*drv, worker.store)) {
                 if (i.second.second)
                     lockFiles.insert(localStore->toRealPath(*i.second.second));
                 else {
@@ -650,7 +654,11 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
     std::unique_ptr<BuildLog> buildLog = std::make_unique<BuildLog>(
         worker.settings.logLines,
         std::make_unique<Activity>(
-            *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), machineName, 1, 1}));
+            *logger,
+            lvlInfo,
+            actBuild,
+            msg,
+            std::to_array<Logger::Field>({worker.store.printStorePath(drvPath), machineName, 1, 1})));
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 
@@ -830,7 +838,11 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         buildLog = std::make_unique<BuildLog>(
             worker.settings.logLines,
             std::make_unique<Activity>(
-                *logger, lvlInfo, actBuild, msg, Logger::Fields{worker.store.printStorePath(drvPath), "", 1, 1}));
+                *logger,
+                lvlInfo,
+                actBuild,
+                msg,
+                std::to_array<Logger::Field>({worker.store.printStorePath(drvPath), "", 1, 1})));
         mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
         worker.updateProgress();
     };
@@ -1099,11 +1111,13 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
             Strings args_;
             args_.push_front(hook);
 
-            unix::closeExtraFDs();
-
             restoreProcessContext();
 
-            execvp(hook.c_str(), stringsToCharPtrs(args_).data());
+            /* On Linux, it's crucial that this is done after restoreProcessContext() since
+               that needs an open mountns file descriptor (fdSavedMountNamespace). */
+            unix::closeExtraFDs();
+
+            execvp(requireCString(hook), stringsToCharPtrs(args_).data());
 
             throw SysError("executing %s", PathFmt(hook));
         },
@@ -1159,7 +1173,8 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         return rpDecline;
 
     if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>(worker.settings.buildHook);
+        worker.hook = std::make_unique<HookInstance>(
+            worker.settings.buildHook, std::chrono::milliseconds(worker.settings.buildHookKillTimeout));
 
     try {
 
@@ -1272,7 +1287,7 @@ Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()
 {
-    assert(!drv->type().isImpure());
+    assert(!type(*drv).isImpure());
 
     for (auto * drvStore : {&worker.evalStore, &worker.store})
         if (drvStore->isValidPath(drvPath))
@@ -1289,7 +1304,7 @@ std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPar
 std::pair<bool, SingleDrvOutputs>
 DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs)
 {
-    if (drv->type().isImpure())
+    if (type(*drv).isImpure())
         return {false, {}};
 
     bool checkHash = buildMode == bmRepair;
@@ -1328,7 +1343,8 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
                             .outPath = info.known->path,
                         },
                         drvOutput,
-                    });
+                    },
+                    NoCheckSigs);
             }
         }
         if (info.known && info.known->isValid())

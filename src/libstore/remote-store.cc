@@ -499,7 +499,7 @@ void RemoteStore::addMultipleToStore(
     conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
 }
 
-void RemoteStore::registerDrvOutput(const Realisation & info)
+void RemoteStore::registerDrvOutputUnchecked(const Realisation & info)
 {
     auto conn(getConnection());
     conn->to << WorkerProto::Op::RegisterDrvOutput;
@@ -747,7 +747,10 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
 void RemoteStore::addTempRoot(const StorePath & path)
 {
     auto conn(getConnection());
+    if (conn->tempRootsPinned.get(path))
+        return;
     conn->addTempRoot(*this, &conn.daemonException, path);
+    conn->tempRootsPinned.upsert(path, true);
 }
 
 Roots RemoteStore::findRoots(bool censor)

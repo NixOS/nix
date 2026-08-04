@@ -541,11 +541,11 @@ static void main_nix_build(int argc, char ** argv)
             shell = store->printStorePath(*outPath) + "/bin/bash";
         }
 
-        if (drv.shouldResolve()) {
-            auto resolvedDrv = drv.tryResolve(*store);
+        if (shouldResolve(drv)) {
+            auto resolvedDrv = tryResolve(drv, *store);
             if (!resolvedDrv)
                 throw Error("failed to resolve derivation '%s'", store->printStorePath(packageInfo.requireDrvPath()));
-            drv = resolvedDrv->unresolve();
+            drv = unresolve(*resolvedDrv);
         }
 
         // Set the environment.
@@ -678,6 +678,8 @@ static void main_nix_build(int argc, char ** argv)
 
         Strings envStrs;
         for (auto & i : env)
+            /* TODO: Check that `i.first` doesn't contain an `=` sign. Or maybe factor out the environment
+               strings preparation code. */
             envStrs.push_back(i.first + "=" + i.second);
 
         auto args = interactive ? Strings{"bash", "--rcfile", rcfile} : Strings{"bash", rcfile};
@@ -692,7 +694,7 @@ static void main_nix_build(int argc, char ** argv)
 
         logger->stop();
 
-        execvp(shell->c_str(), argPtrs.data());
+        execvp(requireCString(shell.value()), argPtrs.data());
 
         throw SysError("executing shell '%s'", *shell);
     }

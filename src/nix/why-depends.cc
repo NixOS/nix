@@ -110,7 +110,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         auto dependencyPath = *optDependencyPath;
         auto dependencyPathHash = dependencyPath.hashPart();
 
-        auto const inf = std::numeric_limits<size_t>::max();
+        const auto inf = std::numeric_limits<size_t>::max();
 
         struct Node
         {

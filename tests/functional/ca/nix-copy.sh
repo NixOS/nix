@@ -2,6 +2,8 @@
 
 source common.sh
 
+signIfNeeded
+
 export REMOTE_STORE="file://$cacheDir"
 
 ensureCorrectlyCopied () {

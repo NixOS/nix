@@ -292,12 +292,8 @@ struct curlFileTransfer : public FileTransfer
                     curl_multi_remove_handle(fileTransfer.curlm.get(), req);
                 curl_easy_cleanup(req);
             }
-            try {
-                if (!done && enqueued)
-                    failInterruptedOrCancelled();
-            } catch (...) {
-                ignoreExceptionInDestructor();
-            }
+            if (!done && enqueued)
+                failInterruptedOrCancelled();
         }
 
         void failEx(std::exception_ptr ex) noexcept
@@ -323,7 +319,7 @@ struct curlFileTransfer : public FileTransfer
             failEx(std::make_exception_ptr(std::forward<T>(e)));
         }
 
-        void failInterruptedOrCancelled()
+        void failInterruptedOrCancelled() noexcept
         {
             HintFmt fmt("%s of '%s' was interrupted", Uncolored(request.noun()), request.displayUri());
 
@@ -476,7 +472,7 @@ struct curlFileTransfer : public FileTransfer
                     lvlTalkative,
                     actFileTransfer,
                     fmt("%s '%s'", request.verb(/*continuous=*/true), request.displayUri()),
-                    Logger::Fields{request.displayUri()},
+                    std::to_array<Logger::Field>({request.displayUri()}),
                     request.parentAct);
                 // Reset the start time to when we actually started the download.
                 startTime = std::chrono::steady_clock::now();

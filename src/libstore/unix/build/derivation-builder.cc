@@ -478,7 +478,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
 
     usingSubmitted = requiredFeatures.count(drvFeatureBuilderRpcV0);
 
-    if (usingSubmitted && !drv.type().isCA()) {
+    if (usingSubmitted && !type(drv).isCA()) {
         throw Error("The builder-rpc-v0 feature may only be used with content-addressing derivations");
     }
 
@@ -1087,7 +1087,7 @@ void DerivationBuilderImpl::setUser()
 
 void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & envStrs)
 {
-    execve(drv.builder.c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
+    execve(requireCString(drv.builder), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
 SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
@@ -1688,9 +1688,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 .outputName = outputName,
             },
         };
-        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !drv.type().isImpure()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !type(drv).isImpure()) {
             store.signRealisation(thisRealisation);
-            store.registerDrvOutput(thisRealisation);
+            store.registerDrvOutput(thisRealisation, NoCheckSigs);
         }
         builtOutputs.emplace(outputName, thisRealisation);
     }
@@ -1745,7 +1745,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
         };
 
         store.signRealisation(realisation);
-        store.registerDrvOutput(realisation);
+        store.registerDrvOutput(realisation, NoCheckSigs);
         builtOutputs.emplace(outputName, realisation);
 
         // TODO: handle --check
@@ -1854,7 +1854,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = false;
         else if (localSettings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
-            useSandbox = params.drv.type().isSandboxed() && !params.drvOptions.noChroot;
+            useSandbox = type(params.drv).isSandboxed() && !params.drvOptions.noChroot;
     }
 
     if (store.storeDir != store.config->realStoreDir.get()) {

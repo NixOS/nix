@@ -30,7 +30,7 @@ subdir('nix-meson-build-support/windows-version')
 rapidcheck = dependency('rapidcheck')
 deps_private += rapidcheck
 
-gtest = dependency('gtest', main : true)
+gtest = dependency('gtest', main : false)
 deps_private += gtest
 
 gmock = dependency('gmock')
@@ -67,6 +67,7 @@ sources = files(
   'closure.cc',
   'compression.cc',
   'config.cc',
+  'current-process.cc',
   'executable-path.cc',
   'file-content-address.cc',
   'file-descriptor.cc',
@@ -80,6 +81,7 @@ sources = files(
   'local-keys.cc',
   'logging.cc',
   'lru-cache.cc',
+  'main.cc',
   'memo.cc',
   'memory-source-accessor.cc',
   'monitorfdhup.cc',
@@ -123,6 +125,10 @@ this_exe = executable(
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
+if 'fuzzer-no-link' in get_option('b_sanitize')
+  subdir('fuzz')
+endif
+
 test(
   meson.project_name(),
   this_exe,
@@ -145,6 +151,7 @@ if host_machine.system() == 'linux'
       args : [
         '--syscall', 'openat2',
         '--syscall', 'fchmodat2',
+        '--syscall', 'close_range',
         '--',
         this_exe,
       ],

@@ -6,6 +6,7 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
@@ -24,6 +25,8 @@
 #include "store-config-private.hh"
 
 #include <filesystem>
+#include <array>
+
 #include <nlohmann/json.hpp>
 
 #ifdef _WIN32
@@ -446,7 +449,7 @@ std::map<std::string, std::optional<StorePath>> Store::queryStaticPartialDerivat
 {
     std::map<std::string, std::optional<StorePath>> outputs;
     auto drv = readInvalidDerivation(path);
-    for (auto & [outputName, output] : drv.outputsAndOptPaths(*this)) {
+    for (auto & [outputName, output] : outputsAndOptPaths(drv, *this)) {
         outputs.emplace(outputName, output.second);
     }
     return outputs;
@@ -456,7 +459,7 @@ std::optional<StorePath>
 Store::queryStaticPartialDerivationOutput(const StorePath & path, const std::string & outputName)
 {
     auto drv = readInvalidDerivation(path);
-    auto outputs = drv.outputsAndOptPaths(*this);
+    auto outputs = outputsAndOptPaths(drv, *this);
     auto it = outputs.find(outputName);
     if (it == outputs.end())
         throw Error("derivation '%s' does not have an output named '%s'", printStorePath(path), outputName);
@@ -870,7 +873,7 @@ StorePathSet Store::exportReferences(const StorePathSet & storePaths, const Stor
     for (auto & j : paths2) {
         if (j.isDerivation()) {
             Derivation drv = derivationFromPath(j);
-            for (auto & k : drv.outputsAndOptPaths(*this)) {
+            for (auto & k : outputsAndOptPaths(drv, *this)) {
                 if (!k.second.second)
                     /* FIXME: I am confused why we are calling
                        `computeFSClosure` on the output path, rather than
@@ -930,7 +933,7 @@ void copyStorePath(
         lvlInfo,
         actCopyPath,
         makeCopyPathMessage(srcCfg, dstCfg, storePathS),
-        {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
+        std::to_array<Logger::Field>({storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()}));
     PushActivity pact(act.id);
 
     auto info = srcStore.queryPathInfo(storePath);
@@ -1087,7 +1090,7 @@ std::map<StorePath, StorePath> copyPaths(
                 lvlInfo,
                 actCopyPath,
                 makeCopyPathMessage(srcCfg, dstCfg, storePathS),
-                {storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()});
+                std::to_array<Logger::Field>({storePathS, srcCfg.getHumanReadableURI(), dstCfg.getHumanReadableURI()}));
             PushActivity pact(act.id);
 
             LambdaSink progressSink([&](std::string_view data) {
@@ -1204,7 +1207,7 @@ static Derivation readDerivationCommon(Store & store, const StorePath & drvPath,
         if (contents.empty())
             throw FormatError("file is empty (possible filesystem corruption)");
 
-        return parseDerivation(store, std::move(contents), Derivation::nameFromPath(drvPath));
+        return derivation::parse(store, std::move(contents), Derivation::nameFromPath(drvPath));
     } catch (FormatError & e) {
         throw Error("error parsing derivation '%s': %s", store.printStorePath(drvPath), e.message());
     }
@@ -1228,12 +1231,12 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         return path;
 
     auto drv = readDerivation(path);
-    if (!drv.type().hasKnownOutputPaths()) {
+    if (!type(drv).hasKnownOutputPaths()) {
         // The build log is actually attached to the corresponding
         // resolved derivation, so we need to get it first
-        auto resolvedDrv = drv.tryResolve(*this);
+        auto resolvedDrv = tryResolve(drv, *this);
         if (resolvedDrv)
-            return nix::computeStorePath(*this, resolvedDrv->unresolve());
+            return nix::computeStorePath(*this, unresolve(*resolvedDrv));
     }
 
     return path;

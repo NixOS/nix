@@ -2,6 +2,7 @@
 #include "nix/store/serve-protocol-impl.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 
 namespace nix {
 
@@ -72,7 +73,7 @@ void ServeProto::BasicClientConnection::putBuildDerivationRequest(
     const ServeProto::BuildOptions & options)
 {
     to << ServeProto::Command::BuildDerivation << store.printStorePath(drvPath);
-    writeDerivation(to, store, drv);
+    derivation::write(to, store, drv);
 
     ServeProto::write(store, *this, options);
 

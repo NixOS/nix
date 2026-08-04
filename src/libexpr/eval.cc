@@ -116,6 +116,13 @@ std::ostream & operator<<(std::ostream & os, const ValueType t)
     return os;
 }
 
+std::ostream & operator<<(std::ostream & os, WhileTryingToUse w)
+{
+    /* Reset color first: `HintFmt` wraps arguments in `Magenta` by
+       default, but this word is sentence structure, not a value. */
+    return os << ANSI_NORMAL << (w.v.isWHNF() ? "using" : "evaluating");
+}
+
 std::string printValue(EvalState & state, Value & v)
 {
     std::ostringstream out;
@@ -652,14 +659,13 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
     if (isFunctor(v)) {
         try {
             Value & functor = *v.attrs()->get(s.functor)->value;
-            Value * vp[] = {&v};
             Value partiallyApplied;
             // The first parameter is not user-provided, and may be
             // handled by code that is opaque to the user, like lib.const = x: y: y;
             // So preferably we show docs that are relevant to the
             // "partially applied" function returned by e.g. `const`.
             // We apply the first argument:
-            callFunction(functor, vp, partiallyApplied, noPos);
+            callFunction(functor, std::to_array({&v}), partiallyApplied, noPos);
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
         } catch (Error & e) {
@@ -1546,7 +1552,7 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos)
 {
     auto _level = addCallDepth(pos);
 
@@ -1699,7 +1705,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     primOpCalls[fn->name]++;
 
                 try {
-                    fn->impl(*this, vCur.determinePos(noPos), args.data(), vCur);
+                    fn->impl(*this, CallSite{pos}, args.data(), vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1749,7 +1755,7 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
                     // 2. Create a fake env (arg1, arg2, etc.) and a fake expr (arg1: arg2: etc: builtins.name arg1 arg2
                     // etc)
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
-                    fn->impl(*this, vCur.determinePos(noPos), vArgs, vCur);
+                    fn->impl(*this, CallSite{pos}, vArgs, vCur);
                 } catch (Error & e) {
                     if (fn->addTrace)
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
@@ -1764,10 +1770,8 @@ void EvalState::callFunction(Value & fun, std::span<Value *> args, Value & vRes,
             /* 'vCur' may be allocated on the stack of the calling
                function, but for functors we may keep a reference, so
                heap-allocate a copy and use that instead. */
-            Value * args2[] = {allocValue(), args[0]};
-            *args2[0] = vCur;
             try {
-                callFunction(*functor->value, args2, vCur, functor->pos);
+                callFunction(*functor->value, std::to_array({&(*allocValue() = vCur), args[0]}), vCur, functor->pos);
             } catch (Error & e) {
                 e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
@@ -2482,26 +2486,6 @@ bool EvalState::isDerivation(Value & v)
     return i->value->string_view().compare("derivation") == 0;
 }
 
-std::optional<std::string>
-EvalState::tryAttrsToString(const PosIdx pos, Value & v, NixStringContext & context, bool coerceMore, bool copyToStore)
-{
-    auto i = v.attrs()->get(s.toString);
-    if (i) {
-        Value v1;
-        callFunction(*i->value, v, v1, pos);
-        return coerceToString(
-                   pos,
-                   v1,
-                   context,
-                   "while evaluating the result of the `__toString` attribute",
-                   coerceMore,
-                   copyToStore)
-            .toOwned();
-    }
-
-    return {};
-}
-
 BackedStringView EvalState::coerceToString(
     const PosIdx pos,
     Value & v,
@@ -2533,17 +2517,31 @@ BackedStringView EvalState::coerceToString(
     }
 
     if (v.type() == nAttrs) {
-        auto maybeString = tryAttrsToString(pos, v, context, coerceMore, copyToStore);
-        if (maybeString)
-            return std::move(*maybeString);
-        auto i = v.attrs()->get(s.outPath);
-        if (!i) {
-            error<TypeError>(
-                "cannot coerce %1% to a string: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
-                .withTrace(pos, errorCtx)
-                .debugThrow();
-        }
-        return coerceToString(pos, *i->value, context, errorCtx, coerceMore, copyToStore, canonicalizePath);
+        return peelToStringOutPath(
+            pos,
+            v,
+            /*checkToStringReturn=*/false, // Historical quirk
+            [&](Value * peeled, bool) -> BackedStringView {
+                if (peeled->type() == nAttrs) {
+                    error<TypeError>(
+                        "cannot coerce %1% to a string: %2%",
+                        showType(*peeled),
+                        ValuePrinter(*this, *peeled, errorPrintOptions))
+                        .withTrace(pos, errorCtx)
+                        .debugThrow();
+                }
+                /* `canonicalizePath=false` is `ExprConcat`'s hack for
+                   preserving the trailing slash on source-parsed path
+                   literals like the `/foo/` in `/foo/${x}`. Any attrset
+                   in that slot is a computed value with no
+                   source-fidelity intent — the peeled path came from
+                   user code, not from the interpolation syntax. Force
+                   canonicalisation on the peel result regardless of
+                   which peel path (`__toString` or `outPath`) got us
+                   here. */
+                return coerceToString(
+                    pos, *peeled, context, errorCtx, coerceMore, copyToStore, /*canonicalizePath=*/true);
+            });
     }
 
     if (v.type() == nExternal) {
@@ -2622,34 +2620,21 @@ StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePat
 
 SourcePath EvalState::coerceToPath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx)
 {
-    try {
-        forceValue(v, pos);
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
-        throw;
-    }
-
-    /* Handle path values directly, without coercing to a string. */
-    if (v.type() == nPath)
-        return v.path();
-
-    /* Similarly, handle __toString where the result may be a path
-       value. */
-    if (v.type() == nAttrs) {
-        auto i = v.attrs()->get(s.toString);
-        if (i) {
-            Value v1;
-            callFunction(*i->value, v, v1, pos);
-            return coerceToPath(pos, v1, context, errorCtx);
-        }
-    }
-
-    /* Any other value should be coercible to a string, interpreted
-       relative to the root filesystem. */
-    auto path = coerceToString(pos, v, context, errorCtx, false, false, true).toOwned();
-    if (path == "" || path[0] != '/')
-        error<EvalError>("string '%1%' doesn't represent an absolute path", path).withTrace(pos, errorCtx).debugThrow();
-    return rootPath(CanonPath(path));
+    return peelToStringOutPath(
+        pos,
+        v,
+        /*checkToStringReturn=*/false, // Historical quirk
+        [&](Value * peeled, bool) -> SourcePath {
+            Value & effective = *peeled;
+            if (effective.type() == nPath)
+                return effective.path();
+            auto path = coerceToString(pos, effective, context, errorCtx, false, false, true).toOwned();
+            if (path == "" || path[0] != '/')
+                error<EvalError>("string '%1%' doesn't represent an absolute path", path)
+                    .withTrace(pos, errorCtx)
+                    .debugThrow();
+            return rootPath(CanonPath(path));
+        });
 }
 
 StorePath

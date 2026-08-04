@@ -17,7 +17,6 @@ namespace nix {
  */
 static void runFetchClosureWithRewrite(
     EvalState & state,
-    const PosIdx pos,
     Store & fromStore,
     const StorePath & fromPath,
     const std::optional<StorePath> & toPathMaybe,
@@ -36,16 +35,14 @@ static void runFetchClosureWithRewrite(
                      "rewriting '%s' to content-addressed form yielded '%s', while '%s' was expected",
                      state.store->printStorePath(fromPath),
                      state.store->printStorePath(rewrittenPath),
-                     state.store->printStorePath(*toPathMaybe)),
-                 .pos = state.positions[pos]});
+                     state.store->printStorePath(*toPathMaybe))});
         if (!toPathMaybe)
             throw Error(
                 {.msg = HintFmt(
                      "rewriting '%s' to content-addressed form yielded '%s'\n"
                      "Use this value for the 'toPath' attribute passed to 'fetchClosure'",
                      state.store->printStorePath(fromPath),
-                     state.store->printStorePath(rewrittenPath)),
-                 .pos = state.positions[pos]});
+                     state.store->printStorePath(rewrittenPath))});
     }
 
     const auto & toPath = *toPathMaybe;
@@ -61,8 +58,7 @@ static void runFetchClosureWithRewrite(
             {.msg = HintFmt(
                  "The 'toPath' value '%s' is input-addressed, so it can't possibly be the result of rewriting to a content-addressed path.\n\n"
                  "Set 'toPath' to an empty string to make Nix report the correct content-addressed path.",
-                 state.store->printStorePath(toPath)),
-             .pos = state.positions[pos]});
+                 state.store->printStorePath(toPath))});
     }
 
     state.allowClosure(toPath);
@@ -73,8 +69,8 @@ static void runFetchClosureWithRewrite(
 /**
  * Fetch the closure and make sure it's content addressed.
  */
-static void runFetchClosureWithContentAddressedPath(
-    EvalState & state, const PosIdx pos, Store & fromStore, const StorePath & fromPath, Value & v)
+static void
+runFetchClosureWithContentAddressedPath(EvalState & state, Store & fromStore, const StorePath & fromPath, Value & v)
 {
     state.store->addTempRoot(fromPath);
 
@@ -91,8 +87,7 @@ static void runFetchClosureWithContentAddressedPath(
                  "    inputAddressed = true;\n\n"
                  "to the 'fetchClosure' arguments.\n\n"
                  "Note that to ensure authenticity input-addressed store paths, users must configure a trusted binary cache public key on their systems. This is not needed for content-addressed paths.",
-                 state.store->printStorePath(fromPath)),
-             .pos = state.positions[pos]});
+                 state.store->printStorePath(fromPath))});
     }
 
     state.allowClosure(fromPath);
@@ -103,8 +98,8 @@ static void runFetchClosureWithContentAddressedPath(
 /**
  * Fetch the closure and make sure it's input addressed.
  */
-static void runFetchClosureWithInputAddressedPath(
-    EvalState & state, const PosIdx pos, Store & fromStore, const StorePath & fromPath, Value & v)
+static void
+runFetchClosureWithInputAddressedPath(EvalState & state, Store & fromStore, const StorePath & fromPath, Value & v)
 {
     state.store->addTempRoot(fromPath);
 
@@ -118,8 +113,7 @@ static void runFetchClosureWithInputAddressedPath(
             {.msg = HintFmt(
                  "The store object referred to by 'fromPath' at '%s' is not input-addressed, but 'inputAddressed' is set to 'true'.\n\n"
                  "Remove the 'inputAddressed' attribute (it defaults to 'false') to expect 'fromPath' to be content-addressed",
-                 state.store->printStorePath(fromPath)),
-             .pos = state.positions[pos]});
+                 state.store->printStorePath(fromPath))});
     }
 
     state.allowClosure(fromPath);
@@ -129,9 +123,9 @@ static void runFetchClosureWithInputAddressedPath(
 
 typedef std::optional<StorePath> StorePathOrGap;
 
-static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchClosure(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    state.forceAttrs(*args[0], pos, "while evaluating the argument passed to builtins.fetchClosure");
+    state.forceAttrs(*args[0], noPos, "while evaluating the argument passed to builtins.fetchClosure");
 
     std::optional<std::string> fromStoreUrl;
     std::optional<StorePath> fromPath;
@@ -167,15 +161,11 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
             inputAddressedMaybe = state.forceBool(*attr.value, attr.pos, attrHint());
 
         else
-            throw Error(
-                {.msg = HintFmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName),
-                 .pos = state.positions[pos]});
+            throw Error({.msg = HintFmt("attribute '%s' isn't supported in call to 'fetchClosure'", attrName)});
     }
 
     if (!fromPath)
-        throw Error(
-            {.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath"),
-             .pos = state.positions[pos]});
+        throw Error({.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromPath")});
 
     bool inputAddressed = inputAddressedMaybe.value_or(false);
 
@@ -185,14 +175,11 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
                 {.msg = HintFmt(
                      "attribute '%s' is set to true, but '%s' is also set. Please remove one of them",
                      "inputAddressed",
-                     "toPath"),
-                 .pos = state.positions[pos]});
+                     "toPath")});
     }
 
     if (!fromStoreUrl)
-        throw Error(
-            {.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore"),
-             .pos = state.positions[pos]});
+        throw Error({.msg = HintFmt("attribute '%s' is missing in call to 'fetchClosure'", "fromStore")});
 
     auto storeRef = StoreReference::parse(*fromStoreUrl);
 
@@ -204,22 +191,19 @@ static void prim_fetchClosure(EvalState & state, const PosIdx pos, Value ** args
         }())
         throw Error({
             .msg = HintFmt("'fetchClosure' only supports http:// and https:// stores"),
-            .pos = state.positions[pos],
         });
 
     if (!storeRef.params.empty())
-        throw Error(
-            {.msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl),
-             .pos = state.positions[pos]});
+        throw Error({.msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl)});
 
     auto fromStore = openStore(std::move(storeRef));
 
     if (toPath)
-        runFetchClosureWithRewrite(state, pos, *fromStore, *fromPath, *toPath, v);
+        runFetchClosureWithRewrite(state, *fromStore, *fromPath, *toPath, v);
     else if (inputAddressed)
-        runFetchClosureWithInputAddressedPath(state, pos, *fromStore, *fromPath, v);
+        runFetchClosureWithInputAddressedPath(state, *fromStore, *fromPath, v);
     else
-        runFetchClosureWithContentAddressedPath(state, pos, *fromStore, *fromPath, v);
+        runFetchClosureWithContentAddressedPath(state, *fromStore, *fromPath, v);
 }
 
 static RegisterPrimOp primop_fetchClosure({

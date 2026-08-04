@@ -82,11 +82,11 @@ static void resolvedAttrToValue(EvalState & state, Value & v, const fetchers::Re
 /**
  * internal primop: Force a LazyFetcherAttr external value.
  */
-static void prim_forceLazyFetcherAttr(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_forceLazyFetcherAttr(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     Value & arg = *args[0];
 
-    state.forceValue(arg, pos);
+    state.forceValue(arg, noPos);
     // We only construct this primop with LazyFetcherAttr preapplied.
     assert(arg.type() == nExternal);
     auto * ext = dynamic_cast<LazyFetcherAttr *>(args[0]->external());
@@ -119,6 +119,7 @@ static void emitLazyAttrThunk(EvalState & state, const fetchers::LazyAttr & lazy
 
 void emitTreeAttrs(
     EvalState & state,
+    PosIdx callPos,
     const StorePath & storePath,
     const fetchers::Input & input,
     Value & v,
@@ -127,44 +128,46 @@ void emitTreeAttrs(
 {
     auto attrs = state.buildBindings(100);
 
-    state.mkStorePathString(storePath, attrs.alloc(state.s.outPath));
+    state.mkStorePathString(storePath, attrs.alloc(state.s.outPath, callPos));
 
     // FIXME: support arbitrary input attributes.
 
     if (auto narHash = input.getNarHash())
-        attrs.alloc("narHash").mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
+        attrs.alloc("narHash", callPos).mkString(narHash->to_string(HashFormat::SRI, true), state.mem);
 
     if (input.getType() == "git")
-        attrs.alloc("submodules").mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
+        attrs.alloc("submodules", callPos)
+            .mkBool(fetchers::maybeGetBoolAttr(input.attrs, "submodules").value_or(false));
 
     if (!forceDirty) {
 
         if (auto rev = input.getRev()) {
-            attrs.alloc("rev").mkString(rev->gitRev(), state.mem);
-            attrs.alloc("shortRev").mkString(rev->gitShortRev(), state.mem);
+            attrs.alloc("rev", callPos).mkString(rev->gitRev(), state.mem);
+            attrs.alloc("shortRev", callPos).mkString(rev->gitShortRev(), state.mem);
         } else if (emptyRevFallback) {
             // Backwards compat for `builtins.fetchGit`: dirty repos return an empty sha1 as rev
             auto emptyHash = Hash(HashAlgorithm::SHA1);
-            attrs.alloc("rev").mkString(emptyHash.gitRev(), state.mem);
-            attrs.alloc("shortRev").mkString(emptyHash.gitShortRev(), state.mem);
+            attrs.alloc("rev", callPos).mkString(emptyHash.gitRev(), state.mem);
+            attrs.alloc("shortRev", callPos).mkString(emptyHash.gitShortRev(), state.mem);
         }
 
         if (auto revCount = maybeGetLazyAttr(input.attrs, "revCount"))
-            emitLazyAttrThunk(state, *revCount, attrs.alloc("revCount"));
+            emitLazyAttrThunk(state, *revCount, attrs.alloc("revCount", callPos));
         else if (auto revCount = input.getRevCount())
-            attrs.alloc("revCount").mkInt(*revCount);
+            attrs.alloc("revCount", callPos).mkInt(*revCount);
         else if (emptyRevFallback)
-            attrs.alloc("revCount").mkInt(0);
+            attrs.alloc("revCount", callPos).mkInt(0);
     }
 
     if (auto dirtyRev = fetchers::maybeGetStrAttr(input.attrs, "dirtyRev")) {
-        attrs.alloc("dirtyRev").mkString(*dirtyRev, state.mem);
-        attrs.alloc("dirtyShortRev").mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
+        attrs.alloc("dirtyRev", callPos).mkString(*dirtyRev, state.mem);
+        attrs.alloc("dirtyShortRev", callPos)
+            .mkString(*fetchers::maybeGetStrAttr(input.attrs, "dirtyShortRev"), state.mem);
     }
 
     if (auto lastModified = input.getLastModified()) {
-        attrs.alloc("lastModified").mkInt(*lastModified);
-        attrs.alloc("lastModifiedDate")
+        attrs.alloc("lastModified", callPos).mkInt(*lastModified);
+        attrs.alloc("lastModifiedDate", callPos)
             .mkString(fmt("%s", std::put_time(std::gmtime(&*lastModified), "%Y%m%d%H%M%S")), state.mem);
     }
 
@@ -180,7 +183,11 @@ struct FetchTreeParams
 };
 
 static void fetchTree(
-    EvalState & state, const PosIdx pos, Value ** args, Value & v, const FetchTreeParams & params = FetchTreeParams{})
+    EvalState & state,
+    CallSite callSite,
+    Value * const * args,
+    Value & v,
+    const FetchTreeParams & params = FetchTreeParams{})
 {
     fetchers::Input input{};
     NixStringContext context;
@@ -189,20 +196,20 @@ static void fetchTree(
     if (params.isFetchGit)
         type = "git";
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], noPos);
 
     if (args[0]->type() == nAttrs) {
-        state.forceAttrs(*args[0], pos, fmt("while evaluating the argument passed to '%s'", fetcher));
+        state.forceAttrs(*args[0], noPos, fmt("while evaluating the argument passed to '%s'", fetcher));
 
         fetchers::Attrs attrs;
 
         if (auto aType = args[0]->attrs()->get(state.s.type)) {
             if (type)
-                state.error<EvalError>("unexpected argument 'type'").atPos(pos).debugThrow();
+                state.error<EvalError>("unexpected argument 'type'").atPos(noPos).debugThrow();
             type = state.forceStringNoCtx(
                 *aType->value, aType->pos, fmt("while evaluating the `type` argument passed to '%s'", fetcher));
         } else if (!type)
-            state.error<EvalError>("argument 'type' is missing in call to '%s'", fetcher).atPos(pos).debugThrow();
+            state.error<EvalError>("argument 'type' is missing in call to '%s'", fetcher).atPos(noPos).debugThrow();
 
         attrs.emplace("type", type.value());
 
@@ -227,14 +234,14 @@ static void fetchTree(
                             fetcher,
                             state.symbols[attr.name],
                             intValue)
-                        .atPos(pos)
+                        .atPos(noPos)
                         .debugThrow();
 
                 attrs.emplace(state.symbols[attr.name], uint64_t(intValue));
             } else if (state.symbols[attr.name] == "publicKeys") {
                 experimentalFeatureSettings.require(Xp::VerifiedFetches);
                 attrs.emplace(
-                    state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, pos, context).dump());
+                    state.symbols[attr.name], printValueAsJSON(state, true, *attr.value, noPos, context).dump());
             } else
                 state
                     .error<TypeError>(
@@ -258,14 +265,14 @@ static void fetchTree(
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>("argument 'name' isn’t supported in call to '%s'", fetcher)
-                    .atPos(pos)
+                    .atPos(noPos)
                     .debugThrow();
 
         input = fetchers::Input::fromAttrs(state.fetchSettings, std::move(attrs));
     } else {
         auto url = state
                        .coerceToString(
-                           pos,
+                           noPos,
                            *args[0],
                            context,
                            fmt("while evaluating the first argument passed to '%s'", fetcher),
@@ -287,7 +294,7 @@ static void fetchTree(
                 state
                     .error<EvalError>(
                         "passing a string argument to '%s' requires the 'flakes' experimental feature", fetcher)
-                    .atPos(pos)
+                    .atPos(noPos)
                     .debugThrow();
             input = fetchers::Input::fromURL(state.fetchSettings, url);
         }
@@ -306,7 +313,7 @@ static void fetchTree(
             state
                 .error<EvalError>(
                     "in pure evaluation mode, '%s' doesn't fetch unlocked input '%s'", fetcher, input.to_string())
-                .atPos(pos)
+                .atPos(noPos)
                 .debugThrow();
     }
 
@@ -324,12 +331,12 @@ static void fetchTree(
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
-    emitTreeAttrs(state, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
+    emitTreeAttrs(state, callSite.pos, storePath, cachedInput.lockedInput, v, params.emptyRevFallback, false);
 }
 
-static void prim_fetchTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchTree(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    fetchTree(state, pos, args, v, {});
+    fetchTree(state, callSite, args, v, {});
 }
 
 static RegisterPrimOp primop_fetchTree({
@@ -378,7 +385,7 @@ static RegisterPrimOp primop_fetchTree({
           `type` or an attribute like `builtins.fetchTree.git`! -->
         )");
 
-        auto indentString = [](std::string const & str, std::string const & indent) {
+        auto indentString = [](const std::string & str, const std::string & indent) {
             std::string result;
             std::istringstream stream(str);
             std::string line;
@@ -460,9 +467,9 @@ static RegisterPrimOp primop_fetchTree({
     .experimentalFeature = Xp::FetchTree,
 });
 
-void prim_fetchFinalTree(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+void prim_fetchFinalTree(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    fetchTree(state, pos, args, v, {.isFinal = true});
+    fetchTree(state, callSite, args, v, {.isFinal = true});
 }
 
 static RegisterPrimOp primop_fetchFinalTree({
@@ -472,19 +479,13 @@ static RegisterPrimOp primop_fetchFinalTree({
     .internal = true,
 });
 
-static void fetch(
-    EvalState & state,
-    const PosIdx pos,
-    Value ** args,
-    Value & v,
-    const std::string & who,
-    bool unpack,
-    std::string name)
+static void
+fetch(EvalState & state, Value * const * args, Value & v, const std::string & who, bool unpack, std::string name)
 {
     std::optional<std::string> url;
     std::optional<Hash> expectedHash;
 
-    state.forceValue(*args[0], pos);
+    state.forceValue(*args[0], noPos);
 
     bool isArgAttrs = args[0]->type() == nAttrs;
     bool nameAttrPassed = false;
@@ -505,13 +506,13 @@ static void fetch(
                 name = state.forceStringNoCtx(
                     *attr.value, attr.pos, "while evaluating the name of the content we should fetch");
             } else
-                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(pos).debugThrow();
+                state.error<EvalError>("unsupported argument '%s' to '%s'", n, who).atPos(noPos).debugThrow();
         }
 
         if (!url)
-            state.error<EvalError>("'url' argument required").atPos(pos).debugThrow();
+            state.error<EvalError>("'url' argument required").atPos(noPos).debugThrow();
     } else
-        url = state.forceStringNoCtx(*args[0], pos, "while evaluating the url we should fetch");
+        url = state.forceStringNoCtx(*args[0], noPos, "while evaluating the url we should fetch");
 
     if (who == "fetchTarball")
         url = state.settings.resolvePseudoUrl(*url);
@@ -543,13 +544,13 @@ static void fetch(
                 *url,
                 Uncolored(e.message()),
                 Uncolored(resolution.str()))
-            .atPos(pos)
+            .atPos(noPos)
             .debugThrow();
     }
 
     if (state.settings.pureEval && !expectedHash)
         state.error<EvalError>("in pure evaluation mode, '%s' requires a 'sha256' argument", who)
-            .atPos(pos)
+            .atPos(noPos)
             .debugThrow();
 
     // early exit if pinned and already in the store
@@ -611,9 +612,9 @@ static void fetch(
     }
 }
 
-static void prim_fetchurl(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchurl(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchurl", false, "");
+    fetch(state, args, v, "fetchurl", false, "");
 }
 
 static RegisterPrimOp primop_fetchurl({
@@ -637,9 +638,9 @@ static RegisterPrimOp primop_fetchurl({
     .impl = prim_fetchurl,
 });
 
-static void prim_fetchTarball(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchTarball(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
-    fetch(state, pos, args, v, "fetchTarball", true, "source");
+    fetch(state, args, v, "fetchTarball", true, "source");
 }
 
 static RegisterPrimOp primop_fetchTarball({
@@ -687,10 +688,14 @@ static RegisterPrimOp primop_fetchTarball({
     .impl = prim_fetchTarball,
 });
 
-static void prim_fetchGit(EvalState & state, const PosIdx pos, Value ** args, Value & v)
+static void prim_fetchGit(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     fetchTree(
-        state, pos, args, v, FetchTreeParams{.emptyRevFallback = true, .allowNameArgument = true, .isFetchGit = true});
+        state,
+        callSite,
+        args,
+        v,
+        FetchTreeParams{.emptyRevFallback = true, .allowNameArgument = true, .isFetchGit = true});
 }
 
 static RegisterPrimOp primop_fetchGit({

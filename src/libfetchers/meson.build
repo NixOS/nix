@@ -48,6 +48,7 @@ sources = files(
   'input-cache.cc',
   'mercurial.cc',
   'path.cc',
+  'register-library-versions.cc',
   'registry.cc',
   'tarball.cc',
 )

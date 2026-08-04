@@ -1,0 +1,20 @@
+error:
+       … while calling the 'readFileType' builtin
+         at /pwd/lang/eval-fail-readFileType-outPath-abort.nix:1:1:
+            1| builtins.readFileType { outPath = abort "some failure"; }
+             | ^
+            2|
+
+       … while evaluating the `outPath` attribute
+         at /pwd/lang/eval-fail-readFileType-outPath-abort.nix:1:25:
+            1| builtins.readFileType { outPath = abort "some failure"; }
+             |                         ^
+            2|
+
+       … while calling the 'abort' builtin
+         at /pwd/lang/eval-fail-readFileType-outPath-abort.nix:1:35:
+            1| builtins.readFileType { outPath = abort "some failure"; }
+             |                                   ^
+            2|
+
+       error: evaluation aborted with the following error message: 'some failure'

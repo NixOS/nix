@@ -4,6 +4,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include <array>
+
 namespace nix {
 
 DerivationResolutionGoal::DerivationResolutionGoal(
@@ -54,10 +56,10 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
     for (const auto & [inputDrvPath, inputNode] : drv->inputs.drvs.map) {
         /* Ensure that pure, non-fixed-output derivations don't
            depend on impure derivations. */
-        if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !drv->type().isImpure()
-            && !drv->type().isFixed()) {
+        if (experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !type(*drv).isImpure()
+            && !type(*drv).isFixed()) {
             auto inputDrv = worker.evalStore.readDerivation(inputDrvPath);
-            if (inputDrv.type().isImpure())
+            if (type(inputDrv).isImpure())
                 throw Error(
                     "pure derivation '%s' depends on impure derivation '%s'",
                     worker.store.printStorePath(drvPath),
@@ -96,13 +98,14 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
     {
         auto & fullDrv = *drv;
 
-        if (fullDrv.shouldResolve()) {
+        if (shouldResolve(fullDrv)) {
             experimentalFeatureSettings.require(Xp::CaDerivations);
 
             /* We are be able to resolve this derivation based on the
                now-known results of dependencies. If so, we become a
                stub goal aliasing that resolved derivation goal. */
-            std::optional attempt = fullDrv.tryResolve(
+            std::optional attempt = tryResolve(
+                fullDrv,
                 worker.store,
                 [&](ref<const SingleDerivedPath> drvPath, const std::string & outputName) -> std::optional<StorePath> {
                     auto mEntry = get(inputGoals, drvPath);
@@ -129,11 +132,11 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                    inputDrvOutputs statefully, sometimes it gets out of sync with
                    the real source of truth (store). So we query the store
                    directly if there's a problem. */
-                attempt = fullDrv.tryResolve(worker.store, &worker.evalStore);
+                attempt = tryResolve(fullDrv, worker.store, &worker.evalStore);
             }
             assert(attempt);
 
-            auto pathResolved = computeStorePath(worker.store, attempt->unresolve());
+            auto pathResolved = computeStorePath(worker.store, unresolve(*attempt));
 
             auto msg =
                 fmt("resolved derivation: '%s' -> '%s'",
@@ -144,10 +147,10 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 lvlInfo,
                 actBuildWaiting,
                 msg,
-                Logger::Fields{
+                std::to_array<Logger::Field>({
                     worker.store.printStorePath(drvPath),
                     worker.store.printStorePath(pathResolved),
-                });
+                }));
 
             resolvedDrv =
                 std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), *std::move(attempt));

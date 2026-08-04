@@ -35,10 +35,11 @@ mkMesonExecutable (finalAttrs: {
   fileset = fileset.unions [
     ../../nix-meson-build-support
     ./nix-meson-build-support
+    ./fuzz/harnesses
     ../../.version
     ./.version
-    ./meson.build
     ./meson.options
+    (fileset.fileFilter (file: file.name == "meson.build") ./.)
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
   ];

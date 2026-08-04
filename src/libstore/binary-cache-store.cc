@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <future>
+#include <array>
 #include <regex>
 #include <sstream>
 #include <variant>
@@ -575,7 +576,7 @@ void BinaryCacheStore::queryPathInfoUncached(
             lvlTalkative,
             actQueryPathInfo,
             fmt("querying info about '%s' on '%s'", storePathS, uri),
-            Logger::Fields{storePathS, uri});
+            std::to_array<Logger::Field>({storePathS, uri}));
         PushActivity pact(act->id);
 
         auto narInfoFile = narInfoFileFor(storePath);
@@ -678,7 +679,7 @@ void BinaryCacheStore::queryRealisationUncached(
     getFile(outputInfoFilePath, std::move(newCallback));
 }
 
-void BinaryCacheStore::registerDrvOutput(const Realisation & info)
+void BinaryCacheStore::registerDrvOutputUnchecked(const Realisation & info)
 {
     if (diskCache)
         diskCache->upsertRealisation(config.getReference().render(/*FIXME withParams=*/false), info);

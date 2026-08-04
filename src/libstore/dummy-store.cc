@@ -5,6 +5,7 @@
 #include "nix/util/json-utils.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/realisation.hh"
+#include "nix/store/derivation/aterm.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
 
@@ -228,7 +229,7 @@ public:
         if (info.path.isDerivation()) {
             warn("back compat supporting `addToStore` for inserting derivations in dummy store");
             writeDerivation(
-                parseDerivation(*this, accessor->readFile(CanonPath::root), Derivation::nameFromPath(info.path)));
+                derivation::parse(*this, accessor->readFile(CanonPath::root), Derivation::nameFromPath(info.path)));
             return;
         }
 
@@ -341,7 +342,7 @@ public:
         return readDerivation(drvPath);
     }
 
-    void registerDrvOutput(const Realisation & output) override
+    void registerDrvOutputUnchecked(const Realisation & output) override
     {
         buildTrace.insert_or_visit({output.id.drvPath, {{output.id.outputName, output}}}, [&](auto & kv) {
             kv.second.insert_or_assign(output.id.outputName, output);
@@ -371,7 +372,7 @@ public:
                 /* compute path info on demand */
                 auto res2 = make_ref<MemorySourceAccessor>();
                 res2->root = MemorySourceAccessor::File::Regular{
-                    .contents = kv.second.unparse(*this, false),
+                    .contents = unparse(kv.second, *this),
                 };
                 res = std::move(res2).get_ptr();
             });

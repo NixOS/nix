@@ -115,9 +115,9 @@ protected:
      * the build trace entries themselves than the entire directory, for
      * a smoother migration path.
      */
-    constexpr const static std::string realisationsPrefix = "build-trace-v2";
+    constexpr static const std::string realisationsPrefix = "build-trace-v2";
 
-    constexpr const static std::string cacheInfoFile = "nix-cache-info";
+    constexpr static const std::string cacheInfoFile = "nix-cache-info";
 
     BinaryCacheStore(Config &);
 
@@ -241,7 +241,7 @@ public:
         PathFilter & filter,
         RepairFlag repair) override;
 
-    void registerDrvOutput(const Realisation & info) override;
+    void registerDrvOutputUnchecked(const Realisation & info) override;
 
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;

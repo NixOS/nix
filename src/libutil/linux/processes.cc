@@ -21,6 +21,7 @@
 #include <sys/prctl.h>
 #include <grp.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <sched.h>
 
@@ -85,10 +86,12 @@ struct ExecChildParams
  */
 [[gnu::noinline, noreturn]] static void doExecChild(const ExecChildParams & params) noexcept
 {
-    auto die = [&params] [[noreturn]] (int err, const char * msg) {
+    Descriptor errorPipe = params.errorPipe;
+
+    auto die = [&errorPipe] [[noreturn]] (int err, const char * msg) {
         [[maybe_unused]] ssize_t ret; /* Swallow all errors. */
-        ret = ::write(params.errorPipe, reinterpret_cast<const char *>(&err), sizeof(err));
-        ret = ::write(params.errorPipe, msg, ::strlen(msg));
+        ret = ::write(errorPipe, reinterpret_cast<const char *>(&err), sizeof(err));
+        ret = ::write(errorPipe, msg, ::strlen(msg));
         ::_exit(1);
     };
 
@@ -131,6 +134,34 @@ struct ExecChildParams
         if (::chdir(savedCwd) == -1)
             dieWithErrno("restoring cwd");
     }
+
+    /* Now we can safely close all (possibly) leaked file descriptors. Note that
+       we try to open most things as O_CLOEXEC, but we don't control external
+       libraries and some facilities (e.g. libcurl) lack an atomic open with
+       O_CLOEXEC that doesn't race via subsequent fcntl. But for error reporting
+       purposes we should dup (and mark as O_CLOEXEC) the error pipe descriptor.
+       */
+
+    static constexpr int relocatedErrorPipeFD = STDERR_FILENO + 1;
+
+    /* dup3 fails if oldfd == newfd, so skip that case. */
+    if (errorPipe != relocatedErrorPipeFD) {
+        if (::dup3(errorPipe, relocatedErrorPipeFD, O_CLOEXEC) == -1)
+            dieWithErrno("dupping error pipe");
+        errorPipe = relocatedErrorPipeFD;
+    }
+
+#if HAVE_CLOSEFROM
+    /* glibc uses this in its posix_spawn implementation and also exposes it
+       in <unistd.h>. Notably, it has a fallback for kernels that don't support
+       close_range. */
+    ::closefrom(relocatedErrorPipeFD + 1);
+#elifdef SYS_close_range
+    /* This is mostly best-effort. This code should only be used on musl and it
+       would only fail on older kernels. Reimplementing /proc/self/fd iteration
+       like what glibc does in __closefrom_fallback is a lot of complex code. */
+    ::syscall(SYS_close_range, relocatedErrorPipeFD + 1, ~0u, 0);
+#endif
 
     /* Important! Calling syscalls directly and not libc functions because of a
        discrepancy in POSIX specification (i.e. POSIX setgid/setuid has to apply
@@ -180,8 +211,6 @@ struct ExecChildParams
     /* Like unix::restoreSignals(), but safe to do in a vfork child. */
     if (unix::savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &unix::savedSignalMask, nullptr) == -1)
         dieWithErrno("restoring signals");
-
-    /* TODO: Close leaked file descriptors? The best way is with close_range(). */
 
     if (params.lookupPath)
         /* Nonstandard, but both musl and glibc have it and it doesn't
@@ -249,7 +278,9 @@ void runProgram2(const RunOptions & options)
 
     /* Prepare arguments and environment for the child. */
     Strings args_(options.args);
-    args_.push_front(options.program.native());
+    /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
+       trickery. */
+    args_.push_front(options.argv0.value_or(options.program.native()));
     const Strings env_ = options.environment ? prepareEnvironmentStrings(*options.environment) : Strings{};
     const auto env = stringsToCharPtrs(env_);
     const auto args = stringsToCharPtrs(args_);

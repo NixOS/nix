@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <memory_resource>
+#include <new>
 
 namespace nix {
 

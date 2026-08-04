@@ -19,7 +19,7 @@ struct BaseNix32
 private:
     static const std::array<uint8_t, 256> reverseMap;
 
-    const static constexpr uint8_t invalid = 0xFF;
+    static constexpr const uint8_t invalid = 0xFF;
 
 public:
     static inline std::optional<uint8_t> lookupReverse(char base32)

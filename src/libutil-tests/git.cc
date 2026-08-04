@@ -101,7 +101,7 @@ TEST_F(GitTest, blob_write)
  * so that we can check our test data in a small shell script test test
  * (`src/libutil-tests/data/git/check-data.sh`).
  */
-const static git::Tree treeSha1 = {
+static const git::Tree treeSha1 = {
     {
         "Foo",
         {
@@ -141,7 +141,7 @@ const static git::Tree treeSha1 = {
  * Same conceptual object as `treeSha1`, just different hash algorithm.
  * See that one for details.
  */
-const static git::Tree treeSha256 = {
+static const git::Tree treeSha256 = {
     {
         "Foo",
         {

@@ -1,0 +1,15 @@
+# All (valid) tokens are padded to be 8 bytes aligned.
+"node\x00\x00\x00\x00"
+"regular\x00"
+"symlink\x00"
+"contents"
+"executable\x00\x00\x00\x00\x00\x00"
+"target\x00\x00"
+"type\x00\x00\x00\x00"
+"entry\x00\x00\x00"
+"(\x00\x00\x00\x00\x00\x00\x00"
+")\x00\x00\x00\x00\x00\x00\x00"
+"nix-archive-1\x00\x00\x00"
+# Case hack suffixes.
+"~nix~case~hack~1"
+"~nix~case~hack~2"

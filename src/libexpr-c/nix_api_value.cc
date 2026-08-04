@@ -41,8 +41,8 @@ static void nix_c_primop_wrapper(
     void * userdata,
     int arity,
     nix::EvalState & state,
-    const nix::PosIdx pos,
-    nix::Value ** args,
+    nix::CallSite callSite,
+    nix::Value * const * args,
     nix::Value & v)
 {
     nix_c_context ctx;
@@ -73,16 +73,16 @@ static void nix_c_primop_wrapper(
     if (ctx.last_err_code != NIX_OK) {
         if (ctx.last_err_code == NIX_ERR_RECOVERABLE) {
             state.error<nix::RecoverableEvalError>("Recoverable error from custom function: %s", *ctx.last_err)
-                .atPos(pos)
+                .atPos(nix::noPos)
                 .debugThrow();
         } else {
-            state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(pos).debugThrow();
+            state.error<nix::EvalError>("Error from custom function: %s", *ctx.last_err).atPos(nix::noPos).debugThrow();
         }
     }
 
     if (!vTmp.isValid()) {
         state.error<nix::EvalError>("Implementation error in custom function: return value was not initialized")
-            .atPos(pos)
+            .atPos(nix::noPos)
             .debugThrow();
     }
 
@@ -91,7 +91,7 @@ static void nix_c_primop_wrapper(
         // e.g. implementing tail recursion by returning a thunk to the next
         // "iteration". Until then, this is most likely a mistake or misunderstanding.
         state.error<nix::EvalError>("Implementation error in custom function: return value must not be a thunk")
-            .atPos(pos)
+            .atPos(nix::noPos)
             .debugThrow();
     }
 

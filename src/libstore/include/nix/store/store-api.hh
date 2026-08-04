@@ -37,11 +37,15 @@ struct Realisation;
 struct RealisedPath;
 struct DrvOutput;
 
-template<typename Inputs>
-struct DerivationT;
+namespace derivation {
+template<typename Inputs, typename Out>
+struct Derivation;
 struct FullInputs;
-using BasicDerivation = DerivationT<StorePathSet>;
-using Derivation = DerivationT<FullInputs>;
+struct Output;
+} // namespace derivation
+
+using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
+using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;
@@ -747,12 +751,17 @@ public:
      * as this information is already present in the drv file, but necessary for
      * floating-ca derivations and their dependencies as there's no way to
      * retrieve this information otherwise.
+     *
+     * The method that does not perform signature checks is internal only, users should
+     * explicitly set the `checkSigs` argument to `NoCheckSigs`.
      */
-    virtual void registerDrvOutput(const Realisation & output) = 0;
+protected:
+    virtual void registerDrvOutputUnchecked(const Realisation & output) = 0;
 
+public:
     virtual void registerDrvOutput(const Realisation & output, CheckSigsFlag checkSigs)
     {
-        return registerDrvOutput(output);
+        return registerDrvOutputUnchecked(output);
     }
 
     /**
