@@ -14,6 +14,7 @@
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <ranges>
 
@@ -49,24 +50,51 @@ struct StringViewStream
     }
 };
 
-constexpr struct Escapes
+/**
+ * Maps a character to its counterpart in an escape sequence, with
+ * `'\0'` meaning "no such escape". That is a usable sentinel because it
+ * is neither an escape character nor the meaning of one.
+ */
+struct EscapeMap
 {
-    char map[256];
+    using Map = std::array<char, 256>;
 
-    constexpr Escapes()
+    constexpr EscapeMap(Map map)
+        : map(map)
     {
-        for (int i = 0; i < 256; i++)
-            map[i] = (char) (unsigned char) i;
-        map[(int) (unsigned char) 'n'] = '\n';
-        map[(int) (unsigned char) 'r'] = '\r';
-        map[(int) (unsigned char) 't'] = '\t';
     }
 
-    char operator[](char c) const
+    constexpr std::optional<char> lookup(char c) const
     {
-        return map[(unsigned char) c];
+        auto res = map[(unsigned char) c];
+        return res ? std::optional{res} : std::nullopt;
     }
-} escapes;
+
+private:
+    Map map;
+};
+
+/* The character an escape sequence stands for, e.g. `'n'` -> `'\n'`. */
+constexpr EscapeMap escapes = [] {
+    EscapeMap::Map map{};
+    map[(unsigned char) 'n'] = '\n';
+    map[(unsigned char) 'r'] = '\r';
+    map[(unsigned char) 't'] = '\t';
+    map[(unsigned char) '\\'] = '\\';
+    map[(unsigned char) '\"'] = '\"';
+    return EscapeMap{map};
+}();
+
+/* The inverse of `escapes`: the character which must be escaped to
+   write the given one, e.g. `'\n'` -> `'n'`. */
+constexpr EscapeMap unescapes = [] {
+    EscapeMap::Map map{};
+    for (size_t i = 0; i < map.size(); i++)
+        if (auto escaped = escapes.lookup((char) i))
+            map[(unsigned char) *escaped] = char(i);
+    return EscapeMap{map};
+}();
+
 } // namespace
 
 /* Read string `s' from stream `str'. */
@@ -84,94 +112,179 @@ static void expect(StringViewStream & str, char c)
     str.remaining.remove_prefix(1);
 }
 
-/* Read a C-style string from stream `str'. */
+/**
+ * Read a C-style string from stream `str'.
+ *
+ * This is for the fields whose contents are arbitrary, and so may need
+ * escaping: the environment variables, the builder, and its arguments.
+ */
 static BackedStringView parseString(StringViewStream & str)
 {
     expect(str, '"');
-    size_t start = 0;
-    size_t end = str.remaining.size();
-    const auto data = str.remaining.data();
-    bool foundClose = false;
-    while (start < end) {
-        auto idx = str.remaining.find('"', start);
-        if (idx == std::string_view::npos) {
-            break;
-        }
-        size_t pos = idx;
-        for (; pos > 0 && data[pos - 1] == '\\'; pos--)
-            ;
-        if ((idx - pos) % 2 == 0) { // even number of backslashes
-            end = idx;
-            foundClose = true;
-            break;
-        }
-        start = idx + 1;
-    }
-    if (!foundClose)
-        throw FormatError("unterminated string in derivation");
 
-    start = 0;
-    const auto content = str.remaining.substr(start, end);
-    str.remaining.remove_prefix(end + 1);
-
-    auto nextBackslash = content.find('\\', start);
-    if (nextBackslash == std::string_view::npos) {
-        return content;
-    }
-
-    std::string res;
-    res.reserve(end);
-    do {
-        if (nextBackslash == end - 1) {
+    const auto next = [&]() -> char {
+        auto ch = str.get();
+        if (ch == EOF) {
             throw FormatError("unterminated string in derivation");
         }
-        if (nextBackslash > start) {
-            res.append(&data[start], nextBackslash - start);
+        return (char) ch;
+    };
+
+    std::string res;
+
+    while (true) {
+        auto ch = next();
+        if (ch == '"') {
+            return res;
+        } else if ((char) ch == '\\') {
+            ch = next();
+            auto escaped = escapes.lookup(ch);
+            if (!escaped.has_value()) {
+                throw FormatError("unknown escape '\\%1%'", ch);
+            }
+            res.push_back(escaped.value());
+        } else if (unescapes.lookup(ch).has_value()) {
+            // Characters that can be escaped must be escaped
+            throw FormatError("invalid character in string");
+        } else {
+            res.push_back(ch);
         }
-        res.push_back(escapes[data[nextBackslash + 1]]);
-        start = nextBackslash + 2;
-        nextBackslash = content.find('\\', start);
-    } while (nextBackslash != std::string_view::npos);
-    if (end > start) {
-        res.append(&data[start], end - start);
     }
-    return res;
+}
+
+/**
+ * Read a string which must not contain any escape sequence, and so can
+ * be taken verbatim from the input.
+ *
+ * This is for the fields drawn from restricted alphabets: store paths,
+ * output names, and the platform. An escape in one of those is not
+ * merely redundant but a second encoding of the same value, so it is
+ * rejected.
+ */
+static BackedStringView parseUnquotedString(StringViewStream & str)
+{
+    expect(str, '"');
+    auto end = str.remaining.find('"');
+    if (end == std::string_view::npos)
+        throw FormatError("unterminated string in derivation");
+    auto content = str.remaining.substr(0, end);
+    // Already know that it ends in an endquote from the find, no need to check again
+    str.remaining.remove_prefix(end + 1);
+    if (content.find('\\') != std::string_view::npos)
+        throw FormatError("unexected escape sequence in unquoted string");
+
+    return content;
 }
 
 /* Store paths in derivations must be written in their canonical form. */
 static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str)
 {
-    return store.parseStorePathCanonical(*parseString(str));
+    return store.parseStorePathCanonical(*parseUnquotedString(str));
 }
 
-static bool endOfList(StringViewStream & str)
+/**
+ * Parse a `[...]`-delimited list, calling `parseItem` for each item.
+ */
+static void parseList(StringViewStream & str, auto parseItem)
 {
-    if (str.peek() == ',') {
-        str.get();
-        return false;
-    }
+    expect(str, '[');
+
+    /* The empty list is the one case with no item to parse. */
     if (str.peek() == ']') {
         str.get();
-        return true;
+        return;
     }
-    return false;
+
+    while (true) {
+        parseItem();
+        auto ch = str.get();
+        if (ch == ']')
+            return;
+        if (ch != ',')
+            throw FormatError("invalid list");
+    }
+}
+
+/**
+ * The key of a container element: the element itself for a set, and the
+ * first half of the pair for a map.
+ */
+template<typename T>
+static const T & keyOf(const T & elem)
+{
+    return elem;
+}
+
+template<typename K, typename V>
+static const K & keyOf(const std::pair<const K, V> & elem)
+{
+    return elem.first;
+}
+
+/**
+ * Check that `key` may be appended to an ordered container: the ATerm
+ * encoding is canonical, so items must appear in ascending order, and
+ * not be duplicated, lest the same value have multiple encodings.
+ *
+ * Comparing against the last element rather than inspecting an insert
+ * result means the caller can then insert with a hint of `end()`, which
+ * is amortized constant time rather than logarithmic.
+ *
+ * @param describe renders the offending item for the error message. It
+ * is a callback because rendering can be expensive, and we only need it
+ * when something is wrong.
+ */
+static void checkMonotonic(const auto & c, const auto & key, auto describe)
+{
+    if (c.empty())
+        return;
+    const auto & last = keyOf(*c.rbegin());
+    if (last == key) [[unlikely]] /* Must not be duplicated. */
+        throw FormatError("duplicate %s", describe());
+    if (!(last < key)) [[unlikely]]
+        throw FormatError("%s does not appear in a sorted order", describe());
+}
+
+/**
+ * Parse a list of `(key, value)` pairs into an ordered map, requiring
+ * the keys to be monotonic per `checkMonotonic`.
+ *
+ * @param parseKey parses a key
+ * @param parseValue parses the value belonging to the just-parsed key
+ * @param describe renders a key for error messages
+ */
+static void parseMap(StringViewStream & str, auto & map, auto parseKey, auto parseValue, auto describe)
+{
+    parseList(str, [&] {
+        expect(str, '(');
+        auto key = parseKey();
+        expect(str, ',');
+        auto value = parseValue(key);
+        checkMonotonic(map, key, [&] { return describe(key); });
+        map.emplace_hint(map.end(), std::move(key), std::move(value));
+        expect(str, ')');
+    });
 }
 
 static StringSet parseStrings(StringViewStream & str)
 {
     StringSet res;
-    expect(str, '[');
-    while (!endOfList(str))
-        res.insert(parseString(str).toOwned());
+    parseList(str, [&] {
+        auto content = parseUnquotedString(str).toOwned();
+        checkMonotonic(res, content, [&] { return fmt("set item '%s'", content); });
+        res.insert(res.end(), std::move(content));
+    });
     return res;
 }
 
 static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str)
 {
     StorePathSet res;
-    expect(str, '[');
-    while (!endOfList(str))
-        res.insert(parseStorePath(store, str));
+    parseList(str, [&] {
+        auto path = parseStorePath(store, str);
+        checkMonotonic(res, path, [&] { return fmt("store path '%s'", store.printStorePath(path)); });
+        res.insert(res.end(), std::move(path));
+    });
     return res;
 }
 
@@ -237,6 +350,9 @@ static Output parseOutput(
             };
         }
     } else {
+        if (!hashS.empty()) {
+            throw FormatError("hash specified without hash algorithm");
+        }
         if (pathS.empty()) {
             return Output::Deferred{};
         }
@@ -304,14 +420,13 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
         case '(':
             expect(str, '(');
             node.value = parseStrings(str);
-            expect(str, ",["sv);
-            while (!endOfList(str)) {
-                expect(str, '(');
-                auto outputName = parseString(str).toOwned();
-                expect(str, ',');
-                node.childMap.insert_or_assign(outputName, parseDerivedPathMapNode(store, str, version));
-                expect(str, ')');
-            }
+            expect(str, ',');
+            parseMap(
+                str,
+                node.childMap,
+                [&] { return parseString(str).toOwned(); },
+                [&](const auto &) { return parseDerivedPathMapNode(store, str, version); },
+                [](const auto & outputName) { return fmt("output name '%s'", outputName); });
             expect(str, ')');
             break;
         default:
@@ -365,60 +480,67 @@ Full parse(
     }
 
     /* Parse the list of outputs. */
-    expect(str, '[');
-    while (!endOfList(str)) {
+    /* Not a `parseMap`: the entry is a flat 4-tuple of name and the
+       three output fields, not a name paired with a value. */
+    parseList(str, [&] {
         expect(str, '(');
-        std::string id = parseString(str).toOwned();
+        auto id = parseUnquotedString(str).toOwned();
         auto output = parseOutput(store, name, id, str, xpSettings);
-        drv.outputs.emplace(std::move(id), std::move(output));
-    }
+        checkMonotonic(drv.outputs, id, [&] { return fmt("output name '%s'", id); });
+        drv.outputs.emplace_hint(drv.outputs.end(), std::move(id), std::move(output));
+    });
 
     /* Parse the list of input derivations. */
     derivation::FullInputs fullInputs;
-    expect(str, ",["sv);
-    while (!endOfList(str)) {
-        expect(str, '(');
-        auto drvPath = parseStorePath(store, str);
-        expect(str, ',');
-        auto node = parseDerivedPathMapNode(store, str, version);
-        /* Such an entry cannot be represented in the flat inputs set,
-           and would thus be silently dropped rather than round-tripped.
-           Nix itself never produces one. */
-        if (node.value.empty() && node.childMap.empty())
-            throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
-        fullInputs.drvs.map.insert_or_assign(std::move(drvPath), std::move(node));
-        expect(str, ')');
-    }
+    expect(str, ',');
+    parseMap(
+        str,
+        fullInputs.drvs.map,
+        [&] {
+            auto drvPath = parseStorePath(store, str);
+            drvPath.requireDerivation();
+            return drvPath;
+        },
+        [&](const StorePath & drvPath) {
+            auto node = parseDerivedPathMapNode(store, str, version);
+            /* Such an entry cannot be represented in the flat inputs set,
+               and would thus be silently dropped rather than round-tripped.
+               Nix itself never produces one. */
+            if (node.value.empty() && node.childMap.empty())
+                throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
+            return node;
+        },
+        [&](const StorePath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
 
     expect(str, ',');
     fullInputs.srcs = parseStorePaths(store, str);
     drv.inputs = fullInputs.toSet();
     expect(str, ',');
-    drv.platform = parseString(str).toOwned();
+    drv.platform = parseUnquotedString(str).toOwned();
     expect(str, ',');
     drv.builder = parseString(str).toOwned();
 
     /* Parse the builder arguments. */
-    expect(str, ",["sv);
-    while (!endOfList(str))
-        drv.args.push_back(parseString(str).toOwned());
+    expect(str, ',');
+    parseList(str, [&] { drv.args.push_back(parseString(str).toOwned()); });
 
     /* Parse the environment variables. */
-    expect(str, ",["sv);
-    while (!endOfList(str)) {
-        expect(str, '(');
-        auto name = parseString(str).toOwned();
-        expect(str, ',');
-        auto value = parseString(str);
-        if (name == StructuredAttrs::envVarName) {
-            drv.structuredAttrs = StructuredAttrs::parse(*std::move(value));
-        } else {
-            drv.env.insert_or_assign(std::move(name), std::move(value).toOwned());
-        }
-        expect(str, ')');
-    }
+    expect(str, ',');
+    parseMap(
+        str,
+        drv.env,
+        [&] { return parseString(str).toOwned(); },
+        [&](const auto &) { return parseString(str).toOwned(); },
+        [](const auto & name) { return fmt("environment variable '%s'", name); });
+
+    /* Structured attrs are just an ordinary environment variable as far
+       as the ATerm is concerned, so only take them out once the whole
+       map is parsed, and the ordering checks have seen them. */
+    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     expect(str, ')');
+    if (!str.remaining.empty())
+        throw FormatError("expected end of file, found '%s'", str.remaining);
     return drv;
 }
 
@@ -445,21 +567,15 @@ static void printString(std::string & res, std::string_view s)
         s.remove_prefix(chunk.size());
         char * buf = buffer.data();
         char * p = buf;
-        for (auto c : chunk)
-            if (c == '\"' || c == '\\') {
+        for (auto c : chunk) {
+            auto escape = unescapes.lookup(c);
+            if (escape.has_value()) {
                 *p++ = '\\';
+                *p++ = escape.value();
+            } else {
                 *p++ = c;
-            } else if (c == '\n') {
-                *p++ = '\\';
-                *p++ = 'n';
-            } else if (c == '\r') {
-                *p++ = '\\';
-                *p++ = 'r';
-            } else if (c == '\t') {
-                *p++ = '\\';
-                *p++ = 't';
-            } else
-                *p++ = c;
+            }
+        }
         res.append(buf, p - buf);
     }
     res += '"';
