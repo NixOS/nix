@@ -1,0 +1,16 @@
+error:
+       … while using the result of the `__toString` attribute
+         at /pwd/lang/eval-fail-toString-returns-non-coercible.nix:2:6:
+            1| # interpolation checks the return type of __toString
+            2| "${{ __toString = self: null; }}"
+             |      ^
+            3|
+
+       … while evaluating a path segment
+         at /pwd/lang/eval-fail-toString-returns-non-coercible.nix:2:2:
+            1| # interpolation checks the return type of __toString
+            2| "${{ __toString = self: null; }}"
+             |  ^
+            3|
+
+       error: cannot coerce null to a string: null
