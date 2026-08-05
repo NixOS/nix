@@ -151,7 +151,7 @@ void drainFD(Descriptor fd, Sink & sink, DrainFdSinkOpts opts)
 #endif
 
     size_t bytesRead = 0;
-    std::array<std::byte, 64 * 1024> buf;
+    std::vector<std::byte> buf(64 * 1024);
     while (1) {
         checkInterrupt();
 
