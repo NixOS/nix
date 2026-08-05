@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
@@ -238,11 +239,11 @@ void derivationToValue(EvalState & state, const SourcePath & path, const StorePa
                 NixStringContextElem::DrvDeep{.drvPath = storePath},
             },
             state.mem);
-    attrs.alloc(state.s.name).mkString(drv.env["name"], state.mem);
+    attrs.alloc(state.s.name).mkString(drv.env["name"].value, state.mem);
 
     auto list = state.buildList(drv.outputs.size());
     for (const auto & [i, o] : enumerate(drv.outputs)) {
-        mkOutputString(state, attrs, storePath, o);
+        mkOutputString(state, attrs, storePath, {o.first, o.second.output});
         (list[i] = state.allocValue())->mkString(o.first, state.mem);
     }
     attrs.alloc(state.s.outputs).mkList(list);
@@ -1787,18 +1788,28 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputs.srcs.insert(j);
+                        drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            drv.inputs.drvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                                drv.inputs.insert(
+                                    SingleDerivedPath::Built{
+                                        .drvPath = makeConstantStorePathRef(j),
+                                        .output = outputName,
+                                    });
+                            }
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputs.drvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.insert(
+                        SingleDerivedPath::Built{
+                            .drvPath = b.drvPath,
+                            .output = b.output,
+                        });
                 },
                 [&](const NixStringContextElem::Opaque & o) {
                     state.ensureLazyPathCopied(o.path);
-                    drv.inputs.srcs.insert(o.path);
+                    drv.inputs.insert(SingleDerivedPath::Opaque{o.path});
                 },
             },
             c.raw);
@@ -1846,8 +1857,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         };
 
         if (!isSubmittingOutputs)
-            drv.env["out"] = state.store->printStorePath(dof.path(*state.store, drvName, "out"));
-        drv.outputs.insert_or_assign("out", std::move(dof));
+            drv.env["out"] = {.value = state.store->printStorePath(dof.path(*state.store, drvName, "out"))};
+        drv.outputs.insert_or_assign("out", decltype(drv.outputs)::mapped_type{.output = std::move(dof)});
     }
 
     else if (contentAddressed || isImpure) {
@@ -1859,21 +1870,23 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
         for (auto & i : outputs) {
             if (!isSubmittingOutputs)
-                drv.env[i] = hashPlaceholder(i);
+                drv.env[i] = {.value = hashPlaceholder(i)};
             if (isImpure)
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutput::Impure{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
+                    decltype(drv.outputs)::mapped_type{
+                        .output = DerivationOutput::Impure{
+                            .method = method,
+                            .hashAlgo = ha,
+                        }});
             else
                 drv.outputs.insert_or_assign(
                     i,
-                    DerivationOutput::CAFloating{
-                        .method = method,
-                        .hashAlgo = ha,
-                    });
+                    decltype(drv.outputs)::mapped_type{
+                        .output = DerivationOutput::CAFloating{
+                            .method = method,
+                            .hashAlgo = ha,
+                        }});
         }
     }
 
@@ -1885,12 +1898,22 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
            that changes in the set of output names do get reflected in
            the hash. */
         for (auto & i : outputs) {
-            drv.env[i] = "";
-            drv.outputs.insert_or_assign(i, DerivationOutput::Deferred{});
+            drv.env[i] = {};
+            drv.outputs.insert_or_assign(i, decltype(drv.outputs)::mapped_type{.output = DerivationOutput::Deferred{}});
         }
-
-        fillInOutputPaths(drv, *state.store);
     }
+
+    /* Parse the legacy environment-variable (and structured-attributes)
+       encodings of the derivation options into their first-class
+       fields, so that the two are in sync (which the ATerm
+       serialization requires). Must happen after the outputs are
+       populated, so per-output checks have somewhere to land, and
+       before output paths are filled in, which consults the options.
+       The warnings for dubious values were already emitted above. */
+    elaborateLegacyOptions(*state.store, drv, /*shouldWarn=*/false);
+
+    if (!outputHash && !contentAddressed && !isImpure)
+        fillInOutputPaths(drv, *state.store);
 
     /* Write the resulting term into the Nix store directory.
 
@@ -1920,7 +1943,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
             },
             state.mem);
     for (auto & i : drv.outputs)
-        mkOutputString(state, result, drvPath, i);
+        mkOutputString(state, result, drvPath, {i.first, i.second.output});
 
     v.mkAttrs(result);
 }

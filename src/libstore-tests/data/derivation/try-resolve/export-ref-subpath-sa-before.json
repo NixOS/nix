@@ -1,9 +1,7 @@
 {
   "args": [],
   "builder": "/bin/bash",
-  "env": {
-    "__json": "{\"exportReferencesGraph\":{\"refs\":[\"/19r5f6rm1xa6ii9sam7fqbmaj8skmasskfj0rixxb1zjpqcy470p/foo\"]}}"
-  },
+  "env": {},
   "inputs": {
     "drvs": {
       "g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv": {
@@ -16,10 +14,24 @@
     "srcs": []
   },
   "name": "export-ref-subpath-sa",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
+      "checks": null,
       "hashAlgo": "sha256",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
   "structuredAttrs": {
@@ -30,5 +42,5 @@
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

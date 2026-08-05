@@ -252,7 +252,9 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
     drv.args = {store->printStorePath(getEnvShPath)};
 
-    /* Remove derivation checks. */
+    /* Remove derivation checks, both the first-class options and their
+       legacy environment-variable (and structured-attributes) encoding,
+       which must stay in sync. */
     if (drv.structuredAttrs) {
         drv.structuredAttrs->structuredAttrs.erase("outputChecks");
     } else {
@@ -261,30 +263,33 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
         drv.env.erase("disallowedReferences");
         drv.env.erase("disallowedRequisites");
     }
+    drv.options.allOutputChecks = std::nullopt;
+    for (auto & [_, output] : drv.outputs)
+        output.options.checks = std::nullopt;
 
     drv.env.erase("name");
 
     /* Rehash and write the derivation. FIXME: would be nice to use
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
-    drv.env.emplace("name", drv.name);
-    drv.inputs.srcs.insert(std::move(getEnvShPath));
+    drv.env.emplace("name", derivation::EnvValue{.value = drv.name});
+    drv.inputs.insert(SingleDerivedPath::Opaque{std::move(getEnvShPath)});
     for (auto & [outputName, output] : drv.outputs) {
         std::visit(
             overloaded{
                 [&](const DerivationOutput::InputAddressed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
+                    output.output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = {};
                 },
                 [&](const DerivationOutput::CAFixed &) {
-                    output = DerivationOutput::Deferred{};
-                    drv.env[outputName] = "";
+                    output.output = DerivationOutput::Deferred{};
+                    drv.env[outputName] = {};
                 },
                 [&](const auto &) {
                     // Do nothing for other types (CAFloating, Deferred, Impure)
                 },
             },
-            output.raw);
+            output.output.raw);
     }
     fillInOutputPaths(drv, *evalStore);
 

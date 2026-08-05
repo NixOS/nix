@@ -3,6 +3,8 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/elaborate.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 
@@ -185,36 +187,38 @@ struct DerivationJsonAtermTest : DerivationTest,
 
 MAKE_TEST_P(DerivationJsonAtermTest);
 
-INSTANTIATE_TEST_SUITE_P(
-    DerivationJSONATerm,
-    DerivationJsonAtermTest,
-    ::testing::Values(
-        Derivation{
-            .outputs = {},
-            .inputs{
-                .srcs{
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
-                },
-                .drvs{.map{
-                    {
-                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                        {
-                            .value{
-                                "cat",
-                                "dog",
-                            },
-                        },
-                    },
-                }},
-            },
-            .platform = "wasm-sel4",
-            .builder = "foo",
-            .args = {"bar", "baz"},
-            .env{
-                {"BIG_BAD", "WOLF"},
-            },
-            .name = "simple-derivation",
-        }));
+INSTANTIATE_TEST_SUITE_P(DerivationJSONATerm, DerivationJsonAtermTest, ::testing::Values([] {
+                             Derivation drv{
+                                 .name = "simple-derivation",
+                                 .outputs = {},
+                                 .inputs =
+                                     derivation::FullInputs{
+                                         .srcs{
+                                             StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+                                         },
+                                         .drvs{.map{
+                                             {
+                                                 StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+                                                 {
+                                                     .value{
+                                                         "cat",
+                                                         "dog",
+                                                     },
+                                                 },
+                                             },
+                                         }},
+                                     }
+                                         .toSet(),
+                                 .platform = "wasm-sel4",
+                                 .builder = "foo",
+                                 .args = {"bar", "baz"},
+                                 .env{
+                                     {"BIG_BAD", {.value = "WOLF"}},
+                                 },
+                             };
+                             drv = derivation::ATerm::lower(drv).elaborate(StoreDirConfig{"/nix/store"}, drv.name);
+                             return drv;
+                         }()));
 
 struct DynDerivationJsonAtermTest : DynDerivationTest,
                                     JsonCharacterizationTest<Derivation>,
@@ -225,36 +229,40 @@ MAKE_TEST_P(DynDerivationJsonAtermTest);
 
 Derivation makeDynDepDerivation()
 {
-    return Derivation{
+    Derivation drv{
+        .name = "dyn-dep-derivation",
         .outputs = {},
-        .inputs{
-            .srcs{
-                StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
-            },
-            .drvs{.map{
-                {
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                    DerivedPathMap<StringSet>::ChildNode{
-                        .value{
-                            "cat",
-                            "dog",
-                        },
-                        .childMap{
-                            {"cat", DerivedPathMap<StringSet>::ChildNode{.value = {"kitten"}}},
-                            {"goose", DerivedPathMap<StringSet>::ChildNode{.value = {"gosling"}}},
+        .inputs =
+            derivation::FullInputs{
+                .srcs{
+                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+                },
+                .drvs{.map{
+                    {
+                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
+                        DerivedPathMap<StringSet>::ChildNode{
+                            .value{
+                                "cat",
+                                "dog",
+                            },
+                            .childMap{
+                                {"cat", DerivedPathMap<StringSet>::ChildNode{.value = {"kitten"}}},
+                                {"goose", DerivedPathMap<StringSet>::ChildNode{.value = {"gosling"}}},
+                            },
                         },
                     },
-                },
-            }},
-        },
+                }},
+            }
+                .toSet(),
         .platform = "wasm-sel4",
         .builder = "foo",
         .args = {"bar", "baz"},
         .env{
-            {"BIG_BAD", "WOLF"},
+            {"BIG_BAD", {.value = "WOLF"}},
         },
-        .name = "dyn-dep-derivation",
     };
+    drv = derivation::ATerm::lower(drv).elaborate(StoreDirConfig{"/nix/store"}, drv.name);
+    return drv;
 }
 
 INSTANTIATE_TEST_SUITE_P(DynDerivationJSONATerm, DynDerivationJsonAtermTest, ::testing::Values(makeDynDepDerivation()));

@@ -8,17 +8,16 @@ namespace nix {
 
 class Store;
 
+struct SingleDerivedPath;
+
 namespace derivation {
-template<typename Inputs, typename Out>
+template<typename Input, typename Out>
 struct Derivation;
-struct FullInputs;
 struct Output;
-template<typename Input>
-struct Options;
 } // namespace derivation
 
-using Derivation = derivation::Derivation<derivation::FullInputs, derivation::Output>;
-using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
+using Derivation = derivation::Derivation<SingleDerivedPath, derivation::Output>;
+using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
 
 /**
  * Derivations claim to "just" specify their environment variables, but
@@ -82,15 +81,8 @@ struct DesugaredEnv
      * Given a (resolved) derivation, its options, and the closure of
      * its inputs (which we can get since the derivation is resolved),
      * desugar the environment to create a `DesguaredEnv`.
-     *
-     * @todo drvOptions will go away as a separate argument when it is
-     * just part of `Derivation`.
      */
-    static DesugaredEnv create(
-        Store & store,
-        const BasicDerivation & drv,
-        const derivation::Options<StorePath> & drvOptions,
-        const StorePathSet & inputPaths);
+    static DesugaredEnv create(Store & store, const BasicDerivation & drv, const StorePathSet & inputPaths);
 };
 
 } // namespace nix

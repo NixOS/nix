@@ -59,6 +59,7 @@ sources = files(
   'content-address.cc',
   'derivation-advanced-attrs.cc',
   'derivation/external-formats.cc',
+  'derivation/full-inputs.cc',
   'derivation/invariants.cc',
   'derivations.cc',
   'derived-path.cc',
