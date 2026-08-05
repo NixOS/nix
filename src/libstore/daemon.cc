@@ -635,7 +635,11 @@ static void performOp(
          * it cannot be trusted that its outPath was calculated
          * correctly.
          */
-        derivation::read(conn.from, *store, drv, Derivation::nameFromPath(drvPath));
+        {
+            derivation::BasicATerm drvATerm;
+            derivation::read(conn.from, *store, drvATerm, Derivation::nameFromPath(drvPath));
+            drv = drvATerm.elaborate(*store, Derivation::nameFromPath(drvPath));
+        }
         auto buildMode = WorkerProto::Serialise<BuildMode>::read(*store, rconn);
         logger->startWork();
 

@@ -182,16 +182,16 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Create a CA floating output derivation
     Derivation drv{
+        .name = "test-ca-drv",
         .outputs{
             {
                 "out",
-                DerivationOutput{DerivationOutput::CAFloating{
-                    .method = ContentAddressMethod::Raw::NixArchive,
-                    .hashAlgo = HashAlgorithm::SHA256,
-                }},
+                {.output = DerivationOutput{DerivationOutput::CAFloating{
+                     .method = ContentAddressMethod::Raw::NixArchive,
+                     .hashAlgo = HashAlgorithm::SHA256,
+                 }}},
             },
         },
-        .name = "test-ca-drv",
     };
 
     // Write the derivation to the destination store
@@ -281,10 +281,10 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     depDrv.outputs = {
         {
             "out",
-            DerivationOutput{DerivationOutput::CAFloating{
-                .method = ContentAddressMethod::Raw::NixArchive,
-                .hashAlgo = HashAlgorithm::SHA256,
-            }},
+            {.output = DerivationOutput{DerivationOutput::CAFloating{
+                 .method = ContentAddressMethod::Raw::NixArchive,
+                 .hashAlgo = HashAlgorithm::SHA256,
+             }}},
         },
     };
 
@@ -321,13 +321,14 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Create the root CA floating derivation that depends on depDrv
     Derivation rootDrv{
+        .name = "root-drv",
         .outputs{
             {
                 "out",
-                DerivationOutput{DerivationOutput::CAFloating{
-                    .method = ContentAddressMethod::Raw::NixArchive,
-                    .hashAlgo = HashAlgorithm::SHA256,
-                }},
+                {.output = DerivationOutput{DerivationOutput::CAFloating{
+                     .method = ContentAddressMethod::Raw::NixArchive,
+                     .hashAlgo = HashAlgorithm::SHA256,
+                 }}},
             },
         },
         // Add the dependency derivation as an input
@@ -337,7 +338,6 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
                 .output = "out",
             },
         },
-        .name = "root-drv",
     };
 
     // Write the root derivation to the destination store

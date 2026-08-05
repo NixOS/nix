@@ -440,8 +440,7 @@ gid_t ChrootLinuxDerivationBuilder::sandboxGid()
 
 std::unique_ptr<UserLock> ChrootLinuxDerivationBuilder::getBuildUser()
 {
-    return acquireUserLock(
-        settings.nixStateDir, store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
+    return acquireUserLock(settings.nixStateDir, store.config->getLocalSettings(), drv.useUidRange() ? 65536 : 1, true);
 }
 
 void ChrootLinuxDerivationBuilder::prepareUser()
@@ -876,7 +875,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
     }
 
     /* Make /etc unwritable */
-    if (!drvOptions.useUidRange(drv))
+    if (!drv.useUidRange())
         chmod(chrootRootDir / "etc", 0555);
 
     /* Unshare this mount namespace. This is necessary because
