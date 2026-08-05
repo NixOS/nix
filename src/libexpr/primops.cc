@@ -3178,7 +3178,7 @@ void prim_getAttr(EvalState & state, CallSite callSite, Value * const * args, Va
     auto i = state.getAttr(state.symbols.create(attr), args[1]->attrs(), "in the attribute set under consideration");
     // !!! add to stack trace?
     if (state.countCalls && i->pos)
-        state.attrSelects[i->pos]++;
+        state.attrSelects->try_emplace_or_visit(i->pos, 1, [](auto & j) { j.second++; });
     state.forceValue(*i->value, noPos);
     v = *i->value;
 }
