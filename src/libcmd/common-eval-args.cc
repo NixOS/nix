@@ -30,8 +30,7 @@ EvalSettings evalSettings{
                 /* Const is a lie here, because settings currently carry mutables caches. */
                 const auto & fetchSettings = state.fetchSettings;
                 experimentalFeatureSettings.require(Xp::Flakes);
-                // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
+                auto flakeRef = parseFlakeRef(fetchSettings, rest, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] =
                     flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);

@@ -1,3 +1,4 @@
+#include "nix/util/json-utils.hh" // IWYU pragma: keep (partial specialization of adl_serialiser)
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/fetchers/fetch-settings.hh"
 #include "nix/util/args/root.hh"
@@ -469,7 +470,7 @@ void mainWrapped(int argc, char ** argv)
             b["args"] = primOp->args;
             b["doc"] = trim(stripIndentation(*primOp->doc));
             if (primOp->experimentalFeature)
-                b["experimental-feature"] = primOp->experimentalFeature;
+                b["experimental-feature"] = *primOp->experimentalFeature;
             builtinsJson.emplace(state.symbols[builtin.name], std::move(b));
         }
         for (auto & [name, info] : state.constantInfos) {

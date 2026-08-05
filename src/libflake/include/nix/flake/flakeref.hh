@@ -96,7 +96,7 @@ std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef);
  */
 FlakeRef parseFlakeRef(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
@@ -107,7 +107,7 @@ FlakeRef parseFlakeRef(
  */
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true,
@@ -118,7 +118,7 @@ std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
  */
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir = {},
     bool allowMissing = false,
     bool isFlake = true);

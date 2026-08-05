@@ -73,7 +73,7 @@ FlakeRef::resolve(const fetchers::Settings & fetchSettings, Store & store, fetch
 
 FlakeRef parseFlakeRef(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
@@ -100,7 +100,7 @@ fromParsedURL(const fetchers::Settings & fetchSettings, ParsedURL && parsedURL, 
 
 std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
@@ -108,8 +108,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
 {
     static std::regex pathFlakeRegex(R"(([^?#]*)(\?([^#]*))?(#(.*))?)", std::regex::ECMAScript);
 
-    std::smatch match;
-    auto succeeds = std::regex_match(url, match, pathFlakeRegex);
+    std::match_results<std::string_view::const_iterator> match;
+    auto succeeds = std::regex_match(url.begin(), url.end(), match, pathFlakeRegex);
     if (!succeeds)
         throw Error("invalid flakeref '%s'", url);
     std::filesystem::path path = match[1].str();
@@ -220,15 +220,16 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
  * `flake:<flake-id>?ref=<ref>&rev=<rev>`.
  */
 static std::optional<std::pair<FlakeRef, std::string>>
-parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & url, bool isFlake)
+parseFlakeIdRef(const fetchers::Settings & fetchSettings, std::string_view url, bool isFlake)
 {
-    std::smatch match;
+    /* https://lists.isocpp.org/std-proposals/att-0008/Dxxxx_string_view_support_for_regex.pdf */
+    std::match_results<std::string_view::const_iterator> match;
 
     static std::regex flakeRegex(
         "((" + flakeIdRegexS + ")(?:/(?:" + refAndOrRevRegex + "))?)" + "(?:#(" + fragmentRegex + "))?",
         std::regex::ECMAScript);
 
-    if (std::regex_match(url, match, flakeRegex)) {
+    if (std::regex_match(url.begin(), url.end(), match, flakeRegex)) {
         auto parsedURL = ParsedURL{
             .scheme = "flake",
             .authority = std::nullopt,
@@ -244,7 +245,7 @@ parseFlakeIdRef(const fetchers::Settings & fetchSettings, const std::string & ur
 
 std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir,
     bool isFlake)
 {
@@ -264,7 +265,7 @@ std::optional<std::pair<FlakeRef, std::string>> parseURLFlakeRef(
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake,
@@ -348,7 +349,7 @@ FlakeRef FlakeRef::canonicalize() const
 
 std::tuple<FlakeRef, std::string, ExtendedOutputsSpec> parseFlakeRefWithFragmentAndExtendedOutputsSpec(
     const fetchers::Settings & fetchSettings,
-    const std::string & url,
+    std::string_view url,
     const std::optional<std::filesystem::path> & baseDir,
     bool allowMissing,
     bool isFlake)
