@@ -216,7 +216,7 @@ fi
 # Only fast-fail should be reported as a failure.
 # Uses fifo for synchronization to ensure deterministic behavior.
 # Requires -j2 so slow and fast-fail run concurrently (fifo deadlocks if serialized).
-if isDaemonNewer "2.34pre" && canUseSandbox; then
+if isDaemonNewer "2.34pre" && canUseSandbox && unprivilegedUserNamespacesSupported; then
     fifoDir="$TEST_ROOT/cancelled-builds-fifo"
     mkdir -p "$fifoDir"
     mkfifo "$fifoDir/fifo"
@@ -229,7 +229,6 @@ if isDaemonNewer "2.34pre" && canUseSandbox; then
     if ! isTestOnNixOS; then
         sandboxPathsArg=(--option sandbox-paths "/nix/store")
     fi
-    cat /proc/sys/user/max_user_namespaces /proc/sys/user/max_pid_namespaces >&2 || true
     out="$(nix flake check ./cancelled-builds --no-sandbox-fallback --impure -L -j2 \
         --option sandbox true \
         "${sandboxPathsArg[@]}" \

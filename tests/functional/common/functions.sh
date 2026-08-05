@@ -352,8 +352,14 @@ count() {
 
 trap onError ERR
 
+# Note: with newer AppArmor stacks, this restriction doesn't prevent *creating*
+# a user namespace, but denies mounting inside it, which Nix's sandbox needs.
+unprivilegedUserNamespacesSupported() {
+  ! { [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ $(< /proc/sys/kernel/apparmor_restrict_unprivileged_userns) -eq 1 ]]; }
+}
+
 requiresUnprivilegedUserNamespaces() {
-  if [[ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]] && [[ $(< /proc/sys/kernel/apparmor_restrict_unprivileged_userns) -eq 1 ]]; then
+  if ! unprivilegedUserNamespacesSupported; then
     skipTest "Unprivileged user namespaces are disabled. Run 'sudo sysctl -w /proc/sys/kernel/apparmor_restrict_unprivileged_userns=0' to allow, and run these tests."
   fi
 }
