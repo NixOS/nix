@@ -43,8 +43,8 @@ struct Derivation;
 struct Output;
 } // namespace derivation
 
-using BasicDerivation = derivation::Derivation<StorePathSet, derivation::Output>;
-using Derivation = derivation::Derivation<std::set<SingleDerivedPath>, derivation::Output>;
+using BasicDerivation = derivation::Derivation<StorePath, derivation::Output>;
+using Derivation = derivation::Derivation<SingleDerivedPath, derivation::Output>;
 
 struct SourceAccessor;
 struct NarInfoDiskCache;

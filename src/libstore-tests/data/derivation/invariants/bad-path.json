@@ -10,11 +10,25 @@
     "srcs": []
   },
   "name": "bad-path",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
-      "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name"
+      "checks": null,
+      "path": "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-wrong-name",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

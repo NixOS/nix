@@ -53,4 +53,19 @@ Full unresolve(const Basic & drv);
 
 } // namespace derivation
 
+/**
+ * Resolve the derivation-option fields of @a drv onto @a resolved,
+ * mapping any references to derivation outputs to concrete store paths
+ * via @a queryResolutionChain.
+ *
+ * This is the options part of `derivation::tryResolve`.
+ *
+ * @return false if some reference could not be resolved.
+ */
+bool tryResolveDerivationOptions(
+    const Derivation & drv,
+    BasicDerivation & resolved,
+    fun<std::optional<StorePath>(ref<const SingleDerivedPath> drvPath, const std::string & outputName)>
+        queryResolutionChain);
+
 } // namespace nix

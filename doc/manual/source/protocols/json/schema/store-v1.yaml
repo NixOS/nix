@@ -56,7 +56,7 @@ properties:
       Map of [store path](@docroot@/store/store-path.md) base names (always ending in `.drv`) to [derivations](@docroot@/store/derivation/index.md).
     patternProperties:
       "^[0123456789abcdfghijklmnpqrsvwxyz]{32}-.+\\.drv$":
-        "$ref": "./derivation-v4.yaml"
+        "$ref": "./derivation-v5.yaml"
     additionalProperties: false
 
   buildTrace:

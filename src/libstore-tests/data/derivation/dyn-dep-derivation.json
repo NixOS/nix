@@ -35,7 +35,19 @@
     ]
   },
   "name": "dyn-dep-derivation",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {},
   "system": "wasm-sel4",
-  "version": 4
+  "version": 5
 }

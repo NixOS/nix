@@ -1,0 +1,114 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-top-options-v1.json"
+title: Derivation Options
+description: |
+  JSON representation of the [options](@docroot@/store/derivation/index.md#options) that apply to a derivation as a whole.
+
+  Options that apply to individual outputs appear inline in the derivation's `outputs` map instead;
+  see [Derivation Output Checks](derivation-output-checks-v1.yaml).
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - allOutputChecks
+  - exportReferencesGraph
+  - additionalSandboxProfile
+  - noChroot
+  - impureHostDeps
+  - impureEnvVars
+  - allowLocalNetworking
+  - requiredSystemFeatures
+  - preferLocalBuild
+  - allowSubstitutes
+properties:
+  allOutputChecks:
+    title: Checks For All Outputs
+    description: |
+      A single set of [output checks](@docroot@/store/derivation/outputs/index.md#output-checks) applying to every output of the derivation, or `null` if there is none.
+
+      Checks may instead be specified per output, inline in the derivation's `outputs` map;
+      see [Derivation Output Checks](derivation-output-checks-v1.yaml).
+    oneOf:
+      - type: "null"
+      - "$ref": "derivation-output-checks-v1.yaml#/$defs/outputChecks"
+  exportReferencesGraph:
+    type: object
+    title: Export References Graph
+    description: |
+      See [*export references graph*](@docroot@/store/derivation/index.md#export-references-graph).
+    additionalProperties:
+      type: array
+      items:
+        "$ref": "deriving-path-v1.yaml"
+  additionalSandboxProfile:
+    type: string
+    title: Additional Sandbox Profile
+    description: |
+      See [*additional sandbox profile*](@docroot@/store/derivation/index.md#additional-sandbox-profile). (macOS specific.)
+  noChroot:
+    type: boolean
+    title: No Chroot
+    description: |
+      See [*no chroot*](@docroot@/store/derivation/index.md#no-chroot).
+  impureHostDeps:
+    type: array
+    title: Impure Host Dependencies
+    description: |
+      See [*impure host dependencies*](@docroot@/store/derivation/index.md#impure-host-deps). (macOS specific.)
+    items:
+      type: string
+  impureEnvVars:
+    type: array
+    title: Impure Environment Variables
+    description: |
+      See [*impure environment variables*](@docroot@/store/derivation/index.md#impure-env-vars).
+    items:
+      type: string
+  allowLocalNetworking:
+    type: boolean
+    title: Allow Local Networking
+    description: |
+      See [*allow local networking*](@docroot@/store/derivation/index.md#allow-local-networking). (macOS specific.)
+  requiredSystemFeatures:
+    type: array
+    title: Required System Features
+    description: |
+      See [*required system features*](@docroot@/store/derivation/index.md#required-system-features).
+    items:
+      type: string
+  preferLocalBuild:
+    type: boolean
+    title: Prefer Local Build
+    description: |
+      See [*prefer local build*](@docroot@/store/derivation/index.md#prefer-local-build).
+  allowSubstitutes:
+    type: boolean
+    title: Allow Substitutes
+    description: |
+      See [*allow substitutes*](@docroot@/store/derivation/index.md#allow-substitutes).
+additionalProperties: false
+
+"$defs":
+  resolved:
+    title: Derivation Options (resolved)
+    description: |
+      Like the [derivation options](#) above, but for a
+      [resolved derivation](derivation-resolved-v5.yaml):
+      all references are plain store paths rather than deriving paths,
+      since a resolved derivation has no derivation dependencies left to refer to.
+    allOf:
+      - "$ref": "#"
+      - properties:
+          allOutputChecks:
+            oneOf:
+              - type: "null"
+              - "$ref": "derivation-output-checks-v1.yaml#/$defs/outputChecksResolved"
+          exportReferencesGraph:
+            additionalProperties:
+              items:
+                "$ref": "store-path-v1.yaml"

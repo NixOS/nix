@@ -1,0 +1,55 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "dev": "/02qcpld1y6xhs5gz9bchpxaw0xdhmsp5dv88lh25r2ss44kh8dxz",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "advanced-attributes-structured-attrs-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
+  "outputs": {
+    "dev": {
+      "checks": null,
+      "hashAlgo": "sha256",
+      "method": "nar",
+      "unsafeDiscardReferences": false
+    },
+    "out": {
+      "checks": null,
+      "hashAlgo": "sha256",
+      "method": "nar",
+      "unsafeDiscardReferences": false
+    }
+  },
+  "structuredAttrs": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-structured-attrs-defaults",
+    "outputHashAlgo": "sha256",
+    "outputHashMode": "recursive",
+    "outputs": [
+      "out",
+      "dev"
+    ],
+    "system": "my-system"
+  },
+  "system": "my-system",
+  "version": 5
+}

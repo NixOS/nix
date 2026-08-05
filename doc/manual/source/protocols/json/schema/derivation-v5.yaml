@@ -1,5 +1,5 @@
 "$schema": "http://json-schema.org/draft-04/schema"
-"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v4.json"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-v5.json"
 title: Derivation
 description: |
   Experimental JSON representation of a Nix derivation (version 4).
@@ -22,6 +22,7 @@ required:
   - builder
   - args
   - env
+  - options
 properties:
   name: { "$ref": "#/$defs/common/properties/name" }
   version: { "$ref": "#/$defs/common/properties/version" }
@@ -31,6 +32,7 @@ properties:
   args: { "$ref": "#/$defs/common/properties/args" }
   env: { "$ref": "#/$defs/common/properties/env" }
   structuredAttrs: { "$ref": "#/$defs/common/properties/structuredAttrs" }
+  options: { "$ref": "#/$defs/common/properties/options" }
 
   inputs:
     type: object
@@ -99,10 +101,10 @@ additionalProperties: false
           Used when calculating store paths for the derivation's outputs.
 
       version:
-        const: 4
+        const: 5
         title: Format version (must be 4)
         description: |
-          Must be `4`.
+          Must be `5`.
           This is a guard that allows us to continue evolving this format.
           The choice of `3` is fairly arbitrary, but corresponds to this informal version:
 
@@ -119,6 +121,14 @@ additionalProperties: false
             - Reorganize inputs into nested structure (`inputs.srcs` and `inputs.drvs`)
 
             - Use canonical content address JSON format for floating content addressed derivation outputs.
+
+          - Version 5: Derivation options become first-class:
+
+            - New required `options` field for the top-level derivation options.
+
+            - Per-output checks and reference-scanning options appear inline in each `outputs` entry.
+
+            - Environment variable values may be objects carrying the *pass as file* flag.
 
           Note that while this format is experimental, the maintenance of versions is best-effort, and not promised to identify every change.
 
@@ -171,8 +181,22 @@ additionalProperties: false
         title: Environment variables
         description: |
           Environment variables passed to the `builder`.
+
+          Each value is either a plain string, or an object also carrying the
+          [*pass as file*](@docroot@/store/derivation/index.md#pass-as-file) flag.
         additionalProperties:
-          type: string
+          oneOf:
+            - type: string
+            - type: object
+              required:
+                - value
+                - passAsFile
+              properties:
+                value:
+                  type: string
+                passAsFile:
+                  type: boolean
+              additionalProperties: false
 
       structuredAttrs:
         title: Structured attributes
@@ -181,6 +205,12 @@ additionalProperties: false
           Structured attributes are JSON, and thus embedded as-is.
         type: object
         additionalProperties: true
+
+      options:
+        title: Derivation options
+        description: |
+          The [options](@docroot@/store/derivation/index.md#options) that apply to the derivation as a whole.
+        "$ref": "derivation-top-options-v1.yaml"
 
   output:
     overall:
@@ -210,6 +240,8 @@ additionalProperties: false
           title: Output path
           description: |
             The output path determined from the derivation itself.
+        checks: { "$ref": "derivation-output-checks-v1.yaml#/properties/checks" }
+        unsafeDiscardReferences: { "$ref": "derivation-output-checks-v1.yaml#/properties/unsafeDiscardReferences" }
       additionalProperties: false
 
     caFixed:
@@ -230,6 +262,8 @@ additionalProperties: false
           title: Expected hash value
           description: |
             The expected content hash.
+        checks: { "$ref": "derivation-output-checks-v1.yaml#/properties/checks" }
+        unsafeDiscardReferences: { "$ref": "derivation-output-checks-v1.yaml#/properties/unsafeDiscardReferences" }
       additionalProperties: false
 
     caFloating:
@@ -254,6 +288,8 @@ additionalProperties: false
           "$ref": "./hash-v1.yaml#/$defs/algorithm"
           description: |
             What hash algorithm to use for the given method of content-addressing.
+        checks: { "$ref": "derivation-output-checks-v1.yaml#/properties/checks" }
+        unsafeDiscardReferences: { "$ref": "derivation-output-checks-v1.yaml#/properties/unsafeDiscardReferences" }
       additionalProperties: false
 
     deferred:
@@ -262,7 +298,9 @@ additionalProperties: false
         Input-addressed output which depends on a (CA) derivation whose outputs (and thus their content-address
         are not yet known.
       type: object
-      properties: {}
+      properties:
+        checks: { "$ref": "derivation-output-checks-v1.yaml#/properties/checks" }
+        unsafeDiscardReferences: { "$ref": "derivation-output-checks-v1.yaml#/properties/unsafeDiscardReferences" }
       additionalProperties: false
 
     impure:
@@ -277,6 +315,8 @@ additionalProperties: false
       properties:
         impure:
           const: true
+        checks: { "$ref": "derivation-output-checks-v1.yaml#/properties/checks" }
+        unsafeDiscardReferences: { "$ref": "derivation-output-checks-v1.yaml#/properties/unsafeDiscardReferences" }
         method:
           "$ref": "./content-address-v1.yaml#/$defs/method"
           description: |
