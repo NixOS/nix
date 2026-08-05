@@ -197,6 +197,13 @@ void initNix(bool loadConfig)
     if (sigaction(SIGWINCH, &act, 0))
         throw SysError("handling SIGWINCH");
 
+    /* Same for SIGCONT and SIGTSTP, which are also handled by
+     * signalHandlerThread. */
+    if (sigaction(SIGCONT, &act, 0))
+        throw SysError("handling SIGCONT");
+    if (sigaction(SIGTSTP, &act, 0))
+        throw SysError("handling SIGTSTP");
+
     /* Disable SA_RESTART for interrupts, so that system calls on this thread
      * error with EINTR like they do on Linux.
      * Most signals on BSD systems default to SA_RESTART on, but Nix

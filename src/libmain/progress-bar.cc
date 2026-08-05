@@ -105,7 +105,7 @@ private:
     bool printBuildLogs = false;
     bool isTTY;
 
-    std::unique_ptr<InterruptCallback> interruptCallback;
+    std::unique_ptr<InterruptCallback> interruptCallback, stopCallback, contCallback, winchCallback;
 
     void hideCursorIfNeeded() const
     {
@@ -130,6 +130,30 @@ public:
     {
         hideCursorIfNeeded();
         state_.lock()->active = isTTY;
+
+        /* On Ctrl-Z, unhide the cursor before the process is
+           stopped. */
+        stopCallback = createSignalCallback(SignalType::Stop, [&]() {
+            auto state(state_.lock());
+            if (state->active && !state->isPaused())
+                unhideCursorIfNeeded();
+        });
+
+        /* Redraw the progress bar when the process is resumed or the
+           terminal size changes. */
+        auto redrawCallback = [&]() {
+            auto state(state_.lock());
+            if (state->active && !state->isPaused()) {
+                /* Force a redraw, since the new output may be
+                   identical to the one cached by redraw(). */
+                invalidateRedrawCache();
+                hideCursorIfNeeded();
+                update(*state);
+            }
+        };
+        contCallback = createSignalCallback(SignalType::Cont, redrawCallback);
+        winchCallback = createSignalCallback(SignalType::Winch, redrawCallback);
+
         updateThread = std::thread([&]() {
             auto state(state_.lock());
             auto nextWakeup = std::chrono::milliseconds::max();
