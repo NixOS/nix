@@ -4,7 +4,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/parsed-derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/build/derivation-building-misc.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
@@ -72,22 +72,18 @@ private:
      */
     Co gaveUpOnSubstitution();
     Co tryToBuild(StorePathSet inputPaths);
-    Co buildWithHook(
-        StorePathSet inputPaths,
-        std::map<std::string, InitialOutput> initialOutputs,
-        DerivationOptions<StorePath> drvOptions,
-        PathLocks outputLocks);
+    Co
+    buildWithHook(StorePathSet inputPaths, std::map<std::string, InitialOutput> initialOutputs, PathLocks outputLocks);
     Co buildLocally(
         LocalBuildCapability localBuildCap,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
-        DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
 
     /**
      * Is the build hook willing to perform the build?
      */
-    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
+    HookReply tryBuildHook();
 
     Done doneFailureLogTooLong(BuildLog & buildLog);
 

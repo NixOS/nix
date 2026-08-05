@@ -1,5 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -302,7 +303,8 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
     return node;
 }
 
-Full parse(
+template<>
+ATerm ATerm::parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
@@ -310,9 +312,7 @@ Full parse(
 {
     using namespace std::literals::string_view_literals;
 
-    Full drv{
-        .name = std::string{name},
-    };
+    ATerm drv;
 
     StringViewStream str{s};
     expect(str, 'D');
@@ -369,7 +369,7 @@ Full parse(
 
     expect(str, ',');
     fullInputs.srcs = store.parseStorePathSet(parseStrings(str, true));
-    drv.inputs = fullInputs.toSet();
+    drv.inputs = std::move(fullInputs);
     expect(str, ',');
     drv.platform = parseString(str).toOwned();
     expect(str, ',');
@@ -380,23 +380,29 @@ Full parse(
     while (!endOfList(str))
         drv.args.push_back(parseString(str).toOwned());
 
-    /* Parse the environment variables. */
+    /* Parse the environment variables, kept verbatim. */
     expect(str, ",["sv);
     while (!endOfList(str)) {
         expect(str, '(');
         auto name = parseString(str).toOwned();
         expect(str, ',');
         auto value = parseString(str);
-        if (name == StructuredAttrs::envVarName) {
-            drv.structuredAttrs = StructuredAttrs::parse(*std::move(value));
-        } else {
-            drv.env.insert_or_assign(std::move(name), std::move(value).toOwned());
-        }
+        drv.env.insert_or_assign(std::move(name), std::move(value).toOwned());
         expect(str, ')');
     }
 
     expect(str, ')');
+
     return drv;
+}
+
+Full parse(
+    const StoreDirConfig & store,
+    std::string && s,
+    std::string_view name,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    return ATerm::parse(store, std::move(s), name, xpSettings).elaborate(store, name, xpSettings);
 }
 
 /* --------------------------------------------------------------------------
@@ -633,9 +639,17 @@ static void unparseOutput(
 /**
  * This one, unlike the public one, is polymorphic on the output parameter to
  * support the (private) `hashInputModulo`.
+ *
+ * The `inputs` to serialize are passed separately, in one of the
+ * format-oriented representations (`FullInputs` or `HashModuloInputs`);
+ * `drv.inputs` itself is ignored.
  */
-template<typename Inputs, typename Out>
-static std::string unparseDerivation(const StoreDirConfig & store, const Derivation<Inputs, Out> & drv)
+template<
+    typename Inputs,
+    typename Drv,
+    typename Out = typename std::decay_t<decltype(std::declval<Drv>().outputs)>::mapped_type>
+static std::string
+unparseDerivation(const StoreDirConfig & store, const Inputs & inputs, std::string_view drvName, const Drv & drv)
     requires(
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
@@ -655,7 +669,7 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
        constructed.) */
     bool dynDrvDep = false;
     if constexpr (std::is_same_v<Inputs, FullInputs>)
-        dynDrvDep = hasDynamicDrvDep(drv.inputs);
+        dynDrvDep = hasDynamicDrvDep(inputs);
     if (dynDrvDep) {
         s += "DrvWithVersion("sv;
         // Only version we have so far
@@ -674,13 +688,13 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
             s += ',';
         s += '(';
         printUnquotedString(s, i.first);
-        unparseOutput(store, s, i.second, drv.name, i.first);
+        unparseOutput(store, s, i.second, drvName, i.first);
         s += ')';
     }
 
     s += "],["sv;
     first = true;
-    for (auto & [key, node] : drv.inputs.drvs.map) {
+    for (auto & [key, node] : inputs.drvs.map) {
         if (first)
             first = false;
         else
@@ -692,7 +706,7 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
     }
 
     s += "],"sv;
-    auto paths = store.printStorePathSet(drv.inputs.srcs); // FIXME: slow
+    auto paths = store.printStorePathSet(inputs.srcs); // FIXME: slow
     printUnquotedStrings(s, paths.begin(), paths.end());
 
     s += ',';
@@ -705,27 +719,16 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
     s += ",["sv;
     first = true;
 
-    auto unparseEnv = [&](const StringPairs & atermEnv) {
-        for (auto & i : atermEnv) {
-            if (first)
-                first = false;
-            else
-                s += ',';
-            s += '(';
-            printString(s, i.first);
+    for (auto & i : drv.env) {
+        if (first)
+            first = false;
+        else
             s += ',';
-            printString(s, i.second);
-            s += ')';
-        }
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        unparseEnv(scratch);
-    } else {
-        unparseEnv(drv.env);
+        s += '(';
+        printString(s, i.first);
+        s += ',';
+        printString(s, i.second);
+        s += ')';
     }
 
     s += "])"sv;
@@ -733,11 +736,59 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
     return s;
 }
 
+template<>
+std::string ATerm::to_string(const StoreDirConfig & store, std::string_view name) const
+{
+    return unparseDerivation(store, inputs, name, *this);
+}
+
+template<typename Inputs, typename Out>
+ATermT<Inputs, Out> ATermT<Inputs, Out>::lower(const Elaborated & drv)
+{
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    Outputs<Out> outputs;
+    for (auto & [outputName, output] : drv.outputs)
+        outputs.insert_or_assign(outputName, output.output);
+
+    ATermT<Inputs, Out> res{
+        .outputs = std::move(outputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
+    if constexpr (std::is_same_v<Inputs, FullInputs>)
+        res.inputs = FullInputs::fromSet(drv.inputs);
+    else
+        res.inputs = drv.inputs;
+    return res;
+}
+
+template ATerm ATerm::lower(const Full & drv);
+template BasicATerm BasicATerm::lower(const Basic & drv);
+
 std::string unparse(const Full & drv, const StoreDirConfig & store)
 {
-    // Convert to FullInputs for ATerm serialization
-    return unparseDerivation(
-        store, drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
+    auto lowered = ATerm::lower(drv);
+
+    /* Lowering to the ATerm format drops the parsed options and
+       structured attributes; it is only faithful if re-parsing the
+       environment gets them back. This is the case for all derivations
+       whose options actually stem from the legacy environment-variable
+       encoding. */
+    if (lowered.elaborate(store, drv.name) != drv)
+        throw Error(
+            "derivation '%s' is not representable in the ATerm format: "
+            "its fields are not in sync with their environment-variable encoding",
+            drv.name);
+
+    return lowered.to_string(store, drv.name);
 }
 
 /* --------------------------------------------------------------------------
@@ -815,28 +866,18 @@ static bool inputModulo(
  * Returns `std::nullopt` if any input is deferred (depends on a CA or
  * dynamic derivation whose outputs are not yet known).
  */
-template<typename Out>
-static std::optional<Derivation<HashModuloInputs, Out>> derivationModulo(Store & store, Derivation<FullInputs, Out> drv)
+static std::optional<HashModuloInputs> derivationModulo(Store & store, FullInputs inputs, std::string_view drvName)
 {
-    Derivation<HashModuloInputs, Out> masked{
-        .outputs = std::move(drv.outputs),
-        .inputs{
-            .srcs = std::move(drv.inputs.srcs),
-            .drvs = {},
-        },
-        .platform = std::move(drv.platform),
-        .builder = std::move(drv.builder),
-        .args = std::move(drv.args),
-        .env = std::move(drv.env),
-        .structuredAttrs = std::move(drv.structuredAttrs),
-        .name = std::move(drv.name),
+    HashModuloInputs masked{
+        .srcs = std::move(inputs.srcs),
+        .drvs = {},
     };
 
-    for (auto & [drvPath, node] : drv.inputs.drvs.map) {
+    for (auto & [drvPath, node] : inputs.drvs.map) {
         /* Need to build and resolve dynamic derivations first */
         if (!node.childMap.empty())
             return std::nullopt;
-        if (inputModulo(store, masked.inputs.drvs.map, drvPath, node.value, masked.name))
+        if (inputModulo(store, masked.drvs.map, drvPath, node.value, drvName))
             return std::nullopt;
     }
 
@@ -877,7 +918,7 @@ HashModulo hashInputModulo(Store & store, const Full & drv)
     if (type(drv).isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
-            auto & dof = std::get<Output::CAFixed>(i.second.raw);
+            auto & dof = std::get<Output::CAFixed>(i.second.output.raw);
             auto hash = hashString(
                 HashAlgorithm::SHA256,
                 "fixed:out:" + dof.ca.printMethodAlgo() + ":" + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
@@ -887,32 +928,51 @@ HashModulo hashInputModulo(Store & store, const Full & drv)
         return outputHashes;
     }
 
-    /* If any output is not InputAddressed, this derivation has no hash
-       modulo. */
-    for (auto & [name, output] : drv.outputs)
-        if (!std::get_if<Output::InputAddressed>(&output.raw))
+    /* Extract InputAddressed outputs. If any output is not
+       InputAddressed, this derivation has no hash modulo. */
+    Outputs<Output::InputAddressed> convertedOutputs;
+    for (auto & [name, output] : drv.outputs) {
+        auto * p = std::get_if<Output::InputAddressed>(&output.output.raw);
+        if (!p)
             return HashModulo::DeferredDrv{};
+        convertedOutputs.insert({name, *p});
+    }
 
-    auto inputAddressingModulo = derivationModulo(
-        store,
-        drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
-            .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
-    if (!inputAddressingModulo)
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    auto maskedInputs = derivationModulo(store, FullInputs::fromSet(drv.inputs), drv.name);
+    if (!maskedInputs)
         return HashModulo::DeferredDrv{};
-
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *inputAddressingModulo));
+    ATermT<FullInputs, Output::InputAddressed> masked{
+        .outputs = std::move(convertedOutputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
+    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *maskedInputs, drv.name, masked));
 }
 
 /**
- * Replace the outputs with `Deferred` and blank the env vars named
- * after them, so the hash does not depend on the derivation's own
- * output paths. Only valid for input-addressed (possibly deferred)
- * derivations.
+ * Build the ATerm-shaped intermediate whose outputs are replaced with
+ * `Deferred` and whose env vars named after them are blanked, so the
+ * hash does not depend on the derivation's own output paths. Only valid
+ * for input-addressed (possibly deferred) derivations.
  */
-template<typename Inputs>
-static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<Inputs, Output> & drv)
+template<typename Input>
+static ATermT<FullInputs, Output::Deferred> maskOutputsAndEnv(const Derivation<Input, Output> & drv)
 {
-    auto masked = drv.mapOutputs([](const Output & output) -> Output::Deferred {
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+
+    Outputs<Output::Deferred> maskedOutputs;
+    for (auto & [name, output] : drv.outputs) {
         std::visit(
             overloaded{
                 [&](const Output::InputAddressed &) {},
@@ -924,13 +984,23 @@ static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<I
                     panic("hashModulo: unexpected output type, these derivation types are not input addressed");
                 },
             },
-            output.raw);
-        return {};
-    });
-    for (auto & [name, output] : masked.outputs)
-        if (auto j = masked.env.find(name); j != masked.env.end())
+            output.output.raw);
+        maskedOutputs.insert({name, {}});
+        if (auto j = env.find(name); j != env.end())
             j->second = "";
-    return masked;
+    }
+
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    return {
+        .outputs = std::move(maskedOutputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
 }
 
 /**
@@ -941,27 +1011,21 @@ static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<I
  */
 std::optional<Hash> hashModulo(Store & store, const Full & drv)
 {
-    auto masked =
-        derivationModulo(store, maskOutputsAndEnv(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
-            return FullInputs::fromSet(inputs);
-        }));
-    if (!masked)
+    auto maskedInputs = derivationModulo(store, FullInputs::fromSet(drv.inputs), drv.name);
+    if (!maskedInputs)
         return std::nullopt;
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *masked));
+    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *maskedInputs, drv.name, maskOutputsAndEnv(drv)));
 }
 
 Hash hashModulo(Store & store, const Basic & drv)
 {
     /* A resolved derivation has no input derivations, so there is
        nothing to substitute and the hash is always computable. */
-    auto masked = maskOutputsAndEnv(drv).mapInputs([](const StorePathSet & srcs) {
-        return HashModuloInputs{
-            .srcs = srcs,
-            .drvs = {},
-        };
-    });
-
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, masked));
+    HashModuloInputs maskedInputs{
+        .srcs = drv.inputs,
+        .drvs = {},
+    };
+    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, maskedInputs, drv.name, maskOutputsAndEnv(drv)));
 }
 
 /* --------------------------------------------------------------------------
@@ -977,34 +1041,32 @@ static Output readOutput(Source & in, const StoreDirConfig & store)
     return parseOutput(store, pathS, hashAlgo, hash, experimentalFeatureSettings);
 }
 
-Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name)
+Source & read(Source & in, const StoreDirConfig & store, BasicATerm & drv, std::string_view name)
 {
-    drv.name = name;
-
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
-        auto name = readString(in);
+        auto outputName = readString(in);
         auto output = readOutput(in, store);
-        drv.outputs.emplace(std::move(name), std::move(output));
+        drv.outputs.emplace(std::move(outputName), std::move(output));
     }
 
     drv.inputs = CommonProto::Serialise<StorePathSet>::read(store, CommonProto::ReadConn{.from = in});
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
+    drv.env.clear();
     nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
         auto key = readString(in);
         auto value = readString(in);
-        drv.env[key] = value;
+        drv.env.insert_or_assign(std::move(key), std::move(value));
     }
-    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     return in;
 }
 
-void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
+void write(Sink & out, const StoreDirConfig & store, const BasicATerm & drv, std::string_view name)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
@@ -1016,7 +1078,7 @@ void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
                         << "";
                 },
                 [&](const Output::CAFixed & dof) {
-                    out << store.printStorePath(dof.path(store, drv.name, i.first)) << dof.ca.printMethodAlgo()
+                    out << store.printStorePath(dof.path(store, name, i.first)) << dof.ca.printMethodAlgo()
                         << dof.ca.hash.to_string(HashFormat::Base16, false);
                 },
                 [&](const Output::CAFloating & dof) {
@@ -1036,20 +1098,9 @@ void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
     CommonProto::write(store, CommonProto::WriteConn{.to = out}, drv.inputs);
     out << drv.platform << drv.builder << drv.args;
 
-    auto writeEnv = [&](const StringPairs atermEnv) {
-        out << atermEnv.size();
-        for (auto & [k, v] : atermEnv)
-            out << k << v;
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        writeEnv(scratch);
-    } else {
-        writeEnv(drv.env);
-    }
+    out << drv.env.size();
+    for (auto & [k, v] : drv.env)
+        out << k << v;
 }
 
 } // namespace derivation

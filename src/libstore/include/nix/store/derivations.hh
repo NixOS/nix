@@ -9,6 +9,8 @@
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
 
@@ -24,6 +26,7 @@ static constexpr std::string_view drvFeatureBuilderRpcV0 = "builder-rpc-v0";
 
 struct StoreDirConfig;
 class Store;
+struct WorkerSettings;
 
 /* Abstract syntax of derivations. */
 
@@ -146,20 +149,53 @@ struct Type
     bool hasKnownOutputPaths() const;
 };
 
-template<typename Inputs, typename Out = Output>
+template<typename Input, typename Out = Output>
 struct Derivation;
 
-using Basic = Derivation<StorePathSet>;
-using Full = Derivation<std::set<SingleDerivedPath>>;
+using Basic = Derivation<StorePath>;
+using Full = Derivation<SingleDerivedPath>;
 
-template<typename Inputs, typename Out>
+template<typename Input, typename Out>
+struct OutputWithOptions
+{
+    Out output;
+    OutputOptions<Input> options;
+
+    bool operator==(const OutputWithOptions &) const = default;
+};
+
+/**
+ * Right-hand side of a VAR=VALUE definition in @see Derivation::env.
+ */
+struct EnvValue
+{
+    std::string value;
+
+    /**
+     * In non-structured mode, all bindings specified in the derivation
+     * go directly via the environment, except those listed in the
+     * passAsFile attribute. Those are instead passed as file names
+     * pointing to temporary files containing the contents.
+     *
+     * Note that passAsFile is ignored in structure mode because it's
+     * not needed (attributes are not passed through the environment, so
+     * there is no size constraint).
+     */
+    bool passAsFile = false;
+
+    bool operator==(const EnvValue &) const = default;
+};
+
+template<typename Input, typename Out>
 struct Derivation
 {
+    std::string name;
+
     /**
      * keyed on symbolic IDs
      */
-    Outputs<Out> outputs;
-    Inputs inputs;
+    std::map<std::string, OutputWithOptions<Input, Out>, std::less<>> outputs;
+    std::set<Input> inputs;
     std::string platform;
     /**
      * Probably should be an absolute path in the path format that `platform` uses
@@ -169,10 +205,10 @@ struct Derivation
     /**
      * Must not contain the key `__json`, at least in order to serialize to ATerm.
      */
-    StringPairs env;
+    std::map<std::string, EnvValue, std::less<>> env;
     std::optional<StructuredAttrs> structuredAttrs;
 
-    std::string name;
+    TopOptions<Input> options;
 
     bool operator==(const Derivation &) const = default;
 
@@ -185,6 +221,12 @@ struct Derivation
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
+    StringSet getRequiredSystemFeatures() const
+        requires std::is_same_v<Out, Output>;
+
+    bool useUidRange() const
+        requires std::is_same_v<Out, Output>;
+
     /**
      * Apply string rewrites to the `env`, `args` and `builder`
      * fields.
@@ -193,20 +235,27 @@ struct Derivation
 
     /**
      * Return a derivation identical to this one, but with the inputs transformed by `f`.
+     *
+     * N.B. neither the top-level nor the per-output options are carried
+     * over (they may contain `Input`-typed references); they are
+     * default-initialized and must be filled in by the caller.
      */
     template<typename F>
-    Derivation<std::invoke_result_t<F, const Inputs &>, Out> mapInputs(F f) const
+    Derivation<typename std::invoke_result_t<F, const std::set<Input> &>::value_type, Out> mapInputs(F f) const
     {
-        return {
-            .outputs = outputs,
+        Derivation<typename std::invoke_result_t<F, const std::set<Input> &>::value_type, Out> res{
+            .name = name,
             .inputs = f(inputs),
             .platform = platform,
             .builder = builder,
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
-            .name = name,
         };
+        for (auto & [outputName, output] : outputs)
+            res.outputs.insert_or_assign(
+                outputName, typename decltype(res.outputs)::mapped_type{.output = output.output});
+        return res;
     }
 
     /**
@@ -350,6 +399,68 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
 void fillInOutputPaths(Full & drv, Store & store);
 
 /**
+ * JSON format version for derivation serialization.
+ *
+ * Used by `nix derivation show` and `nix derivation add`.
+ */
+enum class JsonFormat : uint64_t {
+    /**
+     * Legacy format: the derivation options are not first-class, but
+     * instead encoded in `env` (and `structuredAttrs`); relatedly,
+     * environment variable values are plain strings (the *pass as
+     * file* flag being part of the legacy encoding), and outputs
+     * carry no inline checks.
+     *
+     * Decoding this format requires a store, in order to parse the
+     * options out of the environment variables.
+     */
+    V4 = 4,
+    /**
+     * Current format: first-class `options` field, per-output checks
+     * inline in the `outputs` map, and environment variable values
+     * that may be objects carrying the *pass as file* flag.
+     *
+     * This format is "pure": it can be encoded and decoded without
+     * reference to any store.
+     */
+    V5 = 5,
+};
+
+/**
+ * Convert an integer version number to a `JsonFormat`.
+ * Throws Error if the version is not supported.
+ */
+JsonFormat parseJsonFormat(uint64_t version);
+
+/**
+ * Serialize a derivation to JSON in the given format.
+ *
+ * Note that the legacy `JsonFormat::V4` relies on the derivation
+ * options also being encoded in `env` (and `structuredAttrs`), in
+ * sync with the first-class fields — as is guaranteed for any
+ * derivation read from the store.
+ */
+template<typename Input>
+nlohmann::json toJSON(const Derivation<Input> & drv, JsonFormat format);
+
+/**
+ * Parse a derivation from JSON, in any supported format.
+ *
+ * Unlike the plain JSON decoder, which is store-independent and
+ * therefore only supports the current format, this can also decode
+ * the legacy `JsonFormat::V4`, using the store directory to parse the
+ * derivation options out of their legacy environment-variable
+ * encoding.
+ *
+ * Unlike `parseJsonAndValidate`, this does not fill in output paths
+ * or check invariants, and so does not need a full store.
+ */
+Full fromJSON(
+    const StoreDirConfig & store,
+    const nlohmann::json & json,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+/**
  * Parse a derivation from JSON, and also perform various
  * conveniences such as:
  *
@@ -357,20 +468,22 @@ void fillInOutputPaths(Full & drv, Store & store);
  *
  * 2. Checking invariants in general.
  *
- * In the future it might also do things like:
- *
- * - assist with the migration from older JSON formats.
- *
- * - (a somewhat example of the above) initialize
- *   `DerivationOptions` from their traditional encoding inside the
- *   `env` and `structuredAttrs`.
+ * 3. Assisting with the migration from older JSON formats: for
+ *    `JsonFormat::V4` input, the derivation options are initialized
+ *    from their legacy encoding inside the `env` and
+ *    `structuredAttrs`, which is why this function, unlike the plain
+ *    JSON decoder (which only accepts the current format), needs a
+ *    store.
  *
  * @param store The store to use for path computation and validation
  * @param json The JSON representation of the derivation
  * @return A validated derivation with output paths filled in
  * @throws Error if parsing fails, output paths can't be computed, or validation fails
  */
-Full parseJsonAndValidate(Store & store, const nlohmann::json & json);
+Full parseJsonAndValidate(
+    Store & store,
+    const nlohmann::json & json,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 } // namespace derivation
 
@@ -410,15 +523,29 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName);
  */
 std::string hashPlaceholder(const OutputNameView outputName);
 
-/**
- * The expected JSON version for derivation serialization.
- * Used by `nix derivation show` and `nix derivation add`.
- */
-constexpr unsigned expectedJsonVersionDerivation = 4;
+template<>
+struct json_avoids_null<derivation::EnvValue> : std::true_type
+{};
+
+template<typename Input, typename Output>
+struct json_avoids_null<derivation::OutputWithOptions<Input, Output>> : std::true_type
+{};
 
 } // namespace nix
 
+JSON_IMPL(nix::derivation::EnvValue)
+
+namespace nix {
+/**
+ * Just to avoid a comma in a macro invocation below.
+ */
+template<typename Input>
+using OutputWithOptionsFor = derivation::OutputWithOptions<Input, derivation::Output>;
+} // namespace nix
+
 namespace nlohmann {
-template<typename Inputs>
-JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Inputs>);
+template<typename Input>
+JSON_IMPL_WITH_XP_FEATURES_INNER(nix::OutputWithOptionsFor<Input>);
+template<typename Input>
+JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Input>);
 } // namespace nlohmann

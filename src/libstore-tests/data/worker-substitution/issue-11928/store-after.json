@@ -79,14 +79,28 @@
         "srcs": []
       },
       "name": "root-drv",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allOutputChecks": null,
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": []
+      },
       "outputs": {
         "out": {
+          "checks": null,
           "hashAlgo": "sha256",
-          "method": "nar"
+          "method": "nar",
+          "unsafeDiscardReferences": false
         }
       },
       "system": "",
-      "version": 4
+      "version": 5
     },
     "vy7j6m6p5y0327fhk3zxn12hbpzkh6lp-dep-drv.drv": {
       "args": [],
@@ -97,14 +111,28 @@
         "srcs": []
       },
       "name": "dep-drv",
+      "options": {
+        "additionalSandboxProfile": "",
+        "allOutputChecks": null,
+        "allowLocalNetworking": false,
+        "allowSubstitutes": true,
+        "exportReferencesGraph": {},
+        "impureEnvVars": [],
+        "impureHostDeps": [],
+        "noChroot": false,
+        "preferLocalBuild": false,
+        "requiredSystemFeatures": []
+      },
       "outputs": {
         "out": {
+          "checks": null,
           "hashAlgo": "sha256",
-          "method": "nar"
+          "method": "nar",
+          "unsafeDiscardReferences": false
         }
       },
       "system": "",
-      "version": 4
+      "version": 5
     }
   }
 }

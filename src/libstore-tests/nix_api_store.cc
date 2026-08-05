@@ -725,7 +725,7 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_store_realise_output_ordering)
     auto outj_ph = nix::hashPlaceholder("outj");
 
     std::string drvJson = R"({
-        "version": 4,
+        "version": 5,
         "name": "multi-output-test",
         "system": ")" + nix::settings.thisSystem.get()
                           + R"(",

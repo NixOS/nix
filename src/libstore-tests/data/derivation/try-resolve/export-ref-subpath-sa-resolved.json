@@ -1,17 +1,33 @@
 {
   "args": [],
   "builder": "/bin/bash",
-  "env": {
-    "__json": "{\"exportReferencesGraph\":{\"refs\":[\"/nix/store/f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out/foo\"]}}"
-  },
+  "env": {},
   "inputs": [
     "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"
   ],
   "name": "export-ref-subpath-sa",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {
+      "refs": [
+        "f1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep-out"
+      ]
+    },
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
+      "checks": null,
       "hashAlgo": "sha256",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
   "structuredAttrs": {
@@ -22,5 +38,5 @@
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }
