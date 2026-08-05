@@ -45,6 +45,77 @@ In particular, the specification decides:
 
 - if the content is content-addressed, [what is its content address](./content-address.md#fixed) (and thus what is its [store path])
 
+## Output checks {#output-checks}
+
+In addition to the output specification above, a derivation may mandate additional *checks* on its outputs:
+properties that must hold for the produced store objects in order for the build to be considered successful.
+Checks may be specified separately for each output, or once for all outputs of the derivation.
+
+### Reference checks
+
+The main checks constrain the [references][reference] of an output.
+These checks vary along two axes, yielding 4 possible checks:
+
+- Whether the check applies to the *direct* references of the output, or to its entire closure via *transitive* references ([requisites][requisite]).
+
+- Whether the check *allows* a set of references (every reference must be a member of the set, though not every member needs to be referenced), or *disallows* a set of references (no reference may be a member of the set).
+
+The four checks are:
+
+- [*allowed references*]{#allowed-references}:
+  An optional set; the output's references must be a subset of it.
+  When the set is absent the check is skipped, i.e. every reference is allowed.
+
+  For example, the empty set enforces that the output has no runtime dependencies at all.
+
+  > **Usage note**
+  >
+  > This is used in NixOS to check that generated files such as initial ramdisks for booting Linux don't have accidental dependencies on other paths in the Nix store.
+
+- [*allowed requisites*]{#allowed-requisites}:
+  Like *allowed references*, but applying to the whole closure of the output:
+  every transitive dependency must be a member of the set.
+
+- [*disallowed references*]{#disallowed-references}:
+  A set of which no member may be a direct reference of the output.
+  (There is no need for this check to be optional: disallowing nothing is the same as skipping the check.)
+
+- [*disallowed requisites*]{#disallowed-requisites}:
+  Like *disallowed references*, but applying to the whole closure of the output:
+  no member of the set may appear anywhere in the output's transitive dependencies.
+
+The references of a store object are always store paths.
+However, if every element of these sets had to be a store path, it would be hard-to-impossible to constrain references from outputs *to other outputs* of the same derivation, because in general the store paths of outputs are not known until the derivation is built.
+For this reason, an element of these sets may also be an *output name* of the derivation being checked, standing for the store path of that output, whatever it turns out to be.
+For example, an output can be permitted to reference itself by including its own name in its *allowed references*.
+
+### Size checks
+
+- [*max size*]{#max-size}:
+  The size of the output's store object may not exceed the given number of bytes.
+
+- [*max closure size*]{#max-closure-size}:
+  The total size of the output's closure may not exceed the given number of bytes.
+
+### Self-reference handling
+
+- [*ignore self references*]{#ignore-self-refs}:
+  Whether references of an output to itself are exempted from the reference checks above.
+
+### Reference scanning
+
+- [*unsafe discard references*]{#unsafe-discard-references}:
+  Disables scanning the output for run-time references altogether.
+  The output is then registered as having no references, regardless of its contents.
+
+  This is useful, for example, when generating self-contained filesystem images with their own embedded Nix store:
+  hashes found inside such an image refer to the embedded store and not to the host's Nix store.
+
+  As the name suggests, this is unsafe: discarding references that are in fact needed at run time makes the closure incomplete, so copying the output elsewhere will not bring its dependencies along.
+
+[reference]: @docroot@/glossary.md#gloss-reference
+[requisite]: @docroot@/store/store-object.md#references
+
 ## Types of derivations
 
 The sections on each type of derivation output addressing ended up discussing other attributes of the derivation besides its outputs, such as purity, scheduling, determinism, etc.

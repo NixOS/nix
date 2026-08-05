@@ -138,9 +138,19 @@ See [Wikipedia](https://en.wikipedia.org/wiki/Argv) for details.
 
 Environment variables which will be passed to the [builder](#builder) executable.
 
+Each environment variable additionally has a [*pass as file*]{#pass-as-file} flag.
+When it is set, rather than passing the value directly in the environment, the value is written to a temporary file in the build directory, and an environment variable named like the original but with a `Path` suffix is set to the path of that file.
+For example, a variable `big` with *pass as file* set results in an environment variable `bigPath` pointing to a file containing the value of `big`.
+This is useful for large values, since most operating systems impose a limit on the size of the process environment (typically a few hundred kilobytes).
+
+This flag has no effect when [structured attributes](#structured-attrs) are used, as attributes are then not passed through the environment in the first place, so there is no size constraint to avoid.
+
 #### Structured Attributes {#structured-attrs}
 
 Nix also has special support for embedding JSON in the derivations.
+
+Structured attributes obviate the need for the [*pass as file*](#pass-as-file) flag, since JSON files have no size restrictions, unlike process environments.
+They also allow [options](#options) and [output checks](outputs/index.md#output-checks) to be expressed in a structured way, rather than string-encoded in environment variables.
 
 The environment variable `NIX_ATTRS_JSON_FILE` points to the exact location of that file both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
 
@@ -148,6 +158,73 @@ As a convenience to Bash builders, Nix writes a script that initialises shell va
 The environment variable `NIX_ATTRS_SH_FILE` points to the exact location of the script, both in a build and a [`nix-shell`](@docroot@/command-ref/nix-shell.md).
 This includes non-nested (associative) arrays.
 For example, the attribute `hardening.format = true` ends up as the Bash associative array element `${hardening[format]}`.
+
+### Options {#options}
+
+Derivations carry a number of *options* influencing how they are built and scheduled.
+Historically, these were encoded with specially-named [environment variables](#env) or [structured attributes](#structured-attrs); they are, however, fields of the derivation in their own right.
+
+Options that apply to individual outputs — [output checks](outputs/index.md#output-checks) and [reference scanning](outputs/index.md#unsafe-discard-references) — are documented with [derivation outputs](outputs/index.md).
+The remaining options apply to the derivation as a whole:
+
+- [*export references graph*]{#export-references-graph}:
+  A map from file names to sets of [deriving paths][deriving path].
+  For each entry, the *references graph* of the given store objects — each store object in their [closure], along with its references — is made available to the builder:
+  as a file of the given name in the build directory (in the format used by `nix-store --register-validity`, with the deriver fields left empty),
+  or, with [structured attributes](#structured-attrs), under the given key in the JSON attributes file (as a list of store object infos).
+
+  This lets a builder do something with the closure of its inputs.
+
+  > **Usage note**
+  >
+  > Examples of builders using this include the builders in NixOS that generate the initial ramdisk for booting Linux (a `cpio` archive containing the closure of the boot script)
+  > and the ISO-9660 image for the installation CD (which is populated with a Nix store containing the closure of a bootable NixOS configuration).
+
+- [*required system features*]{#required-system-features}:
+  A set of features that a Nix instance must have among its [`system-features`](@docroot@/command-ref/conf-file.md#conf-system-features) for the derivation to be scheduled on it, in addition to the [system](#system) type matching.
+
+- [*prefer local build*]{#prefer-local-build}:
+  A hint that the derivation is cheapest to build locally: when [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), it will, if possible, be built locally rather than forwarded to a remote machine.
+
+- [*allow substitutes*]{#allow-substitutes}:
+  Whether the derivation's outputs may be [substituted](@docroot@/glossary.md#gloss-substitute).
+  When disabled, the derivation is always built (locally or remotely); this is useful for derivations that are cheaper to build than to substitute.
+  A Nix instance may ignore this option via the [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) configuration option.
+
+  > **Note**
+  >
+  > When disabled, some Nix instance must be able to run the [builder](#builder) on the specified [system](#system) type, since the derivation cannot be substituted.
+
+- [*impure environment variables*]{#impure-env-vars}:
+  A set of environment variables passed from the environment of the calling user to the builder, which otherwise starts from a cleared environment.
+  This is only allowed for [fixed-output derivations][fixed-output derivation], where such impurities are tolerable because (the hash of) the output is known in advance.
+  It is ignored for all other derivations.
+
+  > **Warning**
+  >
+  > The variables are taken from the environment of the building process itself:
+  > when building via a daemon, from the daemon's environment, and only otherwise from the environment of the calling command, e.g. `nix-build`.
+
+  If the [`configurable-impure-env` experimental feature](@docroot@/development/experimental-features.md#xp-feature-configurable-impure-env) is enabled,
+  these environment variables can also be controlled through the [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env) configuration option.
+
+- Sandbox-related options:
+
+  - [*no chroot*]{#no-chroot}:
+    The derivation asks to be built without sandboxing.
+    A builder is free to not respect this wish (because it is insecure) and fail the build instead.
+
+  - [*additional sandbox profile*]{#additional-sandbox-profile}:
+    (Darwin only) Additional sandbox profile text, granting the build extra permissions inside the sandbox.
+
+  - [*impure host dependencies*]{#impure-host-deps}:
+    (Darwin only) A set of host system paths made available inside the sandbox.
+
+  - [*allow local networking*]{#allow-local-networking}:
+    (Darwin only) Whether the build may access the local network inside the sandbox.
+
+[closure]: @docroot@/glossary.md#gloss-closure
+[fixed-output derivation]: @docroot@/glossary.md#gloss-fixed-output-derivation
 
 ### Placeholders
 

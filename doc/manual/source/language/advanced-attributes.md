@@ -5,15 +5,9 @@ Derivations can declare some infrequently used optional attributes.
 ## Inputs
 
   - [`exportReferencesGraph`]{#adv-attr-exportReferencesGraph}\
-    This attribute allows builders access to the references graph of
-    their inputs. The attribute is a list of inputs in the Nix store
-    whose references graph the builder needs to know. The value of
-    this attribute should be a list of pairs `[ name1 path1 name2
-    path2 ...  ]`. The references graph of each *pathN* will be stored
-    in a text file *nameN* in the temporary build directory. The text
-    files have the format used by `nix-store --register-validity`
-    (with the deriver fields left empty). For example, when the
-    following derivation is built:
+    Specifies the [*export references graph*](@docroot@/store/derivation/index.md#export-references-graph) option.
+    The value of this attribute should be a list of pairs `[ name1 path1 name2 path2 ...  ]`.
+    For example, when the following derivation is built:
 
     ```nix
     derivation {
@@ -25,17 +19,10 @@ Derivations can declare some infrequently used optional attributes.
     the references graph of `libfoo` is placed in the file
     `libfoo-graph` in the temporary build directory.
 
-    `exportReferencesGraph` is useful for builders that want to do
-    something with the closure of a store path. Examples include the
-    builders in NixOS that generate the initial ramdisk for booting
-    Linux (a `cpio` archive containing the closure of the boot script)
-    and the ISO-9660 image for the installation CD (which is populated
-    with a Nix store containing the closure of a bootable NixOS
-    configuration).
-
   - [`passAsFile`]{#adv-attr-passAsFile}\
-    A list of names of attributes that should be passed via files rather
-    than environment variables. For example, if you have
+    A list of names of attributes whose environment variables should be marked
+    [*pass as file*](@docroot@/store/derivation/index.md#pass-as-file).
+    For example, if you have
 
     ```nix
     passAsFile = ["big"];
@@ -44,36 +31,29 @@ Derivations can declare some infrequently used optional attributes.
 
     then when the builder runs, the environment variable `bigPath`
     will contain the absolute path to a temporary file containing `a
-    very long string`. That is, for any attribute *x* listed in
-    `passAsFile`, Nix will pass an environment variable `xPath`
-    holding the path of the file containing the value of attribute
-    *x*. This is useful when you need to pass large strings to a
-    builder, since most operating systems impose a limit on the size
-    of the environment (typically, a few hundred kilobyte).
+    very long string`.
 
   - [`__structuredAttrs`]{#adv-attr-structuredAttrs}\
     If the special attribute `__structuredAttrs` is set to `true`, the other derivation
     attributes are serialised into a file in JSON format.
 
-    This obviates the need for [`passAsFile`](#adv-attr-passAsFile) since JSON files have no size restrictions, unlike process environments.
-    It also makes it possible to tweak derivation settings in a structured way;
-    see [`outputChecks`](#adv-attr-outputChecks) for example.
-
     See the [corresponding section in the derivation page](@docroot@/store/derivation/index.md#structured-attrs) for further details.
 
     > **Warning**
     >
-    > If set to `true`, other advanced attributes such as [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
-    [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites), maxSize, and maxClosureSize.
-    will have no effect.
+    > If set to `true`, the top-level attributes [`allowedReferences`](#adv-attr-allowedReferences), [`allowedRequisites`](#adv-attr-allowedRequisites),
+    > [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites)
+    > will have no effect; use [`outputChecks`](#adv-attr-outputChecks) instead.
 
 ## Output checks
 
-See the [corresponding section in the derivation output page](@docroot@/store/derivation/outputs/index.md).
+These attributes specify [checks on the derivation's outputs](@docroot@/store/derivation/outputs/index.md#output-checks).
+The concepts behind them are documented there; this section gives the syntax for specifying them from the Nix language.
+
+Store paths in these lists may be given as strings with context (i.e. by interpolating a derivation), and outputs of the derivation itself are denoted by their plain output names, e.g. `"out"`.
 
   - [`allowedReferences`]{#adv-attr-allowedReferences}\
-    The optional attribute `allowedReferences` specifies a list of legal
-    references (dependencies) of the output of the builder. For example,
+    Specifies the [*allowed references*](@docroot@/store/derivation/outputs/index.md#allowed-references) check. For example,
 
     ```nix
     allowedReferences = [];
@@ -81,15 +61,10 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
 
     enforces that the output of a derivation cannot have any runtime
     dependencies on its inputs. To allow an output to have a runtime
-    dependency on itself, use `"out"` as a list item. This is used in
-    NixOS to check that generated files such as initial ramdisks for
-    booting Linux don’t have accidental dependencies on other paths in
-    the Nix store.
+    dependency on itself, use `"out"` as a list item.
 
   - [`allowedRequisites`]{#adv-attr-allowedRequisites}\
-    This attribute is similar to `allowedReferences`, but it specifies
-    the legal requisites of the whole closure, so all the dependencies
-    recursively. For example,
+    Specifies the [*allowed requisites*](@docroot@/store/derivation/outputs/index.md#allowed-requisites) check. For example,
 
     ```nix
     allowedRequisites = [ foobar ];
@@ -100,21 +75,17 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
     `foobar` itself doesn't introduce any other dependency itself.
 
   - [`disallowedReferences`]{#adv-attr-disallowedReferences}\
-    The optional attribute `disallowedReferences` specifies a list of
-    illegal references (dependencies) of the output of the builder. For
-    example,
+    Specifies the [*disallowed references*](@docroot@/store/derivation/outputs/index.md#disallowed-references) check. For example,
 
     ```nix
     disallowedReferences = [ foo ];
     ```
 
     enforces that the output of a derivation cannot have a direct
-    runtime dependencies on the derivation `foo`.
+    runtime dependency on the derivation `foo`.
 
   - [`disallowedRequisites`]{#adv-attr-disallowedRequisites}\
-    This attribute is similar to `disallowedReferences`, but it
-    specifies illegal requisites for the whole closure, so all the
-    dependencies recursively. For example,
+    Specifies the [*disallowed requisites*](@docroot@/store/derivation/outputs/index.md#disallowed-requisites) check. For example,
 
     ```nix
     disallowedRequisites = [ foobar ];
@@ -133,10 +104,9 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
     [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites),
     the following attributes are available:
 
-    - `maxSize` defines the maximum size of the resulting [store object](@docroot@/store/store-object.md).
-    - `maxClosureSize` defines the maximum size of the output's closure.
-    - `ignoreSelfRefs` controls whether self-references should be considered when
-      checking for allowed references/requisites.
+    - `maxSize` specifies the [*max size*](@docroot@/store/derivation/outputs/index.md#max-size) check.
+    - `maxClosureSize` specifies the [*max closure size*](@docroot@/store/derivation/outputs/index.md#max-closure-size) check.
+    - `ignoreSelfRefs` controls the [*ignore self references*](@docroot@/store/derivation/outputs/index.md#ignore-self-refs) behavior.
 
     Example:
 
@@ -162,7 +132,9 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
   - [`unsafeDiscardReferences`]{#adv-attr-unsafeDiscardReferences}\
     When using [structured attributes](#adv-attr-structuredAttrs), the
     attribute `unsafeDiscardReferences` is an attribute set with a boolean value for each output name.
-    If set to `true`, it disables scanning the output for runtime dependencies.
+    If set to `true`, it enables the
+    [*unsafe discard references*](@docroot@/store/derivation/outputs/index.md#unsafe-discard-references)
+    behavior for that output.
 
     Example:
 
@@ -171,30 +143,19 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
     unsafeDiscardReferences.out = true;
     ```
 
-    This is useful, for example, when generating self-contained filesystem images with
-    their own embedded Nix store: hashes found inside such an image refer
-    to the embedded store and not to the host's Nix store.
-
 ## Build scheduling
 
   - [`preferLocalBuild`]{#adv-attr-preferLocalBuild}\
-    If this attribute is set to `true` and [distributed building is enabled](@docroot@/command-ref/conf-file.md#conf-builders), then, if possible, the derivation will be built locally instead of being forwarded to a remote machine.
+    If set to `true`, enables the [*prefer local build*](@docroot@/store/derivation/index.md#prefer-local-build) option.
     This is useful for derivations that are cheapest to build locally.
 
   - [`allowSubstitutes`]{#adv-attr-allowSubstitutes}\
-    If this attribute is set to `false`, then Nix will always build this derivation (locally or remotely); it will not try to substitute its outputs.
+    If set to `false`, disables the [*allow substitutes*](@docroot@/store/derivation/index.md#allow-substitutes) option, so Nix will always build this derivation (locally or remotely) rather than substituting its outputs.
     This is useful for derivations that are cheaper to build than to substitute.
 
-    This attribute can be ignored by setting [`always-allow-substitutes`](@docroot@/command-ref/conf-file.md#conf-always-allow-substitutes) to `true`.
-
-    > **Note**
-    >
-    > If set to `false`, the [`builder`] should be able to run on the system type specified in the [`system` attribute](./derivations.md#attr-system), since the derivation cannot be substituted.
-
-    [`builder`]: ./derivations.md#attr-builder
-
 - [`requiredSystemFeatures`]{#adv-attr-requiredSystemFeatures}\
-  If a derivation has the `requiredSystemFeatures` attribute, then Nix will only build it on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
+  Specifies the [*required system features*](@docroot@/store/derivation/index.md#required-system-features) option:
+  Nix will only build the derivation on a machine that has the corresponding features set in its [`system-features` configuration](@docroot@/command-ref/conf-file.md#conf-system-features).
 
   For example, setting
 
@@ -207,11 +168,8 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
 # Impure builder configuration
 
   - [`impureEnvVars`]{#adv-attr-impureEnvVars}\
-    This attribute allows you to specify a list of environment variables
-    that should be passed from the environment of the calling user to
-    the builder. Usually, the environment is cleared completely when the
-    builder is executed, but with this attribute you can allow specific
-    environment variables to be passed unmodified. For example,
+    Specifies the [*impure environment variables*](@docroot@/store/derivation/index.md#impure-env-vars) option: a list of environment variables
+    that should be passed from the environment of the calling user to the builder. For example,
     `fetchurl` in Nixpkgs has the line
 
     ```nix
@@ -220,26 +178,6 @@ See the [corresponding section in the derivation output page](@docroot@/store/de
 
     to make it use the proxy server configuration specified by the user
     in the environment variables `http_proxy` and friends.
-
-    This attribute is only allowed in [fixed-output derivations][fixed-output derivation],
-    where impurities such as these are okay since (the hash
-    of) the output is known in advance. It is ignored for all other
-    derivations.
-
-    > **Warning**
-    >
-    > `impureEnvVars` implementation takes environment variables from
-    > the current builder process. When a daemon is building its
-    > environmental variables are used. Without the daemon, the
-    > environmental variables come from the environment of the
-    > `nix-build`.
-
-    If the [`configurable-impure-env` experimental
-    feature](@docroot@/development/experimental-features.md#xp-feature-configurable-impure-env)
-    is enabled, these environment variables can also be controlled
-    through the
-    [`impure-env`](@docroot@/command-ref/conf-file.md#conf-impure-env)
-    configuration setting.
 
 ## Setting the derivation type
 
