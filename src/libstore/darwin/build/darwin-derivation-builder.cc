@@ -141,7 +141,7 @@ void DarwinDerivationBuilder::setUser()
         }
         sandboxProfile += ")\n";
 
-        sandboxProfile += drvOptions.additionalSandboxProfile;
+        sandboxProfile += drv.options.additionalSandboxProfile;
     } else
         sandboxProfile +=
 #include "sandbox-minimal.sb"
@@ -166,7 +166,7 @@ void DarwinDerivationBuilder::setUser()
         sandboxArgs.push_back(tmpDir.native());
         sandboxArgs.push_back("_GLOBAL_TMP_DIR");
         sandboxArgs.push_back(globalTmpDirStr);
-        if (drvOptions.allowLocalNetworking) {
+        if (drv.options.allowLocalNetworking) {
             sandboxArgs.push_back("_ALLOW_LOCAL_NETWORKING");
             sandboxArgs.push_back("1");
         }

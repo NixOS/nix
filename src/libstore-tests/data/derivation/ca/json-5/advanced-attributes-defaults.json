@@ -1,0 +1,42 @@
+{
+  "args": [
+    "-c",
+    "echo hello > $out"
+  ],
+  "builder": "/bin/bash",
+  "env": {
+    "builder": "/bin/bash",
+    "name": "advanced-attributes-defaults",
+    "out": "/1rz4g4znpzjwh1xymhjpm42vipw92pr73vdgl6xs1hycac8kf2n9",
+    "outputHashAlgo": "sha256",
+    "outputHashMode": "recursive",
+    "system": "my-system"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "advanced-attributes-defaults",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
+  "outputs": {
+    "out": {
+      "checks": null,
+      "hashAlgo": "sha256",
+      "method": "nar",
+      "unsafeDiscardReferences": false
+    }
+  },
+  "system": "my-system",
+  "version": 5
+}

@@ -94,20 +94,21 @@ protected:
     Full makeSource(Written & written, std::string_view builder)
     {
         Full drv{
+            .name = "source",
             .outputs{
                 {
                     "out",
-                    Output::CAFixed{
-                        .ca{
-                            .method = ContentAddressMethod::Raw::NixArchive,
-                            .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-                        },
-                    },
+                    {.output =
+                         Output::CAFixed{
+                             .ca{
+                                 .method = ContentAddressMethod::Raw::NixArchive,
+                                 .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                             },
+                         }},
                 },
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "source",
         };
         fillInOutputPaths(drv, store, readDrv(written));
         return drv;
@@ -121,6 +122,7 @@ protected:
     makeIntermediate(Written & written, const Full & source, std::string_view builder = "/bin/intermediate")
     {
         FullDeferred drv{
+            .name = "intermediate",
             .outputs{
                 {"dev", {}},
                 {"out", {}},
@@ -133,7 +135,6 @@ protected:
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "intermediate",
         };
         auto filledIn = fillInOutputPaths(std::move(drv), store, readDrv(written));
         EXPECT_TRUE(filledIn);
@@ -148,11 +149,11 @@ protected:
     Full makeParent(std::set<SingleDerivedPath> inputs)
     {
         return Full{
-            .outputs = {{"out", Output::Deferred{}}},
+            .name = "parent",
+            .outputs = {{"out", {.output = Output::Deferred{}}}},
             .inputs = std::move(inputs),
             .platform = "x86_64-linux",
             .builder = "/bin/parent",
-            .name = "parent",
         };
     }
 
@@ -283,7 +284,7 @@ TEST_P(HashModuloBothMaskedTest, to_aterm)
     writeTest(std::string{GetParam()} + "-both-masked.drv", [&] {
         auto m = bothMasked(written, named(written, GetParam()));
         EXPECT_TRUE(m);
-        return m ? unparse(*m, store) : "";
+        return m ? m->to_string(store, /*name=*/"") : "";
     });
 }
 
@@ -302,7 +303,7 @@ TEST_P(HashModuloBothMaskedTest, from_aterm)
     auto expected = bothMasked(written, named(written, GetParam()));
     ASSERT_TRUE(expected);
     readTest(std::string{GetParam()} + "-both-masked.drv", [&](auto encoded) {
-        EXPECT_EQ((parse<masked::HashInputs, Output::Deferred>(store, std::move(encoded), expected->name)), *expected);
+        EXPECT_EQ(Drv<Output::Deferred>::parse(store, std::move(encoded), /*name=*/""), *expected);
     });
 }
 

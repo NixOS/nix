@@ -52,3 +52,9 @@ warning:
              10|   maxSize = 1234;
                |   ^
              11|   maxClosureSize = 12345;
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'allowedReferences'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'allowedRequisites'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'disallowedRequisites'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'disallowedReferences'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'maxSize'; use 'outputChecks' instead
+warning: 'structuredAttrs' disables the effect of the top-level attribute 'maxClosureSize'; use 'outputChecks' instead

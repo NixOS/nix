@@ -2,6 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
@@ -42,7 +43,7 @@ struct HashInputs
         bool operator==(const Drvs &) const = default;
     } drvs;
 
-    /* Needed so that `Drv`, and thus `Derivation<HashInputs, Out>`, is
+    /* Needed so that `Drv`, and thus `ATermT<HashInputs, Out>`, is
        comparable: the tests compare masked derivations structurally
        rather than comparing their hashes. */
     bool operator==(const HashInputs &) const = default;
@@ -70,6 +71,12 @@ struct HashInputs
  * than only as hashes means the computation can be inspected and
  * compared.
  *
+ * Both are `ATermT` rather than `Derivation` because they only exist to
+ * be printed and hashed, and because output masking makes them *not*
+ * faithful derivations: with the outputs masked and the environment
+ * variables named after them blanked, the environment no longer encodes
+ * the options a `Derivation` would carry.
+ *
  * "Output masking" is the traditional name --- it is the "masked" store
  * derivation of `primops.cc`, blanking the output paths in the
  * `outputs` field and in the env vars named after them alike. "Input
@@ -82,7 +89,7 @@ struct HashInputs
  *   https://nix.dev/manual/nix/latest/store/derivation/outputs/input-address.html#input-masked-drv
  */
 template<typename Out = Output::InputAddressed>
-using Drv = Derivation<HashInputs, Out>;
+using Drv = ATermT<HashInputs, Out>;
 
 /**
  * The hashes modulo of a derivation.
@@ -189,7 +196,7 @@ template<typename Out>
 std::optional<Drv<Output::Deferred>> bothMaskedDerivation(
     const StoreDirConfig & store,
     ReadDerivation readDerivation,
-    const Derivation<std::set<SingleDerivedPath>, Out> & drv);
+    const Derivation<SingleDerivedPath, Out> & drv);
 
 extern template std::optional<Drv<Output::Deferred>>
 bothMaskedDerivation(const StoreDirConfig & store, ReadDerivation readDerivation, const Full & drv);
