@@ -44,6 +44,11 @@ struct ReceiveInterrupts
     ~ReceiveInterrupts() {}
 };
 
+inline std::unique_ptr<InterruptCallback> createSignalCallback(SignalType type, fun<void()> callback)
+{
+    return {};
+}
+
 inline std::unique_ptr<InterruptCallback> createInterruptCallback(fun<void()> callback)
 {
     return {};
