@@ -51,8 +51,9 @@ rec {
     final: prev: {
       withASan = withSanitizers;
       withUBSan = withSanitizers;
-      # So that this stuff is at least built in CI.
       withFuzzer = withSanitizers;
+      # Build the fuzz targets in CI.
+      withFuzzTargets = withSanitizers;
 
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
@@ -92,8 +93,35 @@ rec {
     packaging-overriding =
       let
         nix = packages'.nix;
+        checkFuzzConfiguration =
+          withFuzzer: withFuzzTargets:
+          let
+            components = nixComponents.overrideScope (
+              _: _: {
+                inherit withFuzzer withFuzzTargets;
+              }
+            );
+          in
+          lib.all
+            (
+              name:
+              let
+                flags = components.${name}.mesonFlags;
+              in
+              ((lib.elem (lib.mesonOption "b_sanitize" "fuzzer-no-link") flags) == withFuzzer)
+              && lib.elem (lib.mesonBool "fuzzers" withFuzzTargets) flags
+              && !(lib.elem (lib.mesonBool "fuzzers" (!withFuzzTargets)) flags)
+            )
+            [
+              "nix-util-tests"
+              "nix-store-tests"
+            ];
       in
       assert (nix.appendPatches [ pkgs.emptyFile ]).libs.nix-util.src.patches == [ pkgs.emptyFile ];
+      assert checkFuzzConfiguration false false;
+      assert checkFuzzConfiguration false true;
+      assert checkFuzzConfiguration true false;
+      assert checkFuzzConfiguration true true;
       if pkgs.stdenv.buildPlatform.isDarwin then
         lib.warn "packaging-overriding check currently disabled because of a permissions issue on macOS" pkgs.emptyFile
       else

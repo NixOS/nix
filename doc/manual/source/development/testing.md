@@ -307,11 +307,15 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 The project utilises [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
 The harnesses reside in corresponding `-tests` subprojects (e.g. `src/libutil-tests/fuzz`).
-In order to correctly utilise them, the whole project needs to be built with correct flags to ensure that all libraries are instrumented.
+The `fuzzers` option builds the harnesses, while `fuzzer-no-link` instruments the whole project.
+Meson rejects `fuzzers=true` unless `unit-tests=true` and `b_sanitize` includes `fuzzer-no-link`.
 
 ```shell
 nix develop .#native-clangStdenv
+appendToVar mesonFlags "-Dfuzzers=true"
 appendToVar mesonFlags "-Db_sanitize=address,undefined,fuzzer-no-link"
+# Clang sanitizer/shared-library workaround: https://github.com/mesonbuild/meson/issues/764
+appendToVar mesonFlags "-Db_lundef=false"
 appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Because Boehm doesn't play well with ASan
 configurePhase
 buildPhase
