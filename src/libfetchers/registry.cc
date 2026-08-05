@@ -37,8 +37,8 @@ std::shared_ptr<Registry> Registry::read(const Settings & settings, const Source
                 auto exact = i.find("exact");
                 registry->entries.push_back(
                     Entry{
-                        .from = Input::fromAttrs(settings, jsonToAttrs(i["from"])),
-                        .to = Input::fromAttrs(settings, std::move(toAttrs)),
+                        .from = Input::fromAttrs(jsonToAttrs(i["from"])),
+                        .to = Input::fromAttrs(std::move(toAttrs)),
                         .extraAttrs = extraAttrs,
                         .exact = exact != i.end() && exact.value()});
             }

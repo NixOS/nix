@@ -188,7 +188,7 @@ static FlakeInput parseFlakeInput(
 
     if (attrs.count("type"))
         try {
-            input.ref = FlakeRef::fromAttrs(state.fetchSettings, attrs);
+            input.ref = FlakeRef::fromAttrs(attrs);
         } catch (Error & e) {
             e.addTrace(state.positions[pos], HintFmt("while evaluating flake input"));
             throw;
@@ -198,7 +198,7 @@ static FlakeInput parseFlakeInput(
         if (!attrs.empty())
             throw Error("unexpected flake input attribute '%s', at %s", attrs.begin()->first, state.positions[pos]);
         if (url)
-            input.ref = parseFlakeRef(state.fetchSettings, *url, {}, true, input.isFlake, true);
+            input.ref = parseFlakeRef(*url, {}, true, input.isFlake, true);
     }
 
     if (input.ref && input.follows)
@@ -284,8 +284,7 @@ static Flake readFlake(
                     if (formal.name != state.s.self)
                         flake.inputs.emplace(
                             state.symbols[formal.name],
-                            FlakeInput{
-                                .ref = parseFlakeRef(state.fetchSettings, std::string(state.symbols[formal.name]))});
+                            FlakeInput{.ref = parseFlakeRef(std::string(state.symbols[formal.name]))});
                 }
             }
         }
@@ -571,8 +570,10 @@ LockedFlake lockFlake(
                     }
 
                     if (!input.ref)
-                        input.ref =
-                            FlakeRef::fromAttrs(state.fetchSettings, {{"type", "indirect"}, {"id", std::string(id)}});
+                        input.ref = FlakeRef::fromAttrs({
+                            {"type", "indirect"},
+                            {"id", std::string(id)},
+                        });
 
                     auto overriddenParentPath =
                         input.ref->input.isRelative()
@@ -906,7 +907,7 @@ LockedFlake
 lockFlake(const Settings & settings, EvalState & state, const SourcePath & flakeDir, const LockFlags & lockFlags)
 {
     /* We need a fake flakeref to put in the `Flake` struct, but it's not used for anything. */
-    auto fakeRef = parseFlakeRef(state.fetchSettings, "flake:get-flake");
+    auto fakeRef = parseFlakeRef("flake:get-flake");
     return lockFlake(settings, state, fakeRef, lockFlags, readFlake(state, fakeRef, fakeRef, fakeRef, flakeDir, {}));
 }
 

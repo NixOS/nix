@@ -137,7 +137,7 @@ MixFlakeOptions::MixFlakeOptions()
                 throw UsageError(
                     "--override-input was passed a zero-length input path, which would refer to the flake itself, not an input");
             lockFlags.inputOverrides.insert_or_assign(
-                std::move(*path), parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string(), true));
+                std::move(*path), parseFlakeRef(flakeRef, absPath(getCommandBaseDir()).string(), true));
         }},
         .completer = {[&](AddCompletions & completions, size_t n, std::string_view prefix) {
             if (n == 0) {
@@ -178,7 +178,7 @@ MixFlakeOptions::MixFlakeOptions()
             auto flake = flake::lockFlake(
                 flakeSettings,
                 *evalState,
-                parseFlakeRef(fetchSettings, flakeRef, absPath(getCommandBaseDir()).string()),
+                parseFlakeRef(flakeRef, absPath(getCommandBaseDir()).string()),
                 {.writeLockFile = false});
             for (auto & [inputName, input] : flake.lockFile.root->inputs) {
                 auto input2 = flake.lockFile.findInput({inputName}); // resolve 'follows' nodes
@@ -190,7 +190,7 @@ MixFlakeOptions::MixFlakeOptions()
                     }
 
                     overrideRegistry(
-                        fetchers::Input::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", inputName}}),
+                        fetchers::Input::fromAttrs({{"type", "indirect"}, {"id", inputName}}),
                         input3->lockedRef.input,
                         extraAttrs);
                 }
@@ -343,8 +343,7 @@ void completeFlakeRefWithFragment(
             auto flakeRefS = std::string(prefix.substr(0, hash));
 
             // TODO: ideally this would use the command base directory instead of assuming ".".
-            auto flakeRef =
-                parseFlakeRef(fetchSettings, expandTilde(flakeRefS), std::filesystem::current_path().string());
+            auto flakeRef = parseFlakeRef(expandTilde(flakeRefS), std::filesystem::current_path().string());
 
             auto evalCache = openEvalCache(
                 *evalState, make_ref<flake::LockedFlake>(lockFlake(flakeSettings, *evalState, flakeRef, lockFlags)));
@@ -507,7 +506,7 @@ Installables SourceExprCommand::parseInstallables(ref<Store> store, std::vector<
 
             try {
                 auto [flakeRef, fragment] =
-                    parseFlakeRefWithFragment(fetchSettings, std::string{prefix}, absPath(getCommandBaseDir()));
+                    parseFlakeRefWithFragment(std::string{prefix}, absPath(getCommandBaseDir()));
                 result.push_back(
                     make_ref<InstallableFlake>(
                         this,
@@ -760,8 +759,7 @@ std::vector<FlakeRef> RawInstallablesCommand::getFlakeRefsForCompletion()
     std::vector<FlakeRef> res;
     res.reserve(rawInstallables.size());
     for (const auto & i : rawInstallables)
-        res.push_back(
-            parseFlakeRefWithFragment(fetchSettings, expandTilde(i), absPath(getCommandBaseDir()).string()).first);
+        res.push_back(parseFlakeRefWithFragment(expandTilde(i), absPath(getCommandBaseDir()).string()).first);
     return res;
 }
 
@@ -780,8 +778,7 @@ void RawInstallablesCommand::run(ref<Store> store)
 
 std::vector<FlakeRef> InstallableCommand::getFlakeRefsForCompletion()
 {
-    return {parseFlakeRefWithFragment(fetchSettings, expandTilde(_installable), absPath(getCommandBaseDir()).string())
-                .first};
+    return {parseFlakeRefWithFragment(expandTilde(_installable), absPath(getCommandBaseDir()).string()).first};
 }
 
 void InstallablesCommand::run(ref<Store> store, std::vector<std::string> && rawInstallables)
