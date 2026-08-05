@@ -1450,7 +1450,10 @@ static std::string showAttrSelectionPath(EvalState & state, Env & env, std::span
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    PosIdx pos2;
+    // current or last *definition site* (the attr, not the select)
+    PosIdx attrPos;
+    const AttrName * unresolvedOrEnd = attrPathStart;
+    // cursor, result if successful
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -1483,28 +1486,34 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                         allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error<EvalError>("attribute '%1%' missing", state.symbols[name])
-                        .atPos(pos)
                         .withSuggestions(suggestions)
                         .withFrame(env, *this)
                         .debugThrow();
                 }
             }
             vAttrs = j->value;
-            pos2 = j->pos;
+            attrPos = j->pos;
+            unresolvedOrEnd = &i + 1;
             if (state.countCalls)
-                state.attrSelects->try_emplace_or_visit(pos2, 1, [](auto & i) { i.second++; });
+                state.attrSelects->try_emplace_or_visit(attrPos, 1, [](auto & i) { i.second++; });
         }
 
-        state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos));
+        state.forceValue(*vAttrs, (attrPos ? attrPos : this->pos));
 
     } catch (Error & e) {
-        if (pos2) {
-            auto pos2r = state.positions[pos2];
-            auto origin = std::get_if<SourcePath>(&pos2r.origin);
-            if (!(origin && *origin == state.derivationInternal))
-                state.addErrorTrace(
-                    e, pos2, "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        // Traces are printed in reverse, so we add context before the main item.
+        if (attrPos) {
+            auto attrPosR = state.positions[attrPos];
+            auto origin = std::get_if<SourcePath>(&attrPosR.origin);
+            if (!(origin && *origin == state.derivationInternal)) {
+                auto successPath =
+                    showAttrSelectionPath(state, env, std::span<const AttrName>(attrPathStart, unresolvedOrEnd));
+                state.addErrorTrace(e, attrPos, "from the definition of '%1%'", successPath);
+            }
         }
+        // Add main item: the selection site itself (`a.b`), ie the actual access
+        state.addErrorTrace(
+            e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
         throw;
     }
 

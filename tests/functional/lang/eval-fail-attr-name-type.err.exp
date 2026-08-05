@@ -1,5 +1,12 @@
 error:
        … while evaluating the attribute 'puppy."${key}"'
+         at /pwd/lang/eval-fail-attr-name-type.nix:7:1:
+            6| in
+            7| attrs.puppy.${key}
+             | ^
+            8|
+
+       … from the definition of 'puppy'
          at /pwd/lang/eval-fail-attr-name-type.nix:3:5:
             2|   attrs = {
             3|     puppy.doggy = { };
