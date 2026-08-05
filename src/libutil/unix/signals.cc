@@ -101,8 +101,14 @@ static void signalHandlerThread(sigset_t set)
             triggerSignalCallbacks(SignalType::Winch);
         }
 
-        else if (signal == SIGCONT)
+        else if (signal == SIGCONT) {
+            /* The terminal may have been resized while we were
+               stopped, and we won't have received SIGWINCH for it,
+               since the kernel only sends it to the foreground process
+               group. */
+            updateWindowSize();
             triggerSignalCallbacks(SignalType::Cont);
+        }
 
 #ifndef __FreeBSD__
         else if (signal == SIGTSTP) {
