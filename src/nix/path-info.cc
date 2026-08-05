@@ -116,14 +116,15 @@ struct CmdPathInfo : StorePathsCommand, MixJSON
         addFlag({
             .longName = "size",
             .shortName = 's',
-            .description = "Print the size of the NAR serialisation of each path.",
+            .description = "Print the [*NAR size*](@docroot@/store/store-object.md#nar-size) of each store object.",
             .handler = {&showSize, true},
         });
 
         addFlag({
             .longName = "closure-size",
             .shortName = 'S',
-            .description = "Print the sum of the sizes of the NAR serialisations of the closure of each path.",
+            .description =
+                "Print the [*closure NAR size*](@docroot@/store/store-object.md#closure-nar-size) of each store object, i.e. the sum over its whole closure.",
             .handler = {&showClosureSize, true},
         });
 

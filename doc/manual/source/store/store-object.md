@@ -40,10 +40,10 @@ The *referrers closure* of a store object are the store objects that can reach t
 > We can create graphs from the store objects in a store, but the contents of the store is not, in general fixed, and may instead change over time.
 >
 > - The references of a store object --- the set of store paths called the references --- is a field of a store object, and thus intrinsic by definition.
-    Regardless of what store contains the store object in question, and what else that store may or may not contain, the references are the same.
+>   Regardless of what store contains the store object in question, and what else that store may or may not contain, the references are the same.
 >
 > - The requisites of a store object are almost intrinsic --- some store paths do not precisely refer to a unique single store object.
-> Exactly what store object is being referenced, and what in turn *its* references are, depends on the store in question.
+>   Exactly what store object is being referenced, and what in turn *its* references are, depends on the store in question.
 >   Different stores may disagree on what a given store path refers to.
 >
 > - The referrers of a store object are completely extrinsic, and depends solely on the store which contains that store object, not the store object itself.
@@ -71,4 +71,24 @@ A store can only contain a store object if it also contains all the store object
 
 [Store implementations](@docroot@/store/types/index.md) currently associate more information than described above with a store object.
 Quite arguably some of this information doesn't belong here, because it conflates concerns.
+
+Two such properties are sizes:
+
+- [*NAR size*]{#nar-size}:
+  The size in bytes of the store object's [file system object](./file-system-object.md), serialised as a [Nix Archive](./file-system-object/content-address.md#serial-nix-archive).
+
+  This is an intrinsic property of the store object itself, and not of the way any particular store happens to store it.
+  In particular, it is unrelated to the space the store object occupies on disk, which varies with compression, deduplication, and file system overheads.
+
+- [*closure NAR size*]{#closure-nar-size}:
+  The sum of the [*NAR size*](#nar-size) of every store object in the [closure] of the store object, including itself.
+
+  Unlike the *NAR size*, this is not quite an intrinsic property.
+  As a consequence of the [requisites](#references) being slightly ambiguous as described above, the *closure NAR size* is also slightly ambiguous;
+  both depend on the store in question and the exact closure in that store.
+
+  Because of these issues, implementations currently typically compute this on the fly rather than storing it.
+
 For details see the [store object info](@docroot@/protocols/json/store-object-info.md) JSON format or the [narinfo](@docroot@/protocols/binary-cache/narinfo.md) format.
+
+[closure]: @docroot@/glossary.md#gloss-closure
