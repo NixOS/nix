@@ -217,6 +217,7 @@ nix_nested_manpages = [
       'query',
       'read-log',
       'realise',
+      'register-validity',
       'repair-path',
       'restore',
       'serve',
