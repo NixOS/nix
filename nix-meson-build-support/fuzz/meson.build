@@ -1,13 +1,17 @@
 # To deduplicate the boilerplate of compiling fuzz harnesses, this file provides
 # the shared definitions for that.
 
+sanitizers_for_project = get_option('b_sanitize').split(',')
+if 'fuzzer-no-link' not in sanitizers_for_project
+  error('fuzzers=true requires fuzzer-no-link in b_sanitize')
+endif
+
 if cxx.get_id() != 'clang'
   # Because we use libFuzzer.
-  error('fuzzing is requires an LLVM toolchain')
+  error('fuzzing requires an LLVM toolchain')
 endif
 
 foreach t : fuzz_targets
-  sanitizers_for_project = get_option('b_sanitize').split(',')
   sanitizers = []
   foreach i : sanitizers_for_project
     if i != 'fuzzer-no-link'

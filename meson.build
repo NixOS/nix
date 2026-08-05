@@ -43,6 +43,10 @@ if get_option('doc-gen')
 endif
 
 # Testing
+if get_option('fuzzers') and not get_option('unit-tests')
+  error('fuzzers=true requires unit-tests=true')
+endif
+
 if get_option('unit-tests')
   subproject('libutil-test-support')
   subproject('libutil-tests')

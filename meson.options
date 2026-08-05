@@ -15,6 +15,13 @@ option(
 )
 
 option(
+  'fuzzers',
+  type : 'boolean',
+  value : false,
+  description : 'Build libFuzzer targets',
+)
+
+option(
   'functional-tests',
   type : 'boolean',
   value : true,
