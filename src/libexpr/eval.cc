@@ -3154,7 +3154,7 @@ void EvalState::printStatistics()
         {
             auto & list = topObj["attributes"];
             list = json::array();
-            attrSelects->visit_all([&](auto & i) {
+            attrSelects->cvisit_all([&](auto & i) {
                 json obj = json::object();
                 if (auto pos = positions[i.first]) {
                     if (auto path = std::get_if<SourcePath>(&pos.origin))
