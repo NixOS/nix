@@ -27,18 +27,15 @@ EvalSettings evalSettings{
         {
             "flake",
             [](EvalState & state, std::string_view rest) {
+                /* Const is a lie here, because settings currently carry mutables caches. */
+                const auto & fetchSettings = state.fetchSettings;
                 experimentalFeatureSettings.require(Xp::Flakes);
-                // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
+                auto flakeRef = parseFlakeRef(fetchSettings, rest, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] =
                     flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
                 auto storePath = nix::fetchToStore(
-                    state.fetchSettings,
-                    *state.store,
-                    SourcePath(accessor),
-                    FetchMode::Copy,
-                    lockedRef.input.getName());
+                    fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
                 state.allowPath(storePath);
                 return state.storePath(storePath);
             },
@@ -177,9 +174,11 @@ const Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir)
 {
+    const auto & fetchSettings = state.fetchSettings;
+
     if (EvalSettings::isPseudoUrl(s)) {
-        auto accessor = fetchers::downloadTarball(*state.store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
+        auto accessor = fetchers::downloadTarball(*state.store, fetchSettings, EvalSettings::resolvePseudoUrl(s));
+        auto storePath = fetchToStore(fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
         return state.storePath(storePath);
     }
 
@@ -189,7 +188,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
         auto [accessor, lockedRef] =
             flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
         auto storePath = nix::fetchToStore(
-            state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+            fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
         state.allowPath(storePath);
         return state.storePath(storePath);
     }

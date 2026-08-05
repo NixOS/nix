@@ -1,3 +1,4 @@
+#include "nix/util/json-utils.hh"
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-flake.hh"
 #include "nix/main/common-args.hh"
@@ -156,8 +157,8 @@ struct ProfileManifest
                 }
                 if (e.value(sUrl, "") != "") {
                     element.source = ProfileElementSource{
-                        parseFlakeRef(fetchSettings, e[sOriginalUrl]),
-                        parseFlakeRef(fetchSettings, e[sUrl]),
+                        parseFlakeRef(fetchSettings, getString(e[sOriginalUrl])),
+                        parseFlakeRef(fetchSettings, getString(e[sUrl])),
                         e["attrPath"],
                         e["outputs"].get<ExtendedOutputsSpec>()};
                 }
