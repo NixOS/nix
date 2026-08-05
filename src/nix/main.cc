@@ -86,8 +86,6 @@ static bool haveInternet()
 #endif
 }
 
-std::string programPath;
-
 struct NixArgs : virtual MultiCommand, virtual MixCommonArgs, virtual RootArgs
 {
     bool useNet = true;
@@ -408,8 +406,7 @@ void mainWrapped(int argc, char ** argv)
 
     Finally f([] { logger->stop(); });
 
-    programPath = argv[0];
-    auto programName = std::string(baseNameOf(programPath));
+    auto programName = std::string(baseNameOf(argv[0]));
     auto extensionPos = programName.find_last_of(".");
     if (extensionPos != std::string::npos)
         programName.erase(extensionPos);
