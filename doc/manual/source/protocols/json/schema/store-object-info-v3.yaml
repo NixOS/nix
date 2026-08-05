@@ -84,7 +84,8 @@ $defs:
         minimum: 0
         title: NAR Size
         description: |
-          Size of the [file system object](@docroot@/store/file-system-object.md) part of the store object when serialized as a [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive).
+          The [*NAR size*](@docroot@/store/store-object.md#nar-size) of the store object:
+          the size of its [file system object](@docroot@/store/file-system-object.md) part when serialized as a [Nix Archive](@docroot@/store/file-system-object/content-address.md#serial-nix-archive).
 
       references:
         type: array
@@ -184,7 +185,8 @@ $defs:
         minimum: 0
         title: Closure Size
         description: |
-          The total size of this store object and every other object in its [closure](@docroot@/glossary.md#gloss-closure).
+          The [*closure NAR size*](@docroot@/store/store-object.md#closure-nar-size) of the store object:
+          the total size of this store object and every other object in its [closure](@docroot@/glossary.md#gloss-closure).
 
           > This field is not stored at all, but computed by traversing the other fields across all the store objects in a closure.
     additionalProperties: false

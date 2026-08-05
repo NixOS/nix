@@ -187,11 +187,13 @@ This involves two steps:
   The files must conform to the model described in the [Exposing in OS file systems](./file-system-object/os-file-system.md) section.
   For example, timestamps and permissions are canonicalised.
 
-- **Calculate the references**
+- [**Calculate the references**]{#scanning-for-references}
 
   Nix scans each output path for [references] to input store objects by looking for the [digest][store path digest] of each input.
   (The name part and the [store directory path] are ignored when scanning; an input's hash part that is neither followed by a `-` nor proceeded by a `/` still scans as a reference.)
   Since these are potential runtime dependencies, Nix will register them as references of the output store object they occur in.
+
+  This scanning can be disabled per output with the [*unsafe discard references*](derivation/outputs/index.md#unsafe-discard-references) setting.
 
 ### Traditional (post-build) processing
 
