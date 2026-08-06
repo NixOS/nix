@@ -2,6 +2,9 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
+#ifndef _WIN32
+#  include "util-tests-config.hh"
+#endif
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -94,7 +97,7 @@ TEST(runProgram2, nonexistent)
         NIX_SPAWN_EXCEPTION);
 }
 
-#ifndef _WIN32 /* Leaking file descriptors into the child isn't a concern on windows. */
+#if !defined(_WIN32) && HAVE_CLOSEFROM /* Leaking file descriptors into the child isn't a concern on windows. */
 
 TEST(runProgram2, leakedFDsAreClosed)
 {
