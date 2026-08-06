@@ -278,6 +278,8 @@ void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
+    assert(!std::holds_alternative<Descriptor>(options.program));
+
     /* Create a pipe. */
     Pipe out;
     // TODO: I copied this from unix but this is handled again in spawnProcess, so might be weird to split it up like
@@ -285,7 +287,7 @@ void runProgram2(const RunOptions & options)
     if (options.standardOut)
         out.create();
 
-    std::filesystem::path realProgram = options.program;
+    std::filesystem::path realProgram = std::get<std::filesystem::path>(options.program);
     // TODO: Implement shebang / program interpreter lookup on Windows
     auto interpreter = getProgramInterpreter(realProgram);
 
@@ -302,7 +304,7 @@ void runProgram2(const RunOptions & options)
     /* Wait for the child to finish. */
     int status = pid.wait();
     if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+        throw ExecError(status, "program %1% %2%", PathFmt(realProgram), statusToString(status));
 }
 
 std::string statusToString(int status)

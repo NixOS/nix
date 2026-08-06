@@ -1,5 +1,7 @@
 #include "nix/util/processes.hh"
 #include "nix/util/current-process.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/serialise.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -39,6 +41,29 @@ TEST(runProgram, worksTrivial)
         ASSERT_EQ(output, "hello");
     }
 }
+
+#ifdef __linux__
+
+TEST(runProgram2, worksTrivialWithDescriptor)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+    AutoCloseFD selfFD = openFileReadonly(*self);
+
+    StringSink output;
+    ASSERT_NO_THROW({
+        runProgram2({
+            .program = selfFD.get(),
+            .args = {"__util_test_spawn_trivial"},
+            .argv0 = "nix-util-tests",
+            .standardOut = &output,
+        });
+    });
+
+    ASSERT_EQ(output.s, "hello");
+}
+
+#endif
 
 #ifdef _WIN32
 #  define NIX_EXECUTABLE_EXTENSION ".exe"

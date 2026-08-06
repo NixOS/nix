@@ -305,12 +305,17 @@ void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
+    /* TODO: FreeBSD seems to have fexecve. */
+    assert(!std::holds_alternative<Descriptor>(options.program));
+
     /* Create a pipe. */
     Pipe out;
     if (options.standardOut)
         out.create();
 
     ProcessOptions processOptions;
+
+    const std::filesystem::path & program = std::get<std::filesystem::path>(options.program);
 
     auto suspension = logger->suspendIf(options.isInteractive);
 
@@ -338,7 +343,7 @@ void runProgram2(const RunOptions & options)
             Strings args_(options.args);
             /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
                trickery. */
-            args_.push_front(options.argv0.value_or(options.program.native()));
+            args_.push_front(options.argv0.value_or(program.native()));
 
             restoreProcessContext();
 
@@ -349,13 +354,13 @@ void runProgram2(const RunOptions & options)
             unix::closeExtraFDs();
 
             if (options.lookupPath)
-                execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
+                execvp(program.c_str(), stringsToCharPtrs(args_).data());
             // This allows you to refer to a program with a pathname relative
             // to the PATH variable.
             else
-                execv(options.program.c_str(), stringsToCharPtrs(args_).data());
+                execv(program.c_str(), stringsToCharPtrs(args_).data());
 
-            throw SysError("executing %s", PathFmt(options.program));
+            throw SysError("executing %s", PathFmt(program));
         },
         processOptions);
 
@@ -367,7 +372,7 @@ void runProgram2(const RunOptions & options)
     /* Wait for the child to finish. */
     int status = pid.wait();
     if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+        throw ExecError(status, "program %1% %2%", PathFmt(program), statusToString(status));
 }
 
 #endif // __linux__
