@@ -305,10 +305,12 @@ You can run them manually with `nix build .#hydraJobs.tests.{testName}` or `nix-
 
 ## Fuzzing
 
-The project utilises [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
+The project uses [`libFuzzer`](https://llvm.org/docs/LibFuzzer.html) and LLVM coverage instrumentation to fuzz sensitive pieces of code.
 The harnesses reside in corresponding `-tests` subprojects (e.g. `src/libutil-tests/fuzz`).
-The `fuzzers` option builds the harnesses, while `fuzzer-no-link` instruments the whole project.
-Meson rejects `fuzzers=true` unless `unit-tests=true` and `b_sanitize` includes `fuzzer-no-link`.
+The `fuzzers` option builds the harnesses. The `fuzzing-engine` option accepts one compiler-driver argument for linking an external fuzzing engine.
+Meson rejects `fuzzers=true` unless `unit-tests=true`.
+If `fuzzing-engine` is empty, Meson requires Clang and `fuzzer-no-link` in `b_sanitize`.
+The compiler driver then links the harnesses with libFuzzer and libstdc++.
 
 ```shell
 nix develop .#native-clangStdenv
@@ -320,6 +322,18 @@ appendToVar mesonFlags "-Dlibexpr:gc=disabled" # Because Boehm doesn't play well
 configurePhase
 buildPhase
 ```
+
+To use an external fuzzing engine, set `fuzzing-engine`:
+
+```shell
+mesonFlagsArray+=(
+  "-Dfuzzers=true"
+  "-Dfuzzing-engine=$LIB_FUZZING_ENGINE"
+)
+```
+
+Nix passes this value as one compiler-driver argument.
+The caller must also choose a compatible compiler and C++ runtime and provide any required instrumentation and sanitizer flags.
 
 If you want to collect coverage metrics you also need to specify the following compiler flags before running the `configurePhase`:
 
