@@ -5,7 +5,7 @@ badTestNames=()
 # Golden test support
 #
 # Test that the output of the given test matches what is expected. If
-# `_NIX_TEST_ACCEPT` is non-empty also update the expected output so
+# `_NIX_TEST_ACCEPT` is `1` also update the expected output so
 # that next time the test succeeds.
 function diffAndAcceptInner() {
     local -r testName=$1
@@ -27,8 +27,11 @@ function diffAndAcceptInner() {
         badTestNames+=("$testName")
     fi
 
-    # Update expected if `_NIX_TEST_ACCEPT` is non-empty.
-    if test -n "${_NIX_TEST_ACCEPT-}"; then
+    # Update expected if `_NIX_TEST_ACCEPT` is `1`. (Comparing against
+    # `1` exactly, rather than any non-empty value, matches the C++ unit
+    # tests' handling of this variable, and makes `_NIX_TEST_ACCEPT=0`
+    # mean "off" as one would expect.)
+    if [[ "${_NIX_TEST_ACCEPT-}" == 1 ]]; then
         cp "$got" "$expected"
         # Delete empty expected files to avoid bloating the repo with
         # empty files.
@@ -42,7 +45,7 @@ function characterisationTestExit() {
     # Make sure shellcheck knows all these will be defined by the caller
     : "${badDiff?} ${badExitCode?}"
 
-    if test -n "${_NIX_TEST_ACCEPT-}"; then
+    if [[ "${_NIX_TEST_ACCEPT-}" == 1 ]]; then
         if (( "$badDiff" )); then
             set +x
             echo >&2 'Output did mot match, but accepted output as the persisted expected output.'
