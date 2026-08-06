@@ -326,6 +326,9 @@
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
         }
+        // (lib.optionalAttrs (system == "x86_64-linux")) {
+          fuzzing-engine = nixpkgsFor.${system}.native.callPackage ./tests/fuzzing-engine { };
+        }
         # Add "passthru" tests
         //
           flatMapAttrs
