@@ -47,6 +47,7 @@ endif
 
 configdata = configuration_data()
 configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+configdata.set('HAVE_CLOSEFROM', cxx.has_function('closefrom').to_int())
 
 config_priv_h = configure_file(
   configuration : configdata,

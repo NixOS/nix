@@ -94,7 +94,7 @@ TEST(runProgram2, nonexistent)
         NIX_SPAWN_EXCEPTION);
 }
 
-#ifndef _WIN32 /* Leaking file descriptors into the child isn't a concern on windows. */
+#if !defined(_WIN32) && HAVE_CLOSEFROM /* Leaking file descriptors into the child isn't a concern on windows. */
 
 TEST(runProgram2, leakedFDsAreClosed)
 {
