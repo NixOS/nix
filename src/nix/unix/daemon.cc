@@ -34,6 +34,9 @@
 #include <grp.h>
 #include <fcntl.h>
 
+#if defined(__APPLE__)
+#  include <membership.h>
+#endif
 #ifdef __linux__
 #  include "nix/util/cgroup.hh"
 #endif
@@ -153,11 +156,24 @@ static void setSigChldAction(bool autoReap)
  *
  * @param group Group the user might be a member of.
  */
-static bool matchUser(std::string_view user, const struct group & gr)
+static bool matchUser(const std::string & user, const struct group & group)
 {
-    for (char ** mem = gr.gr_mem; *mem; mem++)
-        if (user == std::string_view(*mem))
+    for (char ** mem = group.gr_mem; *mem; mem++)
+        if (user == *mem)
             return true;
+
+#if defined(__APPLE__)
+    if (auto pw = getpwnam(user.c_str())) {
+        uuid_t user_uuid, group_uuid;
+        if (!mbr_uid_to_uuid(pw->pw_uid, user_uuid) && !mbr_gid_to_uuid(group.gr_gid, group_uuid)) {
+            int ismember = 0;
+            if (!mbr_check_membership(user_uuid, group_uuid, &ismember)) {
+                return !!ismember;
+            }
+        }
+    }
+#endif
+
     return false;
 }
 
