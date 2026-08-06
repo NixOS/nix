@@ -70,7 +70,7 @@ nix_err nix_flake_reference_parse_flags_set_base_directory(
 
 nix_err nix_flake_reference_and_fragment_from_string(
     nix_c_context * context,
-    nix_fetchers_settings * fetchSettings,
+    [[maybe_unused]] nix_fetchers_settings * fetchSettings,
     nix_flake_settings * flakeSettings,
     nix_flake_reference_parse_flags * parseFlags,
     const char * strData,
@@ -84,8 +84,7 @@ nix_err nix_flake_reference_and_fragment_from_string(
     try {
         std::string str(strData, strSize);
 
-        auto [flakeRef, fragment] =
-            nix::parseFlakeRefWithFragment(*fetchSettings->settings, str, parseFlags->baseDirectory, true);
+        auto [flakeRef, fragment] = nix::parseFlakeRefWithFragment(str, parseFlags->baseDirectory, true);
         *flakeReferenceOut = new nix_flake_reference{nix::make_ref<nix::FlakeRef>(flakeRef)};
         return call_nix_get_string_callback(fragment, fragmentCallback, fragmentCallbackUserData);
     }

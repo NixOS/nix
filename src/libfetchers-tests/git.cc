@@ -187,14 +187,12 @@ TEST_F(GitTest, submodulePeriodSupport)
     }();
 
     auto settings = fetchers::Settings{};
-    auto input = fetchers::Input::fromAttrs(
-        settings,
-        {
-            {"url", "file://" + encodeUrlPath(pathToUrlPath(repoPath))},
-            {"submodules", Explicit{true}},
-            {"type", "git"},
-            {"ref", "main"},
-        });
+    auto input = fetchers::Input::fromAttrs({
+        {"url", "file://" + encodeUrlPath(pathToUrlPath(repoPath))},
+        {"submodules", Explicit{true}},
+        {"type", "git"},
+        {"ref", "main"},
+    });
 
     auto [accessor, i] = input.getAccessor(settings, *store);
 

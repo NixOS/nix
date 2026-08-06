@@ -50,16 +50,16 @@ public:
      *
      * The URL indicate which sort of fetcher, and provides information to that fetcher.
      */
-    static Input fromURL(const Settings & settings, const std::string & url, bool requireTree = true);
+    static Input fromURL(const std::string & url, bool requireTree = true);
 
-    static Input fromURL(const Settings & settings, const ParsedURL & url, bool requireTree = true);
+    static Input fromURL(const ParsedURL & url, bool requireTree = true);
 
     /**
      * Create an `Input` from a an `Attrs`.
      *
      * The URL indicate which sort of fetcher, and provides information to that fetcher.
      */
-    static Input fromAttrs(const Settings & settings, Attrs && attrs);
+    static Input fromAttrs(Attrs && attrs);
 
     ParsedURL toURL() const;
 
@@ -189,10 +189,9 @@ struct InputScheme
 {
     virtual ~InputScheme() {}
 
-    virtual std::optional<Input>
-    inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const = 0;
+    virtual std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const = 0;
 
-    virtual std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const = 0;
+    virtual std::optional<Input> inputFromAttrs(const Attrs & attrs) const = 0;
 
     /**
      * What is the name of the scheme?

@@ -78,8 +78,8 @@ struct CmdBundle : InstallableValueCommand
 
         auto val = installable->toValue(*evalState).first;
 
-        auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] = parseFlakeRefWithFragmentAndExtendedOutputsSpec(
-            fetchSettings, bundler, std::filesystem::current_path().string());
+        auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] =
+            parseFlakeRefWithFragmentAndExtendedOutputsSpec(bundler, std::filesystem::current_path().string());
         const flake::LockFlags lockFlags{.writeLockFile = false};
         InstallableFlake bundler{
             this,

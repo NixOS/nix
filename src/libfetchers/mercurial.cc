@@ -40,7 +40,7 @@ static std::string runHg(OsStrings args)
 
 struct MercurialInputScheme : InputScheme
 {
-    std::optional<Input> inputFromURL(const Settings & settings, const ParsedURL & url, bool requireTree) const override
+    std::optional<Input> inputFromURL(const ParsedURL & url, bool requireTree) const override
     {
         if (url.scheme != "hg+http" && url.scheme != "hg+https" && url.scheme != "hg+ssh" && url.scheme != "hg+file")
             return {};
@@ -61,7 +61,7 @@ struct MercurialInputScheme : InputScheme
 
         attrs.emplace("url", url2.to_string());
 
-        return inputFromAttrs(settings, attrs);
+        return inputFromAttrs(attrs);
     }
 
     std::string_view schemeName() const override
@@ -106,7 +106,7 @@ struct MercurialInputScheme : InputScheme
         return attrs;
     }
 
-    std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         parseURL(getStrAttr(attrs, "url"));
 

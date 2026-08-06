@@ -230,7 +230,7 @@ ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, co
     attrs.insert_or_assign("type", "tarball");
     attrs.insert_or_assign("url", url);
 
-    auto input = Input::fromAttrs(settings, std::move(attrs));
+    auto input = Input::fromAttrs(std::move(attrs));
 
     return input.getAccessor(settings, store).first;
 }
@@ -254,8 +254,7 @@ struct CurlInputScheme : InputScheme
 
     static const StringSet specialParams;
 
-    std::optional<Input>
-    inputFromURL(const Settings & settings, const ParsedURL & _url, bool requireTree) const override
+    std::optional<Input> inputFromURL(const ParsedURL & _url, bool requireTree) const override
     {
         if (!isValidURL(_url, requireTree))
             return std::nullopt;
@@ -373,7 +372,7 @@ struct CurlInputScheme : InputScheme
         return allowedAttrsImpl();
     }
 
-    std::optional<Input> inputFromAttrs(const Settings & settings, const Attrs & attrs) const override
+    std::optional<Input> inputFromAttrs(const Attrs & attrs) const override
     {
         Input input{};
         input.attrs = attrs;
@@ -495,7 +494,7 @@ struct TarballInputScheme : CurlInputScheme
         auto result = downloadTarball_(settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
-            auto immutableInput = Input::fromURL(settings, *result.immutableUrl);
+            auto immutableInput = Input::fromURL(*result.immutableUrl);
             // FIXME: would be nice to support arbitrary flakerefs
             // here, e.g. git flakes.
             if (immutableInput.getType() != "tarball")

@@ -107,8 +107,8 @@ struct CmdRegistryAdd : MixEvalArgs, Command, RegistryCommand
 
     void run() override
     {
-        auto fromRef = parseFlakeRef(fetchSettings, fromUrl);
-        auto toRef = parseFlakeRef(fetchSettings, toUrl);
+        auto fromRef = parseFlakeRef(fromUrl);
+        auto toRef = parseFlakeRef(toUrl);
         auto registry = getRegistry();
         fetchers::Attrs extraAttrs;
         if (toRef.subdir != "")
@@ -143,7 +143,7 @@ struct CmdRegistryRemove : RegistryCommand, Command
     void run() override
     {
         auto registry = getRegistry();
-        registry->remove(parseFlakeRef(fetchSettings, url).input);
+        registry->remove(parseFlakeRef(url).input);
         registry->write(getRegistryPath().string());
     }
 };
@@ -184,8 +184,8 @@ struct CmdRegistryPin : RegistryCommand, EvalCommand
         if (locked.empty())
             locked = url;
         auto registry = getRegistry();
-        auto ref = parseFlakeRef(fetchSettings, url);
-        auto lockedRef = parseFlakeRef(fetchSettings, locked);
+        auto ref = parseFlakeRef(url);
+        auto lockedRef = parseFlakeRef(locked);
         auto resolvedInput = lockedRef.resolve(fetchSettings, *store).input;
         auto resolved = resolvedInput.getAccessor(fetchSettings, *store).second;
         if (!resolved.isLocked(fetchSettings))
@@ -226,7 +226,7 @@ struct CmdRegistryResolve : StoreCommand
     void run(nix::ref<nix::Store> store) override
     {
         for (auto & url : urls) {
-            auto ref = parseFlakeRef(fetchSettings, url);
+            auto ref = parseFlakeRef(url);
             auto resolved = ref.resolve(fetchSettings, *store);
             logger->cout("%s", resolved.to_string());
         }

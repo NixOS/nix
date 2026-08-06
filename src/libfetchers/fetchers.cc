@@ -37,9 +37,9 @@ const InputSchemeMap & getAllInputSchemes()
     return inputSchemes();
 }
 
-Input Input::fromURL(const Settings & settings, const std::string & url, bool requireTree)
+Input Input::fromURL(const std::string & url, bool requireTree)
 {
-    return fromURL(settings, parseURL(url), requireTree);
+    return fromURL(parseURL(url), requireTree);
 }
 
 static void fixupInput(Input & input)
@@ -51,10 +51,10 @@ static void fixupInput(Input & input)
     input.getLastModified();
 }
 
-Input Input::fromURL(const Settings & settings, const ParsedURL & url, bool requireTree)
+Input Input::fromURL(const ParsedURL & url, bool requireTree)
 {
     for (auto & [_, inputScheme] : inputSchemes()) {
-        auto res = inputScheme->inputFromURL(settings, url, requireTree);
+        auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
             res->scheme = inputScheme;
@@ -72,7 +72,7 @@ Input Input::fromURL(const Settings & settings, const ParsedURL & url, bool requ
     throw Error("input '%s' is unsupported", url);
 }
 
-Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
+Input Input::fromAttrs(Attrs && attrs)
 {
     auto schemeName = ({
         auto schemeNameOpt = maybeGetStrAttr(attrs, "type");
@@ -108,7 +108,7 @@ Input Input::fromAttrs(const Settings & settings, Attrs && attrs)
         if (name != "type" && name != "__final" && allowedAttrs.count(name) == 0)
             throw Error("input attribute '%s' not supported by scheme '%s'", name, schemeName);
 
-    auto res = inputScheme->inputFromAttrs(settings, attrs);
+    auto res = inputScheme->inputFromAttrs(attrs);
     if (!res)
         return raw();
     res->scheme = inputScheme;

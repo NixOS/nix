@@ -56,7 +56,7 @@ getFlakeRef(const fetchers::Settings & fetchSettings, const nlohmann::json & jso
                     attrs.insert_or_assign(k.first, k.second);
             }
         }
-        return FlakeRef::fromAttrs(fetchSettings, attrs);
+        return FlakeRef::fromAttrs(attrs);
     }
 
     throw Error("attribute '%s' missing in lock file", attr);
