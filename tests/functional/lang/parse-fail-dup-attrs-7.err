@@ -1,0 +1,6 @@
+error: attribute 'x' already defined at «stdin»:6:13
+       at «stdin»:7:13:
+            6|     inherit x;
+            7|     inherit x;
+             |             ^
+            8|   };

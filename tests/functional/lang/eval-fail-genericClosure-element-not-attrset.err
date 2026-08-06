@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-element-not-attrset.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [ "not an attrset" ];
+
+       … in genericClosure element "not an attrset"
+
+       error: expected a set but found a string: "not an attrset"

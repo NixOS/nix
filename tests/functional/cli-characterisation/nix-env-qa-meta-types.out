@@ -1,0 +1,26 @@
+{
+  "": {
+    "meta": {
+      "aBool": true,
+      "aFloat": 3.14,
+      "aList": [
+        1,
+        2,
+        3
+      ],
+      "aString": "hello",
+      "anInt": 42,
+      "stringBool": "true",
+      "stringFloat": "2.72",
+      "stringInt": "123"
+    },
+    "name": "meta-types-1.0",
+    "outputName": "out",
+    "outputs": {
+      "out": null
+    },
+    "pname": "meta-types",
+    "system": "SYSTEM",
+    "version": "1.0"
+  }
+}

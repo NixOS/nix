@@ -1,0 +1,12 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-operator-not-list.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [ { key = 1; } ];
+
+       … while calling operator on genericClosure element { key = 1; }
+
+       … while evaluating the return value of the `operator` passed to builtins.genericClosure
+
+       error: expected a list but found a string: "not a list"

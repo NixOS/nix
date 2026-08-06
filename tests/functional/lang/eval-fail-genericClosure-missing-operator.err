@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-missing-operator.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [ { key = 1; } ];
+
+       … in the attrset passed as argument to builtins.genericClosure
+
+       error: attribute 'operator' missing

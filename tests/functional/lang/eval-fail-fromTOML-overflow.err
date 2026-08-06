@@ -1,0 +1,13 @@
+error:
+       … while calling the 'fromTOML' builtin
+         at /pwd/lang/eval-fail-fromTOML-overflow.nix:1:1:
+            1| builtins.fromTOML ''attr = 9223372036854775808''
+             | ^
+            2|
+
+       error: while parsing TOML: [error] toml::parse_dec_integer: too large integer: current max digits = 2^63
+        --> fromTOML
+          |
+        1 | attr = 9223372036854775808
+          |                           ^-- must be < 2^63
+       

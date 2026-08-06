@@ -1,0 +1,11 @@
+error:
+       … while querying the derivation named 'bad-drvpath-1.0'
+
+       … while evaluating the 'drvPath' attribute of a derivation
+         at /pwd/cli-characterisation/bad-drvpath.nix:5:3:
+            4|   outPath = builtins.toFile "out" "";
+            5|   drvPath = builtins.toFile "not-a-drv" "";
+             |   ^
+            6| }
+
+       error: store path 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-not-a-drv' is not a valid derivation path

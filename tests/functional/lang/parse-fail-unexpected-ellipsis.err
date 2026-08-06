@@ -1,0 +1,5 @@
+error: syntax error, unexpected '...', expecting '.' or '='
+       at «stdin»:1:5:
+            1| { a ... }
+             |     ^
+            2|

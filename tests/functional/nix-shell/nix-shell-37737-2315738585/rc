@@ -1,0 +1,4 @@
+_nix_shell_clean_tmpdir() { command rm -rf '/home/amaanq/projects/nix/nix/gc-structured-logs/tests/functional/nix-shell/nix-shell-37737-2315738585'; };trap _nix_shell_clean_tmpdir EXIT; exitHooks+=(_nix_shell_clean_tmpdir); failureHooks+=(_nix_shell_clean_tmpdir); unset PATH;dontAddDisableDepTrack=1;
+
+[ -e $stdenv/setup ] && source $stdenv/setup; PATH='/tmp/nix-shell.5wT4gQ/nix-test/main/nix-shell/store/ix2swgjncph6wbzk9a57vb1x3xqas9dx-bash/bin':"$PATH"; SHELL='/tmp/nix-shell.5wT4gQ/nix-test/main/nix-shell/store/ix2swgjncph6wbzk9a57vb1x3xqas9dx-bash/bin/bash'; BASH='/tmp/nix-shell.5wT4gQ/nix-test/main/nix-shell/store/ix2swgjncph6wbzk9a57vb1x3xqas9dx-bash/bin/bash'; set +e; [ -n "$PS1" -a -z "$NIX_SHELL_PRESERVE_PROMPT" ] && PS1='\n\[\033[1;32m\][nix-shell:\w]\$\[\033[0m\] '; if [ "$(type -t runHook)" = function ]; then runHook shellHook; fi; unset NIX_ENFORCE_PURITY; shopt -u nullglob; unset TZ; shopt -s execfail;echo $NIX_BUILD_TOP
+exit
