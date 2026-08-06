@@ -1,6 +1,14 @@
 # vim: filetype=meson
 
 option(
+  'unit-tests',
+  type : 'boolean',
+  value : true,
+  description : 'Build unit tests',
+  yield : true,
+)
+
+option(
   'benchmarks',
   type : 'boolean',
   value : false,
