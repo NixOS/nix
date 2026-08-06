@@ -119,7 +119,7 @@ std::string runProgram(
 
 struct RunOptions
 {
-    std::filesystem::path program;
+    std::variant<std::filesystem::path, Descriptor> program;
     bool lookupPath = true;
     OsStrings args;
 #ifndef _WIN32

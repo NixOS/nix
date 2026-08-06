@@ -2,6 +2,7 @@
 #include "nix/util/current-process.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 #include "nix/util/serialise.hh"
@@ -36,7 +37,9 @@ namespace {
    types. */
 struct ExecChildParams
 {
+    /* program/programFd are mutually exclusive. */
     const char * program;
+    Descriptor programFD;
     const char * chdir;
     char * const * environment;
     char * const * args;
@@ -135,32 +138,55 @@ struct ExecChildParams
             dieWithErrno("restoring cwd");
     }
 
-    /* Now we can safely close all (possibly) leaked file descriptors. Note that
-       we try to open most things as O_CLOEXEC, but we don't control external
-       libraries and some facilities (e.g. libcurl) lack an atomic open with
-       O_CLOEXEC that doesn't race via subsequent fcntl. But for error reporting
-       purposes we should dup (and mark as O_CLOEXEC) the error pipe descriptor.
-       */
+    /* Now we can safely close all (possibly) leaked file descriptors. Note
+       that we try to open most things as O_CLOEXEC, but we don't control
+       external libraries and some facilities (e.g. libcurl) lack an atomic
+       open with O_CLOEXEC that doesn't race via subsequent fcntl. But for error
+       reporting purposes we should dup (and mark as O_CLOEXEC) the error pipe
+       descriptor. TODO: All this will become even more complicated once we have
+       redirections. We'd need to select the maximum redirected FD first and
+       close any holes lower than that maximum. Then the following constants
+       will no longer be constants. */
 
-    static constexpr int relocatedErrorPipeFD = STDERR_FILENO + 1;
+    static constexpr Descriptor relocatedErrorPipeFD = STDERR_FILENO + 1;
+    static constexpr Descriptor relocatedProgramFD = relocatedErrorPipeFD + 1;
+
+    Descriptor programFD = params.programFD;
 
     /* dup3 fails if oldfd == newfd, so skip that case. */
     if (errorPipe != relocatedErrorPipeFD) {
+        /* Move the programFD out of the way first if needed to avoid collisions.
+           God why is posix so... yummy? */
+        if (programFD == relocatedErrorPipeFD) {
+            programFD = ::dup(programFD);
+            if (programFD == INVALID_DESCRIPTOR)
+                dieWithErrno("dupping executable file descriptor");
+        }
         if (::dup3(errorPipe, relocatedErrorPipeFD, O_CLOEXEC) == -1)
             dieWithErrno("dupping error pipe");
         errorPipe = relocatedErrorPipeFD;
     }
 
+    /* Do the same but for the to-be-executed file descriptor. But only if it's
+       specified. */
+    if (programFD != INVALID_DESCRIPTOR && programFD != relocatedProgramFD) {
+        if (::dup3(programFD, relocatedProgramFD, O_CLOEXEC) == -1)
+            dieWithErrno("dupping executable file descriptor");
+        programFD = relocatedProgramFD;
+    }
+
+    Descriptor lastKeptFD = (programFD != INVALID_DESCRIPTOR ? relocatedProgramFD : relocatedErrorPipeFD);
+
 #if HAVE_CLOSEFROM
     /* glibc uses this in its posix_spawn implementation and also exposes it
        in <unistd.h>. Notably, it has a fallback for kernels that don't support
        close_range. */
-    ::closefrom(relocatedErrorPipeFD + 1);
+    ::closefrom(lastKeptFD + 1);
 #elifdef SYS_close_range
     /* This is mostly best-effort. This code should only be used on musl and it
        would only fail on older kernels. Reimplementing /proc/self/fd iteration
        like what glibc does in __closefrom_fallback is a lot of complex code. */
-    ::syscall(SYS_close_range, relocatedErrorPipeFD + 1, ~0u, 0);
+    ::syscall(SYS_close_range, lastKeptFD + 1, ~0u, 0);
 #endif
 
     /* Important! Calling syscalls directly and not libc functions because of a
@@ -212,7 +238,9 @@ struct ExecChildParams
     if (unix::savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &unix::savedSignalMask, nullptr) == -1)
         dieWithErrno("restoring signals");
 
-    if (params.lookupPath)
+    if (programFD != INVALID_DESCRIPTOR)
+        ::fexecve(programFD, params.args, params.environment);
+    else if (params.lookupPath)
         /* Nonstandard, but both musl and glibc have it and it doesn't
            seem to do anything weird or allocate memory, so it should
            be fine-ish? The use of execvp has some footguns though (see
@@ -267,6 +295,11 @@ void runProgram2(const RunOptions & options)
 {
     checkInterrupt();
 
+    const std::filesystem::path * programPath = std::get_if<std::filesystem::path>(&options.program);
+    const Descriptor * programFd = std::get_if<Descriptor>(&options.program);
+
+    assert(!programFd || options.argv0.has_value());
+
     /* Create a pipe. */
     Pipe out;
     if (options.standardOut)
@@ -280,13 +313,15 @@ void runProgram2(const RunOptions & options)
     Strings args_(options.args);
     /* Allow the caller to specify an alternative argv[0]. Useful for self-exec
        trickery. */
-    args_.push_front(options.argv0.value_or(options.program.native()));
+    args_.push_front(options.argv0 ? std::filesystem::path(*options.argv0) : *programPath);
+
     const Strings env_ = options.environment ? prepareEnvironmentStrings(*options.environment) : Strings{};
     const auto env = stringsToCharPtrs(env_);
     const auto args = stringsToCharPtrs(args_);
 
     const ExecChildParams params = {
-        .program = options.program.c_str(),
+        .program = programPath ? programPath->c_str() : nullptr,
+        .programFD = programFd ? *programFd : INVALID_DESCRIPTOR,
         .chdir = options.chdir ? options.chdir->c_str() : nullptr,
         .environment = options.environment ? env.data() : environ,
         .args = args.data(),
@@ -324,11 +359,21 @@ void runProgram2(const RunOptions & options)
     StringSink childErrorSink;
     drainFD(childErrorPipe.readSide.get(), childErrorSink);
 
+    auto getProgramPath = [&]() -> std::filesystem::path {
+        return std::visit(
+            overloaded{
+                /* For memfd this will return something of the form "memfd:..." depending
+                   on how it was mem_creat-ed. */
+                [](Descriptor fd) { return descriptorToPath(fd); },
+                [](const std::filesystem::path & path) { return path; }},
+            options.program);
+    };
+
     /* We don't write anything to the pipe on success. */
     if (const auto & errorContent = childErrorSink.s; errorContent.size()) {
         int status = pid.wait();
 
-        auto execErr = ExecError(status, "could not start program %1%", PathFmt(options.program));
+        auto execErr = ExecError(status, "could not start program %1%", PathFmt(getProgramPath()));
 
         /* The child returned garbage through the error pipe. I think it's
            pretty unlikely that this will happen, but maybe a signal arriving
@@ -353,7 +398,7 @@ void runProgram2(const RunOptions & options)
     /* Wait for the child to finish. */
     int status = pid.wait();
     if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+        throw ExecError(status, "program %1% %2%", PathFmt(getProgramPath()), statusToString(status));
 }
 
 } // namespace nix
