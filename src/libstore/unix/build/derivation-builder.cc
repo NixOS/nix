@@ -609,7 +609,7 @@ void DerivationBuilderImpl::prepareSandbox()
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
-void DerivationBuilderImpl::openSlave()
+AutoCloseFD DerivationBuilderImpl::openSlaveNoDup()
 {
     std::string slaveName = getPtsName(builderOut.get());
 
@@ -627,8 +627,7 @@ void DerivationBuilderImpl::openSlave()
     if (tcsetattr(builderOut.get(), TCSANOW, &term))
         throw SysError("putting pseudoterminal into raw mode");
 
-    if (dup2(builderOut.get(), STDERR_FILENO) == -1)
-        throw SysError("cannot pipe standard error into log file");
+    return builderOut;
 }
 
 #if NIX_WITH_AWS_AUTH
