@@ -329,6 +329,10 @@ EvalState::EvalState(
     , baseEnv(mem.allocEnv(BASE_ENV_SIZE))
 #endif
     , staticBaseEnv{std::make_shared<StaticEnv>(nullptr, nullptr)}
+    , countCalls(getEnv("NIX_COUNT_CALLS").value_or("0") != "0")
+    , primOpCalls(make_ref<decltype(primOpCalls)::element_type>())
+    , functionCalls(make_ref<decltype(functionCalls)::element_type>())
+    , attrSelects(make_ref<decltype(attrSelects)::element_type>())
 {
 #ifndef _WIN32
     static std::once_flag stackSizeBumped;
@@ -343,8 +347,6 @@ EvalState::EvalState(
 
     corepkgsFS->setPathDisplay("<nix", ">");
     internalFS->setPathDisplay("«nix-internal»", "");
-
-    countCalls = getEnv("NIX_COUNT_CALLS").value_or("0") != "0";
 
     static_assert(sizeof(Env) <= 16, "environment must be <= 16 bytes");
 
@@ -947,7 +949,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
         forceAttrs(*env->values[0], fromWith->pos, "while evaluating the first subexpression of a with expression");
         if (auto j = env->values[0]->attrs()->get(var.name)) {
             if (countCalls) [[unlikely]]
-                attrSelects[j->pos]++;
+                attrSelects->try_emplace_or_visit(j->pos, 1, [](auto & i) { i.second++; });
             return j->value;
         }
         if (!fromWith->parentWith) [[unlikely]]
@@ -1448,7 +1450,10 @@ static std::string showAttrSelectionPath(EvalState & state, Env & env, std::span
 void ExprSelect::eval(EvalState & state, Env & env, Value & v)
 {
     Value vTmp;
-    PosIdx pos2;
+    // current or last *definition site* (the attr, not the select)
+    PosIdx attrPos;
+    const AttrName * unresolvedOrEnd = attrPathStart;
+    // cursor, result if successful
     Value * vAttrs = &vTmp;
 
     e->eval(state, env, vTmp);
@@ -1481,28 +1486,34 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                         allAttrNames.insert(std::string(state.symbols[attr.name]));
                     auto suggestions = Suggestions::bestMatches(allAttrNames, state.symbols[name]);
                     state.error<EvalError>("attribute '%1%' missing", state.symbols[name])
-                        .atPos(pos)
                         .withSuggestions(suggestions)
                         .withFrame(env, *this)
                         .debugThrow();
                 }
             }
             vAttrs = j->value;
-            pos2 = j->pos;
+            attrPos = j->pos;
+            unresolvedOrEnd = &i + 1;
             if (state.countCalls)
-                state.attrSelects[pos2]++;
+                state.attrSelects->try_emplace_or_visit(attrPos, 1, [](auto & i) { i.second++; });
         }
 
-        state.forceValue(*vAttrs, (pos2 ? pos2 : this->pos));
+        state.forceValue(*vAttrs, (attrPos ? attrPos : this->pos));
 
     } catch (Error & e) {
-        if (pos2) {
-            auto pos2r = state.positions[pos2];
-            auto origin = std::get_if<SourcePath>(&pos2r.origin);
-            if (!(origin && *origin == state.derivationInternal))
-                state.addErrorTrace(
-                    e, pos2, "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        // Traces are printed in reverse, so we add context before the main item.
+        if (attrPos) {
+            auto attrPosR = state.positions[attrPos];
+            auto origin = std::get_if<SourcePath>(&attrPosR.origin);
+            if (!(origin && *origin == state.derivationInternal)) {
+                auto successPath =
+                    showAttrSelectionPath(state, env, std::span<const AttrName>(attrPathStart, unresolvedOrEnd));
+                state.addErrorTrace(e, attrPos, "from the definition of '%1%'", successPath);
+            }
         }
+        // Add main item: the selection site itself (`a.b`), ie the actual access
+        state.addErrorTrace(
+            e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
         throw;
     }
 
@@ -1702,7 +1713,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
 
                 nrPrimOpCalls++;
                 if (countCalls)
-                    primOpCalls[fn->name]++;
+                    primOpCalls->try_emplace_or_visit(fn->name, 1, [](auto & i) { i.second++; });
 
                 try {
                     fn->impl(*this, CallSite{pos}, args.data(), vCur);
@@ -1747,7 +1758,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 auto fn = primOp->primOp();
                 nrPrimOpCalls++;
                 if (countCalls)
-                    primOpCalls[fn->name]++;
+                    primOpCalls->try_emplace_or_visit(fn->name, 1, [](auto & i) { i.second++; });
 
                 try {
                     // TODO:
@@ -1816,7 +1827,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
 // prevents tail-call optimisation.
 void EvalState::incrFunctionCall(ExprLambda * fun)
 {
-    functionCalls[fun]++;
+    functionCalls->try_emplace_or_visit(fun, 1, [](auto & i) { i.second++; });
 }
 
 void EvalState::autoCallFunction(const Bindings & args, Value & fun, Value & res)
@@ -3124,11 +3135,16 @@ void EvalState::printStatistics()
 #endif
 
     if (countCalls) {
-        topObj["primops"] = primOpCalls;
+        {
+            auto & obj = topObj["primops"];
+            obj = json::object();
+            primOpCalls->visit_all([&](auto & i) { obj[i.first] = i.second; });
+        }
         {
             auto & list = topObj["functions"];
             list = json::array();
-            for (auto & [fun, count] : functionCalls) {
+            functionCalls->visit_all([&](auto & i) {
+                auto & [fun, count] = i;
                 json obj = json::object();
                 if (fun->name)
                     obj["name"] = (std::string_view) symbols[fun->name];
@@ -3142,12 +3158,12 @@ void EvalState::printStatistics()
                 }
                 obj["count"] = count;
                 list.push_back(obj);
-            }
+            });
         }
         {
-            auto list = topObj["attributes"];
+            auto & list = topObj["attributes"];
             list = json::array();
-            for (auto & i : attrSelects) {
+            attrSelects->cvisit_all([&](auto & i) {
                 json obj = json::object();
                 if (auto pos = positions[i.first]) {
                     if (auto path = std::get_if<SourcePath>(&pos.origin))
@@ -3157,7 +3173,7 @@ void EvalState::printStatistics()
                 }
                 obj["count"] = i.second;
                 list.push_back(obj);
-            }
+            });
         }
     }
 

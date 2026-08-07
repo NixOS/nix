@@ -27,16 +27,14 @@ class InputFromAttrsTest : public ::testing::WithParamInterface<InputFromAttrsTe
 
 TEST_P(InputFromAttrsTest, attrsAreCorrectAndRoundTrips)
 {
-    fetchers::Settings fetchSettings;
-
     const auto & testCase = GetParam();
 
-    auto input = fetchers::Input::fromAttrs(fetchSettings, fetchers::Attrs(testCase.attrs));
+    auto input = fetchers::Input::fromAttrs(fetchers::Attrs(testCase.attrs));
 
     EXPECT_EQ(input.toAttrs(), testCase.expectedAttrs);
     EXPECT_EQ(input.toURLString(), testCase.expectedUrl);
 
-    auto input2 = fetchers::Input::fromAttrs(fetchSettings, input.toAttrs());
+    auto input2 = fetchers::Input::fromAttrs(input.toAttrs());
     EXPECT_EQ(input, input2);
     EXPECT_EQ(input.toAttrs(), input2.toAttrs());
 }
@@ -70,7 +68,7 @@ class GitHubInputTest : public ::testing::Test
 TEST_F(GitHubInputTest, throwOnInvalidURLParam)
 {
     EXPECT_THAT(
-        []() { Input::fromURL(fetchers::Settings{}, "github:a/b?tag=foo"); },
+        []() { Input::fromURL("github:a/b?tag=foo"); },
         ::testing::ThrowsMessage<BadURL>(testing::HasSubstrIgnoreANSIMatcher("tag")));
 }
 

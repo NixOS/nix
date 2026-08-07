@@ -47,7 +47,7 @@ PrimOp getFlake(const Settings & settings)
             std::string flakeRefS(
                 state.forceStringNoCtx(*args[0], noPos, "while evaluating the argument passed to builtins.getFlake"));
 
-            auto flakeRef = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true);
+            auto flakeRef = nix::parseFlakeRef(flakeRefS, {}, true);
             if (state.settings.pureEval && !flakeRef.input.isLocked(state.fetchSettings))
                 throw Error(
                     "cannot call 'getFlake' on unlocked flake reference '%s', at %s (use --impure to override)",
@@ -100,7 +100,7 @@ static void prim_parseFlakeRef(EvalState & state, CallSite callSite, Value * con
 {
     std::string flakeRefS(
         state.forceStringNoCtx(*args[0], noPos, "while evaluating the argument passed to builtins.parseFlakeRef"));
-    auto attrs = nix::parseFlakeRef(state.fetchSettings, flakeRefS, {}, true).toAttrs();
+    auto attrs = nix::parseFlakeRef(flakeRefS, {}, true).toAttrs();
     auto binds = state.buildBindings(attrs.size());
     for (const auto & [key, value] : attrs) {
         auto s = state.symbols.create(key);
@@ -171,7 +171,7 @@ static void prim_flakeRefToString(EvalState & state, CallSite callSite, Value * 
                 .debugThrow();
         }
     }
-    auto flakeRef = FlakeRef::fromAttrs(state.fetchSettings, attrs);
+    auto flakeRef = FlakeRef::fromAttrs(attrs);
     v.mkString(flakeRef.to_string(), state.mem);
 }
 

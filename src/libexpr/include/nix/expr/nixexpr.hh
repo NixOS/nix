@@ -316,6 +316,9 @@ struct ExprSelect : Expr
         return pos;
     }
 
+    /**
+     * @return `std::span<const AttrName>` starting at `attrPathStart`
+     */
     std::span<const AttrName> getAttrPath() const
     {
         return {attrPathStart, nAttrPath};

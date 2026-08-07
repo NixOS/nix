@@ -17,6 +17,7 @@
   # Configuration Options
 
   version,
+  withFuzzTargets ? false,
 }:
 
 let
@@ -34,7 +35,7 @@ mkMesonExecutable (finalAttrs: {
     ./fuzz/harnesses
     ../../.version
     ./.version
-    # ./meson.options
+    ./meson.options
     (fileset.fileFilter (file: file.name == "meson.build") ./.)
     (fileset.fileFilter (file: file.hasExt "cc") ./.)
     (fileset.fileFilter (file: file.hasExt "hh") ./.)
@@ -53,6 +54,7 @@ mkMesonExecutable (finalAttrs: {
   ];
 
   mesonFlags = [
+    (lib.mesonBool "fuzzers" withFuzzTargets)
   ];
 
   passthru = {
@@ -70,6 +72,10 @@ mkMesonExecutable (finalAttrs: {
             + ''
               export _NIX_TEST_UNIT_DATA=${./data}
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+              for target in fuzz-parse-dump fuzz-parse-dump-case-hacked; do
+                ${if withFuzzTargets then "test -x" else "test ! -e"} \
+                  "${finalAttrs.finalPackage}/bin/$target${stdenv.hostPlatform.extensions.executable}"
+              done
               touch $out
             ''
           );

@@ -120,7 +120,7 @@ if host_machine.system() != 'windows'
   test_env += {'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store'}
 endif
 
-if 'fuzzer-no-link' in get_option('b_sanitize')
+if get_option('fuzzers')
   subdir('fuzz')
 endif
 

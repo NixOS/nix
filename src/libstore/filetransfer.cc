@@ -402,17 +402,6 @@ struct curlFileTransfer : public FileTransfer
 
                     if (name == "etag") {
                         result.etag = trim(line.substr(i + 1));
-                        /* Hack to work around a GitHub bug: it sends
-                           ETags, but ignores If-None-Match. So if we get
-                           the expected ETag on a 200 response, then shut
-                           down the connection because we already have the
-                           data. */
-                        long httpStatus = 0;
-                        curl_easy_getinfo(req, CURLINFO_RESPONSE_CODE, &httpStatus);
-                        if (result.etag == request.expectedETag && httpStatus == HttpStatus::Ok) {
-                            debug("shutting down on 200 HTTP response with expected ETag");
-                            return 0;
-                        }
                     }
 
                     else if (name == "content-encoding") {
@@ -442,7 +431,7 @@ struct curlFileTransfer : public FileTransfer
                             time_t now = time(nullptr);
                             retryAfterMs = saturateMs(std::chrono::seconds{date > now ? date - now : 0});
                         } else {
-                            debug("ignoring unparseable Retry-After header: '%s'", value);
+                            debug("ignoring unparsable Retry-After header: '%s'", value);
                         }
                     }
                 }
@@ -766,13 +755,6 @@ struct curlFileTransfer : public FileTransfer
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
                 result.cached = (httpStatus == HttpStatus::NotModified);
-
-                // In 2021, GitHub responds to If-None-Match with 304,
-                // but omits ETag. We just use the If-None-Match etag
-                // since 304 implies they are the same.
-                if (httpStatus == HttpStatus::NotModified && result.etag == "")
-                    result.etag = request.expectedETag;
-
                 curl_off_t dlSize = 0;
                 curl_easy_getinfo(req, CURLINFO_SIZE_DOWNLOAD_T, &dlSize);
                 act().progress(dlSize, dlSize);

@@ -51,7 +51,7 @@ FlakeCommand::FlakeCommand()
 
 FlakeRef FlakeCommand::getFlakeRef()
 {
-    return parseFlakeRef(fetchSettings, flakeUrl, std::filesystem::current_path().string()); // FIXME
+    return parseFlakeRef(flakeUrl, std::filesystem::current_path().string()); // FIXME
 }
 
 flake::LockedFlake FlakeCommand::lockFlake()
@@ -62,7 +62,7 @@ flake::LockedFlake FlakeCommand::lockFlake()
 std::vector<FlakeRef> FlakeCommand::getFlakeRefsForCompletion()
 {
     return {// Like getFlakeRef but with expandTilde called first
-            parseFlakeRef(fetchSettings, expandTilde(flakeUrl), std::filesystem::current_path().string())};
+            parseFlakeRef(expandTilde(flakeUrl), std::filesystem::current_path().string())};
 }
 
 struct CmdFlakeUpdate : FlakeCommand
@@ -907,7 +907,7 @@ struct CmdFlakeInitCommon : virtual Args, EvalCommand
         auto evalState = getEvalState();
 
         auto [templateFlakeRef, templateName] =
-            parseFlakeRefWithFragment(fetchSettings, templateUrl, std::filesystem::current_path().string());
+            parseFlakeRefWithFragment(templateUrl, std::filesystem::current_path().string());
 
         auto installable = InstallableFlake(
             nullptr,

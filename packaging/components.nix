@@ -326,6 +326,11 @@ in
   withFuzzer = false;
 
   /**
+    Whether to build the libFuzzer targets in Meson test components.
+  */
+  withFuzzTargets = false;
+
+  /**
     Whether meson components are checked with [clang-tidy](https://clang.llvm.org/extra/clang-tidy/).
   */
   withClangTidy = false;

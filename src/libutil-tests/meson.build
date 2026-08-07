@@ -125,7 +125,7 @@ this_exe = executable(
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
 )
 
-if 'fuzzer-no-link' in get_option('b_sanitize')
+if get_option('fuzzers')
   subdir('fuzz')
 endif
 

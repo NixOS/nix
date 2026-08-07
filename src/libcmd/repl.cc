@@ -723,8 +723,11 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
         throw SystemError(e.code(), "cannot determine current working directory");
     }
 
-    auto flakeRef = parseFlakeRef(fetchSettings, flakeRefS, cwd.string(), true);
-    if (evalSettings.pureEval && !flakeRef.input.isLocked(fetchSettings))
+    const auto & fetchSettings = state->fetchSettings;
+    const bool isPureEval = state->settings.pureEval;
+
+    auto flakeRef = parseFlakeRef(flakeRefS, cwd.string(), true);
+    if (isPureEval && !flakeRef.input.isLocked(fetchSettings))
         throw Error("cannot use ':load-flake' on unlocked flake reference '%s' (use --impure to override)", flakeRefS);
 
     Value v;
@@ -737,8 +740,8 @@ void NixRepl::loadFlake(const std::string & flakeRefS)
             flakeRef,
             flake::LockFlags{
                 .updateLockFile = false,
-                .useRegistries = !evalSettings.pureEval,
-                .allowUnlocked = !evalSettings.pureEval,
+                .useRegistries = !isPureEval,
+                .allowUnlocked = !isPureEval,
             }),
         v);
     addAttrsToScope(v);

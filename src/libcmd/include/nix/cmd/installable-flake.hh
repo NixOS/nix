@@ -1,7 +1,6 @@
 #pragma once
 ///@file
 
-#include "nix/cmd/common-eval-args.hh"
 #include "nix/cmd/installable-value.hh"
 
 namespace nix {
@@ -84,7 +83,7 @@ struct InstallableFlake : InstallableValue
  */
 static inline FlakeRef defaultNixpkgsFlakeRef()
 {
-    return FlakeRef::fromAttrs(fetchSettings, {{"type", "indirect"}, {"id", "nixpkgs"}});
+    return FlakeRef::fromAttrs({{"type", "indirect"}, {"id", "nixpkgs"}});
 }
 
 } // namespace nix

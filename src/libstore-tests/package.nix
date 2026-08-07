@@ -21,6 +21,7 @@
   version,
   filesetToSource,
   withBenchmarks ? false,
+  withFuzzTargets ? false,
 }:
 
 let
@@ -58,6 +59,7 @@ mkMesonExecutable (finalAttrs: {
 
   mesonFlags = [
     (lib.mesonBool "benchmarks" withBenchmarks)
+    (lib.mesonBool "fuzzers" withFuzzTargets)
   ];
 
   passthru = {
@@ -92,6 +94,10 @@ mkMesonExecutable (finalAttrs: {
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-store-benchmarks"}
             ''
             + ''
+              for target in fuzz-parse-derivation fuzz-parse-derivation-experimental; do
+                ${if withFuzzTargets then "test -x" else "test ! -e"} \
+                  "${finalAttrs.finalPackage}/bin/$target${stdenv.hostPlatform.extensions.executable}"
+              done
               touch $out
             ''
           );

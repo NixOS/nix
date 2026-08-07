@@ -27,18 +27,15 @@ EvalSettings evalSettings{
         {
             "flake",
             [](EvalState & state, std::string_view rest) {
+                /* Const is a lie here, because settings currently carry mutables caches. */
+                const auto & fetchSettings = state.fetchSettings;
                 experimentalFeatureSettings.require(Xp::Flakes);
-                // FIXME `parseFlakeRef` should take a `std::string_view`.
-                auto flakeRef = parseFlakeRef(fetchSettings, std::string{rest}, {}, true, false);
+                auto flakeRef = parseFlakeRef(rest, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] =
                     flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
                 auto storePath = nix::fetchToStore(
-                    state.fetchSettings,
-                    *state.store,
-                    SourcePath(accessor),
-                    FetchMode::Copy,
-                    lockedRef.input.getName());
+                    fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
                 state.allowPath(storePath);
                 return state.storePath(storePath);
             },
@@ -125,8 +122,8 @@ MixEvalArgs::MixEvalArgs()
         .category = category,
         .labels = {"original-ref", "resolved-ref"},
         .handler = {[&](std::string _from, std::string _to) {
-            auto from = parseFlakeRef(fetchSettings, _from, std::filesystem::current_path().string());
-            auto to = parseFlakeRef(fetchSettings, _to, std::filesystem::current_path().string());
+            auto from = parseFlakeRef(_from, std::filesystem::current_path().string());
+            auto to = parseFlakeRef(_to, std::filesystem::current_path().string());
             fetchers::Attrs extraAttrs;
             if (to.subdir != "")
                 extraAttrs["dir"] = to.subdir;
@@ -177,19 +174,21 @@ const Bindings * MixEvalArgs::getAutoArgs(EvalState & state)
 
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir)
 {
+    const auto & fetchSettings = state.fetchSettings;
+
     if (EvalSettings::isPseudoUrl(s)) {
-        auto accessor = fetchers::downloadTarball(*state.store, state.fetchSettings, EvalSettings::resolvePseudoUrl(s));
-        auto storePath = fetchToStore(state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
+        auto accessor = fetchers::downloadTarball(*state.store, fetchSettings, EvalSettings::resolvePseudoUrl(s));
+        auto storePath = fetchToStore(fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy);
         return state.storePath(storePath);
     }
 
     else if (hasPrefix(s, "flake:")) {
         experimentalFeatureSettings.require(Xp::Flakes);
-        auto flakeRef = parseFlakeRef(fetchSettings, std::string(s.substr(6)), {}, true, false);
+        auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto [accessor, lockedRef] =
-            flakeRef.resolve(fetchSettings, *state.store).lazyFetch(fetchSettings, *state.store);
+            flakeRef.resolve(state.fetchSettings, *state.store).lazyFetch(state.fetchSettings, *state.store);
         auto storePath = nix::fetchToStore(
-            state.fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
+            fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
         state.allowPath(storePath);
         return state.storePath(storePath);
     }

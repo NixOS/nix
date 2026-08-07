@@ -7,6 +7,7 @@
 #include "nix/flake/flakeref.hh"
 #include "nix/fetchers/attrs.hh"
 #include "nix/fetchers/fetchers.hh"
+#include "nix/store/tests/libstore.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
@@ -17,49 +18,49 @@ namespace nix {
 
 TEST(parseFlakeRef, path)
 {
-    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+    EnableExperimentalFeature enableFlakes("flakes");
 
     fetchers::Settings fetchSettings;
 
     {
         auto s = "/foo/bar";
-        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto flakeref = parseFlakeRef(s);
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar");
     }
 
     {
         auto s = "/foo/bar?revCount=123&rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto flakeref = parseFlakeRef(s);
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar?rev=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&revCount=123");
     }
 
     {
         auto s = "/foo/bar?xyzzy=123";
-        EXPECT_THROW(parseFlakeRef(fetchSettings, s), Error);
+        EXPECT_THROW(parseFlakeRef(s), Error);
     }
 
     {
         auto s = "/foo/bar#bla";
-        EXPECT_THROW(parseFlakeRef(fetchSettings, s), Error);
+        EXPECT_THROW(parseFlakeRef(s), Error);
     }
 
     {
         auto s = "/foo/bar#bla";
-        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(s);
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar");
         ASSERT_EQ(fragment, "bla");
     }
 
     {
         auto s = "/foo/bar?revCount=123#bla";
-        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(s);
         ASSERT_EQ(flakeref.to_string(), "path:/foo/bar?revCount=123");
         ASSERT_EQ(fragment, "bla");
     }
 
     {
         auto s = "/foo bar/baz?dir=bla space";
-        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto flakeref = parseFlakeRef(s);
         ASSERT_EQ(flakeref.to_string(), "path:/foo%20bar/baz?dir=bla%20space");
         ASSERT_EQ(flakeref.toAttrs().at("dir"), fetchers::Attr("bla space"));
     }
@@ -67,32 +68,32 @@ TEST(parseFlakeRef, path)
 
 TEST(parseFlakeRef, GitArchiveInput)
 {
-    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+    EnableExperimentalFeature enableFlakes("flakes");
 
     fetchers::Settings fetchSettings;
 
     {
         auto s = "github:foo/bar/branch%23"; // branch name with `#`
-        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto flakeref = parseFlakeRef(s);
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
     }
 
     {
         auto s = "github:foo/bar?ref=branch%23"; // branch name with `#`
-        auto flakeref = parseFlakeRef(fetchSettings, s);
+        auto flakeref = parseFlakeRef(s);
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch%23");
     }
 
     {
         auto s = "github:foo/bar?ref=branch#\"name.with.dot\""; // unescaped quotes `"`
-        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(s);
         ASSERT_EQ(fragment, "\"name.with.dot\"");
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar/branch");
     }
 
     {
         auto s = "github:foo/bar#\"name.with.dot\""; // unescaped quotes `"`
-        auto [flakeref, fragment] = parseFlakeRefWithFragment(fetchSettings, s);
+        auto [flakeref, fragment] = parseFlakeRefWithFragment(s);
         ASSERT_EQ(fragment, "\"name.with.dot\"");
         ASSERT_EQ(flakeref.to_string(), "github:foo/bar");
     }
@@ -111,23 +112,22 @@ class InputFromURLTest : public ::testing::WithParamInterface<InputFromURLTestCa
 
 TEST_P(InputFromURLTest, attrsAreCorrectAndRoundTrips)
 {
-    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
-    fetchers::Settings fetchSettings;
+    EnableExperimentalFeature enableFlakes("flakes");
 
     const auto & testCase = GetParam();
 
-    auto flakeref = parseFlakeRef(fetchSettings, testCase.url);
+    auto flakeref = parseFlakeRef(testCase.url);
 
     EXPECT_EQ(flakeref.toAttrs(), testCase.attrs);
     EXPECT_EQ(flakeref.to_string(), testCase.expectedUrl);
 
-    auto input = fetchers::Input::fromURL(fetchSettings, flakeref.to_string());
+    auto input = fetchers::Input::fromURL(flakeref.to_string());
 
     EXPECT_EQ(input.toURLString(), testCase.expectedUrl);
     EXPECT_EQ(input.toAttrs(), testCase.attrs);
 
     // Round-trip check.
-    auto input2 = fetchers::Input::fromURL(fetchSettings, input.toURLString());
+    auto input2 = fetchers::Input::fromURL(input.toURLString());
     EXPECT_EQ(input, input2);
     EXPECT_EQ(input.toURLString(), input2.toURLString());
 }
@@ -274,9 +274,8 @@ INSTANTIATE_TEST_SUITE_P(
 
 TEST(to_string, doesntReencodeUrl)
 {
-    fetchers::Settings fetchSettings;
     auto s = "http://localhost:8181/test/+3d.tar.gz";
-    auto flakeref = parseFlakeRef(fetchSettings, s);
+    auto flakeref = parseFlakeRef(s);
     auto unparsed = flakeref.to_string();
     auto expected = "http://localhost:8181/test/%2B3d.tar.gz";
 
@@ -285,16 +284,14 @@ TEST(to_string, doesntReencodeUrl)
 
 TEST(parseFlakeRef, malformedGithubUrlDoesNotCrash)
 {
-    experimentalFeatureSettings.experimentalFeatures.get().insert(Xp::Flakes);
+    EnableExperimentalFeature enableFlakes("flakes");
 
     fetchers::Settings fetchSettings;
 
     // Using ref= instead of rev= with a github: URL should produce an
     // error, not an assertion failure in renderAuthorityAndPath
     // (https://github.com/NixOS/nix/issues/15196).
-    EXPECT_THROW(
-        parseFlakeRef(fetchSettings, "github:nixos/nixpkgs/nixpkgs.git?ref=aead170c1a49253ebfa5027010dfd89a77b73ca4"),
-        Error);
+    EXPECT_THROW(parseFlakeRef("github:nixos/nixpkgs/nixpkgs.git?ref=aead170c1a49253ebfa5027010dfd89a77b73ca4"), Error);
 }
 
 } // namespace nix

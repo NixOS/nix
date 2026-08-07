@@ -42,6 +42,15 @@ echo Bye! > "$TEST_ROOT/expected"
 )
 [[ "Bye!" == $(< "$TEST_ROOT/expected") ]]
 
+# _NIX_TEST_ACCEPT=0 means off: doesn't match, `badDiff=1` set, file unchanged
+echo Hi! > "$TEST_ROOT/got"
+echo Bye! > "$TEST_ROOT/expected"
+(
+  _NIX_TEST_ACCEPT=0 diffAndAcceptInner test "$TEST_ROOT/got" "$TEST_ROOT/expected"
+  (( "$badDiff" == 1 ))
+)
+[[ "Bye!" == $(< "$TEST_ROOT/expected") ]]
+
 # _NIX_TEST_ACCEPT=1 matches non-empty
 echo Hi! > "$TEST_ROOT/got"
 cp "$TEST_ROOT/got" "$TEST_ROOT/expected"
