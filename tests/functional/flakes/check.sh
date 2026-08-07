@@ -224,3 +224,24 @@ EOF
 checkRes=$(nix flake check --keep-going "$flakeDir" 2>&1 && fail "nix flake check should have failed" || true)
 echo "$checkRes" | grepQuiet "checks.${system}.failingCheck"
 echo "$checkRes" | grepQuiet "checks.${system}.anotherFailingCheck"
+
+# Test that missing `drvPath` is an error.
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    checks.${system}.missingDrvPath = {
+      name = "missing-drvPath";
+      type = "derivation";
+    };
+    checks.${system}.anotherMissingDrvPath = {
+      name = "another-missing-drvPath";
+      type = "derivation";
+    };
+  };
+}
+EOF
+
+# shellcheck disable=SC2015
+checkRes=$(nix flake check --keep-going "$flakeDir" 2>&1 && fail "nix flake check should have failed" || true)
+echo "$checkRes" | grepQuiet "checks.${system}.missingDrvPath"
+echo "$checkRes" | grepQuiet "checks.${system}.anotherMissingDrvPath"
