@@ -38,4 +38,6 @@ bool userNamespacesSupported();
 
 bool mountAndPidNamespacesSupported();
 
+bool binfmtMiscUserNamespacesSupported();
+
 } // namespace nix
