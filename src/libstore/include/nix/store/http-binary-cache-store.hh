@@ -131,7 +131,7 @@ protected:
     void upsertFile(
         const std::string & path, RestartableSource & source, const std::string & mimeType, uint64_t sizeHint) override;
 
-    FileTransferRequest makeRequest(std::string_view path);
+    virtual FileTransferRequest makeRequest(std::string_view path);
 
     /**
      * Uploads data to the binary cache.
