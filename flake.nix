@@ -134,85 +134,17 @@
         a given `pkgs` and `getStdenv`.
       */
       packageSetsFor =
-        let
-          /**
-            Removes a prefix from the attribute names of a set of splices.
-            This is a completely uninteresting and exists for compatibility only.
-
-            Example:
-            ```nix
-            renameSplicesFrom "pkgs" { pkgsBuildBuild = ...; ... }
-            => { buildBuild = ...; ... }
-            ```
-          */
-          renameSplicesFrom = prefix: x: {
-            buildBuild = x."${prefix}BuildBuild";
-            buildHost = x."${prefix}BuildHost";
-            buildTarget = x."${prefix}BuildTarget";
-            hostHost = x."${prefix}HostHost";
-            hostTarget = x."${prefix}HostTarget";
-            targetTarget = x."${prefix}TargetTarget";
-          };
-
-          /**
-            Adds a prefix to the attribute names of a set of splices.
-            This is a completely uninteresting and exists for compatibility only.
-
-            Example:
-            ```nix
-            renameSplicesTo "self" { buildBuild = ...; ... }
-            => { selfBuildBuild = ...; ... }
-            ```
-          */
-          renameSplicesTo = prefix: x: {
-            "${prefix}BuildBuild" = x.buildBuild;
-            "${prefix}BuildHost" = x.buildHost;
-            "${prefix}BuildTarget" = x.buildTarget;
-            "${prefix}HostHost" = x.hostHost;
-            "${prefix}HostTarget" = x.hostTarget;
-            "${prefix}TargetTarget" = x.targetTarget;
-          };
-
-          /**
-            Takes a function `f` and returns a function that applies `f` pointwise to each splice.
-
-            Example:
-            ```nix
-            mapSplices (x: x * 10) { buildBuild = 1; buildHost = 2; ... }
-            => { buildBuild = 10; buildHost = 20; ... }
-            ```
-          */
-          mapSplices =
-            f:
-            {
-              buildBuild,
-              buildHost,
-              buildTarget,
-              hostHost,
-              hostTarget,
-              targetTarget,
-            }:
-            {
-              buildBuild = f buildBuild;
-              buildHost = f buildHost;
-              buildTarget = f buildTarget;
-              hostHost = f hostHost;
-              hostTarget = f hostTarget;
-              targetTarget = f targetTarget;
-            };
-
-        in
         args@{
           pkgs,
           getStdenv ? pkgs: pkgs.stdenv,
         }:
         let
-          nixComponentsSplices = mapSplices (
+          nixComponentsSplices = lib.mapCrossIndex (
             pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixComponents
-          ) (renameSplicesFrom "pkgs" pkgs);
-          nixDependenciesSplices = mapSplices (
+          ) (lib.renameCrossIndexFrom "pkgs" pkgs);
+          nixDependenciesSplices = lib.mapCrossIndex (
             pkgs': (packageSetsFor (args // { pkgs = pkgs'; })).nixDependencies
-          ) (renameSplicesFrom "pkgs" pkgs);
+          ) (lib.renameCrossIndexFrom "pkgs" pkgs);
 
           # A new scope, so that we can use `callPackage` to inject our own interdependencies
           # without "polluting" the top level "`pkgs`" attrset.
@@ -225,7 +157,7 @@
                 inherit (nixDependencies) newScope;
               }
               {
-                otherSplices = renameSplicesTo "self" nixComponentsSplices;
+                otherSplices = lib.renameCrossIndexTo "self" nixComponentsSplices;
                 f = import ./packaging/components.nix {
                   inherit (pkgs) lib;
                   inherit officialRelease;
@@ -244,7 +176,7 @@
                 inherit (pkgs) newScope; # layered directly on pkgs, unlike nixComponents2 above
               }
               {
-                otherSplices = renameSplicesTo "self" nixDependenciesSplices;
+                otherSplices = lib.renameCrossIndexTo "self" nixDependenciesSplices;
                 f = import ./packaging/dependencies.nix {
                   inherit inputs pkgs;
                   stdenv = getStdenv pkgs;
