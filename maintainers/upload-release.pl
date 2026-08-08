@@ -282,6 +282,14 @@ unless ($opt->skip_s3) {
     };
     warn "$@" if $@;
     eval {
+        downloadFile("binaryTarballCross.x86_64-linux.powerpc64-unknown-linux-gnuabielfv1", "1");
+    };
+    warn "$@" if $@;
+    eval {
+        downloadFile("binaryTarballCross.x86_64-linux.powerpc64le-unknown-linux-gnu", "1");
+    };
+    warn "$@" if $@;
+    eval {
         downloadFile("binaryTarballCross.x86_64-linux.riscv64-unknown-linux-gnu", "1");
     };
     warn "$@" if $@;
@@ -297,6 +305,8 @@ unless ($opt->skip_s3) {
         "  x86_64-linux = \"" . getStorePath("build.nix-everything.x86_64-linux") . "\";\n" .
         "  i686-linux = \"" . getStorePath("build.nix-everything.i686-linux") . "\";\n" .
         "  aarch64-linux = \"" . getStorePath("build.nix-everything.aarch64-linux") . "\";\n" .
+        "  powerpc64-linux = \"" . getStorePath("buildCross.nix-everything.powerpc64-unknown-linux-gnuabielfv1.x86_64-linux") . "\";\n" .
+        "  powerpc64le-linux = \"" . getStorePath("buildCross.nix-everything.powerpc64le-unknown-linux-gnu.x86_64-linux") . "\";\n" .
         "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
         "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
         "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .

@@ -136,6 +136,8 @@ Nix can be built for various platforms, as specified in [`flake.nix`]:
 - `aarch64-darwin`
 - `armv6l-linux`
 - `armv7l-linux`
+- `powerpc64-linux` (ELFv1 ABI)
+- `powerpc64le-linux`
 - `riscv64-linux`
 
 In order to build Nix for a different platform than the one you're currently
@@ -162,6 +164,8 @@ $ nix build .#packages.aarch64-linux.default
 Cross-compiled builds are available for:
 - `armv6l-linux`
 - `armv7l-linux`
+- `powerpc64-linux` (ELFv1 ABI)
+- `powerpc64le-linux`
 - `riscv64-linux`
 Add more [system types](#system-type) to `crossSystems` in `flake.nix` to bootstrap Nix on unsupported platforms.
 
