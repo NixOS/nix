@@ -268,7 +268,7 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
        'buildDerivation', but that's privileged. */
     drv.name += "-env";
     drv.env.emplace("name", drv.name);
-    drv.inputs.srcs.insert(std::move(getEnvShPath));
+    drv.inputs.insert(SingleDerivedPath::Opaque{std::move(getEnvShPath)});
     for (auto & [outputName, output] : drv.outputs) {
         std::visit(
             overloaded{
