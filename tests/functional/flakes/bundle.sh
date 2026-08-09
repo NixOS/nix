@@ -32,3 +32,16 @@ nix bundle --bundler .#bundlers."$system".simple  .#packages."$system".default
 
 nix bundle --bundler .#bundlers."$system".default .#apps."$system".default
 nix bundle --bundler .#bundlers."$system".simple  .#apps."$system".default
+
+# Function auto call
+cat <<'EOF' > function.nix
+{ x ? 1 }:
+with import ./config.nix;
+mkDerivation {
+  name = "bundle-function";
+  buildCommand = "echo hi > $out";
+}
+EOF
+nix bundle --bundler .#bundlers."$system".simple -f function.nix -o function-bundle
+# given a function, the bundler falls back to packages.default
+[[ $(cat function-bundle/hello) = "Hello World!" ]]
