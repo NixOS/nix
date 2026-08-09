@@ -4,6 +4,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
   - package-ecosystem: "nix"
     directory: "/"
     schedule:
@@ -12,3 +14,5 @@ updates:
       flake-inputs:
         patterns:
           - "*"
+    cooldown:
+      default-days: 7
