@@ -3281,9 +3281,11 @@ static RegisterPrimOp primop_hasAttr({
     .name = "__hasAttr",
     .args = {"s", "set"},
     .doc = R"(
-      `hasAttr` returns `true` if *set* has an attribute named *s*, and
-      `false` otherwise. This is a dynamic version of the `?` operator,
-      since *s* is an expression rather than an identifier.
+      `hasAttr` returns `true` if *set* has an attribute named *s*, and `false` if it does not.
+      This is a dynamic version of the `?` operator, since *s* is an expression rather than an identifier.
+
+      Unlike the `?` operator, however, *s* cannot refer to a nested attribute set.
+      Also unlike the `?` operator, if *s* is not a string or *set* is not an attribute set, evaluation is aborted.
 
       Has `O(log n)` time complexity, where `n` is number of attributes in the *set*.
     )",
