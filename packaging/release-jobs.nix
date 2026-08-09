@@ -42,6 +42,8 @@ let
       inherit (hydraJobs.buildCross.nix-everything)
         riscv64-unknown-linux-gnu
         x86_64-unknown-freebsd
+        powerpc64-unknown-linux-gnuabielfv1
+        powerpc64le-unknown-linux-gnu
         ;
     };
 
