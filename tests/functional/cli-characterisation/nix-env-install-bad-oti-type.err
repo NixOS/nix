@@ -1,0 +1,5 @@
+installing 'bad-outputs-to-install-type-1.0'
+this derivation will be built:
+  /test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-bad-outputs-to-install-type-1.0.drv
+building '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-bad-outputs-to-install-type-1.0.drv'...
+error: this derivation has bad 'meta.outputsToInstall'

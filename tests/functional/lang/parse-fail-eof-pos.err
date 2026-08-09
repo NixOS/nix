@@ -1,0 +1,5 @@
+error: syntax error, unexpected end of file
+       at «stdin»:3:1:
+            2| # no content
+            3|
+             | ^

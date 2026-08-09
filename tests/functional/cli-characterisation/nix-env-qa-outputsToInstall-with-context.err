@@ -1,0 +1,5 @@
+installing 'outputsToInstall-with-context-1.0'
+this derivation will be built:
+  /test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-outputsToInstall-with-context-1.0.drv
+building '/test-root/store/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-outputsToInstall-with-context-1.0.drv'...
+error: this derivation has bad 'meta.outputsToInstall'

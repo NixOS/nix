@@ -1,0 +1,2 @@
+installing 'bad-output-specified-1.0'
+error: derivation does not have output 'nonexistent'

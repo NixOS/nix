@@ -1,0 +1,12 @@
+error:
+       … from call site
+         at /pwd/lang/eval-fail-empty-formals.nix:1:1:
+            1| (foo@{ }: 1) { a = 3; }
+             | ^
+            2|
+
+       error: function 'anonymous lambda' called with unexpected argument 'a'
+       at /pwd/lang/eval-fail-empty-formals.nix:1:2:
+            1| (foo@{ }: 1) { a = 3; }
+             |  ^
+            2|

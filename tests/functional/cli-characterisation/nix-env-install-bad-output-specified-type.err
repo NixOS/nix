@@ -1,0 +1,15 @@
+installing 'bad-output-specified-type-1.0'
+error:
+       … while evaluating the 'outputSpecified' attribute of a derivation
+         at /pwd/cli-characterisation/bad-output-specified-type.nix:9:3:
+            8|   };
+            9|   outputSpecified = "yes";
+             |   ^
+           10| }
+
+       error: expected a Boolean but found a string: "yes"
+       at /pwd/cli-characterisation/bad-output-specified-type.nix:9:3:
+            8|   };
+            9|   outputSpecified = "yes";
+             |   ^
+           10| }

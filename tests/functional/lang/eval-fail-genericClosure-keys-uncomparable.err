@@ -1,0 +1,12 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-keys-uncomparable.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [
+
+       … while comparing element { key = { }; }
+
+       … with element { key = { }; }
+
+       error: cannot compare a set with a set; values of that type are incomparable (values are { } and { })

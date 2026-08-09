@@ -1,0 +1,5 @@
+error: duplicate formal function argument 'args'
+       at «stdin»:1:1:
+            1| args@{args, x, y, z}: x
+             | ^
+            2|

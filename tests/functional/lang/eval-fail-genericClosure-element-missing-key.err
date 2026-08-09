@@ -1,0 +1,10 @@
+error:
+       … while calling the 'genericClosure' builtin
+         at /pwd/lang/eval-fail-genericClosure-element-missing-key.nix:1:1:
+            1| builtins.genericClosure {
+             | ^
+            2|   startSet = [ { nokey = 1; } ];
+
+       … in genericClosure element { nokey = 1; }
+
+       error: attribute 'key' missing

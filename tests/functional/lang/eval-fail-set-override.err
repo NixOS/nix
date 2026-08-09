@@ -1,0 +1,4 @@
+error:
+       … while evaluating the `__overrides` attribute
+
+       error: expected a set but found an integer: 1
