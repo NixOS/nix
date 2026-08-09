@@ -76,7 +76,7 @@ struct CmdRepl : RawInstallablesCommand
                 auto & installable = InstallableValue::require(*installable_);
                 auto what = installable.what();
                 if (file) {
-                    auto [val, pos] = installable.toValue(*state);
+                    auto [val, pos] = installable.toValue(*state, AutoCall::No);
                     auto what = installable.what();
                     state->forceValue(*val, pos);
                     auto autoArgs = getAutoArgs(*state);
@@ -85,7 +85,7 @@ struct CmdRepl : RawInstallablesCommand
                     state->forceValue(*valPost, pos);
                     values.push_back({valPost, what});
                 } else {
-                    auto [val, pos] = installable.toValue(*state);
+                    auto [val, pos] = installable.toValue(*state, AutoCall::No);
                     values.push_back({val, what});
                 }
             }

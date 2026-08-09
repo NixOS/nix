@@ -27,16 +27,25 @@ InstallableAttrPath::InstallableAttrPath(
 {
 }
 
-std::pair<Value *, PosIdx> InstallableAttrPath::toValue(EvalState & state)
+std::pair<Value *, PosIdx> InstallableAttrPath::toValue(EvalState & state, AutoCall autoCall)
 {
-    auto [vRes, pos] = findAlongAttrPath(state, attrPath, *cmd.getAutoArgs(state), **v);
+    auto & autoArgs = *cmd.getAutoArgs(state);
+    auto [vRes, pos] = findAlongAttrPath(state, attrPath, autoArgs, **v);
     state.forceValue(*vRes, pos);
+
+    if (autoCall == AutoCall::Yes) {
+        auto * vAuto = state.allocValue();
+        state.autoCallFunction(autoArgs, *vRes, *vAuto);
+        state.forceValue(*vAuto, pos);
+        return {vAuto, pos};
+    }
+
     return {vRes, pos};
 }
 
 DerivedPathsWithInfo InstallableAttrPath::toDerivedPaths()
 {
-    auto [v, pos] = toValue(*state);
+    auto [v, pos] = toValue(*state, AutoCall::No);
 
     if (std::optional derivedPathWithInfo =
             trySinglePathToDerivedPaths(*v, pos, fmt("while evaluating the attribute '%s'", attrPath))) {
