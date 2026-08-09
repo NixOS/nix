@@ -47,6 +47,8 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
+        "powerpc64-unknown-linux-gnuabielfv1"
+        "powerpc64le-unknown-linux-gnu"
         "riscv64-unknown-linux-gnu"
         # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
         # "x86_64-unknown-netbsd"
