@@ -1,5 +1,9 @@
 name: Backport
 on:
+  # Backporting requires write permissions and a pull_request_target trigger.
+  # Note that we only run the steps with elevated permissions on PRs that have
+  # been merged, so the merged changes are already considered trusted.
+  # zizmor: ignore[dangerous-triggers]
   pull_request_target:
     types: [closed, labeled]
 permissions:
@@ -16,7 +20,8 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: generate-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        # TODO: Explicitly list the required permissions.
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0 # zizmor: ignore[github-app]
         with:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}

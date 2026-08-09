@@ -18,7 +18,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-permissions: read-all
+# Not worth the hassle to explicitly list. This workflow is unprivileged anyway.
+permissions: read-all # zizmor: ignore[excessive-permissions]
 
 jobs:
   eval:
