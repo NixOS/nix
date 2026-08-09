@@ -625,7 +625,9 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
                                         fmt("%s.%s.%s", name, attr_name, state->symbols[attr2.name]),
                                         *attr2.value,
                                         attr2.pos);
-                                    if (drvPath && attr_name == settings.thisSystem.get()) {
+                                    if (!drvPath) {
+                                        reportError(Error("'%s.%s.drvPath' does not exist", name, attr_name));
+                                    } else if (attr_name == settings.thisSystem.get()) {
                                         auto path = DerivedPath::Built{
                                             .drvPath = makeConstantStorePathRef(*drvPath),
                                             .outputs = OutputsSpec::All{},
