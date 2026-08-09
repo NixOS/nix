@@ -15,7 +15,8 @@ jobs:
       # for korthout/backport-action
       contents: write
       pull-requests: write
-    if: github.repository_owner == 'NixOS' && github.event.pull_request.merged == true && (github.event_name != 'labeled' || startsWith('backport', github.event.label.name))
+    # nixpkgs does the same https://github.com/NixOS/nixpkgs/blob/c89bab9ae1dc0fd601ff44d017a3a8dc820fc7cd/.github/workflows/backport.yml#L24
+    if: github.repository_owner == 'NixOS' && github.event.pull_request.merged == true && (github.event.action != 'labeled' || startsWith(github.event.label.name, 'backport'))
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Generate GitHub App token
@@ -30,7 +31,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           # required to find all branches
           fetch-depth: 0
-          persist-credentials: false
+          # We really do want to checkout a merged PR to backport it.
+          allow-unsafe-pr-checkout: true
+          persist-credentials: true
       - name: Create backport PRs
         uses: korthout/backport-action@2e830a1d0b8269505846ddd407a70876913ad1f8 # v4.6.0
         id: backport
