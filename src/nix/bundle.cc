@@ -76,7 +76,7 @@ struct CmdBundle : InstallableValueCommand
     {
         auto evalState = getEvalState();
 
-        auto val = installable->toValue(*evalState, AutoCall::No).first;
+        auto val = installable->toValue(*evalState, AutoCall::Yes).first;
 
         auto [bundlerFlakeRef, bundlerName, extendedOutputsSpec] =
             parseFlakeRefWithFragmentAndExtendedOutputsSpec(bundler, std::filesystem::current_path().string());

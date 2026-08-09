@@ -43,5 +43,4 @@ mkDerivation {
 }
 EOF
 nix bundle --bundler .#bundlers."$system".simple -f function.nix -o function-bundle
-# given a function, the bundler falls back to packages.default
-[[ $(cat function-bundle/hello) = "Hello World!" ]]
+[[ $(cat function-bundle) = hi ]]
