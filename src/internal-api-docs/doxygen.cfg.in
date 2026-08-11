@@ -3,8 +3,8 @@
 PROJECT_NAME           = "Nix"
 PROJECT_NUMBER         = @PROJECT_NUMBER@
 PROJECT_BRIEF          = "Nix, the purely functional package manager; unstable internal interfaces"
-PROJECT_LOGO           =
-PROJECT_ICON           =
+PROJECT_LOGO           = @src@/internal-api-docs/logo.png
+PROJECT_ICON           = @src@/internal-api-docs/logo.png
 
 OUTPUT_DIRECTORY       = @OUTPUT_DIRECTORY@
 GENERATE_LATEX         = NO
