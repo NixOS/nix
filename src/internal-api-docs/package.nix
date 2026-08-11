@@ -30,6 +30,7 @@ mkMesonDerivation (finalAttrs: {
       # Source is not compiled, but still must be available for Doxygen
       # to gather comments.
       (cpp ../.)
+      ../../CONTRIBUTING.md
     ];
 
   nativeBuildInputs = [

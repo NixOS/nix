@@ -202,7 +202,7 @@ AutoCloseFD openDirectory(const std::filesystem::path & path, FinalSymlink final
 /**
  * Open a `Descriptor` with read-only access to the given file.
  *
- * @note For directories use @ref openDirectory.
+ * @note For directories use @ref nix::openDirectory().
  */
 AutoCloseFD openFileReadonly(const std::filesystem::path & path, FinalSymlink finalSymlink = FinalSymlink::Follow);
 
@@ -223,8 +223,8 @@ struct OpenNewFileForWriteParams
 };
 
 /**
- * Open a `Descriptor` for write access or create it if it doesn't exist or truncate existing depending on @ref
- * truncateExisting.
+ * Open a `Descriptor` for write access or create it if it doesn't exist or truncate existing depending on
+ * @ref nix::OpenNewFileForWriteParams::truncateExisting.
  *
  * @param mode POSIX permission bits. Ignored on Windows.
  * @throws Nothing.

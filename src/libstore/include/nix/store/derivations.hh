@@ -151,7 +151,21 @@ struct Type
 template<typename Inputs, typename Out = Output>
 struct Derivation;
 
+/**
+ * @brief Derivation that depends only on other store objects.
+ *
+ * This type is what's used in Store::buildDerivation or for resolved derivations
+ *
+ * @see derivation::tryResolve.
+ */
 using Basic = Derivation<StorePathSet>;
+
+/**
+ * @brief Derivation that depends on the outputs of other derivations in addition.
+ *
+ * This type is what's constructed by the evaluator and written to the store in
+ * ATerm format.
+ */
 using Full = Derivation<FullInputs>;
 
 template<typename Inputs, typename Out>

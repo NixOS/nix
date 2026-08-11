@@ -95,7 +95,7 @@ struct DerivedPathMap
     ChildNode * findSlot(const SingleDerivedPath & k);
 
     /**
-     * Find the node for `k` and invoke @ref callback on it, pruning empty
+     * Find the node for `k` and invoke @p callback on it, pruning empty
      * ancestors afterwards.
      *
      * @param callback Invoked on the found node. Should return true if

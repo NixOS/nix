@@ -11,6 +11,7 @@ GENERATE_LATEX         = NO
 STRIP_FROM_PATH        = @src@
 
 INPUT                  =      \
+  @src@/../CONTRIBUTING.md    \
   @src@/libcmd                \
   @src@/libexpr               \
   @src@/libexpr-test-support  \
@@ -67,6 +68,7 @@ EXPAND_AS_DEFINED      =                    \
   NIX_VALUE_STORAGE_GET_IMPL                \
   NIX_VALUE_STORAGE_SET_IMPL                \
   ARG                                       \
+  COMMA_                                    \
   MAKE_WRAPPER_CONSTRUCTOR                  \
   GENERATE_CMP                              \
   GENERATE_CMP_EXT                          \
