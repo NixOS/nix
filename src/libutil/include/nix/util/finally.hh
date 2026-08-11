@@ -5,6 +5,8 @@
 #include <cassert>
 #include <exception>
 
+namespace nix {
+
 /**
  * A trivial class to run a function at the end of a scope.
  */
@@ -55,3 +57,5 @@ public:
         }
     }
 };
+
+} // namespace nix
