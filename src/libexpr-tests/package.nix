@@ -10,12 +10,14 @@
 
   rapidcheck,
   gtest,
+  gbenchmark,
   runCommand,
 
   # Configuration Options
 
   version,
   resolvePath,
+  withBenchmarks ? false,
 }:
 
 let
@@ -44,9 +46,13 @@ mkMesonExecutable (finalAttrs: {
     nix-expr-test-support
     rapidcheck
     gtest
+  ]
+  ++ lib.optionals withBenchmarks [
+    gbenchmark
   ];
 
   mesonFlags = [
+    (lib.mesonBool "benchmarks" withBenchmarks)
   ];
 
   passthru = {
@@ -64,6 +70,11 @@ mkMesonExecutable (finalAttrs: {
             + ''
               export _NIX_TEST_UNIT_DATA=${resolvePath ./data}
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+            ''
+            + lib.optionalString withBenchmarks ''
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-expr-benchmarks"}
+            ''
+            + ''
               touch $out
             ''
           );

@@ -1,5 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
@@ -350,18 +351,25 @@ Full parse(
     }
 
     /* Parse the list of input derivations. */
+    derivation::FullInputs fullInputs;
     expect(str, ",["sv);
     while (!endOfList(str)) {
         expect(str, '(');
         auto drvPath = parsePath(str);
         expect(str, ',');
-        drv.inputs.drvs.map.insert_or_assign(
-            store.parseStorePath(*drvPath), parseDerivedPathMapNode(store, str, version));
+        auto node = parseDerivedPathMapNode(store, str, version);
+        /* Such an entry cannot be represented in the flat inputs set,
+           and would thus be silently dropped rather than round-tripped.
+           Nix itself never produces one. */
+        if (node.value.empty() && node.childMap.empty())
+            throw FormatError("inputDrvs entry for '%s' specifies no outputs", *drvPath);
+        fullInputs.drvs.map.insert_or_assign(store.parseStorePath(*drvPath), std::move(node));
         expect(str, ')');
     }
 
     expect(str, ',');
-    drv.inputs.srcs = store.parseStorePathSet(parseStrings(str, true));
+    fullInputs.srcs = store.parseStorePathSet(parseStrings(str, true));
+    drv.inputs = fullInputs.toSet();
     expect(str, ',');
     drv.platform = parseString(str).toOwned();
     expect(str, ',');
@@ -647,7 +655,7 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
        constructed.) */
     bool dynDrvDep = false;
     if constexpr (std::is_same_v<Inputs, FullInputs>)
-        dynDrvDep = hasDynamicDrvDep(drv.inputs.drvs.map);
+        dynDrvDep = hasDynamicDrvDep(drv.inputs);
     if (dynDrvDep) {
         s += "DrvWithVersion("sv;
         // Only version we have so far
@@ -727,7 +735,9 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
 
 std::string unparse(const Full & drv, const StoreDirConfig & store)
 {
-    return unparseDerivation(store, drv);
+    // Convert to FullInputs for ATerm serialization
+    return unparseDerivation(
+        store, drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
 }
 
 /* --------------------------------------------------------------------------
@@ -884,7 +894,9 @@ HashModulo hashInputModulo(Store & store, const Full & drv)
             return HashModulo::DeferredDrv{};
 
     auto inputAddressingModulo = derivationModulo(
-        store, drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); }));
+        store,
+        drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
+            .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
     if (!inputAddressingModulo)
         return HashModulo::DeferredDrv{};
 
@@ -929,7 +941,10 @@ static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<I
  */
 std::optional<Hash> hashModulo(Store & store, const Full & drv)
 {
-    auto masked = derivationModulo(store, maskOutputsAndEnv(drv));
+    auto masked =
+        derivationModulo(store, maskOutputsAndEnv(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
+            return FullInputs::fromSet(inputs);
+        }));
     if (!masked)
         return std::nullopt;
     return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *masked));
