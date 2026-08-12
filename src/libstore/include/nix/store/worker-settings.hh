@@ -212,7 +212,7 @@ public:
           > Multiple builders specified on the command line:
           >
           > ```console
-          > --builders 'ssh://mac x86_64-darwin ; ssh://beastie x86_64-freebsd'
+          > --builders 'ssh://mac aarch64-darwin ; ssh://beastie x86_64-freebsd'
           > ```
 
           > **Example**
