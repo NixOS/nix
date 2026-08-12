@@ -81,7 +81,7 @@ public:
     }
 
     /**
-     * Visits the expression and invokes an overloaded functor object \ref f.
+     * Visits the expression and invokes an overloaded functor object @p f.
      * If the underlying Expr has a dynamic type of ExprString the overload taking std::string_view
      * is invoked.
      *

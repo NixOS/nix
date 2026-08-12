@@ -1,5 +1,5 @@
-/// Runtime versions of the third-parties libraries libstore adds on top of the
-/// lower nix libraries' dependencies.
+// Runtime versions of the third-parties libraries libstore adds on top of the
+// lower nix libraries' dependencies.
 
 #include "nix/util/library-versions.hh"
 #include "nix/util/fmt.hh"

@@ -57,8 +57,8 @@ public:
     /**
      * Recursive Nix calls are only allowed to build or realize paths
      * in the original input closure or added via a recursive Nix call
-     * (so e.g. you can't do 'nix-store -r /nix/store/<bla>' where
-     * /nix/store/<bla> is some arbitrary path in a binary cache).
+     * (so e.g. you can't do `nix-store -r /nix/store/<bla>` where
+     * `/nix/store/<bla>` is some arbitrary path in a binary cache).
      */
     virtual bool isAllowed(const StorePath &) = 0;
     virtual bool isAllowed(const DrvOutput & id) = 0;

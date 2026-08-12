@@ -1,4 +1,4 @@
-/// Runtime versions of the third-parties libraries added by libutil.
+// Runtime versions of the third-parties libraries added by libutil.
 
 #include "nix/util/library-versions.hh"
 #include "nix/util/fmt.hh"

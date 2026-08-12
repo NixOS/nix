@@ -209,7 +209,7 @@ public:
      *
      * @param pos Nullable source position to put in trace item
      * @param fs Format string, see `HintFmt`
-     * @param args... Format string arguments.
+     * @param args Format string arguments.
      */
     template<typename... Args>
     void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, Args &&... args)

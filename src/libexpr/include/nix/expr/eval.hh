@@ -1137,7 +1137,7 @@ public:
      * Realise the given string with context, and return the string with outputs instead of downstream output
      * placeholders.
      * @param[in] str the string to realise
-     * @param[out] paths all referenced store paths will be added to this set
+     * @param[out] storePathsOutMaybe all referenced store paths will be added to this set if it's not nullptr
      * @return the realised string
      * @throw EvalError if the value is not a string, path or derivation (see `coerceToString`)
      */
