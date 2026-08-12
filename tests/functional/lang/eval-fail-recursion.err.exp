@@ -1,4 +1,6 @@
 error:
+       … entering the infinite recursion
+
        … in the right operand of the update (//) operator
          at /pwd/lang/eval-fail-recursion.nix:2:14:
             1| let

@@ -2233,7 +2233,7 @@ void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & 
 
 [[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value & v)
 {
-    state.error<InfiniteRecursionError>("infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
+    state.error<InfiniteRecursionError>(&v, "infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
 }
 
 // always force this to be separate, otherwise forceValue may inline it and take
@@ -2250,6 +2250,17 @@ void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, c
         std::rethrow_exception(e);
     } catch (const Interrupted & e) {
         recovery = allocValue();
+    } catch (InfiniteRecursionError & ir) {
+        // Mark where evaluation enters the infinite recursion, so the trace
+        // distinguishes the cycle from the code leading up to it.
+        //
+        // The blackholed value is forced at two frames:
+        // 1. re-forcing of the thunk at stack tip (`env` is null)
+        // 2. initial forcing of the thunk, which is where the cycle starts
+        // Only the first force has an `env`, so we expect this entry to be added once.
+        if (env && ir.v == &v)
+            ir.addTrace(
+                nullptr, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {
