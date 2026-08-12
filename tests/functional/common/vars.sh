@@ -75,7 +75,7 @@ export IMPURE_VAR2=bar
 # shellcheck disable=SC2034
 cacheDir=$TEST_ROOT/binary-cache
 
-if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user true; then
+if [[ $(uname) == Linux ]] && [[ -L /proc/self/ns/user ]] && unshare --user --mount-proc true; then
     _canUseSandbox=1
 fi
 
