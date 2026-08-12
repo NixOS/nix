@@ -39,7 +39,6 @@
       ];
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
       systems = linuxSystems ++ darwinSystems;

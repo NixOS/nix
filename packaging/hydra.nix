@@ -302,7 +302,6 @@ rec {
     self.hydraJobs.binaryTarball."x86_64-linux"
     self.hydraJobs.binaryTarball."i686-linux"
     self.hydraJobs.binaryTarball."aarch64-linux"
-    self.hydraJobs.binaryTarball."x86_64-darwin"
     self.hydraJobs.binaryTarball."aarch64-darwin"
     # Cross
     self.hydraJobs.binaryTarballCross."x86_64-linux"."armv6l-unknown-linux-gnueabihf"
@@ -326,7 +325,6 @@ rec {
       (
         linux64BitSystems
         ++ [
-          "x86_64-darwin"
           "aarch64-darwin"
         ]
       )

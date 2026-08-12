@@ -271,7 +271,6 @@ unless ($opt->skip_s3) {
     downloadFile("binaryTarball.i686-linux", "1");
     downloadFile("binaryTarball.x86_64-linux", "1");
     downloadFile("binaryTarball.aarch64-linux", "1");
-    downloadFile("binaryTarball.x86_64-darwin", "1");
     downloadFile("binaryTarball.aarch64-darwin", "1");
     eval {
         downloadFile("binaryTarballCross.x86_64-linux.armv6l-unknown-linux-gnueabihf", "1");
@@ -308,7 +307,6 @@ unless ($opt->skip_s3) {
         "  powerpc64-linux = \"" . getStorePath("buildCross.nix-everything.powerpc64-unknown-linux-gnuabielfv1.x86_64-linux") . "\";\n" .
         "  powerpc64le-linux = \"" . getStorePath("buildCross.nix-everything.powerpc64le-unknown-linux-gnu.x86_64-linux") . "\";\n" .
         "  riscv64-linux = \"" . getStorePath("buildCross.nix-everything.riscv64-unknown-linux-gnu.x86_64-linux") . "\";\n" .
-        "  x86_64-darwin = \"" . getStorePath("build.nix-everything.x86_64-darwin") . "\";\n" .
         "  aarch64-darwin = \"" . getStorePath("build.nix-everything.aarch64-darwin") . "\";\n" .
         "  x86_64-freebsd = \"" . getStorePath("buildCross.nix-everything.x86_64-unknown-freebsd.x86_64-linux") . "\";\n" .
         "}\n");
