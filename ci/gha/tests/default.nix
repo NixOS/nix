@@ -56,6 +56,7 @@ rec {
       withFuzzTargets = withSanitizers;
 
       nix-store-tests = prev.nix-store-tests.override { withBenchmarks = true; };
+      nix-expr-tests = prev.nix-expr-tests.override { withBenchmarks = true; };
       # Boehm is incompatible with ASAN.
       nix-expr = prev.nix-expr.override { enableGC = !withSanitizers; };
 

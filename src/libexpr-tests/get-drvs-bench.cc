@@ -18,7 +18,7 @@ struct GetDerivationsEnv
     std::shared_ptr<EvalState> statePtr;
     EvalState & state;
 
-    Bindings * autoArgs = nullptr;
+    const Bindings * autoArgs = nullptr;
     Value attrsValue;
 
     explicit GetDerivationsEnv(size_t attrCount)
