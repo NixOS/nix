@@ -192,6 +192,15 @@ struct RestrictedBuilder : Builder
 
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
 
+    BuildResult buildDerivation(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        const StorePathSet & inputs,
+        BuildMode buildMode) override;
+
+    std::vector<KeyedBuildResult> buildPathsWithResults(
+        const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode) override;
+
     void ensurePath(const StorePath & path) override;
 
     void repairPath(const StorePath & path) override;
@@ -402,6 +411,18 @@ BuildResult
 RestrictedBuilder::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     throw Unsupported("buildDerivation");
+}
+
+BuildResult RestrictedBuilder::buildDerivation(
+    const StorePath & drvPath, const BasicDerivation & drv, const StorePathSet & inputs, BuildMode buildMode)
+{
+    throw Unsupported("buildDerivation (with inputs)");
+}
+
+std::vector<KeyedBuildResult> RestrictedBuilder::buildPathsWithResults(
+    const std::vector<DerivedPath> & reqs, const StorePathSet & inputs, BuildMode buildMode)
+{
+    throw Unsupported("buildPathsWithResults (with inputs)");
 }
 
 void RestrictedBuilder::repairPath(const StorePath & path)
