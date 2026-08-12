@@ -29,10 +29,15 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 
 std::optional<StorePath> StoreDirConfig::maybeParseStorePath(std::string_view path) const
 {
+    // If it's not an absolute path, or if the dirname of the path isn't /nix/store
+    // (or whatever our storeDir is), then it can't be a store path.
+    if ((path.size() > 0 && path[0] != '/') || canonPath(path).parent_path() != this->storeDir) {
+        return std::nullopt;
+    }
     try {
         return parseStorePath(path);
     } catch (Error &) {
-        return {};
+        return std::nullopt;
     }
 }
 
