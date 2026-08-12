@@ -15,8 +15,8 @@ commonDir="$(readlink -f "$(dirname "${BASH_SOURCE[0]-$0}")")"
 # shellcheck disable=SC1091
 source "${_NIX_TEST_BUILD_DIR}/common/subst-vars.sh"
 # Make sure shellcheck knows all these will be defined by the above generated snippet
-: "${bindir?} ${coreutils?} ${dot?} ${SHELL?} ${busybox?} ${version?} ${system?}"
-export coreutils dot busybox version system
+: "${bindir?} ${coreutils?} ${dot?} ${SHELL?} ${busybox?} ${version?} ${system?} ${with_secretspec?}"
+export coreutils dot busybox version system with_secretspec
 
 export PAGER=cat
 

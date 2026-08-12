@@ -368,10 +368,14 @@ protected:
      */
     struct RunChildArgs
     {
+        std::optional<std::string> netrcData;
 #if NIX_WITH_AWS_AUTH
         std::optional<AwsCredentials> awsCredentials;
 #endif
     };
+
+    /** Read builtin:fetchurl netrc data before forking the builder process. */
+    std::optional<std::string> preResolveNetrcData();
 
     /**
      * Run the builder's process.

@@ -130,6 +130,19 @@ curl = dependency('libcurl', 'curl', version : '>= 8.17.0')
 
 deps_private += curl
 
+secretspec_ffi = dependency(
+  'secretspec_ffi',
+  version : '>= 0.19.0',
+  required : get_option('secretspec'),
+)
+if secretspec_ffi.found()
+  deps_private += secretspec_ffi
+  # Checked against secretspec_abi_version() at run time, so that a library
+  # swapped underneath us is diagnosed instead of silently misinterpreted.
+  configdata_priv.set_quoted('SECRETSPEC_FFI_VERSION', secretspec_ffi.version())
+endif
+configdata_pub.set('NIX_WITH_SECRETSPEC', secretspec_ffi.found().to_int())
+
 # seccomp only makes sense on Linux
 is_linux = host_machine.system() == 'linux'
 seccomp_required = get_option('seccomp-sandboxing')
@@ -194,6 +207,7 @@ prefix = get_option('prefix')
 # it is already an absolute path (which is the default for store-dir, localstatedir, and log-dir).
 path_opts = [
   # Meson built-ins.
+  'datadir',
   'mandir',
   'libdir',
   'includedir',
@@ -231,6 +245,10 @@ endif
 # by joining it with prefix, unless it was already an absolute path
 # (which is the default for store-dir, localstatedir, and log-dir).
 configdata_priv.set_quoted('NIX_STORE_DIR', store_dir)
+configdata_priv.set_quoted(
+  'NIX_SECRETSPEC_FILE',
+  datadir / 'nix/secretspec.toml',
+)
 # On Windows, NIX_STATE_DIR, NIX_LOG_DIR, and NIX_CONF_DIR are determined at
 # runtime using the Windows known folders API (FOLDERID_ProgramData), so we
 # don't define them at compile time.
@@ -327,6 +345,7 @@ sources = files(
   'restricted-store.cc',
   's3-binary-cache-store.cc',
   's3-url.cc',
+  'secretspec-settings.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',
@@ -384,12 +403,14 @@ this_library = library(
 )
 
 install_headers(headers, subdir : 'nix/store', preserve_path : true)
+install_data('secretspec.toml', install_dir : get_option('datadir') / 'nix')
 
 libraries_private = []
 
 extra_pkg_config_variables = {
   'storedir' : get_option('store-dir'),
   'localstatedir' : get_option('localstatedir'),
+  'with_secretspec' : secretspec_ffi.found() ? 'true' : 'false',
 }
 
 subdir('nix-meson-build-support/export')

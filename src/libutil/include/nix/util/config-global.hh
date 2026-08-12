@@ -18,6 +18,8 @@ public:
 
     void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
+    std::optional<FlakeConfigSetting> getFlakeConfigSetting(const std::string & name) const override;
+
     void resetOverridden() override;
 
     nlohmann::json toJSON() override;

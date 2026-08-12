@@ -149,11 +149,11 @@ std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view pat
         return {parseStorePath(path.substr(0, slash)), CanonPath{path.substr(slash)}};
 }
 
-ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore)
+ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted)
 {
     auto store = ref<Store>(shared_from_this());
     auto evalStoreRef = evalStore ? ref<Store>(std::move(evalStore)) : store;
-    return make_ref<LocalBuilder>(store, evalStoreRef);
+    return make_ref<LocalBuilder>(store, evalStoreRef, requestTrusted);
 }
 
 std::filesystem::path Store::followLinksToStore(std::string_view _path) const

@@ -4,6 +4,8 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/config.hh"
 
+#include <optional>
+
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
@@ -14,7 +16,7 @@ struct BuiltinBuilderContext
 {
     const BasicDerivation & drv;
     std::map<std::string, std::string> outputs;
-    std::string netrcData;
+    std::optional<std::string> netrcData;
     std::string caFileData;
     Strings hashedMirrors;
     std::filesystem::path tmpDirInSandbox;

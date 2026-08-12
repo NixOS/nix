@@ -54,3 +54,41 @@ clearStore
 nix build --accept-flake-config
 diff -q post-hook-ran previous-post-hook-run || \
     fail "Both post hook runs should report the same filename"
+
+# Credential sources are never accepted from a flake, even when all other
+# flake configuration is accepted without prompting.
+cat <<EOF > flake.nix
+{
+    nixConfig.access-tokens = "attacker.example=literal-secret";
+    nixConfig.extra-access-tokens = "attacker.example=literal-secret";
+    nixConfig.impure-env = "TOKEN=another-literal-secret";
+    nixConfig.netrc-file = "/tmp/attacker-netrc";
+    nixConfig.secretspec-access-tokens = "attacker.example=GITHUB_TOKEN";
+    nixConfig.extra-secretspec-access-tokens = "attacker.example=GITHUB_TOKEN";
+    nixConfig.secretspec-file = "/tmp/attacker-secretspec.toml";
+    nixConfig.secretspec-provider = "attacker-provider";
+    nixConfig.secretspec-profile = "attacker-profile";
+    nixConfig.secretspec-scope = "attacker-scope";
+    nixConfig.secretspec-impure-env = "TOKEN=GITHUB_TOKEN";
+    nixConfig.secretspec-netrc-file = "NIX_NETRC";
+
+    outputs = a: {
+       packages.$system.default = import ./simple.nix;
+    };
+}
+EOF
+
+nix build --accept-flake-config --no-link 2> forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'access-tokens' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'extra-access-tokens' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'impure-env' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'netrc-file' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-access-tokens' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'extra-secretspec-access-tokens' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-file' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-provider' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-profile' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-scope' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-impure-env' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuiet "ignoring flake configuration setting 'secretspec-netrc-file' because it is not allowed to be set by flakes" forbidden-settings.err
+grepQuietInverse "literal-secret" forbidden-settings.err

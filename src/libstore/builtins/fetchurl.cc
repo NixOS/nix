@@ -12,9 +12,10 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
     /* Make the host's netrc data available. Too bad curl requires
        this to be stored in a file. It would be nice if we could just
        pass a pointer to the data. */
-    if (ctx.netrcData != "") {
+    if (ctx.netrcData) {
+        fileTransferSettings.secretSpecNetrcFile = "";
         fileTransferSettings.netrcFile = ctx.tmpDirInSandbox / "netrc";
-        writeFile(fileTransferSettings.netrcFile.get(), ctx.netrcData, 0600);
+        writeFile(fileTransferSettings.netrcFile.get(), *ctx.netrcData, 0600);
     }
 
     auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";

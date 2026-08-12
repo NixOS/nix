@@ -911,7 +911,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                      * daemon thread. Ideally we should reuse the same
                      * Worker to share scheduling state.
                      */
-                    Worker freshWorker{goal.worker.store, goal.worker.evalStore};
+                    Worker freshWorker{goal.worker.store, goal.worker.evalStore, NotTrusted};
                     auto builder = makeRestrictedBuilder(freshWorker, context);
                     daemon::processConnection(
                         store, std::move(from), std::move(to), NotTrusted, recursiveFlag, builder.get_ptr());
@@ -954,6 +954,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 .inputPaths = inputPaths,
                 .initialOutputs = initialOutputs,
                 .buildMode = buildMode,
+                .requestTrusted = worker.requestTrusted,
                 .defaultPathsInChroot = std::move(defaultPathsInChroot),
                 .systemFeatures = worker.store.config.systemFeatures.get(),
                 .desugaredEnv = std::move(desugaredEnv),
@@ -1174,7 +1175,9 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
 
     if (!worker.hook)
         worker.hook = std::make_unique<HookInstance>(
-            worker.settings.buildHook, std::chrono::milliseconds(worker.settings.buildHookKillTimeout));
+            worker.settings.buildHook,
+            std::chrono::milliseconds(worker.settings.buildHookKillTimeout),
+            worker.requestTrusted);
 
     try {
 

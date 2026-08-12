@@ -20,6 +20,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/secretspec-settings.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -657,9 +658,45 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
 }
 #endif
 
+std::optional<std::string> DerivationBuilderImpl::preResolveNetrcData()
+{
+    if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
+        auto netrcAppliesTo = [](std::string_view url) {
+            auto scheme = VerbatimURL{url}.scheme();
+            return scheme == "http" || scheme == "https";
+        };
+
+        bool hasNetrcCapableUrl = false;
+        if (auto url = drv.env.find("url"); url != drv.env.end())
+            hasNetrcCapableUrl = netrcAppliesTo(url->second);
+
+        auto out = get(drv.outputs, "out");
+        auto fixed = out ? std::get_if<DerivationOutput::CAFixed>(&out->raw) : nullptr;
+        if (!hasNetrcCapableUrl && fixed && fixed->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat) {
+            for (const auto & mirror : localSettings.hashedMirrors.get())
+                if (netrcAppliesTo(mirror)) {
+                    hasNetrcCapableUrl = true;
+                    break;
+                }
+        }
+
+        if (!hasNetrcCapableUrl)
+            return std::nullopt;
+
+        if (!fileTransferSettings.secretSpecNetrcFile.get().empty())
+            return readFile(fileTransferSettings.getNetrcFile());
+        try {
+            return readFile(fileTransferSettings.netrcFile.get());
+        } catch (SystemError &) {
+        }
+    }
+    return std::nullopt;
+}
+
 void DerivationBuilderImpl::startChild()
 {
     RunChildArgs args{
+        .netrcData = preResolveNetrcData(),
 #if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif
@@ -773,13 +810,17 @@ void DerivationBuilderImpl::initEnv()
        already know the cryptographic hash of the output). */
     if (!derivationType.isSandboxed()) {
         auto & impureEnv = localSettings.impureEnv.get();
-        if (!impureEnv.empty())
+        auto & secretSpecImpureEnv = localSettings.secretSpecImpureEnv.get();
+        if (!impureEnv.empty() || !secretSpecImpureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
         for (auto & i : drvOptions.impureEnvVars) {
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
+            } else if (auto secret = secretSpecImpureEnv.find(i);
+                       requestTrusted && secret != secretSpecImpureEnv.end()) {
+                env[i] = secretSpecSettings.getInlineSecret(secret->second);
             } else {
                 env[i] = getEnv(i).value_or("");
             }
@@ -970,6 +1011,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
+            .netrcData = std::move(args.netrcData),
             .hashedMirrors = settings.getLocalSettings().hashedMirrors,
             .tmpDirInSandbox = tmpDirInSandbox(),
 #if NIX_WITH_AWS_AUTH
@@ -978,11 +1020,6 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-            try {
-                ctx.netrcData = readFile(fileTransferSettings.netrcFile.get());
-            } catch (SystemError &) {
-            }
-
             if (auto & caFile = fileTransferSettings.caFile.get())
                 try {
                     ctx.caFileData = readFile(*caFile);

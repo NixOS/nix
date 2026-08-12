@@ -96,7 +96,21 @@ void Config::getSettings(std::map<std::string, SettingInfo> & res, bool overridd
     for (const auto & opt : _settings)
         if (!opt.second.isAlias && (!overriddenOnly || opt.second.setting->overridden)
             && experimentalFeatureSettings.isEnabled(opt.second.setting->experimentalFeature))
-            res.emplace(opt.first, SettingInfo{opt.second.setting->to_string(), opt.second.setting->description});
+            res.emplace(
+                opt.first,
+                SettingInfo{
+                    opt.second.setting->to_string(),
+                    opt.second.setting->description,
+                    opt.second.setting->flakeConfigSetting,
+                });
+}
+
+std::optional<FlakeConfigSetting> Config::getFlakeConfigSetting(const std::string & name) const
+{
+    auto setting = _settings.find(name);
+    if (setting == _settings.end())
+        return std::nullopt;
+    return setting->second.setting->flakeConfigSetting;
 }
 
 /**
@@ -233,11 +247,13 @@ AbstractSetting::AbstractSetting(
     const std::string & name,
     const std::string & description,
     const StringSet & aliases,
-    std::optional<ExperimentalFeature> experimentalFeature)
+    std::optional<ExperimentalFeature> experimentalFeature,
+    FlakeConfigSetting flakeConfigSetting)
     : name(name)
     , description(stripIndentation(description))
     , aliases(aliases)
     , experimentalFeature(std::move(experimentalFeature))
+    , flakeConfigSetting(flakeConfigSetting)
 {
 }
 

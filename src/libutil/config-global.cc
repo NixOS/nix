@@ -29,6 +29,14 @@ void GlobalConfig::getSettings(std::map<std::string, SettingInfo> & res, bool ov
         config->getSettings(res, overriddenOnly);
 }
 
+std::optional<FlakeConfigSetting> GlobalConfig::getFlakeConfigSetting(const std::string & name) const
+{
+    for (auto & config : configRegistrations())
+        if (auto setting = config->getFlakeConfigSetting(name))
+            return setting;
+    return std::nullopt;
+}
+
 void GlobalConfig::resetOverridden()
 {
     for (auto & config : configRegistrations())

@@ -77,6 +77,11 @@ void ConfigFile::apply(const Settings & flakeSettings)
         else
             assert(false);
 
+        if (globalConfig.getFlakeConfigSetting(baseName) == FlakeConfigSetting::Forbidden) {
+            warn("ignoring flake configuration setting '%s' because it is not allowed to be set by flakes", name);
+            continue;
+        }
+
         if (!whitelist.count(baseName) && !flakeSettings.acceptFlakeConfig) {
             bool trusted = false;
             auto trustedList = readTrustedList();
