@@ -71,7 +71,7 @@ nix_err nix_path_info_get_references(
     nix_c_context * context,
     const nix_path_info * path_info,
     void * user_data,
-    nix_err (*callback)(void * user_data, const StorePath * store_path));
+    void (*callback)(nix_c_context * context, void * user_data, const StorePath * store_path));
 
 /**
  * @brief Get the deriver of a store path
@@ -98,7 +98,7 @@ nix_err nix_path_info_get_sigs(
     nix_c_context * context,
     const nix_path_info * path_info,
     void * user_data,
-    nix_err (*callback)(void * user_data, const char * sig, unsigned int sig_len));
+    void (*callback)(nix_c_context * context, void * user_data, const char * sig, unsigned int sig_len));
 
 /**
  * @brief Get the content address of a store path, if any
