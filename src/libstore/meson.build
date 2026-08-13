@@ -278,6 +278,7 @@ sources = files(
   'common-ssh-store-config.cc',
   'content-address.cc',
   'daemon.cc',
+  'dependency-graph.cc',
   'derivation-options.cc',
   'derivation/aterm.cc',
   'derivation/full-inputs.cc',
