@@ -3,7 +3,7 @@
 /**
  * @defgroup libstore_pathinfo PathInfo
  * @ingroup libstore
- * @brief Store path metadata (narHash, references, signatures, etc.)
+ * @brief Store path metadata
  * @{
  */
 /** @file
@@ -60,6 +60,7 @@ uint64_t nix_path_info_get_nar_size(nix_c_context * context, const nix_path_info
  *
  * Calls the callback once for each reference. The StorePath passed to the
  * callback is borrowed and only valid for the duration of the callback.
+ * Iteration stops if the callback returns with `context` in an error state.
  *
  * @param[out] context Optional, stores error information
  * @param[in] path_info the nix_path_info to read from
@@ -87,6 +88,10 @@ StorePath * nix_path_info_get_deriver(nix_c_context * context, const nix_path_in
  * @brief Iterate over the signatures of a store path
  *
  * Calls the callback once for each signature string (format: "keyName:base64sig").
+ * The `sig` data is borrowed and the callback must not assume that the buffer
+ * persists after it returns.
+ *
+ * Iteration stops if the callback returns with `context` in an error state.
  *
  * @param[out] context Optional, stores error information
  * @param[in] path_info the nix_path_info to read from
