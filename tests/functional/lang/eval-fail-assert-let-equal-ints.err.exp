@@ -1,0 +1,8 @@
+error:
+       … while evaluating the condition of the assertion '(let x = 1; y = 2; in (x == y))'
+         at /pwd/lang/eval-fail-assert-let-equal-ints.nix:1:1:
+            1| assert
+             | ^
+            2|   let
+
+       error: an integer with value '1' is not equal to an integer with value '2'
