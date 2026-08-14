@@ -39,6 +39,7 @@ sources = files(
   'libstore-network.cc',
   'outputs-spec.cc',
   'path.cc',
+  'secret-resolver.cc',
   'test-main.cc',
 )
 

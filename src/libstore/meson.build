@@ -328,6 +328,7 @@ sources = files(
   'restricted-store.cc',
   's3-binary-cache-store.cc',
   's3-url.cc',
+  'secret-resolver.cc',
   'serve-protocol-connection.cc',
   'serve-protocol.cc',
   'sqlite.cc',
