@@ -306,9 +306,14 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
         /* TODO: Can we do this fchmod to avoid TOCTOU? */
         nix::chmod(src, st.st_mode | S_IWUSR);
 
-    if (::rename(src.c_str(), dst.c_str()) == -1)
-        /* FIXME: Revert write permissions on error path if changePerm. */
-        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+    if (::rename(src.c_str(), dst.c_str()) == -1) {
+        const int savedErrno = errno;
+        if (changePerm)
+            /* Ignore all errors on restoring permissions. We want to throw the
+               original error originating from ::rename. */
+            ::chmod(src.c_str(), st.st_mode);
+        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+    }
 
     if (changePerm)
         nix::chmod(dst, st.st_mode);

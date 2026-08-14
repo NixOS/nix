@@ -408,10 +408,9 @@ TEST_F(MovePathTest, nonWritableDirectories)
     ASSERT_FALSE(pathExists(srcDir));
     ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
 
-    // Buggy behavior. We don't restore permissions on rename errors.
     ASSERT_THROW(movePath(dstDir, tmpDir / "nonexistent" / "dir"), SysError);
-    // FIXME: Should be the old 0500 permissions and not remain writable.
-    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0700);
+    // Permissions are restored on rename errors.
+    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
 }
 
 #endif
