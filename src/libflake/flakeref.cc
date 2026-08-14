@@ -280,9 +280,9 @@ FlakeRef FlakeRef::fromAttrs(const fetchers::Attrs & attrs)
 }
 
 std::pair<ref<SourceAccessor>, FlakeRef>
-FlakeRef::lazyFetch(const fetchers::Settings & fetchSettings, Store & store) const
+FlakeRef::lazyFetch(const fetchers::FetchContext & fetchContext, Store & store) const
 {
-    auto [accessor, lockedInput] = input.getAccessor(fetchSettings, store);
+    auto [accessor, lockedInput] = input.getAccessor(fetchContext, store);
     return {accessor, FlakeRef(std::move(lockedInput), subdir)};
 }
 

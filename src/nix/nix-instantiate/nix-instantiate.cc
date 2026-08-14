@@ -169,7 +169,8 @@ static int main_nix_instantiate(int argc, char ** argv)
         auto store = openStore();
         auto evalStore = myArgs.evalStoreUrl ? openStore(StoreReference{*myArgs.evalStoreUrl}) : store;
 
-        auto state = std::make_shared<EvalState>(myArgs.lookupPath, evalStore, fetchSettings, evalSettings, store);
+        auto state = std::make_shared<EvalState>(
+            myArgs.lookupPath, evalStore, fetchers::FetchContext{fetchSettings, {}}, evalSettings, store);
         state->repair = myArgs.repair;
 
         const Bindings & autoArgs = *myArgs.getAutoArgs(*state);

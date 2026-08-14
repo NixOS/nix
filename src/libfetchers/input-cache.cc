@@ -1,4 +1,5 @@
 #include "nix/fetchers/input-cache.hh"
+#include "nix/fetchers/fetch-settings.hh"
 #include "nix/fetchers/git-utils.hh"
 #include "nix/fetchers/registry.hh"
 #include "nix/util/sync.hh"
@@ -6,14 +7,15 @@
 namespace nix::fetchers {
 
 InputCache::CachedResult InputCache::getAccessor(
-    const Settings & settings, Store & store, const Input & originalInput, UseRegistries useRegistries)
+    const FetchContext & context, Store & store, const Input & originalInput, UseRegistries useRegistries)
 {
+    auto & settings = context.settings;
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
 
     if (!fetched) {
         if (originalInput.isDirect()) {
-            auto [accessor, lockedInput] = originalInput.getAccessor(settings, store);
+            auto [accessor, lockedInput] = originalInput.getAccessor(context, store);
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
             if (useRegistries != UseRegistries::No) {
@@ -21,7 +23,7 @@ InputCache::CachedResult InputCache::getAccessor(
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);
                 if (!fetched) {
-                    auto [accessor, lockedInput] = resolvedInput.getAccessor(settings, store);
+                    auto [accessor, lockedInput] = resolvedInput.getAccessor(context, store);
                     fetched.emplace(
                         CachedInput{.lockedInput = lockedInput, .accessor = accessor, .extraAttrs = extraAttrs});
                 }

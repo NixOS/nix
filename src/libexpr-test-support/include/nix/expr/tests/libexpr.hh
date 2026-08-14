@@ -29,7 +29,7 @@ protected:
     LibExprTest(ref<Store> store, auto && makeEvalSettings)
         : LibStoreTest()
         , evalSettings(makeEvalSettings(readOnlyMode))
-        , state({}, store, fetchSettings, evalSettings, nullptr)
+        , state({}, store, fetchers::FetchContext{fetchSettings, {}}, evalSettings, nullptr)
     {
     }
 

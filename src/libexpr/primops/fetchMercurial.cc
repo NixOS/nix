@@ -79,7 +79,7 @@ static void prim_fetchMercurial(EvalState & state, CallSite callSite, Value * co
         attrs.insert_or_assign("rev", rev->gitRev());
     auto input = fetchers::Input::fromAttrs(std::move(attrs));
 
-    auto [storePath, input2] = input.fetchToStore(state.fetchSettings, *state.store);
+    auto [storePath, input2] = input.fetchToStore(state.fetchContext, *state.store);
 
     auto attrs2 = state.buildBindings(8);
     state.mkStorePathString(storePath, attrs2.alloc(state.s.outPath));
