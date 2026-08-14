@@ -413,6 +413,28 @@ TEST_F(MovePathTest, nonWritableDirectories)
     ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
 }
 
+TEST_F(MovePathTest, symlinkReplacesSymlink)
+{
+    auto srcLink = tmpDir / "link";
+    auto dstLink = tmpDir / "dst";
+    createSymlink("dangling", srcLink);
+    createSymlink("other", dstLink);
+
+    movePath(srcLink, dstLink);
+    ASSERT_EQ(readLink(dstLink), "dangling");
+}
+
+TEST_F(MovePathTest, symlinkReplacesRegular)
+{
+    auto srcLink = tmpDir / "link";
+    auto dst = tmpDir / "dst";
+    createSymlink("hello", srcLink);
+    writeFile(dst, "test");
+
+    movePath(srcLink, dst);
+    ASSERT_EQ(readLink(dst), "hello");
+}
+
 #endif
 
 } // namespace nix
