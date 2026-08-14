@@ -363,6 +363,12 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
     }
 }
 
+void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    if (::rename(src.c_str(), dst.c_str()) == -1)
+        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+}
+
 void createDir(const std::filesystem::path & path, mode_t mode)
 {
     if (::mkdir(path.c_str(), mode) == -1)

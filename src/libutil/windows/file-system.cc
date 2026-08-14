@@ -195,6 +195,11 @@ std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 
 void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
 {
+    renameFile(src, dst);
+}
+
+void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
     /* TODO: FileRenameInformationEx with FILE_RENAME_POSIX_SEMANTICS? */
     if (!::MoveFileExW(src.c_str(), dst.c_str(), MOVEFILE_REPLACE_EXISTING))
         throw windows::WinError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
