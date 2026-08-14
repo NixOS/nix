@@ -297,4 +297,82 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
         throw SysError("changing ownership of %s", PathFmt(path));
 }
 
+void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    /* If we have O_PATH (Linux, FreeBSD), then we can open the to-be-renamed
+       file without requiring any permissions and "pin" the inode that we'll
+       fchmod. This avoids operating on paths, which is prone to TOCTOU. */
+#ifdef O_PATH
+    AutoCloseFD fd = ::open(src.c_str(), O_NOFOLLOW | O_CLOEXEC | O_PATH);
+    if (!fd)
+        throw SysError("failed to open file %1%", PathFmt(src));
+
+    auto changePermsOnFile = [&](mode_t newMode) -> int {
+        /* AT_EMPTY_PATH here is supported since 6.6, but reports EINVAL without fchmodat2. */
+        if (::fchmodat(fd.get(), "", newMode, AT_EMPTY_PATH) == 0)
+            return 0;
+
+#  ifdef __linux__
+        if (errno == EINVAL) {
+            auto path = fmt("/proc/self/fd/%d", fd.get());
+            if (::chmod(path.c_str(), newMode) == 0)
+                return 0;
+        }
+#  endif
+
+        return -1;
+    };
+
+    const PosixStat st = nix::fstat(fd.get());
+#else
+    const PosixStat st = nix::lstat(src);
+#endif
+
+    bool changePerm = (::geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+    if (changePerm) {
+        const mode_t newMode = st.st_mode | S_IWUSR;
+#ifdef O_PATH
+        if (changePermsOnFile(newMode) == -1)
+            throw SysError("making %s writable for renaming", PathFmt(src));
+#else
+        nix::chmod(src, newMode);
+#endif
+    }
+
+    if (::rename(src.c_str(), dst.c_str()) == -1) {
+        const int savedErrno = errno;
+        if (changePerm) {
+            /* Ignore all errors on restoring permissions. We want to throw the
+               original error originating from ::rename. */
+#ifdef O_PATH
+            changePermsOnFile(st.st_mode);
+#else
+            ::chmod(src.c_str(), st.st_mode);
+#endif
+        }
+        throw SysError(savedErrno, "renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+    }
+
+    if (changePerm) {
+#ifdef O_PATH
+        if (changePermsOnFile(st.st_mode) == -1)
+            throw SysError("restoring permissions on %s", PathFmt(dst));
+#else
+        nix::chmod(dst, st.st_mode);
+#endif
+    }
+}
+
+void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    if (::rename(src.c_str(), dst.c_str()) == -1)
+        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+}
+
+void createDir(const std::filesystem::path & path, mode_t mode)
+{
+    if (::mkdir(path.c_str(), mode) == -1)
+        throw SysError("creating directory %s", PathFmt(path));
+}
+
 } // namespace nix

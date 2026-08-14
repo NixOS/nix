@@ -1335,7 +1335,22 @@ StorePath LocalStore::addToStoreFromDump(
                 }
             } else {
                 /* Move the temporary path we restored above. */
-                moveFile(tempPath, realPath);
+                try {
+                    renameFile(tempPath, realPath);
+                } catch (const SystemError & e) {
+                    if (!e.is(std::errc::cross_device_link))
+                        throw;
+
+                    /* Apparently this can happen even on the same filesystem (and the paths that are renamed above
+                       are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
+                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath.
+                       Note that copyRecursive doesn't copy over permissions, but those will be canonicalised below. */
+                    warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
+                    RestoreSink copySink{/*startFsync=*/false};
+                    copySink.dstPath = realPath;
+                    copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink, CanonPath::root);
+                    delTempDir->deletePath();
+                }
             }
 
             /* For computing the nar hash. In recursive SHA-256 mode, this
