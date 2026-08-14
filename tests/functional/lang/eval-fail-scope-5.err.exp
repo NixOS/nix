@@ -26,6 +26,13 @@ error:
              |     ^
             8|       x ? y,
 
+       … in an operand of '+'
+         at /pwd/lang/eval-fail-scope-5.nix:11:5:
+           10|     }:
+           11|     x + y;
+             |     ^
+           12|
+
        … entering the infinite recursion
 
        error: infinite recursion encountered

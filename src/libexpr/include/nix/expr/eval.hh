@@ -685,8 +685,8 @@ public:
      * type.
      */
     inline bool evalBool(Env & env, Expr * e);
-    inline bool evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx);
-    inline void evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx);
+    inline bool evalBool(Env & env, Expr * e, std::string_view errorCtx);
+    inline void evalAttrs(Env & env, Expr * e, Value & v, std::string_view errorCtx);
 
     /**
      * If `v` is a thunk, enter it and overwrite `v` with the result
