@@ -225,7 +225,7 @@ static DownloadTarballResult downloadTarball_(
     return attrsToResult(infoAttrs);
 }
 
-ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, const std::string & url)
+ref<SourceAccessor> downloadTarball(Store & store, const FetchContext & context, const std::string & url)
 {
     /* Go through Input::getAccessor() to ensure that the resulting
        accessor has a fingerprint. */
@@ -235,7 +235,7 @@ ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, co
 
     auto input = Input::fromAttrs(std::move(attrs));
 
-    return input.getAccessor(settings, store).first;
+    return input.getAccessor(context, store).first;
 }
 
 // An input scheme corresponding to a curl-downloadable resource.
@@ -424,8 +424,9 @@ struct FileInputScheme : CurlInputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
+    getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
+        auto & settings = context.settings;
         auto input(_input);
 
         /* Unlike TarballInputScheme, this stores downloaded files in
@@ -490,8 +491,9 @@ struct TarballInputScheme : CurlInputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
+    getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
+        auto & settings = context.settings;
         auto input(_input);
 
         auto result = downloadTarball_(settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");

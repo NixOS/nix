@@ -167,7 +167,12 @@ ref<EvalState> EvalCommand::getEvalState()
 {
     if (!evalState) {
         evalState = std::allocate_shared<EvalState>(
-            traceable_allocator<EvalState>(), lookupPath, getEvalStore(), fetchSettings, evalSettings, getStore());
+            traceable_allocator<EvalState>(),
+            lookupPath,
+            getEvalStore(),
+            fetchers::FetchContext{fetchSettings, {}},
+            evalSettings,
+            getStore());
 
         evalState->repair = repair;
 

@@ -1078,7 +1078,9 @@ struct CmdFlakeClone : FlakeCommand
         if (destDir.empty())
             throw Error("missing flag '--dest'");
 
-        getFlakeRef().resolve(fetchSettings, *store).input.clone(fetchSettings, *store, destDir);
+        getFlakeRef()
+            .resolve(fetchSettings, *store)
+            .input.clone(fetchers::FetchContext{fetchSettings, {}}, *store, destDir);
     }
 };
 
@@ -1118,7 +1120,8 @@ struct CmdFlakeArchive : FlakeCommand, MixJSON, MixDryRun, MixNoCheckSigs
 
         auto getStorePath = [&](const FlakeRef & lockedRef) {
             return dryRun ? lockedRef.input.computeStorePath(*store)
-                          : std::get<StorePath>(lockedRef.input.fetchToStore(fetchSettings, *store));
+                          : std::get<StorePath>(
+                                lockedRef.input.fetchToStore(fetchers::FetchContext{fetchSettings, {}}, *store));
         };
 
         auto storePath = getStorePath(flake.flake.lockedRef);
@@ -1527,7 +1530,7 @@ struct CmdFlakePrefetch : FlakeCommand, MixJSON
     {
         auto originalRef = getFlakeRef();
         auto resolvedRef = originalRef.resolve(fetchSettings, *store);
-        auto [accessor, lockedRef] = resolvedRef.lazyFetch(getEvalState()->fetchSettings, *store);
+        auto [accessor, lockedRef] = resolvedRef.lazyFetch(getEvalState()->fetchContext, *store);
         auto storePath =
             fetchToStore(getEvalState()->fetchSettings, *store, accessor, FetchMode::Copy, lockedRef.input.getName());
         auto hash = store->queryPathInfo(storePath)->narHash;

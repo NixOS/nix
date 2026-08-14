@@ -27,7 +27,7 @@ TEST_F(AccessKeysTest, singleOrgGitHub)
     fetchSettings.accessTokens.get().insert({"github.com/a", "token"});
     auto i = Input::fromURL("github:a/b");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/a/b");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "github.com", "github.com/a/b");
     ASSERT_EQ(token, "token");
 }
 
@@ -37,7 +37,7 @@ TEST_F(AccessKeysTest, nonMatches)
     fetchSettings.accessTokens.get().insert({"github.com", "token"});
     auto i = Input::fromURL("gitlab:github.com/evil");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "gitlab.com", "gitlab.com/github.com/evil");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "gitlab.com", "gitlab.com/github.com/evil");
     ASSERT_EQ(token, std::nullopt);
 }
 
@@ -47,7 +47,7 @@ TEST_F(AccessKeysTest, noPartialMatches)
     fetchSettings.accessTokens.get().insert({"github.com/partial", "token"});
     auto i = Input::fromURL("github:partial-match/repo");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/partial-match");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "github.com", "github.com/partial-match");
     ASSERT_EQ(token, std::nullopt);
 }
 
@@ -59,13 +59,13 @@ TEST_F(AccessKeysTest, repoGitHub)
     fetchSettings.accessTokens.get().insert({"github.com/a/c", "yet_another_token"});
     auto i = Input::fromURL("github:a/a");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/a/a");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "github.com", "github.com/a/a");
     ASSERT_EQ(token, "token");
 
-    token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/a/b");
+    token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "github.com", "github.com/a/b");
     ASSERT_EQ(token, "another_token");
 
-    token = i.scheme->getAccessToken(fetchSettings, "github.com", "github.com/a/c");
+    token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "github.com", "github.com/a/c");
     ASSERT_EQ(token, "yet_another_token");
 }
 
@@ -76,10 +76,10 @@ TEST_F(AccessKeysTest, multipleGitLab)
     fetchSettings.accessTokens.get().insert({"gitlab.com/a/b", "another_token"});
     auto i = Input::fromURL("gitlab:a/b");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "gitlab.com", "gitlab.com/a/b");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "gitlab.com", "gitlab.com/a/b");
     ASSERT_EQ(token, "another_token");
 
-    token = i.scheme->getAccessToken(fetchSettings, "gitlab.com", "gitlab.com/a/c");
+    token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "gitlab.com", "gitlab.com/a/c");
     ASSERT_EQ(token, "token");
 }
 
@@ -90,10 +90,10 @@ TEST_F(AccessKeysTest, multipleSourceHut)
     fetchSettings.accessTokens.get().insert({"git.sr.ht/~a/b", "another_token"});
     auto i = Input::fromURL("sourcehut:a/b");
 
-    auto token = i.scheme->getAccessToken(fetchSettings, "git.sr.ht", "git.sr.ht/~a/b");
+    auto token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "git.sr.ht", "git.sr.ht/~a/b");
     ASSERT_EQ(token, "another_token");
 
-    token = i.scheme->getAccessToken(fetchSettings, "git.sr.ht", "git.sr.ht/~a/c");
+    token = i.scheme->getAccessToken(FetchContext{fetchSettings, {}}, "git.sr.ht", "git.sr.ht/~a/c");
     ASSERT_EQ(token, "token");
 }
 

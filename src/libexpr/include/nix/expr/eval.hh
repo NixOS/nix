@@ -17,6 +17,7 @@
 #include "nix/expr/repl-exit-status.hh"
 #include "nix/util/ref.hh"
 #include "nix/expr/counter.hh"
+#include "nix/fetchers/fetch-settings.hh"
 
 // For `NIX_USE_BOEHMGC`, and if that's set, `GC_THREADS`
 #include "nix/expr/config.hh"
@@ -41,7 +42,6 @@ constexpr size_t maxPrimOpArity = 8;
 class Store;
 
 namespace fetchers {
-struct Settings;
 struct InputCache;
 struct Input;
 } // namespace fetchers
@@ -399,6 +399,7 @@ class EvalState : public std::enable_shared_from_this<EvalState>
 public:
     static constexpr StaticEvalSymbols s = StaticEvalSymbols::create();
 
+    const fetchers::FetchContext fetchContext;
     const fetchers::Settings & fetchSettings;
     const EvalSettings & settings;
 
@@ -544,14 +545,14 @@ public:
     /**
      * @param lookupPath     Only used during construction.
      * @param store          The store to use for instantiation
-     * @param fetchSettings  Must outlive the lifetime of this EvalState!
+     * @param fetchContext   Its Settings reference must outlive this EvalState.
      * @param settings       Must outlive the lifetime of this EvalState!
      * @param buildStore     The store to use for builds ("import from derivation", C API `nix_string_realise`)
      */
     EvalState(
         const LookupPath & lookupPath,
         ref<Store> store,
-        const fetchers::Settings & fetchSettings,
+        const fetchers::FetchContext & fetchContext,
         const EvalSettings & settings,
         std::shared_ptr<Store> buildStore = nullptr);
     ~EvalState();
