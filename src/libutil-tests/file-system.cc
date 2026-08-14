@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 #include <rapidcheck/gtest.h>
 
+#include <ranges>
+
 #ifdef _WIN32
 #  define FS_SEP L"\\"
 #  define FS_ROOT_NO_TRAILING_SLASH L"C:" // Need a mounted one, C drive is likely
@@ -346,5 +348,72 @@ TEST(createTempDir, works)
     nix::AutoDelete delTmpDir(tmpDir, /*recursive=*/true);
     ASSERT_TRUE(std::filesystem::is_directory(tmpDir));
 }
+
+/* ----------------------------------------------------------------------------
+ * movePath
+ * --------------------------------------------------------------------------*/
+
+class MovePathTest : public ::testing::Test
+{
+protected:
+    std::filesystem::path tmpDir;
+    nix::AutoDelete delTmpDir;
+
+private:
+    void SetUp() override
+    {
+        tmpDir = createTempDir();
+        delTmpDir = {tmpDir, /*recursive=*/true};
+    }
+
+    void TearDown() override
+    {
+        delTmpDir.deletePath();
+    }
+};
+
+TEST_F(MovePathTest, works)
+{
+    auto regSrc = tmpDir / OS_STR("reg1");
+    auto regAnother = tmpDir / OS_STR("reg2");
+    writeFile(regSrc, "hello1");
+    writeFile(regAnother, "hello2");
+    // Overwrite existing.
+    movePath(regAnother, regSrc);
+
+    auto dirSrc = tmpDir / OS_STR("dir");
+    createDir(dirSrc);
+    writeFile(dirSrc / OS_STR("reg"), "hello3");
+    auto dst = tmpDir / OS_STR("renamed");
+    movePath(regSrc, dst);
+    ASSERT_FALSE(pathExists(regSrc));
+    ASSERT_EQ(readFile(dst), "hello2");
+
+    // Non-empty directory can't replace a regular file.
+    unlink(dst);
+    movePath(dirSrc, dst);
+    auto files = std::ranges::to<std::vector<std::filesystem::path>>(DirectoryIterator{dst});
+    ASSERT_EQ(files, std::vector{dst / OS_STR("reg")});
+}
+
+#ifndef _WIN32
+
+TEST_F(MovePathTest, nonWritableDirectories)
+{
+    // Non-writable source directory.
+    auto srcDir = tmpDir / "src";
+    auto dstDir = tmpDir / "dst";
+    createDir(srcDir, 0500);
+    movePath(srcDir, dstDir);
+    ASSERT_FALSE(pathExists(srcDir));
+    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0500);
+
+    // Buggy behavior. We don't restore permissions on rename errors.
+    ASSERT_THROW(movePath(dstDir, tmpDir / "nonexistent" / "dir"), SysError);
+    // FIXME: Should be the old 0500 permissions and not remain writable.
+    ASSERT_EQ(lstat(dstDir).st_mode & 0777, 0700);
+}
+
+#endif
 
 } // namespace nix

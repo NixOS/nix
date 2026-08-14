@@ -297,4 +297,21 @@ void chown(const std::filesystem::path & path, uid_t owner, gid_t group)
         throw SysError("changing ownership of %s", PathFmt(path));
 }
 
+void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
+{
+    const PosixStat st = nix::lstat(src);
+
+    bool changePerm = (::geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
+    if (changePerm)
+        /* TODO: Can we do this fchmod to avoid TOCTOU? */
+        nix::chmod(src, st.st_mode | S_IWUSR);
+
+    if (::rename(src.c_str(), dst.c_str()) == -1)
+        /* FIXME: Revert write permissions on error path if changePerm. */
+        throw SysError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+
+    if (changePerm)
+        nix::chmod(dst, st.st_mode);
+}
+
 } // namespace nix

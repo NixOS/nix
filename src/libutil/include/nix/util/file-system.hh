@@ -535,6 +535,17 @@ void unlinkIfExists(const std::filesystem::path & path);
 void tryUnlink(const std::filesystem::path & path);
 
 /**
+ * @brief Move/rename path 'src' to 'dst'.
+ *
+ * Temporarily makes 'src' writable if it's a directory and we're not root (to
+ * be able to update the directory's parent link "..").
+ *
+ * Atomically replaces the destination if it exists. Does not follow symlinks if
+ * dst is a symlink.
+ */
+void movePath(const std::filesystem::path & src, const std::filesystem::path & dst);
+
+/**
  * @brief A directory iterator that can be used to iterate over the
  * contents of a directory. It is similar to std::filesystem::directory_iterator
  * but throws NixError on failure instead of std::filesystem::filesystem_error.
