@@ -5,9 +5,11 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/sync.hh"
+#include "nix/store/secret-resolver.hh"
 
 #include <map>
 #include <limits>
+#include <memory>
 
 #include <sys/types.h>
 
@@ -166,6 +168,19 @@ private:
     void anchor() override;
 
     mutable Sync<std::shared_ptr<Cache>> _cache;
+};
+
+/**
+ * Dependencies shared by one fetch operation tree.
+ *
+ * The resolver is deliberately owned here rather than by Settings or a
+ * process-global singleton. This lets callers isolate resolver state and
+ * select the lifetime appropriate for a command or evaluation.
+ */
+struct FetchContext
+{
+    const Settings & settings;
+    std::shared_ptr<SecretResolver> secretResolver;
 };
 
 } // namespace nix::fetchers

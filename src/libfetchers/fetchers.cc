@@ -197,14 +197,15 @@ bool Input::contains(const Input & other) const
 }
 
 // FIXME: remove
-std::pair<StorePath, Input> Input::fetchToStore(const Settings & settings, Store & store) const
+std::pair<StorePath, Input> Input::fetchToStore(const FetchContext & context, Store & store) const
 {
+    auto & settings = context.settings;
     if (!scheme)
         throw Error("cannot fetch unsupported input '%s'", attrsToJSON(toAttrs()));
 
     auto [storePath, input] = [&]() -> std::pair<StorePath, Input> {
         try {
-            auto [accessor, result] = getAccessorUnchecked(settings, store);
+            auto [accessor, result] = getAccessorUnchecked(context, store);
 
             auto storePath =
                 nix::fetchToStore(settings, store, SourcePath(accessor), FetchMode::Copy, result.getName());
@@ -285,10 +286,10 @@ void Input::checkLocks(Input specified, Input & result)
     }
 }
 
-std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settings, Store & store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const FetchContext & context, Store & store) const
 {
     try {
-        auto [accessor, result] = getAccessorUnchecked(settings, store);
+        auto [accessor, result] = getAccessorUnchecked(context, store);
 
         result.attrs.insert_or_assign("__final", Explicit<bool>(true));
 
@@ -301,8 +302,9 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settin
     }
 }
 
-std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings & settings, Store & store) const
+std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const FetchContext & context, Store & store) const
 {
+    auto & settings = context.settings;
     // FIXME: cache the accessor
 
     if (!scheme)
@@ -366,7 +368,7 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
     if (inTest)
         std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    auto [accessor, result] = scheme->getAccessor(settings, store, *this);
+    auto [accessor, result] = scheme->getAccessor(context, store, *this);
 
     if (!accessor->fingerprint)
         accessor->fingerprint = result.getFingerprint(store);
@@ -383,11 +385,11 @@ Input Input::applyOverrides(std::optional<std::string> ref, std::optional<Hash> 
     return scheme->applyOverrides(*this, ref, rev);
 }
 
-void Input::clone(const Settings & settings, Store & store, const std::filesystem::path & destDir) const
+void Input::clone(const FetchContext & context, Store & store, const std::filesystem::path & destDir) const
 {
     if (!scheme)
         throw Error("cannot clone unsupported input '%s'", attrsToJSON(attrs));
-    scheme->clone(settings, store, *this, destDir);
+    scheme->clone(context, store, *this, destDir);
 }
 
 std::optional<std::filesystem::path> Input::getSourcePath() const
@@ -501,12 +503,12 @@ void InputScheme::putFile(
 }
 
 void InputScheme::clone(
-    const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir) const
+    const FetchContext & context, Store & store, const Input & input, const std::filesystem::path & destDir) const
 {
     if (std::filesystem::exists(destDir))
         throw Error("cannot clone into existing path %s", PathFmt(destDir));
 
-    auto [accessor, input2] = getAccessor(settings, store, input);
+    auto [accessor, input2] = getAccessor(context, store, input);
 
     Activity act(*logger, lvlTalkative, actUnknown, fmt("copying '%s' to %s...", input2.to_string(), PathFmt(destDir)));
 

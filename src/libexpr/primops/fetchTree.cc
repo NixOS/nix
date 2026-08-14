@@ -327,7 +327,7 @@ static void fetchTree(
     }
 
     auto cachedInput =
-        state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+        state.inputCache->getAccessor(state.fetchContext, *state.store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
@@ -587,7 +587,7 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
             attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
         auto input = fetchers::Input::fromAttrs(std::move(attrs));
         auto cachedInput =
-            state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+            state.inputCache->getAccessor(state.fetchContext, *state.store, input, fetchers::UseRegistries::No);
         auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
         state.mkStorePathString(storePath, v);
     } else {

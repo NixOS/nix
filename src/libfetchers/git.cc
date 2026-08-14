@@ -442,7 +442,7 @@ struct GitInputScheme : InputScheme
         return res;
     }
 
-    void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
+    void clone(const FetchContext & context, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
         auto repoInfo = getRepoInfo(input);
@@ -808,8 +808,9 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromCommit(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromCommit(const FetchContext & context, Store & store, RepoInfo & repoInfo, Input && input) const
     {
+        auto & settings = context.settings;
         assert(!repoInfo.workdirInfo.isDirty);
 
         auto origRev = input.getRev();
@@ -966,7 +967,7 @@ struct GitInputScheme : InputScheme
                 attrs.insert_or_assign("lfs", Explicit<bool>{smudgeLfs});
                 attrs.insert_or_assign("allRefs", Explicit<bool>{true});
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(context, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
                 mounts.insert_or_assign(submodule.path, submoduleAccessor);
             }
@@ -983,8 +984,9 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessorFromWorkdir(const Settings & settings, Store & store, RepoInfo & repoInfo, Input && input) const
+    getAccessorFromWorkdir(const FetchContext & context, Store & store, RepoInfo & repoInfo, Input && input) const
     {
+        auto & settings = context.settings;
         auto repoPath = repoInfo.getPath().value();
 
         if (getSubmodulesAttr(input))
@@ -1016,7 +1018,7 @@ struct GitInputScheme : InputScheme
                 // attrs.insert_or_assign("allRefs", Explicit<bool>{ true });
 
                 auto submoduleInput = fetchers::Input::fromAttrs(std::move(attrs));
-                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(settings, store);
+                auto [submoduleAccessor, submoduleInput2] = submoduleInput.getAccessor(context, store);
                 submoduleAccessor->setPathDisplay("«" + submoduleInput.to_string() + "»");
 
                 /* If the submodule is dirty, mark this repo dirty as
@@ -1070,7 +1072,7 @@ struct GitInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
+    getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
         Input input(_input);
 
@@ -1086,8 +1088,8 @@ struct GitInputScheme : InputScheme
         }
 
         auto [accessor, final] = input.getRef() || input.getRev() || !repoInfo.getPath()
-                                     ? getAccessorFromCommit(settings, store, repoInfo, std::move(input))
-                                     : getAccessorFromWorkdir(settings, store, repoInfo, std::move(input));
+                                     ? getAccessorFromCommit(context, store, repoInfo, std::move(input))
+                                     : getAccessorFromWorkdir(context, store, repoInfo, std::move(input));
 
         return {accessor, std::move(final)};
     }

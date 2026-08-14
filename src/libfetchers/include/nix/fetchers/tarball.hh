@@ -16,6 +16,7 @@ struct SourceAccessor;
 namespace nix::fetchers {
 
 struct Settings;
+struct FetchContext;
 
 struct DownloadFileResult
 {
@@ -44,6 +45,6 @@ struct DownloadTarballResult
  * Download and import a tarball into the Git cache. The result is the
  * Git tree hash of the root directory.
  */
-ref<SourceAccessor> downloadTarball(Store & store, const Settings & settings, const std::string & url);
+ref<SourceAccessor> downloadTarball(Store & store, const FetchContext & context, const std::string & url);
 
 } // namespace nix::fetchers

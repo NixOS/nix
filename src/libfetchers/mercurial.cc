@@ -395,8 +395,9 @@ struct MercurialInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
+    getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
+        auto & settings = context.settings;
         Input input(_input);
 
         auto storePath = fetchToStore(settings, store, input);
