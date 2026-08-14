@@ -378,19 +378,6 @@ void recursiveSync(const std::filesystem::path & path)
     }
 }
 
-void createDir(const std::filesystem::path & path, mode_t mode)
-{
-    if (mkdir(
-            path.string().c_str()
-#ifndef _WIN32
-                ,
-            mode
-#endif
-            )
-        == -1)
-        throw SysError("creating directory %s", PathFmt(path));
-}
-
 void createDirs(const std::filesystem::path & path)
 {
     try {

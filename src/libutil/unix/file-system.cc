@@ -314,4 +314,10 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
         nix::chmod(dst, st.st_mode);
 }
 
+void createDir(const std::filesystem::path & path, mode_t mode)
+{
+    if (::mkdir(path.c_str(), mode) == -1)
+        throw SysError("creating directory %s", PathFmt(path));
+}
+
 } // namespace nix

@@ -200,4 +200,10 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
         throw windows::WinError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
 }
 
+void createDir(const std::filesystem::path & path, [[maybe_unused]] mode_t mode)
+{
+    if (!::CreateDirectoryW(path.c_str(), nullptr))
+        throw windows::WinError("creating directory %s", PathFmt(path));
+}
+
 } // namespace nix
