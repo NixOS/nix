@@ -11,7 +11,7 @@ error:
              |                     ^
             2|
 
-       … in the left operand of the AND (&&) operator
+       … in the left operand of '&&'
          at /pwd/lang/eval-fail-foldlPrime-4.nix:1:26:
             1| builtins.foldl' (a: b: a && b) "foo" [ true ]
              |                          ^

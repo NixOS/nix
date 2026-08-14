@@ -1926,7 +1926,7 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of '!'"));
 }
 
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
@@ -1950,22 +1950,22 @@ void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        state.evalBool(env, e1, pos, "in the left operand of the AND (&&) operator")
-        && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
+        state.evalBool(env, e1, pos, "in the left operand of '&&'")
+        && state.evalBool(env, e2, pos, "in the right operand of '&&'"));
 }
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        state.evalBool(env, e1, pos, "in the left operand of the OR (||) operator")
-        || state.evalBool(env, e2, pos, "in the right operand of the OR (||) operator"));
+        state.evalBool(env, e1, pos, "in the left operand of '||'")
+        || state.evalBool(env, e2, pos, "in the right operand of '||'"));
 }
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        !state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator")
-        || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
+        !state.evalBool(env, e1, pos, "in the left operand of '->'")
+        || state.evalBool(env, e2, pos, "in the right operand of '->'"));
 }
 
 void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)
@@ -2070,8 +2070,8 @@ void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q)
 {
     /* Output rightmost attrset first to the merge queue as the one
        with the most priority. */
-    e2->evalForUpdate(state, env, q, "in the right operand of the update (//) operator");
-    e1->evalForUpdate(state, env, q, "in the left operand of the update (//) operator");
+    e2->evalForUpdate(state, env, q, "in the right operand of '//'");
+    e1->evalForUpdate(state, env, q, "in the left operand of '//'");
 }
 
 void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)

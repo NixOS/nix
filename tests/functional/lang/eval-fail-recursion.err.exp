@@ -1,7 +1,7 @@
 error:
        … entering the infinite recursion
 
-       … in the right operand of the update (//) operator
+       … in the right operand of '//'
          at /pwd/lang/eval-fail-recursion.nix:2:14:
             1| let
             2|   a = { } // a;
