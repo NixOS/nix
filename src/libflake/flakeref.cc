@@ -64,10 +64,10 @@ std::ostream & operator<<(std::ostream & str, const FlakeRef & flakeRef)
     return str;
 }
 
-FlakeRef
-FlakeRef::resolve(const fetchers::Settings & fetchSettings, Store & store, fetchers::UseRegistries useRegistries) const
+FlakeRef FlakeRef::resolve(
+    const fetchers::FetchContext & fetchContext, Store & store, fetchers::UseRegistries useRegistries) const
 {
-    auto [input2, extraAttrs] = lookupInRegistries(fetchSettings, store, input, useRegistries);
+    auto [input2, extraAttrs] = lookupInRegistries(fetchContext, store, input, useRegistries);
     return FlakeRef(std::move(input2), fetchers::maybeGetStrAttr(extraAttrs, "dir").value_or(subdir));
 }
 

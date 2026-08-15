@@ -9,6 +9,10 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+namespace nix {
+class SecretResolver;
+}
+
 namespace nix::lfs {
 
 /**
@@ -32,8 +36,9 @@ struct Fetch
 
     // derived from git remote url
     nix::ParsedURL url;
+    std::shared_ptr<nix::SecretResolver> secretResolver;
 
-    Fetch(git_repository * repo, git_oid rev);
+    Fetch(git_repository * repo, git_oid rev, std::shared_ptr<nix::SecretResolver> secretResolver);
     bool shouldFetch(const CanonPath & path) const;
     void fetch(
         const std::string & content,

@@ -9,7 +9,6 @@ namespace nix::fetchers {
 InputCache::CachedResult InputCache::getAccessor(
     const FetchContext & context, Store & store, const Input & originalInput, UseRegistries useRegistries)
 {
-    auto & settings = context.settings;
     auto fetched = lookup(originalInput);
     Input resolvedInput = originalInput;
 
@@ -19,7 +18,7 @@ InputCache::CachedResult InputCache::getAccessor(
             fetched.emplace(CachedInput{.lockedInput = lockedInput, .accessor = accessor});
         } else {
             if (useRegistries != UseRegistries::No) {
-                auto [res, extraAttrs] = lookupInRegistries(settings, store, originalInput, useRegistries);
+                auto [res, extraAttrs] = lookupInRegistries(context, store, originalInput, useRegistries);
                 resolvedInput = std::move(res);
                 fetched = lookup(resolvedInput);
                 if (!fetched) {

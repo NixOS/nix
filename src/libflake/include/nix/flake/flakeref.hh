@@ -74,7 +74,7 @@ struct FlakeRef
     fetchers::Attrs toAttrs() const;
 
     FlakeRef resolve(
-        const fetchers::Settings & fetchSettings,
+        const fetchers::FetchContext & fetchContext,
         Store & store,
         fetchers::UseRegistries useRegistries = fetchers::UseRegistries::All) const;
 

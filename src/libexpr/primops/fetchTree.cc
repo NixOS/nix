@@ -301,7 +301,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.fetchSettings, *state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchContext, *state.store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
@@ -591,7 +591,7 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
         auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
         state.mkStorePathString(storePath, v);
     } else {
-        auto storePath = fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
+        auto storePath = fetchers::downloadFile(*state.store, state.fetchContext, *url, name).storePath;
         if (expectedHash) {
             auto hash = hashPath(
                             {state.store->requireStoreObjectAccessor(storePath)},

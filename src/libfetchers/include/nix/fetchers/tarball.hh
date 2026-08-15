@@ -28,7 +28,7 @@ struct DownloadFileResult
 
 DownloadFileResult downloadFile(
     Store & store,
-    const Settings & settings,
+    const FetchContext & context,
     const VerbatimURL & url,
     const std::string & name,
     const Headers & headers = {});

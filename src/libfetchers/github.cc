@@ -300,7 +300,7 @@ struct GitArchiveInputScheme : InputScheme
         auto source = sinkToSource([&](Sink & sink) {
             FileTransferRequest req(url.url);
             req.headers = url.headers;
-            getFileTransfer()->download(std::move(req), sink);
+            getFileTransfer()->download(FileTransferContext{context.secretResolver}, std::move(req), sink);
         });
 
         auto act = std::make_unique<Activity>(
@@ -414,7 +414,6 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
     RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
-        auto & settings = context.settings;
         auto host = getHost(input);
         auto url = fmt(
             host == "github.com" ? "https://api.%s/repos/%s/%s/commits/%s" : "https://%s/api/v3/repos/%s/%s/commits/%s",
@@ -425,7 +424,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
+        auto downloadResult = downloadFile(store, context, url, "source", headers);
         auto json = nlohmann::json::parse(
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
@@ -496,7 +495,6 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
     RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
-        auto & settings = context.settings;
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // See rate limiting note below
         auto url =
@@ -508,7 +506,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
 
         Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
+        auto downloadResult = downloadFile(store, context, url, "source", headers);
         auto json = nlohmann::json::parse(
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
@@ -578,7 +576,6 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
     RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
-        auto & settings = context.settings;
         // TODO: In the future, when the sourcehut graphql API is implemented for mercurial
         // and with anonymous access, this method should use it instead.
 
@@ -592,7 +589,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto downloadFileResult = downloadFile(store, settings, fmt("%s/HEAD", base_url), "source", headers);
+            auto downloadFileResult = downloadFile(store, context, fmt("%s/HEAD", base_url), "source", headers);
             auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
 
             auto remoteLine = git::parseLsRemoteLine(getLine(contents).first);
@@ -605,7 +602,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto downloadFileResult = downloadFile(store, settings, fmt("%s/info/refs", base_url), "source", headers);
+        auto downloadFileResult = downloadFile(store, context, fmt("%s/info/refs", base_url), "source", headers);
         auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
         std::istringstream is(contents);
 
