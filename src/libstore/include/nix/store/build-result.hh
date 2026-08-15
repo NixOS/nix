@@ -82,8 +82,8 @@ public:
      * Delegates to the string constructor after formatting.
      */
     template<typename... Args>
-    BuildError(Status status, const Args &... args)
-        : CloneableError(args...)
+    BuildError(Status status, Args &&... args)
+        : CloneableError(std::forward<Args>(args)...)
         , status{status}
     {
     }
