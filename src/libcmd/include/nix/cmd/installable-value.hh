@@ -72,6 +72,15 @@ struct ExtraPathInfoValue : ExtraPathInfo
 };
 
 /**
+ * Whether an installable that evaluates to a function should be called
+ * with its default arguments.
+ */
+enum class AutoCall : bool {
+    No = false,
+    Yes = true,
+};
+
+/**
  * An Installable which corresponds a Nix language value, in addition to
  * a collection of \ref DerivedPath "derived paths".
  */
@@ -86,7 +95,7 @@ struct InstallableValue : Installable
 
     virtual ~InstallableValue() {}
 
-    virtual std::pair<Value *, PosIdx> toValue(EvalState & state) = 0;
+    virtual std::pair<Value *, PosIdx> toValue(EvalState & state, AutoCall autoCall) = 0;
 
     /**
      * Get a cursor to each value this Installable could refer to.

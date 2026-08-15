@@ -141,7 +141,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
     }};
 }
 
-std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
+std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state, AutoCall)
 {
     return {&getCursor(state)->forceValue(), noPos};
 }
