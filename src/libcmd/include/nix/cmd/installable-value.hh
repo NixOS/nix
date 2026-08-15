@@ -102,14 +102,18 @@ struct InstallableValue : Installable
      * However if none exists, throw exception instead of returning
      * empty vector.
      */
-    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state);
+    virtual std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state, AutoCall autoCall);
 
     /**
      * Get the first and most preferred cursor this Installable could
      * refer to, or throw an exception if none exists.
      */
-    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state);
+    virtual ref<eval_cache::AttrCursor> getCursor(EvalState & state, AutoCall autoCall);
 
+    /**
+     * Get the app this Installable refers to. Implies `AutoCall::Yes`,
+     * since an app has to be a package or an app definition.
+     */
     UnresolvedApp toApp(EvalState & state);
 
     static InstallableValue & require(Installable & installable);
