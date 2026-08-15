@@ -128,6 +128,8 @@ public:
 
     ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
 
+    ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore) override;
+
     void addTempRoots(const StorePathSet & paths) override;
 
     Roots findRoots(bool censor) override;

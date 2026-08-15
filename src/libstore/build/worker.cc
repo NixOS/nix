@@ -16,7 +16,7 @@
 
 namespace nix {
 
-Worker::Worker(Store & store, Store & evalStore)
+Worker::Worker(Store & store, Store & evalStore, SecretContext buildContext)
     /* Can't use make_ref, because the constructor is private. */
     : wakerState(ref<Waker>(new Waker{}))
     , act(*logger, actRealise)
@@ -27,6 +27,7 @@ Worker::Worker(Store & store, Store & evalStore)
 #endif
     , store(store)
     , evalStore(evalStore)
+    , buildContext(std::move(buildContext))
     , settings(nix::settings.getWorkerSettings())
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
