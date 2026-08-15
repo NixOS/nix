@@ -66,7 +66,7 @@ struct InstallableFlake : InstallableValue
      * Get a cursor to every attrpath in getActualAttrPaths() that
      * exists. However if none exists, throw an exception.
      */
-    std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state) override;
+    std::vector<ref<eval_cache::AttrCursor>> getCursors(EvalState & state, AutoCall autoCall) override;
 
     ref<flake::LockedFlake> getLockedFlake() const;
 

@@ -53,7 +53,7 @@ resolveString(Store & store, const std::string & toResolve, const std::vector<Bu
 
 UnresolvedApp InstallableValue::toApp(EvalState & state)
 {
-    auto cursor = getCursor(state);
+    auto cursor = getCursor(state, AutoCall::Yes);
     auto attrPath = cursor->getAttrPath();
 
     auto type = cursor->getAttr("type")->getString();
