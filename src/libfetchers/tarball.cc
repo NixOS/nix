@@ -14,11 +14,12 @@ namespace nix::fetchers {
 
 DownloadFileResult downloadFile(
     Store & store,
-    const Settings & settings,
+    const FetchContext & context,
     const VerbatimURL & url,
     const std::string & name,
     const Headers & headers)
 {
+    auto & settings = context.settings;
     // FIXME: check store
 
     Cache::Key key{
@@ -48,7 +49,7 @@ DownloadFileResult downloadFile(
         request.expectedETag = getStrAttr(cached->value, "etag");
     FileTransferResult res;
     try {
-        res = getFileTransfer()->download(request);
+        res = getFileTransfer()->download(FileTransferContext{context.secretResolver}, request);
     } catch (FileTransferError & e) {
         if (cached) {
             warn("%s; using cached version", e.message());
@@ -105,8 +106,9 @@ DownloadFileResult downloadFile(
 }
 
 static DownloadTarballResult downloadTarball_(
-    const Settings & settings, const std::string & urlS, const Headers & headers, const std::string & displayPrefix)
+    const FetchContext & context, const std::string & urlS, const Headers & headers, const std::string & displayPrefix)
 {
+    auto & settings = context.settings;
     ParsedURL url = parseURL(urlS);
 
     // Some friendly error messages for common mistakes.
@@ -160,7 +162,10 @@ static DownloadTarballResult downloadTarball_(
     auto source = sinkToSource([&](Sink & sink) {
         FileTransferRequest req(url);
         req.expectedETag = cached ? getStrAttr(cached->value, "etag") : "";
-        getFileTransfer()->download(std::move(req), sink, [_res](FileTransferResult r) { *_res->lock() = r; });
+        getFileTransfer()->download(
+            FileTransferContext{context.secretResolver}, std::move(req), sink, [_res](FileTransferResult r) {
+                *_res->lock() = r;
+            });
     });
 
     // TODO: fall back to cached value if download fails.
@@ -423,14 +428,13 @@ struct FileInputScheme : CurlInputScheme
     std::pair<ref<SourceAccessor>, Input>
     getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
-        auto & settings = context.settings;
         auto input(_input);
 
         /* Unlike TarballInputScheme, this stores downloaded files in
            the Nix store directly, since there is little deduplication
            benefit in using the Git cache for single big files like
            tarballs. */
-        auto file = downloadFile(store, settings, getStrAttr(input.attrs, "url"), input.getName());
+        auto file = downloadFile(store, context, getStrAttr(input.attrs, "url"), input.getName());
 
         auto narHash = store.queryPathInfo(file.storePath)->narHash;
         input.attrs.insert_or_assign("narHash", narHash.to_string(HashFormat::SRI, true));
@@ -493,7 +497,7 @@ struct TarballInputScheme : CurlInputScheme
         auto & settings = context.settings;
         auto input(_input);
 
-        auto result = downloadTarball_(settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
+        auto result = downloadTarball_(context, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);

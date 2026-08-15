@@ -245,6 +245,7 @@ struct curlFileTransfer : public FileTransfer
 
         TransferItem(
             curlFileTransfer & fileTransfer,
+            const FileTransferContext &,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
@@ -1196,16 +1197,19 @@ struct curlFileTransfer : public FileTransfer
         return ItemHandle(item.get_ptr());
     }
 
-    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
+    ItemHandle enqueueFileTransfer(
+        const FileTransferContext & context,
+        const FileTransferRequest & request,
+        Callback<FileTransferResult> callback) override
     {
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+            return enqueueItem(make_ref<TransferItem>(*this, context, std::move(modifiedRequest), std::move(callback)));
         }
 
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        return enqueueItem(make_ref<TransferItem>(*this, context, request, std::move(callback)));
     }
 
     void unpauseTransfer(std::weak_ptr<Item> item)
@@ -1301,8 +1305,20 @@ void FileTransferRequest::setupForS3()
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
 {
+    return enqueueFileTransfer(FileTransferContext{}, request);
+}
+
+FileTransfer::ItemHandle
+FileTransfer::enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback)
+{
+    return enqueueFileTransfer(FileTransferContext{}, request, std::move(callback));
+}
+
+std::future<FileTransferResult>
+FileTransfer::enqueueFileTransfer(const FileTransferContext & context, const FileTransferRequest & request)
+{
     auto promise = std::make_shared<std::promise<FileTransferResult>>();
-    enqueueFileTransfer(request, {[promise](std::future<FileTransferResult> fut) {
+    enqueueFileTransfer(context, request, {[promise](std::future<FileTransferResult> fut) {
                             try {
                                 promise->set_value(fut.get());
                             } catch (...) {
@@ -1314,22 +1330,47 @@ std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTran
 
 FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 {
-    return enqueueFileTransfer(request).get();
+    return download(FileTransferContext{}, request);
+}
+
+FileTransferResult FileTransfer::download(const FileTransferContext & context, const FileTransferRequest & request)
+{
+    return enqueueFileTransfer(context, request).get();
 }
 
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
+    return upload(FileTransferContext{}, request);
+}
+
+FileTransferResult FileTransfer::upload(const FileTransferContext & context, const FileTransferRequest & request)
+{
     /* Note: this method is the same as download, but helps in readability */
-    return enqueueFileTransfer(request).get();
+    return enqueueFileTransfer(context, request).get();
 }
 
 FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
 {
-    return enqueueFileTransfer(request).get();
+    return deleteResource(FileTransferContext{}, request);
+}
+
+FileTransferResult
+FileTransfer::deleteResource(const FileTransferContext & context, const FileTransferRequest & request)
+{
+    return enqueueFileTransfer(context, request).get();
 }
 
 void FileTransfer::download(
     FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback)
+{
+    download(FileTransferContext{}, std::move(request), sink, std::move(resultCallback));
+}
+
+void FileTransfer::download(
+    const FileTransferContext & context,
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -1389,7 +1430,7 @@ void FileTransfer::download(
     };
 
     auto handle = enqueueFileTransfer(
-        request, {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
+        context, request, {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {
