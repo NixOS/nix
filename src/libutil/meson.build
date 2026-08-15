@@ -64,7 +64,10 @@ subdir('nix-meson-build-support/libatomic')
 
 if host_machine.system() == 'windows'
   socket = cxx.find_library('ws2_32')
-  deps_other += socket
+  # `NtCreateFile` and `RtlNtStatusToDosError`, used by the `*at`-style file
+  # system functions in `windows/file-system-at.cc`, live here.
+  nt = cxx.find_library('ntdll')
+  deps_other += [ socket, nt ]
 elif host_machine.system() == 'sunos'
   socket = cxx.find_library('socket')
   network_service_library = cxx.find_library('nsl')
@@ -251,7 +254,7 @@ libraries_private = []
 if host_machine.system() == 'windows'
   # `libraries_private` cannot contain ad-hoc dependencies (from
   # `find_library), so we need to do this manually
-  libraries_private += [ '-lws2_32' ]
+  libraries_private += [ '-lws2_32', '-lntdll' ]
 endif
 
 subdir('nix-meson-build-support/export')
