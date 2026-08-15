@@ -1,6 +1,7 @@
 #pragma once
 ///@file
 
+#include "nix/store/secret-resolver.hh"
 #include "nix/store/outputs-spec.hh"
 #include "nix/store/path.hh"
 #include "nix/store/derived-path.hh"
@@ -472,6 +473,12 @@ public:
      * store before building.
      */
     virtual ref<Builder> getBuilder(std::shared_ptr<Store> evalStore = nullptr);
+
+    /**
+     * Get a builder with dependencies scoped to this build operation.
+     * Remote stores must not forward the resolver to another trust domain.
+     */
+    virtual ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore = nullptr);
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.

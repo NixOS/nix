@@ -395,6 +395,12 @@ ref<Builder> LegacySSHStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<LegacySSHStore>(std::dynamic_pointer_cast<LegacySSHStore>(shared_from_this())));
 }
 
+ref<Builder> LegacySSHStore::getBuilder(const SecretContext &, std::shared_ptr<Store> evalStore)
+{
+    /* Secret resolution is local to the process that performs the build. */
+    return getBuilder(std::move(evalStore));
+}
+
 void LegacySSHStore::computeFSClosure(
     const StorePathSet & paths, StorePathSet & out, bool flipDirection, bool includeOutputs, bool includeDerivers)
 {

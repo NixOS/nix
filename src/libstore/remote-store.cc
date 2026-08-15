@@ -745,6 +745,13 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
+ref<Builder> RemoteStore::getBuilder(const SecretContext &, std::shared_ptr<Store> evalStore)
+{
+    /* A resolver is process-local authority.  The remote endpoint must create
+       its own build context instead of receiving ours over the store protocol. */
+    return getBuilder(std::move(evalStore));
+}
+
 void RemoteStore::addTempRoot(const StorePath & path)
 {
     auto conn(getConnection());
