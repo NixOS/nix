@@ -166,6 +166,11 @@ public:
     {
         unreachable();
     }
+
+    ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore) override
+    {
+        unreachable();
+    }
 };
 
 void RestrictedStore::anchor() {}
