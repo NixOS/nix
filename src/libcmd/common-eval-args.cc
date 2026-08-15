@@ -33,7 +33,7 @@ EvalSettings evalSettings{
                 auto flakeRef = parseFlakeRef(rest, {}, true, false);
                 debug("fetching flake search path element '%s''", rest);
                 auto [accessor, lockedRef] =
-                    flakeRef.resolve(fetchSettings, *state.store).lazyFetch(state.fetchContext, *state.store);
+                    flakeRef.resolve(state.fetchContext, *state.store).lazyFetch(state.fetchContext, *state.store);
                 auto storePath = nix::fetchToStore(
                     fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
                 state.allowPath(storePath);
@@ -186,7 +186,7 @@ SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::files
         experimentalFeatureSettings.require(Xp::Flakes);
         auto flakeRef = parseFlakeRef(std::string(s.substr(6)), {}, true, false);
         auto [accessor, lockedRef] =
-            flakeRef.resolve(state.fetchSettings, *state.store).lazyFetch(state.fetchContext, *state.store);
+            flakeRef.resolve(state.fetchContext, *state.store).lazyFetch(state.fetchContext, *state.store);
         auto storePath = nix::fetchToStore(
             fetchSettings, *state.store, SourcePath(accessor), FetchMode::Copy, lockedRef.input.getName());
         state.allowPath(storePath);

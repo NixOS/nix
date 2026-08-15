@@ -858,8 +858,14 @@ public:
         : state_{State{
               .repo = repo_,
               .root = peelToTreeOrBlob(lookupObject(*repo_, hashToOID(rev)).get()),
-              .lfsFetch = options.smudgeLfs ? std::make_optional(lfs::Fetch(*repo_, hashToOID(rev))) : std::nullopt,
-              .options = options,
+              .lfsFetch = options.smudgeLfs
+                              ? std::make_optional(lfs::Fetch(*repo_, hashToOID(rev), options.secretResolver))
+                              : std::nullopt,
+              .options =
+                  {
+                      .exportIgnore = options.exportIgnore,
+                      .smudgeLfs = options.smudgeLfs,
+                  },
           }}
     {
     }
