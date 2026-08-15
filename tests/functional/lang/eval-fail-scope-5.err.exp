@@ -26,6 +26,8 @@ error:
              |     ^
             8|       x ? y,
 
+       … entering the infinite recursion
+
        error: infinite recursion encountered
        at /pwd/lang/eval-fail-scope-5.nix:8:11:
             7|     {
