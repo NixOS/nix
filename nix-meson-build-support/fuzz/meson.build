@@ -39,7 +39,7 @@ foreach t : fuzz_targets
   executable(
     'fuzz-' + t[0],
     t[1],
-    dependencies : deps_private_subproject + deps_private + deps_other,
+    dependencies : fuzz_dependencies,
     link_args : fuzz_link_args,
     install : true,
   )

@@ -22,9 +22,9 @@ let
       project('fuzzing-engine-${name}', 'cpp', meson_version : '>= 1.8')
 
       cxx = meson.get_compiler('cpp')
-      deps_private_subproject = []
-      deps_private = []
-      deps_other = []
+      fuzz_dependencies = []
+
+      assert(not get_option('unit-tests'))
 
       if get_option('fuzzers')
         fuzz_targets = [
@@ -143,6 +143,7 @@ let
       buildPhase =
         let
           mesonFlags = [
+            (lib.mesonBool "unit-tests" false)
             (lib.mesonBool "fuzzers" true)
           ]
           ++ lib.optional (fuzzingEngine != null) (lib.mesonOption "fuzzing-engine" fuzzingEngine)
