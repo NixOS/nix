@@ -19,6 +19,6 @@ error:
 
        … while counting down; n = 1
 
-       (stack trace truncated; use '--show-trace' to show the full, detailed trace)
+       (stack trace filtered; use '--show-trace' to show the full, detailed trace)
 
        error: kaboom
