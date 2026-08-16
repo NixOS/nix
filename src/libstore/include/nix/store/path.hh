@@ -11,6 +11,9 @@ namespace nix {
 
 struct Hash;
 
+MakeError(BadStorePath, Error);
+MakeError(BadStorePathName, BadStorePath);
+
 /**
  * Check whether a name is a valid store path name.
  *
