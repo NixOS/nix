@@ -21,6 +21,8 @@
 
 namespace nix {
 
+class GcpCredentialProvider;
+
 const std::filesystem::path & nixConfDir();
 
 class FileTransferSettings : public Config
@@ -314,6 +316,15 @@ struct FileTransferRequest
     std::optional<std::string> preResolvedAwsSessionToken;
 #endif
 
+    /**
+     * Credential provider for `gs://` requests. Unset means anonymous.
+     */
+    std::shared_ptr<GcpCredentialProvider> gcpCredentialProvider;
+
+    std::optional<std::string> bearerToken;
+
+    std::function<std::optional<std::string>()> refreshBearerToken;
+
     FileTransferRequest(VerbatimURL uri)
         : uri(std::move(uri))
         , parentAct(getCurActivity())
@@ -364,6 +375,7 @@ struct FileTransferRequest
     }
 
     void setupForS3();
+    void setupForGCS();
 
 private:
     friend struct curlFileTransfer;
