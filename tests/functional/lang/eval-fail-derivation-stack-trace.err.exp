@@ -6,12 +6,12 @@ error:
              |       ^
            50|       drvPath = strict.drvPath;
 
-       … while calling the 'derivationStrict' builtin
-         at «nix-internal»/derivation-internal.nix:36:12:
-           35|
-           36|   strict = derivationStrict drvAttrs;
-             |            ^
-           37|
+       … while selecting an attribute
+         at «nix-internal»/derivation-internal.nix:49:17:
+           48|     value = commonAttrs // {
+           49|       outPath = strict.${outputName};
+             |                 ^
+           50|       drvPath = strict.drvPath;
 
        … while evaluating derivation 'test-5'
          whose name attribute is located at /pwd/lang/eval-fail-derivation-stack-trace.nix:12:9
