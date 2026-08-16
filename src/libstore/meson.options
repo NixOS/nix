@@ -39,3 +39,9 @@ option(
   type : 'feature',
   description : 'build support for AWS authentication with S3',
 )
+
+option(
+  'gcs-auth',
+  type : 'feature',
+  description : 'build support for Google Cloud authentication with GCS',
+)

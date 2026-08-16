@@ -2,16 +2,16 @@
 ///@file
 
 #include "nix/store/config.hh"
-#include "nix/store/http-binary-cache-store.hh"
 #include "nix/store/s3-url.hh"
+#include "nix/store/s3-compat-binary-cache-store.hh"
 
 namespace nix {
 
-struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
+struct S3BinaryCacheStoreConfig : S3CompatBinaryCacheStoreConfig
 {
     S3BinaryCacheStoreConfig(const Params & params)
         : StoreConfig(params, FilePathType::Unix)
-        , HttpBinaryCacheStoreConfig(params)
+        , S3CompatBinaryCacheStoreConfig(params)
     {
     }
 
@@ -79,38 +79,6 @@ struct S3BinaryCacheStoreConfig : HttpBinaryCacheStoreConfig
           forces path-style addressing (deprecated by AWS). `virtual`
           forces virtual-hosted-style addressing (bucket names must not
           contain dots).
-        )"};
-
-    Setting<bool> multipartUpload{
-        this,
-        false,
-        "multipart-upload",
-        R"(
-          Whether to use multipart uploads for large files. When enabled,
-          files exceeding the multipart threshold will be uploaded in
-          multiple parts, which is required for files larger than 5 GiB and
-          can improve performance and reliability for large uploads.
-        )"};
-
-    Setting<uint64_t> multipartChunkSize{
-        this,
-        5 * 1024 * 1024,
-        "multipart-chunk-size",
-        R"(
-          The size (in bytes) of each part in multipart uploads. Must be
-          at least 5 MiB (AWS S3 requirement). Larger chunk sizes reduce the
-          number of requests but use more memory. Default is 5 MiB.
-        )",
-        {"buffer-size"}};
-
-    Setting<uint64_t> multipartThreshold{
-        this,
-        100 * 1024 * 1024,
-        "multipart-threshold",
-        R"(
-          The minimum file size (in bytes) for using multipart uploads.
-          Files smaller than this threshold will use regular PUT requests.
-          Default is 100 MiB. Only takes effect when multipart-upload is enabled.
         )"};
 
     Setting<std::optional<std::string>> storageClass{
