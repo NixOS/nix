@@ -55,14 +55,14 @@ AutoCloseFD openLockFile(const std::filesystem::path & path, bool create)
  * Wine has incomplete file locking support, so we degrade gracefully.
  */
 template<typename... Args>
-static bool warnOrThrowWine(DWORD lastError, const std::string & fs, const Args &... args)
+static bool warnOrThrowWine(DWORD lastError, const std::string & fs, Args &&... args)
 {
     using namespace nix::windows;
     if (isWine()) {
         warn(fs + ": %s (ignored under Wine)", args..., lastError);
         return true;
     }
-    throw WinError(lastError, fs, args...);
+    throw WinError(lastError, fs, std::forward<Args>(args)...);
 }
 
 bool lockFile(Descriptor desc, LockType lockType, bool wait)

@@ -139,9 +139,9 @@ void dumpString(std::string_view s, Sink & sink)
 }
 
 template<typename... Args>
-static SerialisationError badArchive(std::string_view s, const Args &... args)
+static SerialisationError badArchive(std::string_view s, Args &&... args)
 {
-    return SerialisationError("bad archive: " + s, args...);
+    return SerialisationError("bad archive: " + s, std::forward<Args>(args)...);
 }
 
 static void parseContents(CreateRegularFileSink & sink, Source & source)

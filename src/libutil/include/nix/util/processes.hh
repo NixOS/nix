@@ -147,8 +147,8 @@ public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, const Args &... args)
-        : CloneableError(args...)
+    ExecError(int status, Args &&... args)
+        : CloneableError(std::forward<Args>(args)...)
         , status(status)
     {
     }
