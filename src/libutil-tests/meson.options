@@ -4,6 +4,14 @@ option(
   'fuzzers',
   type : 'boolean',
   value : false,
-  description : 'Build libFuzzer targets',
+  description : 'Build fuzz targets',
+  yield : true,
+)
+
+option(
+  'fuzzing-engine',
+  type : 'string',
+  value : '',
+  description : 'One compiler-driver argument for linking an external fuzzing engine',
   yield : true,
 )
