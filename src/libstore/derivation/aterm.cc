@@ -177,6 +177,8 @@ static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStre
 
 static Output parseOutput(
     const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
     std::string_view pathS,
     std::string_view hashAlgoStr,
     std::string_view hashS,
@@ -200,13 +202,31 @@ static Output parseOutput(
         } else if (!hashS.empty()) {
             [[maybe_unused]] auto path = store.parseStorePathCanonical(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
-            return Output::CAFixed{
+            Output::CAFixed dof{
                 .ca =
                     ContentAddress{
                         .method = std::move(method),
                         .hash = std::move(hash),
                     },
             };
+            /* The stated path is redundant --- it is a function of the
+               content address --- but it must still agree, lest two
+               derivations that mean the same thing hash differently.
+
+               Skipped when fuzzing: the check makes the path a preimage
+               of a hash of the rest of the output, which a fuzzer has no
+               way to solve, so leaving it in would make this branch
+               unreachable to it. `CAFixedPathMismatch` covers the check
+               itself. See "Checks that defeat fuzzing" in
+               doc/manual/source/development/testing.md. */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+            if (path != dof.path(store, drvName, outputName))
+                throw FormatError(
+                    "derivation output '%s' has path '%s', which does not match its content address",
+                    outputName,
+                    pathS);
+#endif
+            return dof;
         } else {
             xpSettings.require(Xp::CaDerivations);
             if (!pathS.empty())
@@ -228,6 +248,8 @@ static Output parseOutput(
 
 static Output parseOutput(
     const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
     StringViewStream & str,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
 {
@@ -239,7 +261,7 @@ static Output parseOutput(
     const auto hash = parseString(str);
     expect(str, ')');
 
-    return parseOutput(store, *pathS, *hashAlgo, *hash, xpSettings);
+    return parseOutput(store, drvName, outputName, *pathS, *hashAlgo, *hash, xpSettings);
 }
 
 /**
@@ -347,7 +369,7 @@ Full parse(
     while (!endOfList(str)) {
         expect(str, '(');
         std::string id = parseString(str).toOwned();
-        auto output = parseOutput(store, str, xpSettings);
+        auto output = parseOutput(store, name, id, str, xpSettings);
         drv.outputs.emplace(std::move(id), std::move(output));
     }
 
@@ -984,13 +1006,13 @@ Hash hashModulo(Store & store, const Basic & drv)
    Wire protocol serialisation
    -------------------------------------------------------------------------- */
 
-static Output readOutput(Source & in, const StoreDirConfig & store)
+static Output readOutput(Source & in, const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName)
 {
     const auto pathS = readString(in);
     const auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    return parseOutput(store, pathS, hashAlgo, hash, experimentalFeatureSettings);
+    return parseOutput(store, drvName, outputName, pathS, hashAlgo, hash, experimentalFeatureSettings);
 }
 
 Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name)
@@ -1000,9 +1022,9 @@ Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::strin
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
-        auto name = readString(in);
-        auto output = readOutput(in, store);
-        drv.outputs.emplace(std::move(name), std::move(output));
+        auto outputName = readString(in);
+        auto output = readOutput(in, store, name, outputName);
+        drv.outputs.emplace(std::move(outputName), std::move(output));
     }
 
     drv.inputs = CommonProto::Serialise<StorePathSet>::read(store, CommonProto::ReadConn{.from = in});
