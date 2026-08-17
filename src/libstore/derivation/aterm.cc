@@ -784,7 +784,7 @@ static bool inputModulo(
             [&](const HashModulo::DeferredDrv &) { return true; },
             // Regular non-CA derivation, replace derivation
             [&](const HashModulo::DrvHash & drvHash) {
-                drvInputs.insert_or_assign(drvHash, outputNames);
+                drvInputs[drvHash].insert(outputNames.begin(), outputNames.end());
                 return false;
             },
             // CA derivation's output hashes
@@ -794,7 +794,7 @@ static bool inputModulo(
                     const auto h = get(outputHashes, outputName);
                     if (!h)
                         throw Error("no hash for output '%s' of derivation '%s'", outputName, drvName);
-                    drvInputs.insert_or_assign(*h, std::set<OutputName, std::less<>>{"out"});
+                    drvInputs[*h].insert("out");
                 }
                 return false;
             },

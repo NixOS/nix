@@ -237,9 +237,10 @@ INSTANTIATE_TEST_SUITE_P(
  * derivations that are nonetheless identical modulo their fixed-output
  * inputs, which is what makes `parent-split` interesting: its two input
  * derivations collide on a single key in the intermediate `inputDrvs`
- * map.
+ * map. The output names requested of each must be *merged*, not
+ * clobbered.
  */
-TEST_F(HashModuloTest, collidingInputDrvs)
+TEST_F(HashModuloTest, collidingInputDrvsMergeOutputNames)
 {
     auto first = named("intermediate-first");
     auto second = named("intermediate-second");
@@ -250,6 +251,17 @@ TEST_F(HashModuloTest, collidingInputDrvs)
 
     /* ...and so the same intermediate ATerm, hence the same hash. */
     EXPECT_EQ(unparseModulo(*store, first), unparseModulo(*store, second));
+
+    /* `out` from one and `dev` from the other therefore hashes the same
+       as both outputs from a single one of them. */
+    EXPECT_EQ(hashModulo(*store, named("parent-split")), hashModulo(*store, named("parent-joined")));
+
+    /* ...and symmetrically, with the roles of the two swapped. */
+    auto splitOther = makeParent({
+        SingleDerivedPath::Built{.drvPath = drvRef(first), .output = "dev"},
+        SingleDerivedPath::Built{.drvPath = drvRef(second), .output = "out"},
+    });
+    EXPECT_EQ(hashModulo(*store, splitOther), hashModulo(*store, named("parent-joined")));
 }
 
 /**
