@@ -29,8 +29,10 @@ Worker::Worker(Store & store, Store & evalStore, SecretContext buildContext)
     , evalStore(evalStore)
     , buildContext(std::move(buildContext))
     , settings(nix::settings.getWorkerSettings())
-    , getSubstituters{[] {
-        return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
+    , getSubstituters{[resolver = this->buildContext.secretResolver] {
+        return nix::settings.getWorkerSettings().useSubstitutes
+                   ? getDefaultSubstituters(SecretContext{.secretResolver = resolver})
+                   : std::list<ref<Store>>{};
     }}
 {
 #ifdef _WIN32

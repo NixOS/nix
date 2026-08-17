@@ -25,7 +25,9 @@ LocalFSStoreConfig::LocalFSStoreConfig(const std::filesystem::path & rootDir, co
 }
 
 LocalFSStore::LocalFSStore(const Config & config)
-    : Store{static_cast<const Store::Config &>(*this)}
+    /* Abstract, so the most-derived store initialises the virtual `Store` base
+       and this argument is never the one that survives. */
+    : Store{static_cast<const Store::Config &>(*this), SecretContext{}}
     , config{config}
 {
 }
