@@ -1,10 +1,11 @@
+#include <algorithm>
 #include <cerrno>
+#include <limits>
 #include <map>
 
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/archive.hh"
-#include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/source-path.hh"
@@ -151,7 +152,7 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     sink.preallocateContents(size);
 
     if (sink.skipContents) {
-        uint64_t left = alignUp(size, 8);
+        uint64_t left = size;
         /* Source::skip takes a size_t, which might be narrower on 32 bit systems, so
            be careful around truncations. */
         while (left) {
@@ -159,10 +160,9 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
             source.skip(toSkip);
             left -= toSkip;
         }
-        return;
+    } else {
+        source.drainInto(sink, size);
     }
-
-    source.drainInto(sink, size);
 
     readPadding(size, source);
 }
