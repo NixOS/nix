@@ -207,6 +207,13 @@ struct ParsedURL
             return true;
         });
     }
+
+    /**
+     * The returned range borrows `path`, so it must not outlive the URL it
+     * came from. A `const &`-qualified member still binds to temporaries, so
+     * reject those explicitly.
+     */
+    auto pathSegments(bool skipEmpty) && = delete;
 };
 
 std::ostream & operator<<(std::ostream & os, const ParsedURL & url);
@@ -401,6 +408,14 @@ struct VerbatimURL
                 [](const ParsedURL & url) -> std::string_view { return url.scheme; }},
             raw);
     }
+
+    /**
+     * The returned view borrows `raw`, so it must not outlive the URL it came
+     * from. A `const &`-qualified member still binds to temporaries, so
+     * reject those explicitly: `VerbatimURL{url}.scheme()` would otherwise
+     * compile and read freed memory.
+     */
+    std::string_view scheme() && = delete;
 
     /**
      * Get the last non-empty path segment from the URL.
