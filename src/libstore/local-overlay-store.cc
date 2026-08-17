@@ -21,10 +21,10 @@ std::string LocalOverlayStoreConfig::doc()
         ;
 }
 
-ref<Store> LocalOverlayStoreConfig::openStore() const
+ref<Store> LocalOverlayStoreConfig::openStore(const SecretContext & context) const
 {
     return make_ref<LocalOverlayStore>(
-        ref{std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())});
+        ref{std::dynamic_pointer_cast<const LocalOverlayStoreConfig>(shared_from_this())}, context);
 }
 
 StoreReference LocalOverlayStoreConfig::getReference() const
@@ -42,12 +42,13 @@ std::filesystem::path LocalOverlayStoreConfig::toUpperPath(const StorePath & pat
     return upperLayer.get() / path.to_string();
 }
 
-LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
-    : Store{*config}
-    , LocalFSStore{*config}
-    , LocalStore{static_cast<ref<const LocalStore::Config>>(config)}
+LocalOverlayStore::LocalOverlayStore(ref<const Config> config, SecretContext secretContext)
+    /* Copied, not moved: the lower store is opened with the same authority. */
+    : Store{*config, secretContext}
+    , LocalFSStore{*config} /* The `Store` base is initialised above; this argument is discarded. */
+    , LocalStore{static_cast<ref<const LocalStore::Config>>(config), SecretContext{}}
     , config{config}
-    , lowerStore(openStore(config->lowerStoreUri.get()).dynamic_pointer_cast<LocalFSStore>())
+    , lowerStore(openStore(secretContext, config->lowerStoreUri.get()).dynamic_pointer_cast<LocalFSStore>())
 {
     if (!config->upperLayer.isOverridden())
         throw Error("overlay store at %s requires the 'upper-layer' setting", PathFmt(config->realStoreDir.get()));

@@ -59,7 +59,7 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };
@@ -80,7 +80,7 @@ public:
 
     SSHMaster master;
 
-    LegacySSHStore(ref<const Config>);
+    LegacySSHStore(ref<const Config>, SecretContext secretContext);
 
     ref<Connection> openConnection();
 
@@ -139,7 +139,7 @@ public:
 
 public:
 
-    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
+    using Store::getBuilder;
 
     ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore) override;
 

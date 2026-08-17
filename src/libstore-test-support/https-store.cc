@@ -10,12 +10,14 @@ void TestHttpBinaryCacheStore::init()
     BinaryCacheStore::init();
 }
 
-ref<TestHttpBinaryCacheStore> TestHttpBinaryCacheStoreConfig::openTestStore(ref<FileTransfer> fileTransfer) const
+ref<TestHttpBinaryCacheStore>
+TestHttpBinaryCacheStoreConfig::openTestStore(ref<FileTransfer> fileTransfer, const SecretContext & context) const
 {
     auto store = make_ref<TestHttpBinaryCacheStore>(
         ref{// FIXME we shouldn't actually need a mutable config
             std::const_pointer_cast<HttpBinaryCacheStore::Config>(shared_from_this())},
-        fileTransfer);
+        fileTransfer,
+        context);
     store->init();
     return store;
 }
@@ -41,8 +43,8 @@ void HttpsBinaryCacheStoreTest::SetUp()
     cacheDir = tmpDir / "cache";
     delTmpDir = std::make_unique<AutoDelete>(tmpDir);
 
-    localCacheStore =
-        make_ref<LocalBinaryCacheStoreConfig>(cacheDir, LocalBinaryCacheStoreConfig::Params{})->openStore();
+    localCacheStore = make_ref<LocalBinaryCacheStoreConfig>(cacheDir, LocalBinaryCacheStoreConfig::Params{})
+                          ->openStore(SecretContext{});
 
     caCert = tmpDir / "ca.crt";
     caKey = tmpDir / "ca.key";
@@ -143,9 +145,10 @@ ref<TestHttpBinaryCacheStoreConfig> HttpsBinaryCacheStoreTest::makeConfig()
     return res;
 }
 
-ref<TestHttpBinaryCacheStore> HttpsBinaryCacheStoreTest::openStore(ref<TestHttpBinaryCacheStoreConfig> config)
+ref<TestHttpBinaryCacheStore>
+HttpsBinaryCacheStoreTest::openStore(ref<TestHttpBinaryCacheStoreConfig> config, const SecretContext & context)
 {
-    return config->openTestStore(ref<FileTransfer>{testFileTransfer});
+    return config->openTestStore(ref<FileTransfer>{testFileTransfer}, context);
 }
 
 } // namespace nix::testing

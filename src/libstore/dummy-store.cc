@@ -124,9 +124,9 @@ public:
 
 } // namespace
 
-ref<Store> DummyStoreConfig::openStore() const
+ref<Store> DummyStoreConfig::openStore(const SecretContext & context) const
 {
-    return openDummyStore();
+    return openDummyStore(context);
 }
 
 bool DummyStoreConfig::getReadOnly() const
@@ -151,8 +151,8 @@ public:
      */
     ref<WholeStoreViewAccessor> wholeStoreView = make_ref<WholeStoreViewAccessor>();
 
-    DummyStoreImpl(ref<const Config> config)
-        : Store{*config}
+    DummyStoreImpl(ref<const Config> config, SecretContext secretContext)
+        : Store{*config, std::move(secretContext)}
         , DummyStore{config}
     {
         wholeStoreView->setPathDisplay(config->storeDir);
@@ -394,9 +394,9 @@ public:
 
 void DummyStoreImpl::anchor() {}
 
-ref<DummyStore> DummyStore::Config::openDummyStore() const
+ref<DummyStore> DummyStore::Config::openDummyStore(const SecretContext & context) const
 {
-    return make_ref<DummyStoreImpl>(ref{shared_from_this()});
+    return make_ref<DummyStoreImpl>(ref{shared_from_this()}, context);
 }
 
 static RegisterStoreImplementation<DummyStore::Config> regDummyStore;

@@ -36,7 +36,7 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };

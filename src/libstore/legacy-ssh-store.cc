@@ -90,8 +90,8 @@ struct LegacySSHStore::Connection : public ServeProto::BasicClientConnection
 
 void LegacySSHStore::anchor() {}
 
-LegacySSHStore::LegacySSHStore(ref<const Config> config)
-    : Store{*config}
+LegacySSHStore::LegacySSHStore(ref<const Config> config, SecretContext secretContext)
+    : Store{*config, std::move(secretContext)}
     , config{config}
     , connections(
           make_ref<Pool<Connection>>(
@@ -387,18 +387,13 @@ LegacySSHBuilder::buildPathsWithResults(const std::vector<DerivedPath> & reqs, B
     return results;
 }
 
-ref<Builder> LegacySSHStore::getBuilder(std::shared_ptr<Store> evalStore)
+ref<Builder> LegacySSHStore::getBuilder(const SecretContext &, std::shared_ptr<Store> evalStore)
 {
+    /* Secret resolution is local to the process that performs the build. */
     if (evalStore && evalStore.get() != this)
         throw Error("building on an SSH store is incompatible with '--eval-store'");
     return make_ref<LegacySSHBuilder>(
         ref<LegacySSHStore>(std::dynamic_pointer_cast<LegacySSHStore>(shared_from_this())));
-}
-
-ref<Builder> LegacySSHStore::getBuilder(const SecretContext &, std::shared_ptr<Store> evalStore)
-{
-    /* Secret resolution is local to the process that performs the build. */
-    return getBuilder(std::move(evalStore));
 }
 
 void LegacySSHStore::computeFSClosure(
@@ -471,9 +466,9 @@ std::optional<TrustedFlag> LegacySSHStore::isTrustedClient()
     return std::nullopt;
 }
 
-ref<Store> LegacySSHStore::Config::openStore() const
+ref<Store> LegacySSHStore::Config::openStore(const SecretContext & context) const
 {
-    return make_ref<LegacySSHStore>(ref{shared_from_this()});
+    return make_ref<LegacySSHStore>(ref{shared_from_this()}, context);
 }
 
 static RegisterStoreImplementation<LegacySSHStore::Config> regLegacySSHStore;

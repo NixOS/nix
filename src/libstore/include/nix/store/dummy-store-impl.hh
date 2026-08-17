@@ -56,7 +56,9 @@ public:
     boost::concurrent_flat_map<StorePath, std::map<std::string, UnkeyedRealisation>> buildTrace;
 
     DummyStore(ref<const Config> config)
-        : Store{*config}
+        /* Abstract, so the most-derived store initialises the virtual `Store`
+           base and this argument is never the one that survives. */
+        : Store{*config, SecretContext{}}
         , config(config)
     {
     }

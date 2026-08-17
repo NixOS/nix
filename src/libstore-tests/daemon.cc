@@ -13,7 +13,7 @@ namespace nix {
 TEST(DaemonConnection, interruptedHandshakeClearsInterrupt)
 {
     auto config = make_ref<DummyStoreConfig>(StoreReference::Params{});
-    auto store = config->openStore();
+    auto store = config->openStore(SecretContext{});
 
     Pipe fromClient, toClient;
     fromClient.create();

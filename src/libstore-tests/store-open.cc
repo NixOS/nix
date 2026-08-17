@@ -4,6 +4,7 @@
 #include "nix/store/store-reference.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/tests/secret-resolver.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/finally.hh"
 
@@ -57,6 +58,23 @@ TEST(StoreOpen, resolveStoreConfig_auto_withParams)
     auto * localConfig = dynamic_cast<LocalStore::Config *>(config.get());
     ASSERT_NE(localConfig, nullptr);
     EXPECT_EQ(localConfig->getStateDir(), stateDir);
+}
+
+TEST(StoreOpen, defaultSubstitutersDoNotRetainOperationResolver)
+{
+    std::weak_ptr<SecretResolver> weakResolver;
+
+    {
+        auto resolver = std::make_shared<testing::CallbackSecretResolver>(
+            [](const SecretRequest &) -> std::optional<ResolvedSecret> { return std::nullopt; });
+        weakResolver = resolver;
+
+        /* Unit tests configure no substituters. The cache must still not keep
+           its operation-scoped key alive after this call returns. */
+        EXPECT_TRUE(getDefaultSubstituters(SecretContext{.secretResolver = resolver}).empty());
+    }
+
+    EXPECT_TRUE(weakResolver.expired());
 }
 
 } // namespace nix

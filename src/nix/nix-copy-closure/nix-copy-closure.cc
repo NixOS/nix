@@ -55,8 +55,8 @@ static int main_nix_copy_closure(int argc, char ** argv)
                for SSH reference parsing? */
             make_ref<LegacySSHStoreConfig>(ParsedURL::Authority::parse(sshHost), LegacySSHStoreConfig::Params{});
         remoteConfig->compress |= gzip;
-        auto to = toMode ? remoteConfig->openStore() : openStore();
-        auto from = toMode ? openStore() : remoteConfig->openStore();
+        auto to = toMode ? remoteConfig->openStore(SecretContext{}) : openStore();
+        auto from = toMode ? openStore() : remoteConfig->openStore(SecretContext{});
 
         RealisedPath::Set storePaths2;
         for (auto & path : storePaths)

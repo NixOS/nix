@@ -54,7 +54,7 @@ public:
         return {"unix"};
     }
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };
@@ -69,7 +69,7 @@ public:
 
     ref<const Config> config;
 
-    UDSRemoteStore(ref<const Config>);
+    UDSRemoteStore(ref<const Config>, SecretContext secretContext);
 
     ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override
     {

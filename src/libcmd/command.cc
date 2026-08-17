@@ -94,7 +94,7 @@ ref<Store> StoreCommand::getStore()
 
 ref<Store> StoreCommand::createStore()
 {
-    auto store = getStoreConfig()->openStore();
+    auto store = getStoreConfig()->openStore(SecretContext{});
     store->init();
     return store;
 }
