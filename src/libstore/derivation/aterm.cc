@@ -138,17 +138,10 @@ static BackedStringView parseString(StringViewStream & str)
     return res;
 }
 
-static void validatePath(std::string_view s)
+/* Store paths in derivations must be written in their canonical form. */
+static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str)
 {
-    if (s.size() == 0 || s[0] != '/')
-        throw FormatError("bad path '%1%' in derivation", s);
-}
-
-static BackedStringView parsePath(StringViewStream & str)
-{
-    auto s = parseString(str);
-    validatePath(*s);
-    return s;
+    return store.parseStorePathCanonical(*parseString(str));
 }
 
 static bool endOfList(StringViewStream & str)
@@ -164,12 +157,21 @@ static bool endOfList(StringViewStream & str)
     return false;
 }
 
-static StringSet parseStrings(StringViewStream & str, bool arePaths)
+static StringSet parseStrings(StringViewStream & str)
 {
     StringSet res;
     expect(str, '[');
     while (!endOfList(str))
-        res.insert((arePaths ? parsePath(str) : parseString(str)).toOwned());
+        res.insert(parseString(str).toOwned());
+    return res;
+}
+
+static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str)
+{
+    StorePathSet res;
+    expect(str, '[');
+    while (!endOfList(str))
+        res.insert(parseStorePath(store, str));
     return res;
 }
 
@@ -196,7 +198,7 @@ static Output parseOutput(
                 .hashAlgo = std::move(hashAlgo),
             };
         } else if (!hashS.empty()) {
-            validatePath(pathS);
+            [[maybe_unused]] auto path = store.parseStorePathCanonical(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
             return Output::CAFixed{
                 .ca =
@@ -218,9 +220,8 @@ static Output parseOutput(
         if (pathS.empty()) {
             return Output::Deferred{};
         }
-        validatePath(pathS);
         return Output::InputAddressed{
-            .path = store.parseStorePath(pathS),
+            .path = store.parseStorePathCanonical(pathS),
         };
     }
 }
@@ -265,7 +266,7 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
 
     DerivedPathMap<StringSet>::ChildNode node;
 
-    auto parseNonDynamic = [&]() { node.value = parseStrings(str, false); };
+    auto parseNonDynamic = [&]() { node.value = parseStrings(str); };
 
     // Older derivation should never use new form, but newer
     // derivation can use old form.
@@ -280,7 +281,7 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
             break;
         case '(':
             expect(str, '(');
-            node.value = parseStrings(str, false);
+            node.value = parseStrings(str);
             expect(str, ",["sv);
             while (!endOfList(str)) {
                 expect(str, '(');
@@ -355,20 +356,20 @@ Full parse(
     expect(str, ",["sv);
     while (!endOfList(str)) {
         expect(str, '(');
-        auto drvPath = parsePath(str);
+        auto drvPath = parseStorePath(store, str);
         expect(str, ',');
         auto node = parseDerivedPathMapNode(store, str, version);
         /* Such an entry cannot be represented in the flat inputs set,
            and would thus be silently dropped rather than round-tripped.
            Nix itself never produces one. */
         if (node.value.empty() && node.childMap.empty())
-            throw FormatError("inputDrvs entry for '%s' specifies no outputs", *drvPath);
-        fullInputs.drvs.map.insert_or_assign(store.parseStorePath(*drvPath), std::move(node));
+            throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
+        fullInputs.drvs.map.insert_or_assign(std::move(drvPath), std::move(node));
         expect(str, ')');
     }
 
     expect(str, ',');
-    fullInputs.srcs = store.parseStorePathSet(parseStrings(str, true));
+    fullInputs.srcs = parseStorePaths(store, str);
     drv.inputs = fullInputs.toSet();
     expect(str, ',');
     drv.platform = parseString(str).toOwned();
