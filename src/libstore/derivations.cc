@@ -945,7 +945,8 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
                     [&](const DrvHashModulo::DeferredDrv &) { return true; },
                     // Regular non-CA derivation, replace derivation
                     [&](const DrvHashModulo::DrvHash & drvHash) {
-                        inputs2.insert_or_assign(drvHash.to_string(HashFormat::Base16, false), node);
+                        inputs2[drvHash.to_string(HashFormat::Base16, false)].value.insert(
+                            node.value.begin(), node.value.end());
                         return false;
                     },
                     // CA derivation's output hashes
@@ -955,11 +956,7 @@ DrvHashModulo hashDerivationModulo(Store & store, const Derivation & drv, bool m
                             const auto h = get(outputHashes, outputName);
                             if (!h)
                                 throw Error("no hash for output '%s' of derivation '%s'", outputName, drv.name);
-                            inputs2.insert_or_assign(
-                                h->to_string(HashFormat::Base16, false),
-                                DerivedPathMap<StringSet>::ChildNode{
-                                    .value = {"out"},
-                                });
+                            inputs2[h->to_string(HashFormat::Base16, false)].value.insert("out");
                         }
                         return false;
                     },
