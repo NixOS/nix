@@ -130,6 +130,16 @@ drvPath
 ' '".*-simple.drv"' \
 --file "$testDir/simple.nix" --experimental-features 'ca-derivations'
 
+# `--file` autocalls, `--expr` does not.
+testReplResponse '
+drvPath
+' '".*-simple.drv"' \
+--file "$testDir/repl/function.nix"
+
+testReplResponse '
+' 'while evaluating an attribute set to be merged in the global scope' \
+--expr '{ x ? 1 }: import '"$testDir"'/simple.nix'
+
 mkdir -p flake && cat <<EOF > flake/flake.nix
 {
     outputs = { self }: {

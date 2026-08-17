@@ -1358,6 +1358,8 @@ static void prim_warn(EvalState & state, CallSite callSite, Value * const * args
             .level = lvlWarn,
             .msg = HintFmt(std::string(msgStr)),
             .isFromExpr = true,
+            // Do not indent relative to the "evaluation warning: " prefix if the message starts with a newline.
+            .noIndent = msgStr.starts_with("\n"),
         };
         logWarning(info);
     }
@@ -1444,21 +1446,27 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
     } catch (Error & e) {
         Pos pos = state.positions[nameAttr->pos];
         /*
-         * Here we make two abuses of the error system
+         * Here we call addTrace in a slightly unusual way:
          *
-         * 1. We print the location as a string to avoid a code snippet being
-         * printed. While the location of the name attribute is a good hint, the
-         * exact code there is irrelevant.
-         *
-         * 2. We mark this trace as a frame trace, meaning that we stop printing
-         * less important traces from now on. In particular, this prevents the
-         * display of the automatic "while calling builtins.derivationStrict"
-         * trace, which is of little use for the public we target here.
+         * 1. We print the location as a string (instead of passing it via the
+         * first argument to addTrace) to avoid a code snippet being printed.
+         * While the location of the name attribute is a good hint, the exact
+         * code there is irrelevant.
          *
          * Please keep in mind that error reporting is done on a best-effort
-         * basis in nix. There is no accurate location for a derivation, as it
-         * often results from the composition of several functions
+         * basis in nix. There is no single accurate location for a derivation,
+         * as it often results from the composition of several functions
          * (derivationStrict, derivation, mkDerivation, mkPythonModule, etc.)
+         *
+         * 2. We use TracePrint::Always so that users who have not enabled
+         * --show-trace will still get a full trace of the derivation
+         * dependency chain that led to an evaluation error. The user may be
+         * interested in the last item in the chain (the derivation with an
+         * eval issue), an item near the top of the chain (a package they added
+         * to their configuration), or an item in the middle of the chain (an
+         * optional dependency they can remove with an override somewhere
+         * because they don't need the corresponding functionality), so
+         * displaying the entire chain is worth the space.
          */
         e.addTrace(
             nullptr,
@@ -1466,7 +1474,8 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
                 "while evaluating derivation '%s'\n"
                 "  whose name attribute is located at %s",
                 drvName,
-                pos));
+                pos),
+            TracePrint::Always);
         throw;
     }
 }
@@ -1787,18 +1796,28 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
                     StorePathSet refs;
                     state.store->computeFSClosure(d.drvPath, refs);
                     for (auto & j : refs) {
-                        drv.inputs.srcs.insert(j);
+                        drv.inputs.insert(SingleDerivedPath::Opaque{j});
                         if (j.isDerivation()) {
-                            drv.inputs.drvs.map[j].value = state.store->readDerivation(j).outputNames();
+                            for (auto & outputName : state.store->readDerivation(j).outputNames()) {
+                                drv.inputs.insert(
+                                    SingleDerivedPath::Built{
+                                        .drvPath = makeConstantStorePathRef(j),
+                                        .output = outputName,
+                                    });
+                            }
                         }
                     }
                 },
                 [&](const NixStringContextElem::Built & b) {
-                    drv.inputs.drvs.ensureSlot(*b.drvPath).value.insert(b.output);
+                    drv.inputs.insert(
+                        SingleDerivedPath::Built{
+                            .drvPath = b.drvPath,
+                            .output = b.output,
+                        });
                 },
                 [&](const NixStringContextElem::Opaque & o) {
                     state.ensureLazyPathCopied(o.path);
-                    drv.inputs.srcs.insert(o.path);
+                    drv.inputs.insert(SingleDerivedPath::Opaque{o.path});
                 },
             },
             c.raw);

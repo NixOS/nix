@@ -11,7 +11,7 @@ error:
              |                   ^
             2|   "foo"
 
-       … in the argument of the not operator
+       … in the argument of '!'
          at /pwd/lang/eval-fail-sort-5.nix:1:24:
             1| builtins.sort (a: b: a <= b) [
              |                        ^

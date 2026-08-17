@@ -356,7 +356,9 @@ protected:
     /**
      * Create a file in `tmpDir` owned by the builder.
      *
-     * @param Name must not contain more than one path segment and none of them must be `..`, `.`
+     * @param name Must not contain more than one path segment and none of them must be `..`, `.`
+     * @param contents Contents to be written to the file.
+     *
      * Otherwise this function throws an Error.
      */
     void writeBuilderFile(const std::string & name, std::string_view contents);

@@ -5,7 +5,9 @@
 
 #include <array>
 #include <cctype>
+#include <mutex>
 
+#include <openssl/crypto.h>
 #include <sodium.h>
 #include <boost/lexical_cast.hpp>
 #include <stdint.h>
@@ -22,27 +24,45 @@ bad_ref_cast::~bad_ref_cast() {}
 
 void initLibUtil()
 {
-    // Check that exception handling works. Exception handling has been observed
-    // not to work on darwin when the linker flags aren't quite right.
-    // In this case we don't want to expose the user to some unrelated uncaught
-    // exception, but rather tell them exactly that exception handling is
-    // broken.
-    // When exception handling fails, the message tends to be printed by the
-    // C++ runtime, followed by an abort.
-    // For example on macOS we might see an error such as
-    // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is broken.
-    // This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
-    bool caught = false;
-    try {
-        throwExceptionSelfCheck();
-    } catch (const nix::Error & _e) {
-        caught = true;
-    }
-    // This is not actually the main point of this check, but let's make sure anyway:
-    assert(caught);
+    static std::once_flag done;
+    std::call_once(done, []() {
+        // Check that exception handling works. Exception handling has been observed
+        // not to work on darwin when the linker flags aren't quite right.
+        // In this case we don't want to expose the user to some unrelated uncaught
+        // exception, but rather tell them exactly that exception handling is
+        // broken.
+        // When exception handling fails, the message tends to be printed by the
+        // C++ runtime, followed by an abort.
+        // For example on macOS we might see an error such as
+        // libc++abi: terminating with uncaught exception of type nix::SystemError: error: C++ exception handling is
+        // broken. This would appear to be a problem with the way Nix was compiled and/or linked and/or loaded.
+        bool caught = false;
+        try {
+            throwExceptionSelfCheck();
+        } catch (const nix::Error & _e) {
+            caught = true;
+        }
+        // This is not actually the main point of this check, but let's make sure anyway:
+        assert(caught);
 
-    if (sodium_init() == -1)
-        throw Error("could not initialise libsodium");
+        if (sodium_init() == -1)
+            throw Error("could not initialise libsodium");
+
+        /* Prevent OpenSSL from registering its atexit() handler
+           (OPENSSL_cleanup()). If we exit() while other threads that use
+           OpenSSL are still running, OPENSSL_cleanup() frees OpenSSL's
+           thread-local state handlers; when those threads then exit, their
+           thread-specific-data destructors (init_thread_stop()) crash on
+           the freed state. This happens in particular in nix-daemon
+           connection children, where library destructors run by _dl_fini()
+           (e.g. aws-crt-cpp's) stop their worker threads *after*
+           OPENSSL_cleanup() has already run. Since we're exiting anyway,
+           skipping the cleanup is harmless. This must run before any other
+           use of OpenSSL, since only the first initialisation takes
+           effect. */
+        if (OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr) != 1)
+            throw Error("could not initialise OpenSSL");
+    });
 }
 
 //////////////////////////////////////////////////////////////////////

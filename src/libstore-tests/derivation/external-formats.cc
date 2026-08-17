@@ -3,6 +3,7 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/full-inputs.hh"
 #include "derivation/test-support.hh"
 #include "nix/util/tests/json-characterization.hh"
 
@@ -192,20 +193,19 @@ INSTANTIATE_TEST_SUITE_P(
         Derivation{
             .outputs = {},
             .inputs{
-                .srcs{
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+                SingleDerivedPath::Opaque{
+                    .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
                 },
-                .drvs{.map{
-                    {
-                        StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                        {
-                            .value{
-                                "cat",
-                                "dog",
-                            },
-                        },
-                    },
-                }},
+                /* dep2.drv^cat */
+                SingleDerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"}),
+                    .output = "cat",
+                },
+                /* dep2.drv^dog */
+                SingleDerivedPath::Built{
+                    .drvPath = makeConstantStorePathRef(StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"}),
+                    .output = "dog",
+                },
             },
             .platform = "wasm-sel4",
             .builder = "foo",
@@ -225,27 +225,40 @@ MAKE_TEST_P(DynDerivationJsonAtermTest);
 
 Derivation makeDynDepDerivation()
 {
+    auto dep2 = makeConstantStorePathRef(StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"});
+
     return Derivation{
         .outputs = {},
         .inputs{
-            .srcs{
-                StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+            SingleDerivedPath::Opaque{
+                .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
             },
-            .drvs{.map{
-                {
-                    StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"},
-                    DerivedPathMap<StringSet>::ChildNode{
-                        .value{
-                            "cat",
-                            "dog",
-                        },
-                        .childMap{
-                            {"cat", DerivedPathMap<StringSet>::ChildNode{.value = {"kitten"}}},
-                            {"goose", DerivedPathMap<StringSet>::ChildNode{.value = {"gosling"}}},
-                        },
-                    },
-                },
-            }},
+            /* dep2.drv^cat */
+            SingleDerivedPath::Built{
+                .drvPath = dep2,
+                .output = "cat",
+            },
+            /* dep2.drv^dog */
+            SingleDerivedPath::Built{
+                .drvPath = dep2,
+                .output = "dog",
+            },
+            /* dep2.drv^cat^kitten */
+            SingleDerivedPath::Built{
+                .drvPath = make_ref<SingleDerivedPath>(SingleDerivedPath::Built{
+                    .drvPath = dep2,
+                    .output = "cat",
+                }),
+                .output = "kitten",
+            },
+            /* dep2.drv^goose^gosling */
+            SingleDerivedPath::Built{
+                .drvPath = make_ref<SingleDerivedPath>(SingleDerivedPath::Built{
+                    .drvPath = dep2,
+                    .output = "goose",
+                }),
+                .output = "gosling",
+            },
         },
         .platform = "wasm-sel4",
         .builder = "foo",

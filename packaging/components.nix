@@ -326,6 +326,11 @@ in
   withFuzzer = false;
 
   /**
+    Whether to build unit-test executables in Meson test components.
+  */
+  withUnitTests = true;
+
+  /**
     Whether to build the libFuzzer targets in Meson test components.
   */
   withFuzzTargets = false;

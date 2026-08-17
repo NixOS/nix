@@ -14,9 +14,6 @@ namespace nix {
 
 struct SourcePath;
 
-MakeError(BadStorePath, Error);
-MakeError(BadStorePathName, BadStorePath);
-
 /**
  * @todo This should just be inherited by `StoreConfig`. However, it
  * would be a huge amount of churn if `Store` didn't have these methods

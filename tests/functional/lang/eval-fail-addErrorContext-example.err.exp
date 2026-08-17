@@ -1,6 +1,13 @@
 error:
        … while counting down; n = 10
 
+       … in an operand of '+'
+         at /pwd/lang/eval-fail-addErrorContext-example.nix:7:80:
+            6|     else
+            7|       builtins.addErrorContext "while counting down; n = ${toString n}" ("x" + countDown (n - 1));
+             |                                                                                ^
+            8| in
+
        … while counting down; n = 9
 
        … while counting down; n = 8

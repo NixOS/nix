@@ -13,13 +13,12 @@ project(
 )
 
 cxx = meson.get_compiler('cpp')
+build_unit_tests = get_option('unit-tests')
 
 subdir('nix-meson-build-support/deps-lists')
 
 deps_private_maybe_subproject = [
   dependency('nix-util'),
-  dependency('nix-util-c'),
-  dependency('nix-util-test-support'),
 ]
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
@@ -27,33 +26,15 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-rapidcheck = dependency('rapidcheck')
-deps_private += rapidcheck
-
-gtest = dependency('gtest', main : false)
-deps_private += gtest
-
-gmock = dependency('gmock')
-deps_private += gmock
-
-zstd = dependency('libzstd', version : '>= 1.4.0')
-deps_private += zstd
-
 if host_machine.system() == 'windows'
   # Boost.ASIO needs this unconditionally.
   socket = cxx.find_library('ws2_32')
   deps_other += socket
 endif
 
-configdata = configuration_data()
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
-
-config_priv_h = configure_file(
-  configuration : configdata,
-  output : 'util-tests-config.hh',
-)
-
 subdir('nix-meson-build-support/common')
+
+fuzz_dependencies = deps_private + deps_other
 
 sources = files(
   'alignment.cc',
@@ -111,54 +92,74 @@ endif
 
 include_dirs = [ include_directories('.') ]
 
+if build_unit_tests
+  unit_dependencies = fuzz_dependencies + [
+    dependency('nix-util-c'),
+    dependency('nix-util-test-support'),
+    dependency('rapidcheck'),
+    dependency('gtest', main : false),
+    dependency('gmock'),
+    dependency('libzstd', version : '>= 1.4.0'),
+  ]
 
-this_exe = executable(
-  meson.project_name(),
-  sources,
-  config_priv_h,
-  dependencies : deps_private_subproject + deps_private + deps_other,
-  include_directories : include_dirs,
-  # TODO: -lrapidcheck, see ../libutil-support/build.meson
-  link_args : linker_export_flags + [ '-lrapidcheck' ],
-  # get main from gtest
-  install : true,
-  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
-)
+  configdata = configuration_data()
+  configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+
+  config_priv_h = configure_file(
+    configuration : configdata,
+    output : 'util-tests-config.hh',
+  )
+
+  this_exe = executable(
+    meson.project_name(),
+    sources,
+    config_priv_h,
+    dependencies : unit_dependencies,
+    include_directories : include_dirs,
+    # TODO: -lrapidcheck, see ../libutil-support/build.meson
+    link_args : linker_export_flags + [ '-lrapidcheck' ],
+    # get main from gtest
+    install : true,
+    cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
+  )
+endif
 
 if get_option('fuzzers')
   subdir('fuzz')
 endif
 
-test(
-  meson.project_name(),
-  this_exe,
-  env : {
-    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-  },
-  protocol : 'gtest',
-)
+if build_unit_tests
+  test(
+    meson.project_name(),
+    this_exe,
+    env : {
+      '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+    },
+    protocol : 'gtest',
+  )
 
-# Run the same tests again under `enosys -d openat2` to exercise the
-# iterative (non-openat2) fallback path on Linux.  `enosys` uses
-# seccomp to make `openat2` return `ENOSYS`, which the wrapper in
-# file-system-at.cc caches and falls back to the iterative impl.
-if host_machine.system() == 'linux'
-  enosys = find_program('enosys', required : false)
-  if enosys.found()
-    test(
-      meson.project_name() + '-without-new-syscalls',
-      enosys,
-      args : [
-        '--syscall', 'openat2',
-        '--syscall', 'fchmodat2',
-        '--syscall', 'close_range',
-        '--',
-        this_exe,
-      ],
-      env : {
-        '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-      },
-      protocol : 'gtest',
-    )
+  # Run the same tests again under `enosys -d openat2` to exercise the
+  # iterative (non-openat2) fallback path on Linux.  `enosys` uses
+  # seccomp to make `openat2` return `ENOSYS`, which the wrapper in
+  # file-system-at.cc caches and falls back to the iterative impl.
+  if host_machine.system() == 'linux'
+    enosys = find_program('enosys', required : false)
+    if enosys.found()
+      test(
+        meson.project_name() + '-without-new-syscalls',
+        enosys,
+        args : [
+          '--syscall', 'openat2',
+          '--syscall', 'fchmodat2',
+          '--syscall', 'close_range',
+          '--',
+          this_exe,
+        ],
+        env : {
+          '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+        },
+        protocol : 'gtest',
+      )
+    endif
   endif
 endif

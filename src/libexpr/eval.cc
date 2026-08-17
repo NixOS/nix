@@ -1208,8 +1208,9 @@ void EvalState::eval(Expr * e, Value & v)
     e->eval(*this, baseEnv, v);
 }
 
-inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::string_view errorCtx)
+inline bool EvalState::evalBool(Env & env, Expr * e, std::string_view errorCtx)
 {
+    PosIdx pos = e->getPos();
     try {
         Value v;
         e->eval(*this, env, v);
@@ -1226,8 +1227,9 @@ inline bool EvalState::evalBool(Env & env, Expr * e, const PosIdx pos, std::stri
     }
 }
 
-inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx pos, std::string_view errorCtx)
+inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, std::string_view errorCtx)
 {
+    PosIdx pos = e->getPos();
     try {
         e->eval(*this, env, v);
         if (v.type() != nAttrs)
@@ -1237,6 +1239,16 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, const PosIdx po
                 .debugThrow();
     } catch (Error & e) {
         e.addTrace(positions[pos], errorCtx);
+        throw;
+    }
+}
+
+void Expr::eval(EvalState & state, Env & env, Value & v, std::string_view errorCtx)
+{
+    try {
+        eval(state, env, v);
+    } catch (Error & e) {
+        e.addTrace(state.positions[getPos()], errorCtx);
         throw;
     }
 }
@@ -1456,7 +1468,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     // cursor, result if successful
     Value * vAttrs = &vTmp;
 
-    e->eval(state, env, vTmp);
+    e->eval(state, env, vTmp, "while selecting an attribute");
 
     try {
         auto dts = state.debugRepl ? makeDebugTraceStacker(
@@ -1541,7 +1553,7 @@ void ExprOpHasAttr::eval(EvalState & state, Env & env, Value & v)
     Value vTmp;
     Value * vAttrs = &vTmp;
 
-    e->eval(state, env, vTmp);
+    e->eval(state, env, vTmp, "in the argument of '?'");
 
     for (auto & i : attrPath) {
         state.forceValue(*vAttrs, getPos());
@@ -1896,12 +1908,12 @@ void ExprWith::eval(EvalState & state, Env & env, Value & v)
 void ExprIf::eval(EvalState & state, Env & env, Value & v)
 {
     // We cheat in the parser, and pass the position of the condition as the position of the if itself.
-    (state.evalBool(env, cond, pos, "while evaluating a branch condition") ? then : else_)->eval(state, env, v);
+    (state.evalBool(env, cond, "while evaluating a branch condition") ? then : else_)->eval(state, env, v);
 }
 
 void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 {
-    if (!state.evalBool(env, cond, pos, "in the condition of the assert statement")) {
+    if (!state.evalBool(env, cond, "in the condition of the assert statement")) {
         std::ostringstream out;
         cond->show(state.symbols, out);
         auto exprStr = out.view();
@@ -1926,46 +1938,46 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
 
 void ExprOpNot::eval(EvalState & state, Env & env, Value & v)
 {
-    v.mkBool(!state.evalBool(env, e, getPos(), "in the argument of the not operator")); // XXX: FIXME: !
+    v.mkBool(!state.evalBool(env, e, "in the argument of '!'"));
 }
 
 void ExprOpEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1;
-    e1->eval(state, env, v1);
+    e1->eval(state, env, v1, "in the left operand of '=='");
     Value v2;
-    e2->eval(state, env, v2);
+    e2->eval(state, env, v2, "in the right operand of '=='");
     v.mkBool(state.eqValues(v1, v2, pos, "while testing two values for equality"));
 }
 
 void ExprOpNEq::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1;
-    e1->eval(state, env, v1);
+    e1->eval(state, env, v1, "in the left operand of '!='");
     Value v2;
-    e2->eval(state, env, v2);
+    e2->eval(state, env, v2, "in the right operand of '!='");
     v.mkBool(!state.eqValues(v1, v2, pos, "while testing two values for inequality"));
 }
 
 void ExprOpAnd::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        state.evalBool(env, e1, pos, "in the left operand of the AND (&&) operator")
-        && state.evalBool(env, e2, pos, "in the right operand of the AND (&&) operator"));
+        state.evalBool(env, e1, "in the left operand of '&&'")
+        && state.evalBool(env, e2, "in the right operand of '&&'"));
 }
 
 void ExprOpOr::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        state.evalBool(env, e1, pos, "in the left operand of the OR (||) operator")
-        || state.evalBool(env, e2, pos, "in the right operand of the OR (||) operator"));
+        state.evalBool(env, e1, "in the left operand of '||'")
+        || state.evalBool(env, e2, "in the right operand of '||'"));
 }
 
 void ExprOpImpl::eval(EvalState & state, Env & env, Value & v)
 {
     v.mkBool(
-        !state.evalBool(env, e1, pos, "in the left operand of the IMPL (->) operator")
-        || state.evalBool(env, e2, pos, "in the right operand of the IMPL (->) operator"));
+        !state.evalBool(env, e1, "in the left operand of '->'")
+        || state.evalBool(env, e2, "in the right operand of '->'"));
 }
 
 void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)
@@ -2062,7 +2074,7 @@ void ExprOpUpdate::eval(EvalState & state, Env & env, Value & v)
 void Expr::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
 {
     Value v;
-    state.evalAttrs(env, this, v, getPos(), errorCtx);
+    state.evalAttrs(env, this, v, errorCtx);
     q.push_back(v);
 }
 
@@ -2070,8 +2082,8 @@ void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q)
 {
     /* Output rightmost attrset first to the merge queue as the one
        with the most priority. */
-    e2->evalForUpdate(state, env, q, "in the right operand of the update (//) operator");
-    e1->evalForUpdate(state, env, q, "in the left operand of the update (//) operator");
+    e2->evalForUpdate(state, env, q, "in the right operand of '//'");
+    e1->evalForUpdate(state, env, q, "in the left operand of '//'");
 }
 
 void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, std::string_view errorCtx)
@@ -2082,9 +2094,9 @@ void ExprOpUpdate::evalForUpdate(EvalState & state, Env & env, UpdateQueue & q, 
 void ExprOpConcatLists::eval(EvalState & state, Env & env, Value & v)
 {
     Value v1;
-    e1->eval(state, env, v1);
+    e1->eval(state, env, v1, "in the left operand of '++'");
     Value v2;
-    e2->eval(state, env, v2);
+    e2->eval(state, env, v2, "in the right operand of '++'");
     Value * lists[2] = {&v1, &v2};
     state.concatLists(v, lists, pos, "while evaluating one of the elements to concatenate");
 }
@@ -2138,7 +2150,7 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
     for (auto & [i_pos, i] : es) {
         Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp);
+        i->eval(state, env, vTmp, "in an operand of '+'");
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -2233,7 +2245,7 @@ void ExprBlackHole::eval(EvalState & state, [[maybe_unused]] Env & env, Value & 
 
 [[gnu::noinline]] [[noreturn]] void ExprBlackHole::throwInfiniteRecursionError(EvalState & state, Value & v)
 {
-    state.error<InfiniteRecursionError>("infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
+    state.error<InfiniteRecursionError>(&v, "infinite recursion encountered").atPos(v.determinePos(noPos)).debugThrow();
 }
 
 // always force this to be separate, otherwise forceValue may inline it and take
@@ -2250,6 +2262,17 @@ void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, c
         std::rethrow_exception(e);
     } catch (const Interrupted & e) {
         recovery = allocValue();
+    } catch (InfiniteRecursionError & ir) {
+        // Mark where evaluation enters the infinite recursion, so the trace
+        // distinguishes the cycle from the code leading up to it.
+        //
+        // The blackholed value is forced at two frames:
+        // 1. re-forcing of the thunk at stack tip (`env` is null)
+        // 2. initial forcing of the thunk, which is where the cycle starts
+        // Only the first force has an `env`, so we expect this entry to be added once.
+        if (env && ir.v == &v)
+            ir.addTrace(
+                nullptr, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {

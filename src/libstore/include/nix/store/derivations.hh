@@ -6,7 +6,6 @@
 #include "nix/util/hash.hh"
 #include "nix/store/content-address.hh"
 #include "nix/util/repair-flag.hh"
-#include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
@@ -14,7 +13,6 @@
 #include "nix/util/variant-wrapper.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
-#include <ranges>
 #include <variant>
 
 namespace nix {
@@ -151,8 +149,22 @@ struct Type
 template<typename Inputs, typename Out = Output>
 struct Derivation;
 
+/**
+ * @brief Derivation that depends only on other store objects.
+ *
+ * This type is what's used in Store::buildDerivation or for resolved derivations
+ *
+ * @see derivation::tryResolve.
+ */
 using Basic = Derivation<StorePathSet>;
-using Full = Derivation<FullInputs>;
+
+/**
+ * @brief Derivation that depends on the outputs of other derivations in addition.
+ *
+ * This type is what's constructed by the evaluator and written to the store in
+ * ATerm format.
+ */
+using Full = Derivation<std::set<SingleDerivedPath>>;
 
 template<typename Inputs, typename Out>
 struct Derivation
@@ -247,6 +259,17 @@ Type type(const Derivation<Inputs, Output> & drv);
  */
 template<typename Inputs>
 OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store);
+
+/**
+ * Does the derivation have a dependency on the output of a dynamic
+ * derivation?
+ *
+ * In other words, does it depend on the output of a derivation that is
+ * itself an output of a derivation? This corresponds to a dependency
+ * that is an inductive derived path with more than one layer of
+ * `DerivedPath::Built`.
+ */
+bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs);
 
 /**
  * Determine whether this derivation should be resolved before building.
@@ -374,21 +397,6 @@ using Derivation = derivation::Full;
  * This is a pure computation based on the derivation content and store directory.
  */
 StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv);
-
-/**
- * Does the derivation have a dependency on the output of a dynamic
- * derivation?
- *
- * In other words, does it on the output of derivation that is itself an
- * output of a derivation? This corresponds to a dependency that is an
- * inductive derived path with more than one layer of
- * `DerivedPath::Built`.
- */
-template<std::ranges::input_range Range>
-bool hasDynamicDrvDep(Range && drvsMap)
-{
-    return std::ranges::any_of(std::forward<Range>(drvsMap), [](auto & kv) { return !kv.second.childMap.empty(); });
-}
 
 /**
  * \todo Remove.

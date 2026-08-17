@@ -39,7 +39,6 @@
       ];
       linuxSystems = linux32BitSystems ++ linux64BitSystems;
       darwinSystems = [
-        "x86_64-darwin"
         "aarch64-darwin"
       ];
       systems = linuxSystems ++ darwinSystems;
@@ -47,6 +46,8 @@
       crossSystems = [
         "armv6l-unknown-linux-gnueabihf"
         "armv7l-unknown-linux-gnueabihf"
+        "powerpc64-unknown-linux-gnuabielfv1"
+        "powerpc64le-unknown-linux-gnu"
         "riscv64-unknown-linux-gnu"
         # Disabled because of https://github.com/NixOS/nixpkgs/issues/344423
         # "x86_64-unknown-netbsd"
@@ -257,6 +258,9 @@
         }).topLevel
         // (lib.optionalAttrs (builtins.elem system linux64BitSystems)) {
           dockerImage = self.hydraJobs.dockerImage.${system};
+        }
+        // (lib.optionalAttrs (system == "x86_64-linux")) {
+          fuzzing-engine = nixpkgsFor.${system}.native.callPackage ./tests/fuzzing-engine { };
         }
         # Add "passthru" tests
         //

@@ -21,12 +21,18 @@
   version,
   filesetToSource,
   withBenchmarks ? false,
+  withUnitTests ? true,
   withFuzzTargets ? false,
 }:
 
 let
   inherit (lib) fileset;
+  doBenchmarks = withUnitTests && withBenchmarks;
 in
+
+assert lib.assertMsg (
+  withUnitTests || withFuzzTargets
+) "nix-store-tests requires unit tests or fuzz targets";
 
 mkMesonExecutable (finalAttrs: {
   pname = "nix-store-tests";
@@ -46,19 +52,22 @@ mkMesonExecutable (finalAttrs: {
   ];
 
   buildInputs = [
+    nix-store
+  ]
+  ++ lib.optionals withUnitTests [
     sqlite
     rapidcheck
     gtest
-    nix-store
     nix-store-c
     nix-store-test-support
   ]
-  ++ lib.optionals withBenchmarks [
+  ++ lib.optionals doBenchmarks [
     gbenchmark
   ];
 
   mesonFlags = [
-    (lib.mesonBool "benchmarks" withBenchmarks)
+    (lib.mesonBool "unit-tests" withUnitTests)
+    (lib.mesonBool "benchmarks" doBenchmarks)
     (lib.mesonBool "fuzzers" withFuzzTargets)
   ];
 
@@ -78,22 +87,24 @@ mkMesonExecutable (finalAttrs: {
         in
         runCommand "${finalAttrs.pname}-run"
           {
-            meta.broken = !stdenv.hostPlatform.emulatorAvailable buildPackages;
-            nativeBuildInputs = [
+            meta.broken = withUnitTests && !stdenv.hostPlatform.emulatorAvailable buildPackages;
+            nativeBuildInputs = lib.optionals withUnitTests [
               writableTmpDirAsHomeHook
               openssl
             ];
           }
           (
-            ''
+            lib.optionalString withUnitTests ''
               export _NIX_TEST_UNIT_DATA=${data + "/src/libstore-tests/data"}
               export NIX_REMOTE=$HOME/store
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
             ''
-            + lib.optionalString withBenchmarks ''
+            + lib.optionalString doBenchmarks ''
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-store-benchmarks"}
             ''
             + ''
+              ${if withUnitTests then "test -x" else "test ! -e"} \
+                "${finalAttrs.finalPackage}/bin/${finalAttrs.pname}${stdenv.hostPlatform.extensions.executable}"
               for target in fuzz-parse-derivation fuzz-parse-derivation-experimental; do
                 ${if withFuzzTargets then "test -x" else "test ! -e"} \
                   "${finalAttrs.finalPackage}/bin/$target${stdenv.hostPlatform.extensions.executable}"
@@ -106,6 +117,8 @@ mkMesonExecutable (finalAttrs: {
 
   meta = {
     platforms = lib.platforms.unix ++ lib.platforms.windows;
+  }
+  // lib.optionalAttrs withUnitTests {
     mainProgram = finalAttrs.pname + stdenv.hostPlatform.extensions.executable;
   };
 

@@ -11,6 +11,9 @@ namespace nix {
 
 struct Hash;
 
+MakeError(BadStorePath, Error);
+MakeError(BadStorePathName, BadStorePath);
+
 /**
  * Check whether a name is a valid store path name.
  *
@@ -84,8 +87,7 @@ typedef std::set<StorePath> StorePathSet;
 typedef std::vector<StorePath> StorePaths;
 
 /**
- * The file extension of \ref nix::Derivation derivations when serialized
- * into store objects.
+ * The file extension of @ref nix::derivation::Derivation when serialized into store objects.
  */
 constexpr std::string_view drvExtension = ".drv";
 

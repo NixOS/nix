@@ -1,0 +1,156 @@
+error:
+       … in the left operand of '->'
+         at /pwd/lang/eval-fail-operator-trace.nix:23:7:
+           22|   s = r || a;
+           23|   t = s -> a;
+             |       ^
+           24| in
+
+       … in the left operand of '||'
+         at /pwd/lang/eval-fail-operator-trace.nix:22:7:
+           21|   r = q && a;
+           22|   s = r || a;
+             |       ^
+           23|   t = s -> a;
+
+       … in the left operand of '&&'
+         at /pwd/lang/eval-fail-operator-trace.nix:21:7:
+           20|   q = p != 1;
+           21|   r = q && a;
+             |       ^
+           22|   s = r || a;
+
+       … in the left operand of '!='
+         at /pwd/lang/eval-fail-operator-trace.nix:20:7:
+           19|   p = o == 1;
+           20|   q = p != 1;
+             |       ^
+           21|   r = q && a;
+
+       … in the left operand of '=='
+         at /pwd/lang/eval-fail-operator-trace.nix:19:7:
+           18|   o = n >= 1;
+           19|   p = o == 1;
+             |       ^
+           20|   q = p != 1;
+
+       … in the argument of '!'
+         at /pwd/lang/eval-fail-operator-trace.nix:18:9:
+           17|   n = m > 1;
+           18|   o = n >= 1;
+             |         ^
+           19|   p = o == 1;
+
+       … while calling the 'lessThan' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:18:9:
+           17|   n = m > 1;
+           18|   o = n >= 1;
+             |         ^
+           19|   p = o == 1;
+
+       … while calling the 'lessThan' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:17:9:
+           16|   m = l <= 1;
+           17|   n = m > 1;
+             |         ^
+           18|   o = n >= 1;
+
+       … in the argument of '!'
+         at /pwd/lang/eval-fail-operator-trace.nix:16:9:
+           15|   l = k < 1;
+           16|   m = l <= 1;
+             |         ^
+           17|   n = m > 1;
+
+       … while calling the 'lessThan' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:16:9:
+           15|   l = k < 1;
+           16|   m = l <= 1;
+             |         ^
+           17|   n = m > 1;
+
+       … while calling the 'lessThan' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:15:9:
+           14|   k = j // { };
+           15|   l = k < 1;
+             |         ^
+           16|   m = l <= 1;
+
+       … in the left operand of '//'
+         at /pwd/lang/eval-fail-operator-trace.nix:14:7:
+           13|   j = !i;
+           14|   k = j // { };
+             |       ^
+           15|   l = k < 1;
+
+       … in the argument of '!'
+         at /pwd/lang/eval-fail-operator-trace.nix:13:8:
+           12|   i = h + 1;
+           13|   j = !i;
+             |        ^
+           14|   k = j // { };
+
+       … in an operand of '+'
+         at /pwd/lang/eval-fail-operator-trace.nix:12:7:
+           11|   h = g - 1;
+           12|   i = h + 1;
+             |       ^
+           13|   j = !i;
+
+       … while calling the 'sub' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:11:9:
+           10|   g = f / 1;
+           11|   h = g - 1;
+             |         ^
+           12|   i = h + 1;
+
+       … while calling the 'div' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:10:9:
+            9|   f = e * 1;
+           10|   g = f / 1;
+             |         ^
+           11|   h = g - 1;
+
+       … while calling the 'mul' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:9:9:
+            8|   e = d ++ [ ];
+            9|   f = e * 1;
+             |         ^
+           10|   g = f / 1;
+
+       … in the left operand of '++'
+         at /pwd/lang/eval-fail-operator-trace.nix:8:7:
+            7|   d = c ? y;
+            8|   e = d ++ [ ];
+             |       ^
+            9|   f = e * 1;
+
+       … in the argument of '?'
+         at /pwd/lang/eval-fail-operator-trace.nix:7:7:
+            6|   c = -b;
+            7|   d = c ? y;
+             |       ^
+            8|   e = d ++ [ ];
+
+       … while calling the 'sub' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:6:7:
+            5|   b = a.x;
+            6|   c = -b;
+             |       ^
+            7|   d = c ? y;
+
+       … while selecting an attribute
+         at /pwd/lang/eval-fail-operator-trace.nix:5:7:
+            4|   a = throw "kaboom";
+            5|   b = a.x;
+             |       ^
+            6|   c = -b;
+
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail-operator-trace.nix:4:7:
+            3| let
+            4|   a = throw "kaboom";
+             |       ^
+            5|   b = a.x;
+
+       error: kaboom

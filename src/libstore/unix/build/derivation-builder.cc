@@ -253,24 +253,6 @@ SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
     return builtOutputs;
 }
 
-/* Move/rename path 'src' to 'dst'. Temporarily make 'src' writable if
-   it's a directory and we're not root (to be able to update the
-   directory's parent link ".."). */
-static void movePath(const std::filesystem::path & src, const std::filesystem::path & dst)
-{
-    auto st = lstat(src);
-
-    bool changePerm = (geteuid() && S_ISDIR(st.st_mode) && !(st.st_mode & S_IWUSR));
-
-    if (changePerm)
-        chmod(src, st.st_mode | S_IWUSR);
-
-    std::filesystem::rename(src, dst);
-
-    if (changePerm)
-        chmod(dst, st.st_mode);
-}
-
 static void replaceValidPath(const std::filesystem::path & storePath, const std::filesystem::path & tmpPath)
 {
     /* We can't atomically replace storePath (the original) with
@@ -1857,7 +1839,9 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = type(params.drv).isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    if (store.storeDir != store.config->realStoreDir.get()) {
+    const bool isRelocatedStore = store.storeDir != store.config->realStoreDir.get();
+
+    if (isRelocatedStore) {
 #if defined(__linux__) || defined(__FreeBSD__)
         useSandbox = true;
 #else
@@ -1870,10 +1854,19 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
         if (!localSettings.sandboxFallback)
             throw Error(
                 "this system does not support the kernel namespaces that are required for sandboxing; use '--no-sandbox' to disable sandboxing");
-        debug("auto-disabling sandboxing because the prerequisite namespaces are not available");
+
+        if (isRelocatedStore)
+            throw Error(
+                "this system does not support the kernel namespaces that are required for sandboxing, which is required for building in a diverted store");
+
+        static std::atomic<bool> warned = false;
+        warnOnce(
+            warned,
+            "auto-disabling sandboxing because the prerequisite namespaces are not available and '%1%' is enabled; use '--no-sandbox' or specify 'sandbox = false' setting to silence this warning",
+            localSettings.sandboxFallback.name);
+
         useSandbox = false;
     }
-
 #endif
 
     if (!useSandbox && params.drvOptions.useUidRange(params.drv))

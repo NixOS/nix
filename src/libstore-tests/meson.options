@@ -1,6 +1,14 @@
 # vim: filetype=meson
 
 option(
+  'unit-tests',
+  type : 'boolean',
+  value : true,
+  description : 'Build unit tests',
+  yield : true,
+)
+
+option(
   'benchmarks',
   type : 'boolean',
   value : false,
@@ -12,6 +20,14 @@ option(
   'fuzzers',
   type : 'boolean',
   value : false,
-  description : 'Build libFuzzer targets',
+  description : 'Build fuzz targets',
+  yield : true,
+)
+
+option(
+  'fuzzing-engine',
+  type : 'string',
+  value : '',
+  description : 'One compiler-driver argument for linking an external fuzzing engine',
   yield : true,
 )

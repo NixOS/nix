@@ -140,7 +140,6 @@ nix_err nix_flake_lock_flags_set_mode_check(nix_c_context * context, nix_flake_l
  * @brief Put the lock flags in a mode that updates the lock file in memory, if needed.
  * @param[out] context Optional, stores error information
  * @param[in] flags The flags to modify
- * @param[in] update Whether to allow updates
  *
  * This will cause `nix_flake_lock` to update the lock file in memory, if needed.
  */
@@ -150,7 +149,6 @@ nix_err nix_flake_lock_flags_set_mode_virtual(nix_c_context * context, nix_flake
  * @brief Put the lock flags in a mode that updates the lock file on disk, if needed.
  * @param[out] context Optional, stores error information
  * @param[in] flags The flags to modify
- * @param[in] update Whether to allow updates
  *
  * This will cause `nix_flake_lock` to update the lock file on disk, if needed.
  */
@@ -233,7 +231,7 @@ void nix_flake_reference_free(nix_flake_reference * store);
  * @brief Get the output attributes of a flake.
  * @param[out] context Optional, stores error information
  * @param[in] settings The settings to use
- * @param[in] locked_flake the flake to get the output attributes from
+ * @param[in] lockedFlake the flake to get the output attributes from
  * @return A new nix_value or NULL on failure. Release the `nix_value` with `nix_value_decref`.
  */
 nix_value * nix_locked_flake_get_output_attrs(

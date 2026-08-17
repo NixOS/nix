@@ -13,6 +13,7 @@ project(
 )
 
 cxx = meson.get_compiler('cpp')
+build_unit_tests = get_option('unit-tests')
 
 subdir('nix-meson-build-support/deps-lists')
 
@@ -20,8 +21,6 @@ nix_store = dependency('nix-store')
 
 deps_private_maybe_subproject = [
   nix_store,
-  dependency('nix-store-c'),
-  dependency('nix-store-test-support'),
 ]
 deps_public_maybe_subproject = []
 subdir('nix-meson-build-support/subprojects')
@@ -29,29 +28,9 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-sqlite = dependency('sqlite3', 'sqlite', version : '>=3.6.19')
-deps_private += sqlite
-
-rapidcheck = dependency('rapidcheck')
-deps_private += rapidcheck
-
-gtest = dependency('gtest', main : true)
-deps_private += gtest
-
-configdata = configuration_data()
-configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
-
-configdata.set_quoted('NIX_STORE_DIR', nix_store.get_variable('storedir'))
-
-config_priv_h = configure_file(
-  configuration : configdata,
-  output : 'store-tests-config.hh',
-)
-
-gtest = dependency('gmock')
-deps_private += gtest
-
 subdir('nix-meson-build-support/common')
+
+fuzz_dependencies = deps_private + deps_other
 
 sources = files(
   'build-result.cc',
@@ -59,6 +38,7 @@ sources = files(
   'content-address.cc',
   'derivation-advanced-attrs.cc',
   'derivation/external-formats.cc',
+  'derivation/full-inputs.cc',
   'derivation/invariants.cc',
   'derivations.cc',
   'derived-path.cc',
@@ -97,69 +77,90 @@ sources = files(
 
 include_dirs = [ include_directories('.') ]
 
+if build_unit_tests
+  unit_dependencies = fuzz_dependencies + [
+    dependency('nix-store-c'),
+    dependency('nix-store-test-support'),
+    dependency('sqlite3', 'sqlite', version : '>=3.6.19'),
+    dependency('rapidcheck'),
+    dependency('gtest', main : true),
+    dependency('gmock'),
+  ]
 
-this_exe = executable(
-  meson.project_name(),
-  sources,
-  config_priv_h,
-  dependencies : deps_private_subproject + deps_private + deps_other,
-  include_directories : include_dirs,
-  # TODO: -lrapidcheck, see ../libutil-support/build.meson
-  link_args : linker_export_flags + [ '-lrapidcheck' ],
-  # get main from gtest
-  install : true,
-  cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
-)
+  configdata = configuration_data()
+  configdata.set_quoted('PACKAGE_VERSION', meson.project_version())
+  configdata.set_quoted('NIX_STORE_DIR', nix_store.get_variable('storedir'))
 
-test_env = {
-  '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-  'HOME' : meson.current_build_dir() / 'test-home',
-}
-
-if host_machine.system() != 'windows'
-  test_env += {'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store'}
-endif
-
-if get_option('fuzzers')
-  subdir('fuzz')
-endif
-
-test(
-  meson.project_name(),
-  this_exe,
-  env : test_env,
-  protocol : 'gtest',
-)
-
-# Build benchmarks if enabled
-if get_option('benchmarks')
-  gbenchmark = dependency('benchmark', required : true)
-
-  benchmark_sources = files(
-    'bench-main.cc',
-    'derivation-parser-bench.cc',
-    'ref-scan-bench.cc',
-    'register-valid-paths-bench.cc',
+  config_priv_h = configure_file(
+    configuration : configdata,
+    output : 'store-tests-config.hh',
   )
 
-  benchmark_exe = executable(
-    'nix-store-benchmarks',
-    benchmark_sources,
+  this_exe = executable(
+    meson.project_name(),
+    sources,
     config_priv_h,
-    dependencies : deps_private_subproject + deps_private + deps_other + [
-      gbenchmark,
-    ],
+    dependencies : unit_dependencies,
     include_directories : include_dirs,
-    link_args : linker_export_flags,
+    # TODO: -lrapidcheck, see ../libutil-support/build.meson
+    link_args : linker_export_flags + [ '-lrapidcheck' ],
+    # get main from gtest
     install : true,
     cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
   )
 
-  benchmark(
-    'nix-store-benchmarks',
-    benchmark_exe,
-    env : {
-      '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
-    },
+  test_env = {
+    '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+    'HOME' : meson.current_build_dir() / 'test-home',
+  }
+
+  if host_machine.system() != 'windows'
+    test_env += {
+      'NIX_REMOTE' : meson.current_build_dir() / 'test-home' / 'store',
+    }
+  endif
+
+  test(
+    meson.project_name(),
+    this_exe,
+    env : test_env,
+    protocol : 'gtest',
   )
+
+  # Build benchmarks if enabled
+  if get_option('benchmarks')
+    gbenchmark = dependency('benchmark', required : true)
+
+    benchmark_sources = files(
+      'bench-main.cc',
+      'derivation-parser-bench.cc',
+      'ref-scan-bench.cc',
+      'register-valid-paths-bench.cc',
+    )
+
+    benchmark_exe = executable(
+      'nix-store-benchmarks',
+      benchmark_sources,
+      config_priv_h,
+      dependencies : unit_dependencies + [
+        gbenchmark,
+      ],
+      include_directories : include_dirs,
+      link_args : linker_export_flags,
+      install : true,
+      cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
+    )
+
+    benchmark(
+      'nix-store-benchmarks',
+      benchmark_exe,
+      env : {
+        '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+      },
+    )
+  endif
+endif
+
+if get_option('fuzzers')
+  subdir('fuzz')
 endif

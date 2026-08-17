@@ -69,7 +69,7 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
 {
     Activity act(*logger, lvlTalkative, actUnknown, fmt("evaluating derivation '%s'", what()));
 
-    auto attr = getCursor(*state);
+    auto attr = getCursor(*state, AutoCall::No);
 
     auto attrPath = attr->getAttrPathStr();
 
@@ -141,12 +141,12 @@ DerivedPathsWithInfo InstallableFlake::toDerivedPaths()
     }};
 }
 
-std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state)
+std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state, AutoCall autoCall)
 {
-    return {&getCursor(state)->forceValue(), noPos};
+    return {&getCursor(state, autoCall)->forceValue(), noPos};
 }
 
-std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState & state)
+std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState & state, AutoCall)
 {
     auto evalCache = openEvalCache(state, getLockedFlake());
 

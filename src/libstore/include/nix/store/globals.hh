@@ -220,7 +220,7 @@ public:
           The following system types are widely used, as Nix is actively supported on these platforms:
 
           - `x86_64-linux`
-          - `x86_64-darwin`
+          - `x86_64-darwin` (only via Rosetta 2)
           - `i686-linux`
           - `aarch64-linux`
           - `aarch64-darwin`
