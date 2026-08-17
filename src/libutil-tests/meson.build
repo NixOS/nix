@@ -160,4 +160,34 @@ if build_unit_tests
       )
     endif
   endif
+
+  # Build benchmarks if enabled
+  if get_option('benchmarks')
+    gbenchmark = dependency('benchmark', required : true)
+
+    benchmark_sources = files(
+      'bench-main.cc',
+    )
+
+    benchmark_exe = executable(
+      'nix-util-benchmarks',
+      benchmark_sources,
+      config_priv_h,
+      dependencies : unit_dependencies + [
+        gbenchmark,
+      ],
+      include_directories : include_dirs,
+      link_args : linker_export_flags,
+      install : true,
+      cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
+    )
+
+    benchmark(
+      'nix-util-benchmarks',
+      benchmark_exe,
+      env : {
+        '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
+      },
+    )
+  endif
 endif
