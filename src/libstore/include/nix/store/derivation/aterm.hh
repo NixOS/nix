@@ -135,6 +135,24 @@ std::optional<Hash> hashModulo(Store & store, const Full & drv);
  */
 Hash hashModulo(Store & store, const Basic & drv);
 
+/**
+ * The intermediate ATerm that `hashModulo` hashes: the derivation with
+ * its outputs masked, and with each input derivation replaced by its
+ * own hash modulo (in place of its store path).
+ *
+ * This is not a real derivation --- it cannot be parsed back --- but it
+ * is exactly what the input address is computed from, so exposing it
+ * makes that computation reviewable rather than a black box.
+ *
+ * Returns `std::nullopt` in the same cases `hashModulo` does.
+ */
+std::optional<std::string> unparseModulo(Store & store, const Full & drv);
+
+/**
+ * Like the above, but for a resolved (basic) derivation.
+ */
+std::string unparseModulo(Store & store, const Basic & drv);
+
 Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name);
 void write(Sink & out, const StoreDirConfig & store, const Basic & drv);
 

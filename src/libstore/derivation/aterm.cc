@@ -939,7 +939,7 @@ static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<I
  * output paths. Only valid for input-addressed (possibly deferred)
  * derivations.
  */
-std::optional<Hash> hashModulo(Store & store, const Full & drv)
+std::optional<std::string> unparseModulo(Store & store, const Full & drv)
 {
     auto masked =
         derivationModulo(store, maskOutputsAndEnv(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
@@ -947,13 +947,13 @@ std::optional<Hash> hashModulo(Store & store, const Full & drv)
         }));
     if (!masked)
         return std::nullopt;
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *masked));
+    return unparseDerivation(store, *masked);
 }
 
-Hash hashModulo(Store & store, const Basic & drv)
+std::string unparseModulo(Store & store, const Basic & drv)
 {
     /* A resolved derivation has no input derivations, so there is
-       nothing to substitute and the hash is always computable. */
+       nothing to substitute. */
     auto masked = maskOutputsAndEnv(drv).mapInputs([](const StorePathSet & srcs) {
         return HashModuloInputs{
             .srcs = srcs,
@@ -961,7 +961,22 @@ Hash hashModulo(Store & store, const Basic & drv)
         };
     });
 
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, masked));
+    return unparseDerivation(store, masked);
+}
+
+std::optional<Hash> hashModulo(Store & store, const Full & drv)
+{
+    auto masked = unparseModulo(store, drv);
+    if (!masked)
+        return std::nullopt;
+    return hashString(HashAlgorithm::SHA256, *masked);
+}
+
+Hash hashModulo(Store & store, const Basic & drv)
+{
+    /* A resolved derivation has no input derivations, so the hash is
+       always computable. */
+    return hashString(HashAlgorithm::SHA256, unparseModulo(store, drv));
 }
 
 /* --------------------------------------------------------------------------
