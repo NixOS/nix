@@ -36,7 +36,9 @@ void RemoteStoreConfig::anchor() {}
 
 /* TODO: Separate these store types into different files, give them better names */
 RemoteStore::RemoteStore(const Config & config)
-    : Store{config}
+    /* Abstract, so the most-derived store initialises the virtual `Store` base
+       and this argument is never the one that survives. */
+    : Store{config, SecretContext{}}
     , config{config}
     , connections(
           make_ref<Pool<Connection>>(
@@ -739,17 +741,12 @@ void RemoteBuilder::repairPath(const StorePath & path)
     throw Unsupported("operation 'repairPath' is not supported by store '%s'", store->config.getHumanReadableURI());
 }
 
-ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
-{
-    return make_ref<RemoteBuilder>(
-        ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
-}
-
 ref<Builder> RemoteStore::getBuilder(const SecretContext &, std::shared_ptr<Store> evalStore)
 {
     /* A resolver is process-local authority.  The remote endpoint must create
        its own build context instead of receiving ours over the store protocol. */
-    return getBuilder(std::move(evalStore));
+    return make_ref<RemoteBuilder>(
+        ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
 void RemoteStore::addTempRoot(const StorePath & path)

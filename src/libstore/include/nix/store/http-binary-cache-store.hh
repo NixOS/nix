@@ -83,9 +83,9 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore(ref<FileTransfer> fileTransfer) const;
+    ref<Store> openStore(const SecretContext & context, ref<FileTransfer> fileTransfer) const;
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };
@@ -112,7 +112,8 @@ public:
 
     ref<Config> config;
 
-    HttpBinaryCacheStore(ref<Config> config, ref<FileTransfer> fileTransfer = getFileTransfer());
+    HttpBinaryCacheStore(
+        ref<Config> config, ref<FileTransfer> fileTransfer = getFileTransfer(), SecretContext context = {});
 
     void init() override;
 

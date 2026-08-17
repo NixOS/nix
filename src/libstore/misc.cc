@@ -95,7 +95,7 @@ querySubstitutablePathInfosAsync(Store & store, const StorePathCAMap & paths, Su
 
     co_await forEachAsync(paths, [&store, &infos](auto path) -> asio::awaitable<void> {
         std::optional<Error> lastStoresException = std::nullopt;
-        for (auto & sub : getDefaultSubstituters()) {
+        for (auto & sub : getDefaultSubstituters(store.getSecretContext())) {
             if (lastStoresException.has_value()) {
                 logError(lastStoresException->info());
                 lastStoresException.reset();
@@ -248,7 +248,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                                 continue;
 
                             bool found = false;
-                            for (auto & sub : getDefaultSubstituters()) {
+                            for (auto & sub : getDefaultSubstituters(secretContext)) {
                                 /* TODO: Asyncify this. */
                                 auto realisation = sub->queryRealisation({drvPath, outputName});
                                 if (!realisation)

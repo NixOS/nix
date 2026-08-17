@@ -372,7 +372,7 @@ static void daemonLoop(
                         }
 
                         // Handle the connection.
-                        auto store = storeConfig->openStore();
+                        auto store = storeConfig->openStore(SecretContext{});
                         store->init();
                         processConnection(
                             std::move(store),
@@ -486,7 +486,7 @@ static void runDaemon(
     std::visit(
         overloaded{
             [&](StdIO) {
-                auto store = storeConfig->openStore();
+                auto store = storeConfig->openStore(SecretContext{});
                 store->init();
 
                 std::shared_ptr<RemoteStore> remoteStore;

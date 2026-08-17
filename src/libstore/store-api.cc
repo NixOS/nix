@@ -151,7 +151,7 @@ std::pair<StorePath, CanonPath> StoreDirConfig::toStorePath(std::string_view pat
 
 ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore)
 {
-    return getBuilder(SecretContext{}, std::move(evalStore));
+    return getBuilder(secretContext, std::move(evalStore));
 }
 
 ref<Builder> Store::getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore)
@@ -415,13 +415,14 @@ StringSet Store::Config::getDefaultSystemFeatures()
     return res;
 }
 
-Store::Store(const Store::Config & config)
+Store::Store(const Store::Config & config, SecretContext secretContext)
     : StoreDirConfig{config}
     , config{config}
     , pathInfoCache(
           config.pathInfoCacheSize
               ? std::make_shared<decltype(pathInfoCache)::element_type>((size_t) config.pathInfoCacheSize)
               : nullptr)
+    , secretContext{std::move(secretContext)}
 {
     assertLibStoreInitialized();
 }
@@ -520,7 +521,7 @@ StorePathSet Store::querySubstitutablePaths(const StorePathSet & paths)
 
     StorePathSet res;
 
-    for (auto & sub : getDefaultSubstituters()) {
+    for (auto & sub : getDefaultSubstituters(secretContext)) {
         if (remaining.empty())
             break;
         if (sub->storeDir != storeDir)

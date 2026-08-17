@@ -91,9 +91,9 @@ std::filesystem::path LocalBuildStoreConfig::getBuildDir() const
                                         : AbsolutePath{stateDir.get() / "builds"};
 }
 
-ref<Store> LocalStore::Config::openStore() const
+ref<Store> LocalStore::Config::openStore(const SecretContext & context) const
 {
-    return make_ref<LocalStore>(ref{shared_from_this()});
+    return make_ref<LocalStore>(ref{shared_from_this()}, context);
 }
 
 bool LocalStoreConfig::getDefaultRequireSigs()
@@ -123,7 +123,12 @@ struct LocalStore::State::Stmts
 };
 
 LocalStore::LocalStore(ref<const Config> config)
-    : Store{*config}
+    : LocalStore(std::move(config), {})
+{
+}
+
+LocalStore::LocalStore(ref<const Config> config, SecretContext secretContext)
+    : Store{*config, std::move(secretContext)}
     , LocalFSStore{*config}
     , config{config}
     , _state(make_ref<Sync<State>>())

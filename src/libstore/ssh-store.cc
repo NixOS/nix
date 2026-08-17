@@ -51,8 +51,8 @@ public:
 
     ref<const Config> config;
 
-    SSHStore(ref<const Config> config)
-        : Store{*config}
+    SSHStore(ref<const Config> config, SecretContext secretContext)
+        : Store{*config, std::move(secretContext)}
         , RemoteStore{*config}
         , config{config}
         , master(config->createSSHMaster(
@@ -152,10 +152,10 @@ private:
 public:
     using Config = MountedSSHStoreConfig;
 
-    MountedSSHStore(ref<const Config> config)
-        : Store{*config}
-        , RemoteStore{*config}
-        , SSHStore{config}
+    MountedSSHStore(ref<const Config> config, SecretContext secretContext)
+        : Store{*config, std::move(secretContext)}
+        , RemoteStore{*config} /* The `Store` base is initialised above; this argument is discarded. */
+        , SSHStore{config, SecretContext{}}
         , LocalFSStore{*config}
     {
         extraRemoteProgramArgs = {
@@ -211,14 +211,15 @@ public:
 
 void MountedSSHStore::anchor() {}
 
-ref<Store> SSHStore::Config::openStore() const
+ref<Store> SSHStore::Config::openStore(const SecretContext & context) const
 {
-    return make_ref<SSHStore>(ref{shared_from_this()});
+    return make_ref<SSHStore>(ref{shared_from_this()}, context);
 }
 
-ref<Store> MountedSSHStore::Config::openStore() const
+ref<Store> MountedSSHStore::Config::openStore(const SecretContext & context) const
 {
-    return make_ref<MountedSSHStore>(ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())});
+    return make_ref<MountedSSHStore>(
+        ref{std::dynamic_pointer_cast<const MountedSSHStore::Config>(shared_from_this())}, context);
 }
 
 ref<RemoteStore::Connection> SSHStore::openConnection()

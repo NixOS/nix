@@ -90,7 +90,7 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 
@@ -120,7 +120,7 @@ struct LocalOverlayStore : virtual LocalStore
 
     ref<const Config> config;
 
-    LocalOverlayStore(ref<const Config>);
+    LocalOverlayStore(ref<const Config>, SecretContext secretContext);
 
 private:
     void anchor() override;
