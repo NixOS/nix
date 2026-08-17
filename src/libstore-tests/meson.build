@@ -36,11 +36,12 @@ sources = files(
   'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
-  'derivation-advanced-attrs.cc',
+  'derivation/advanced-attrs.cc',
   'derivation/external-formats.cc',
   'derivation/full-inputs.cc',
   'derivation/invariants.cc',
-  'derivations.cc',
+  'derivation/resolution.cc',
+  'derivation/write.cc',
   'derived-path.cc',
   'downstream-placeholder.cc',
   'dummy-store.cc',
@@ -72,7 +73,6 @@ sources = files(
   'uds-remote-store.cc',
   'worker-protocol.cc',
   'worker-substitution.cc',
-  'write-derivation.cc',
 )
 
 include_dirs = [ include_directories('.') ]
@@ -133,7 +133,7 @@ if build_unit_tests
 
     benchmark_sources = files(
       'bench-main.cc',
-      'derivation-parser-bench.cc',
+      'derivation/parser-bench.cc',
       'ref-scan-bench.cc',
       'register-valid-paths-bench.cc',
     )
