@@ -525,7 +525,7 @@ nix::Hash adl_serializer<nix::Hash>::from_json(const json & json, const nix::Exp
     return nix::Hash::parseSRI(s, xpSettings);
 }
 
-void adl_serializer<nix::Hash>::to_json(json & json, const nix::Hash & hash)
+void adl_serializer<nix::Hash>::to_json(json & json, const nix::Hash & hash, const nix::ExperimentalFeatureSettings &)
 {
     json = hash.to_string(nix::HashFormat::SRI, true);
 }

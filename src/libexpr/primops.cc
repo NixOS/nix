@@ -1780,6 +1780,11 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         drv.structuredAttrs = std::move(*jsonObject);
     }
 
+    /* Extract `__meta` from structured attrs into `drv.meta` before output-path
+       computation, so the hash-modulo path sees the canonical (meta-free)
+       structuredAttrs. The language (no `derivation::parse`) also calls this. */
+    derivation::extractMeta(drv);
+
     /* Everything in the context of the strings in the derivation
        attributes should be added as dependencies of the resulting
        derivation. */

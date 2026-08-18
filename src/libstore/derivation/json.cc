@@ -7,7 +7,8 @@
 
 namespace nlohmann {
 
-void adl_serializer<nix::DerivationOutput>::to_json(json & res, const nix::DerivationOutput & o)
+void adl_serializer<nix::DerivationOutput>::to_json(
+    json & res, const nix::DerivationOutput & o, const nix::ExperimentalFeatureSettings &)
 {
     using namespace nix;
     res = nlohmann::json::object();
@@ -143,7 +144,7 @@ static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & in
 
 template<typename Inputs>
 void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
-    json & res, const nix::derivation::Derivation<Inputs> & d)
+    json & res, const nix::derivation::Derivation<Inputs> & d, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
     res = nlohmann::json::object();
@@ -167,6 +168,14 @@ void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
 
     if (d.structuredAttrs)
         res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+
+    // See e.g. doc/manual/source/protocols/json/schema/derivation-v4.yaml
+    if (xpSettings.isEnabled(nix::Xp::DerivationMeta)) {
+        if (d.meta)
+            res["meta"] = *d.meta;
+        else
+            res["meta"] = nullptr;
+    }
 }
 
 template<typename Inputs>
@@ -283,6 +292,13 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
             if (auto structuredAttrs = get(json, "structuredAttrs"))
                 return StructuredAttrs{*structuredAttrs};
             return std::nullopt;
+        }(),
+        .meta = [&]() -> std::optional<nlohmann::json::object_t> {
+            auto metaPtr = get(json, "meta");
+            if (!metaPtr || metaPtr->is_null())
+                return std::nullopt;
+            xpSettings.require(Xp::DerivationMeta);
+            return getObject(*metaPtr);
         }(),
         .name = getString(valueAt(json, "name")),
     };

@@ -159,7 +159,7 @@ INSTANTIATE_TEST_SUITE_P(
     TEST_P(FIXTURE, to_json)                                                                    \
     {                                                                                           \
         const auto & drv = GetParam();                                                          \
-        writeJsonTest(drv.name, drv);                                                           \
+        writeJsonTest(drv.name, drv, mockXpSettings);                                           \
     }                                                                                           \
                                                                                                 \
     TEST_P(FIXTURE, from_aterm)                                                                 \
@@ -271,6 +271,50 @@ Derivation makeDynDepDerivation()
 }
 
 INSTANTIATE_TEST_SUITE_P(DynDerivationJSONATerm, DynDerivationJsonAtermTest, ::testing::Values(makeDynDepDerivation()));
+
+struct DerivationMetaJsonAtermTest : DerivationMetaTest,
+                                     JsonCharacterizationTest<Derivation>,
+                                     ::testing::WithParamInterface<Derivation>
+{};
+
+MAKE_TEST_P(DerivationMetaJsonAtermTest);
+
+Derivation makeMetaDerivation()
+{
+    return Derivation{
+        .outputs{
+            {
+                "out",
+                DerivationOutput{DerivationOutput::InputAddressed{
+                    .path = StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"},
+                }},
+            },
+        },
+        .inputs{
+            .srcs{
+                StorePath{"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep1"},
+            },
+            .drvs{},
+        },
+        .platform = "x86_64-linux",
+        .builder = "/bin/sh",
+        .args = {"-c", "echo hello > $out"},
+        .env{
+            {"out", "/nix/store/c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-meta-derivation"},
+        },
+        /* structuredAttrs is empty after `extractMeta`. */
+        .structuredAttrs = StructuredAttrs{.structuredAttrs = {}},
+        .meta =
+            nlohmann::json::object_t{
+                {"description", "A test derivation"},
+                {"maintainer", "test@example.com"},
+                {"version", "1.0"},
+            },
+        .name = "meta-derivation",
+    };
+}
+
+INSTANTIATE_TEST_SUITE_P(DerivationMetaJSONATerm, DerivationMetaJsonAtermTest, ::testing::Values(makeMetaDerivation()));
 
 #undef MAKE_TEST_P
 

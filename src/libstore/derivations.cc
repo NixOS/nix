@@ -3,6 +3,7 @@
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/worker-protocol.hh"
 #include "nix/util/types.hh"
 #include "nix/util/util.hh"
 #include "nix/store/common-protocol.hh"
@@ -116,6 +117,16 @@ StorePath computeStorePath(const StoreDirConfig & store, const Derivation & drv)
 
 StorePath Store::writeDerivation(const Derivation & drv, RepairFlag repair)
 {
+    /* Check that the store supports derivation-meta before writing,
+       to produce a clear error instead of a confusing hash mismatch. */
+    if (drv.meta && !hasProtoFeature(WorkerProto::featureDerivationMeta)) {
+        throw Error(
+            "derivation '%s' uses 'derivation-meta', but the store '%s' does not support this feature; "
+            "consider updating it to Nix 2.35, or disable the use of 'derivation-meta' in your derivations",
+            drv.name,
+            config.getHumanReadableURI());
+    }
+
     auto [suffix, contents, references, path] = infoForDerivation(*this, drv);
 
     /* In case the derivation is already valid, we bail out early since that's
@@ -626,13 +637,79 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
 template void checkInvariants(const Basic & drv, Store & store, const StorePath & drvPath);
 template void checkInvariants(const Full & drv, Store & store, const StorePath & drvPath);
 
+void checkCanonicalRequiredSystemFeatures(
+    std::string_view drvName, const nlohmann::json & requiredSystemFeatures, std::string_view context)
+{
+    auto features = getStringList(requiredSystemFeatures);
+
+    // Check sorted and unique. This allows e.g. derivation-meta to reliably
+    // convert from high-level representation to ATerm, without having to track
+    // where into the system features to insert. That wouldn't be high-level.
+    if (!std::ranges::is_sorted(features))
+        throw Error(
+            "derivation '%s' has unsorted 'requiredSystemFeatures', which is not permitted %s", drvName, context);
+    if (auto dup = std::ranges::adjacent_find(features); dup != features.end())
+        throw Error(
+            "derivation '%s' has a duplicate 'requiredSystemFeatures' entry '%s', which is not permitted %s",
+            drvName,
+            *dup,
+            context);
+}
+
+/* Considering the significance of the ATerm format, we make sure that the
+   high-level representation is clean and representable unambiguously in ATerm.
+
+   Specifically it means that `unparse` and `write` need to work, or equivalently,
+   the derivation must be a possible `derivation::extraMeta` return value.
+
+   Allowing these invariants to be violated means it would be possible to
+   construct a JSON that doesn't roundtrip to ATerm. */
+static void checkMetaInvariant(const auto & drv)
+{
+    if (!drv.meta)
+        return;
+
+    /* `meta` is only representable as part of structured attributes (see
+       `Derivation::meta`). Without them there is nowhere to serialise it, so it
+       would be silently dropped. Reject this rather than lose data. */
+    if (!drv.structuredAttrs)
+        throw Error(
+            "derivation '%s' has 'meta' but no structured attributes; 'meta' requires structured attributes", drv.name);
+
+    auto & sa = drv.structuredAttrs->structuredAttrs;
+
+    if (sa.contains("__meta"))
+        throw Error(
+            "derivation '%s' must not set the '__meta' structured attribute, because that conflicts with the encoding of 'meta' in the current derivation format", // which is ATerm
+            drv.name);
+
+    auto rsfIt = sa.find("requiredSystemFeatures");
+    if (rsfIt == sa.end() || !rsfIt->second.is_array())
+        return;
+
+    // `derivation-meta` is implied by `meta` and reinjected on serialisation, so
+    // in the clean representation it must be absent. This is the high-level
+    // counterpart of `extractMeta` requiring it to be *present* in the encoding.
+    for (const auto & feature : rsfIt->second)
+        if (feature.is_string() && feature.template get<std::string>() == "derivation-meta")
+            throw Error(
+                "derivation '%s' must not list 'derivation-meta' in 'requiredSystemFeatures'; it is implied by 'meta' != null",
+                drv.name);
+
+    // Shared with `extractMeta`: the ordering/duplicate requirement is the same
+    // on the clean list here as on the encoded list there. */
+    checkCanonicalRequiredSystemFeatures(drv.name, rsfIt->second, "when 'meta' is set");
+}
+
 void checkInvariants(const Basic & drv, Store & store)
 {
+    checkMetaInvariant(drv);
     processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 
 void checkInvariants(const Full & drv, Store & store)
 {
+    checkMetaInvariant(drv);
     processDerivationOutputPaths<false>(store, drv, drv.name);
 }
 

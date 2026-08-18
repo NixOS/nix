@@ -31,12 +31,16 @@ void readJsonTest(CharacterizationTest & test, std::string_view testStem, const 
  * Golden test for JSON writing
  */
 template<typename T>
-void writeJsonTest(CharacterizationTest & test, std::string_view testStem, const T & value)
+void writeJsonTest(CharacterizationTest & test, std::string_view testStem, const T & value, auto... args)
 {
     using namespace nlohmann;
     test.writeTest(
         std::string{testStem} + ".json",
-        [&]() -> json { return static_cast<json>(value); },
+        [&]() -> json {
+            json res;
+            adl_serializer<T>::to_json(res, value, args...);
+            return res;
+        },
         [](const auto & file) { return json::parse(readFile(file)); },
         [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });
 }
@@ -127,9 +131,9 @@ struct JsonCharacterizationTest : virtual CharacterizationTest
     /**
      * Golden test for writing
      */
-    void writeJsonTest(std::string_view testStem, const T & value)
+    void writeJsonTest(std::string_view testStem, const T & value, auto... args)
     {
-        nix::writeJsonTest(*this, testStem, value);
+        nix::writeJsonTest(*this, testStem, value, args...);
     }
 
     void checkpointJson(std::string_view testStem, const T & value)

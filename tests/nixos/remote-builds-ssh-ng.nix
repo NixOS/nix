@@ -8,6 +8,27 @@ test@{
 let
   pkgs = config.nodes.client.nixpkgs.pkgs;
 
+  clientNixVersion = config.nodes.client.nix.package.version;
+  clientSupportsDerivationMeta = lib.versionAtLeast clientNixVersion "2.35";
+
+  builderNixVersion = config.nodes.builder.nix.package.version;
+  builderSupportsDerivationMeta = lib.versionAtLeast builderNixVersion "2.35";
+
+  # derivation-meta requires __structuredAttrs, which needs bash for .attrs.sh.
+  metaExpr = pkgs.writeText "meta-expr.nix" ''
+    let bash = builtins.storePath ${pkgs.bash}; in
+    derivation {
+      name = "meta-test";
+      system = "i686-linux";
+      builder = "''${bash}/bin/bash";
+      args = [ "-c" "source $NIX_ATTRS_SH_FILE; echo hello > \''${outputs[out]}" ];
+      __structuredAttrs = true;
+      __meta = { description = "test"; };
+      requiredSystemFeatures = [ "derivation-meta" ];
+      outputs = [ "out" ];
+    }
+  '';
+
   # Trivial Nix expression to build remotely.
   expr =
     config: nr:
@@ -67,6 +88,9 @@ in
         }:
         {
           nix.settings.max-jobs = 0; # force remote building
+          nix.settings.experimental-features = lib.optionals clientSupportsDerivationMeta [
+            "derivation-meta"
+          ];
           nix.distributedBuilds = true;
           nix.buildMachines = [
             {
@@ -76,10 +100,14 @@ in
               system = "i686-linux";
               maxJobs = 1;
               protocol = "ssh-ng";
+              supportedFeatures = lib.optionals clientSupportsDerivationMeta [ "derivation-meta" ];
             }
           ];
           virtualisation.writableStore = true;
-          virtualisation.additionalPaths = [ config.system.build.extraUtils ];
+          virtualisation.additionalPaths = [
+            config.system.build.extraUtils
+            pkgs.bash
+          ];
           nix.settings.substituters = lib.mkForce [ ];
           programs.ssh.extraConfig = "ConnectTimeout 30";
         };
@@ -135,6 +163,23 @@ in
 
         # Check that we get phase reporting in the log file
         client.succeed("grep -q '@nix {\"action\":\"setPhase\",\"phase\":\"buildPhase\"}' log-output")
-      '';
+      ''
+      + lib.optionalString clientSupportsDerivationMeta (
+        if builderSupportsDerivationMeta then
+          ''
+
+            # Both client and builder support derivation-meta; building should work.
+            client.succeed("nix-build ${metaExpr}")
+          ''
+        else
+          ''
+
+            # The client supports derivation-meta but the builder does not.
+            # Expect a clear error instead of a confusing hash mismatch.
+            output = client.fail("nix-build ${metaExpr} 2>&1")
+            assert "'derivation-meta', but the store" in output, \
+              f"Expected derivation-meta protocol feature error, got: {output}"
+          ''
+      );
   };
 }

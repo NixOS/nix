@@ -407,6 +407,9 @@ StringSet Store::Config::getDefaultSystemFeatures()
         res.insert(std::string{drvFeatureBuilderRpcV0});
     }
 
+    if (experimentalFeatureSettings.isEnabled(Xp::DerivationMeta))
+        res.insert("derivation-meta");
+
     return res;
 }
 

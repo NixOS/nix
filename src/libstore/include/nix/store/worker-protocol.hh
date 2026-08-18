@@ -152,6 +152,12 @@ struct WorkerProto
     static constexpr std::string_view featureSubmitOutput = "submit-output";
 
     /**
+     * Feature for derivation-meta support: the daemon or worker understands
+     * __meta extraction and output hash computation without meta.
+     */
+    static constexpr std::string_view featureDerivationMeta = "derivation-meta";
+
+    /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
      */

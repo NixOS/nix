@@ -186,6 +186,14 @@ struct Derivation
     StringPairs env;
     std::optional<StructuredAttrs> structuredAttrs;
 
+    /**
+     * Metadata excluded from the builder and derivation hash.
+     *
+     * Represented in ATerm by the `__meta` field in structured attrs +
+     * `derivation-meta` in `requiredSystemFeatures`.
+     */
+    std::optional<nlohmann::json::object_t> meta;
+
     std::string name;
 
     bool operator==(const Derivation &) const = default;
@@ -219,6 +227,7 @@ struct Derivation
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
+            .meta = meta,
             .name = name,
         };
     }
@@ -241,6 +250,7 @@ struct Derivation
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
+            .meta = meta,
             .name = name,
         };
     }
@@ -385,6 +395,38 @@ void fillInOutputPaths(Full & drv, Store & store);
  * @throws Error if parsing fails, output paths can't be computed, or validation fails
  */
 Full parseJsonAndValidate(Store & store, const nlohmann::json & json);
+
+/**
+ * True when `structuredAttrs` correctly opts into the `derivation-meta` feature:
+ */
+bool hasMetaFeature(const nlohmann::json::object_t & structuredAttrs);
+
+/**
+ * Check that a `requiredSystemFeatures` array is in the canonical shape allows
+ * us to reinsert features into the encoding without having to remember their
+ * position in the representation that's supposed to be high level.
+ *
+ * The same requirement applies to both representations of the list: the clean
+ * list (validated by `checkInvariants`) and the encoded list that still contains
+ * e.g. `derivation-meta` (validated by `extractMeta`).
+ *
+ * @param context why the requirement applies, used in the error message,
+ *                e.g. `"when 'meta' is set"` or `"when using 'derivation-meta'"`
+ */
+void checkCanonicalRequiredSystemFeatures(
+    std::string_view drvName, const nlohmann::json & requiredSystemFeatures, std::string_view context);
+
+/**
+ * If `drv` opts into `derivation-meta`, move `__meta` from its
+ * structured attrs into `drv.meta` and remove `derivation-meta` from
+ * its `requiredSystemFeatures`.
+ *
+ * Only required for legacy formats that do not have a nice, separate `meta` field.
+ * Called from `derivation::parse` (ATerm) and `derivation::read` (worker protocol).
+ */
+template<typename Inputs, typename Out>
+void extractMeta(
+    Derivation<Inputs, Out> & drv, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 } // namespace derivation
 
