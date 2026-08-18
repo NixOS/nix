@@ -2,10 +2,14 @@
 #include <gmock/gmock.h>
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
 
 #include <cstring>
+#include <random>
+#include <algorithm>
+#include <thread>
 
 #ifndef _WIN32
 #  include <fcntl.h>
@@ -321,5 +325,124 @@ TEST(WriteFull, RespectsAllowInterrupts)
     FdSource source(pipe.readSide.get());
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "hello");
 }
+
+class CopyFdRangeTest : public ::testing::TestWithParam<std::tuple</*tryCoW*/ bool, /* isRegularFile*/ bool>>
+{
+protected:
+    static std::string makeData()
+    {
+        std::mt19937 rng{42};
+        std::string data(192 * 1024 + 1024, '\0');
+        std::ranges::generate(data, rng);
+        return data;
+    }
+
+    bool tryCoW()
+    {
+        return std::get<0>(GetParam());
+    }
+
+    bool isRegularFile()
+    {
+        return std::get<1>(GetParam());
+    }
+};
+
+TEST_P(CopyFdRangeTest, regularToRegular)
+{
+    auto source = createAnonymousTempFile();
+    auto dest = createAnonymousTempFile();
+    auto input = makeData();
+    writeFull(source.get(), input);
+
+    FdSink sink{dest.get()};
+    sink.isRegularFile = isRegularFile();
+    copyFdRange(source.get(), 0, input.size(), sink, tryCoW());
+    sink.flush();
+    ASSERT_EQ(sink.written, input.size());
+    ASSERT_EQ(lseek(dest.get(), 0, SEEK_SET), 0);
+    ASSERT_EQ(readFile(dest.get()), input);
+}
+
+TEST_P(CopyFdRangeTest, offsetWorks)
+{
+    auto source = createAnonymousTempFile();
+    auto dest = createAnonymousTempFile();
+    auto input = makeData();
+    writeFull(source.get(), input);
+
+    static constexpr off_t offset = 4096;
+    FdSink sink{dest.get()};
+    sink.isRegularFile = isRegularFile();
+    copyFdRange(source.get(), offset, input.size() - offset, sink, tryCoW());
+    sink.flush();
+    ASSERT_EQ(sink.written, input.size() - offset);
+    ASSERT_EQ(lseek(dest.get(), 0, SEEK_SET), 0);
+    ASSERT_EQ(readFile(dest.get()), input.substr(offset));
+}
+
+TEST_P(CopyFdRangeTest, endOfFile)
+{
+    auto source = createAnonymousTempFile();
+    Descriptor dest;
+    AutoCloseFD dest_ = createAnonymousTempFile();
+    Pipe pipe;
+    if (isRegularFile()) {
+        dest = dest_.get();
+    } else {
+        pipe.create();
+        dest = pipe.writeSide.get();
+    }
+    FdSink sink(dest);
+    sink.isRegularFile = isRegularFile();
+    /* This can't ever deadlock, because nothing should be written to the pipe anyway. */
+    EXPECT_THROW(copyFdRange(source.get(), 0, 512 * 1024, sink, tryCoW()), EndOfFile);
+}
+
+TEST_P(CopyFdRangeTest, toPipe)
+{
+    auto input = makeData();
+    auto source = createAnonymousTempFile();
+    writeFull(source.get(), input);
+
+    Pipe pipe;
+    pipe.create();
+
+    std::string output;
+    std::thread reader([&] { output = drainFD(pipe.readSide.get()); });
+
+    FdSink sink{pipe.writeSide.get()};
+    /* This is only a hint and isn't load-bearing. */
+    sink.isRegularFile = isRegularFile();
+    copyFdRange(source.get(), 0, input.size(), sink, tryCoW());
+    sink.flush();
+    pipe.writeSide.close();
+    reader.join();
+    ASSERT_EQ(sink.written, input.size());
+    ASSERT_EQ(output, input);
+}
+
+TEST_P(CopyFdRangeTest, nonSeekableInput)
+{
+    Pipe in;
+    in.create();
+    auto dest = createAnonymousTempFile();
+    FdSink sink{dest.get()};
+    sink.isRegularFile = isRegularFile();
+    // TODO: Test the error code accurately.
+    EXPECT_THROW(copyFdRange(in.readSide.get(), 0, 128 * 1024, sink, tryCoW()), SystemError);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    CopyFdRange,
+    CopyFdRangeTest,
+    ::testing::Combine(::testing::Values(false, true), ::testing::Values(false, true)),
+    [](const ::testing::TestParamInfo<std::tuple<bool, bool>> & info) {
+        std::string res = "";
+        res += std::get<0>(info.param) ? "fast" : "slow";
+        res += "_";
+        res += std::get<1>(info.param) ? "regular" : "nonregular";
+        return res;
+    });
 
 } // namespace nix

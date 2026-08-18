@@ -210,6 +210,7 @@ struct RestoreRegularFile : CreateRegularFileSink, FdSink
         , fd(std::move(fd_))
         , startFsync(startFSync_)
     {
+        isRegularFile = true; /* Hint for copying contents via CoW copy_file_range. */
     }
 
     void anchor() override;

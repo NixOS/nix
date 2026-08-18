@@ -3,6 +3,8 @@
 #include "nix/util/util.hh"
 #include "nix/util/signals.hh"
 
+#include "file-descriptor-private.hh"
+
 #include <span>
 #include <fcntl.h>
 #include <unistd.h>
@@ -202,10 +204,30 @@ std::string drainFD(Descriptor fd, DrainFdOpts opts)
     return std::move(sink.s);
 }
 
-void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink)
+void copyFdRange(Descriptor fd, off_t offset, size_t nbytes, Sink & sink, bool tryCoW)
 {
+    /* Nothing to do. */
+    if (!nbytes)
+        return;
+
+    static constexpr size_t copyBufferSize = 64 * 1024;
+
+    if (tryCoW) {
+        /* dynamic_cast here is slightly annoying, but it's much cheaper than
+           doing I/O so it doesn't really matter. */
+        FdSink * fdSink = dynamic_cast<FdSink *>(&sink);
+        /* Destination is a regular file which hasn't been written to and we've
+           been hinted that we should try block cloning. Try it and in case we
+           can't do block cloning then fall back to the loop below. Also, don't
+           bother with files smaller than the copy buffer. */
+        if (fdSink && !fdSink->hasData() && fdSink->written == 0 && fdSink->isRegularFile && nbytes > copyBufferSize
+            && tryCopyFdRangeFast(fd, fdSink->fd, offset, nbytes, fdSink->written)) {
+            return;
+        }
+    }
+
     auto left = nbytes;
-    std::array<std::byte, 64 * 1024> buf;
+    std::array<std::byte, copyBufferSize> buf;
 
     while (left) {
         auto limit = std::min<size_t>(left, buf.size());

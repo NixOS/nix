@@ -138,10 +138,7 @@ if build_unit_tests
     protocol : 'gtest',
   )
 
-  # Run the same tests again under `enosys -d openat2` to exercise the
-  # iterative (non-openat2) fallback path on Linux.  `enosys` uses
-  # seccomp to make `openat2` return `ENOSYS`, which the wrapper in
-  # file-system-at.cc caches and falls back to the iterative impl.
+  # Run the same tests again under `enosys` to exercise fallback paths on Linux.
   if host_machine.system() == 'linux'
     enosys = find_program('enosys', required : false)
     if enosys.found()
@@ -152,6 +149,7 @@ if build_unit_tests
           '--syscall', 'openat2',
           '--syscall', 'fchmodat2',
           '--syscall', 'close_range',
+          '--syscall', 'copy_file_range',
           '--',
           this_exe,
         ],
