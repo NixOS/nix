@@ -562,7 +562,7 @@ public:
                 "too many formal arguments, implementation supports at most %1%",
                 std::numeric_limits<decltype(nFormals)>::max());
             if (pos)
-                err.atPos(positions[pos]);
+                err.atPos(positions.getEntry(pos));
             throw std::move(err);
         }
         std::uninitialized_copy_n(formals.formals.begin(), nFormals, formalsStart);

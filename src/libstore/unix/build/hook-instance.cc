@@ -22,7 +22,7 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
     try {
         buildHook = ExecutablePath::load().findPath(buildHook);
     } catch (ExecutableLookupError & e) {
-        e.addTrace(nullptr, "while resolving the 'build-hook' setting'");
+        e.addTrace({}, "while resolving the 'build-hook' setting'");
         throw;
     }
 

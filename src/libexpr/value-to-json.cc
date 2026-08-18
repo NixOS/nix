@@ -69,7 +69,7 @@ json printValueAsJSON(
                             printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
                     } catch (Error & e) {
                         e.addTrace(
-                            state.positions[a->pos],
+                            state.positions.getEntry(a->pos),
                             HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
                         throw;
                     }
@@ -86,7 +86,7 @@ json printValueAsJSON(
             try {
                 out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
             } catch (Error & e) {
-                e.addTrace(state.positions[pos], HintFmt("while evaluating list element at index %1%", i));
+                e.addTrace(state.positions.getEntry(pos), HintFmt("while evaluating list element at index %1%", i));
                 throw;
             }
             i++;

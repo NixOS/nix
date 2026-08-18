@@ -73,7 +73,8 @@ std::optional<StorePath> PackageInfo::queryDrvPath() const
             try {
                 found.requireDerivation();
             } catch (Error & e) {
-                e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
+                e.addTrace(
+                    state->positions.getEntry(i->pos), "while evaluating the 'drvPath' attribute of a derivation");
                 throw;
             }
             drvPath = {std::move(found)};
@@ -441,7 +442,7 @@ static void getDerivations(
                     }
                 }
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", symbol);
+                e.addTrace(state.positions.getEntry(i->pos), "while evaluating the attribute '%s'", symbol);
                 throw;
             }
         }

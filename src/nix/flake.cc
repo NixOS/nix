@@ -387,7 +387,7 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
 
         // FIXME: rewrite to use EvalCache.
 
-        auto resolve = [&](PosIdx p) { return state->positions[p]; };
+        auto resolve = [&](PosIdx p) { return state->positions.getEntry(p); };
 
         auto argHasName = [&](Symbol arg, std::string_view expected) {
             std::string_view name = state->symbols[arg];
@@ -397,7 +397,7 @@ struct CmdFlakeCheck : FlakeCommand, MixPrintOutPaths, MixOutLinkBase
         auto checkSystemName = [&](std::string_view system, const PosIdx pos) {
             // FIXME: what's the format of "system"?
             if (system.find('-') == std::string::npos)
-                reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos)));
+                reportError(Error("'%s' is not a valid system type, at %s", system, resolve(pos).second));
         };
 
         auto checkSystemType = [&](std::string_view system, const PosIdx pos) {

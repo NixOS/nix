@@ -26,9 +26,10 @@ void SystemError::anchor() {}
 
 void SysError::anchor() {}
 
-void BaseError::addTrace(std::shared_ptr<const Pos> && e, HintFmt hint, TracePrint print)
+void BaseError::addTrace(std::pair<PosIdx, std::shared_ptr<const Pos>> && e, HintFmt hint, TracePrint print)
 {
-    err.traces.push_front(Trace{.pos = std::move(e), .hint = hint, .print = print});
+    err.lastTracePos = e.first;
+    err.traces.push_front(Trace{.pos = std::move(e.second), .hint = hint, .print = print});
 }
 
 void throwExceptionSelfCheck()
@@ -57,6 +58,11 @@ const std::string & BaseError::calcWhat() const
 bool BaseError::hasPos() const
 {
     return err.pos.get() && *err.pos.get();
+}
+
+PosIdx BaseError::getLastTracePosIdx() const
+{
+    return err.lastTracePos;
 }
 
 std::optional<std::string> ErrorInfo::programName = std::nullopt;

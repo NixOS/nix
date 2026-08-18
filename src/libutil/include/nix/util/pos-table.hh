@@ -107,6 +107,11 @@ public:
      */
     Pos operator[](PosIdx p) const;
 
+    std::pair<PosIdx, std::shared_ptr<const Pos>> getEntry(PosIdx p) const
+    {
+        return {p, std::move((*this)[p])};
+    }
+
     Pos::Origin originOf(PosIdx p) const
     {
         if (auto o = resolve(p))

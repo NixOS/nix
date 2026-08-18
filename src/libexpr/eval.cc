@@ -671,7 +671,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
         } catch (Error & e) {
-            e.addTrace(nullptr, "while partially calling '%1%' to retrieve documentation", "__functor");
+            e.addTrace({}, "while partially calling '%1%' to retrieve documentation", "__functor");
             throw;
         }
     }
@@ -871,13 +871,13 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
 template<typename... Args>
 void EvalState::addErrorTrace(Error & e, const Args &... formatArgs) const
 {
-    e.addTrace(nullptr, HintFmt(formatArgs...));
+    e.addTrace({}, HintFmt(formatArgs...));
 }
 
 template<typename... Args>
 void EvalState::addErrorTrace(Error & e, const PosIdx pos, const Args &... formatArgs) const
 {
-    e.addTrace(positions[pos], HintFmt(formatArgs...));
+    e.addTrace(positions.getEntry(pos), HintFmt(formatArgs...));
 }
 
 template<typename... Args>
@@ -1222,7 +1222,7 @@ inline bool EvalState::evalBool(Env & env, Expr * e, std::string_view errorCtx)
                 .debugThrow();
         return v.boolean();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1238,7 +1238,7 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, std::string_vie
                 .withFrame(env, *e)
                 .debugThrow();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1248,7 +1248,7 @@ void Expr::eval(EvalState & state, Env & env, Value & v, std::string_view errorC
     try {
         eval(state, env, v);
     } catch (Error & e) {
-        e.addTrace(state.positions[getPos()], errorCtx);
+        e.addTrace(state.positions.getEntry(getPos()), errorCtx);
         throw;
     }
 }
@@ -1620,7 +1620,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
                     if (pos)
-                        e.addTrace(positions[pos], "from call site");
+                        e.addTrace(positions.getEntry(pos), "from call site");
                     throw;
                 }
 
@@ -1796,7 +1796,8 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
             try {
                 callFunction(*functor->value, std::to_array({&(*allocValue() = vCur), args[0]}), vCur, functor->pos);
             } catch (Error & e) {
-                e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
+                e.addTrace(
+                    positions.getEntry(pos), "while calling a functor (an attribute set with a '__functor' attribute)");
                 throw;
             }
             args = args.subspan(1);
@@ -1926,7 +1927,8 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
                 eq->e2->eval(state, env, v2);
                 state.assertEqValues(v1, v2, eq->pos, "in an equality assertion");
             } catch (AssertionError & e) {
-                e.addTrace(state.positions[pos], "while evaluating the condition of the assertion '%s'", exprStr);
+                e.addTrace(
+                    state.positions.getEntry(pos), "while evaluating the condition of the assertion '%s'", exprStr);
                 throw;
             }
         }
@@ -2271,8 +2273,7 @@ void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, c
         // 2. initial forcing of the thunk, which is where the cycle starts
         // Only the first force has an `env`, so we expect this entry to be added once.
         if (env && ir.v == &v)
-            ir.addTrace(
-                nullptr, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
+            ir.addTrace({}, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {
@@ -2323,7 +2324,7 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
         std::rethrow_exception(e);
     } catch (InfiniteRecursionError & e) {
         if (!e.hasPos())
-            e.atPos(positions[pos]);
+            e.atPos(positions.getEntry(pos));
     } catch (...) {
     }
 }
@@ -2385,7 +2386,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
                 .debugThrow();
         return v.integer();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 
@@ -2405,7 +2406,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
                 .debugThrow();
         return v.fpoint();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2421,7 +2422,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
                 .debugThrow();
         return v.boolean();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 
@@ -2452,7 +2453,7 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
                 .atPos(pos)
                 .debugThrow();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2468,7 +2469,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
                 .debugThrow();
         return v.string_view();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2582,7 +2583,7 @@ BackedStringView EvalState::coerceToString(
         try {
             return v.external()->coerceToString(*this, pos, context, coerceMore, copyToStore);
         } catch (Error & e) {
-            e.addTrace(nullptr, errorCtx);
+            e.addTrace({}, errorCtx);
             throw;
         }
     }
@@ -2615,7 +2616,7 @@ BackedStringView EvalState::coerceToString(
                         copyToStore,
                         canonicalizePath);
                 } catch (Error & e) {
-                    e.addTrace(positions[pos], errorCtx);
+                    e.addTrace(positions.getEntry(pos), errorCtx);
                     throw;
                 }
                 if (n < v.listSize() - 1
@@ -2839,7 +2840,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
             try {
                 assertEqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx);
             } catch (Error & e) {
-                e.addTrace(positions[pos], "while comparing list element %d", n);
+                e.addTrace(positions.getEntry(pos), "while comparing list element %d", n);
                 throw;
             }
         }
@@ -2854,7 +2855,8 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                     assertEqValues(*i->value, *j->value, pos, errorCtx);
                     return;
                 } catch (Error & e) {
-                    e.addTrace(positions[pos], "while comparing a derivation by its '%s' attribute", "outPath");
+                    e.addTrace(
+                        positions.getEntry(pos), "while comparing a derivation by its '%s' attribute", "outPath");
                     throw;
                 }
                 assert(false);
@@ -2906,10 +2908,10 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 //    at <pos>
                 //  while comparing attribute '<name>'
                 if (j->pos != noPos)
-                    e.addTrace(positions[j->pos], "where right hand side is");
+                    e.addTrace(positions.getEntry(j->pos), "where right hand side is");
                 if (i->pos != noPos)
-                    e.addTrace(positions[i->pos], "where left hand side is");
-                e.addTrace(positions[pos], "while comparing attribute '%s'", symbols[i->name]);
+                    e.addTrace(positions.getEntry(i->pos), "where left hand side is");
+                e.addTrace(positions.getEntry(pos), "while comparing attribute '%s'", symbols[i->name]);
                 throw;
             }
         }
@@ -3505,7 +3507,7 @@ void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
         auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
         Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
         if (pos) {
-            error.atPos(pos());
+            error.atPos({noPos, pos()});
         }
         throw std::move(error);
     }
