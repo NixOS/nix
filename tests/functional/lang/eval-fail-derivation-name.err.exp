@@ -1,11 +1,4 @@
 error:
-       … while evaluating the attribute 'outPath'
-         at «nix-internal»/derivation-internal.nix:<number>:<number>:
-     <number>|     value = commonAttrs // {
-     <number>|       outPath = strict.${outputName};
-             |       ^
-     <number>|       drvPath = strict.drvPath;
-
        … while selecting an attribute
          at «nix-internal»/derivation-internal.nix:<number>:<number>:
      <number>|     value = commonAttrs // {

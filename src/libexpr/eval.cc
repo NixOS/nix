@@ -1221,8 +1221,9 @@ inline bool EvalState::evalBool(Env & env, Expr * e, std::string_view errorCtx)
                 .withFrame(env, *e)
                 .debugThrow();
         return v.boolean();
-    } catch (Error & e) {
-        e.addTrace(positions.getEntry(pos), errorCtx);
+    } catch (Error & err) {
+        if (e->hasNewPos(err))
+            err.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1237,8 +1238,9 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, std::string_vie
                 "expected a set but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
                 .withFrame(env, *e)
                 .debugThrow();
-    } catch (Error & e) {
-        e.addTrace(positions.getEntry(pos), errorCtx);
+    } catch (Error & err) {
+        if (e->hasNewPos(err))
+            err.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1248,7 +1250,8 @@ void Expr::eval(EvalState & state, Env & env, Value & v, std::string_view errorC
     try {
         eval(state, env, v);
     } catch (Error & e) {
-        e.addTrace(state.positions.getEntry(getPos()), errorCtx);
+        if (hasNewPos(e))
+            e.addTrace(state.positions.getEntry(getPos()), errorCtx);
         throw;
     }
 }
@@ -1467,6 +1470,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     const AttrName * unresolvedOrEnd = attrPathStart;
     // cursor, result if successful
     Value * vAttrs = &vTmp;
+    Expr * thunkExpr = nullptr;
 
     e->eval(state, env, vTmp, "while selecting an attribute");
 
@@ -1510,11 +1514,12 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 state.attrSelects->try_emplace_or_visit(attrPos, 1, [](auto & i) { i.second++; });
         }
 
+        thunkExpr = vAttrs->maybeGetThunkExpr();
         state.forceValue(*vAttrs, (attrPos ? attrPos : this->pos));
 
     } catch (Error & e) {
         // Traces are printed in reverse, so we add context before the main item.
-        if (attrPos) {
+        if (attrPos && (thunkExpr == nullptr || thunkExpr->hasNewPos(e))) {
             auto attrPosR = state.positions[attrPos];
             auto origin = std::get_if<SourcePath>(&attrPosR.origin);
             if (!(origin && *origin == state.derivationInternal)) {
@@ -1524,8 +1529,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
         }
         // Add main item: the selection site itself (`a.b`), ie the actual access
-        state.addErrorTrace(
-            e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        if (hasNewPos(e)) {
+            state.addErrorTrace(
+                e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        }
         throw;
     }
 
@@ -1575,7 +1582,8 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(
+    Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos, const Expr * expr)
 {
     auto _level = addCallDepth(pos);
 
@@ -1619,7 +1627,9 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 try {
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
-                    if (pos)
+                    // Do not trace the call site if it encloses the lambda
+                    // being called; the lambda already has a trace.
+                    if (pos && pos != lambda.pos && (expr == nullptr || expr->comparePos(lambda.pos) != 0))
                         e.addTrace(positions.getEntry(pos), "from call site");
                     throw;
                 }
@@ -1697,12 +1707,16 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(
-                        e,
-                        lambda.pos,
-                        "while calling %s",
-                        lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda");
-                    if (pos)
+                    if (lambda.hasNewPos(e)) {
+                        addErrorTrace(
+                            e,
+                            lambda.pos,
+                            "while calling %s",
+                            lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda");
+                    }
+                    // Do not trace the call site if it encloses the lambda
+                    // being called; the lambda already has a trace.
+                    if (pos && pos != lambda.pos && (expr == nullptr || expr->comparePos(lambda.pos) != 0))
                         addErrorTrace(e, pos, "from call site");
                 }
                 throw;
@@ -1730,7 +1744,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 try {
                     fn->impl(*this, CallSite{pos}, args.data(), vCur);
                 } catch (Error & e) {
-                    if (fn->addTrace)
+                    if (fn->addTrace && (expr == nullptr || expr->hasNewPos(e)))
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
@@ -1780,7 +1794,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->impl(*this, CallSite{pos}, vArgs, vCur);
                 } catch (Error & e) {
-                    if (fn->addTrace)
+                    if (fn->addTrace && (expr == nullptr || expr->hasNewPos(e)))
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
@@ -1793,11 +1807,15 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
             /* 'vCur' may be allocated on the stack of the calling
                function, but for functors we may keep a reference, so
                heap-allocate a copy and use that instead. */
+            auto thunkExpr = functor->value->maybeGetThunkExpr();
             try {
                 callFunction(*functor->value, std::to_array({&(*allocValue() = vCur), args[0]}), vCur, functor->pos);
             } catch (Error & e) {
-                e.addTrace(
-                    positions.getEntry(pos), "while calling a functor (an attribute set with a '__functor' attribute)");
+                if (thunkExpr == nullptr || thunkExpr->hasNewPos(e)) {
+                    e.addTrace(
+                        positions.getEntry(pos),
+                        "while calling a functor (an attribute set with a '__functor' attribute)");
+                }
                 throw;
             }
             args = args.subspan(1);
@@ -1833,7 +1851,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     for (size_t i = 0; i < args->size(); ++i)
         vArgs[i] = (*args)[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, vArgs, v, pos);
+    state.callFunction(vFun, vArgs, v, pos, this);
 }
 
 // Lifted out of callFunction() because it creates a temporary that
@@ -1927,8 +1945,10 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
                 eq->e2->eval(state, env, v2);
                 state.assertEqValues(v1, v2, eq->pos, "in an equality assertion");
             } catch (AssertionError & e) {
-                e.addTrace(
-                    state.positions.getEntry(pos), "while evaluating the condition of the assertion '%s'", exprStr);
+                if (hasNewPos(e)) {
+                    e.addTrace(
+                        state.positions.getEntry(pos), "while evaluating the condition of the assertion '%s'", exprStr);
+                }
                 throw;
             }
         }
@@ -2342,7 +2362,8 @@ void EvalState::forceValueDeep(Value & v)
         state.forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
-            for (auto & i : *v.attrs())
+            for (auto & i : *v.attrs()) {
+                auto thunkExpr = i.value->maybeGetThunkExpr();
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = state.debugRepl && i.value->isThunk() ? makeDebugTraceStacker(
@@ -2356,9 +2377,11 @@ void EvalState::forceValueDeep(Value & v)
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    state.addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", state.symbols[i.name]);
+                    if (thunkExpr == nullptr || thunkExpr->hasNewPos(e))
+                        state.addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", state.symbols[i.name]);
                     throw;
                 }
+            }
         }
 
         else if (v.isList()) {

@@ -63,14 +63,17 @@ json printValueAsJSON(
                 // All that remains is to return a JSON object.
                 json obj = json::object();
                 for (auto & a : peeled->attrs()->lexicographicOrder(state.symbols)) {
+                    auto thunkExpr = a->value->maybeGetThunkExpr();
                     try {
                         obj.emplace(
                             state.symbols[a->name],
                             printValueAsJSON(state, strict, *a->value, a->pos, context, copyToStore));
                     } catch (Error & e) {
-                        e.addTrace(
-                            state.positions.getEntry(a->pos),
-                            HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
+                        if (thunkExpr == nullptr || thunkExpr->hasNewPos(e)) {
+                            e.addTrace(
+                                state.positions.getEntry(a->pos),
+                                HintFmt("while evaluating attribute '%1%'", state.symbols[a->name]));
+                        }
                         throw;
                     }
                 }
@@ -83,10 +86,12 @@ json printValueAsJSON(
         out = json::array();
         int i = 0;
         for (auto elem : v.listView()) {
+            auto thunkExpr = elem->maybeGetThunkExpr();
             try {
                 out.push_back(printValueAsJSON(state, strict, *elem, pos, context, copyToStore));
             } catch (Error & e) {
-                e.addTrace(state.positions.getEntry(pos), HintFmt("while evaluating list element at index %1%", i));
+                if (thunkExpr == nullptr || thunkExpr->hasNewPos(e))
+                    e.addTrace(state.positions.getEntry(pos), HintFmt("while evaluating list element at index %1%", i));
                 throw;
             }
             i++;

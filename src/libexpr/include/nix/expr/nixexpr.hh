@@ -143,9 +143,62 @@ struct Expr
         return noPos;
     }
 
+    /**
+     * Return equivalent if this expression includes a subexpression positioned
+     * at `otherPos`, unordered if this is unpositioned or `otherPos` is
+     * `noPos`, and less or greater if `otherPos` occurs after or before every
+     * marked position in this expression.
+     *
+     * Note that positions that don't correspond to positioned subexpressions
+     * may not pass this test, even if that position is contained in the
+     * interval spanned by the parsed expression. For example: `foo 0`, as an
+     * expression, contains the subexpression `0`, but since integer literals
+     * don't get their own position information, calling `comparePos` on the
+     * `ExprCall` with the position of the `0` literal is not guaranteed to
+     * return equivalent. Another example: `foo bar` spans the position of the `a`
+     * character, but calling `comparePos` on the `ExprCall` with the position
+     * of the `a` is not guaranteed to return equivalent either, because `ExprVar`s
+     * don't know how long they are.
+     *
+     * This is fine for two reasons:
+     * 1. We don't really care about incorrect misses; this function is only
+     * used to filter traces, and an incorrect non-equivalent just means that a
+     * trace slips through.
+     * 2. This should only ever be called with positions that came from
+     * subexpressions in the first place -- so nothing from unpositioned
+     * expressions like integer literals, and nothing that comes from the
+     * middle of a token.
+     */
+    virtual std::partial_ordering comparePos(PosIdx otherPos) const noexcept
+    {
+        return getPos().partialCompare(otherPos);
+    }
+
+    /**
+     * Return true if this expression does not contain the position of the
+     * last-added trace in the argument.
+     *
+     * Use this method to drop traces that would be redundant. In an expression
+     * like `throw "oops" * 5 + 1`, we don't need a trace entry for `throw`
+     * *and* for the multiplication *and* for the addition. Once the `throw`
+     * has been indicated, the other two traces would be redundant; the user
+     * already knows where to look from the `throw` trace. If the expression
+     * for the current stack frame is known when an error `e` is caught, we can
+     * remove these redundant frames by only adding a trace if `hasNewPos(e)`
+     * is true.
+     */
+    bool hasNewPos(const Error & e) const
+    {
+        return comparePos(e.getLastTracePosIdx()) != 0;
+    }
+
     // These are temporary methods to be used only in parser.y
     virtual void resetCursedOr() {};
     virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) {};
+
+protected:
+    /** The shared logic for implementing comparePos for binary operators. */
+    static std::partial_ordering binOpComparePos(const Expr *, PosIdx, const Expr *, PosIdx);
 };
 
 #define COMMON_METHODS                                                         \
@@ -319,6 +372,8 @@ struct ExprSelect : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     /**
      * @return `std::span<const AttrName>` starting at `attrPathStart`
      */
@@ -357,6 +412,8 @@ struct ExprOpHasAttr : Expr
     {
         return e->getPos();
     }
+
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
 
     COMMON_METHODS
 };
@@ -440,6 +497,8 @@ struct ExprAttrs : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     COMMON_METHODS
 
     std::shared_ptr<const StaticEnv> bindInheritSources(EvalState & es, const std::shared_ptr<const StaticEnv> & env);
@@ -465,6 +524,8 @@ struct ExprList : Expr
     {
         return elems.empty() ? noPos : elems.front()->getPos();
     }
+
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
 };
 
 struct Formal
@@ -593,6 +654,8 @@ public:
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     virtual void setDocComment(DocComment docComment) override;
     COMMON_METHODS
 };
@@ -628,6 +691,8 @@ struct ExprCall : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     virtual void resetCursedOr() override;
     virtual void warnIfCursedOr(const SymbolTable & symbols, const PosTable & positions) override;
     void moveDataToAllocator(std::pmr::polymorphic_allocator<char> & alloc);
@@ -641,6 +706,9 @@ struct ExprLet : Expr
     ExprLet(ExprAttrs * attrs, Expr * body)
         : attrs(attrs)
         , body(body) {};
+
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     COMMON_METHODS
 };
 
@@ -660,6 +728,8 @@ struct ExprWith : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     COMMON_METHODS
 };
 
@@ -678,6 +748,8 @@ struct ExprIf : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     COMMON_METHODS
 };
 
@@ -695,6 +767,8 @@ struct ExprAssert : Expr
         return pos;
     }
 
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
+
     COMMON_METHODS
 };
 
@@ -708,6 +782,8 @@ struct ExprOpNot : Expr
     {
         return e->getPos();
     }
+
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
 
     COMMON_METHODS
 };
@@ -739,6 +815,10 @@ struct ExprOpNot : Expr
     PosIdx getPos() const override                                                       \
     {                                                                                    \
         return pos;                                                                      \
+    }                                                                                    \
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override            \
+    {                                                                                    \
+        return binOpComparePos(e1, pos, e2, otherPos);                                   \
     }
 
 #define MakeBinOp(name, s)        \
@@ -800,6 +880,8 @@ struct ExprConcatStrings : Expr
     {
         return pos;
     }
+
+    std::partial_ordering comparePos(PosIdx otherPos) const noexcept override;
 
     COMMON_METHODS
 };

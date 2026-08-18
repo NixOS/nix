@@ -1,10 +1,4 @@
 error:
-       … while evaluating the condition of the assertion '({ a = { b = [ ({ c = { d = true; }; }) ]; }; } == { a = { b = [ ({ c = { d = false; }; }) ]; }; })'
-         at /pwd/lang/eval-fail-assert-nested-bool.nix:1:1:
-            1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };
-             | ^
-            2|
-
        … while comparing attribute 'a'
          at /pwd/lang/eval-fail-assert-nested-bool.nix:1:39:
             1| assert { a.b = [ { c.d = true; } ]; } == { a.b = [ { c.d = false; } ]; };

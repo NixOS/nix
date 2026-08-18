@@ -1554,6 +1554,11 @@ public:
         return getStorage<ClosureThunk>();
     }
 
+    Expr * maybeGetThunkExpr() const noexcept
+    {
+        return isThunk() ? thunk().expr : nullptr;
+    }
+
     PrimOpApplicationThunk primOpApp() const noexcept
     {
         return getStorage<PrimOpApplicationThunk>();

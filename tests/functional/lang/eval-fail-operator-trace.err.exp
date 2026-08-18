@@ -55,13 +55,6 @@ error:
              |         ^
            18|   o = n >= 1;
 
-       … in the argument of '!'
-         at /pwd/lang/eval-fail-operator-trace.nix:16:9:
-           15|   l = k < 1;
-           16|   m = l <= 1;
-             |         ^
-           17|   n = m > 1;
-
        … while calling the 'lessThan' builtin
          at /pwd/lang/eval-fail-operator-trace.nix:16:9:
            15|   l = k < 1;

@@ -421,6 +421,7 @@ static void getDerivations(
            precedence). */
         for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
             std::string_view symbol{state.symbols[i->name]};
+            Expr * thunkExpr = i->value->maybeGetThunkExpr();
             try {
                 debug("evaluating attribute '%1%'", symbol);
                 if (!isAttrPathComponent(symbol))
@@ -442,7 +443,8 @@ static void getDerivations(
                     }
                 }
             } catch (Error & e) {
-                e.addTrace(state.positions.getEntry(i->pos), "while evaluating the attribute '%s'", symbol);
+                if (thunkExpr == nullptr || thunkExpr->hasNewPos(e))
+                    e.addTrace(state.positions.getEntry(i->pos), "while evaluating the attribute '%s'", symbol);
                 throw;
             }
         }

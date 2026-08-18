@@ -595,6 +595,278 @@ void ExprPos::bindVars(EvalState & es, const std::shared_ptr<const StaticEnv> & 
         es.exprEnvs.insert(std::make_pair(this, env));
 }
 
+/* Finding positions in expressions for error traces. */
+
+std::partial_ordering ExprOpHasAttr::comparePos(PosIdx otherPos) const noexcept
+{
+    return e->comparePos(otherPos);
+}
+
+std::partial_ordering ExprOpNot::comparePos(PosIdx otherPos) const noexcept
+{
+    return e->comparePos(otherPos);
+}
+
+/**
+ * Utility for aggregating invididual comparisons between points in an interval
+ * and a point into an overall comparison between the entire interval and the
+ * point.
+ *
+ * comparePos methods, if implemented naively, would walk the entire expression
+ * tree. To try to make them a little less expensive, we exploit the (mostly)
+ * ordered nature of the tree and perform the comparison in two directions:
+ * first from the left, until we find a value that is less than the position in
+ * question; at which point we pivot to searching from the right. If we also
+ * find a value that is greater than the position in question, we can terminate
+ * the search. (Of course, if when searching from the left, we find a value
+ * that is *greater* than the position in question, we can also terminate
+ * early; same for the other side.)
+ */
+struct PartialOrderingAccumulator
+{
+    /**
+     * The result of the comparison. Is kept updated throughout, and is used to
+     * record whether a value less than or greater than the needle has been
+     * found yet.
+     */
+    std::partial_ordering result = std::partial_ordering::unordered;
+
+    /**
+     * Accumulate `po` into `result`. Return true if the result is known after
+     * the update.
+     */
+    bool updateAgnostic(std::partial_ordering po)
+    {
+        if (po == std::partial_ordering::unordered) {
+            return false;
+        }
+        if (po < 0) {
+            if (!(result > 0)) {
+                result = std::partial_ordering::less;
+                return false;
+            }
+        } else if (po > 0) {
+            if (!(result < 0)) {
+                result = std::partial_ordering::greater;
+                return false;
+            }
+        }
+        result = std::partial_ordering::equivalent;
+        return true;
+    }
+
+    /**
+     * As `updateAgnostic`, but optimized for when every comparison to the left
+     * of this one has already been checked.
+     */
+    bool updateLeft(std::partial_ordering po)
+    {
+        if (po == std::partial_ordering::unordered) {
+            return false;
+        }
+        if (po < 0 && !(result > 0)) {
+            result = std::partial_ordering::less;
+            return false;
+        }
+        result = po <= 0 || (po > 0 && result < 0) ? std::partial_ordering::equivalent : std::partial_ordering::greater;
+        return true;
+    }
+
+    /**
+     * As `updateAgnostic`, but optimized for when every comparison to the
+     * right of this one has already been checked. Prefer searching from the
+     * right with this method when `result < 0` (meaning that the interval is
+     * already known to contain a value less than the needle).
+     */
+    bool updateRight(std::partial_ordering po)
+    {
+        if (po == std::partial_ordering::unordered) {
+            return false;
+        }
+        if (po > 0 && !(result < 0)) {
+            result = std::partial_ordering::greater;
+            return false;
+        }
+        result = po >= 0 || (po < 0 && result > 0) ? std::partial_ordering::equivalent : std::partial_ordering::less;
+        return true;
+    }
+};
+
+/**
+ * Search a sequence of expressions, known to be in order of their positions
+ * and found to the right of all other positions (which must have already been
+ * checked) in the subexpression.
+ */
+static std::partial_ordering
+updateAndEndWithExprs(PartialOrderingAccumulator & poa, const std::span<Expr * const> elems, PosIdx otherPos)
+{
+    Expr * const * lastChecked = nullptr;
+    if (!(poa.result < 0)) {
+        for (auto & elem : elems) {
+            if (poa.updateLeft(elem->comparePos(otherPos)) || &elem == &elems.back())
+                return poa.result;
+
+            if (poa.result < 0) {
+                lastChecked = &elem;
+                break;
+            }
+        }
+    }
+    for (auto & elem : std::views::reverse(elems)) {
+        if (&elem == lastChecked || poa.updateRight(elem->comparePos(otherPos)))
+            break;
+    }
+    return poa.result;
+}
+
+std::partial_ordering ExprList::comparePos(PosIdx otherPos) const noexcept
+{
+    if (otherPos == noPos)
+        return std::partial_ordering::unordered;
+
+    PartialOrderingAccumulator poa{};
+    return updateAndEndWithExprs(poa, elems, otherPos);
+}
+
+std::partial_ordering ExprCall::comparePos(PosIdx otherPos) const noexcept
+{
+    if (otherPos == noPos)
+        return std::partial_ordering::unordered;
+
+    PartialOrderingAccumulator poa{};
+
+    // Only check pos if we know this is not a desugared infix operator. In
+    // those cases, pos points to a location between the first and second
+    // arguments. So comparing with the argument positions only is sufficient,
+    // and comparing with pos would lead to an incorrect result if otherPos is
+    // contained in the first operand.
+    PosIdx p;
+    if (args->empty() || (p = args->front()->getPos()) == noPos || p >= pos) {
+        if (poa.updateLeft(pos.partialCompare(otherPos)))
+            return poa.result;
+    }
+
+    return updateAndEndWithExprs(poa, std::span(*args), otherPos);
+}
+
+std::partial_ordering ExprConcatStrings::comparePos(PosIdx otherPos) const noexcept
+{
+    if (otherPos == noPos)
+        return std::partial_ordering::unordered;
+
+    PartialOrderingAccumulator poa{};
+
+    // We ignore pos, since as in the ExprCall case, it might be an infix
+    // operator. Unlike in the ExprCall case, we never need to check the
+    // position of the outer string, since it can't be the position of a
+    // subexpression. Checking only the operands/interpolated values is
+    // sufficient.
+    std::pair<PosIdx, Expr *> * lastChecked = nullptr;
+    for (auto & e : es) {
+        if (poa.updateLeft(e.first.partialCompare(otherPos)))
+            return poa.result;
+
+        if (poa.result < 0) {
+            lastChecked = &e;
+            break;
+        }
+    }
+
+    for (auto & e : std::views::reverse(es)) {
+        if (&e == lastChecked || poa.updateRight(e.second->comparePos(otherPos))
+            || poa.updateRight(e.first.partialCompare(otherPos)))
+            return poa.result;
+    }
+
+    return poa.result;
+}
+
+std::partial_ordering ExprAttrs::comparePos(PosIdx otherPos) const noexcept
+{
+    if (otherPos == noPos)
+        return std::partial_ordering::unordered;
+
+    PartialOrderingAccumulator poa{};
+
+    if (poa.updateLeft(pos.partialCompare(otherPos)))
+        return poa.result;
+
+    // Attributes aren't position-ordered, so this can't use the smart
+    // reversing search we use for lists.
+    for (auto & [_, attr] : *attrs) {
+        if (poa.updateAgnostic(attr.pos.partialCompare(otherPos)) || poa.updateAgnostic(attr.e->comparePos(otherPos)))
+            return poa.result;
+    }
+    for (auto & attr : *dynamicAttrs) {
+        if (poa.updateAgnostic(attr.pos.partialCompare(otherPos))
+            || poa.updateAgnostic(attr.nameExpr->comparePos(otherPos))
+            || poa.updateAgnostic(attr.valueExpr->comparePos(otherPos)))
+            return poa.result;
+    }
+
+    return poa.result;
+}
+
+// This macro assumes a free PosIdx otherPos.
+#define COMPARE_POS_BODY_TEMPLATE(updates)       \
+    if (otherPos == noPos)                       \
+        return std::partial_ordering::unordered; \
+    PartialOrderingAccumulator poa{};            \
+    updates;                                     \
+    return poa.result;
+
+#define COMPARE_POS_TEMPLATE(Cls, updates)                                \
+    std::partial_ordering Cls::comparePos(PosIdx otherPos) const noexcept \
+    {                                                                     \
+        COMPARE_POS_BODY_TEMPLATE(updates)                                \
+    }
+
+// These macros assume a free PartialOrderingAccumulator poa.
+#define UPDATE_L2(e1, e2) (poa.updateLeft(e1) || poa.updateLeft(e2))
+#define UPDATE_L3(e1, e2, e3) (poa.updateLeft(e1) || (poa.result < 0 ? UPDATE_R2(e2, e3) : UPDATE_L2(e2, e3)))
+#define UPDATE_L4(e1, e2, e3, e4) \
+    (poa.updateLeft(e1) || (poa.result < 0 ? UPDATE_R3(e2, e3, e4) : UPDATE_L3(e2, e3, e4)))
+#define UPDATE_R2(e1, e2) (poa.updateRight(e2) || poa.updateRight(e1))
+#define UPDATE_R3(e1, e2, e3) (poa.updateRight(e3) || UPDATE_R2(e1, e2))
+
+COMPARE_POS_TEMPLATE(ExprLambda, UPDATE_L2(pos.partialCompare(otherPos), body->comparePos(otherPos)));
+COMPARE_POS_TEMPLATE(ExprLet, UPDATE_L2(attrs->comparePos(otherPos), body->comparePos(otherPos)));
+
+COMPARE_POS_TEMPLATE(
+    ExprAssert, UPDATE_L3(pos.partialCompare(otherPos), cond->comparePos(otherPos), body->comparePos(otherPos)));
+
+COMPARE_POS_TEMPLATE(
+    ExprSelect,
+    UPDATE_L3(
+        pos.partialCompare(otherPos),
+        e->comparePos(otherPos),
+        def ? def->comparePos(otherPos) : std::partial_ordering::unordered));
+
+COMPARE_POS_TEMPLATE(
+    ExprWith, UPDATE_L3(pos.partialCompare(otherPos), attrs->comparePos(otherPos), body->comparePos(otherPos)));
+
+std::partial_ordering Expr::binOpComparePos(const Expr * e1, PosIdx pos, const Expr * e2, PosIdx otherPos)
+{
+    COMPARE_POS_BODY_TEMPLATE(
+        UPDATE_L3(e1->comparePos(otherPos), pos.partialCompare(otherPos), e2->comparePos(otherPos)));
+}
+
+COMPARE_POS_TEMPLATE(
+    ExprIf,
+    UPDATE_L4(
+        pos.partialCompare(otherPos),
+        cond->comparePos(otherPos),
+        then->comparePos(otherPos),
+        else_->comparePos(otherPos)));
+
+#undef COMPARE_POS_BODY_TEMPLATE
+#undef COMPARE_POS_TEMPLATE
+#undef UPDATE_L2
+#undef UPDATE_L3
+#undef UPDATE_L4
+#undef UPDATE_R2
+#undef UPDATE_R3
+
 /* Storing function names. */
 
 void Expr::setName(Symbol name) {}
