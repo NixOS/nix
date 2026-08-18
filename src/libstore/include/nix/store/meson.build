@@ -36,6 +36,7 @@ headers = [ config_pub_h ] + files(
   'derivation-options.hh',
   'derivation/aterm.hh',
   'derivation/full-inputs.hh',
+  'derivation/modulo.hh',
   'derivation/output.hh',
   'derivations.hh',
   'derived-path-map.hh',

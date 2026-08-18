@@ -282,6 +282,7 @@ sources = files(
   'derivation/aterm.cc',
   'derivation/full-inputs.cc',
   'derivation/json.cc',
+  'derivation/modulo.cc',
   'derivation/output.cc',
   'derivations.cc',
   'derived-path-map.cc',
