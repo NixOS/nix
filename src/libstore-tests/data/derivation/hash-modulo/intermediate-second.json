@@ -1,0 +1,30 @@
+{
+  "args": [],
+  "builder": "/bin/intermediate",
+  "env": {
+    "dev": "/nix/store/xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev",
+    "out": "/nix/store/jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate"
+  },
+  "inputs": {
+    "drvs": {
+      "jwmbpldsdgfjhkxk317jn55jilyfl63f-source.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "intermediate",
+  "outputs": {
+    "dev": {
+      "path": "xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev"
+    },
+    "out": {
+      "path": "jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

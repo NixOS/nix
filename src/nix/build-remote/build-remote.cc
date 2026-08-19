@@ -272,7 +272,15 @@ static int main_build_remote(int argc, char ** argv)
 
         std::cerr << "# accept\n" << storeUri << "\n";
 
-        auto inputs = readStrings<StringSet>(source);
+        /* The other side of the build hook protocol is Nix itself, so
+           these are always printed in canonical form. */
+        auto inputs = [&] {
+            StorePathSet res;
+            for (auto & i : readStrings<StringSet>(source))
+                res.insert(store->parseStorePathCanonical(i));
+            return res;
+        }();
+
         auto wantedOutputs = readStrings<StringSet>(source);
 
         AutoCloseFD uploadLock;
@@ -306,7 +314,7 @@ static int main_build_remote(int argc, char ** argv)
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
-            copyPaths(*store, *sshStore, store->parseStorePathSet(inputs), NoRepair, NoCheckSigs, substitute);
+            copyPaths(*store, *sshStore, inputs, NoRepair, NoCheckSigs, substitute);
         }
 
         uploadLock = -1;
@@ -346,7 +354,7 @@ static int main_build_remote(int argc, char ** argv)
                 // 2. Changing the `inputSrcs` set changes the
                 //    associated output ids, which break CA derivations
                 .inputs =
-                    hasInputDrvs ? store->parseStorePathSet(inputs) : [&] {
+                    hasInputDrvs ? inputs : [&] {
                         StorePathSet srcs;
                         for (auto & input : drv.inputs)
                             if (auto * op = std::get_if<SingleDerivedPath::Opaque>(&input.raw()))

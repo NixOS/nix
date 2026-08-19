@@ -3,6 +3,8 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 
+#include "../file-descriptor-private.hh"
+
 #include <span>
 
 #include <fileapi.h>
@@ -45,12 +47,19 @@ size_t readOffset(Descriptor fd, off_t offset, std::span<std::byte> buffer)
     ov.Offset = static_cast<DWORD>(offset);
     if constexpr (sizeof(offset) > 4) /* We don't build with 32 bit off_t, but let's be safe. */
         ov.OffsetHigh = static_cast<DWORD>(offset >> 32);
+    // TODO: Don't do this on each call maybe?
+    if (::GetFileType(fd) != FILE_TYPE_DISK)
+        // Not the most accurate error code, but it will do.
+        throw windows::WinError(
+            DWORD(ERROR_SEEK_ON_DEVICE), "reading at offset %1% from a non-seekable handle", offset);
     DWORD n;
     if (!ReadFile(fd, buffer.data(), static_cast<DWORD>(buffer.size()), &n, &ov)) {
-        throw windows::WinError([&] {
-            return HintFmt(
-                "reading %1% bytes at offset %2% from %3%", buffer.size(), offset, PathFmt(descriptorToPath(fd)));
-        });
+        auto err = ::GetLastError();
+        // We report EOF as 0 return code, not an actual error.
+        if (err == ERROR_HANDLE_EOF)
+            return 0;
+        throw windows::WinError(
+            err, "reading %1% bytes at offset %2% from %3%", buffer.size(), offset, PathFmt(descriptorToPath(fd)));
     }
     return static_cast<size_t>(n);
 }
@@ -131,6 +140,13 @@ void syncDescriptor(Descriptor fd)
     if (!::FlushFileBuffers(fd)) {
         throw windows::WinError([&] { return HintFmt("flushing file %s", PathFmt(descriptorToPath(fd))); });
     }
+}
+
+bool tryCopyFdRangeFast(Descriptor from, Descriptor to, off_t offset, size_t nbytes, size_t & written)
+{
+    /* TODO: Implement if this becomes relevant. Seems like windows maybe has some reflinking capabilities:
+       https://devblogs.microsoft.com/engineering-at-microsoft/dev-drive-and-copy-on-write-for-developer-performance/ */
+    return false;
 }
 
 } // namespace nix

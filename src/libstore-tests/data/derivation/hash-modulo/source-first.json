@@ -1,0 +1,20 @@
+{
+  "args": [],
+  "builder": "/bin/first",
+  "env": {
+    "out": "/nix/store/i00sflxqsj37lfmf95m8mn0grv615hpj-source"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "source",
+  "outputs": {
+    "out": {
+      "hash": "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=",
+      "method": "nar"
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}
