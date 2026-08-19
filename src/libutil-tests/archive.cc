@@ -22,6 +22,41 @@ public:
 class InvalidNarTest : public NarTest, public ::testing::WithParamInterface<std::tuple<std::string, std::string>>
 {};
 
+enum class NarContentMode {
+    Skip,
+    Drain,
+};
+
+struct DrainingFileSystemObjectSink : NullFileSystemObjectSink
+{
+    void createRegularFile(const CanonPath &, fun<void(CreateRegularFileSink &)> func) override
+    {
+        struct : CreateRegularFileSink
+        {
+            void operator()(std::string_view) override {}
+
+            void isExecutable() override {}
+        } sink;
+
+        func(sink);
+    }
+};
+
+size_t parseNar(std::string_view narContents, NarContentMode mode)
+{
+    StringSource source{narContents};
+
+    if (mode == NarContentMode::Skip) {
+        NullFileSystemObjectSink sink;
+        parseDump(sink, source);
+    } else {
+        DrainingFileSystemObjectSink sink;
+        parseDump(sink, source);
+    }
+
+    return source.pos;
+}
+
 } // namespace
 
 TEST_P(InvalidNarTest, throwsErrorMessage)
@@ -57,5 +92,55 @@ INSTANTIATE_TEST_SUITE_P(
         std::pair{"executable-after-contents", "bad archive: expected tag ')', got 'executable'"},
         // Test that the 'name' field cannot come before the 'node' field in a directory entry.
         std::pair{"name-after-node", "bad archive: expected tag 'name'"}));
+
+TEST_F(NarTest, oneByteRegularFileParsesWithBothContentModes)
+{
+    readTest("regular-one-byte-zero-padding", [&](const std::string & narContents) {
+        auto skippingOffset = parseNar(narContents, NarContentMode::Skip);
+        auto drainingOffset = parseNar(narContents, NarContentMode::Drain);
+
+        EXPECT_EQ(skippingOffset, narContents.size());
+        EXPECT_EQ(drainingOffset, skippingOffset);
+    });
+}
+
+TEST_F(NarTest, nonZeroContentPaddingFailsWithBothContentModes)
+{
+    readTest("regular-one-byte-non-zero-padding", [&](const std::string & narContents) {
+        for (auto mode : {NarContentMode::Skip, NarContentMode::Drain}) {
+            ASSERT_THAT(
+                [&]() { parseNar(narContents, mode); },
+                ::testing::ThrowsMessage<SerialisationError>(testing::HasSubstrIgnoreANSIMatcher("non-zero padding")));
+        }
+    });
+}
+
+TEST_F(NarTest, truncatedLargeContentsFailsWithBothContentModes)
+{
+    readTest("regular-truncated-large-contents", [&](const std::string & narContents) {
+        for (auto mode : {NarContentMode::Skip, NarContentMode::Drain})
+            EXPECT_THROW(parseNar(narContents, mode), EndOfFile);
+    });
+}
+
+TEST_F(NarTest, truncatedContentPaddingFailsWithBothContentModes)
+{
+    readTest("regular-truncated-padding", [&](const std::string & narContents) {
+        for (auto mode : {NarContentMode::Skip, NarContentMode::Drain})
+            EXPECT_THROW(parseNar(narContents, mode), EndOfFile);
+    });
+}
+
+TEST_F(NarTest, trailingBytesRemainUnreadWithBothContentModes)
+{
+    readTest("regular-one-byte-zero-padding", [&](const std::string & narContents) {
+        auto narWithSentinel = narContents + "sentinel";
+        auto skippingOffset = parseNar(narWithSentinel, NarContentMode::Skip);
+        auto drainingOffset = parseNar(narWithSentinel, NarContentMode::Drain);
+
+        EXPECT_EQ(skippingOffset, narContents.size());
+        EXPECT_EQ(drainingOffset, skippingOffset);
+    });
+}
 
 } // namespace nix
