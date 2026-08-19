@@ -2,14 +2,15 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/modulo.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
 
-namespace nix::derivation {
+namespace nix::derivation::modulo {
 
 /**
- * Tests for `hashModulo` and `hashInputModulo`.
+ * Tests for `hash` and `hashInput`.
  *
  * The point of "hash modulo" is that derivations which differ only in
  * the *provenance* of their fixed-output inputs are indistinguishable:
@@ -124,7 +125,7 @@ protected:
     /**
      * A derivation depending on the given outputs of the given input
      * derivations, with its own output left deferred so that
-     * `hashModulo` masks it.
+     * `hash` masks it.
      */
     Full makeParent(std::set<SingleDerivedPath> inputs)
     {
@@ -218,12 +219,12 @@ INSTANTIATE_TEST_SUITE_P(HashModuloATerm, HashModuloATermTest, ::testing::Values
 struct HashModuloModuloTest : HashModuloTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(HashModuloModuloTest, unparseModulo)
+TEST_P(HashModuloModuloTest, unparse)
 {
     writeTest(std::string{GetParam()} + "-modulo.drv", [&] {
-        auto modulo = unparseModulo(*store, named(GetParam()));
-        EXPECT_TRUE(modulo);
-        return modulo.value_or("");
+        auto encoded = unparseModulo(*store, named(GetParam()));
+        EXPECT_TRUE(encoded);
+        return encoded.value_or("");
     });
 }
 
@@ -254,14 +255,14 @@ TEST_F(HashModuloTest, collidingInputDrvsMergeOutputNames)
 
     /* `out` from one and `dev` from the other therefore hashes the same
        as both outputs from a single one of them. */
-    EXPECT_EQ(hashModulo(*store, named("parent-split")), hashModulo(*store, named("parent-joined")));
+    EXPECT_EQ(hash(*store, named("parent-split")), hash(*store, named("parent-joined")));
 
     /* ...and symmetrically, with the roles of the two swapped. */
     auto splitOther = makeParent({
         SingleDerivedPath::Built{.drvPath = drvRef(first), .output = "dev"},
         SingleDerivedPath::Built{.drvPath = drvRef(second), .output = "out"},
     });
-    EXPECT_EQ(hashModulo(*store, splitOther), hashModulo(*store, named("parent-joined")));
+    EXPECT_EQ(hash(*store, splitOther), hash(*store, named("parent-joined")));
 }
 
 /**
@@ -280,7 +281,7 @@ TEST_F(HashModuloTest, differingOutputNamesDiffer)
         SingleDerivedPath::Built{.drvPath = intermediate, .output = "dev"},
     });
 
-    EXPECT_NE(hashModulo(*store, justOut), hashModulo(*store, both));
+    EXPECT_NE(hash(*store, justOut), hash(*store, both));
 }
 
 /**
@@ -290,8 +291,8 @@ TEST_F(HashModuloTest, differingOutputNamesDiffer)
  */
 TEST_F(HashModuloTest, fixedOutputIsProvenanceFree)
 {
-    auto first = hashInputModulo(*store, named("source-first"));
-    auto second = hashInputModulo(*store, named("source-second"));
+    auto first = hashInput(*store, named("source-first"));
+    auto second = hashInput(*store, named("source-second"));
 
     auto * outputHashes = std::get_if<HashModulo::CaOutputHashes>(&first.raw);
     ASSERT_TRUE(outputHashes);
@@ -317,7 +318,7 @@ TEST_F(HashModuloTest, differingInputDrvsDiffer)
         },
     });
 
-    EXPECT_NE(hashModulo(*store, a), hashModulo(*store, b));
+    EXPECT_NE(hash(*store, a), hash(*store, b));
 }
 
-} // namespace nix::derivation
+} // namespace nix::derivation::modulo
