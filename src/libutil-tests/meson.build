@@ -167,6 +167,7 @@ if build_unit_tests
 
     benchmark_sources = files(
       'bench-main.cc',
+      'reference-rewrite-bench.cc',
     )
 
     benchmark_exe = executable(
@@ -188,6 +189,7 @@ if build_unit_tests
       env : {
         '_NIX_TEST_UNIT_DATA' : meson.current_source_dir() / 'data',
       },
+      timeout : 90,
     )
   endif
 endif
