@@ -5,7 +5,7 @@
 | [Attribute selection]                  | *attrset* `.` *attrpath* \[ `or` *expr* \] | none          | 1          |
 | [Function application]                 | *func* *expr*                              | left          | 2          |
 | [Arithmetic negation][arithmetic]      | `-` *number*                               | none          | 3          |
-| [Has attribute]                        | *attrset* `?` *attrpath*                   | none          | 4          |
+| [Has attribute]                        | *expr* `?` *attrpath*                      | none          | 4          |
 | List concatenation                     | *list* `++` *list*                         | right         | 5          |
 | [Multiplication][arithmetic]           | *number* `*` *number*                      | left          | 6          |
 | [Division][arithmetic]                 | *number* `/` *number*                      | left          | 6          |
@@ -68,18 +68,21 @@ A callable value is either:
 
 > **Syntax**
 >
-> *attrset* `?` *attrpath*
+> *expr* `?` *attrpath*
 
-Test whether [attribute set] *attrset* contains the attribute denoted by *attrpath*.
+Test whether *expr* is an [attribute set] containing the attribute denoted by *[attrpath]*.
+If *attrpath* contains multiple components, and any of its components (other than the last) do not correspond to an attribute set in *expr*, the result is false.
 The result is a [Boolean] value.
 
 See also: [`builtins.hasAttr`](@docroot@/language/builtins.md#builtins-hasAttr)
+
+[attrpath]: ./syntax.md#attrpath-literal
 
 [Boolean]: ./types.md#type-bool
 
 [Has attribute]: #has-attribute
 
-After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*
+After evaluating *attrset* and *attrpath*, the computational complexity is O(log(*n*)) for *n* attributes in the *attrset*.
 
 ## Arithmetic
 
