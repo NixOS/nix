@@ -78,20 +78,21 @@ protected:
     Full makeSource(std::string_view builder)
     {
         Full drv{
+            .name = "source",
             .outputs{
                 {
                     "out",
-                    Output::CAFixed{
-                        .ca{
-                            .method = ContentAddressMethod::Raw::NixArchive,
-                            .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
-                        },
-                    },
+                    {.output =
+                         Output::CAFixed{
+                             .ca{
+                                 .method = ContentAddressMethod::Raw::NixArchive,
+                                 .hash = Hash::parseAnyPrefixed("sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8="),
+                             },
+                         }},
                 },
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "source",
         };
         fillInOutputPaths(drv, *store);
         return drv;
@@ -104,9 +105,10 @@ protected:
     Full makeIntermediate(const Full & source, std::string_view builder = "/bin/intermediate")
     {
         Full drv{
+            .name = "intermediate",
             .outputs{
-                {"dev", Output::Deferred{}},
-                {"out", Output::Deferred{}},
+                {"dev", {.output = Output::Deferred{}}},
+                {"out", {.output = Output::Deferred{}}},
             },
             .inputs{
                 SingleDerivedPath::Built{
@@ -116,7 +118,6 @@ protected:
             },
             .platform = "x86_64-linux",
             .builder = std::string{builder},
-            .name = "intermediate",
         };
         fillInOutputPaths(drv, *store);
         return drv;
@@ -130,11 +131,11 @@ protected:
     Full makeParent(std::set<SingleDerivedPath> inputs)
     {
         return Full{
-            .outputs = {{"out", Output::Deferred{}}},
+            .name = "parent",
+            .outputs = {{"out", {.output = Output::Deferred{}}}},
             .inputs = std::move(inputs),
             .platform = "x86_64-linux",
             .builder = "/bin/parent",
-            .name = "parent",
         };
     }
 

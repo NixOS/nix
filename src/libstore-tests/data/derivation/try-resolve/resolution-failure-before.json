@@ -14,12 +14,26 @@
     "srcs": []
   },
   "name": "resolution-failure",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
   "outputs": {
     "out": {
+      "checks": null,
       "hashAlgo": "sha256",
-      "method": "nar"
+      "method": "nar",
+      "unsafeDiscardReferences": false
     }
   },
   "system": "x86_64-linux",
-  "version": 4
+  "version": 5
 }

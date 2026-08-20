@@ -14,6 +14,7 @@ namespace nix {
 struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 {
     bool recursive = false;
+    std::optional<derivation::JsonFormat> jsonFormat;
 
     CmdShowDerivation()
     {
@@ -22,6 +23,18 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
             .shortName = 'r',
             .description = "Include the dependencies of the specified derivations.",
             .handler = {&recursive, true},
+        });
+
+        addFlag({
+            .longName = "json-format",
+            .description =
+                "JSON format version of [derivation](@docroot@/protocols/json/derivation/index.md) to use (4 or 5).\n"
+                "Version 4 only encodes the derivation options (and pass-as-file flags) via the environment variables.\n"
+                "Version 5 represents the derivation options first-class.",
+            .labels = {"version"},
+            .handler = {[this](std::string s) {
+                jsonFormat = derivation::parseJsonFormat(string2IntWithUnitPrefix<uint64_t>(s));
+            }},
         });
     }
 
@@ -52,17 +65,19 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
             drvPaths = std::move(closure);
         }
 
+        auto format = jsonFormat.value_or(derivation::JsonFormat::V5);
+
         json jsonRoot = json::object();
 
         for (auto & drvPath : drvPaths) {
             if (!drvPath.isDerivation())
                 continue;
 
-            jsonRoot[drvPath.to_string()] = store->readDerivation(drvPath);
+            jsonRoot[drvPath.to_string()] = derivation::toJSON(store->readDerivation(drvPath), format);
         }
         printJSON(
             nlohmann::json{
-                {"version", expectedJsonVersionDerivation},
+                {"version", static_cast<uint64_t>(format)},
                 {"derivations", std::move(jsonRoot)},
             });
     }

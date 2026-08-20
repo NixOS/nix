@@ -6,6 +6,7 @@
 #include "nix/store/derived-path.hh"
 #include "nix/store/realisation.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/build.hh"
@@ -1235,8 +1236,10 @@ std::optional<StorePath> Store::getBuildDerivationPath(const StorePath & path)
         // The build log is actually attached to the corresponding
         // resolved derivation, so we need to get it first
         auto resolvedDrv = tryResolve(drv, *this);
-        if (resolvedDrv)
+        if (resolvedDrv) {
+            // TODO check options compatibility with ATerm.
             return nix::computeStorePath(*this, unresolve(*resolvedDrv));
+        }
     }
 
     return path;
