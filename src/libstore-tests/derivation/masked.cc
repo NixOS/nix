@@ -246,7 +246,7 @@ INSTANTIATE_TEST_SUITE_P(HashModuloJSON, HashModuloJsonTest, ::testing::ValuesIn
 struct HashModuloATermTest : HashModuloTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(HashModuloATermTest, parse)
+TEST_P(HashModuloATermTest, from_aterm)
 {
     Written written;
     auto expected = named(written, GetParam());
@@ -256,7 +256,7 @@ TEST_P(HashModuloATermTest, parse)
     });
 }
 
-TEST_P(HashModuloATermTest, unparse)
+TEST_P(HashModuloATermTest, to_aterm)
 {
     Written written;
     writeTest(std::string{GetParam()} + ".drv", [&] { return unparse(named(written, GetParam()), store); });
@@ -277,13 +277,32 @@ INSTANTIATE_TEST_SUITE_P(HashModuloATerm, HashModuloATermTest, ::testing::Values
 struct HashModuloBothMaskedTest : HashModuloTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(HashModuloBothMaskedTest, unparse)
+TEST_P(HashModuloBothMaskedTest, to_aterm)
 {
     Written written;
     writeTest(std::string{GetParam()} + "-both-masked.drv", [&] {
         auto m = bothMasked(written, named(written, GetParam()));
         EXPECT_TRUE(m);
         return m ? unparse(*m, store) : "";
+    });
+}
+
+/**
+ * The encoding is unambiguous: reading a masked derivation back yields
+ * what was printed.
+ *
+ * This is the property that matters most about this format. If two
+ * distinct masked derivations could ever print the same bytes, they
+ * would hash the same, and two derivations that mean different things
+ * would share an output path.
+ */
+TEST_P(HashModuloBothMaskedTest, from_aterm)
+{
+    Written written;
+    auto expected = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readTest(std::string{GetParam()} + "-both-masked.drv", [&](auto encoded) {
+        EXPECT_EQ((parse<masked::HashInputs, Output::Deferred>(store, std::move(encoded), expected->name)), *expected);
     });
 }
 
