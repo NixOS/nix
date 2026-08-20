@@ -1,6 +1,7 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
+#include "nix/store/derivation/resolution.hh"
 
 #include <nlohmann/json.hpp>
 
