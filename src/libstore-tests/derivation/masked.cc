@@ -250,7 +250,7 @@ INSTANTIATE_TEST_SUITE_P(MaskedHashJSON, MaskedHashJsonTest, ::testing::ValuesIn
 struct MaskedHashATermTest : MaskedHashTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(MaskedHashATermTest, parse)
+TEST_P(MaskedHashATermTest, from_aterm)
 {
     Written written;
     auto expected = named(written, GetParam());
@@ -260,7 +260,7 @@ TEST_P(MaskedHashATermTest, parse)
     });
 }
 
-TEST_P(MaskedHashATermTest, unparse)
+TEST_P(MaskedHashATermTest, to_aterm)
 {
     Written written;
     writeTest(std::string{GetParam()} + ".drv", [&] { return unparse(named(written, GetParam()), store); });
@@ -288,6 +288,25 @@ TEST_P(MaskedHashFullyMaskedTest, unparse)
         auto m = bothMasked(written, named(written, GetParam()));
         EXPECT_TRUE(m);
         return m ? unparse(*m, store) : "";
+    });
+}
+
+/**
+ * The encoding is unambiguous: reading a masked derivation back yields
+ * what was printed.
+ *
+ * This is the property that matters most about this format. If two
+ * distinct masked derivations could ever print the same bytes, they
+ * would hash the same, and two derivations that mean different things
+ * would share an output path.
+ */
+TEST_P(MaskedHashFullyMaskedTest, from_aterm)
+{
+    Written written;
+    auto expected = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readTest(std::string{GetParam()} + "-fully-masked.drv", [&](auto encoded) {
+        EXPECT_EQ((parse<masked::HashInputs, Output::Deferred>(store, std::move(encoded), expected->name)), *expected);
     });
 }
 

@@ -73,9 +73,9 @@ concept RenderableDerivation =
 /**
  * Print a derivation in one of the intermediate forms.
  *
- * The `masked::HashInputs` cases are not round-trippable: `parse` cannot
- * read them back, as their input derivations are named by hash rather
- * than by store path.
+ * The `masked::HashInputs` cases name their input derivations by hash
+ * rather than by store path, so the default `parse` cannot read them
+ * back; `parse<masked::HashInputs, Output::Deferred>` is their inverse.
  */
 template<typename Inputs, typename Out>
     requires RenderableDerivation<Inputs, Out>
@@ -85,14 +85,52 @@ std::string unparse(
     bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
 
 /**
- * Read a derivation from a file.
+ * The derivation shapes `parse` below can read. Same as
+ * `RenderableDerivation`, except that the regular form's inputs are the
+ * flat set callers hold, not the nested `FullInputs` the ATerm encodes.
  */
-Full parse(
+template<typename Inputs, typename Out>
+concept ParsableDerivation =
+    (std::is_same_v<Inputs, std::set<SingleDerivedPath>>
+     && (std::is_same_v<Out, Output> || std::is_same_v<Out, Output::InputAddressed>
+         || std::is_same_v<Out, Output::Deferred>) )
+    || (std::is_same_v<Inputs, masked::HashInputs>
+        && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) );
+
+/**
+ * Read a derivation from a file.
+ *
+ * The type arguments say which form is expected. They default to the
+ * regular one, so ordinary callers need not mention them; reading back
+ * a masked derivation --- the inverse of `unparse` for that form ---
+ * is `parse<masked::HashInputs, Output::Deferred>`.
+ *
+ * Nothing in production reads the masked form, which exists to be
+ * hashed. Being able to read it is what lets the tests check that the
+ * encoding is unambiguous, which is what makes an input address well
+ * defined.
+ */
+template<typename Inputs = std::set<SingleDerivedPath>, typename Out = Output>
+    requires ParsableDerivation<Inputs, Out>
+Derivation<Inputs, Out> parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
     bool supportWindowsStoreDir = defaultSupportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+
+extern template Full parse(
+    const StoreDirConfig & store,
+    std::string && s,
+    std::string_view name,
+    bool supportWindowsStoreDir,
+    const ExperimentalFeatureSettings &);
+extern template Derivation<masked::HashInputs, Output::Deferred> parse(
+    const StoreDirConfig & store,
+    std::string && s,
+    std::string_view name,
+    bool supportWindowsStoreDir,
+    const ExperimentalFeatureSettings &);
 
 Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name);
 void write(Sink & out, const StoreDirConfig & store, const Basic & drv);
