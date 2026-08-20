@@ -768,23 +768,8 @@ void RemoteStore::addTempRoots(const StorePathSet & paths)
 
         for (auto & path : newPaths)
             conn->tempRootsPinned.upsert(path, true);
-    } else {
-        /* Fallback for daemons that don't support the batched
-           operation. Note that this is very slow for large sets of
-           paths on high-latency links, due to a network round-trip per
-           path. */
-        warn(
-            "the daemon is missing the '%s' protocol feature, needed to support batched gc root registration, falling back to sequential registration",
-            WorkerProto::featureAddTempRoots);
-        for (auto & path : paths) {
-            if (conn->tempRootsPinned.get(path))
-                continue;
-
-            conn->addTempRoot(*this, &conn.daemonException, path);
-
-            conn->tempRootsPinned.upsert(path, true);
-        }
     }
+    /* Note: there is no fallback for old daemons to prevent performance regressions. */
 }
 
 Roots RemoteStore::findRoots(bool censor)
