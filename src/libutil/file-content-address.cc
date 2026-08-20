@@ -89,7 +89,7 @@ void restorePath(
             path,
             0666,
             {
-                .truncateExisting = true,
+                .truncateExisting = false, /* Like RestoreSink, we can only create new files. */
                 .followSymlinksOnTruncate = false,
                 .writeOnly = true,
             });
