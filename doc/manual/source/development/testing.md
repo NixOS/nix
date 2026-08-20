@@ -367,6 +367,29 @@ xdg-open cov-html/index.html
 
 If you have found a memory safety issue using fuzzing, consider reporting it [privately](https://github.com/NixOS/nix/security/) if you deem the issue to be security relevant.
 
+### Checks that defeat fuzzing
+
+Fuzzing is crucial for validating invariants, but a few invariants are ones a fuzzer can never satisfy.
+A check that a field equals a cryptographic hash of other fields is the usual case: passing it requires a hash preimage, so the code below the check becomes *unreachable* to the fuzzer rather than merely hard to reach.
+This is different from a check that is only awkward to satisfy --- sorted keys, balanced delimiters, no redundant escapes --- which a coverage-guided fuzzer will learn to get past on its own.
+Only the former should be gated.
+
+Such checks are compiled out under `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`, e.g.:
+
+```c++
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (path != computedPath)
+        throw FormatError(...);
+#endif
+```
+
+The macro name is a convention from [OSS-Fuzz](https://google.github.io/oss-fuzz/) and libFuzzer.
+`nix-meson-build-support/common/meson.build` defines it for every subproject when `fuzzer-no-link` is in `b_sanitize`, which is exactly when a fuzzer-instrumented build is being made.
+Builds using an external `fuzzing-engine` are expected to pass it themselves, as OSS-Fuzz does.
+
+Anything gated this way is no longer exercised by the fuzzer, so it must be covered by a unit test instead.
+For an example of both halves, see the fixed-output derivation path check in `parseOutput` (`src/libstore/derivation/aterm.cc`) and its test `CAFixedPathMismatch`.
+
 ## Installer tests
 
 GitHub Actions CI in the Nix repository also tests the installer on PRs. It does not require additional setup and utilises [GHA Artifacts](https://docs.github.com/en/actions/tutorials/store-and-share-data) and can be run in any Nix repository fork.

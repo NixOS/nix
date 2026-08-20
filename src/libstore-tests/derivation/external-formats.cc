@@ -25,6 +25,24 @@ TEST_F(DerivationTest, UnterminatedString)
         FormatError);
 }
 
+/**
+ * A fixed-output derivation states its output path, but that path is a
+ * function of the content address, so a stated path that disagrees is
+ * rejected rather than silently kept.
+ *
+ * This is also the coverage for the check itself, which `parseOutput`
+ * compiles out under `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`.
+ */
+TEST_F(DerivationTest, CAFixedPathMismatch)
+{
+#ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    GTEST_SKIP() << "Path check is compiled out of fuzzer-instrumented builds";
+#endif
+    ASSERT_THROW(
+        derivation::parse(*store, readFile(goldenMaster("bad-ca-fixed-path.drv")), "fixed", mockXpSettings),
+        FormatError);
+}
+
 TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
 {
     ASSERT_THROW(
