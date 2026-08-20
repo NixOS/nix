@@ -53,7 +53,8 @@ static void stripXAttrs(const std::filesystem::path & path, const StringSet & ig
         if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
             throw SysError("querying extended attributes of %s", PathFmt(path));
 
-        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+        using namespace std::string_view_literals;
+        for (auto & eaName : tokenizeString<Strings>(std::string_view(eaBuf.data(), eaSize), "\0"sv)) {
             if (ignoredAcls.count(eaName))
                 continue;
             if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
