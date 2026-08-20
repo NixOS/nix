@@ -258,6 +258,8 @@ void writeFile(
     FsSync sync = FsSync::No,
     FinalSymlink finalSymlink = FinalSymlink::Follow);
 
+void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesystem::path * origPath = nullptr);
+
 void writeFile(
     Descriptor fd, std::string_view s, FsSync sync = FsSync::No, const std::filesystem::path * origPath = nullptr);
 

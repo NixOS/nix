@@ -111,6 +111,8 @@ public:
     void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
 };
 
+class RestoreSinkHooks;
+
 /**
  * Write files at the given path
  */
@@ -118,6 +120,8 @@ struct RestoreSink : FileSystemObjectSink
 {
 private:
     void anchor() override;
+
+    RestoreSinkHooks * hooks = nullptr;
 
 public:
     std::filesystem::path dstPath;
@@ -133,11 +137,15 @@ public:
     AutoCloseFD dirFd;
     bool startFsync = false;
 
-    explicit RestoreSink(bool startFsync)
-        : startFsync{startFsync}
+    explicit RestoreSink(bool startFsync, RestoreSinkHooks * hooks = nullptr)
+        : hooks{hooks}
+        , startFsync{startFsync}
     {
     }
 
+    /**
+     * @todo Remove. Only keep the callback driven function (at least for recursive traversal).
+     */
     void createDirectory(const CanonPath & path) override;
 
     void createDirectory(const CanonPath & path, DirectoryCreatedCallback callback) override;
@@ -145,6 +153,50 @@ public:
     void createRegularFile(const CanonPath & path, fun<void(CreateRegularFileSink &)>) override;
 
     void createSymlink(const CanonPath & path, const std::string & target) override;
+};
+
+/**
+ * Hooks invoked when filesystem objects created by `RestoreSink` are complete,
+ * so callers can post-process them (e.g. metadata canonicalisation). By doing
+ * this in the hooks, the whole operation can be done in a single recursive tree
+ * traversal during unpacking.
+ *
+ * @todo Do something on Windows.
+ */
+class RestoreSinkHooks
+{
+    virtual void anchor();
+
+public:
+    virtual ~RestoreSinkHooks() = default;
+
+    /**
+     * @brief Called when the callback passed to @ref nix::RestoreSink::createDirectory()
+     * returns.
+     *
+     * Naturally, this means that recursive copying and @ref nix::restorePath()
+     * drives these in post-order when walking up the directory tree. This makes
+     * it suitable for canonicalising permissions of directories.
+     *
+     * @param dirFd File descriptor of the directory.
+     */
+    virtual void directoryDone(Descriptor dirFd) = 0;
+
+    /**
+     * Called when the callback passed to @ref nix::RestoreSink::createRegularFile() returns.
+     *
+     * @param fd File descriptor of the file.
+     * @param executable Whether @ref nix::CreateRegularFileSink::isExecutable() was called.
+     */
+    virtual void regularFileCreated(Descriptor fd, bool executable) = 0;
+
+    /**
+     * @brief Called after a symlink is created.
+     *
+     * @param parentFd Directory file descriptor of the symlink parent (immediate one).
+     * @param name Relative path of the symlink beneath the parent directory.
+     */
+    virtual void symlinkCreated(Descriptor parentFd, const CanonPath & name) = 0;
 };
 
 /**
