@@ -3,14 +3,17 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/fs-sink.hh"
 
 #if NIX_SUPPORT_ACL
 #  include <sys/xattr.h>
 #endif
 
+#include <sys/stat.h>
+
 namespace nix {
 
-const time_t mtimeStore = 1; /* 1 second into the epoch */
+static constexpr time_t mtimeStore = 1; /* 1 second into the epoch */
 
 static void canonicaliseTimestampAndPermissions(const std::filesystem::path & path, const PosixStat & st)
 {
@@ -183,6 +186,104 @@ void canonicalisePathMetaData(const std::filesystem::path & path, CanonicalizePa
 {
     InodesSeen inodesSeen;
     canonicalisePathMetaData_(path, options, inodesSeen);
+}
+
+#ifndef _WIN32
+static void setStoreWriteTime(Descriptor fd)
+{
+    struct ::timespec times[2] = {
+        {.tv_sec = 0, .tv_nsec = UTIME_OMIT}, /* Leave alone. tv_sec is ignored. */
+        {.tv_sec = mtimeStore, .tv_nsec = 0},
+    };
+
+    if (::futimens(fd, times) == -1)
+        throw SysError([&]() {
+            return HintFmt("changing modification time of %s (using `futimens`)", PathFmt(descriptorToPath(fd)));
+        });
+}
+#endif
+
+/* These hooks are supposed to be used only for freshly created files, not
+   something we get from the builder output -- that needs additional validation.
+   Use this for creating store objects with canonicalised permissions in a
+   single restorePath pass. */
+class CanonicalisingRestoreHooks : public RestoreSinkHooks
+{
+#if NIX_SUPPORT_ACL
+    const StringSet & ignoredAcls;
+#endif
+
+    void canonicaliseTimestampAndPermissions(Descriptor fd, mode_t mode)
+    {
+#ifndef _WIN32 /* TODO: Figure out what sort of canonicalisation we even want. */
+#  if NIX_SUPPORT_ACL
+        stripXAttrs(fd, ignoredAcls);
+#  endif
+        if (::fchmod(fd, mode) == -1)
+            throw SysError([&]() { return HintFmt("setting permissions on %s", PathFmt(descriptorToPath(fd))); });
+        setStoreWriteTime(fd);
+#endif
+    }
+
+    void anchor() override;
+
+public:
+#if NIX_SUPPORT_ACL
+    explicit CanonicalisingRestoreHooks(const StringSet & ignoredAcls)
+        : ignoredAcls(ignoredAcls)
+    {
+    }
+#else
+    CanonicalisingRestoreHooks() = default;
+#endif
+
+    void directoryDone(Descriptor dirFd) override
+    {
+        canonicaliseTimestampAndPermissions(dirFd, 0555);
+    }
+
+    void regularFileCreated(Descriptor fd, bool executable) override
+    {
+        canonicaliseTimestampAndPermissions(fd, executable ? 0555 : 0444);
+    }
+
+    void symlinkCreated(Descriptor parentFd, const CanonPath & name) override
+    {
+#ifndef _WIN32 /* Handling of symlinks on windows needs a ton more work. */
+#  if NIX_SUPPORT_ACL
+        AutoCloseFD fd = ::openat(parentFd, name.rel_c_str(), O_PATH | O_NOFOLLOW | O_CLOEXEC);
+        if (!fd)
+            throw SysError(
+                [&]() { return HintFmt("failed to open %1%", PathFmt(descriptorToPath(parentFd) / name.rel())); });
+        /* Would be nice to use the *at family of syscalls with AT_EMPTY_PATH added in (6.13)
+           https://github.com/torvalds/linux/commit/6140be90ec70c39fa844741ca3cc807dd0866394,
+           but there are no glibc wrappers and apparently no manpages for them too? */
+        stripXAttrs<std::filesystem::path>(
+            "/proc/self/fd/" + std::to_string(fd.get()),
+            ignoredAcls,
+            FinalSymlink::Follow /* Need to follow the magic link. */
+        );
+#  endif
+        struct ::timespec times[2] = {
+            {.tv_sec = 0, .tv_nsec = UTIME_OMIT}, /* Leave alone. tv_sec is ignored. */
+            {.tv_sec = mtimeStore, .tv_nsec = 0},
+        };
+
+        if (::utimensat(parentFd, name.rel_c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
+            throw SysError([&]() {
+                return HintFmt(
+                    "changing modification time of %s (using `utimensat`)",
+                    PathFmt(descriptorToPath(parentFd) / name.rel()));
+            });
+#endif
+    }
+};
+
+void CanonicalisingRestoreHooks::anchor() {}
+
+std::unique_ptr<RestoreSinkHooks> makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(const StringSet & ignoredAcls))
+{
+    return std::make_unique<CanonicalisingRestoreHooks>(NIX_WHEN_SUPPORT_ACLS2(ignoredAcls));
 }
 
 } // namespace nix

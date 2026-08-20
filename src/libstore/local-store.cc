@@ -1101,8 +1101,14 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 HashSink hashSink(HashAlgorithm::SHA256);
 
                 TeeSource wrapperSource{source, hashSink};
+                auto canonicalisingRestoreHooks =
+                    makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                restorePath(
+                    realPath,
+                    wrapperSource,
+                    config->getLocalSettings().fsyncStorePaths,
+                    canonicalisingRestoreHooks.get());
 
                 auto hashResult = hashSink.finish();
 
@@ -1156,8 +1162,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 }
 
                 autoGC();
-
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1260,6 +1264,8 @@ StorePath LocalStore::addToStoreFromDump(
        wrong sort, and we need to rehash.
        References are also in store path, if scanning we will need to move */
     bool inMemoryAndDontNeedRestore = inMemory && methodsMatch && !filterReferences;
+    auto canonicalisingRestoreHooks =
+        makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
     if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
@@ -1270,7 +1276,7 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths);
+        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths, canonicalisingRestoreHooks.get());
 
         std::string().swap(dump);
     }
@@ -1321,7 +1327,12 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, localSettings.fsyncStorePaths);
+                    restorePath(
+                        realPath,
+                        dumpSource,
+                        (FileSerialisationMethod) fim,
+                        localSettings.fsyncStorePaths,
+                        canonicalisingRestoreHooks.get());
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1331,17 +1342,18 @@ StorePath LocalStore::addToStoreFromDump(
             } else {
                 /* Move the temporary path we restored above. */
                 try {
-                    renameFile(tempPath, realPath);
+                    /* movePath and not renameFile because at this point the top-level directory is
+                       read-only. */
+                    movePath(tempPath, realPath);
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
 
                     /* Apparently this can happen even on the same filesystem (and the paths that are renamed above
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
-                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath.
-                       Note that copyRecursive doesn't copy over permissions, but those will be canonicalised below. */
+                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    RestoreSink copySink{/*startFsync=*/false};
+                    RestoreSink copySink{/*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
                     copySink.dstPath = realPath;
                     copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink, CanonPath::root);
                     delTempDir->deletePath();
@@ -1356,9 +1368,6 @@ StorePath LocalStore::addToStoreFromDump(
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
             }
-
-            canonicalisePathMetaData(
-                realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 
