@@ -20,6 +20,31 @@
 
 namespace nix {
 
+/**
+ * Throw for a failed socket call, reading the error from wherever the
+ * platform put it.
+ *
+ * Winsock does not touch `errno`: it reports through `WSAGetLastError()`.
+ * Building a `SysError` for a socket failure on Windows therefore renders
+ * whatever unrelated value `errno` happened to be holding, which is
+ * actively misleading -- a socket created before Winsock was initialised
+ * reported "Bad file descriptor" rather than the actual
+ * WSANOTINITIALISED.
+ */
+template<typename... Args>
+[[noreturn]] static void throwSocketError(const Args &... args)
+{
+#ifdef _WIN32
+    /* Must be a `DWORD` so the explicitly-provided-code `WinError`
+       constructor is chosen over the `GetLastError()` one -- and
+       `GetLastError()` is the wrong source here. */
+    DWORD err = static_cast<DWORD>(WSAGetLastError());
+    throw windows::WinError(err, args...);
+#else
+    throw SysError(args...);
+#endif
+}
+
 AutoCloseFD createUnixDomainSocket()
 {
     AutoCloseFD fdSocket = toDescriptor(socket(
@@ -31,7 +56,7 @@ AutoCloseFD createUnixDomainSocket()
         ,
         0));
     if (!fdSocket)
-        throw SysError("cannot create Unix domain socket");
+        throwSocketError("cannot create Unix domain socket");
 #ifndef _WIN32
     unix::closeOnExec(fdSocket.get());
 #endif
@@ -47,7 +72,7 @@ AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mo
     chmod(path, mode);
 
     if (listen(toSocket(fdSocket.get()), 100) == -1)
-        throw SysError("cannot listen on socket %s", PathFmt(path));
+        throwSocketError("cannot listen on socket %s", PathFmt(path));
 
     return fdSocket;
 }
@@ -180,7 +205,7 @@ static void bindConnectProcHelper(
     } else {
         memcpy(addr.sun_path, pathStr.c_str(), pathStr.size() + 1);
         if (operation(fd, psaddr, sizeof(addr)) == -1)
-            throw SysError("cannot %s to socket at '%s'", operationName, PathFmt(path));
+            throwSocketError("cannot %s to socket at '%s'", operationName, PathFmt(path));
     }
 }
 
