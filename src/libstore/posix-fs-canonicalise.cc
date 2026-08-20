@@ -40,25 +40,70 @@ void canonicaliseTimestampAndPermissions(const std::filesystem::path & path)
 
 #if NIX_SUPPORT_ACL
 
-static void stripXAttrs(const std::filesystem::path & path, const StringSet & ignoredAcls)
+static ssize_t listXAttr(const std::filesystem::path & path, char * list, size_t size, FinalSymlink finalSymlink)
 {
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+    if (finalSymlink == FinalSymlink::DontFollow)
+        return ::llistxattr(path.c_str(), list, size);
+    return ::listxattr(path.c_str(), list, size);
+}
+
+static ssize_t listXAttr(Descriptor fd, char * list, size_t size, [[maybe_unused]] FinalSymlink finalSymlink)
+{
+    return ::flistxattr(fd, list, size);
+}
+
+static int removeXAttr(const std::filesystem::path & path, const char * name, FinalSymlink finalSymlink)
+{
+    if (finalSymlink == FinalSymlink::DontFollow)
+        return ::lremovexattr(path.c_str(), name);
+    return ::removexattr(path.c_str(), name);
+}
+
+static int removeXAttr(Descriptor fd, const char * name, [[maybe_unused]] FinalSymlink finalSymlink)
+{
+    return ::fremovexattr(fd, name);
+}
+
+static std::filesystem::path renderXAttrsFuncArgumentPath(Descriptor fd)
+{
+    return descriptorToPath(fd);
+}
+
+static std::filesystem::path renderXAttrsFuncArgumentPath(std::filesystem::path path)
+{
+    return path;
+}
+
+template<typename T>
+static void
+stripXAttrs(const T & pathOrFd, const StringSet & ignoredAcls, FinalSymlink finalSymlink = FinalSymlink::DontFollow)
+{
+    ssize_t eaSize = listXAttr(pathOrFd, nullptr, 0, finalSymlink);
 
     if (eaSize < 0) {
         if (errno != ENOTSUP && errno != ENODATA)
-            throw SysError("querying extended attributes of %s", PathFmt(path));
+            throw SysError([&]() {
+                return HintFmt("querying extended attributes of %s", PathFmt(renderXAttrsFuncArgumentPath(pathOrFd)));
+            });
     } else if (eaSize > 0) {
         std::vector<char> eaBuf(eaSize);
 
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
-            throw SysError("querying extended attributes of %s", PathFmt(path));
+        if ((eaSize = listXAttr(pathOrFd, eaBuf.data(), eaBuf.size(), finalSymlink)) < 0)
+            throw SysError([&]() {
+                return HintFmt("querying extended attributes of %s", PathFmt(renderXAttrsFuncArgumentPath(pathOrFd)));
+            });
 
         using namespace std::string_view_literals;
         for (auto & eaName : tokenizeString<Strings>(std::string_view(eaBuf.data(), eaSize), "\0"sv)) {
             if (ignoredAcls.count(eaName))
                 continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
-                throw SysError("removing extended attribute '%s' from %s", eaName, PathFmt(path));
+            if (removeXAttr(pathOrFd, eaName.c_str(), finalSymlink) == -1)
+                throw SysError([&]() {
+                    return HintFmt(
+                        "removing extended attribute '%s' from %s",
+                        eaName,
+                        PathFmt(renderXAttrsFuncArgumentPath(pathOrFd)));
+                });
         }
     }
 }
