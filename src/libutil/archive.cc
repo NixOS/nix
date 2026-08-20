@@ -307,9 +307,9 @@ void parseDump(FileSystemObjectSink & sink, Source & source)
     parse(sink, source, CanonPath::root, 0);
 }
 
-void restorePath(const std::filesystem::path & path, Source & source, bool startFsync)
+void restorePath(const std::filesystem::path & path, Source & source, bool startFsync, RestoreSinkHooks * hooks)
 {
-    RestoreSink sink{startFsync};
+    RestoreSink sink{startFsync, hooks};
     sink.dstPath = path;
     parseDump(sink, source);
 }

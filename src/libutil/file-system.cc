@@ -300,27 +300,33 @@ void writeFile(const std::filesystem::path & path, Source & source, mode_t mode,
     if (!fd)
         throw NativeSysError("opening file %s", PathFmt(path));
 
-    std::array<char, 64 * 1024> buf;
-
-    try {
-        while (true) {
-            try {
-                auto n = source.read(buf.data(), buf.size());
-                writeFull(fd.get(), {buf.data(), n});
-            } catch (EndOfFile &) {
-                break;
-            }
-        }
-    } catch (Error & e) {
-        e.addTrace({}, "writing file %s", PathFmt(path));
-        throw;
-    }
-    if (sync == FsSync::Yes)
-        fd.fsync();
+    writeFile(fd.get(), source, sync, &path);
     // Explicitly close to make sure exceptions are propagated.
     fd.close();
     if (sync == FsSync::Yes)
         syncParent(path);
+}
+
+void writeFile(Descriptor fd, Source & source, FsSync sync, const std::filesystem::path * origPath)
+{
+    std::array<char, 64 * 1024> buf;
+
+    try {
+        while (true) {
+            size_t n;
+            try {
+                n = source.read(buf.data(), buf.size());
+            } catch (EndOfFile &) {
+                break;
+            }
+            writeFull(fd, {buf.data(), n});
+        }
+    } catch (Error & e) {
+        e.addTrace({}, "writing file %1%", origPath ? PathFmt(*origPath) : PathFmt(descriptorToPath(fd)));
+        throw;
+    }
+    if (sync == FsSync::Yes)
+        syncDescriptor(fd);
 }
 
 void syncParent(const std::filesystem::path & path)
