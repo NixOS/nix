@@ -6,7 +6,6 @@
 #include <strings.h> // for strcasecmp
 
 #include "nix/util/archive.hh"
-#include "nix/util/alignment.hh"
 #include "nix/util/config-global.hh"
 #include "nix/util/posix-source-accessor.hh"
 #include "nix/util/source-path.hh"
@@ -139,21 +138,20 @@ static void parseContents(CreateRegularFileSink & sink, Source & source)
     sink.preallocateContents(size);
 
     if (sink.skipContents) {
-        source.skip(alignUp(size, 8));
-        return;
-    }
+        source.skip(size);
+    } else {
+        uint64_t left = size;
+        std::array<char, 65536> buf;
 
-    uint64_t left = size;
-    std::array<char, 65536> buf;
-
-    while (left) {
-        checkInterrupt();
-        auto n = buf.size();
-        if ((uint64_t) n > left)
-            n = left;
-        source(buf.data(), n);
-        sink({buf.data(), n});
-        left -= n;
+        while (left) {
+            checkInterrupt();
+            auto n = buf.size();
+            if ((uint64_t) n > left)
+                n = left;
+            source(buf.data(), n);
+            sink({buf.data(), n});
+            left -= n;
+        }
     }
 
     readPadding(size, source);
