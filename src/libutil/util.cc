@@ -12,6 +12,10 @@
 #include <boost/lexical_cast.hpp>
 #include <stdint.h>
 
+#ifdef _WIN32
+#  include <winsock2.h>
+#endif
+
 #ifdef NDEBUG
 #  error "Nix may not be built with assertions disabled (i.e. with -DNDEBUG)."
 #endif
@@ -62,6 +66,29 @@ void initLibUtil()
            effect. */
         if (OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr) != 1)
             throw Error("could not initialise OpenSSL");
+
+#ifdef _WIN32
+        /* Winsock must be initialised once per process before any socket
+           call. Without this, every socket() in the process fails with
+           WSANOTINITIALISED, which is how the daemon and every `unix://`
+           store became unreachable on Windows. 2.2 is the version every
+           supported Windows provides.
+
+           WSAStartup() returns the error code directly rather than setting
+           it, because WSAGetLastError() is itself unusable until Winsock is
+           up -- so the code is read from the return value.
+
+           Deliberately not paired with WSACleanup(). Winsock reference-counts
+           startup against cleanup, and tearing it down while another thread
+           still holds a socket invalidates that socket. For the same reason
+           the OpenSSL atexit() handler is suppressed above, we want this
+           released only by process exit. */
+        WSADATA wsaData;
+        /* The error code has to be a `DWORD` for the explicitly-provided-code
+           `WinError` constructor to be chosen over the `GetLastError()` one. */
+        if (DWORD err = static_cast<DWORD>(WSAStartup(MAKEWORD(2, 2), &wsaData)); err != 0)
+            throw windows::WinError(err, "could not initialise Winsock");
+#endif
     });
 }
 
