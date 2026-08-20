@@ -19,8 +19,11 @@ std::optional<OsString> getEnvOs(const OsString & key)
 
     // Retrieve the environment variable value
     DWORD resultSize = GetEnvironmentVariableW(key.c_str(), &value[0], bufferSize);
+    /* Reaching here means the sizing call above succeeded, so the variable
+       exists. A zero character count therefore means its value is empty, not
+       that it is absent. */
     if (resultSize == 0) {
-        return std::nullopt;
+        return OsString{};
     }
 
     // Resize the string to remove the extra null characters
