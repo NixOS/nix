@@ -177,10 +177,25 @@ static BackedStringView parseUnquotedString(StringViewStream & str)
     return content;
 }
 
-/* Store paths in derivations must be written in their canonical form. */
-static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str)
+/**
+ * Read the string of a store path.
+ *
+ * Unless the store directory needs escaping, it is written verbatim,
+ * and an escape in it is rejected. See
+ * `defaultSupportWindowsStoreDir`.
+ *
+ * Separate from `parseStorePath` because an output's path field shares
+ * the encoding but may also be empty, which is no store path at all.
+ */
+static BackedStringView parseStorePathString(StringViewStream & str, bool supportWindowsStoreDir)
 {
-    return store.parseStorePathCanonical(*parseUnquotedString(str));
+    return supportWindowsStoreDir ? parseString(str) : parseUnquotedString(str);
+}
+
+/* Store paths in derivations must be written in their canonical form. */
+static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
+{
+    return store.parseStorePathCanonical(*parseStorePathString(str, supportWindowsStoreDir));
 }
 
 /**
@@ -278,11 +293,11 @@ static StringSet parseStrings(StringViewStream & str)
     return res;
 }
 
-static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str)
+static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
 {
     StorePathSet res;
     parseList(str, [&] {
-        auto path = parseStorePath(store, str);
+        auto path = parseStorePath(store, str, supportWindowsStoreDir);
         checkMonotonic(res, path, [&] { return fmt("store path '%s'", store.printStorePath(path)); });
         res.insert(res.end(), std::move(path));
     });
@@ -427,6 +442,7 @@ Full parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
+    bool supportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings)
 {
     using namespace std::literals::string_view_literals;
@@ -469,7 +485,7 @@ Full parse(
         drv.outputs,
         [&] { return parseUnquotedString(str).toOwned(); },
         [&](const auto & outputName) {
-            const auto pathS = parseString(str);
+            const auto pathS = parseStorePathString(str, supportWindowsStoreDir);
             expect(str, ',');
             const auto hashAlgo = parseString(str);
             expect(str, ',');
@@ -485,7 +501,7 @@ Full parse(
         str,
         fullInputs.drvs.map,
         [&] {
-            auto drvPath = parseStorePath(store, str);
+            auto drvPath = parseStorePath(store, str, supportWindowsStoreDir);
             drvPath.requireDerivation();
             return drvPath;
         },
@@ -501,7 +517,7 @@ Full parse(
         [&](const StorePath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
 
     expect(str, ',');
-    fullInputs.srcs = parseStorePaths(store, str);
+    fullInputs.srcs = parseStorePaths(store, str, supportWindowsStoreDir);
     drv.inputs = fullInputs.toSet();
     expect(str, ',');
     drv.platform = parseUnquotedString(str).toOwned();
@@ -619,15 +635,25 @@ static void printUnquotedStrings(std::string & res, const auto & strings)
     printList(res, strings, [&](const auto & s) { printUnquotedString(res, s); });
 }
 
-/* Store paths in derivations must be written in their canonical form. */
-static void printStorePath(const StoreDirConfig & store, std::string & res, const StorePath & path)
+/* The counterpart of `parseStorePathString`. */
+static void printStorePathString(std::string & res, std::string_view pathS, bool supportWindowsStoreDir)
 {
-    printUnquotedString(res, store.printStorePath(path));
+    if (supportWindowsStoreDir)
+        printString(res, pathS);
+    else
+        printUnquotedString(res, pathS);
 }
 
-static void printStorePaths(const StoreDirConfig & store, std::string & res, const StorePathSet & paths)
+static void
+printStorePath(const StoreDirConfig & store, std::string & res, const StorePath & path, bool supportWindowsStoreDir)
 {
-    printList(res, paths, [&](const auto & path) { printStorePath(store, res, path); });
+    printStorePathString(res, store.printStorePath(path), supportWindowsStoreDir);
+}
+
+static void printStorePaths(
+    const StoreDirConfig & store, std::string & res, const StorePathSet & paths, bool supportWindowsStoreDir)
+{
+    printList(res, paths, [&](const auto & path) { printStorePath(store, res, path, supportWindowsStoreDir); });
 }
 
 static void unparseDerivedPathMapNode(
@@ -654,12 +680,13 @@ static void unparseDerivedPathMapNode(
     }
 }
 
-static void printKey(const StoreDirConfig & store, std::string & res, const StorePath & key)
+static void
+printKey(const StoreDirConfig & store, std::string & res, const StorePath & key, bool supportWindowsStoreDir)
 {
-    printStorePath(store, res, key);
+    printStorePath(store, res, key, supportWindowsStoreDir);
 }
 
-static void printKey(const StoreDirConfig &, std::string & res, const Hash & key)
+static void printKey(const StoreDirConfig &, std::string & res, const Hash & key, bool)
 {
     printUnquotedString(res, key.to_string(HashFormat::Base16, false));
 }
@@ -669,9 +696,10 @@ static void unparseOutput(
     std::string & s,
     const Output::InputAddressed & doi,
     std::string_view,
-    std::string_view)
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    printStorePath(store, s, doi.path);
+    printStorePath(store, s, doi.path, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, {});
     s += ',';
@@ -683,9 +711,10 @@ static void unparseOutput(
     std::string & s,
     const Output::CAFixed & dof,
     std::string_view drvName,
-    std::string_view outputName)
+    std::string_view outputName,
+    bool supportWindowsStoreDir)
 {
-    printStorePath(store, s, dof.path(store, drvName, outputName));
+    printStorePath(store, s, dof.path(store, drvName, outputName), supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, dof.ca.printMethodAlgo());
     s += ',';
@@ -693,32 +722,47 @@ static void unparseOutput(
 }
 
 static void unparseOutput(
-    const StoreDirConfig &, std::string & s, const Output::CAFloating & dof, std::string_view, std::string_view)
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::CAFloating & dof,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, std::string{dof.method.renderPrefix()} + printHashAlgo(dof.hashAlgo));
     s += ',';
     printUnquotedString(s, {});
 }
 
-static void
-unparseOutput(const StoreDirConfig &, std::string & s, const Output::Deferred &, std::string_view, std::string_view)
+static void unparseOutput(
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::Deferred &,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, {});
     s += ',';
     printUnquotedString(s, {});
 }
 
-static void
-unparseOutput(const StoreDirConfig &, std::string & s, const Output::Impure & doi, std::string_view, std::string_view)
+static void unparseOutput(
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::Impure & doi,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
     using namespace std::literals::string_view_literals;
 
     // FIXME
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, std::string{doi.method.renderPrefix()} + printHashAlgo(doi.hashAlgo));
     s += ',';
@@ -730,9 +774,11 @@ static void unparseOutput(
     std::string & s,
     const Output & output,
     std::string_view drvName,
-    std::string_view outputName)
+    std::string_view outputName,
+    bool supportWindowsStoreDir)
 {
-    std::visit([&](const auto & o) { unparseOutput(store, s, o, drvName, outputName); }, output.raw);
+    std::visit(
+        [&](const auto & o) { unparseOutput(store, s, o, drvName, outputName, supportWindowsStoreDir); }, output.raw);
 }
 
 /**
@@ -740,7 +786,7 @@ static void unparseOutput(
  * support the hash modulo intermediate form.
  */
 template<typename Inputs, typename Out>
-std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store)
+std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
     requires(
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
@@ -774,17 +820,19 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
         s,
         drv.outputs,
         [&](const auto & outputName) { printUnquotedString(s, outputName); },
-        [&](const auto & outputName, const auto & output) { unparseOutput(store, s, output, drv.name, outputName); });
+        [&](const auto & outputName, const auto & output) {
+            unparseOutput(store, s, output, drv.name, outputName, supportWindowsStoreDir);
+        });
 
     s += ',';
     printMap(
         s,
         drv.inputs.drvs.map,
-        [&](const auto & key) { printKey(store, s, key); },
+        [&](const auto & key) { printKey(store, s, key, supportWindowsStoreDir); },
         [&](const auto &, const auto & node) { unparseDerivedPathMapNode(store, s, node); });
 
     s += ',';
-    printStorePaths(store, s, drv.inputs.srcs);
+    printStorePaths(store, s, drv.inputs.srcs, supportWindowsStoreDir);
 
     s += ',';
     printUnquotedString(s, drv.platform);
@@ -819,15 +867,17 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
 
 /* The hash modulo intermediate forms, unparsed by `modulo.cc`. */
 template std::string
-unparse(const Derivation<modulo::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store);
+unparse(const Derivation<modulo::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
 template std::string
-unparse(const Derivation<modulo::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store);
+unparse(const Derivation<modulo::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
 
-std::string unparse(const Full & drv, const StoreDirConfig & store)
+std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {
     // Convert to FullInputs for ATerm serialization
     return unparse(
-        drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }), store);
+        drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }),
+        store,
+        supportWindowsStoreDir);
 }
 
 /* --------------------------------------------------------------------------
