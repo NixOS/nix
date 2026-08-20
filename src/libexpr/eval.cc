@@ -390,6 +390,7 @@ EvalState::EvalState(
             makeSampleStackProfiler(*this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
         break;
     case EvalProfilerMode::disabled:
+    case EvalProfilerMode::perf_trampoline:
         break;
     }
 }
@@ -1681,7 +1682,6 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                                      "while calling %s",
                                      lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda")
                                : nullptr;
-
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {

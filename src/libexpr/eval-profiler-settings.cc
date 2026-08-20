@@ -14,6 +14,8 @@ EvalProfilerMode BaseSetting<EvalProfilerMode>::parse(const std::string & str) c
         return EvalProfilerMode::disabled;
     else if (str == "flamegraph")
         return EvalProfilerMode::flamegraph;
+    else if (str == "perf-trampoline")
+        return EvalProfilerMode::perf_trampoline;
     else
         throw UsageError("option '%s' has invalid value '%s'", name, str);
 }
@@ -31,6 +33,8 @@ std::string BaseSetting<EvalProfilerMode>::to_string() const
         return "disabled";
     else if (value == EvalProfilerMode::flamegraph)
         return "flamegraph";
+    else if (value == EvalProfilerMode::perf_trampoline)
+        return "perf-trampoline";
     else
         unreachable();
 }
@@ -40,6 +44,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
     {
         {EvalProfilerMode::disabled, "disabled"},
         {EvalProfilerMode::flamegraph, "flamegraph"},
+        {EvalProfilerMode::perf_trampoline, "perf-trampoline"},
     });
 
 /* Explicit instantiation of templates */
