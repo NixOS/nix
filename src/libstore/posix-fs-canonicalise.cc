@@ -38,6 +38,32 @@ void canonicaliseTimestampAndPermissions(const std::filesystem::path & path)
     canonicaliseTimestampAndPermissions(path, lstat(path));
 }
 
+#if NIX_SUPPORT_ACL
+
+static void stripXAttrs(const std::filesystem::path & path, const StringSet & ignoredAcls)
+{
+    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
+
+    if (eaSize < 0) {
+        if (errno != ENOTSUP && errno != ENODATA)
+            throw SysError("querying extended attributes of %s", PathFmt(path));
+    } else if (eaSize > 0) {
+        std::vector<char> eaBuf(eaSize);
+
+        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
+            throw SysError("querying extended attributes of %s", PathFmt(path));
+
+        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
+            if (ignoredAcls.count(eaName))
+                continue;
+            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
+                throw SysError("removing extended attribute '%s' from %s", eaName, PathFmt(path));
+        }
+    }
+}
+
+#endif
+
 static void canonicalisePathMetaData_(
     const std::filesystem::path & path, CanonicalizePathMetadataOptions options, InodesSeen & inodesSeen)
 {
@@ -60,25 +86,7 @@ static void canonicalisePathMetaData_(
         throw Error("file %1% has an unsupported type", PathFmt(path));
 
 #if NIX_SUPPORT_ACL
-    /* Remove extended attributes / ACLs. */
-    ssize_t eaSize = llistxattr(path.c_str(), nullptr, 0);
-
-    if (eaSize < 0) {
-        if (errno != ENOTSUP && errno != ENODATA)
-            throw SysError("querying extended attributes of %s", PathFmt(path));
-    } else if (eaSize > 0) {
-        std::vector<char> eaBuf(eaSize);
-
-        if ((eaSize = llistxattr(path.c_str(), eaBuf.data(), eaBuf.size())) < 0)
-            throw SysError("querying extended attributes of %s", PathFmt(path));
-
-        for (auto & eaName : tokenizeString<Strings>(std::string(eaBuf.data(), eaSize), std::string("\000", 1))) {
-            if (options.ignoredAcls.count(eaName))
-                continue;
-            if (lremovexattr(path.c_str(), eaName.c_str()) == -1)
-                throw SysError("removing extended attribute '%s' from %s", eaName, PathFmt(path));
-        }
-    }
+    stripXAttrs(path, options.ignoredAcls);
 #endif
 
 #ifndef _WIN32
