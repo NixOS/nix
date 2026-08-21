@@ -2,6 +2,7 @@
 
 #include "nix/store/filetransfer-impl.hh"
 #include "nix/store/tests/secret-resolver.hh"
+#include "nix/util/file-system.hh"
 
 namespace nix {
 
@@ -18,6 +19,11 @@ FileTransferSettings settingsWithNetrc(const std::filesystem::path & path)
     FileTransferSettings settings;
     settings.netrcFile = path;
     return settings;
+}
+
+SecretPurpose buildPurpose()
+{
+    return SecretPurpose{.consumer = "builtin:fetchurl", .operation = "build"};
 }
 
 } // namespace
@@ -121,6 +127,78 @@ TEST(ResolveNetrcFile, leaseOutlivesResolutionAndIsReleasedWithIt)
     }
 
     EXPECT_TRUE(released);
+}
+
+TEST(ResolveNetrcData, resolverValueTakesPrecedenceOverSetting)
+{
+    auto settings = settingsWithNetrc("/definitely/not/a/netrc");
+    auto resolver = std::make_shared<testing::CallbackSecretResolver>(
+        [](const SecretRequest &) { return ResolvedSecret{.value = InlineSecret{"machine example.org"}}; });
+
+    auto data = resolveNetrcData(resolver, settings, buildPurpose());
+
+    ASSERT_TRUE(data);
+    EXPECT_EQ(*data, "machine example.org");
+
+    ASSERT_EQ(resolver->requests.size(), 1u);
+    const auto & request = resolver->requests.at(0);
+    EXPECT_EQ(request.name, "netrc");
+    /* The bytes have to cross into a sandbox, so a leased file is no use. */
+    EXPECT_EQ(request.representation, SecretRepresentation::Inline);
+    EXPECT_EQ(request.purpose.consumer, "builtin:fetchurl");
+    /* One netrc serves every URL the build tries, so it is not host-scoped. */
+    EXPECT_EQ(request.purpose.host, std::nullopt);
+}
+
+TEST(ResolveNetrcData, resolverWithoutNetrcFallsBackToSettingFile)
+{
+    AutoDelete tmpDir(createTempDir());
+    auto netrcPath = tmpDir.path() / "netrc";
+    writeFile(netrcPath, "machine fallback.example.org", 0600);
+
+    auto settings = settingsWithNetrc(netrcPath);
+    auto resolver =
+        std::make_shared<testing::CallbackSecretResolver>([](const SecretRequest &) { return std::nullopt; });
+
+    auto data = resolveNetrcData(resolver, settings, buildPurpose());
+
+    ASSERT_TRUE(data);
+    EXPECT_EQ(*data, "machine fallback.example.org");
+    /* The resolver was asked; the setting is only the fallback. */
+    ASSERT_EQ(resolver->requests.size(), 1u);
+}
+
+TEST(ResolveNetrcData, unreadableSettingYieldsNothing)
+{
+    auto settings = settingsWithNetrc("/definitely/not/a/netrc");
+
+    EXPECT_EQ(resolveNetrcData(nullptr, settings, buildPurpose()), std::nullopt);
+}
+
+TEST(ResolveNetrcData, explicitlyEmptyResolverValueTakesPrecedenceOverSetting)
+{
+    AutoDelete tmpDir(createTempDir());
+    auto netrcPath = tmpDir.path() / "netrc";
+    writeFile(netrcPath, "machine fallback.example.org", 0600);
+
+    auto settings = settingsWithNetrc(netrcPath);
+    auto resolver = std::make_shared<testing::CallbackSecretResolver>(
+        [](const SecretRequest &) { return ResolvedSecret{.value = InlineSecret{""}}; });
+
+    auto data = resolveNetrcData(resolver, settings, buildPurpose());
+
+    ASSERT_TRUE(data);
+    EXPECT_TRUE(data->empty());
+}
+
+TEST(ResolveNetrcData, materialisedFileIsRejected)
+{
+    auto settings = settingsWithNetrc("/definitely/not/a/netrc");
+    auto resolver = std::make_shared<testing::CallbackSecretResolver>([](const SecretRequest &) {
+        return ResolvedSecret{.value = make_ref<testing::CallbackSecretFile>("/run/secrets/netrc")};
+    });
+
+    EXPECT_THROW(resolveNetrcData(resolver, settings, buildPurpose()), Error);
 }
 
 } // namespace nix
