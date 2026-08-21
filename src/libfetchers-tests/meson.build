@@ -48,6 +48,7 @@ sources = files(
   'git-utils.cc',
   'git.cc',
   'input.cc',
+  'merkle-tar-adapter.cc',
   'nix_api_fetchers.cc',
   'public-key.cc',
 )
