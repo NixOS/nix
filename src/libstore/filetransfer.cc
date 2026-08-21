@@ -4,6 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/util.hh"
 
@@ -183,6 +184,36 @@ NetrcFile resolveNetrcFile(
     }
 
     return {.path = settings.netrcFile.get()};
+}
+
+std::optional<std::string> resolveNetrcData(
+    const std::shared_ptr<SecretResolver> & secretResolver,
+    const FileTransferSettings & settings,
+    const SecretPurpose & purpose)
+{
+    if (secretResolver) {
+        auto secret = secretResolver->resolve(
+            SecretRequest{
+                .name = "netrc",
+                .representation = SecretRepresentation::Inline,
+                .purpose = purpose,
+            });
+        if (secret) {
+            auto * inlineSecret = std::get_if<InlineSecret>(&secret->value);
+            if (!inlineSecret)
+                throw Error(
+                    "secret resolver materialised the 'netrc' secret as a file, "
+                    "but it can only be passed on as data here");
+            return inlineSecret->value;
+        }
+    }
+
+    try {
+        return readFile(settings.netrcFile.get());
+    } catch (SystemError &) {
+        /* No netrc configured, which is the common case. */
+        return std::nullopt;
+    }
 }
 
 struct curlFileTransfer : public FileTransfer

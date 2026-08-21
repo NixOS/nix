@@ -505,11 +505,7 @@ void ChrootLinuxDerivationBuilder::prepareSandbox()
 
 void ChrootLinuxDerivationBuilder::startChild()
 {
-    RunChildArgs args{
-#if NIX_WITH_AWS_AUTH
-        .awsCredentials = preResolveAwsCredentials(),
-#endif
-    };
+    auto args = makeRunChildArgs();
 
     /* Set up private namespaces for the build:
 
