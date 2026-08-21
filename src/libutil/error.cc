@@ -414,7 +414,7 @@ std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool s
         if (truncate) {
             oss << "\n"
                 << ANSI_WARNING
-                "(stack trace truncated; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
+                "(stack trace filtered; use '--show-trace' to show the full, detailed trace)" ANSI_NORMAL
                 << "\n";
         }
 
