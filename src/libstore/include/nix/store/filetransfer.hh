@@ -271,6 +271,13 @@ struct FileTransferRequest
     std::optional<uint32_t> retryAttempts;
 
     /**
+     * Optional path to a file of CA certificates, used to verify the server
+     * instead of the ones named by the `ssl-cert-file` setting. Only used for
+     * TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> caFile;
+
+    /**
      * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.
      */
     std::optional<std::filesystem::path> tlsCert;

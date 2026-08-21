@@ -731,9 +731,18 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
+            /* A bundle named by the request wins over the `ssl-cert-file` setting:
+               builtin:fetchurl carries the host's copy into a sandbox that has no
+               certificates of its own. */
+            const std::filesystem::path * caFile = nullptr;
+            if (request.caFile)
+                caFile = &*request.caFile;
+            else if (auto & configuredCaFile = fileTransfer.settings.caFile.get())
+                caFile = &configuredCaFile->path();
+
             /* Note: libcurl copies string arguments, so temporaries from
                .string().c_str() are safe. See the comment near CURLOPT_SSLKEY below. */
-            if (auto & caFile = fileTransfer.settings.caFile.get())
+            if (caFile)
                 curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
 #ifdef _WIN32
             /* Use native windows certificate store when the option is not specified explicitly. */
