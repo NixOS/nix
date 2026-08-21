@@ -8,6 +8,7 @@
 #include "nix/util/types.hh"
 #include "nix/store/store-api.hh"
 #include "nix/fetchers/git-utils.hh"
+#include "nix/fetchers/merkle-tar-adapter.hh"
 #include "nix/fetchers/fetch-settings.hh"
 
 namespace nix::fetchers {
@@ -188,7 +189,8 @@ static DownloadTarballResult downloadTarball_(
     })
                                                                                     : TarArchive{*source};
     auto tarballCache = settings.getTarballCache();
-    auto parseSink = tarballCache->getFileSystemObjectSink();
+    auto writerPool = settings.getTarballWriterPool();
+    auto parseSink = merkle::makeTarSink(*writerPool);
     auto lastModified = unpackTarfileToSink(archive, *parseSink);
     auto tree = parseSink->flush();
 
@@ -204,7 +206,7 @@ static DownloadTarballResult downloadTarball_(
         infoAttrs = cached->value;
     } else {
         infoAttrs.insert_or_assign("etag", res->etag);
-        infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(tree).gitRev());
+        infoAttrs.insert_or_assign("treeHash", tarballCache->dereferenceSingletonDirectory(tree.hash).gitRev());
         infoAttrs.insert_or_assign("lastModified", uint64_t(lastModified));
         if (res->immutableUrl)
             infoAttrs.insert_or_assign("immutableUrl", *res->immutableUrl);

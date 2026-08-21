@@ -10,6 +10,7 @@
 #include "nix/util/hash.hh"
 #include "nix/util/source-path.hh"
 #include "nix/util/fs-sink.hh"
+#include "nix/util/merkle-files.hh"
 
 namespace nix::git {
 
@@ -20,28 +21,10 @@ enum struct ObjectType {
     // Tag,
 };
 
-using RawMode = uint32_t;
-
-enum struct Mode : RawMode {
-    Directory = 0040000,
-    Regular = 0100644,
-    Executable = 0100755,
-    Symlink = 0120000,
-};
-
-std::optional<Mode> decodeMode(RawMode m);
-
-/**
- * An anonymous Git tree object entry (no name part).
- */
-struct TreeEntry
-{
-    Mode mode;
-    Hash hash;
-
-    bool operator==(const TreeEntry &) const = default;
-    auto operator<=>(const TreeEntry &) const = default;
-};
+// Backwards compatibility aliases
+using merkle::Mode;
+using merkle::TreeEntry;
+using nix::RawMode;
 
 /**
  * A Git tree object, fully decoded and stored in memory.
@@ -51,21 +34,10 @@ struct TreeEntry
  */
 using Tree = std::map<std::string, TreeEntry>;
 
-/**
- * Callback for processing a child hash with `parse`
- *
- * The function should
- *
- * 1. Obtain the file system objects denoted by `gitHash`
- *
- * 2. Ensure they match `mode`
- *
- * 3. Feed them into the same sink `parse` was called with
- *
- * Implementations may seek to memoize resources (bandwidth, storage,
- * etc.) for the same Git hash.
- */
-using SinkHook = void(const CanonPath & name, TreeEntry entry);
+inline std::optional<Mode> decodeMode(RawMode m)
+{
+    return merkle::decodeMode(m);
+}
 
 /**
  * Parse the "blob " or "tree " prefix.
@@ -76,72 +48,26 @@ ObjectType
 parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
- * These 3 modes are represented by blob objects.
+ * Read the size of the blob
  *
- * Sometimes we need this information to disambiguate how a blob is
- * being used to better match our own "file system object" data model.
+ * The caller should then call `Source::drainInto` or similar with that
+ * size.
  */
-enum struct BlobMode : RawMode {
-    Regular = static_cast<RawMode>(Mode::Regular),
-    Executable = static_cast<RawMode>(Mode::Executable),
-    Symlink = static_cast<RawMode>(Mode::Symlink),
-};
-
-void parseBlob(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
-    Source & source,
-    BlobMode blobMode,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+uint64_t parseBlob(Source & source, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
  */
 void parseTree(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
+    merkle::DirectorySink & sink,
     Source & source,
     HashAlgorithm hashAlgo,
-    fun<SinkHook> hook,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
- * Helper putting the previous three `parse*` functions together.
- *
- * @param rootModeIfBlob How to interpret a root blob, for which there is no
- * disambiguating dir entry to answer that questino. If the root it not
- * a blob, this is ignored.
- *
- * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
- */
-void parse(
-    FileSystemObjectSink & sink,
-    const CanonPath & sinkPath,
-    Source & source,
-    BlobMode rootModeIfBlob,
-    HashAlgorithm hashAlgo,
-    fun<SinkHook> hook,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
-
-/**
- * Assists with writing a `SinkHook` step (2).
+ * Convert a `SourceAccessor::Type` to a `Mode`.
  */
 std::optional<Mode> convertMode(SourceAccessor::Type type);
-
-/**
- * Simplified version of `SinkHook` for `restore`.
- *
- * Given a `Hash`, return a `SourceAccessor` and `CanonPath` pointing to
- * the file system object with that path.
- */
-using RestoreHook = SourcePath(Hash);
-
-/**
- * Wrapper around `parse` and `RestoreSink`
- *
- * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
- */
-void restore(FileSystemObjectSink & sink, Source & source, HashAlgorithm hashAlgo, fun<RestoreHook> hook);
 
 /**
  * Dumps a single file to a sink
