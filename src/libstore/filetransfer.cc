@@ -134,6 +134,21 @@ struct curlMultiError final : CloneableError<curlMultiError, Error>
     }
 };
 
+/**
+ * Host that `request` authenticates against, for scoping the netrc lookup.
+ */
+std::optional<std::string> netrcHost(const FileTransferRequest & request)
+{
+    try {
+        if (auto & authority = request.uri.parsed().authority)
+            return authority->host;
+    } catch (BadURL &) {
+        /* Leave it to curl to report the malformed URL. An unscoped lookup
+           is the right fallback: it is what the setting would have given. */
+    }
+    return std::nullopt;
+}
+
 /* Check if the linked libcurl was built with HTTP3 support. */
 bool curlSupportsHttp3()
 {
@@ -142,6 +157,33 @@ bool curlSupportsHttp3()
 }
 
 } // namespace
+
+NetrcFile resolveNetrcFile(
+    const FileTransferContext & context, const FileTransferSettings & settings, const FileTransferRequest & request)
+{
+    if (context.secretResolver) {
+        auto secret = context.secretResolver->resolve(
+            SecretRequest{
+                .name = "netrc",
+                .representation = SecretRepresentation::MaterialisedFile,
+                .purpose =
+                    {
+                        .consumer = "file-transfer",
+                        .operation = std::string(request.operation()),
+                        .host = netrcHost(request),
+                    },
+            });
+        if (secret) {
+            auto * file = std::get_if<ref<SecretFile>>(&secret->value);
+            if (!file)
+                throw Error(
+                    "secret resolver returned the 'netrc' secret inline, but curl can only read one from a file");
+            return {.path = (*file)->path(), .lease = *file};
+        }
+    }
+
+    return {.path = settings.netrcFile.get()};
+}
 
 struct curlFileTransfer : public FileTransfer
 {
@@ -158,6 +200,13 @@ struct curlFileTransfer : public FileTransfer
     {
         curlFileTransfer & fileTransfer;
         FileTransferRequest request;
+
+        /**
+         * netrc handed to curl, resolved once per transfer so that retries
+         * reuse one lease rather than taking a fresh one each attempt.
+         */
+        NetrcFile netrc;
+
         FileTransferResult result;
         std::unique_ptr<Activity> _act;
         Callback<FileTransferResult> callback;
@@ -245,11 +294,12 @@ struct curlFileTransfer : public FileTransfer
 
         TransferItem(
             curlFileTransfer & fileTransfer,
-            const FileTransferContext &,
+            const FileTransferContext & context,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
+            , netrc(resolveNetrcFile(context, fileTransfer.settings, request))
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
                 if (errorSink) {
@@ -678,7 +728,7 @@ struct curlFileTransfer : public FileTransfer
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().string().c_str());
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, netrc.path.string().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             if (writtenToSink)
