@@ -74,9 +74,9 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
        bad curl requires this to be stored in a file. It would be nice if we
        could just pass a pointer to the data. */
     FileTransferContext transferContext;
-    if (ctx.netrcData != "")
+    if (ctx.netrcData)
         transferContext.secretResolver =
-            std::make_shared<SandboxNetrcResolver>(ctx.tmpDirInSandbox / "netrc", ctx.netrcData);
+            std::make_shared<SandboxNetrcResolver>(ctx.tmpDirInSandbox / "netrc", *ctx.netrcData);
 
     auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";
     fileTransferSettings.caFile = std::optional<AbsolutePath>{caFilePath};

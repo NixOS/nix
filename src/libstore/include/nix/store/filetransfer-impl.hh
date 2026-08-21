@@ -51,6 +51,26 @@ NetrcFile resolveNetrcFile(
     const FileTransferContext & context, const FileTransferSettings & settings, const FileTransferRequest & request);
 
 /**
+ * The netrc contents for a consumer that cannot be handed a file, such as a
+ * sandboxed build that has to carry the bytes across a fork.
+ *
+ * Precedence matches resolveNetrcFile(): the resolver first, then the
+ * `netrc-file` setting, then nothing at all. Unlike the file case there is
+ * no host to scope by, since one netrc has to serve every URL the consumer
+ * goes on to try.
+ *
+ * An engaged empty string is an explicit empty override. `std::nullopt`
+ * means that neither the resolver nor the configured file supplied data.
+ *
+ * @throws Error if the resolver answers with a materialised file, which
+ * cannot be passed on as data.
+ */
+std::optional<std::string> resolveNetrcData(
+    const std::shared_ptr<SecretResolver> & secretResolver,
+    const FileTransferSettings & settings,
+    const SecretPurpose & purpose);
+
+/**
  * Clamped exponential growth: base * 2^(attempt-1), capped at ceil.
  * Shift is clamped at 31 and the intermediate is widened to uint64_t
  * so the shift cannot overflow uint32_t.
