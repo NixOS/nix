@@ -18,11 +18,16 @@ cat <<EOF > flake.nix
         type = "app";
         program = "\${(import ./shell-hello.nix).hello}/bin/hello";
       };
+      apps.$system.functionApp = {}: {
+        type = "app";
+        program = "\${(import ./shell-hello.nix).hello}/bin/hello";
+      };
     };
 }
 EOF
 nix run --no-write-lock-file .#appAsApp
 nix run --no-write-lock-file .#pkgAsPkg
+nix run --no-write-lock-file .#functionApp
 
 ! nix run --no-write-lock-file .#pkgAsApp || fail "'nix run' shouldn’t accept an 'app' defined under 'packages'"
 ! nix run --no-write-lock-file .#appAsPkg || fail "elements of 'apps' should be of type 'app'"
@@ -87,4 +92,3 @@ nix run --no-write-lock-file -- . myarg1 myarg2 2>&1 | grepQuiet "ARGS: myarg1 m
 
 # And verify that a non-installable first argument causes an error
 expectStderr 1 nix run --no-write-lock-file -- myarg1 myarg2 | grepQuiet "error.*myarg1"
-
