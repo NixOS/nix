@@ -9,11 +9,46 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <random>
+#include <string>
+
+#include "nix/store/filetransfer.hh"
 
 namespace nix {
+
+/**
+ * The netrc file curl should read credentials from, together with the lease
+ * that keeps a resolver-provided one alive.
+ */
+struct NetrcFile
+{
+    std::filesystem::path path;
+
+    /**
+     * Holds the resolver's materialisation open. Null when `path` came from
+     * the `netrc-file` setting, which nothing needs to keep alive.
+     */
+    std::shared_ptr<SecretFile> lease;
+};
+
+/**
+ * Pick the netrc file for one transfer.
+ *
+ * A resolver owning the transfer is asked first, so a broker can hand back
+ * credentials scoped to the host being contacted rather than the whole of
+ * the user's netrc. Without a resolver, or when it holds no netrc, the
+ * `netrc-file` setting applies exactly as before. curl treats a nonexistent
+ * path as "no netrc", so the unconfigured case needs no handling here.
+ *
+ * @throws Error if the resolver answers with an inline secret, which curl
+ * has no way to consume.
+ */
+NetrcFile resolveNetrcFile(
+    const FileTransferContext & context, const FileTransferSettings & settings, const FileTransferRequest & request);
 
 /**
  * Clamped exponential growth: base * 2^(attempt-1), capped at ceil.

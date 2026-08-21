@@ -336,6 +336,27 @@ struct FileTransferRequest
     std::string displayUri() const;
 
     /**
+     * Stable name for the kind of transfer, used as
+     * `SecretPurpose::operation` so a secret broker can scope credentials
+     * to it. Unlike `verb()` this is not a log message: rewording a
+     * progress line must not change what a broker matches on.
+     */
+    std::string_view operation() const
+    {
+        switch (method) {
+        case HttpMethod::Head:
+        case HttpMethod::Get:
+            return "download";
+        case HttpMethod::Put:
+        case HttpMethod::Post:
+            return "upload";
+        case HttpMethod::Delete:
+            return "delete";
+        }
+        unreachable();
+    }
+
+    /**
      * Returns the method description for logging purposes.
      */
     std::string verb(bool continuous = false) const
