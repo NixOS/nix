@@ -11,6 +11,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/muxable-pipe.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
@@ -180,6 +181,19 @@ public:
      */
     AutoCloseFD builderOut;
 
+#ifdef _WIN32
+    /**
+     * The pipe `builderOut` is the read side of.
+     *
+     * On Windows the worker waits with I/O completion ports rather than
+     * `poll`, and `MuxablePipePollState::iterate` needs the pipe's `OVERLAPPED`
+     * state and buffer, not just its handle. So a `Descriptor` is not enough to
+     * register a child with the worker, and the builder has to hand out the
+     * whole pipe. Set by `startBuild`.
+     */
+    MuxablePipe * commChannel = nullptr;
+#endif
+
     /**
      * Set up build environment / sandbox, acquiring resources (e.g.
      * locks as needed). After this is run, the builder should be
@@ -244,7 +258,7 @@ struct DerivationBuilderDeleter
 
 using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter>;
 
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
+#ifndef _WIN32
 DerivationBuilderUnique makeDerivationBuilder(
     LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
 
@@ -257,6 +271,21 @@ DerivationBuilderUnique makeExternalDerivationBuilder(
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);
+#else
+/**
+ * The Windows builder needs the worker's I/O completion port, because the
+ * builder's log pipe has to be tied to it for the worker to be able to wait on
+ * it. This is the extra parameter versus the Unix signature.
+ *
+ * @param ioport The worker's I/O completion port.
+ *
+ * @note There is no `makeExternalDerivationBuilder` counterpart yet.
+ */
+DerivationBuilderUnique makeDerivationBuilder(
+    LocalStore & store,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params,
+    HANDLE ioport);
 #endif
 
 } // namespace nix
