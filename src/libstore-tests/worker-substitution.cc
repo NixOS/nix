@@ -3,6 +3,7 @@
 
 #include "nix/store/build/worker.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/globals.hh"
