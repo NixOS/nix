@@ -78,8 +78,9 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
         transferContext.secretResolver =
             std::make_shared<SandboxNetrcResolver>(ctx.tmpDirInSandbox / "netrc", *ctx.netrcData);
 
+    /* Same for the CA bundle: the sandbox has no certificates of its own,
+       so every request below is pointed at the parent's copy. */
     auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";
-    fileTransferSettings.caFile = std::optional<AbsolutePath>{caFilePath};
     writeFile(caFilePath, ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
@@ -102,6 +103,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
         auto source = sinkToSource([&](Sink & sink) {
             FileTransferRequest request(VerbatimURL{url});
             request.decompress = false;
+            request.caFile = caFilePath;
 
 #if NIX_WITH_AWS_AUTH
             // Use pre-resolved credentials if available
