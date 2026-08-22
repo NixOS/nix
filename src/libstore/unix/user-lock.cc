@@ -224,6 +224,23 @@ std::unique_ptr<UserLock> acquireUserLock(
     const std::filesystem::path & stateDir, const LocalSettings & localSettings, uid_t nrIds, bool useUserNamespace)
 {
     if (auto * uidSettings = localSettings.getAutoAllocateUidSettings()) {
+        /* Auto-allocated UIDs only work inside a user namespace where Nix
+           can fabricate `/etc/passwd`. For non-sandboxed builds (e.g.
+           `__noChroot = true`), fall back to a regular `nixbld` user from
+           `build-users-group` if one is configured. */
+        if (!useUserNamespace) {
+            if (localSettings.buildUsersGroup != "") {
+                auto userPoolDir = stateDir / "userpool";
+                createDirs(userPoolDir);
+                return SimpleUserLock::acquire(userPoolDir, localSettings.buildUsersGroup);
+            }
+            throw Error(
+                "the 'auto-allocate-uids' setting cannot be used for builds that are not sandboxed "
+                "(e.g. derivations with '__noChroot = true' or with 'sandbox = false'), "
+                "because the auto-allocated UID has no entry in '/etc/passwd' outside the sandbox; "
+                "either enable sandboxing for this build or configure 'build-users-group' "
+                "to provide a fallback build user");
+        }
         auto userPoolDir = stateDir / "userpool2";
         createDirs(userPoolDir);
         return AutoUserLock::acquire(userPoolDir, localSettings.buildUsersGroup, nrIds, useUserNamespace, *uidSettings);
