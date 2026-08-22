@@ -272,7 +272,7 @@ struct ClientSettings
                     else
                         warn(
                             "ignoring untrusted substituter '%s', you are not a trusted user.\n"
-                            "Run `man nix.conf` for more information on the `substituters` configuration option.",
+                            "Run `man nix.conf` for more information on the 'substituters' and 'trusted-users' configuration options.",
                             s);
                 }
                 res = std::move(subs);
@@ -303,7 +303,9 @@ struct ClientSettings
                     ;
                 else
                     warn(
-                        "ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user",
+                        "ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user.\n"
+                        "Run `man nix.conf` for more information on the '%s' and 'trusted-users' configuration options.",
+                        name,
                         name);
             } catch (UsageError & e) {
                 logWarning(e.info());
