@@ -4,6 +4,7 @@
 #include "nix/store/derivation-options.hh"
 
 #include <nlohmann/json.hpp>
+#include <cassert>
 #include <regex>
 
 namespace nix {
@@ -11,12 +12,41 @@ namespace nix {
 StructuredAttrs StructuredAttrs::parse(std::string_view encoded)
 {
     try {
+        auto parsed = nlohmann::json::parse(encoded);
+        /* nlohmann does not have a built-in way to check for canonical
+           form, we must reserialise ourselves. We cannot reject a
+           non-canonical encoding --- derivations in the wild have one,
+           and it is part of their identity --- so keep it verbatim in
+           order to round-trip, and merely warn. */
+        std::optional<std::string> verbatim;
+        if (parsed.dump() != encoded) {
+            warn("%s attribute is not in canonical JSON form", envVarName);
+            verbatim = std::string{encoded};
+        }
+
         return StructuredAttrs{
-            .structuredAttrs = nlohmann::json::parse(encoded),
+            .structuredAttrs = std::move(parsed),
+            .verbatim = std::move(verbatim),
         };
     } catch (std::exception & e) {
         throw Error("cannot process %s attribute: %s", envVarName, e.what());
     }
+}
+
+bool StructuredAttrs::operator==(const StructuredAttrs & other) const
+{
+    if (verbatim && other.verbatim) {
+        bool res = *verbatim == *other.verbatim;
+        /* Parsing is deterministic, so the same encoding must have
+           yielded the same value. */
+        if (res)
+            assert(structuredAttrs == other.structuredAttrs);
+        return res;
+    }
+    if (!verbatim && !other.verbatim)
+        return structuredAttrs == other.structuredAttrs;
+    /* Exactly one side is canonical, so dump that one to compare. */
+    return verbatim ? *verbatim == other.unparse().second : unparse().second == *other.verbatim;
 }
 
 std::optional<StructuredAttrs> StructuredAttrs::tryExtract(StringPairs & env)
@@ -33,6 +63,8 @@ std::optional<StructuredAttrs> StructuredAttrs::tryExtract(StringPairs & env)
 
 std::pair<std::string_view, std::string> StructuredAttrs::unparse() const
 {
+    if (verbatim)
+        return {envVarName, *verbatim};
     // TODO don't copy the JSON object just to dump it.
     return {envVarName, static_cast<nlohmann::json>(structuredAttrs).dump()};
 }
