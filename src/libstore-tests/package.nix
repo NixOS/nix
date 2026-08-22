@@ -2,6 +2,7 @@
   lib,
   buildPackages,
   stdenv,
+  mkFuzzSeedCheck,
   mkMesonExecutable,
   writableTmpDirAsHomeHook,
 
@@ -105,13 +106,37 @@ mkMesonExecutable (finalAttrs: {
             + ''
               ${if withUnitTests then "test -x" else "test ! -e"} \
                 "${finalAttrs.finalPackage}/bin/${finalAttrs.pname}${stdenv.hostPlatform.extensions.executable}"
-              for target in fuzz-parse-derivation fuzz-parse-derivation-experimental; do
+              for target in fuzz-parse-derivation fuzz-parse-derivation-experimental fuzz-store-path; do
                 ${if withFuzzTargets then "test -x" else "test ! -e"} \
                   "${finalAttrs.finalPackage}/bin/$target${stdenv.hostPlatform.extensions.executable}"
               done
+            ''
+            +
+              # Sanitizer CI also builds fuzzers with unit tests. Replay only
+              # in the fuzzer-only check to avoid running every seed twice.
+              lib.optionalString
+                (
+                  !withUnitTests
+                  && withFuzzTargets
+                  && stdenv.hostPlatform.isLinux
+                  && stdenv.buildPlatform.canExecute stdenv.hostPlatform
+                )
+                ''
+                  test -e ${finalAttrs.finalPackage.runFuzzSeeds { }}
+                ''
+            + ''
               touch $out
             ''
           );
+    };
+  }
+  // lib.optionalAttrs withFuzzTargets {
+    /**
+      Replay every checked-in seed, then optionally run the fuzzer for `runs` mutations.
+    */
+    runFuzzSeeds = import ./fuzz/seed-check.nix {
+      inherit mkFuzzSeedCheck;
+      package = finalAttrs.finalPackage;
     };
   };
 
