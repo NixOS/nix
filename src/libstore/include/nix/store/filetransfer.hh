@@ -14,6 +14,7 @@
 #include "nix/util/url.hh"
 
 #include "nix/store/config.hh"
+#include "nix/store/secret-resolver.hh"
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
@@ -22,6 +23,12 @@
 namespace nix {
 
 const std::filesystem::path & nixConfDir();
+
+/** Dependencies that may vary between otherwise shared file transfers. */
+struct FileTransferContext
+{
+    std::shared_ptr<SecretResolver> secretResolver;
+};
 
 class FileTransferSettings : public Config
 {
@@ -264,6 +271,13 @@ struct FileTransferRequest
     std::optional<uint32_t> retryAttempts;
 
     /**
+     * Optional path to a file of CA certificates, used to verify the server
+     * instead of the ones named by the `ssl-cert-file` setting. Only used for
+     * TLS-based protocols.
+     */
+    std::optional<std::filesystem::path> caFile;
+
+    /**
      * Optional path to the client certificate in "PEM" format. Only used for TLS-based protocols.
      */
     std::optional<std::filesystem::path> tlsCert;
@@ -327,6 +341,27 @@ struct FileTransferRequest
      * be parsed.
      */
     std::string displayUri() const;
+
+    /**
+     * Stable name for the kind of transfer, used as
+     * `SecretPurpose::operation` so a secret broker can scope credentials
+     * to it. Unlike `verb()` this is not a log message: rewording a
+     * progress line must not change what a broker matches on.
+     */
+    std::string_view operation() const
+    {
+        switch (method) {
+        case HttpMethod::Head:
+        case HttpMethod::Get:
+            return "download";
+        case HttpMethod::Put:
+        case HttpMethod::Post:
+            return "upload";
+        case HttpMethod::Delete:
+            return "delete";
+        }
+        unreachable();
+    }
 
     /**
      * Returns the method description for logging purposes.
@@ -438,8 +473,12 @@ public:
      * the download. The future may throw a FileTransferError
      * exception.
      */
-    virtual ItemHandle
-    enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) = 0;
+    virtual ItemHandle enqueueFileTransfer(
+        const FileTransferContext & context,
+        const FileTransferRequest & request,
+        Callback<FileTransferResult> callback) = 0;
+
+    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback);
 
     /**
      * Unpause a transfer that has been previously paused by a dataCallback.
@@ -448,20 +487,29 @@ public:
 
     std::future<FileTransferResult> enqueueFileTransfer(const FileTransferRequest & request);
 
+    std::future<FileTransferResult>
+    enqueueFileTransfer(const FileTransferContext & context, const FileTransferRequest & request);
+
     /**
      * Synchronously download a file.
      */
     FileTransferResult download(const FileTransferRequest & request);
+
+    FileTransferResult download(const FileTransferContext & context, const FileTransferRequest & request);
 
     /**
      * Synchronously upload a file.
      */
     FileTransferResult upload(const FileTransferRequest & request);
 
+    FileTransferResult upload(const FileTransferContext & context, const FileTransferRequest & request);
+
     /**
      * Synchronously delete a resource.
      */
     FileTransferResult deleteResource(const FileTransferRequest & request);
+
+    FileTransferResult deleteResource(const FileTransferContext & context, const FileTransferRequest & request);
 
     /**
      * Download a file, writing its data to a sink. The sink will be
@@ -469,6 +517,12 @@ public:
      */
     void
     download(FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback = {});
+
+    void download(
+        const FileTransferContext & context,
+        FileTransferRequest && request,
+        Sink & sink,
+        std::function<void(FileTransferResult)> resultCallback = {});
 
     enum Error { NotFound, Unauthorized, Forbidden, Misc, Transient };
 };

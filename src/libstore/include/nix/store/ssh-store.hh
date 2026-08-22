@@ -40,7 +40,7 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };
@@ -71,7 +71,7 @@ public:
         return ExperimentalFeature::MountedSSHStore;
     }
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 };
 
 } // namespace nix

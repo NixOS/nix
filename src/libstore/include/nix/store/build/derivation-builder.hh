@@ -17,6 +17,8 @@
 
 namespace nix {
 
+class SecretResolver;
+
 /**
  * Rethrow the current exception as a subclass of `Error`.
  */
@@ -118,6 +120,9 @@ struct DerivationBuilderParams
     StringSet systemFeatures;
 
     DesugaredEnv desugaredEnv;
+
+    /** Resolver owned by the build operation, never by global settings. */
+    std::shared_ptr<SecretResolver> secretResolver;
 };
 
 /**

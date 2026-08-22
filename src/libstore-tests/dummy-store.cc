@@ -7,6 +7,7 @@
 #include "nix/store/realisation.hh"
 
 #include "nix/store/tests/libstore.hh"
+#include "nix/store/tests/secret-resolver.hh"
 #include "nix/util/tests/json-characterization.hh"
 
 namespace nix {
@@ -62,6 +63,17 @@ TEST(DummyStore, getStateDir_default)
     // the global settings.nixStateDir
     DummyStoreConfig config{{}};
     EXPECT_EQ(config.getStateDir(), settings.nixStateDir);
+}
+
+TEST(DummyStore, openStorePreservesSecretContext)
+{
+    auto config = make_ref<DummyStoreConfig>(StoreReference::Params{});
+    auto resolver = std::make_shared<testing::CallbackSecretResolver>(
+        [](const SecretRequest &) { return ResolvedSecret{.value = InlineSecret{"unused"}}; });
+
+    auto store = config->openStore(SecretContext{.secretResolver = resolver});
+
+    EXPECT_EQ(store->getSecretContext().secretResolver, resolver);
 }
 
 TEST(DummyStore, realisation_read)

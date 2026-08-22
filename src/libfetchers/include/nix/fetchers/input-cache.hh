@@ -5,7 +5,7 @@
 namespace nix::fetchers {
 
 enum class UseRegistries : int;
-struct Settings;
+struct FetchContext;
 
 struct InputCache
 {
@@ -18,7 +18,7 @@ struct InputCache
     };
 
     CachedResult
-    getAccessor(const Settings & settings, Store & store, const Input & originalInput, UseRegistries useRegistries);
+    getAccessor(const FetchContext & context, Store & store, const Input & originalInput, UseRegistries useRegistries);
 
     struct CachedInput
     {

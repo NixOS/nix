@@ -60,8 +60,8 @@ public:
 
     ref<Config> config;
 
-    LocalBinaryCacheStore(ref<Config> config)
-        : Store{*config}
+    LocalBinaryCacheStore(ref<Config> config, SecretContext secretContext)
+        : Store{*config, std::move(secretContext)}
         , BinaryCacheStore{*config}
         , config{config}
     {
@@ -147,11 +147,12 @@ void LocalBinaryCacheStoreConfig::anchor() {}
 
 void LocalBinaryCacheStore::anchor() {}
 
-ref<Store> LocalBinaryCacheStoreConfig::openStore() const
+ref<Store> LocalBinaryCacheStoreConfig::openStore(const SecretContext & context) const
 {
     auto store = make_ref<LocalBinaryCacheStore>(
         ref{// FIXME we shouldn't actually need a mutable config
-            std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())});
+            std::const_pointer_cast<LocalBinaryCacheStore::Config>(shared_from_this())},
+        context);
     store->init();
     return store;
 }

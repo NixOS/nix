@@ -146,7 +146,7 @@ std::pair<Value *, PosIdx> InstallableFlake::toValue(EvalState & state, AutoCall
     return {&getCursor(state, autoCall)->forceValue(), noPos};
 }
 
-std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState & state, AutoCall)
+std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState & state, AutoCall autoCall)
 {
     auto evalCache = openEvalCache(state, getLockedFlake());
 
@@ -163,7 +163,7 @@ std::vector<ref<eval_cache::AttrCursor>> InstallableFlake::getCursors(EvalState 
         try {
             auto attr = root->findAlongAttrPath(AttrPath::parse(state, attrPath));
             if (attr) {
-                res.push_back(ref(*attr));
+                res.push_back(autoCall == AutoCall::Yes ? (*attr)->autoCall() : ref(*attr));
             } else {
                 suggestions += attr.getSuggestions();
             }

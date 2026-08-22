@@ -4,6 +4,8 @@
 
 namespace nix {
 
+static_assert(requires(LegacySSHStore & store, std::shared_ptr<Store> evalStore) { store.getBuilder(evalStore); });
+
 TEST(LegacySSHStore, storeDir_absolutePath)
 {
     LegacySSHStoreConfig config{

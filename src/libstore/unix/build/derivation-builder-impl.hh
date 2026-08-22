@@ -364,14 +364,25 @@ protected:
     void writeBuilderFile(const std::string & name, std::string_view contents);
 
     /**
-     * Arguments passed to runChild().
+     * Arguments passed to runChild(). Everything here is gathered before
+     * the fork, because the child is in no position to go looking for it.
      */
     struct RunChildArgs
     {
+        /**
+         * netrc contents for builtin:fetchurl. An engaged empty value is an
+         * explicit empty netrc and must not fall back to `netrc-file`.
+         */
+        std::optional<std::string> netrcData;
 #if NIX_WITH_AWS_AUTH
         std::optional<AwsCredentials> awsCredentials;
 #endif
     };
+
+    /**
+     * Gather everything runChild() needs from the parent process.
+     */
+    RunChildArgs makeRunChildArgs();
 
     /**
      * Run the builder's process.

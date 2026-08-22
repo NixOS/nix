@@ -1,3 +1,4 @@
+#include "nix/util/sync.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-store.hh"
@@ -6,24 +7,40 @@
 #include "nix/util/environment-variables.hh"
 
 #include <filesystem>
+#include <optional>
 
 namespace nix {
 
+ref<Store> openStore(const SecretContext & context)
+{
+    return openStore(context, StoreReference{settings.storeUri.get()});
+}
+
 ref<Store> openStore()
 {
-    return openStore(StoreReference{settings.storeUri.get()});
+    return openStore(SecretContext{});
+}
+
+ref<Store> openStore(const SecretContext & context, const std::string & uri, const Store::Config::Params & extraParams)
+{
+    return openStore(context, StoreReference::parse(uri, extraParams));
 }
 
 ref<Store> openStore(const std::string & uri, const Store::Config::Params & extraParams)
 {
-    return openStore(StoreReference::parse(uri, extraParams));
+    return openStore(SecretContext{}, uri, extraParams);
+}
+
+ref<Store> openStore(const SecretContext & context, StoreReference && storeURI)
+{
+    auto store = resolveStoreConfig(std::move(storeURI))->openStore(context);
+    store->init();
+    return store;
 }
 
 ref<Store> openStore(StoreReference && storeURI)
 {
-    auto store = resolveStoreConfig(std::move(storeURI))->openStore();
-    store->init();
-    return store;
+    return openStore(SecretContext{}, std::move(storeURI));
 }
 
 ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
@@ -51,7 +68,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     {
                     }
 
-                    ref<Store> openStore() const override
+                    ref<Store> openStore(const SecretContext & context) const override
                     {
                         unreachable();
                     }
@@ -111,32 +128,56 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     return storeConfig;
 }
 
+std::list<ref<Store>> getDefaultSubstituters(const SecretContext & context)
+{
+    /* Opening substituters is expensive, so preserve the process-wide cache
+       for the process-wide, resolver-free context. A resolver belongs to one
+       operation and must be released with it, so neither it nor stores that
+       retain it may be placed in this static cache. */
+    using Cache = std::optional<std::list<ref<Store>>>;
+
+    static Sync<Cache> cache;
+
+    if (!context.secretResolver) {
+        auto cached(cache.lock());
+        if (cached->has_value())
+            return cached->value();
+    }
+
+    /* Opening a store can do network I/O (a binary cache fetches
+       `nix-cache-info` in `init()`), so build the list without the lock
+       held. A concurrent caller may do the same work; the first to install
+       its result wins and the rest is discarded. */
+    std::list<ref<Store>> stores;
+    std::set<StoreReference> done;
+
+    auto addStore = [&](const StoreReference & ref) {
+        if (!done.insert(ref).second)
+            return;
+        try {
+            stores.push_back(openStore(context, StoreReference{ref}));
+        } catch (Error & e) {
+            logWarning(e.info());
+        }
+    };
+
+    for (const auto & ref : settings.getWorkerSettings().substituters.get())
+        addStore(ref);
+
+    stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
+
+    if (context.secretResolver)
+        return stores;
+
+    auto cached(cache.lock());
+    if (!cached->has_value())
+        cached->emplace(std::move(stores));
+    return cached->value();
+}
+
 std::list<ref<Store>> getDefaultSubstituters()
 {
-    static auto stores([]() {
-        std::list<ref<Store>> stores;
-
-        std::set<StoreReference> done;
-
-        auto addStore = [&](const StoreReference & ref) {
-            if (!done.insert(ref).second)
-                return;
-            try {
-                stores.push_back(openStore(StoreReference{ref}));
-            } catch (Error & e) {
-                logWarning(e.info());
-            }
-        };
-
-        for (const auto & ref : settings.getWorkerSettings().substituters.get())
-            addStore(ref);
-
-        stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
-
-        return stores;
-    }());
-
-    return stores;
+    return getDefaultSubstituters(SecretContext{});
 }
 
 Implementations::Map & Implementations::registered()
