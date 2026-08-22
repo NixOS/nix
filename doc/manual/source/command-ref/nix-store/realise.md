@@ -40,6 +40,30 @@ For non-derivation arguments, the argument itself is printed.
 
 {{#include ../status-build-failure.md}}
 
+# Examples
+
+This operation is typically used to build [store derivation]s produced by
+[`nix-instantiate`](@docroot@/command-ref/nix-instantiate.md):
+
+```console
+$ nix-store --realise $(nix-instantiate ./test.nix)
+/nix/store/6gwmy5jcnwdlz6aqqhksz863f1l8xc2w-aterm-2.3.1
+```
+
+This is essentially what [`nix-build`](@docroot@/command-ref/nix-build.md) does.
+
+To test whether a previously-built derivation is deterministic:
+
+```console
+$ nix-build '<nixpkgs>' --attr hello --check -K
+```
+
+Use [`nix-store --read-log`](./read-log.md) to show the stderr and stdout of a build:
+
+```console
+$ nix-store --read-log $(nix-instantiate ./test.nix)
+```
+
 # Options
 
 - `--dry-run`
@@ -68,27 +92,3 @@ For non-derivation arguments, the argument itself is printed.
 {{#include ../opt-common.md}}
 
 {{#include ../env-common.md}}
-
-# Examples
-
-This operation is typically used to build [store derivation]s produced by
-[`nix-instantiate`](@docroot@/command-ref/nix-instantiate.md):
-
-```console
-$ nix-store --realise $(nix-instantiate ./test.nix)
-/nix/store/6gwmy5jcnwdlz6aqqhksz863f1l8xc2w-aterm-2.3.1
-```
-
-This is essentially what [`nix-build`](@docroot@/command-ref/nix-build.md) does.
-
-To test whether a previously-built derivation is deterministic:
-
-```console
-$ nix-build '<nixpkgs>' --attr hello --check -K
-```
-
-Use [`nix-store --read-log`](./read-log.md) to show the stderr and stdout of a build:
-
-```console
-$ nix-store --read-log $(nix-instantiate ./test.nix)
-```

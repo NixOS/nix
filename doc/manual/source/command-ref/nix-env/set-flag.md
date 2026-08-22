@@ -32,12 +32,6 @@ environment build script:
   remains part of the profile (so it won’t be garbage-collected). It
   can be set back to `true` to re-enable the package.
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 To prevent the currently installed Firefox from being upgraded:
@@ -80,3 +74,9 @@ $ nix-env --set-flag priority 5 binutils
 $ nix-env --set-flag priority 10 gcc
 ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ../env-common.md}}
