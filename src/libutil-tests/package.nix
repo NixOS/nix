@@ -10,6 +10,7 @@
 
   rapidcheck,
   gtest,
+  gbenchmark,
   zstd,
   runCommand,
   util-linux,
@@ -17,12 +18,14 @@
   # Configuration Options
 
   version,
+  withBenchmarks ? false,
   withUnitTests ? true,
   withFuzzTargets ? false,
 }:
 
 let
   inherit (lib) fileset;
+  doBenchmarks = withUnitTests && withBenchmarks;
 in
 
 assert lib.assertMsg (
@@ -58,10 +61,14 @@ mkMesonExecutable (finalAttrs: {
   ]
   ++ lib.optionals (withUnitTests && stdenv.hostPlatform.isLinux) [
     util-linux
+  ]
+  ++ lib.optionals doBenchmarks [
+    gbenchmark
   ];
 
   mesonFlags = [
     (lib.mesonBool "unit-tests" withUnitTests)
+    (lib.mesonBool "benchmarks" doBenchmarks)
     (lib.mesonBool "fuzzers" withFuzzTargets)
   ];
 
@@ -80,6 +87,9 @@ mkMesonExecutable (finalAttrs: {
             + lib.optionalString withUnitTests ''
               export _NIX_TEST_UNIT_DATA=${./data}
               ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe finalAttrs.finalPackage}
+            ''
+            + lib.optionalString doBenchmarks ''
+              ${stdenv.hostPlatform.emulator buildPackages} ${lib.getExe' finalAttrs.finalPackage "nix-store-benchmarks"}
             ''
             + ''
               ${if withUnitTests then "test -x" else "test ! -e"} \
