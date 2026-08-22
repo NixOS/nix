@@ -74,6 +74,7 @@ public:
     {
         std::string value;
         std::string description;
+        bool isDeprecated = false;
     };
 
     /**
@@ -198,6 +199,11 @@ public:
     std::optional<ExperimentalFeature> experimentalFeature;
 
     bool isOverridden() const;
+
+    virtual bool excludedFromFullSerialisation() const
+    {
+        return false;
+    }
 
 protected:
 
