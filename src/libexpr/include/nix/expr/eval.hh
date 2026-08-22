@@ -1015,11 +1015,12 @@ public:
 
     bool isFunctor(const Value & fun) const;
 
-    void callFunction(Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos);
+    void callFunction(
+        Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos, const Expr * expr = nullptr);
 
-    void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos)
+    void callFunction(Value & fun, Value & arg, Value & vRes, const PosIdx pos, const Expr * expr = nullptr)
     {
-        callFunction(fun, std::to_array({&arg}), vRes, pos);
+        callFunction(fun, std::to_array({&arg}), vRes, pos, expr);
     }
 
     /**

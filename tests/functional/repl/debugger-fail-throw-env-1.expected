@@ -20,12 +20,6 @@ error:
              | ^
             2|
 
-       … while calling anonymous lambda
-         at /path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix:1:2:
-            1| (_: throw "oh snap") 42
-             |  ^
-            2|
-
        … while calling the 'throw' builtin
          at /path/to/tests/functional/repl/debugger-fail-throw-env-1.in.debugexpr.nix:1:5:
             1| (_: throw "oh snap") 42

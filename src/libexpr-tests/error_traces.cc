@@ -22,7 +22,7 @@ TEST_F(ErrorTraceTest, TraceBuilder)
             try {
                 state.error<EvalError>("puppy").withTrace(noPos, "doggy").debugThrow();
             } catch (Error & e) {
-                e.addTrace(state.positions[noPos], "beans");
+                e.addTrace(state.positions.getEntry(noPos), "beans");
                 throw;
             }
         } catch (BaseError & e) {
@@ -45,8 +45,8 @@ TEST_F(ErrorTraceTest, NestedThrows)
         try {
             state.error<EvalError>("beans").debugThrow();
         } catch (Error & e2) {
-            e.addTrace(state.positions[noPos], "beans2");
-            // e2.addTrace(state.positions[noPos], "Something", "");
+            e.addTrace(state.positions.getEntry(noPos), "beans2");
+            // e2.addTrace(state.positions.getEntry(noPos), "Something", "");
             ASSERT_TRUE(e.info().traces.size() == 2u);
             ASSERT_TRUE(e2.info().traces.size() == 0u);
             ASSERT_FALSE(&e.info() == &e2.info());

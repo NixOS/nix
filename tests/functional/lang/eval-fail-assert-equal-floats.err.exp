@@ -1,10 +1,4 @@
 error:
-       … while evaluating the condition of the assertion '({ b = 1; } == { b = 1.01; })'
-         at /pwd/lang/eval-fail-assert-equal-floats.nix:1:1:
-            1| assert { b = 1.0; } == { b = 1.01; };
-             | ^
-            2| abort "unreachable"
-
        … while comparing attribute 'b'
          at /pwd/lang/eval-fail-assert-equal-floats.nix:1:21:
             1| assert { b = 1.0; } == { b = 1.01; };

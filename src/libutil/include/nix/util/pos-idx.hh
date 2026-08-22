@@ -36,6 +36,11 @@ public:
         return id <=> other.id;
     }
 
+    std::partial_ordering partialCompare(const PosIdx other) const
+    {
+        return id == 0 || other.id == 0 ? std::partial_ordering::unordered : id <=> other.id;
+    }
+
     bool operator==(const PosIdx other) const
     {
         return id == other.id;

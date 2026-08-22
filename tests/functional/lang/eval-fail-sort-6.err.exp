@@ -1,22 +1,4 @@
 error:
-       … while calling the 'sort' builtin
-         at /pwd/lang/eval-fail-sort-6.nix:1:1:
-            1| builtins.sort (a: b: a <= b) [
-             | ^
-            2|   { }
-
-       … while calling anonymous lambda
-         at /pwd/lang/eval-fail-sort-6.nix:1:19:
-            1| builtins.sort (a: b: a <= b) [
-             |                   ^
-            2|   { }
-
-       … in the argument of '!'
-         at /pwd/lang/eval-fail-sort-6.nix:1:24:
-            1| builtins.sort (a: b: a <= b) [
-             |                        ^
-            2|   { }
-
        … while calling the 'lessThan' builtin
          at /pwd/lang/eval-fail-sort-6.nix:1:24:
             1| builtins.sort (a: b: a <= b) [
