@@ -126,7 +126,7 @@ public:
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
-    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
+    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted) override;
 
     void addTempRoot(const StorePath & path) override;
 
@@ -179,7 +179,7 @@ protected:
 
     ref<Pool<Connection>> connections;
 
-    virtual void setOptions(Connection & conn);
+    virtual void setOptions(Connection & conn, TrustedFlag requestTrusted = Trusted);
 
     void setOptions() override;
 
@@ -188,6 +188,7 @@ protected:
     ConnectionHandle getConnection();
 
     friend struct ConnectionHandle;
+    friend struct RemoteBuilder;
 
     virtual ref<SourceAccessor> getFSAccessor(bool requireValidPath = true) override;
 

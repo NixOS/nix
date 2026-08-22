@@ -7,7 +7,8 @@ TODO_NixOS
 # Test fetching a flat file.
 hash=$(nix-hash --flat --type sha256 ./fetchurl.sh)
 
-outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url "file://$(pwd)/fetchurl.sh" --argstr sha256 "$hash" --no-out-link)
+outPath=$(nix-build -vvvvv --expr 'import <nix/fetchurl.nix>' --argstr url "file://$(pwd)/fetchurl.sh" --argstr sha256 "$hash" --no-out-link \
+    --option secretspec-netrc-file UNUSED_NETRC_SECRET)
 
 cmp "$outPath" fetchurl.sh
 

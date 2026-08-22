@@ -1,4 +1,5 @@
 #include "nix/util/config-global.hh"
+#include "nix/store/globals.hh"
 #include "nix/store/build/hook-instance.hh"
 #include "nix/store/build/child.hh"
 #include "nix/util/strings.hh"
@@ -7,7 +8,7 @@
 
 namespace nix {
 
-HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds timeout)
+HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds timeout, TrustedFlag requestTrusted)
 {
     debug("starting build hook '%s'", concatStringsSep(" ", _buildHook));
 
@@ -84,6 +85,13 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
     sink = FdSink(toHook.writeSide.get());
     std::map<std::string, Config::SettingInfo> settings;
     globalConfig.getSettings(settings);
+    /* The standard build hook forwards these settings to remote stores, so
+       override their daemon-configured mapping for untrusted requests. */
+    if (!requestTrusted) {
+        if (auto setting = settings.find(nix::settings.getLocalSettings().secretSpecImpureEnv.name);
+            setting != settings.end())
+            setting->second.value.clear();
+    }
     for (auto & setting : settings)
         sink << 1 << setting.first << setting.second.value;
     sink << 0;

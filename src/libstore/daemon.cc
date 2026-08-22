@@ -299,6 +299,7 @@ struct ClientSettings
                     || (name == "builders" && value == "")) {
                     settings.set(name, value);
                     fileTransferSettings.set(name, value);
+                    secretSpecSettings.set(name, value);
                 } else if (setSubstituters(settings.getWorkerSettings().substituters))
                     ;
                 else
@@ -1134,7 +1135,7 @@ void processConnection(
 #endif
 
     if (!builder)
-        builder = store->getBuilder();
+        builder = store->getBuilder(nullptr, trusted);
 
     /* Exchange the greeting. */
     WorkerProto::Version localVersion;

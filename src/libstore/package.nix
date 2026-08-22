@@ -15,6 +15,7 @@
   libseccomp,
   nlohmann_json,
   sqlite,
+  secretspec-ffi,
   cmake, # for resolving aws-crt-cpp dep
 
   busybox-sandbox-shell ? null,
@@ -38,6 +39,10 @@
   withAWS ?
     # Default is this way because there have been issues building this dependency
     (lib.meta.availableOn stdenv.hostPlatform aws-c-common),
+
+  # secretspec-ffi is a Rust library that is not built for every platform Nix
+  # supports, so credential resolution through SecretSpec is optional.
+  withSecretSpec ? stdenv.hostPlatform.isUnix,
 }:
 
 let
@@ -56,6 +61,7 @@ mkMesonLibrary (finalAttrs: {
     ./.version
     ./meson.build
     ./meson.options
+    ./secretspec.toml
     ./include/nix/store/meson.build
     ./linux/meson.build
     ./linux/include/nix/store/meson.build
@@ -81,7 +87,8 @@ mkMesonLibrary (finalAttrs: {
   ]
   ++ lib.optional stdenv.hostPlatform.isLinux libseccomp
   ++ lib.optional stdenv.hostPlatform.isFreeBSD freebsd.libjail
-  ++ lib.optional withAWS aws-crt-cpp;
+  ++ lib.optional withAWS aws-crt-cpp
+  ++ lib.optional withSecretSpec secretspec-ffi;
 
   propagatedBuildInputs = [
     nix-util
@@ -92,6 +99,7 @@ mkMesonLibrary (finalAttrs: {
     (lib.mesonEnable "seccomp-sandboxing" stdenv.hostPlatform.isLinux)
     (lib.mesonBool "embedded-sandbox-shell" embeddedSandboxShell)
     (lib.mesonEnable "s3-aws-auth" withAWS)
+    (lib.mesonEnable "secretspec" withSecretSpec)
   ]
   ++ lib.optionals withSandboxShell [
     (lib.mesonOption "sandbox-shell" sandboxShell)

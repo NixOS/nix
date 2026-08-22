@@ -5,6 +5,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/sync.hh"
+#include "nix/store/secretspec-settings.hh"
 
 #include <map>
 #include <limits>
@@ -24,7 +25,7 @@ struct Cache;
 
 struct Settings : public Config
 {
-    Settings();
+    explicit Settings(SecretSpecSettings & secretSpecSettings = nix::secretSpecSettings);
 
     Setting<StringMap> accessTokens{
         this,
@@ -78,7 +79,46 @@ struct Settings : public Config
           The `input.foo` uses the "gitlab" fetcher, which might
           requires specifying the token type along with the token
           value.
-          )"};
+          )",
+        {},
+        true,
+        std::nullopt,
+        FlakeConfigSetting::Forbidden};
+
+    Setting<StringMap> secretSpecAccessTokens{
+        this,
+        {},
+        "secretspec-access-tokens",
+        R"(
+          Access tokens resolved through [SecretSpec](https://secretspec.dev/).
+
+          The value is a space-separated list of `host=secret-name` entries. Host
+          and path-prefix matching follows [`access-tokens`](#conf-access-tokens).
+          When both settings match the same prefix, the literal `access-tokens`
+          entry takes precedence; a more-specific entry in either setting takes
+          precedence over a less-specific one.
+
+          Secret values are resolved lazily through the `secretspec-ffi` C ABI
+          and cached in memory by the shared SecretSpec settings. They are never
+          added to the Nix configuration, so `nix config show` displays only the
+          declared secret names. The resolved secrets must contain inline
+          values, not `as_path` values.
+
+          Example `~/.config/nix/nix.conf`:
+
+          ```
+          secretspec-access-tokens = github.com=GITHUB_TOKEN gitlab.com=GITLAB_TOKEN
+          secretspec-scope = nix
+          ```
+
+          These conventional secret names, along with `SOURCEHUT_TOKEN`, are
+          declared by Nix's bundled SecretSpec manifest. Set
+          [`secretspec-file`](#conf-secretspec-file) to use a custom manifest.
+        )",
+        {},
+        true,
+        std::nullopt,
+        FlakeConfigSetting::Forbidden};
 
     Setting<bool> allowDirty{this, true, "allow-dirty", "Whether to allow dirty Git/Mercurial trees."};
 
@@ -161,10 +201,13 @@ struct Settings : public Config
 
     const ref<SrcToStore> srcToStore = createSrcToStore();
 
+    /** Resolve and cache one access-token secret through secretspec-ffi. */
+    std::string getSecretSpecAccessToken(const std::string & name) const;
 
 private:
     void anchor() override;
 
+    SecretSpecSettings & secretSpecSettings;
     mutable Sync<std::shared_ptr<Cache>> _cache;
 };
 

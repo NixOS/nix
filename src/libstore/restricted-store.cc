@@ -162,7 +162,7 @@ public:
         return NotTrusted;
     }
 
-    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override
+    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted) override
     {
         unreachable();
     }

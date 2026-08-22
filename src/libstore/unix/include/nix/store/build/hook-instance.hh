@@ -10,6 +10,8 @@
 
 namespace nix {
 
+enum TrustedFlag : bool;
+
 /**
  * @note Sometimes this is owned by the `Worker`, and sometimes it is
  * owned by a `Goal`. This is for efficiency: rather than starting the
@@ -50,7 +52,7 @@ struct HookInstance
      */
     std::function<void()> onKillChild;
 
-    HookInstance(const Strings & buildHook, std::chrono::milliseconds timeout);
+    HookInstance(const Strings & buildHook, std::chrono::milliseconds timeout, TrustedFlag requestTrusted);
 
     ~HookInstance();
 };

@@ -50,6 +50,11 @@ namespace nix {
 class Args;
 class AbstractSetting;
 
+enum class FlakeConfigSetting {
+    Allowed,
+    Forbidden,
+};
+
 class AbstractConfig
 {
 private:
@@ -74,6 +79,7 @@ public:
     {
         std::string value;
         std::string description;
+        FlakeConfigSetting flakeConfigSetting;
     };
 
     /**
@@ -82,6 +88,9 @@ public:
      * - overriddenOnly: when set to true only overridden settings will be added to `res`
      */
     virtual void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const = 0;
+
+    /** Return flake policy for one known setting, including disabled experimental settings. */
+    virtual std::optional<FlakeConfigSetting> getFlakeConfigSetting(const std::string & name) const = 0;
 
     /**
      * Parses the configuration in `contents` and applies it
@@ -172,6 +181,8 @@ public:
 
     void getSettings(std::map<std::string, SettingInfo> & res, bool overriddenOnly = false) const override;
 
+    std::optional<FlakeConfigSetting> getFlakeConfigSetting(const std::string & name) const override;
+
     void resetOverridden() override;
 
     nlohmann::json toJSON() override;
@@ -197,6 +208,8 @@ public:
 
     std::optional<ExperimentalFeature> experimentalFeature;
 
+    const FlakeConfigSetting flakeConfigSetting;
+
     bool isOverridden() const;
 
 protected:
@@ -205,7 +218,8 @@ protected:
         const std::string & name,
         const std::string & description,
         const StringSet & aliases,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt);
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        FlakeConfigSetting flakeConfigSetting = FlakeConfigSetting::Allowed);
 
     virtual ~AbstractSetting();
 
@@ -362,8 +376,9 @@ public:
         const std::string & name,
         const std::string & description,
         const StringSet & aliases = {},
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : AbstractSetting(name, description, aliases, experimentalFeature)
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        FlakeConfigSetting flakeConfigSetting = FlakeConfigSetting::Allowed)
+        : AbstractSetting(name, description, aliases, experimentalFeature, flakeConfigSetting)
         , value(def)
         , defaultValue(def)
         , documentDefault(documentDefault)
@@ -476,8 +491,10 @@ public:
         const std::string & description,
         const StringSet & aliases = {},
         const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<T>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        FlakeConfigSetting flakeConfigSetting = FlakeConfigSetting::Allowed)
+        : BaseSetting<T>(
+              def, documentDefault, name, description, aliases, std::move(experimentalFeature), flakeConfigSetting)
     {
         options->addSetting(this);
     }
@@ -511,8 +528,10 @@ public:
         const std::string & description,
         const StringSet & aliases = {},
         const bool documentDefault = true,
-        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt)
-        : BaseSetting<AbsolutePath>(def, documentDefault, name, description, aliases, std::move(experimentalFeature))
+        std::optional<ExperimentalFeature> experimentalFeature = std::nullopt,
+        FlakeConfigSetting flakeConfigSetting = FlakeConfigSetting::Allowed)
+        : BaseSetting<AbsolutePath>(
+              def, documentDefault, name, description, aliases, std::move(experimentalFeature), flakeConfigSetting)
     {
         options->addSetting(this);
     }

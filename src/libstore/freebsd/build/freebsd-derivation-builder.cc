@@ -364,6 +364,7 @@ void ChrootFreeBSDDerivationBuilder::startChild()
     int jid;
 
     RunChildArgs args{
+        .netrcData = preResolveNetrcData(),
 #if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif
