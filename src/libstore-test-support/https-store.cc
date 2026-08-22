@@ -29,6 +29,15 @@ void HttpsBinaryCacheStoreTest::SetUp()
 {
     LibStoreNetworkTest::SetUp();
 
+    /* `GTEST_SKIP()` returns from the enclosing function only, so a skip in the
+       base `SetUp()` -- which happens on any host without user namespaces, i.e.
+       the default -- returns from the base and control resumes here. Without this
+       guard the body below still runs for a skipped test, creating temp dirs,
+       opening a store and shelling out to `openssl`, and gtest reports a failure
+       rather than a skip. */
+    if (IsSkipped())
+        return;
+
 #ifdef _WIN32
     GTEST_SKIP() << "HTTPS store tests are not supported on Windows";
 #endif
