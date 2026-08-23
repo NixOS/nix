@@ -267,6 +267,21 @@ rec {
               withMimalloc = false;
               withPluginCApi = false;
             };
+            # Also, temporarily stuff newer libgit2 for more coverage of ifdefs.
+            # Would be nicer for this to be somehow a private input, but we can't
+            # override nixDependencies easily.
+            libgit2 = self.callPackage (
+              { pkgs, fetchFromGitHub }:
+              pkgs.libgit2.overrideAttrs {
+                version = "2.0.0-rc.1";
+                src = fetchFromGitHub {
+                  owner = "libgit2";
+                  repo = "libgit2";
+                  rev = "ae45d0d168f7e8dbfdb8c623589cb51caac96ab3";
+                  hash = "sha256-3sbqHm37SOwBeFgtjI2DLN6kx1F7G2N1m6rRIkqDXNI=";
+                };
+              }
+            ) { };
           }
         )
       );
