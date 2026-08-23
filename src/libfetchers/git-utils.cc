@@ -365,11 +365,19 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                enabling the specific backend.
                */
 
+#if LIBGIT2_VERSION_CHECK(2, 0, 0)
+            git_odb_options odbOpts = GIT_ODB_OPTIONS_INIT;
+            odbOpts.oid_type = git_repository_oid_type(repo.get());
+            if (git_odb_new_ext(Setter(odb), &odbOpts))
+                throw GitError("creating Git object database");
+#else
             if (git_odb_new(Setter(odb)))
                 throw GitError("creating Git object database");
+#endif
 
 #if LIBGIT2_VERSION_CHECK(2, 0, 0)
             git_odb_backend_pack_options packOpts = GIT_ODB_OPTIONS_INIT;
+            packOpts.oid_type = git_repository_oid_type(repo.get());
 #endif
             if (git_odb_backend_pack(
                     &packBackend,
@@ -436,6 +444,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         Indexer indexer;
 #if LIBGIT2_VERSION_CHECK(2, 0, 0)
         git_indexer_options indexerOpts = GIT_INDEXER_OPTIONS_INIT;
+        indexerOpts.oid_type = git_repository_oid_type(repo.get());
 #endif
         if (git_indexer_new(
                 Setter(indexer),
