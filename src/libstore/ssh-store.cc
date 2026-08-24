@@ -89,7 +89,7 @@ protected:
 
     SSHMaster master;
 
-    void setOptions(RemoteStore::Connection & conn) override {
+    void setOptions(RemoteStore::Connection & conn, TrustedFlag) override {
         /* TODO Add a way to explicitly ask for some options to be
            forwarded. One option: A way to query the daemon for its
            settings, and then a series of params to SSHStore like

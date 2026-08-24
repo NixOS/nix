@@ -172,6 +172,8 @@ in
 
   tarballFlakes = runNixOSTest ./tarball-flakes.nix;
 
+  secretspec-daemon = runNixOSTest ./secretspec-daemon.nix;
+
   containers = runNixOSTest ./containers/containers.nix;
 
   setuid = runNixOSTest ./setuid.nix;

@@ -99,7 +99,8 @@ std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile
 
 void FileTransferSettings::anchor() {}
 
-FileTransferSettings::FileTransferSettings()
+FileTransferSettings::FileTransferSettings(SecretSpecSettings & secretSpecSettings)
+    : secretSpecSettings(secretSpecSettings)
 {
     std::optional<AbsolutePath> sslOverride =
         getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
@@ -110,6 +111,13 @@ FileTransferSettings::FileTransferSettings()
             .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
     if (sslOverride)
         caFile = *sslOverride;
+}
+
+AbsolutePath FileTransferSettings::getNetrcFile() const
+{
+    if (!secretSpecNetrcFile.get().empty())
+        return secretSpecSettings.getPathSecret(secretSpecNetrcFile.get());
+    return netrcFile.get();
 }
 
 FileTransferSettings fileTransferSettings;
@@ -213,6 +221,11 @@ struct curlFileTransfer : public FileTransfer
 
         curl_off_t writtenToSink = 0;
 
+        /* Resolved once during construction rather than in init(), which runs
+           on the download thread where a failure to resolve a SecretSpec-backed
+           netrc file would take down every other transfer as well. */
+        std::optional<AbsolutePath> netrcFile;
+
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 
         inline static const std::set<long> successfulStatuses{
@@ -275,6 +288,9 @@ struct curlFileTransfer : public FileTransfer
             })
         {
             result.urls.push_back(request.uri.to_string());
+
+            if (request.uri.scheme() == "http" || request.uri.scheme() == "https")
+                netrcFile = fileTransfer.settings.getNetrcFile();
 
             if (!request.expectedETag.empty())
                 appendHeaders("If-None-Match: " + request.expectedETag);
@@ -675,10 +691,12 @@ struct curlFileTransfer : public FileTransfer
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_LIMIT, 1L);
             curl_easy_setopt(req, CURLOPT_LOW_SPEED_TIME, fileTransfer.settings.stalledDownloadTimeout.get());
 
-            /* If no file exist in the specified path, curl continues to work
-               anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().string().c_str());
-            curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+            if (netrcFile) {
+                /* If no file exists at the specified path, curl continues to
+                   work as if netrc support was disabled. */
+                curl_easy_setopt(req, CURLOPT_NETRC_FILE, netrcFile->string().c_str());
+                curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
+            }
 
             if (writtenToSink)
                 curl_easy_setopt(req, CURLOPT_RESUME_FROM_LARGE, writtenToSink);

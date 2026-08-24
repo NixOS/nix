@@ -387,8 +387,9 @@ LegacySSHBuilder::buildPathsWithResults(const std::vector<DerivedPath> & reqs, B
     return results;
 }
 
-ref<Builder> LegacySSHStore::getBuilder(std::shared_ptr<Store> evalStore)
+ref<Builder> LegacySSHStore::getBuilder(std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted)
 {
+    (void) requestTrusted;
     if (evalStore && evalStore.get() != this)
         throw Error("building on an SSH store is incompatible with '--eval-store'");
     return make_ref<LegacySSHBuilder>(

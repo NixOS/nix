@@ -129,7 +129,7 @@ void RemoteStore::initConnection(Connection & conn)
         setOptions(conn);
 }
 
-void RemoteStore::setOptions(Connection & conn)
+void RemoteStore::setOptions(Connection & conn, TrustedFlag requestTrusted)
 {
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
             << settings.getWorkerSettings().tryFallback << verbosity << settings.getWorkerSettings().maxBuildJobs
@@ -141,6 +141,19 @@ void RemoteStore::setOptions(Connection & conn)
     std::map<std::string, nix::Config::SettingInfo> overrides;
     settings.getSettings(overrides, true); // libstore settings
     fileTransferSettings.getSettings(overrides, true);
+    secretSpecSettings.getSettings(overrides, true);
+    if (!requestTrusted) {
+        /* A trusted connection to another daemon must not turn an untrusted
+           originating request into permission to consume that daemon's
+           SecretSpec-backed impure environment. */
+        overrides.insert_or_assign(
+            settings.getLocalSettings().secretSpecImpureEnv.name,
+            Config::SettingInfo{
+                .value = "",
+                .description = settings.getLocalSettings().secretSpecImpureEnv.description,
+                .flakeConfigSetting = FlakeConfigSetting::Forbidden,
+            });
+    }
     overrides.erase(settings.keepFailed.name);
     overrides.erase(settings.getWorkerSettings().keepGoing.name);
     overrides.erase(settings.getWorkerSettings().tryFallback.name);
@@ -580,10 +593,18 @@ struct RemoteBuilder : Builder
 {
     ref<RemoteStore> store;
     std::shared_ptr<Store> evalStore;
+    TrustedFlag requestTrusted;
 
-    RemoteBuilder(ref<RemoteStore> store, std::shared_ptr<Store> evalStore)
+    void setOptions(RemoteStore::Connection & conn)
+    {
+        if (!conn.protoVersion.features.contains(WorkerProto::featureDisableSetOptions))
+            store->setOptions(conn, requestTrusted);
+    }
+
+    RemoteBuilder(ref<RemoteStore> store, std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted)
         : store(store)
         , evalStore(std::move(evalStore))
+        , requestTrusted(requestTrusted)
     {
     }
 
@@ -637,6 +658,7 @@ void RemoteBuilder::buildPaths(const std::vector<DerivedPath> & drvPaths, BuildM
 {
     copyDrvsFromEvalStore(drvPaths);
     auto conn(store->getConnection());
+    setOptions(*conn);
     conn->to << WorkerProto::Op::BuildPaths;
     WorkerProto::write(*store, *conn, drvPaths);
     conn->to << buildMode;
@@ -651,6 +673,7 @@ RemoteBuilder::buildPathsWithResults(const std::vector<DerivedPath> & paths, Bui
 
     std::optional<RemoteStore::ConnectionHandle> conn_(store->getConnection());
     auto & conn = *conn_;
+    setOptions(*conn);
 
     if (conn->protoVersion >= WorkerProto::Version{.number = {1, 34}}) {
         conn->to << WorkerProto::Op::BuildPathsWithResults;
@@ -720,6 +743,7 @@ RemoteBuilder::buildPathsWithResults(const std::vector<DerivedPath> & paths, Bui
 BuildResult RemoteBuilder::buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode)
 {
     auto conn(store->getConnection());
+    setOptions(*conn);
     conn->putBuildDerivationRequest(*store, &conn.daemonException, drvPath, drv, buildMode);
     conn.processStderr();
     return WorkerProto::Serialise<BuildResult>::read(*store, *conn);
@@ -739,10 +763,12 @@ void RemoteBuilder::repairPath(const StorePath & path)
     throw Unsupported("operation 'repairPath' is not supported by store '%s'", store->config.getHumanReadableURI());
 }
 
-ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
+ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore, TrustedFlag requestTrusted)
 {
     return make_ref<RemoteBuilder>(
-        ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
+        ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())),
+        std::move(evalStore),
+        requestTrusted);
 }
 
 void RemoteStore::addTempRoot(const StorePath & path)

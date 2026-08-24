@@ -506,6 +506,7 @@ void ChrootLinuxDerivationBuilder::prepareSandbox()
 void ChrootLinuxDerivationBuilder::startChild()
 {
     RunChildArgs args{
+        .netrcData = preResolveNetrcData(),
 #if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif

@@ -465,13 +465,17 @@ public:
     virtual ~Store() {}
 
     /**
-     * Get a `Builder` for this store.
+     * Get a `Builder` for this store and request trust level.
      *
      * @param evalStore If provided and different from this store,
      * derivation files will be copied from the eval store to this
      * store before building.
+     *
+     * Direct in-process callers are trusted by default. Daemon connections
+     * must pass the trust level established for the client so credentials are
+     * not made available to builds requested by untrusted users.
      */
-    virtual ref<Builder> getBuilder(std::shared_ptr<Store> evalStore = nullptr);
+    virtual ref<Builder> getBuilder(std::shared_ptr<Store> evalStore = nullptr, TrustedFlag requestTrusted = Trusted);
 
     /**
      * Follow symlinks until we end up with a path in the Nix store.

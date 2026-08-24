@@ -16,6 +16,9 @@ in
 scope: {
   inherit stdenv;
 
+  # TODO: Use pkgs.secretspec-ffi after the pinned nixpkgs is bumped to include it.
+  secretspec-ffi = scope.callPackage ./secretspec-ffi.nix { };
+
   mimalloc =
     if lib.versionAtLeast pkgs.mimalloc.version "3.3.2" then
       pkgs.mimalloc

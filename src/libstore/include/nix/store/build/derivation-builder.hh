@@ -103,6 +103,9 @@ struct DerivationBuilderParams
 
     const BuildMode & buildMode;
 
+    /** Trust level of the client that requested this build. */
+    const TrustedFlag requestTrusted;
+
     /**
      * Extra paths we want to be in the chroot, regardless of the
      * derivation we are building.

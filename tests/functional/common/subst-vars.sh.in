@@ -13,5 +13,6 @@ busybox="@sandbox_shell@"
 
 version=@PACKAGE_VERSION@
 system=@system@
+with_secretspec=@with_secretspec@
 
 fi

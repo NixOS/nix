@@ -193,28 +193,45 @@ struct GitArchiveInputScheme : InputScheme
         return input;
     }
 
-    // Search for the longest possible match starting from the beginning and ending at either the end or a path segment.
+    struct AccessTokenMatch
+    {
+        std::string value;
+        size_t prefixLength;
+    };
+
+    /**
+     * Search for the longest match ending at either the URL end or a path
+     * boundary. An empty value means "no token", so that a more specific entry
+     * can cancel a less specific one.
+     */
+    static std::optional<AccessTokenMatch>
+    findAccessTokenMatch(const StringMap & tokens, const std::string & host, const std::string & url)
+    {
+        std::optional<AccessTokenMatch> answer;
+        if (!url.empty()) {
+            for (const auto & [prefix, value] : tokens) {
+                if ((!answer || prefix.length() > answer->prefixLength) && url.starts_with(prefix)
+                    && (url.length() == prefix.length() || url[prefix.length()] == '/') && !value.empty())
+                    answer = AccessTokenMatch{value, prefix.length()};
+            }
+        }
+        if (!answer)
+            if (auto token = get(tokens, host); token && !token->empty())
+                answer = AccessTokenMatch{*token, host.length()};
+        return answer;
+    }
+
     std::optional<std::string> getAccessToken(
         const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
     {
-        auto tokens = settings.accessTokens.get();
-        std::string answer;
-        size_t answer_match_len = 0;
-        if (!url.empty()) {
-            for (auto & token : tokens) {
-                auto first = url.find(token.first);
-                if (first != std::string::npos && token.first.length() > answer_match_len && first == 0
-                    && url.substr(0, token.first.length()) == token.first
-                    && (url.length() == token.first.length() || url[token.first.length()] == '/')) {
-                    answer = token.second;
-                    answer_match_len = token.first.length();
-                }
-            }
-            if (!answer.empty())
-                return answer;
-        }
-        if (auto token = get(tokens, host))
-            return *token;
+        auto literal = findAccessTokenMatch(settings.accessTokens.get(), host, url);
+        auto secret = findAccessTokenMatch(settings.secretSpecAccessTokens.get(), host, url);
+
+        /* Preserve literal-token compatibility on an equally specific match. */
+        if (literal && (!secret || literal->prefixLength >= secret->prefixLength))
+            return literal->value;
+        if (secret)
+            return settings.getSecretSpecAccessToken(secret->value);
         return {};
     }
 

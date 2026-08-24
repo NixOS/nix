@@ -21,6 +21,7 @@ busybox = find_program('busybox', native : true, required : false)
 # guaranteed to exist either.
 coreutils = find_program('ls', native : true)
 dot = find_program('dot', native : true, required : false)
+nix_store = dependency('nix-store', required : false)
 
 nix_bin_dir = fs.parent(nix.full_path())
 
@@ -34,6 +35,10 @@ test_confdata = {
   'sandbox_shell' : busybox.found() ? busybox.full_path() : '',
   'PACKAGE_VERSION' : meson.project_version(),
   'system' : nix_system_cpu + '-' + host_machine.system(),
+  'with_secretspec' : nix_store.found() ? nix_store.get_variable(
+    'with_secretspec',
+    default_value : 'false',
+  ) : 'false',
 }
 
 # Just configures `common/vars-and-functions.sh.in`.
@@ -189,7 +194,6 @@ suites = [
   },
 ]
 
-nix_store = dependency('nix-store', required : false)
 if nix_store.found()
   add_languages('cpp')
   subdir('test-libstoreconsumer')

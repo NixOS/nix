@@ -636,7 +636,38 @@ public:
         )",
         {},   // aliases
         true, // document default
-        Xp::ConfigurableImpureEnv};
+        Xp::ConfigurableImpureEnv,
+        FlakeConfigSetting::Forbidden};
+
+    Setting<StringMap> secretSpecImpureEnv{
+        this,
+        {},
+        "secretspec-impure-env",
+        R"(
+          A list of `environment-variable=secret-name` mappings for fixed-output
+          derivations using `impureEnvVars`.
+
+          Nix resolves a mapped SecretSpec value lazily, only when a derivation
+          requests that environment variable. Literal values in
+          [`impure-env`](#conf-impure-env) take precedence over an equally named
+          SecretSpec mapping.
+
+          The resolved secrets must contain inline values, not `as_path`
+          values. Only environment-variable and secret names are stored in the
+          Nix configuration and displayed by `nix config show`.
+
+          Resolution happens in the process that runs the build, which for a
+          daemon-backed store is the daemon. See
+          [`secretspec-file`](#conf-secretspec-file) for what that implies for
+          manifest selection and provider choice. The bundled manifest declares
+          `BUILD_TOKEN` for the conventional
+          `environment-variable=BUILD_TOKEN` case; other secret names require a
+          custom manifest.
+        )",
+        {},
+        true,
+        Xp::ConfigurableImpureEnv,
+        FlakeConfigSetting::Forbidden};
 
     Setting<Strings> hashedMirrors{
         this,

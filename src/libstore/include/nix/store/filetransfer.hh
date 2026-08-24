@@ -14,6 +14,7 @@
 #include "nix/util/url.hh"
 
 #include "nix/store/config.hh"
+#include "nix/store/secretspec-settings.hh"
 #if NIX_WITH_AWS_AUTH
 #  include "nix/store/aws-creds.hh"
 #endif
@@ -29,8 +30,10 @@ class FileTransferSettings : public Config
 
     void anchor() override;
 
+    SecretSpecSettings & secretSpecSettings;
+
 public:
-    FileTransferSettings();
+    explicit FileTransferSettings(SecretSpecSettings & secretSpecSettings = nix::secretSpecSettings);
 
     Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
@@ -190,7 +193,40 @@ public:
           > This must be an absolute path, and `~` is not resolved. For
           > example, `~/.netrc` won't resolve to your home directory's
           > `.netrc`.
-        )"};
+        )",
+        {},
+        true,
+        std::nullopt,
+        FlakeConfigSetting::Forbidden};
+
+    Setting<std::string> secretSpecNetrcFile{
+        this,
+        "",
+        "secretspec-netrc-file",
+        R"(
+          Name of a SecretSpec secret containing a complete `netrc` file.
+
+          The secret must be declared with `as_path = true`. When set, this
+          takes precedence over [`netrc-file`](#conf-netrc-file), and Nix keeps
+          the materialized file alive for the lifetime of the process. Nix's
+          bundled SecretSpec manifest provides the conventional `NIX_NETRC`
+          declaration.
+
+          Only the secret name is stored in the Nix configuration and displayed
+          by `nix config show`.
+
+          When configured on a multi-user daemon, this is a daemon-wide
+          credential source rather than a per-user one. Users allowed to request
+          builds can cause matching entries to be used by HTTP(S) transfers,
+          including the `builtin:fetchurl` builder. Only include credentials
+          intended to be shared across that trust domain.
+        )",
+        {},
+        true,
+        std::nullopt,
+        FlakeConfigSetting::Forbidden};
+
+    AbsolutePath getNetrcFile() const;
 
     Setting<std::optional<AbsolutePath>> caFile{
         this,

@@ -39,3 +39,9 @@ option(
   type : 'feature',
   description : 'build support for AWS authentication with S3',
 )
+
+option(
+  'secretspec',
+  type : 'feature',
+  description : 'build support for resolving credentials through SecretSpec',
+)

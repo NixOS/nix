@@ -35,6 +35,20 @@ TEST(Config, getDefinedSetting)
     ASSERT_NE(iter, settings.end());
     ASSERT_EQ(iter->second.value, "");
     ASSERT_EQ(iter->second.description, "description\n");
+    ASSERT_EQ(iter->second.flakeConfigSetting, FlakeConfigSetting::Allowed);
+}
+
+TEST(Config, getForbiddenFlakeSetting)
+{
+    Config config;
+    std::map<std::string, Config::SettingInfo> settings;
+    Setting<std::string> setting{
+        &config, "", "credential-setting", "description", {}, true, std::nullopt, FlakeConfigSetting::Forbidden};
+
+    config.getSettings(settings);
+    ASSERT_EQ(settings.at("credential-setting").flakeConfigSetting, FlakeConfigSetting::Forbidden);
+
+    ASSERT_EQ(config.getFlakeConfigSetting("credential-setting"), FlakeConfigSetting::Forbidden);
 }
 
 TEST(Config, getDefinedOverriddenSettingNotSet)
