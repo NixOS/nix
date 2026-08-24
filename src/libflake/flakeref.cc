@@ -239,18 +239,27 @@ static std::optional<std::pair<FlakeRef, std::string>> parseFlakeIdRef(std::stri
 std::optional<std::pair<FlakeRef, std::string>>
 parseURLFlakeRef(std::string_view url, const std::optional<std::filesystem::path> & baseDir, bool isFlake)
 {
+    std::optional<ParsedURL> parsed;
     try {
-        auto parsed = parseURL(url, /*lenient=*/true);
-        if (baseDir && (parsed.scheme == "path" || parsed.scheme == "git+file")) {
-            /* Here we know that the path must not contain encoded '/' or NUL bytes. */
-            auto path = urlPathToPath(parsed.path);
-            if (!path.is_absolute())
-                parsed.path = pathToUrlPath(absPath(path, get(baseDir)));
-        }
-        return fromParsedURL(std::move(parsed), isFlake);
+        parsed = parseURL(url, /*lenient=*/true);
     } catch (BadURL &) {
+        /* The string is not a URL, so try to interpret it as a path
+           instead (in the caller). Note that errors that occur while
+           *interpreting* a syntactically valid URL (such as an
+           unsupported query parameter) are not caught here; they
+           should be shown to the user rather than masked by a
+           confusing error about the flake ref not being a valid
+           path. */
         return std::nullopt;
     }
+
+    if (baseDir && (parsed->scheme == "path" || parsed->scheme == "git+file")) {
+        /* Here we know that the path must not contain encoded '/' or NUL bytes. */
+        auto path = urlPathToPath(parsed->path);
+        if (!path.is_absolute())
+            parsed->path = pathToUrlPath(absPath(path, get(baseDir)));
+    }
+    return fromParsedURL(std::move(*parsed), isFlake);
 }
 
 std::pair<FlakeRef, std::string> parseFlakeRefWithFragment(
