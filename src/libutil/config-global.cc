@@ -49,7 +49,8 @@ std::string GlobalConfig::toKeyValue()
     std::map<std::string, Config::SettingInfo> settings;
     globalConfig.getSettings(settings);
     for (const auto & s : settings)
-        res += fmt("%s = %s\n", s.first, s.second.value);
+        if (!s.second.excludedFromFullSerialisation)
+            res += fmt("%s = %s\n", s.first, s.second.value);
     return res;
 }
 

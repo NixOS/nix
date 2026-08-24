@@ -67,6 +67,10 @@ testRepl () {
     replOutput=$(nix repl "${nixArgs[@]}" 2>&1 <<< ":sh import $testDir/simple.nix")
     echo "$replOutput" | grepInverse "error: Cannot run 'nix-shell'"
 
+    # `:sh` and `:u` pass full config to the child process via NIX_CONFIG.
+    # Previously we had warnings about deprecated unasked settings.
+    echo "$replOutput" | grepInverse "'warn-short-path-literals' is deprecated"
+
     expectStderr 1 nix repl "${testDir}/simple.nix" \
       | grepQuiet -s "error: path \"$testDir/simple.nix\" is not a flake"
 }
