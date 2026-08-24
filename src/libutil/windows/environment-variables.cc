@@ -65,22 +65,22 @@ StringMap getEnv()
 
 int unsetenv(const char * name)
 {
-    return -SetEnvironmentVariableA(name, nullptr);
+    return SetEnvironmentVariableA(name, nullptr) ? 0 : -1;
 }
 
 int unsetEnvOs(const OsChar * name)
 {
-    return -SetEnvironmentVariableW(name, nullptr);
+    return SetEnvironmentVariableW(name, nullptr) ? 0 : -1;
 }
 
 int setEnv(const char * name, const char * value)
 {
-    return -SetEnvironmentVariableA(name, value);
+    return SetEnvironmentVariableA(name, value) ? 0 : -1;
 }
 
 int setEnvOs(const OsString & name, const OsString & value)
 {
-    return -SetEnvironmentVariableW(name.c_str(), value.c_str());
+    return SetEnvironmentVariableW(name.c_str(), value.c_str()) ? 0 : -1;
 }
 
 } // namespace nix
