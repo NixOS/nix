@@ -12,9 +12,27 @@ struct Sink;
 namespace derivation {
 
 /**
+ * Whether the store directory may contain characters that the ATerm
+ * format escapes --- in practice the `\` of a Windows store directory
+ * such as `C:\ProgramData\nix\store`.
+ *
+ * We could always enable it, as escape sequences should only be allowed
+ * to be used when needed, but out of an abundance of caution we make
+ * it a flag instead.
+ */
+inline constexpr bool defaultSupportWindowsStoreDir =
+#ifdef _WIN32
+    true
+#else
+    false
+#endif
+    ;
+
+/**
  * Print a derivation.
  */
-std::string unparse(const Full & drv, const StoreDirConfig & store);
+std::string
+unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
 
 namespace modulo {
 struct HashInputs;
@@ -31,7 +49,10 @@ struct HashInputs;
  * than by store path.
  */
 template<typename Inputs, typename Out>
-std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store)
+std::string unparse(
+    const Derivation<Inputs, Out> & drv,
+    const StoreDirConfig & store,
+    bool supportWindowsStoreDir = defaultSupportWindowsStoreDir)
     requires(
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
@@ -46,6 +67,7 @@ Full parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
+    bool supportWindowsStoreDir = defaultSupportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name);
