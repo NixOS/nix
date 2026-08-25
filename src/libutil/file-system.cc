@@ -408,6 +408,16 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
 {
 }
 
+/**
+ * Both platforms implement the accounting overload; this wrapper is the same
+ * either way, so it lives here rather than being duplicated in each.
+ */
+void deletePath(const std::filesystem::path & path)
+{
+    uint64_t dummy;
+    deletePath(path, dummy);
+}
+
 void AutoDelete::deletePath()
 {
     if (del) {
