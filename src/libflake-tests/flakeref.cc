@@ -11,6 +11,7 @@
 #include "nix/util/configuration.hh"
 #include "nix/util/error.hh"
 #include "nix/util/experimental-features.hh"
+#include "nix/util/terminal.hh"
 
 namespace nix {
 
@@ -321,6 +322,24 @@ TEST(to_string, doesntReencodeUrl)
     auto expected = "http://localhost:8181/test/%2B3d.tar.gz";
 
     ASSERT_EQ(unparsed, expected);
+}
+
+TEST(parseFlakeRef, urlInterpretationErrorsAreNotMasked)
+{
+    fetchers::Settings fetchSettings;
+
+    // Errors that occur while interpreting a syntactically valid URL
+    // (such as an unsupported query parameter) should be shown to the
+    // user, rather than causing the flake ref to be reinterpreted as a
+    // path, leading to a confusing "not an absolute path" error.
+    try {
+        parseFlakeRef("github:foo/bar?xyzzy=1");
+        FAIL() << "expected parseFlakeRef to throw";
+    } catch (BadURL & e) {
+        auto msg = filterANSIEscapes(e.msg());
+        EXPECT_NE(msg.find("xyzzy"), std::string::npos) << msg;
+        EXPECT_EQ(msg.find("not an absolute path"), std::string::npos) << msg;
+    }
 }
 
 TEST(parseFlakeRef, malformedGithubUrlDoesNotCrash)
