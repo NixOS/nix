@@ -4,6 +4,10 @@
 
 namespace nix {
 
+/* The primitive on Windows, with `getEnv` delegating here rather than the other
+   way round. `getenv` would read the CRT's copy of the environment, snapshotted
+   at process start, which `setEnv` does not update, so it cannot see anything
+   this process has set. */
 std::optional<OsString> getEnvOs(const OsString & key)
 {
     // Determine the required buffer size for the environment variable value
