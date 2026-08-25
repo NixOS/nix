@@ -11,6 +11,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/muxable-pipe.hh"
 #include "nix/util/json-impls.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
@@ -175,10 +176,44 @@ public:
     virtual ~DerivationBuilder() = default;
 
     /**
-     * Master side of the pseudoterminal used for the builder's
-     * standard output/error.
+     * Where the builder's standard output/error is read from, set by
+     * `startBuild`.
+     *
+     * The two platforms cannot share a type here: Unix hands out the
+     * master side of a pseudoterminal, whereas @ref
+     * nix::windows::MuxablePipePollState::iterate needs the pipe's
+     * `OVERLAPPED` state and buffer, which a `Descriptor` does not
+     * carry.
      */
+#ifndef _WIN32
     AutoCloseFD builderOut;
+#else
+    MuxablePipe * builderOut = nullptr;
+#endif
+
+    /**
+     * What the worker should wait on for this build's log.
+     */
+    MuxablePipePollState::CommChannel logChannel()
+    {
+#ifndef _WIN32
+        return builderOut.get();
+#else
+        return builderOut;
+#endif
+    }
+
+    /**
+     * The descriptor a `ChildOutput` event for this build's log carries.
+     */
+    Descriptor logDescriptor()
+    {
+#ifndef _WIN32
+        return builderOut.get();
+#else
+        return builderOut->readSide.get();
+#endif
+    }
 
     /**
      * Set up build environment / sandbox, acquiring resources (e.g.
@@ -244,10 +279,20 @@ struct DerivationBuilderDeleter
 
 using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter>;
 
-#ifndef _WIN32 // TODO enable `DerivationBuilder` on Windows
+/**
+ * @param ioport The worker's I/O completion port, which the log pipe is tied to.
+ */
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params);
+    LocalStore & store,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params
+#ifdef _WIN32
+    ,
+    HANDLE ioport
+#endif
+);
 
+#ifndef _WIN32 // TODO enable `ExternalDerivationBuilder` on Windows
 /**
  * @param handler Must be chosen such that it supports the given
  * derivation.

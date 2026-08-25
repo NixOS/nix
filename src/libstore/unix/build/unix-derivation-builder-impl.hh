@@ -2,6 +2,7 @@
 
 #include "nix/store/aws-creds.hh"
 #include "nix/store/build/derivation-builder.hh"
+#include "build/derivation-builder-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/user-lock.hh"
@@ -9,7 +10,7 @@
 namespace nix {
 
 /**
- * This class represents the state for building locally.
+ * This class represents the state for building locally on Unix.
  *
  * @todo Ideally, it would not be a class, but a single function.
  * However, besides the main entry point, there are a few more methods
@@ -19,34 +20,16 @@ namespace nix {
  * rather than incoming call edges that either should be removed, or
  * become (higher order) function parameters.
  */
-class UnixDerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
+class UnixDerivationBuilderImpl : public DerivationBuilderImpl
 {
 private:
     void anchor() override;
 
 protected:
 
-    /**
-     * The process ID of the builder.
-     */
-    Pid pid;
-
-    LocalStore & store;
-
-    const LocalSettings & localSettings = store.config->getLocalSettings();
-
-    std::shared_ptr<DerivationBuilderCallbacks> miscMethods;
-
 public:
 
-    UnixDerivationBuilderImpl(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , miscMethods{miscMethods}
-        , derivationType{derivation::type(drv)}
-    {
-    }
+    using DerivationBuilderImpl::DerivationBuilderImpl;
 
     /**
      * Cleanup code to run when destroying any UnixDerivationBuilderImpl implementation.
@@ -75,16 +58,6 @@ public:
 protected:
 
     /**
-     * User selected for running the builder.
-     */
-    std::unique_ptr<UserLock> buildUser;
-
-    /**
-     * The temporary directory used for the build.
-     */
-    std::filesystem::path tmpDir;
-
-    /**
      * The top-level temporary directory. `tmpDir` is either equal to
      * or a child of this directory.
      */
@@ -95,38 +68,8 @@ protected:
      */
     AutoCloseFD tmpDirFd;
 
-    /**
-     * The sort of derivation we are building.
-     *
-     * Just a cached value, computed from `drv`.
-     */
-    const derivation::Type derivationType;
-
     typedef StringMap Environment;
     Environment env;
-
-    /**
-     * Hash rewriting.
-     */
-    StringMap inputRewrites, outputRewrites;
-    typedef std::map<StorePath, StorePath> RedirectedOutputs;
-    RedirectedOutputs redirectedOutputs;
-
-    /**
-     * The output paths used during the build.
-     *
-     * - Input-addressed derivations or fixed content-addressed outputs are
-     *   sometimes built when some of their outputs already exist, and can not
-     *   be hidden via sandboxing. We use temporary locations instead and
-     *   rewrite after the build. Otherwise the regular predetermined paths are
-     *   put here.
-     *
-     * - Floating content-addressing derivations do not know their final build
-     *   output paths until the outputs are hashed, so random locations are
-     *   used, and then renamed. The randomness helps guard against hidden
-     *   self-references.
-     */
-    OutputPathMap scratchOutputs;
 
     /**
      * Whether or not derivation is using outputs submitted via recursive-nix
@@ -281,11 +224,6 @@ protected:
         return Strings({store.printStorePath(drvPath)});
     }
 
-    virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
-    {
-        return store.toRealPath(store.parseStorePath(p.native()));
-    }
-
     /**
      * Open the slave side of the pseudoterminal and use it as stderr.
      */
@@ -396,12 +334,6 @@ protected:
     virtual void execBuilder(const Strings & args, const Strings & envStrs);
 
 private:
-
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     */
-    SingleDrvOutputs registerOutputs();
 
     /**
      * Check that the derivation outputs submitted by recursive-nix exist
