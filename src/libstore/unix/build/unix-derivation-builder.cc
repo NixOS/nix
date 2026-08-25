@@ -51,7 +51,7 @@
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 
 #ifdef __linux__
 #  include "chroot-linux-derivation-builder.hh"
@@ -149,11 +149,11 @@ static void handleDiffHook(
     }
 }
 
-void DerivationBuilderImpl::anchor() {}
+void UnixDerivationBuilderImpl::anchor() {}
 
-const std::filesystem::path DerivationBuilderImpl::homeDir = "/homeless-shelter";
+const std::filesystem::path UnixDerivationBuilderImpl::homeDir = "/homeless-shelter";
 
-void DerivationBuilderImpl::killSandbox(bool getStats)
+void UnixDerivationBuilderImpl::killSandbox(bool getStats)
 {
     if (buildUser) {
         auto uid = buildUser->getUID();
@@ -162,7 +162,7 @@ void DerivationBuilderImpl::killSandbox(bool getStats)
     }
 }
 
-bool DerivationBuilderImpl::killChild()
+bool UnixDerivationBuilderImpl::killChild()
 {
     bool ret = pid != -1;
     if (ret) {
@@ -182,7 +182,7 @@ bool DerivationBuilderImpl::killChild()
     return ret;
 }
 
-SingleDrvOutputs DerivationBuilderImpl::unprepareBuild()
+SingleDrvOutputs UnixDerivationBuilderImpl::unprepareBuild()
 {
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -288,7 +288,7 @@ static void replaceValidPath(const std::filesystem::path & storePath, const std:
         deletePath(oldPath);
 }
 
-bool DerivationBuilderImpl::decideWhetherDiskFull()
+bool UnixDerivationBuilderImpl::decideWhetherDiskFull()
 {
     bool diskFull = false;
 
@@ -353,7 +353,7 @@ static void checkNotWorldWritable(std::filesystem::path path)
     return;
 }
 
-std::optional<Descriptor> DerivationBuilderImpl::startBuild()
+std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 {
     if (useBuildUsers(localSettings)) {
         if (!buildUser)
@@ -510,7 +510,7 @@ std::optional<Descriptor> DerivationBuilderImpl::startBuild()
     return builderOut.get();
 }
 
-PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
+PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
 {
     /* Allow a user-configurable set of directories from the
        host file system. */
@@ -585,13 +585,13 @@ PathsInChroot DerivationBuilderImpl::getPathsInSandbox()
     return pathsInChroot;
 }
 
-void DerivationBuilderImpl::prepareSandbox()
+void UnixDerivationBuilderImpl::prepareSandbox()
 {
     if (drvOptions.useUidRange(drv))
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
-void DerivationBuilderImpl::openSlave()
+void UnixDerivationBuilderImpl::openSlave()
 {
     std::string slaveName = getPtsName(builderOut.get());
 
@@ -614,7 +614,7 @@ void DerivationBuilderImpl::openSlave()
 }
 
 #if NIX_WITH_AWS_AUTH
-std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
+std::optional<AwsCredentials> UnixDerivationBuilderImpl::preResolveAwsCredentials()
 {
     if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
         auto url = drv.env.find("url");
@@ -639,7 +639,7 @@ std::optional<AwsCredentials> DerivationBuilderImpl::preResolveAwsCredentials()
 }
 #endif
 
-void DerivationBuilderImpl::startChild()
+void UnixDerivationBuilderImpl::startChild()
 {
     RunChildArgs args{
 #if NIX_WITH_AWS_AUTH
@@ -653,7 +653,7 @@ void DerivationBuilderImpl::startChild()
     });
 }
 
-void DerivationBuilderImpl::processSandboxSetupMessages()
+void UnixDerivationBuilderImpl::processSandboxSetupMessages()
 {
     std::vector<std::string> msgs;
     while (true) {
@@ -684,7 +684,7 @@ void DerivationBuilderImpl::processSandboxSetupMessages()
     }
 }
 
-void DerivationBuilderImpl::initEnv()
+void UnixDerivationBuilderImpl::initEnv()
 {
     env.clear();
 
@@ -777,7 +777,7 @@ void DerivationBuilderImpl::initEnv()
     env["TERM"] = "xterm-256color";
 }
 
-void DerivationBuilderImpl::startDaemon()
+void UnixDerivationBuilderImpl::startDaemon()
 {
     if (usingSubmitted) {
         experimentalFeatureSettings.require(Xp::DynamicDerivations);
@@ -874,7 +874,7 @@ void DerivationBuilderImpl::startDaemon()
     });
 }
 
-void DerivationBuilderImpl::stopDaemon()
+void UnixDerivationBuilderImpl::stopDaemon()
 {
     if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
         // According to the POSIX standard, the 'shutdown' function should
@@ -904,16 +904,16 @@ void DerivationBuilderImpl::stopDaemon()
     daemonSocket.close();
 }
 
-void DerivationBuilderImpl::addDependencyImpl(const StorePath & path) {}
+void UnixDerivationBuilderImpl::addDependencyImpl(const StorePath & path) {}
 
-void DerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
+void UnixDerivationBuilderImpl::chownToBuilder(const std::filesystem::path & path)
 {
     if (!buildUser)
         return;
     chown(path, buildUser->getUID(), buildUser->getGID());
 }
 
-void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path & path)
+void UnixDerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path & path)
 {
     if (!buildUser)
         return;
@@ -921,7 +921,7 @@ void DerivationBuilderImpl::chownToBuilder(int fd, const std::filesystem::path &
         throw SysError("cannot change ownership of file %1%", PathFmt(path));
 }
 
-void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::string_view contents)
+void UnixDerivationBuilderImpl::writeBuilderFile(const std::string & name, std::string_view contents)
 {
     /* Path must be the same after normalisation. This is an additional sanity check in addition to
        existing parsing checks for non-structured attrs exportReferencesGraph. In practice we only expect
@@ -936,7 +936,7 @@ void DerivationBuilderImpl::writeBuilderFile(const std::string & name, std::stri
     chownToBuilder(fd.get(), path);
 }
 
-void DerivationBuilderImpl::runChild(RunChildArgs args)
+void UnixDerivationBuilderImpl::runChild(RunChildArgs args)
 {
     /* Warning: in the child we should absolutely not make any SQLite
        calls! */
@@ -1040,7 +1040,7 @@ void DerivationBuilderImpl::runChild(RunChildArgs args)
     }
 }
 
-void DerivationBuilderImpl::setUser()
+void UnixDerivationBuilderImpl::setUser()
 {
     /* If we are running in `build-users' mode, then switch to the
        user we allocated above.  Make sure that we drop all root
@@ -1067,12 +1067,12 @@ void DerivationBuilderImpl::setUser()
     }
 }
 
-void DerivationBuilderImpl::execBuilder(const Strings & args, const Strings & envStrs)
+void UnixDerivationBuilderImpl::execBuilder(const Strings & args, const Strings & envStrs)
 {
     execve(requireCString(drv.builder), stringsToCharPtrs(args).data(), stringsToCharPtrs(envStrs).data());
 }
 
-SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
+SingleDrvOutputs UnixDerivationBuilderImpl::registerOutputs()
 {
     std::map<std::string, ValidPathInfo> infos;
 
@@ -1678,7 +1678,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
-SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
+SingleDrvOutputs UnixDerivationBuilderImpl::checkSubmittedOutputs()
 {
     // Submitted outputs from the recursive nix daemon
     // It's fine to lock here since all other threads with the reference have been shut down.
@@ -1734,7 +1734,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
     return builtOutputs;
 }
 
-void DerivationBuilderImpl::cleanupBuild(bool force)
+void UnixDerivationBuilderImpl::cleanupBuild(bool force)
 {
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
@@ -1765,7 +1765,7 @@ void DerivationBuilderImpl::cleanupBuild(bool force)
     }
 }
 
-StorePath DerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
+StorePath UnixDerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
     // See doc/manual/source/protocols/store-path.md for details
@@ -1779,7 +1779,7 @@ StorePath DerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
         outputPathName(drv.name, outputName));
 }
 
-StorePath DerivationBuilderImpl::makeFallbackPath(const StorePath & path)
+StorePath UnixDerivationBuilderImpl::makeFallbackPath(const StorePath & path)
 {
     // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
     // See doc/manual/source/protocols/store-path.md for details
@@ -1800,9 +1800,9 @@ void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept
     if (!builder) /* Idempotent and handles nullptr as any deleter must. */
         return;
 
-    if (auto builderImpl = dynamic_cast<DerivationBuilderImpl *>(builder))
+    if (auto builderImpl = dynamic_cast<UnixDerivationBuilderImpl *>(builder))
         /* Note that this might call into virtual functions, which we can't do in a destructor of
-           the DerivationBuilderImpl itself. */
+           the UnixDerivationBuilderImpl itself. */
         builderImpl->cleanupOnDestruction();
 
     delete builder;
@@ -1886,7 +1886,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
 
-    return DerivationBuilderUnique(new DerivationBuilderImpl(store, miscMethods, std::move(params)));
+    return DerivationBuilderUnique(new UnixDerivationBuilderImpl(store, miscMethods, std::move(params)));
 #endif
 }
 

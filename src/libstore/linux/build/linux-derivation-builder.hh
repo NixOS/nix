@@ -1,6 +1,6 @@
 #pragma once
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 
 #include "nix/store/personality.hh"
 #include "store-config-private.hh"
@@ -21,9 +21,9 @@ namespace nix {
 
 void setupSeccomp(const LocalSettings & localSettings);
 
-struct LinuxDerivationBuilder : virtual DerivationBuilderImpl
+struct LinuxDerivationBuilder : virtual UnixDerivationBuilderImpl
 {
-    using DerivationBuilderImpl::DerivationBuilderImpl;
+    using UnixDerivationBuilderImpl::UnixDerivationBuilderImpl;
 
     void enterChroot() override;
 };

@@ -19,8 +19,7 @@ namespace nix {
  * rather than incoming call edges that either should be removed, or
  * become (higher order) function parameters.
  */
-// FIXME: rename this to UnixDerivationBuilder or something like that.
-class DerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
+class UnixDerivationBuilderImpl : public DerivationBuilder, public DerivationBuilderParams
 {
 private:
     void anchor() override;
@@ -40,7 +39,7 @@ protected:
 
 public:
 
-    DerivationBuilderImpl(
+    UnixDerivationBuilderImpl(
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
         , store{store}
@@ -50,7 +49,7 @@ public:
     }
 
     /**
-     * Cleanup code to run when destroying any DerivationBuilderImpl implementation.
+     * Cleanup code to run when destroying any UnixDerivationBuilderImpl implementation.
      */
     void cleanupOnDestruction() noexcept
     {

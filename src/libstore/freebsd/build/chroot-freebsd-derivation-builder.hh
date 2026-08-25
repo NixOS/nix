@@ -13,7 +13,7 @@ struct ChrootFreeBSDDerivationBuilder : ChrootDerivationBuilder, FreeBSDDerivati
 
     ChrootFreeBSDDerivationBuilder(
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, miscMethods, params}
+        : UnixDerivationBuilderImpl{store, miscMethods, params}
         , ChrootDerivationBuilder{store, miscMethods, params}
         , FreeBSDDerivationBuilder{store, miscMethods, params}
     {

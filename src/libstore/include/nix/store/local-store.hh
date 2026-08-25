@@ -540,7 +540,7 @@ private:
     friend struct PathSubstitutionGoal;
     friend struct DerivationGoal;
     /* Only used for createTempDirInStore. */
-    friend class DerivationBuilderImpl;
+    friend class UnixDerivationBuilderImpl;
 };
 
 } // namespace nix

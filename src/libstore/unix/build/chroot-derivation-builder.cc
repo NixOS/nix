@@ -85,7 +85,7 @@ std::filesystem::path ChrootDerivationBuilder::realPathInHost(const std::filesys
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)
 {
-    DerivationBuilderImpl::cleanupBuild(force);
+    UnixDerivationBuilderImpl::cleanupBuild(force);
 
     /* Move paths out of the chroot for easier debugging of
        build failures. */

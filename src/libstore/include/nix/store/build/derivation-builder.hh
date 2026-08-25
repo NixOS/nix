@@ -24,7 +24,7 @@ void rethrowExceptionAsError();
 
 /**
  * Send the current exception to the parent in the format expected by
- * `DerivationBuilderImpl::processSandboxSetupMessages()`.
+ * `UnixDerivationBuilderImpl::processSandboxSetupMessages()`.
  */
 void handleChildException(bool sendException);
 
