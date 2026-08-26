@@ -53,6 +53,7 @@ sources = files(
   'git.cc',
   'hash.cc',
   'hilite.cc',
+  'json-logger.cc',
   'json-utils.cc',
   'local-keys.cc',
   'logging.cc',
