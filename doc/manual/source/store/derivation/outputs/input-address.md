@@ -86,11 +86,14 @@ We replace each element in the derivation's `inputDrvOutputs` using data from a 
 When `hashOutputsOrQuotientDerivation` returns a single drv hash (because the input derivation in question is input-addressing), we simply swap out the `drvPath` for that hash, and keep the same output name.
 When `hashOutputsOrQuotientDerivation` returns a map of content addresses per-output, we look up the output in question, and pair it with the output name `out`.
 
-The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm.md)) and hashed, and this becomes the hash of the "quotient derivation".
+The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm.md#input-address-encoding)) and hashed, and this becomes the hash of the "quotient derivation".
 
 When calculating output hashes, `hashQuotientDerivation` is called on an almost-complete input-addressing derivation, which is just missing its input-addressed outputs paths.
-The derivation hash is then used to calculate output paths for each output.
-<!-- TODO describe how this is done. -->
+The derivation hash is then used to calculate output paths for each output, as the [complete store path calculation](@docroot@/protocols/store-path.md#fingerprint) specifies: it is the digest of the hashed ATerm that specification calls for, under the `"output:" id` case, where `id` is the output name.
+The store object's name is the derivation's name, with `-` and the output name appended --- unless the output is named `out`, in which case the derivation's name is used as-is.
+
+Note that one derivation hash serves every output; what distinguishes their paths is only the output name, which enters twice over, as both `id` and part of the name.
+
 Those output paths can then be substituted into the almost-complete input-addressed derivation to complete it.
 
 > **Note**
@@ -128,6 +131,30 @@ If the outputs are [content-addressed](./content-address.md), then it computes a
 > In this case, the algorithm is *stuck* until the input in question is built, and we know what the actual contents of the output in question is.
 >
 > That is OK however, because there is no problem with delaying the assigning of input addresses (which, remember, is what `hashQuotientDerivation` is ultimately for) until all inputs are known.
+
+### Deferring input-addressing when downstream of unknown CA store objects {#deferred}
+
+As the previous note says, the algorithm is *stuck* when an input is a [floating content-addressed](./content-address.md#floating) output that has not been built yet: there is no content address to substitute for it, so the quotient derivation cannot be completed and no input address can be computed.
+
+The derivation is still written to the store, with its outputs *deferred*: an output in this state has no store path at all, and the environment variable named after it is empty.
+This costs nothing, because a derivation's own store path is [content-addressed](@docroot@/store/store-object/content-address.md#method-text) on the bytes of its serialization, which do not depend on its output paths being known.
+
+A deferred output does not use a third kind of addressing alongside input- and content-addressing.
+It is input-addressed; it just does not know its path yet.
+
+Being stuck is contagious.
+A derivation with deferred outputs has, for this purpose, unknown outputs of its own, so `hashOutputsOrQuotientDerivation` is stuck on it in turn, and anything depending on it must also defer.
+The condition therefore propagates downstream from the floating output that caused it.
+
+Deferral is resolved by building, not by revisiting the same derivation.
+Once the offending inputs are built, their content addresses are known, and the derivation can be [resolved](@docroot@/store/resolution.md): its inputs are replaced by the plain store paths they turned out to denote.
+The resolved derivation is a *different* derivation, with its own store path --- necessarily so, since it has different bytes.
+It has no input derivations left to be stuck on, so its input addresses are computable, and it is what actually gets built.
+
+> **Note**
+>
+> Nothing gates deferred outputs themselves.
+> They only *arise* downstream of [floating content-addressed](./content-address.md#floating) outputs.
 
 ### Performance
 
@@ -220,6 +247,12 @@ where \\(\\mathrm{caInputs}(d)\\) returns the content-addressed inputs of \\(d\\
 > \\(\\sim_\mathrm{Drv}\\) from [derivation resolution](@docroot@/store/resolution.md) is such an equivalence relation.
 > It is coarser than this one: any two derivations which are "'hash quotient derivation'-equivalent" (\\(\\sim_\mathrm{IADrv}\\)) are also "resolution-equivalent" (\\(\\sim_\mathrm{Drv}\\)).
 > It also relates derivations whose `inputDrvOutputs` have been rewritten into `inputSrcs`.
+>
+> Input-addressing downstream of content addressing, as described above, anticipates this.
+> Since a content-addressed input contributes only its content address, and not the derivation that produced it, derivations differing only in *how* an identical content-addressed input was produced are already \\(\\sim_\mathrm{IADrv}\\)-equivalent.
+> And since a deferred derivation is completely resolved before it is input-addressed, its input-addressed `inputDrvOutputs` are normalized to `inputSrcs` as well --- so derivations differing only in how an identical *input-addressed* input was produced are \\(\\sim_\mathrm{IADrv}\\)-equivalent too.
+> That is the same "identify an input by what it is, rather than by how it was made" move as \\(\\sim_\mathrm{Drv}\\).
+> The difference is that \\(\\sim_\mathrm{Drv}\\) makes it unconditionally, whereas here it falls out for content-addressed inputs always, and for the rest only where deferral forced a resolution first.
 
 [deriving-path]: @docroot@/store/derivation/index.md#deriving-path
 [xp-feature-dynamic-derivations]: @docroot@/development/experimental-features.md#xp-feature-dynamic-derivations
