@@ -14,6 +14,13 @@ if host_machine.system() == 'cygwin'
   )
 endif
 
+if host_machine.system() == 'windows'
+  # A unity build, or a single large file like libexpr's primops.cc, can exceed
+  # the COFF section limit:
+  #   Fatal error: can't write 16 bytes to section .text of ...: 'file too big'
+  add_project_arguments([ '-Wa,-mbig-obj' ], language : 'cpp')
+endif
+
 warning_flags = [
   '-Wdeprecated-copy',
   '-Werror=suggest-override',
