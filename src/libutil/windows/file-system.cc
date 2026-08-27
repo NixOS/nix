@@ -10,6 +10,7 @@
 
 #include <boost/format.hpp>
 #include <chrono>
+#include <optional>
 
 // Verify that our S_IFLNK polyfill doesn't conflict with Windows file type constants
 static_assert((S_IFLNK & S_IFMT) == S_IFLNK, "S_IFLNK must fit within S_IFMT mask");
@@ -113,6 +114,32 @@ void clearReadOnly(Descriptor fd)
 }
 
 /**
+ * Clear `FILE_ATTRIBUTE_READONLY` by path.
+ *
+ * The handle-based `clearReadOnly` needs `FILE_WRITE_ATTRIBUTES`, which Wine
+ * will not grant on a file that carries the attribute, so on Wine this is the
+ * only way to clear it. It re-resolves the path, which the rest of this walk
+ * exists to avoid, so it is used only where the handle route is unavailable.
+ *
+ * The Unix side has the same shape: it relaxes permissions with
+ * `fchmodatTryNoFollow`, by name, rather than through the object handle.
+ */
+void clearReadOnlyByPath(const std::filesystem::path & path)
+{
+    auto attrs = GetFileAttributesW(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_READONLY))
+        return;
+
+    attrs &= ~FILE_ATTRIBUTE_READONLY;
+    /* Clearing the last attribute leaves zero, which is not a valid value to
+       set; `FILE_ATTRIBUTE_NORMAL` is how you say "no attributes". */
+    if (attrs == 0)
+        attrs = FILE_ATTRIBUTE_NORMAL;
+
+    SetFileAttributesW(path.c_str(), attrs);
+}
+
+/**
  * Delete through an already-open handle, so the name is never resolved twice.
  *
  * This marks the object for deletion on last-handle-close rather than unlinking
@@ -193,11 +220,36 @@ void deletePathAt(
        classification, listing, clearing the attribute, and the deletion. Two
        opens would mean resolving `name` twice, which is the race this is
        written to avoid. */
-    auto fd = windows::tryNtOpenAt(
-        parentFd,
-        name,
-        DELETE | FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | FILE_WRITE_ATTRIBUTES | SYNCHRONIZE,
-        FILE_OPEN_REPARSE_POINT);
+    constexpr ACCESS_MASK baseAccess = DELETE | FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+
+    /* `FILE_WRITE_ATTRIBUTES` is what lets `clearReadOnly` below drop
+       `FILE_ATTRIBUTE_READONLY`, which Windows requires before it will honour
+       `DELETE`.
+
+       Wine needs the opposite. It derives that attribute from the Unix write
+       bits (`get_file_attributes` in `dlls/ntdll/unix/file.c`), and refuses the
+       open outright when the mask asks for `FILE_WRITE_ATTRIBUTES` on a file
+       that lacks them -- while allowing `DELETE`, because unlinking is governed
+       by the directory. Measured on a mode-0444 file under Wine 11.0:
+       `FILE_WRITE_ATTRIBUTES` is `ERROR_ACCESS_DENIED`, `DELETE` and
+       `FILE_READ_ATTRIBUTES` both succeed.
+
+       So ask for it, and drop it if it is refused. Where it is refused the
+       attribute also cannot be set, but there it does not need to be. */
+    std::optional<AutoCloseFD> fd;
+    bool mayClearReadOnly = true;
+    try {
+        fd = windows::tryNtOpenAt(parentFd, name, baseAccess | FILE_WRITE_ATTRIBUTES, FILE_OPEN_REPARSE_POINT);
+    } catch (windows::WinError & e) {
+        if (e.lastError != ERROR_ACCESS_DENIED)
+            throw;
+        /* The fallback resolves `name` a second time, which is the one
+           concession to the single-open discipline above. It is still a single
+           component inside `parentFd`, which stays open across both attempts,
+           and nothing is modified in between. */
+        mayClearReadOnly = false;
+        fd = windows::tryNtOpenAt(parentFd, name, baseAccess, FILE_OPEN_REPARSE_POINT);
+    }
     if (!fd)
         return; /* Already gone. */
 
@@ -224,7 +276,14 @@ void deletePathAt(
         for (auto & child : listByHandle(fd->get(), path))
             deletePathAt(fd->get(), path / child, bytesFreed, ex);
 
-    clearReadOnly(fd->get());
+    if (mayClearReadOnly)
+        clearReadOnly(fd->get());
+    else
+        /* The handle was opened without `FILE_WRITE_ATTRIBUTES`, so the
+           attribute has to go by path. The deletion below needs it gone either
+           way: `DELETE` access is granted on a read-only file but the
+           disposition is still refused while the attribute is set. */
+        clearReadOnlyByPath(path);
 
     if (!deleteByHandle(fd->get())) {
         auto lastError = GetLastError();
