@@ -28,10 +28,11 @@ public:
     TestHttpBinaryCacheStore & operator=(const TestHttpBinaryCacheStore &) = delete;
     TestHttpBinaryCacheStore & operator=(TestHttpBinaryCacheStore &&) = delete;
 
-    TestHttpBinaryCacheStore(ref<HttpBinaryCacheStoreConfig> config, ref<FileTransfer> fileTransfer)
-        : Store{*config}
+    TestHttpBinaryCacheStore(
+        ref<HttpBinaryCacheStoreConfig> config, ref<FileTransfer> fileTransfer, SecretContext context = {})
+        : Store{*config, context}
         , BinaryCacheStore{*config}
-        , HttpBinaryCacheStore(config, fileTransfer)
+        , HttpBinaryCacheStore(config, fileTransfer, context)
     {
         diskCache = nullptr; /* Disable caching, we'll be creating a new binary cache for each test. */
     }
@@ -48,7 +49,8 @@ public:
     {
     }
 
-    ref<TestHttpBinaryCacheStore> openTestStore(ref<FileTransfer> fileTransfer) const;
+    ref<TestHttpBinaryCacheStore>
+    openTestStore(ref<FileTransfer> fileTransfer, const SecretContext & context = {}) const;
 };
 
 class HttpsBinaryCacheStoreTest : public virtual LibStoreNetworkTest
@@ -89,7 +91,8 @@ protected:
 
     virtual std::vector<std::string> serverArgs();
     ref<TestHttpBinaryCacheStoreConfig> makeConfig();
-    ref<TestHttpBinaryCacheStore> openStore(ref<TestHttpBinaryCacheStoreConfig> config);
+    ref<TestHttpBinaryCacheStore>
+    openStore(ref<TestHttpBinaryCacheStoreConfig> config, const SecretContext & context = {});
 };
 
 class HttpsBinaryCacheStoreMtlsTest : public HttpsBinaryCacheStoreTest

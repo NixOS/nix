@@ -56,7 +56,9 @@ public:
     RestrictionContext & goal;
 
     RestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & goal)
-        : Store{*config}
+        /* No authority by design: a recursive-nix store must not resolve
+           secrets on behalf of the build that owns it. */
+        : Store{*config, SecretContext{}}
         , LocalFSStore{*config}
         , config{config}
         , next(next)
@@ -162,7 +164,7 @@ public:
         return NotTrusted;
     }
 
-    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override
+    ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore) override
     {
         unreachable();
     }

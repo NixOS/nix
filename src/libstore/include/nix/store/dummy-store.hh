@@ -56,9 +56,9 @@ public:
     /**
      * Same as `openStore`, just with a more precise return type.
      */
-    ref<DummyStore> openDummyStore() const;
+    ref<DummyStore> openDummyStore(const SecretContext & context = {}) const;
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override
     {

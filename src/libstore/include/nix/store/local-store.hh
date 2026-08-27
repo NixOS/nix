@@ -172,7 +172,7 @@ public:
 
     static std::string doc();
 
-    ref<Store> openStore() const override;
+    ref<Store> openStore(const SecretContext & context) const override;
 
     StoreReference getReference() const override;
 };
@@ -262,6 +262,8 @@ public:
      * necessary.
      */
     LocalStore(ref<const Config> params);
+
+    LocalStore(ref<const Config> params, SecretContext secretContext);
 
     ~LocalStore();
 

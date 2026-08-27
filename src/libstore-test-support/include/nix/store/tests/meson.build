@@ -11,5 +11,6 @@ headers = files(
   'outputs-spec.hh',
   'path.hh',
   'protocol.hh',
+  'secret-resolver.hh',
   'test-main.hh',
 )

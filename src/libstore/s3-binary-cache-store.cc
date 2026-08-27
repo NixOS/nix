@@ -26,8 +26,8 @@ static constexpr uint64_t AWS_MAX_PART_COUNT = 10000;
 class S3BinaryCacheStore : public virtual HttpBinaryCacheStore
 {
 public:
-    S3BinaryCacheStore(ref<S3BinaryCacheStoreConfig> config)
-        : Store{*config}
+    S3BinaryCacheStore(ref<S3BinaryCacheStoreConfig> config, SecretContext context)
+        : Store{*config, context}
         , BinaryCacheStore{*config}
         , HttpBinaryCacheStore{config}
         , s3Config{config}
@@ -324,7 +324,7 @@ std::string S3BinaryCacheStore::createMultipartUpload(
         std::move(headers->begin(), headers->end(), std::back_inserter(req.headers));
     }
 
-    auto result = fileTransfer->enqueueFileTransfer(req).get();
+    auto result = fileTransfer->enqueueFileTransfer(FileTransferContext{secretContext.secretResolver}, req).get();
 
     std::regex uploadIdRegex("<UploadId>([^<]+)</UploadId>");
     std::smatch match;
@@ -355,7 +355,7 @@ S3BinaryCacheStore::uploadPart(std::string_view key, std::string_view uploadId, 
     req.data = {payload};
     req.mimeType = "application/octet-stream";
 
-    auto result = fileTransfer->enqueueFileTransfer(req).get();
+    auto result = fileTransfer->enqueueFileTransfer(FileTransferContext{secretContext.secretResolver}, req).get();
 
     if (result.etag.empty()) {
         throw Error("S3 UploadPart response missing ETag for part %d", partNumber);
@@ -376,7 +376,7 @@ void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_
         req.uri = VerbatimURL(url);
         req.method = HttpMethod::Delete;
 
-        (void) fileTransfer->enqueueFileTransfer(req).get();
+        (void) fileTransfer->enqueueFileTransfer(FileTransferContext{secretContext.secretResolver}, req).get();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
@@ -409,7 +409,7 @@ void S3BinaryCacheStore::completeMultipartUpload(
     req.data = {payload};
     req.mimeType = "text/xml";
 
-    (void) fileTransfer->enqueueFileTransfer(req).get();
+    (void) fileTransfer->enqueueFileTransfer(FileTransferContext{secretContext.secretResolver}, req).get();
 
     debug("S3 multipart upload completed: %d parts uploaded for '%s'", partEtags.size(), key);
 }
@@ -483,11 +483,11 @@ std::string S3BinaryCacheStoreConfig::doc()
         ;
 }
 
-ref<Store> S3BinaryCacheStoreConfig::openStore() const
+ref<Store> S3BinaryCacheStoreConfig::openStore(const SecretContext & context) const
 {
     auto sharedThis = std::const_pointer_cast<S3BinaryCacheStoreConfig>(
         std::static_pointer_cast<const S3BinaryCacheStoreConfig>(shared_from_this()));
-    return make_ref<S3BinaryCacheStore>(ref{sharedThis});
+    return make_ref<S3BinaryCacheStore>(ref{sharedThis}, context);
 }
 
 static RegisterStoreImplementation<S3BinaryCacheStoreConfig> registerS3BinaryCacheStore;

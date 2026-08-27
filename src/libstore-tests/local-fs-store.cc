@@ -25,7 +25,7 @@ struct TestLocalFSStoreConfig : LocalFSStoreConfig
     {
     }
 
-    ref<Store> openStore() const override
+    ref<Store> openStore(const SecretContext & context) const override
     {
         unreachable();
     }

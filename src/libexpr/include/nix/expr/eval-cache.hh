@@ -82,7 +82,19 @@ struct int_t
 };
 
 typedef uint64_t AttrId;
-typedef std::pair<AttrId, Symbol> AttrKey;
+
+enum class AttrKeyKind {
+    Attribute = 0,
+    AutoCall = 1,
+};
+
+struct AttrKey
+{
+    AttrId parent;
+    Symbol name;
+    AttrKeyKind kind = AttrKeyKind::Attribute;
+};
+
 typedef std::pair<std::string, NixStringContext> string_t;
 
 typedef std::variant<
@@ -108,6 +120,12 @@ class AttrCursor : public std::enable_shared_from_this<AttrCursor>
     RootValue _value;
     std::optional<std::pair<AttrId, AttrValue>> cachedValue;
 
+    /**
+     * Whether this cursor holds the result of auto-calling its parent
+     * (see `autoCall()`) rather than one of its parent's attributes.
+     */
+    bool autoCalled = false;
+
     AttrKey getKey();
 
     Value & getValue();
@@ -126,7 +144,8 @@ public:
         ref<EvalCache> root,
         Parent parent,
         Value * value = nullptr,
-        std::optional<std::pair<AttrId, AttrValue>> && cachedValue = {});
+        std::optional<std::pair<AttrId, AttrValue>> && cachedValue = {},
+        bool autoCalled = false);
 
     AttrPath getAttrPath() const;
 
@@ -167,6 +186,18 @@ public:
     bool isDerivation();
 
     Value & forceValue();
+
+    /**
+     * Return a cursor for this value, auto-called with no automatic
+     * arguments if it is a function (see `EvalState::autoCallFunction()`).
+     * The returned cursor keeps this cursor's attribute path, but gets its
+     * own slot in the evaluation cache, since auto-calling generally
+     * yields a value other than the one at that path.
+     *
+     * The call happens lazily, when the cursor's value is first needed, so
+     * cached attributes are still served without evaluating anything.
+     */
+    ref<AttrCursor> autoCall();
 
     /**
      * Force creation of the .drv file in the Nix store.

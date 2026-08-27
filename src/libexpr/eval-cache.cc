@@ -38,10 +38,11 @@ static const char * schema = R"sql(
 create table if not exists Attributes (
     parent      integer not null,
     name        text,
+    kind        integer not null,
     type        integer not null,
     value       text,
     context     text,
-    primary key (parent, name)
+    primary key (parent, name, kind)
 );
 )sql";
 
@@ -72,7 +73,7 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        auto cacheDir = getCacheDir() / "eval-cache-v6";
+        auto cacheDir = getCacheDir() / "eval-cache-v7";
         createDirs(cacheDir);
 
         auto dbPath = cacheDir / (fingerprint.to_string(HashFormat::Base16, false) + ".sqlite");
@@ -82,15 +83,16 @@ struct AttrDb
         state->db.exec(schema);
 
         state->insertAttribute.create(
-            state->db, "insert or replace into Attributes(parent, name, type, value) values (?, ?, ?, ?)");
+            state->db, "insert or replace into Attributes(parent, name, kind, type, value) values (?, ?, ?, ?, ?)");
 
         state->insertAttributeWithContext.create(
-            state->db, "insert or replace into Attributes(parent, name, type, value, context) values (?, ?, ?, ?, ?)");
+            state->db,
+            "insert or replace into Attributes(parent, name, kind, type, value, context) values (?, ?, ?, ?, ?, ?)");
 
         state->queryAttribute.create(
-            state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ?");
+            state->db, "select rowid, type, value, context from Attributes where parent = ? and name = ? and kind = ?");
 
-        state->queryAttributes.create(state->db, "select name from Attributes where parent = ?");
+        state->queryAttributes.create(state->db, "select name from Attributes where parent = ? and kind = 0");
 
         state->txn = std::make_unique<SQLiteTxn>(state->db);
     }
@@ -127,8 +129,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::FullAttrs)
                 .apply(0, false)
                 .exec();
@@ -140,6 +143,7 @@ struct AttrDb
                 state->insertAttribute.use()
                     .apply(rowId)
                     .apply(symbols[attr])
+                    .apply(static_cast<int>(AttrKeyKind::Attribute))
                     .apply(AttrType::Placeholder)
                     .apply(0, false)
                     .exec();
@@ -163,16 +167,18 @@ struct AttrDb
                     first = false;
                 }
                 state->insertAttributeWithContext.use()
-                    .apply(key.first)
-                    .apply(symbols[key.second])
+                    .apply(key.parent)
+                    .apply(symbols[key.name])
+                    .apply(static_cast<int>(key.kind))
                     .apply(AttrType::String)
                     .apply(s)
                     .apply(ctx)
                     .exec();
             } else {
                 state->insertAttribute.use()
-                    .apply(key.first)
-                    .apply(symbols[key.second])
+                    .apply(key.parent)
+                    .apply(symbols[key.name])
+                    .apply(static_cast<int>(key.kind))
                     .apply(AttrType::String)
                     .apply(s)
                     .exec();
@@ -188,8 +194,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Bool)
                 .apply(b ? 1 : 0)
                 .exec();
@@ -204,8 +211,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Int)
                 .apply(n)
                 .exec();
@@ -220,8 +228,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::ListOfStrings)
                 .apply(dropEmptyInitThenConcatStringsSep("\t", l))
                 .exec();
@@ -236,8 +245,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Placeholder)
                 .apply(0, false)
                 .exec();
@@ -252,8 +262,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Missing)
                 .apply(0, false)
                 .exec();
@@ -268,8 +279,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Misc)
                 .apply(0, false)
                 .exec();
@@ -284,8 +296,9 @@ struct AttrDb
             auto state(_state->lock());
 
             state->insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
+                .apply(key.parent)
+                .apply(symbols[key.name])
+                .apply(static_cast<int>(key.kind))
                 .apply(AttrType::Failed)
                 .apply(0, false)
                 .exec();
@@ -298,7 +311,8 @@ struct AttrDb
     {
         auto state(_state->lock());
 
-        auto queryAttribute(state->queryAttribute.use().apply(key.first).apply(symbols[key.second]));
+        auto queryAttribute(
+            state->queryAttribute.use().apply(key.parent).apply(symbols[key.name]).apply(static_cast<int>(key.kind)));
         if (!queryAttribute.next())
             return {};
 
@@ -374,10 +388,15 @@ ref<AttrCursor> EvalCache::getRoot()
 }
 
 AttrCursor::AttrCursor(
-    ref<EvalCache> root, Parent parent, Value * value, std::optional<std::pair<AttrId, AttrValue>> && cachedValue)
+    ref<EvalCache> root,
+    Parent parent,
+    Value * value,
+    std::optional<std::pair<AttrId, AttrValue>> && cachedValue,
+    bool autoCalled)
     : root(root)
     , parent(parent)
     , cachedValue(std::move(cachedValue))
+    , autoCalled(autoCalled)
 {
     if (value)
         _value = allocRootValue(value);
@@ -391,13 +410,22 @@ AttrKey AttrCursor::getKey()
         parent->first->cachedValue = root->db->getAttr(parent->first->getKey());
         assert(parent->first->cachedValue);
     }
-    return {parent->first->cachedValue->first, parent->second};
+    return {
+        parent->first->cachedValue->first,
+        parent->second,
+        autoCalled ? AttrKeyKind::AutoCall : AttrKeyKind::Attribute,
+    };
 }
 
 Value & AttrCursor::getValue()
 {
     if (!_value) {
-        if (parent) {
+        if (autoCalled) {
+            assert(parent);
+            auto * result = root->state.allocValue();
+            root->state.autoCallFunction(Bindings::emptyBindings, parent->first->forceValue(), *result);
+            _value = allocRootValue(result);
+        } else if (parent) {
             auto & vParent = parent->first->getValue();
             root->state.forceAttrs(vParent, noPos, "while searching for an attribute");
             auto attr = vParent.attrs()->get(parent->second);
@@ -422,7 +450,10 @@ AttrPath AttrCursor::getAttrPath() const
 {
     if (parent) {
         auto attrPath = parent->first->getAttrPath();
-        attrPath.push_back(parent->second);
+        /* The auto-call slot is an implementation detail, so it doesn't
+           show up in the user-visible attribute path. */
+        if (!autoCalled)
+            attrPath.push_back(parent->second);
         return attrPath;
     } else
         return {};
@@ -455,7 +486,10 @@ Value & AttrCursor::forceValue()
         root->state.forceValue(v, noPos);
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
-        if (root->db)
+        /* An auto-call is not an attribute of its parent, so
+           `CachedEvalError::force()` could not reproduce the original
+           error from a cached failure. Just don't cache it. */
+        if (root->db && !autoCalled)
             cachedValue = {root->db->setFailed(getKey()), failed_t()};
         throw;
     }
@@ -755,6 +789,29 @@ bool AttrCursor::isDerivation()
 {
     auto aType = maybeGetAttr("type");
     return aType && aType->getString() == "derivation";
+}
+
+ref<AttrCursor> AttrCursor::autoCall()
+{
+    /* The auto-called value generally differs from the one at this
+       attribute path, so it gets its own slot in the evaluation cache,
+       in a namespace separate from real Nix attributes. */
+    auto name = root->state.s.epsilon;
+
+    std::optional<std::pair<AttrId, AttrValue>> cachedValue2;
+
+    if (root->db) {
+        fetchCachedValue();
+        if (!cachedValue)
+            cachedValue = {root->db->setPlaceholder(getKey()), placeholder_t()};
+        AttrKey key{cachedValue->first, name, AttrKeyKind::AutoCall};
+        cachedValue2 = root->db->getAttr(key);
+        if (!cachedValue2)
+            cachedValue2 = {root->db->setPlaceholder(key), placeholder_t()};
+    }
+
+    return make_ref<AttrCursor>(
+        root, std::make_pair(ref(shared_from_this()), name), nullptr, std::move(cachedValue2), true);
 }
 
 StorePath AttrCursor::forceDerivation()

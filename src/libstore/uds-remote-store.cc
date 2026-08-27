@@ -55,8 +55,8 @@ UDSRemoteStoreConfig::UDSRemoteStoreConfig(const Params & params)
 {
 }
 
-UDSRemoteStore::UDSRemoteStore(ref<const Config> config)
-    : Store{*config}
+UDSRemoteStore::UDSRemoteStore(ref<const Config> config, SecretContext secretContext)
+    : Store{*config, std::move(secretContext)}
     , LocalFSStore{*config}
     , RemoteStore{*config}
     , config{config}
@@ -111,9 +111,9 @@ void UDSRemoteStore::addIndirectRoot(const std::filesystem::path & path)
     readInt(conn->from);
 }
 
-ref<Store> UDSRemoteStore::Config::openStore() const
+ref<Store> UDSRemoteStore::Config::openStore(const SecretContext & context) const
 {
-    return make_ref<UDSRemoteStore>(ref{shared_from_this()});
+    return make_ref<UDSRemoteStore>(ref{shared_from_this()}, context);
 }
 
 static RegisterStoreImplementation<UDSRemoteStore::Config> regUDSRemoteStore;

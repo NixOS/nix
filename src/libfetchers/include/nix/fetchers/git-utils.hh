@@ -5,6 +5,8 @@
 
 namespace nix {
 
+class SecretResolver;
+
 namespace fetchers {
 struct PublicKey;
 struct Settings;
@@ -30,6 +32,7 @@ struct GitAccessorOptions
 {
     bool exportIgnore = false;
     bool smudgeLfs = false;
+    std::shared_ptr<SecretResolver> secretResolver;
 };
 
 struct GitRepo

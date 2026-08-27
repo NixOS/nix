@@ -194,9 +194,10 @@ struct GitArchiveInputScheme : InputScheme
     }
 
     // Search for the longest possible match starting from the beginning and ending at either the end or a path segment.
-    std::optional<std::string> getAccessToken(
-        const fetchers::Settings & settings, const std::string & host, const std::string & url) const override
+    std::optional<std::string>
+    getAccessToken(const FetchContext & context, const std::string & host, const std::string & url) const override
     {
+        auto & settings = context.settings;
         auto tokens = settings.accessTokens.get();
         std::string answer;
         size_t answer_match_len = 0;
@@ -218,20 +219,19 @@ struct GitArchiveInputScheme : InputScheme
         return {};
     }
 
-    Headers
-    makeHeadersWithAuthTokens(const fetchers::Settings & settings, const std::string & host, const Input & input) const
+    Headers makeHeadersWithAuthTokens(const FetchContext & context, const std::string & host, const Input & input) const
     {
         auto owner = getStrAttr(input.attrs, "owner");
         auto repo = getStrAttr(input.attrs, "repo");
         auto hostAndPath = fmt("%s/%s/%s", host, owner, repo);
-        return makeHeadersWithAuthTokens(settings, host, hostAndPath);
+        return makeHeadersWithAuthTokens(context, host, hostAndPath);
     }
 
     Headers makeHeadersWithAuthTokens(
-        const fetchers::Settings & settings, const std::string & host, const std::string & hostAndPath) const
+        const FetchContext & context, const std::string & host, const std::string & hostAndPath) const
     {
         Headers headers;
-        auto accessToken = getAccessToken(settings, host, hostAndPath);
+        auto accessToken = getAccessToken(context, host, hostAndPath);
         if (accessToken) {
             auto hdr = accessHeaderFromToken(*accessToken);
             if (hdr)
@@ -248,9 +248,9 @@ struct GitArchiveInputScheme : InputScheme
         std::optional<Hash> treeHash;
     };
 
-    virtual RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const = 0;
+    virtual RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const = 0;
 
-    virtual DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const = 0;
+    virtual DownloadUrl getDownloadUrl(const FetchContext & context, const Input & input) const = 0;
 
     struct TarballInfo
     {
@@ -258,8 +258,9 @@ struct GitArchiveInputScheme : InputScheme
         time_t lastModified;
     };
 
-    std::pair<Input, TarballInfo> downloadArchive(const Settings & settings, Store & store, Input input) const
+    std::pair<Input, TarballInfo> downloadArchive(const FetchContext & context, Store & store, Input input) const
     {
+        auto & settings = context.settings;
         if (!maybeGetStrAttr(input.attrs, "ref"))
             input.attrs.insert_or_assign("ref", "HEAD");
 
@@ -267,7 +268,7 @@ struct GitArchiveInputScheme : InputScheme
 
         auto rev = input.getRev();
         if (!rev) {
-            auto refInfo = getRevFromRef(settings, store, input);
+            auto refInfo = getRevFromRef(context, store, input);
             rev = refInfo.rev;
             upstreamTreeHash = refInfo.treeHash;
             debug("HEAD revision for '%s' is %s", input.to_string(), refInfo.rev.gitRev());
@@ -293,12 +294,12 @@ struct GitArchiveInputScheme : InputScheme
         }
 
         /* Stream the tarball into the tarball cache. */
-        auto url = getDownloadUrl(settings, input);
+        auto url = getDownloadUrl(context, input);
 
         auto source = sinkToSource([&](Sink & sink) {
             FileTransferRequest req(url.url);
             req.headers = url.headers;
-            getFileTransfer()->download(std::move(req), sink);
+            getFileTransfer()->download(FileTransferContext{context.secretResolver}, std::move(req), sink);
         });
 
         auto act = std::make_unique<Activity>(
@@ -331,9 +332,10 @@ struct GitArchiveInputScheme : InputScheme
     }
 
     std::pair<ref<SourceAccessor>, Input>
-    getAccessor(const Settings & settings, Store & store, const Input & _input) const override
+    getAccessor(const FetchContext & context, Store & store, const Input & _input) const override
     {
-        auto [input, tarballInfo] = downloadArchive(settings, store, _input);
+        auto & settings = context.settings;
+        auto [input, tarballInfo] = downloadArchive(context, store, _input);
 
 #if 0
         input.attrs.insert_or_assign("treeHash", tarballInfo.treeHash.gitRev());
@@ -408,7 +410,7 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return getStrAttr(input.attrs, "repo");
     }
 
-    RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
+    RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
         auto host = getHost(input);
         auto url = fmt(
@@ -418,9 +420,9 @@ struct GitHubInputScheme : GitArchiveInputScheme
             getRepo(input),
             *input.getRef());
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
+        auto downloadResult = downloadFile(store, context, url, "source", headers);
         auto json = nlohmann::json::parse(
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
@@ -429,11 +431,11 @@ struct GitHubInputScheme : GitArchiveInputScheme
             .treeHash = Hash::parseAny(std::string{json["commit"]["tree"]["sha"]}, HashAlgorithm::SHA1)};
     }
 
-    DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
+    DownloadUrl getDownloadUrl(const FetchContext & context, const Input & input) const override
     {
         auto host = getHost(input);
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
         // If we have no auth headers then we default to the public archive
         // urls so we do not run into rate limits.
@@ -447,13 +449,13 @@ struct GitHubInputScheme : GitArchiveInputScheme
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
+    void clone(const FetchContext & context, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
         auto host = getHost(input);
         Input::fromURL(fmt("git+https://%s/%s/%s.git", host, getOwner(input), getRepo(input)))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, store, destDir);
+            .clone(context, store, destDir);
     }
 };
 
@@ -489,7 +491,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         return std::make_pair(token.substr(0, fldsplit), token.substr(fldsplit + 1));
     }
 
-    RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
+    RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
         // See rate limiting note below
@@ -500,9 +502,9 @@ struct GitLabInputScheme : GitArchiveInputScheme
                 getStrAttr(input.attrs, "repo"),
                 *input.getRef());
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
-        auto downloadResult = downloadFile(store, settings, url, "source", headers);
+        auto downloadResult = downloadFile(store, context, url, "source", headers);
         auto json = nlohmann::json::parse(
             store.requireStoreObjectAccessor(downloadResult.storePath)->readFile(CanonPath::root));
 
@@ -516,7 +518,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         }
     }
 
-    DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
+    DownloadUrl getDownloadUrl(const FetchContext & context, const Input & input) const override
     {
         // This endpoint has a rate limit threshold that may be
         // server-specific and vary based whether the user is
@@ -531,11 +533,11 @@ struct GitLabInputScheme : GitArchiveInputScheme
                 getStrAttr(input.attrs, "repo"),
                 input.getRev()->to_string(HashFormat::Base16, false));
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
+    void clone(const FetchContext & context, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("gitlab.com");
@@ -543,7 +545,7 @@ struct GitLabInputScheme : GitArchiveInputScheme
         Input::fromURL(
             fmt("git+https://%s/%s/%s.git", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, store, destDir);
+            .clone(context, store, destDir);
     }
 };
 
@@ -570,7 +572,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         // Once it is implemented, however, should work as expected.
     }
 
-    RefInfo getRevFromRef(const Settings & settings, nix::Store & store, const Input & input) const override
+    RefInfo getRevFromRef(const FetchContext & context, nix::Store & store, const Input & input) const override
     {
         // TODO: In the future, when the sourcehut graphql API is implemented for mercurial
         // and with anonymous access, this method should use it instead.
@@ -581,11 +583,11 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         auto base_url =
             fmt("https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo"));
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
 
         std::string refUri;
         if (ref == "HEAD") {
-            auto downloadFileResult = downloadFile(store, settings, fmt("%s/HEAD", base_url), "source", headers);
+            auto downloadFileResult = downloadFile(store, context, fmt("%s/HEAD", base_url), "source", headers);
             auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
 
             auto remoteLine = git::parseLsRemoteLine(getLine(contents).first);
@@ -598,7 +600,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         }
         std::regex refRegex(refUri);
 
-        auto downloadFileResult = downloadFile(store, settings, fmt("%s/info/refs", base_url), "source", headers);
+        auto downloadFileResult = downloadFile(store, context, fmt("%s/info/refs", base_url), "source", headers);
         auto contents = store.requireStoreObjectAccessor(downloadFileResult.storePath)->readFile(CanonPath::root);
         std::istringstream is(contents);
 
@@ -616,7 +618,7 @@ struct SourceHutInputScheme : GitArchiveInputScheme
         return RefInfo{.rev = Hash::parseAny(*id, HashAlgorithm::SHA1)};
     }
 
-    DownloadUrl getDownloadUrl(const Settings & settings, const Input & input) const override
+    DownloadUrl getDownloadUrl(const FetchContext & context, const Input & input) const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
         auto url =
@@ -626,18 +628,18 @@ struct SourceHutInputScheme : GitArchiveInputScheme
                 getStrAttr(input.attrs, "repo"),
                 input.getRev()->to_string(HashFormat::Base16, false));
 
-        Headers headers = makeHeadersWithAuthTokens(settings, host, input);
+        Headers headers = makeHeadersWithAuthTokens(context, host, input);
         return DownloadUrl{parseURL(url), headers};
     }
 
-    void clone(const Settings & settings, Store & store, const Input & input, const std::filesystem::path & destDir)
+    void clone(const FetchContext & context, Store & store, const Input & input, const std::filesystem::path & destDir)
         const override
     {
         auto host = maybeGetStrAttr(input.attrs, "host").value_or("git.sr.ht");
         Input::fromURL(
             fmt("git+https://%s/%s/%s", host, getStrAttr(input.attrs, "owner"), getStrAttr(input.attrs, "repo")))
             .applyOverrides(input.getRef(), input.getRev())
-            .clone(settings, store, destDir);
+            .clone(context, store, destDir);
     }
 };
 

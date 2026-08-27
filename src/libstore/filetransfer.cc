@@ -4,6 +4,7 @@
 #include "nix/util/config-global.hh"
 #include "nix/util/finally.hh"
 #include "nix/util/callback.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/util.hh"
@@ -153,6 +154,21 @@ struct curlMultiError final : CloneableError<curlMultiError, Error>
     }
 };
 
+/**
+ * Host that `request` authenticates against, for scoping the netrc lookup.
+ */
+std::optional<std::string> netrcHost(const FileTransferRequest & request)
+{
+    try {
+        if (auto & authority = request.uri.parsed().authority)
+            return authority->host;
+    } catch (BadURL &) {
+        /* Leave it to curl to report the malformed URL. An unscoped lookup
+           is the right fallback: it is what the setting would have given. */
+    }
+    return std::nullopt;
+}
+
 /* Check if the linked libcurl was built with HTTP3 support. */
 bool curlSupportsHttp3()
 {
@@ -161,6 +177,63 @@ bool curlSupportsHttp3()
 }
 
 } // namespace
+
+NetrcFile resolveNetrcFile(
+    const FileTransferContext & context, const FileTransferSettings & settings, const FileTransferRequest & request)
+{
+    if (context.secretResolver) {
+        auto secret = context.secretResolver->resolve(
+            SecretRequest{
+                .name = "netrc",
+                .representation = SecretRepresentation::MaterialisedFile,
+                .purpose =
+                    {
+                        .consumer = "file-transfer",
+                        .operation = std::string(request.operation()),
+                        .host = netrcHost(request),
+                    },
+            });
+        if (secret) {
+            auto * file = std::get_if<ref<SecretFile>>(&secret->value);
+            if (!file)
+                throw Error(
+                    "secret resolver returned the 'netrc' secret inline, but curl can only read one from a file");
+            return {.path = (*file)->path(), .lease = *file};
+        }
+    }
+
+    return {.path = settings.netrcFile.get()};
+}
+
+std::optional<std::string> resolveNetrcData(
+    const std::shared_ptr<SecretResolver> & secretResolver,
+    const FileTransferSettings & settings,
+    const SecretPurpose & purpose)
+{
+    if (secretResolver) {
+        auto secret = secretResolver->resolve(
+            SecretRequest{
+                .name = "netrc",
+                .representation = SecretRepresentation::Inline,
+                .purpose = purpose,
+            });
+        if (secret) {
+            auto * inlineSecret = std::get_if<InlineSecret>(&secret->value);
+            if (!inlineSecret)
+                throw Error(
+                    "secret resolver materialised the 'netrc' secret as a file, "
+                    "but it can only be passed on as data here");
+            return inlineSecret->value;
+        }
+    }
+
+    try {
+        return readFile(settings.netrcFile.get());
+    } catch (SystemError &) {
+        /* No netrc configured, which is the common case. */
+        return std::nullopt;
+    }
+}
 
 struct curlFileTransfer : public FileTransfer
 {
@@ -177,6 +250,13 @@ struct curlFileTransfer : public FileTransfer
     {
         curlFileTransfer & fileTransfer;
         FileTransferRequest request;
+
+        /**
+         * netrc handed to curl, resolved once per transfer so that retries
+         * reuse one lease rather than taking a fresh one each attempt.
+         */
+        NetrcFile netrc;
+
         FileTransferResult result;
         std::unique_ptr<Activity> _act;
         Callback<FileTransferResult> callback;
@@ -264,10 +344,12 @@ struct curlFileTransfer : public FileTransfer
 
         TransferItem(
             curlFileTransfer & fileTransfer,
+            const FileTransferContext & context,
             const FileTransferRequest & request,
             Callback<FileTransferResult> && callback)
             : fileTransfer(fileTransfer)
             , request(request)
+            , netrc(resolveNetrcFile(context, fileTransfer.settings, request))
             , callback(std::move(callback))
             , finalSink([this](std::string_view data) {
                 if (errorSink) {
@@ -668,9 +750,18 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SEEKDATA, this);
             }
 
+            /* A bundle named by the request wins over the `ssl-cert-file` setting:
+               builtin:fetchurl carries the host's copy into a sandbox that has no
+               certificates of its own. */
+            const std::filesystem::path * caFile = nullptr;
+            if (request.caFile)
+                caFile = &*request.caFile;
+            else if (auto & configuredCaFile = fileTransfer.settings.caFile.get())
+                caFile = &configuredCaFile->path();
+
             /* Note: libcurl copies string arguments, so temporaries from
                .string().c_str() are safe. See the comment near CURLOPT_SSLKEY below. */
-            if (auto & caFile = fileTransfer.settings.caFile.get())
+            if (caFile)
                 curl_easy_setopt(req, CURLOPT_CAINFO, caFile->string().c_str());
 #ifdef _WIN32
             /* Use native windows certificate store when the option is not specified explicitly. */
@@ -696,7 +787,7 @@ struct curlFileTransfer : public FileTransfer
 
             /* If no file exist in the specified path, curl continues to work
                anyway as if netrc support was disabled. */
-            curl_easy_setopt(req, CURLOPT_NETRC_FILE, fileTransfer.settings.netrcFile.get().string().c_str());
+            curl_easy_setopt(req, CURLOPT_NETRC_FILE, netrc.path.string().c_str());
             curl_easy_setopt(req, CURLOPT_NETRC, CURL_NETRC_OPTIONAL);
 
             if (writtenToSink)
@@ -1215,16 +1306,19 @@ struct curlFileTransfer : public FileTransfer
         return ItemHandle(item.get_ptr());
     }
 
-    ItemHandle enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback) override
+    ItemHandle enqueueFileTransfer(
+        const FileTransferContext & context,
+        const FileTransferRequest & request,
+        Callback<FileTransferResult> callback) override
     {
         /* Handle s3:// URIs by converting to HTTPS and optionally adding auth */
         if (request.uri.scheme() == "s3") {
             auto modifiedRequest = request;
             modifiedRequest.setupForS3();
-            return enqueueItem(make_ref<TransferItem>(*this, std::move(modifiedRequest), std::move(callback)));
+            return enqueueItem(make_ref<TransferItem>(*this, context, std::move(modifiedRequest), std::move(callback)));
         }
 
-        return enqueueItem(make_ref<TransferItem>(*this, request, std::move(callback)));
+        return enqueueItem(make_ref<TransferItem>(*this, context, request, std::move(callback)));
     }
 
     void unpauseTransfer(std::weak_ptr<Item> item)
@@ -1320,8 +1414,20 @@ void FileTransferRequest::setupForS3()
 
 std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTransferRequest & request)
 {
+    return enqueueFileTransfer(FileTransferContext{}, request);
+}
+
+FileTransfer::ItemHandle
+FileTransfer::enqueueFileTransfer(const FileTransferRequest & request, Callback<FileTransferResult> callback)
+{
+    return enqueueFileTransfer(FileTransferContext{}, request, std::move(callback));
+}
+
+std::future<FileTransferResult>
+FileTransfer::enqueueFileTransfer(const FileTransferContext & context, const FileTransferRequest & request)
+{
     auto promise = std::make_shared<std::promise<FileTransferResult>>();
-    enqueueFileTransfer(request, {[promise](std::future<FileTransferResult> fut) {
+    enqueueFileTransfer(context, request, {[promise](std::future<FileTransferResult> fut) {
                             try {
                                 promise->set_value(fut.get());
                             } catch (...) {
@@ -1333,22 +1439,47 @@ std::future<FileTransferResult> FileTransfer::enqueueFileTransfer(const FileTran
 
 FileTransferResult FileTransfer::download(const FileTransferRequest & request)
 {
-    return enqueueFileTransfer(request).get();
+    return download(FileTransferContext{}, request);
+}
+
+FileTransferResult FileTransfer::download(const FileTransferContext & context, const FileTransferRequest & request)
+{
+    return enqueueFileTransfer(context, request).get();
 }
 
 FileTransferResult FileTransfer::upload(const FileTransferRequest & request)
 {
+    return upload(FileTransferContext{}, request);
+}
+
+FileTransferResult FileTransfer::upload(const FileTransferContext & context, const FileTransferRequest & request)
+{
     /* Note: this method is the same as download, but helps in readability */
-    return enqueueFileTransfer(request).get();
+    return enqueueFileTransfer(context, request).get();
 }
 
 FileTransferResult FileTransfer::deleteResource(const FileTransferRequest & request)
 {
-    return enqueueFileTransfer(request).get();
+    return deleteResource(FileTransferContext{}, request);
+}
+
+FileTransferResult
+FileTransfer::deleteResource(const FileTransferContext & context, const FileTransferRequest & request)
+{
+    return enqueueFileTransfer(context, request).get();
 }
 
 void FileTransfer::download(
     FileTransferRequest && request, Sink & sink, std::function<void(FileTransferResult)> resultCallback)
+{
+    download(FileTransferContext{}, std::move(request), sink, std::move(resultCallback));
+}
+
+void FileTransfer::download(
+    const FileTransferContext & context,
+    FileTransferRequest && request,
+    Sink & sink,
+    std::function<void(FileTransferResult)> resultCallback)
 {
     /* Note: we can't call 'sink' via request.dataCallback, because
        that would cause the sink to execute on the fileTransfer
@@ -1408,7 +1539,7 @@ void FileTransfer::download(
     };
 
     auto handle = enqueueFileTransfer(
-        request, {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
+        context, request, {[_state, resultCallback{std::move(resultCallback)}](std::future<FileTransferResult> fut) {
             auto state(_state->lock());
             state->quit = true;
             try {

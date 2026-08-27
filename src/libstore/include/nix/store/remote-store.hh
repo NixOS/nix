@@ -126,7 +126,9 @@ public:
     void queryRealisationUncached(
         const DrvOutput &, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
-    ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
+    using Store::getBuilder;
+
+    ref<Builder> getBuilder(const SecretContext & context, std::shared_ptr<Store> evalStore) override;
 
     void addTempRoot(const StorePath & path) override;
 
