@@ -1,5 +1,5 @@
 #include "linux-derivation-builder.hh"
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "chroot-derivation-builder.hh"
 #include "chroot-linux-derivation-builder.hh"
 
@@ -486,7 +486,7 @@ void ChrootLinuxDerivationBuilder::prepareUser()
     }
 
     // Kill any processes left in the cgroup or build user.
-    DerivationBuilderImpl::prepareUser();
+    UnixDerivationBuilderImpl::prepareUser();
 }
 
 void ChrootLinuxDerivationBuilder::prepareSandbox()
@@ -938,7 +938,7 @@ SingleDrvOutputs ChrootLinuxDerivationBuilder::unprepareBuild()
     sandboxMountNamespace = -1;
     sandboxUserNamespace = -1;
 
-    return DerivationBuilderImpl::unprepareBuild();
+    return UnixDerivationBuilderImpl::unprepareBuild();
 }
 
 void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
@@ -952,7 +952,7 @@ void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
         return;
     }
 
-    DerivationBuilderImpl::killSandbox(getStats);
+    UnixDerivationBuilderImpl::killSandbox(getStats);
 }
 
 void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)

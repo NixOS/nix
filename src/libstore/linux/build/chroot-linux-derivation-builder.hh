@@ -32,7 +32,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     ChrootLinuxDerivationBuilder(
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, miscMethods, params}
+        : UnixDerivationBuilderImpl{store, miscMethods, params}
         , ChrootDerivationBuilder{store, miscMethods, params}
         , LinuxDerivationBuilder{store, miscMethods, params}
     {

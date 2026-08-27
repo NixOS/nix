@@ -145,12 +145,15 @@ struct PostBuildHookState
     }
 };
 
+/* Only used on Unix; on Windows every call site throws instead. */
+#ifndef _WIN32
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
     const StorePathSet & outputPaths);
+#endif
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
@@ -817,9 +820,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 {
     co_await yield();
 
-#ifdef _WIN32 // TODO enable `DerivationBuilder` on Windows
-    throw UnimplementedError("building derivations is not yet implemented on Windows");
-#else
     std::unique_ptr<BuildLog> buildLog;
     std::unique_ptr<LogFile> logFile;
 
@@ -849,7 +849,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 
     std::unique_ptr<Activity> actLock;
     DerivationBuilderUnique builder;
-    Descriptor builderOut;
 
     // Will continue here while waiting for a build user below
     while (true) {
@@ -962,20 +961,30 @@ Goal::Co DerivationBuildingGoal::buildLocally(
             /* If we have to wait and retry (see below), then `builder` will
                already be created, so we don't need to create it again. */
             builder = localBuildCap.externalBuilder
-                          ? makeExternalDerivationBuilder(
-                                localBuildCap.localStore,
-                                std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
-                                std::move(params),
-                                *localBuildCap.externalBuilder)
+                          ?
+#ifdef _WIN32
+                          /* No external-builder support on Windows yet. */
+                          throw UnimplementedError("external builders are not yet supported on Windows")
+#else
+                          makeExternalDerivationBuilder(
+                              localBuildCap.localStore,
+                              std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
+                              std::move(params),
+                              *localBuildCap.externalBuilder)
+#endif
                           : makeDerivationBuilder(
                                 localBuildCap.localStore,
                                 std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
-                                std::move(params));
+                                std::move(params)
+#ifdef _WIN32
+                                    ,
+                                /* The Windows builder needs the worker's I/O completion port. */
+                                worker.ioport.get()
+#endif
+                            );
         }
 
-        if (auto builderOutOpt = builder->startBuild()) {
-            builderOut = *std::move(builderOutOpt);
-        } else {
+        if (!builder->startBuild()) {
             if (!actLock)
                 actLock = std::make_unique<Activity>(
                     *logger,
@@ -991,7 +1000,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 
     actLock.reset();
 
-    worker.childStarted(shared_from_this(), {builderOut}, true, true);
+    worker.childStarted(shared_from_this(), {builder->logChannel()}, true, true);
 
     started();
 
@@ -1000,7 +1009,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     while (true) {
         auto event = co_await WaitForChildEvent{};
         if (auto * output = std::get_if<ChildOutput>(&event)) {
-            if (output->fd == builder->builderOut.get()) {
+            if (output->fd == builder->logDescriptor()) {
                 logSize += output->data.size();
                 if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     builder->killChild();
@@ -1051,6 +1060,15 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         }
 
         if (worker.settings.postBuildHook.get() != "") {
+#ifdef _WIN32
+            /* Nothing here needs `fork`: the child only sets the environment,
+               redirects stdout/stderr and execs, which `spawnProcess` already
+               does. What is missing is that `spawnProcess` is not exported,
+               and that the worker needs an `AsyncPipe` tied to the completion
+               port rather than the plain `Pipe` this produces. Throw rather
+               than silently skip the hook. */
+            throw UnimplementedError("the post-build hook is not yet supported on Windows");
+#else
             auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
             worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
             while (true) {
@@ -1063,6 +1081,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                     break;
                 }
             }
+#endif
         }
 
         /* It is now safe to delete the lock files, since all future
@@ -1073,9 +1092,9 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         outputLocks.unlock();
         co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
     }
-#endif
 }
 
+#ifndef _WIN32
 static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
@@ -1083,9 +1102,6 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePath & drvPath,
     const StorePathSet & outputPaths)
 {
-#ifdef _WIN32
-    throw UnimplementedError("post-build-hook is not implemented on Windows");
-#else
     auto state =
         std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
 
@@ -1126,8 +1142,8 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     state->out->writeSide.close();
 
     return state;
-#endif
 }
+#endif
 
 BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailureError e, BuildLog & buildLog)
 {
