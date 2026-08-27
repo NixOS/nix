@@ -1,4 +1,4 @@
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "darwin-derivation-builder.hh"
 
 #include <spawn.h>
@@ -40,7 +40,7 @@ void DarwinDerivationBuilder::prepareSandbox()
 
 void DarwinDerivationBuilder::setUser()
 {
-    DerivationBuilderImpl::setUser();
+    UnixDerivationBuilderImpl::setUser();
 
     /* This has to appear before import statements. */
     std::string sandboxProfile = "(version 1)\n";
@@ -303,7 +303,7 @@ void DarwinDerivationBuilder::cleanupSysVIPCForUser(uid_t uid)
 
 void DarwinDerivationBuilder::killSandbox(bool getStats)
 {
-    DerivationBuilderImpl::killSandbox(getStats);
+    UnixDerivationBuilderImpl::killSandbox(getStats);
     if (buildUser) {
         auto uid = buildUser->getUID();
         cleanupSysVIPCForUser(uid);

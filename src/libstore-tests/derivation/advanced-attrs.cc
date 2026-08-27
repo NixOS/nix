@@ -36,7 +36,12 @@ public:
     void testRequiredSystemFeatures(const std::string & fileName, const StringSet & expectedFeatures)
     {
         this->readTest(fileName, [&](auto encoded) {
-            auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+            auto got = derivation::parse(
+                *this->store,
+                std::move(encoded),
+                "foo",
+                derivation::defaultSupportWindowsStoreDir,
+                this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
                 *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
             EXPECT_EQ(options.getRequiredSystemFeatures(got), expectedFeatures);
@@ -52,7 +57,12 @@ public:
         const StringSet & expectedSystemFeatures)
     {
         this->readTest(fileName, [&](auto encoded) {
-            auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+            auto got = derivation::parse(
+                *this->store,
+                std::move(encoded),
+                "foo",
+                derivation::defaultSupportWindowsStoreDir,
+                this->mockXpSettings);
             auto options = derivationOptionsFromStructuredAttrs(
                 *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
 
@@ -79,47 +89,62 @@ using BothFixtures = ::testing::Types<DerivationAdvancedAttrsTest, CaDerivationA
 
 TYPED_TEST_SUITE(DerivationAdvancedAttrsBothTest, BothFixtures);
 
-#define TEST_ATERM_JSON(STEM, NAME)                                                                        \
-    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_json)                             \
-    {                                                                                                      \
-        using namespace nlohmann;                                                                          \
-        this->readTest(NAME ".json", [&](const auto & encoded_) {                                          \
-            auto encoded = json::parse(encoded_);                                                          \
-            /* Use DRV file instead of C++ literal as source of truth. */                                  \
-            auto aterm = readFile(this->goldenMaster(NAME ".drv"));                                        \
-            auto expected = derivation::parse(*this->store, std::move(aterm), NAME, this->mockXpSettings); \
-            Derivation got = adl_serializer<Derivation>::from_json(encoded, this->mockXpSettings);         \
-            EXPECT_EQ(got, expected);                                                                      \
-        });                                                                                                \
-    }                                                                                                      \
-                                                                                                           \
-    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_to_json)                               \
-    {                                                                                                      \
-        using namespace nlohmann;                                                                          \
-        this->writeTest(                                                                                   \
-            NAME ".json",                                                                                  \
-            [&]() -> json {                                                                                \
-                /* Use DRV file instead of C++ literal as source of truth. */                              \
-                auto aterm = readFile(this->goldenMaster(NAME ".drv"));                                    \
-                return derivation::parse(*this->store, std::move(aterm), NAME, this->mockXpSettings);      \
-            },                                                                                             \
-            [](const auto & file) { return json::parse(readFile(file)); },                                 \
-            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); });      \
-    }                                                                                                      \
-                                                                                                           \
-    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_aterm)                            \
-    {                                                                                                      \
-        using namespace nlohmann;                                                                          \
-        this->readTest(NAME ".drv", [&](auto encoded) {                                                    \
-            /* Use JSON file instead of C++ literal as source of truth. */                                 \
-            auto j = json::parse(readFile(this->goldenMaster(NAME ".json")));                              \
-            auto expected = adl_serializer<Derivation>::from_json(j, this->mockXpSettings);                \
-            auto got = derivation::parse(*this->store, std::move(encoded), NAME, this->mockXpSettings);    \
-            EXPECT_EQ(static_cast<json>(got), static_cast<json>(expected));                                \
-            EXPECT_EQ(got, expected);                                                                      \
-        });                                                                                                \
-    }                                                                                                      \
-                                                                                                           \
+#define TEST_ATERM_JSON(STEM, NAME)                                                                   \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_json)                        \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->readTest(NAME ".json", [&](const auto & encoded_) {                                     \
+            auto encoded = json::parse(encoded_);                                                     \
+            /* Use DRV file instead of C++ literal as source of truth. */                             \
+            auto aterm = readFile(this->goldenMaster(NAME ".drv"));                                   \
+            auto expected = derivation::parse(                                                        \
+                *this->store,                                                                         \
+                std::move(aterm),                                                                     \
+                NAME,                                                                                 \
+                derivation::defaultSupportWindowsStoreDir,                                            \
+                this->mockXpSettings);                                                                \
+            Derivation got = adl_serializer<Derivation>::from_json(encoded, this->mockXpSettings);    \
+            EXPECT_EQ(got, expected);                                                                 \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_to_json)                          \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->writeTest(                                                                              \
+            NAME ".json",                                                                             \
+            [&]() -> json {                                                                           \
+                /* Use DRV file instead of C++ literal as source of truth. */                         \
+                auto aterm = readFile(this->goldenMaster(NAME ".drv"));                               \
+                return derivation::parse(                                                             \
+                    *this->store,                                                                     \
+                    std::move(aterm),                                                                 \
+                    NAME,                                                                             \
+                    derivation::defaultSupportWindowsStoreDir,                                        \
+                    this->mockXpSettings);                                                            \
+            },                                                                                        \
+            [](const auto & file) { return json::parse(readFile(file)); },                            \
+            [](const auto & file, const auto & got) { return writeFile(file, got.dump(2) + "\n"); }); \
+    }                                                                                                 \
+                                                                                                      \
+    TYPED_TEST(DerivationAdvancedAttrsBothTest, Derivation_##STEM##_from_aterm)                       \
+    {                                                                                                 \
+        using namespace nlohmann;                                                                     \
+        this->readTest(NAME ".drv", [&](auto encoded) {                                               \
+            /* Use JSON file instead of C++ literal as source of truth. */                            \
+            auto j = json::parse(readFile(this->goldenMaster(NAME ".json")));                         \
+            auto expected = adl_serializer<Derivation>::from_json(j, this->mockXpSettings);           \
+            auto got = derivation::parse(                                                             \
+                *this->store,                                                                         \
+                std::move(encoded),                                                                   \
+                NAME,                                                                                 \
+                derivation::defaultSupportWindowsStoreDir,                                            \
+                this->mockXpSettings);                                                                \
+            EXPECT_EQ(static_cast<json>(got), static_cast<json>(expected));                           \
+            EXPECT_EQ(got, expected);                                                                 \
+        });                                                                                           \
+    }                                                                                                 \
+                                                                                                      \
     /* No corresponding write test, because we need to read the drv to write the json file */
 
 TEST_ATERM_JSON(advancedAttributes, "advanced-attributes-defaults");
@@ -164,7 +189,7 @@ using ExportReferencesMap = decltype(DerivationOptions<SingleDerivedPath>::expor
 
 static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
         },
     .unsafeDiscardReferences = {},
@@ -183,7 +208,8 @@ static const DerivationOptions<SingleDerivedPath> advancedAttributes_defaults = 
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_defaults)
 {
     this->readTest("advanced-attributes-defaults.drv", [&](auto encoded) {
-        auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
@@ -211,7 +237,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 {
     DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            DerivationOptions<SingleDerivedPath>::OutputChecks{
+            derivation::OutputChecks<SingleDerivedPath>{
                 .ignoreSelfRefs = true,
             },
         .unsafeDiscardReferences = {},
@@ -227,7 +253,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
     };
 
     this->readTest("advanced-attributes.drv", [&](auto encoded) {
-        auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
@@ -235,7 +262,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
         EXPECT_TRUE(!got.structuredAttrs);
 
         // Reset fields that vary between test cases to enable whole-object comparison
-        options.outputChecks = DerivationOptions<SingleDerivedPath>::OutputChecks{.ignoreSelfRefs = true};
+        options.outputChecks = derivation::OutputChecks<SingleDerivedPath>{.ignoreSelfRefs = true};
         options.exportReferencesGraph = {};
 
         EXPECT_EQ(options, expected);
@@ -247,7 +274,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_ia = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
@@ -277,7 +304,7 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_ia)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_ca = {
     .outputChecks =
-        DerivationOptions<SingleDerivedPath>::OutputChecks{
+        derivation::OutputChecks<SingleDerivedPath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
             .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
@@ -306,7 +333,7 @@ TEST_F(CaDerivationAdvancedAttrsTest, advancedAttributes)
 };
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{},
+    .outputChecks = std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{},
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph = {},
@@ -323,7 +350,8 @@ DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_defaults
 TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs_defaults)
 {
     this->readTest("advanced-attributes-structured-attrs-defaults.drv", [&](auto encoded) {
-        auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
@@ -351,9 +379,9 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 {
     DerivationOptions<SingleDerivedPath> expected = {
         .outputChecks =
-            std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+            std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
                 {"dev",
-                 DerivationOptions<SingleDerivedPath>::OutputChecks{
+                 derivation::OutputChecks<SingleDerivedPath>{
                      .maxSize = 789,
                      .maxClosureSize = 5909,
                  }},
@@ -372,7 +400,8 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
     };
 
     this->readTest("advanced-attributes-structured-attrs.drv", [&](auto encoded) {
-        auto got = derivation::parse(*this->store, std::move(encoded), "foo", this->mockXpSettings);
+        auto got = derivation::parse(
+            *this->store, std::move(encoded), "foo", derivation::defaultSupportWindowsStoreDir, this->mockXpSettings);
 
         auto options = derivationOptionsFromStructuredAttrs(
             *this->store, got.inputs, got.env, get(got.structuredAttrs), true, this->mockXpSettings);
@@ -383,7 +412,7 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
         {
             // Delete all keys but "dev" in options.outputChecks
             auto * outputChecksMapP =
-                std::get_if<std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>>(
+                std::get_if<std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>>(
                     &options.outputChecks);
             ASSERT_TRUE(outputChecksMapP);
             auto & outputChecksMap = *outputChecksMapP;
@@ -404,19 +433,19 @@ TYPED_TEST(DerivationAdvancedAttrsBothTest, advancedAttributes_structuredAttrs)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ia = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
             {"out",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathFoo},
                  .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{pathBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{pathBarDev},
              }},
             {"dev",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -446,19 +475,19 @@ TEST_F(DerivationAdvancedAttrsTest, advancedAttributes_structuredAttrs)
 
 DerivationOptions<SingleDerivedPath> advancedAttributes_structuredAttrs_ca = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<SingleDerivedPath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<SingleDerivedPath>, std::less<>>{
             {"out",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .allowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderFoo},
                  .allowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .disallowedReferences = std::set<DrvRef<SingleDerivedPath>>{placeholderBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<SingleDerivedPath>>{placeholderBarDev},
              }},
             {"dev",
-             DerivationOptions<SingleDerivedPath>::OutputChecks{
+             derivation::OutputChecks<SingleDerivedPath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},
@@ -516,7 +545,7 @@ static const StorePath spFoo{"p0hax2lzvjpfc2gwkk62xdglz0fcqfzn-foo"},
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
     .outputChecks =
-        DerivationOptions<StorePath>::OutputChecks{
+        derivation::OutputChecks<StorePath>{
             .ignoreSelfRefs = true,
         },
     .unsafeDiscardReferences = {},
@@ -534,7 +563,7 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_defaults = {
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
     .outputChecks =
-        DerivationOptions<StorePath>::OutputChecks{
+        derivation::OutputChecks<StorePath>{
             .ignoreSelfRefs = true,
             .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
             .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
@@ -558,7 +587,7 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_all_set = {
 };
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_defaults = {
-    .outputChecks = std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{},
+    .outputChecks = std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{},
     .unsafeDiscardReferences = {},
     .passAsFile = {},
     .exportReferencesGraph = {},
@@ -574,19 +603,19 @@ static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_
 
 static const DerivationOptions<StorePath> advancedAttributes_sp_structuredAttrs_all_set = {
     .outputChecks =
-        std::map<std::string, DerivationOptions<StorePath>::OutputChecks, std::less<>>{
+        std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>>{
             {"out",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .allowedReferences = std::set<DrvRef<StorePath>>{spFoo},
                  .allowedRequisites = std::set<DrvRef<StorePath>>{spFooDev, OutputName{"bin"}},
              }},
             {"bin",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .disallowedReferences = std::set<DrvRef<StorePath>>{spBar, OutputName{"dev"}},
                  .disallowedRequisites = std::set<DrvRef<StorePath>>{spBarDev},
              }},
             {"dev",
-             DerivationOptions<StorePath>::OutputChecks{
+             derivation::OutputChecks<StorePath>{
                  .maxSize = 789,
                  .maxClosureSize = 5909,
              }},

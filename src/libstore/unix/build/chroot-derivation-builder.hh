@@ -1,18 +1,18 @@
 #pragma once
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "chroot.hh"
 
 namespace nix {
 
-struct ChrootDerivationBuilder : virtual DerivationBuilderImpl
+struct ChrootDerivationBuilder : virtual UnixDerivationBuilderImpl
 {
 private:
     void anchor() override;
 public:
     ChrootDerivationBuilder(
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        : UnixDerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
     {
     }
 

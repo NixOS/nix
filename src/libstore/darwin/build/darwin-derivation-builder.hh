@@ -1,10 +1,10 @@
 #pragma once
 
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 
 namespace nix {
 
-struct DarwinDerivationBuilder : DerivationBuilderImpl
+struct DarwinDerivationBuilder : UnixDerivationBuilderImpl
 {
     PathsInChroot pathsInChroot;
 
@@ -19,7 +19,7 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)
-        : DerivationBuilderImpl(store, miscMethods, std::move(params))
+        : UnixDerivationBuilderImpl(store, miscMethods, std::move(params))
         , useSandbox(useSandbox)
     {
     }

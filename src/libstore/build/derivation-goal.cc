@@ -2,6 +2,7 @@
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
 #include "nix/store/common-protocol.hh"

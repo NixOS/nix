@@ -11,7 +11,6 @@
 #include "nix/store/references.hh"
 #include "nix/util/callback.hh"
 #include "nix/util/topo-sort.hh"
-#include "nix/util/finally.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
@@ -1102,8 +1101,14 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 HashSink hashSink(HashAlgorithm::SHA256);
 
                 TeeSource wrapperSource{source, hashSink};
+                auto canonicalisingRestoreHooks =
+                    makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
-                restorePath(realPath, wrapperSource, config->getLocalSettings().fsyncStorePaths);
+                restorePath(
+                    realPath,
+                    wrapperSource,
+                    config->getLocalSettings().fsyncStorePaths,
+                    canonicalisingRestoreHooks.get());
 
                 auto hashResult = hashSink.finish();
 
@@ -1157,8 +1162,6 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
                 }
 
                 autoGC();
-
-                canonicalisePathMetaData(realPath, {NIX_WHEN_SUPPORT_ACLS(config->getLocalSettings().ignoredAcls)});
 
                 optimisePath(realPath, repair); // FIXME: combine with hashPath()
 
@@ -1219,38 +1222,35 @@ StorePath LocalStore::addToStoreFromDump(
        path. */
     bool inMemory = false;
 
-    struct Free
-    {
-        void operator()(void * v)
-        {
-            free(v);
-        }
-    };
-
-    std::unique_ptr<char, Free> dumpBuffer(nullptr);
-    std::string_view dump;
+    /* Because std::string has resize_and_overwrite. */
+    std::string dump;
 
     /* Fill out buffer, and decide whether we are working strictly in
        memory based on whether we break out because the buffer is full
        or the original source is empty */
     while (dump.size() < localSettings.narBufferSize) {
-        auto oldSize = dump.size();
+        const auto oldSize = dump.size();
         constexpr size_t chunkSize = 65536;
         auto want = std::min(chunkSize, localSettings.narBufferSize - oldSize);
-        if (auto tmp = realloc(dumpBuffer.get(), oldSize + want)) {
-            dumpBuffer.release();
-            dumpBuffer.reset((char *) tmp);
-        } else {
-            throw std::bad_alloc();
-        }
-        auto got = 0;
-        Finally cleanup([&]() { dump = {dumpBuffer.get(), dump.size() + got}; });
-        try {
-            got = source.read(dumpBuffer.get() + oldSize, want);
-        } catch (EndOfFile &) {
-            inMemory = true;
+        std::exception_ptr ex;
+        dump.resize_and_overwrite(
+            oldSize + want,
+            [&inMemory, &source, &ex, sz = oldSize](char * buf, std::size_t bufSize) -> std::string::size_type {
+                try {
+                    auto got = source.read(buf + sz, bufSize - sz);
+                    return sz + got;
+                } catch (EndOfFile &) {
+                    inMemory = true;
+                    return sz;
+                } catch (...) {
+                    ex = std::current_exception();
+                    return sz;
+                }
+            });
+        if (ex)
+            std::rethrow_exception(ex);
+        if (inMemory)
             break;
-        }
     }
 
     std::unique_ptr<AutoDelete> delTempDir;
@@ -1264,6 +1264,8 @@ StorePath LocalStore::addToStoreFromDump(
        wrong sort, and we need to rehash.
        References are also in store path, if scanning we will need to move */
     bool inMemoryAndDontNeedRestore = inMemory && methodsMatch && !filterReferences;
+    auto canonicalisingRestoreHooks =
+        makeCanonicalisingRestoreHooks(NIX_WHEN_SUPPORT_ACLS2(config->getLocalSettings().ignoredAcls));
 
     if (!inMemoryAndDontNeedRestore) {
         /* Drain what we pulled so far, and then keep on pulling */
@@ -1274,10 +1276,9 @@ StorePath LocalStore::addToStoreFromDump(
         delTempDir = std::make_unique<AutoDelete>(tempDir);
         tempPath = tempDir / "x";
 
-        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths);
+        restorePath(tempPath, bothSource, dumpMethod, localSettings.fsyncStorePaths, canonicalisingRestoreHooks.get());
 
-        dumpBuffer.reset();
-        dump = {};
+        std::string().swap(dump);
     }
 
     auto [dumpHash, size] = hashSink->finish();
@@ -1326,7 +1327,12 @@ StorePath LocalStore::addToStoreFromDump(
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive:
-                    restorePath(realPath, dumpSource, (FileSerialisationMethod) fim, localSettings.fsyncStorePaths);
+                    restorePath(
+                        realPath,
+                        dumpSource,
+                        (FileSerialisationMethod) fim,
+                        localSettings.fsyncStorePaths,
+                        canonicalisingRestoreHooks.get());
                     break;
                 case FileIngestionMethod::Git:
                     // doesn't correspond to serialization method, so
@@ -1336,17 +1342,18 @@ StorePath LocalStore::addToStoreFromDump(
             } else {
                 /* Move the temporary path we restored above. */
                 try {
-                    renameFile(tempPath, realPath);
+                    /* movePath and not renameFile because at this point the top-level directory is
+                       read-only. */
+                    movePath(tempPath, realPath);
                 } catch (const SystemError & e) {
                     if (!e.is(std::errc::cross_device_link))
                         throw;
 
                     /* Apparently this can happen even on the same filesystem (and the paths that are renamed above
                        are on the same filesystem) with overlayfs https://github.com/NixOS/nix/issues/6262.
-                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath.
-                       Note that copyRecursive doesn't copy over permissions, but those will be canonicalised below. */
+                       Since we couldn't rename, this won't be atomic and we have to gradually copy to the realPath. */
                     warn("can't rename %s as %s, copying instead", PathFmt(tempPath), PathFmt(realPath));
-                    RestoreSink copySink{/*startFsync=*/false};
+                    RestoreSink copySink{/*startFsync=*/false, /*hooks=*/canonicalisingRestoreHooks.get()};
                     copySink.dstPath = realPath;
                     copyRecursive(*makeFSSourceAccessor(tempPath), CanonPath::root, copySink, CanonPath::root);
                     delTempDir->deletePath();
@@ -1361,9 +1368,6 @@ StorePath LocalStore::addToStoreFromDump(
                 dumpPath(realPath, narSink);
                 narHash = narSink.finish();
             }
-
-            canonicalisePathMetaData(
-                realPath, {NIX_WHEN_SUPPORT_ACLS(localSettings.ignoredAcls)}); // FIXME: merge into restorePath
 
             optimisePath(realPath, repair);
 

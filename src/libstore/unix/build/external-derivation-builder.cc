@@ -1,11 +1,11 @@
-#include "derivation-builder-impl.hh"
+#include "unix-derivation-builder-impl.hh"
 #include "nix/store/build/child.hh"
 
 namespace nix {
 
 namespace {
 
-struct ExternalDerivationBuilder : DerivationBuilderImpl
+struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
 {
     ExternalBuilder externalBuilder;
 
@@ -14,7 +14,7 @@ struct ExternalDerivationBuilder : DerivationBuilderImpl
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         ExternalBuilder externalBuilder)
-        : DerivationBuilderImpl(store, miscMethods, std::move(params))
+        : UnixDerivationBuilderImpl(store, miscMethods, std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);

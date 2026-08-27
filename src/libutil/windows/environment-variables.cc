@@ -4,6 +4,10 @@
 
 namespace nix {
 
+/* The primitive on Windows, with `getEnv` delegating here rather than the other
+   way round. `getenv` would read the CRT's copy of the environment, snapshotted
+   at process start, which `setEnv` does not update, so it cannot see anything
+   this process has set. */
 std::optional<OsString> getEnvOs(const OsString & key)
 {
     // Determine the required buffer size for the environment variable value
@@ -19,11 +23,10 @@ std::optional<OsString> getEnvOs(const OsString & key)
 
     // Retrieve the environment variable value
     DWORD resultSize = GetEnvironmentVariableW(key.c_str(), &value[0], bufferSize);
-    if (resultSize == 0) {
-        return std::nullopt;
-    }
 
-    // Resize the string to remove the extra null characters
+    /* Resize to remove the extra null characters. A zero count is not a failure
+       here: the sizing call already told us the variable exists, so it means the
+       value is empty, and resizing to zero returns it as such. */
     value.resize(resultSize);
 
     return value;
@@ -65,22 +68,22 @@ StringMap getEnv()
 
 int unsetenv(const char * name)
 {
-    return -SetEnvironmentVariableA(name, nullptr);
+    return SetEnvironmentVariableA(name, nullptr) ? 0 : -1;
 }
 
 int unsetEnvOs(const OsChar * name)
 {
-    return -SetEnvironmentVariableW(name, nullptr);
+    return SetEnvironmentVariableW(name, nullptr) ? 0 : -1;
 }
 
 int setEnv(const char * name, const char * value)
 {
-    return -SetEnvironmentVariableA(name, value);
+    return SetEnvironmentVariableA(name, value) ? 0 : -1;
 }
 
 int setEnvOs(const OsString & name, const OsString & value)
 {
-    return -SetEnvironmentVariableW(name.c_str(), value.c_str());
+    return SetEnvironmentVariableW(name.c_str(), value.c_str()) ? 0 : -1;
 }
 
 } // namespace nix

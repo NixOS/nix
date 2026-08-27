@@ -49,6 +49,7 @@ sources = files(
   'compression.cc',
   'config.cc',
   'current-process.cc',
+  'environment-variables.cc',
   'executable-path.cc',
   'file-content-address.cc',
   'file-descriptor.cc',

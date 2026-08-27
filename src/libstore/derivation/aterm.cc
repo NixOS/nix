@@ -1,5 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/modulo.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -14,6 +15,7 @@
 #include <boost/unordered/concurrent_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <array>
 #include <optional>
 #include <ranges>
 
@@ -49,24 +51,51 @@ struct StringViewStream
     }
 };
 
-constexpr struct Escapes
+/**
+ * Maps a character to its counterpart in an escape sequence, with
+ * `'\0'` meaning "no such escape". That is a usable sentinel because it
+ * is neither an escape character nor the meaning of one.
+ */
+struct EscapeMap
 {
-    char map[256];
+    using Map = std::array<char, 256>;
 
-    constexpr Escapes()
+    constexpr EscapeMap(Map map)
+        : map(map)
     {
-        for (int i = 0; i < 256; i++)
-            map[i] = (char) (unsigned char) i;
-        map[(int) (unsigned char) 'n'] = '\n';
-        map[(int) (unsigned char) 'r'] = '\r';
-        map[(int) (unsigned char) 't'] = '\t';
     }
 
-    char operator[](char c) const
+    constexpr std::optional<char> lookup(char c) const
     {
-        return map[(unsigned char) c];
+        auto res = map[(unsigned char) c];
+        return res ? std::optional{res} : std::nullopt;
     }
-} escapes;
+
+private:
+    Map map;
+};
+
+/* The character an escape sequence stands for, e.g. `'n'` -> `'\n'`. */
+constexpr EscapeMap escapes = [] {
+    EscapeMap::Map map{};
+    map[(unsigned char) 'n'] = '\n';
+    map[(unsigned char) 'r'] = '\r';
+    map[(unsigned char) 't'] = '\t';
+    map[(unsigned char) '\\'] = '\\';
+    map[(unsigned char) '\"'] = '\"';
+    return EscapeMap{map};
+}();
+
+/* The inverse of `escapes`: the character which must be escaped to
+   write the given one, e.g. `'\n'` -> `'n'`. */
+constexpr EscapeMap unescapes = [] {
+    EscapeMap::Map map{};
+    for (size_t i = 0; i < map.size(); i++)
+        if (auto escaped = escapes.lookup((char) i))
+            map[(unsigned char) *escaped] = char(i);
+    return EscapeMap{map};
+}();
+
 } // namespace
 
 /* Read string `s' from stream `str'. */
@@ -84,99 +113,201 @@ static void expect(StringViewStream & str, char c)
     str.remaining.remove_prefix(1);
 }
 
-/* Read a C-style string from stream `str'. */
+/**
+ * Read a C-style string from stream `str'.
+ *
+ * This is for the fields whose contents are arbitrary, and so may need
+ * escaping: the environment variables, the builder, and its arguments.
+ */
 static BackedStringView parseString(StringViewStream & str)
 {
     expect(str, '"');
-    size_t start = 0;
-    size_t end = str.remaining.size();
-    const auto data = str.remaining.data();
-    bool foundClose = false;
-    while (start < end) {
-        auto idx = str.remaining.find('"', start);
-        if (idx == std::string_view::npos) {
-            break;
-        }
-        size_t pos = idx;
-        for (; pos > 0 && data[pos - 1] == '\\'; pos--)
-            ;
-        if ((idx - pos) % 2 == 0) { // even number of backslashes
-            end = idx;
-            foundClose = true;
-            break;
-        }
-        start = idx + 1;
-    }
-    if (!foundClose)
-        throw FormatError("unterminated string in derivation");
 
-    start = 0;
-    const auto content = str.remaining.substr(start, end);
-    str.remaining.remove_prefix(end + 1);
-
-    auto nextBackslash = content.find('\\', start);
-    if (nextBackslash == std::string_view::npos) {
-        return content;
-    }
-
-    std::string res;
-    res.reserve(end);
-    do {
-        if (nextBackslash == end - 1) {
+    const auto next = [&]() -> char {
+        auto ch = str.get();
+        if (ch == EOF) {
             throw FormatError("unterminated string in derivation");
         }
-        if (nextBackslash > start) {
-            res.append(&data[start], nextBackslash - start);
+        return (char) ch;
+    };
+
+    std::string res;
+
+    while (true) {
+        auto ch = next();
+        if (ch == '"') {
+            return res;
+        } else if ((char) ch == '\\') {
+            ch = next();
+            auto escaped = escapes.lookup(ch);
+            if (!escaped.has_value()) {
+                throw FormatError("unknown escape '\\%1%'", ch);
+            }
+            res.push_back(escaped.value());
+        } else if (unescapes.lookup(ch).has_value()) {
+            // Characters that can be escaped must be escaped
+            throw FormatError("invalid character in string");
+        } else {
+            res.push_back(ch);
         }
-        res.push_back(escapes[data[nextBackslash + 1]]);
-        start = nextBackslash + 2;
-        nextBackslash = content.find('\\', start);
-    } while (nextBackslash != std::string_view::npos);
-    if (end > start) {
-        res.append(&data[start], end - start);
     }
-    return res;
+}
+
+/**
+ * Read a string which must not contain any escape sequence, and so can
+ * be taken verbatim from the input.
+ *
+ * This is for the fields drawn from restricted alphabets: store paths,
+ * output names, and the platform. An escape in one of those is not
+ * merely redundant but a second encoding of the same value, so it is
+ * rejected.
+ */
+static BackedStringView parseUnquotedString(StringViewStream & str)
+{
+    expect(str, '"');
+    auto end = str.remaining.find('"');
+    if (end == std::string_view::npos)
+        throw FormatError("unterminated string in derivation");
+    auto content = str.remaining.substr(0, end);
+    // Already know that it ends in an endquote from the find, no need to check again
+    str.remaining.remove_prefix(end + 1);
+    if (content.find('\\') != std::string_view::npos)
+        throw FormatError("unexected escape sequence in unquoted string");
+
+    return content;
+}
+
+/**
+ * Read the string of a store path.
+ *
+ * Unless the store directory needs escaping, it is written verbatim,
+ * and an escape in it is rejected. See
+ * `defaultSupportWindowsStoreDir`.
+ *
+ * Separate from `parseStorePath` because an output's path field shares
+ * the encoding but may also be empty, which is no store path at all.
+ */
+static BackedStringView parseStorePathString(StringViewStream & str, bool supportWindowsStoreDir)
+{
+    return supportWindowsStoreDir ? parseString(str) : parseUnquotedString(str);
 }
 
 /* Store paths in derivations must be written in their canonical form. */
-static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str)
+static StorePath parseStorePath(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
 {
-    return store.parseStorePathCanonical(*parseString(str));
+    return store.parseStorePathCanonical(*parseStorePathString(str, supportWindowsStoreDir));
 }
 
-static bool endOfList(StringViewStream & str)
+/**
+ * Parse a `[...]`-delimited list, calling `parseItem` for each item.
+ */
+static void parseList(StringViewStream & str, auto parseItem)
 {
-    if (str.peek() == ',') {
-        str.get();
-        return false;
-    }
+    expect(str, '[');
+
+    /* The empty list is the one case with no item to parse. */
     if (str.peek() == ']') {
         str.get();
-        return true;
+        return;
     }
-    return false;
+
+    while (true) {
+        parseItem();
+        auto ch = str.get();
+        if (ch == ']')
+            return;
+        if (ch != ',')
+            throw FormatError("invalid list");
+    }
+}
+
+/**
+ * The key of a container element: the element itself for a set, and the
+ * first half of the pair for a map.
+ */
+template<typename T>
+static const T & keyOf(const T & elem)
+{
+    return elem;
+}
+
+template<typename K, typename V>
+static const K & keyOf(const std::pair<const K, V> & elem)
+{
+    return elem.first;
+}
+
+/**
+ * Check that `key` may be appended to an ordered container: the ATerm
+ * encoding is canonical, so items must appear in ascending order, and
+ * not be duplicated, lest the same value have multiple encodings.
+ *
+ * Comparing against the last element rather than inspecting an insert
+ * result means the caller can then insert with a hint of `end()`, which
+ * is amortized constant time rather than logarithmic.
+ *
+ * @param describe renders the offending item for the error message. It
+ * is a callback because rendering can be expensive, and we only need it
+ * when something is wrong.
+ */
+static void checkMonotonic(const auto & c, const auto & key, auto describe)
+{
+    if (c.empty())
+        return;
+    const auto & last = keyOf(*c.rbegin());
+    if (last == key) [[unlikely]] /* Must not be duplicated. */
+        throw FormatError("duplicate %s", describe());
+    if (!(last < key)) [[unlikely]]
+        throw FormatError("%s does not appear in a sorted order", describe());
+}
+
+/**
+ * Parse a list of `(key, value)` pairs into an ordered map, requiring
+ * the keys to be monotonic per `checkMonotonic`.
+ *
+ * @param parseKey parses a key
+ * @param parseValue parses the value belonging to the just-parsed key
+ * @param describe renders a key for error messages
+ */
+static void parseMap(StringViewStream & str, auto & map, auto parseKey, auto parseValue, auto describe)
+{
+    parseList(str, [&] {
+        expect(str, '(');
+        auto key = parseKey();
+        expect(str, ',');
+        auto value = parseValue(key);
+        checkMonotonic(map, key, [&] { return describe(key); });
+        map.emplace_hint(map.end(), std::move(key), std::move(value));
+        expect(str, ')');
+    });
 }
 
 static StringSet parseStrings(StringViewStream & str)
 {
     StringSet res;
-    expect(str, '[');
-    while (!endOfList(str))
-        res.insert(parseString(str).toOwned());
+    parseList(str, [&] {
+        auto content = parseUnquotedString(str).toOwned();
+        checkMonotonic(res, content, [&] { return fmt("set item '%s'", content); });
+        res.insert(res.end(), std::move(content));
+    });
     return res;
 }
 
-static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str)
+static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
 {
     StorePathSet res;
-    expect(str, '[');
-    while (!endOfList(str))
-        res.insert(parseStorePath(store, str));
+    parseList(str, [&] {
+        auto path = parseStorePath(store, str, supportWindowsStoreDir);
+        checkMonotonic(res, path, [&] { return fmt("store path '%s'", store.printStorePath(path)); });
+        res.insert(res.end(), std::move(path));
+    });
     return res;
 }
 
 static Output parseOutput(
     const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
     std::string_view pathS,
     std::string_view hashAlgoStr,
     std::string_view hashS,
@@ -200,13 +331,31 @@ static Output parseOutput(
         } else if (!hashS.empty()) {
             [[maybe_unused]] auto path = store.parseStorePathCanonical(pathS);
             auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
-            return Output::CAFixed{
+            Output::CAFixed dof{
                 .ca =
                     ContentAddress{
                         .method = std::move(method),
                         .hash = std::move(hash),
                     },
             };
+            /* The stated path is redundant --- it is a function of the
+               content address --- but it must still agree, lest two
+               derivations that mean the same thing hash differently.
+
+               Skipped when fuzzing: the check makes the path a preimage
+               of a hash of the rest of the output, which a fuzzer has no
+               way to solve, so leaving it in would make this branch
+               unreachable to it. `CAFixedPathMismatch` covers the check
+               itself. See "Checks that defeat fuzzing" in
+               doc/manual/source/development/testing.md. */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+            if (path != dof.path(store, drvName, outputName))
+                throw FormatError(
+                    "derivation output '%s' has path '%s', which does not match its content address",
+                    outputName,
+                    pathS);
+#endif
+            return dof;
         } else {
             xpSettings.require(Xp::CaDerivations);
             if (!pathS.empty())
@@ -217,6 +366,9 @@ static Output parseOutput(
             };
         }
     } else {
+        if (!hashS.empty()) {
+            throw FormatError("hash specified without hash algorithm");
+        }
         if (pathS.empty()) {
             return Output::Deferred{};
         }
@@ -224,22 +376,6 @@ static Output parseOutput(
             .path = store.parseStorePathCanonical(pathS),
         };
     }
-}
-
-static Output parseOutput(
-    const StoreDirConfig & store,
-    StringViewStream & str,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings)
-{
-    expect(str, ',');
-    const auto pathS = parseString(str);
-    expect(str, ',');
-    const auto hashAlgo = parseString(str);
-    expect(str, ',');
-    const auto hash = parseString(str);
-    expect(str, ')');
-
-    return parseOutput(store, *pathS, *hashAlgo, *hash, xpSettings);
 }
 
 /**
@@ -282,14 +418,13 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
         case '(':
             expect(str, '(');
             node.value = parseStrings(str);
-            expect(str, ",["sv);
-            while (!endOfList(str)) {
-                expect(str, '(');
-                auto outputName = parseString(str).toOwned();
-                expect(str, ',');
-                node.childMap.insert_or_assign(outputName, parseDerivedPathMapNode(store, str, version));
-                expect(str, ')');
-            }
+            expect(str, ',');
+            parseMap(
+                str,
+                node.childMap,
+                [&] { return parseString(str).toOwned(); },
+                [&](const auto &) { return parseDerivedPathMapNode(store, str, version); },
+                [](const auto & outputName) { return fmt("output name '%s'", outputName); });
             expect(str, ')');
             break;
         default:
@@ -307,6 +442,7 @@ Full parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
+    bool supportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings)
 {
     using namespace std::literals::string_view_literals;
@@ -342,61 +478,73 @@ Full parse(
         throw Error("derivation does not start with 'Derive' or 'DrvWithVersion'");
     }
 
-    /* Parse the list of outputs. */
-    expect(str, '[');
-    while (!endOfList(str)) {
-        expect(str, '(');
-        std::string id = parseString(str).toOwned();
-        auto output = parseOutput(store, str, xpSettings);
-        drv.outputs.emplace(std::move(id), std::move(output));
-    }
+    /* Parse the map of outputs. The value is three fields rather than
+       one, but the framing is a map's, so `parseMap` still applies. */
+    parseMap(
+        str,
+        drv.outputs,
+        [&] { return parseUnquotedString(str).toOwned(); },
+        [&](const auto & outputName) {
+            const auto pathS = parseStorePathString(str, supportWindowsStoreDir);
+            expect(str, ',');
+            const auto hashAlgo = parseString(str);
+            expect(str, ',');
+            const auto hash = parseString(str);
+            return parseOutput(store, name, outputName, *pathS, *hashAlgo, *hash, xpSettings);
+        },
+        [](const auto & outputName) { return fmt("output name '%s'", outputName); });
 
     /* Parse the list of input derivations. */
     derivation::FullInputs fullInputs;
-    expect(str, ",["sv);
-    while (!endOfList(str)) {
-        expect(str, '(');
-        auto drvPath = parseStorePath(store, str);
-        expect(str, ',');
-        auto node = parseDerivedPathMapNode(store, str, version);
-        /* Such an entry cannot be represented in the flat inputs set,
-           and would thus be silently dropped rather than round-tripped.
-           Nix itself never produces one. */
-        if (node.value.empty() && node.childMap.empty())
-            throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
-        fullInputs.drvs.map.insert_or_assign(std::move(drvPath), std::move(node));
-        expect(str, ')');
-    }
+    expect(str, ',');
+    parseMap(
+        str,
+        fullInputs.drvs.map,
+        [&] {
+            auto drvPath = parseStorePath(store, str, supportWindowsStoreDir);
+            drvPath.requireDerivation();
+            return drvPath;
+        },
+        [&](const StorePath & drvPath) {
+            auto node = parseDerivedPathMapNode(store, str, version);
+            /* Such an entry cannot be represented in the flat inputs set,
+               and would thus be silently dropped rather than round-tripped.
+               Nix itself never produces one. */
+            if (node.value.empty() && node.childMap.empty())
+                throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
+            return node;
+        },
+        [&](const StorePath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
 
     expect(str, ',');
-    fullInputs.srcs = parseStorePaths(store, str);
+    fullInputs.srcs = parseStorePaths(store, str, supportWindowsStoreDir);
     drv.inputs = fullInputs.toSet();
     expect(str, ',');
-    drv.platform = parseString(str).toOwned();
+    drv.platform = parseUnquotedString(str).toOwned();
     expect(str, ',');
     drv.builder = parseString(str).toOwned();
 
     /* Parse the builder arguments. */
-    expect(str, ",["sv);
-    while (!endOfList(str))
-        drv.args.push_back(parseString(str).toOwned());
+    expect(str, ',');
+    parseList(str, [&] { drv.args.push_back(parseString(str).toOwned()); });
 
     /* Parse the environment variables. */
-    expect(str, ",["sv);
-    while (!endOfList(str)) {
-        expect(str, '(');
-        auto name = parseString(str).toOwned();
-        expect(str, ',');
-        auto value = parseString(str);
-        if (name == StructuredAttrs::envVarName) {
-            drv.structuredAttrs = StructuredAttrs::parse(*std::move(value));
-        } else {
-            drv.env.insert_or_assign(std::move(name), std::move(value).toOwned());
-        }
-        expect(str, ')');
-    }
+    expect(str, ',');
+    parseMap(
+        str,
+        drv.env,
+        [&] { return parseString(str).toOwned(); },
+        [&](const auto &) { return parseString(str).toOwned(); },
+        [](const auto & name) { return fmt("environment variable '%s'", name); });
+
+    /* Structured attrs are just an ordinary environment variable as far
+       as the ATerm is concerned, so only take them out once the whole
+       map is parsed, and the ordering checks have seen them. */
+    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     expect(str, ')');
+    if (!str.remaining.empty())
+        throw FormatError("expected end of file, found '%s'", str.remaining);
     return drv;
 }
 
@@ -423,21 +571,15 @@ static void printString(std::string & res, std::string_view s)
         s.remove_prefix(chunk.size());
         char * buf = buffer.data();
         char * p = buf;
-        for (auto c : chunk)
-            if (c == '\"' || c == '\\') {
+        for (auto c : chunk) {
+            auto escape = unescapes.lookup(c);
+            if (escape.has_value()) {
                 *p++ = '\\';
+                *p++ = escape.value();
+            } else {
                 *p++ = c;
-            } else if (c == '\n') {
-                *p++ = '\\';
-                *p++ = 'n';
-            } else if (c == '\r') {
-                *p++ = '\\';
-                *p++ = 'r';
-            } else if (c == '\t') {
-                *p++ = '\\';
-                *p++ = 't';
-            } else
-                *p++ = c;
+            }
+        }
         res.append(buf, p - buf);
     }
     res += '"';
@@ -450,109 +592,103 @@ static void printUnquotedString(std::string & res, std::string_view s)
     res += '"';
 }
 
-template<class ForwardIterator>
-static void printStrings(std::string & res, ForwardIterator i, ForwardIterator j)
+/**
+ * Print a `[...]`-delimited list, calling `printItem` for each item.
+ */
+static void printList(std::string & res, const auto & items, auto printItem)
 {
     res += '[';
     bool first = true;
-    for (; i != j; ++i) {
+    for (auto & item : items) {
         if (first)
             first = false;
         else
             res += ',';
-        printString(res, *i);
+        printItem(item);
     }
     res += ']';
 }
 
-template<class ForwardIterator>
-static void printUnquotedStrings(std::string & res, ForwardIterator i, ForwardIterator j)
+/**
+ * Print a map as a list of `(key,value)` pairs, calling `printKey` and
+ * `printValue` for each entry. The map is already in the ascending order
+ * `parseMap` requires.
+ */
+static void printMap(std::string & res, const auto & map, auto printKey, auto printValue)
 {
-    res += '[';
-    bool first = true;
-    for (; i != j; ++i) {
-        if (first)
-            first = false;
-        else
-            res += ',';
-        printUnquotedString(res, *i);
-    }
-    res += ']';
+    printList(res, map, [&](const auto & entry) {
+        res += '(';
+        printKey(entry.first);
+        res += ',';
+        printValue(entry.first, entry.second);
+        res += ')';
+    });
+}
+
+static void printStrings(std::string & res, const auto & strings)
+{
+    printList(res, strings, [&](const auto & s) { printString(res, s); });
+}
+
+static void printUnquotedStrings(std::string & res, const auto & strings)
+{
+    printList(res, strings, [&](const auto & s) { printUnquotedString(res, s); });
+}
+
+/* The counterpart of `parseStorePathString`. */
+static void printStorePathString(std::string & res, std::string_view pathS, bool supportWindowsStoreDir)
+{
+    if (supportWindowsStoreDir)
+        printString(res, pathS);
+    else
+        printUnquotedString(res, pathS);
+}
+
+static void
+printStorePath(const StoreDirConfig & store, std::string & res, const StorePath & path, bool supportWindowsStoreDir)
+{
+    printStorePathString(res, store.printStorePath(path), supportWindowsStoreDir);
+}
+
+static void printStorePaths(
+    const StoreDirConfig & store, std::string & res, const StorePathSet & paths, bool supportWindowsStoreDir)
+{
+    printList(res, paths, [&](const auto & path) { printStorePath(store, res, path, supportWindowsStoreDir); });
 }
 
 static void unparseDerivedPathMapNode(
     const StoreDirConfig &, std::string & s, const std::set<OutputName, std::less<>> & outputNames)
 {
-    s += ',';
-    printUnquotedStrings(s, outputNames.begin(), outputNames.end());
+    printUnquotedStrings(s, outputNames);
 }
 
 static void unparseDerivedPathMapNode(
     const StoreDirConfig & store, std::string & s, const DerivedPathMap<StringSet>::ChildNode & node)
 {
-    using namespace std::literals::string_view_literals;
-
-    s += ',';
     if (node.childMap.empty()) {
-        printUnquotedStrings(s, node.value.begin(), node.value.end());
+        printUnquotedStrings(s, node.value);
     } else {
         s += '(';
-        printUnquotedStrings(s, node.value.begin(), node.value.end());
-        s += ",["sv;
-        bool first = true;
-        for (auto & [outputName, childNode] : node.childMap) {
-            if (first)
-                first = false;
-            else
-                s += ',';
-            s += '(';
-            printUnquotedString(s, outputName);
-            unparseDerivedPathMapNode(store, s, childNode);
-            s += ')';
-        }
-        s += "])"sv;
+        printUnquotedStrings(s, node.value);
+        s += ',';
+        printMap(
+            s,
+            node.childMap,
+            [&](const auto & outputName) { printUnquotedString(s, outputName); },
+            [&](const auto &, const auto & childNode) { unparseDerivedPathMapNode(store, s, childNode); });
+        s += ')';
     }
 }
 
-/**
- * Inputs in the intermediate form used to compute the hash modulo:
- * input derivations are identified by their hash modulo rather than by
- * store path.
- *
- * `Hash::operator<=>` compares bytes left-to-right, which matches
- * base16-lexicographic order (hex encoding is monotonic per byte), so
- * `std::map<Hash, ...>` gives the correct ATerm key ordering directly.
- */
-struct HashModuloInputs
+static void
+printKey(const StoreDirConfig & store, std::string & res, const StorePath & key, bool supportWindowsStoreDir)
 {
-    StorePathSet srcs;
-
-    /**
-     * No `DerivedPathMap` involved: the hash modulo is only ever
-     * computed after dynamic inputs are resolved away, so each input
-     * derivation maps to a plain set of output names.
-     */
-    using DrvMap = std::map<Hash, std::set<OutputName, std::less<>>>;
-
-    /**
-     * Nesting just to match `DerivedPathMap` for easier templating.
-     */
-    struct
-    {
-        DrvMap map;
-    } drvs;
-
-    // no operator== needed; this type is internal-only
-};
-
-static std::string keyToString(const StoreDirConfig & store, const StorePath & key)
-{
-    return store.printStorePath(key);
+    printStorePath(store, res, key, supportWindowsStoreDir);
 }
 
-static std::string keyToString(const StoreDirConfig &, const Hash & key)
+static void printKey(const StoreDirConfig &, std::string & res, const Hash & key, bool)
 {
-    return key.to_string(HashFormat::Base16, false);
+    printUnquotedString(res, key.to_string(HashFormat::Base16, false));
 }
 
 static void unparseOutput(
@@ -560,10 +696,10 @@ static void unparseOutput(
     std::string & s,
     const Output::InputAddressed & doi,
     std::string_view,
-    std::string_view)
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    s += ',';
-    printUnquotedString(s, store.printStorePath(doi.path));
+    printStorePath(store, s, doi.path, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, {});
     s += ',';
@@ -575,10 +711,10 @@ static void unparseOutput(
     std::string & s,
     const Output::CAFixed & dof,
     std::string_view drvName,
-    std::string_view outputName)
+    std::string_view outputName,
+    bool supportWindowsStoreDir)
 {
-    s += ',';
-    printUnquotedString(s, store.printStorePath(dof.path(store, drvName, outputName)));
+    printStorePath(store, s, dof.path(store, drvName, outputName), supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, dof.ca.printMethodAlgo());
     s += ',';
@@ -586,35 +722,47 @@ static void unparseOutput(
 }
 
 static void unparseOutput(
-    const StoreDirConfig &, std::string & s, const Output::CAFloating & dof, std::string_view, std::string_view)
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::CAFloating & dof,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    s += ',';
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, std::string{dof.method.renderPrefix()} + printHashAlgo(dof.hashAlgo));
     s += ',';
     printUnquotedString(s, {});
 }
 
-static void
-unparseOutput(const StoreDirConfig &, std::string & s, const Output::Deferred &, std::string_view, std::string_view)
+static void unparseOutput(
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::Deferred &,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
-    s += ',';
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, {});
     s += ',';
     printUnquotedString(s, {});
 }
 
-static void
-unparseOutput(const StoreDirConfig &, std::string & s, const Output::Impure & doi, std::string_view, std::string_view)
+static void unparseOutput(
+    const StoreDirConfig &,
+    std::string & s,
+    const Output::Impure & doi,
+    std::string_view,
+    std::string_view,
+    bool supportWindowsStoreDir)
 {
     using namespace std::literals::string_view_literals;
 
     // FIXME
-    s += ',';
-    printUnquotedString(s, {});
+    printStorePathString(s, {}, supportWindowsStoreDir);
     s += ',';
     printUnquotedString(s, std::string{doi.method.renderPrefix()} + printHashAlgo(doi.hashAlgo));
     s += ',';
@@ -626,22 +774,24 @@ static void unparseOutput(
     std::string & s,
     const Output & output,
     std::string_view drvName,
-    std::string_view outputName)
+    std::string_view outputName,
+    bool supportWindowsStoreDir)
 {
-    std::visit([&](const auto & o) { unparseOutput(store, s, o, drvName, outputName); }, output.raw);
+    std::visit(
+        [&](const auto & o) { unparseOutput(store, s, o, drvName, outputName, supportWindowsStoreDir); }, output.raw);
 }
 
 /**
  * This one, unlike the public one, is polymorphic on the output parameter to
- * support the (private) `hashInputModulo`.
+ * support the hash modulo intermediate form.
  */
 template<typename Inputs, typename Out>
-static std::string unparseDerivation(const StoreDirConfig & store, const Derivation<Inputs, Out> & drv)
+std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
     requires(
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
         // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, HashModuloInputs>
+        || (std::is_same_v<Inputs, modulo::HashInputs>
             && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ))
 {
     using namespace std::literals::string_view_literals;
@@ -666,58 +816,39 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
         s += "Derive("sv;
     }
 
-    bool first = true;
-    s += '[';
-    for (auto & i : drv.outputs) {
-        if (first)
-            first = false;
-        else
-            s += ',';
-        s += '(';
-        printUnquotedString(s, i.first);
-        unparseOutput(store, s, i.second, drv.name, i.first);
-        s += ')';
-    }
+    printMap(
+        s,
+        drv.outputs,
+        [&](const auto & outputName) { printUnquotedString(s, outputName); },
+        [&](const auto & outputName, const auto & output) {
+            unparseOutput(store, s, output, drv.name, outputName, supportWindowsStoreDir);
+        });
 
-    s += "],["sv;
-    first = true;
-    for (auto & [key, node] : drv.inputs.drvs.map) {
-        if (first)
-            first = false;
-        else
-            s += ',';
-        s += '(';
-        printUnquotedString(s, keyToString(store, key));
-        unparseDerivedPathMapNode(store, s, node);
-        s += ')';
-    }
+    s += ',';
+    printMap(
+        s,
+        drv.inputs.drvs.map,
+        [&](const auto & key) { printKey(store, s, key, supportWindowsStoreDir); },
+        [&](const auto &, const auto & node) { unparseDerivedPathMapNode(store, s, node); });
 
-    s += "],"sv;
-    auto paths = store.printStorePathSet(drv.inputs.srcs); // FIXME: slow
-    printUnquotedStrings(s, paths.begin(), paths.end());
+    s += ',';
+    printStorePaths(store, s, drv.inputs.srcs, supportWindowsStoreDir);
 
     s += ',';
     printUnquotedString(s, drv.platform);
     s += ',';
     printString(s, drv.builder);
     s += ',';
-    printStrings(s, drv.args.begin(), drv.args.end());
+    printStrings(s, drv.args);
 
-    s += ",["sv;
-    first = true;
+    s += ',';
 
     auto unparseEnv = [&](const StringPairs & atermEnv) {
-        for (auto & i : atermEnv) {
-            if (first)
-                first = false;
-            else
-                s += ',';
-            s += '(';
-            printString(s, i.first);
-            s += ',';
-            printString(s, i.second);
-            s += ')';
-        }
+        printMap(
+            s,
+            atermEnv,
+            [&](const auto & name) { printString(s, name); },
+            [&](const auto &, const auto & value) { printString(s, value); });
     };
 
     StructuredAttrs::checkKeyNotInUse(drv.env);
@@ -729,268 +860,37 @@ static std::string unparseDerivation(const StoreDirConfig & store, const Derivat
         unparseEnv(drv.env);
     }
 
-    s += "])"sv;
+    s += ')';
 
     return s;
 }
 
-std::string unparse(const Full & drv, const StoreDirConfig & store)
+/* The hash modulo intermediate forms, unparsed by `modulo.cc`. */
+template std::string
+unparse(const Derivation<modulo::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
+template std::string
+unparse(const Derivation<modulo::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
+
+std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {
     // Convert to FullInputs for ATerm serialization
-    return unparseDerivation(
-        store, drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
-}
-
-/* --------------------------------------------------------------------------
-   Derivation hash modulo
-   -------------------------------------------------------------------------- */
-
-Hashes hashes;
-
-/* pathInputModulo and hashInputModulo are mutually recursive
- */
-
-/**
- * Look up the derivation by value and memoize the `hashInputModulo` call.
- */
-static HashModulo pathInputModulo(Store & store, const StorePath & drvPath)
-{
-    std::optional<HashModulo> hash;
-    if (hashes.cvisit(drvPath, [&hash](const auto & kv) { hash.emplace(kv.second); })) {
-        return *hash;
-    }
-    auto h = hashInputModulo(store, store.readInvalidDerivation(drvPath));
-
-    // Cache it
-    hashes.insert_or_assign(drvPath, h);
-    return h;
-}
-
-/**
- * Look up the hash modulo for the input derivation at `drvPath` and
- * insert the result into `drvInputs`.
- *
- * Returns `true` if deferred and cannot mutate (the caller should bail out).
- */
-static bool inputModulo(
-    Store & store,
-    HashModuloInputs::DrvMap & drvInputs,
-    const StorePath & drvPath,
-    const std::set<OutputName, std::less<>> & outputNames,
-    std::string_view drvName)
-{
-    const auto & res = pathInputModulo(store, drvPath);
-    return std::visit(
-        overloaded{
-            [&](const HashModulo::DeferredDrv &) { return true; },
-            // Regular non-CA derivation, replace derivation
-            [&](const HashModulo::DrvHash & drvHash) {
-                drvInputs[drvHash].insert(outputNames.begin(), outputNames.end());
-                return false;
-            },
-            // CA derivation's output hashes
-            [&](const HashModulo::CaOutputHashes & outputHashes) {
-                for (auto & outputName : outputNames) {
-                    /* Put each one in with a single "out" output.. */
-                    const auto h = get(outputHashes, outputName);
-                    if (!h)
-                        throw Error("no hash for output '%s' of derivation '%s'", outputName, drvName);
-                    drvInputs[*h].insert("out");
-                }
-                return false;
-            },
-        },
-        res.raw);
-}
-
-/**
- * Replace each input derivation store path with its hash modulo,
- * producing the intermediate form used to compute the derivation hash.
- *
- * When `Out` is `DerivationOutput::Deferred`, outputs are masked:
- * output paths and matching env vars are blanked so the hash does not
- * depend on its own output paths.
- *
- * When `Out` is `DerivationOutput`, outputs are preserved as-is.
- *
- * Returns `std::nullopt` if any input is deferred (depends on a CA or
- * dynamic derivation whose outputs are not yet known).
- */
-template<typename Out>
-static std::optional<Derivation<HashModuloInputs, Out>> derivationModulo(Store & store, Derivation<FullInputs, Out> drv)
-{
-    Derivation<HashModuloInputs, Out> masked{
-        .outputs = std::move(drv.outputs),
-        .inputs{
-            .srcs = std::move(drv.inputs.srcs),
-            .drvs = {},
-        },
-        .platform = std::move(drv.platform),
-        .builder = std::move(drv.builder),
-        .args = std::move(drv.args),
-        .env = std::move(drv.env),
-        .structuredAttrs = std::move(drv.structuredAttrs),
-        .name = std::move(drv.name),
-    };
-
-    for (auto & [drvPath, node] : drv.inputs.drvs.map) {
-        /* Need to build and resolve dynamic derivations first */
-        if (!node.childMap.empty())
-            return std::nullopt;
-        if (inputModulo(store, masked.inputs.drvs.map, drvPath, node.value, masked.name))
-            return std::nullopt;
-    }
-
-    return masked;
-}
-
-/* See the header for interface details. These are the implementation details.
-
-   For fixed-output derivations, each hash in the map is not the
-   corresponding output's content hash, but a hash of that hash along
-   with other constant data. The key point is that the value is a pure
-   function of the output's contents, and there are no preimage attacks
-   either spoofing an output's contents for a derivation, or
-   spoofing a derivation for an output's contents.
-
-   For regular derivations, it looks up each subderivation from its hash
-   and recurs. If the subderivation is also regular, it simply
-   substitutes the derivation path with its hash. If the subderivation
-   is fixed-output, however, it takes each output hash and pretends it
-   is a derivation hash producing a single "out" output. This is so we
-   don't leak the provenance of fixed outputs, reducing pointless cache
-   misses as the build itself won't know this.
- */
-
-/**
- * Compute the hash with outputs preserved (as `InputAddressed`).
- * Used for computing a derivation's identity as an input to other
- * derivations.
- *
- * Returns the appropriate `HashModulo` variant:
- * - `CaOutputHashes` for fixed-output CA derivations
- * - `DeferredDrv` for deferred, non-fixed CA, or impure derivations
- * - `DrvHash` for regular input-addressed derivations
- */
-HashModulo hashInputModulo(Store & store, const Full & drv)
-{
-    /* Return a fixed hash for fixed-output derivations. */
-    if (type(drv).isFixed()) {
-        std::map<std::string, Hash> outputHashes;
-        for (const auto & i : drv.outputs) {
-            auto & dof = std::get<Output::CAFixed>(i.second.raw);
-            auto hash = hashString(
-                HashAlgorithm::SHA256,
-                "fixed:out:" + dof.ca.printMethodAlgo() + ":" + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
-                    + store.printStorePath(dof.path(store, drv.name, i.first)));
-            outputHashes.insert_or_assign(i.first, std::move(hash));
-        }
-        return outputHashes;
-    }
-
-    /* If any output is not InputAddressed, this derivation has no hash
-       modulo. */
-    for (auto & [name, output] : drv.outputs)
-        if (!std::get_if<Output::InputAddressed>(&output.raw))
-            return HashModulo::DeferredDrv{};
-
-    auto inputAddressingModulo = derivationModulo(
+    return unparse(
+        drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }),
         store,
-        drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
-            .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
-    if (!inputAddressingModulo)
-        return HashModulo::DeferredDrv{};
-
-    return hashString(HashAlgorithm::SHA256, unparseDerivation(store, *inputAddressingModulo));
-}
-
-/**
- * Replace the outputs with `Deferred` and blank the env vars named
- * after them, so the hash does not depend on the derivation's own
- * output paths. Only valid for input-addressed (possibly deferred)
- * derivations.
- */
-template<typename Inputs>
-static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<Inputs, Output> & drv)
-{
-    auto masked = drv.mapOutputs([](const Output & output) -> Output::Deferred {
-        std::visit(
-            overloaded{
-                [&](const Output::InputAddressed &) {},
-                [&](const Output::Deferred &) {
-                    /* Possibly pessimistically deferred --- we will fill in
-                       the output paths. */
-                },
-                [&](const auto &) {
-                    panic("hashModulo: unexpected output type, these derivation types are not input addressed");
-                },
-            },
-            output.raw);
-        return {};
-    });
-    for (auto & [name, output] : masked.outputs)
-        if (auto j = masked.env.find(name); j != masked.env.end())
-            j->second = "";
-    return masked;
-}
-
-/**
- * Compute the hash with outputs masked (replaced with `Deferred`).
- * Used by `processDerivationOutputPaths` to compute a derivation's own
- * output paths. Only valid for input-addressed (possibly deferred)
- * derivations.
- */
-std::optional<std::string> unparseModulo(Store & store, const Full & drv)
-{
-    auto masked =
-        derivationModulo(store, maskOutputsAndEnv(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
-            return FullInputs::fromSet(inputs);
-        }));
-    if (!masked)
-        return std::nullopt;
-    return unparseDerivation(store, *masked);
-}
-
-std::string unparseModulo(Store & store, const Basic & drv)
-{
-    /* A resolved derivation has no input derivations, so there is
-       nothing to substitute. */
-    auto masked = maskOutputsAndEnv(drv).mapInputs([](const StorePathSet & srcs) {
-        return HashModuloInputs{
-            .srcs = srcs,
-            .drvs = {},
-        };
-    });
-
-    return unparseDerivation(store, masked);
-}
-
-std::optional<Hash> hashModulo(Store & store, const Full & drv)
-{
-    auto masked = unparseModulo(store, drv);
-    if (!masked)
-        return std::nullopt;
-    return hashString(HashAlgorithm::SHA256, *masked);
-}
-
-Hash hashModulo(Store & store, const Basic & drv)
-{
-    /* A resolved derivation has no input derivations, so the hash is
-       always computable. */
-    return hashString(HashAlgorithm::SHA256, unparseModulo(store, drv));
+        supportWindowsStoreDir);
 }
 
 /* --------------------------------------------------------------------------
    Wire protocol serialisation
    -------------------------------------------------------------------------- */
 
-static Output readOutput(Source & in, const StoreDirConfig & store)
+static Output readOutput(Source & in, const StoreDirConfig & store, std::string_view drvName, OutputNameView outputName)
 {
     const auto pathS = readString(in);
     const auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    return parseOutput(store, pathS, hashAlgo, hash, experimentalFeatureSettings);
+    return parseOutput(store, drvName, outputName, pathS, hashAlgo, hash, experimentalFeatureSettings);
 }
 
 Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name)
@@ -1000,9 +900,9 @@ Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::strin
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
-        auto name = readString(in);
-        auto output = readOutput(in, store);
-        drv.outputs.emplace(std::move(name), std::move(output));
+        auto outputName = readString(in);
+        auto output = readOutput(in, store, name, outputName);
+        drv.outputs.emplace(std::move(outputName), std::move(output));
     }
 
     drv.inputs = CommonProto::Serialise<StorePathSet>::read(store, CommonProto::ReadConn{.from = in});

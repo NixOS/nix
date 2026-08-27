@@ -1,5 +1,5 @@
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/modulo.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/expr/eval-inline.hh"
 #include "nix/expr/eval.hh"
@@ -1926,8 +1926,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
        case we don't actually write store derivations, so we can't
        read them later. */
     {
-        auto h = hashInputModulo(*state.store, drv);
-        derivation::hashes.insert_or_assign(drvPath, std::move(h));
+        auto h = derivation::modulo::hashInput(*state.store, drv);
+        derivation::modulo::hashes.insert_or_assign(drvPath, std::move(h));
     }
 
     auto result = state.buildBindings(1 + drv.outputs.size());
@@ -3300,9 +3300,11 @@ static RegisterPrimOp primop_hasAttr({
     .name = "__hasAttr",
     .args = {"s", "set"},
     .doc = R"(
-      `hasAttr` returns `true` if *set* has an attribute named *s*, and
-      `false` otherwise. This is a dynamic version of the `?` operator,
-      since *s* is an expression rather than an identifier.
+      `hasAttr` returns `true` if *set* has an attribute named *s*, and `false` if it does not.
+      This is a dynamic version of the `?` operator, since *s* is an expression rather than an identifier.
+
+      Unlike the `?` operator, however, *s* cannot refer to a nested attribute set.
+      Also unlike the `?` operator, if *s* is not a string or *set* is not an attribute set, evaluation is aborted.
 
       Has `O(log n)` time complexity, where `n` is number of attributes in the *set*.
     )",

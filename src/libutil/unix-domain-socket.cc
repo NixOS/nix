@@ -31,7 +31,7 @@ AutoCloseFD createUnixDomainSocket()
         ,
         0));
     if (!fdSocket)
-        throw SysError("cannot create Unix domain socket");
+        throw NativeSysError("cannot create Unix domain socket");
 #ifndef _WIN32
     unix::closeOnExec(fdSocket.get());
 #endif
@@ -47,7 +47,7 @@ AutoCloseFD createUnixDomainSocket(const std::filesystem::path & path, mode_t mo
     chmod(path, mode);
 
     if (listen(toSocket(fdSocket.get()), 100) == -1)
-        throw SysError("cannot listen on socket %s", PathFmt(path));
+        throw NativeSysError("cannot listen on socket %s", PathFmt(path));
 
     return fdSocket;
 }
@@ -180,7 +180,7 @@ static void bindConnectProcHelper(
     } else {
         memcpy(addr.sun_path, pathStr.c_str(), pathStr.size() + 1);
         if (operation(fd, psaddr, sizeof(addr)) == -1)
-            throw SysError("cannot %s to socket at '%s'", operationName, PathFmt(path));
+            throw NativeSysError("cannot %s to socket at '%s'", operationName, PathFmt(path));
     }
 }
 

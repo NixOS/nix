@@ -55,6 +55,11 @@ void Pid::operator=(AutoCloseFD pid)
     this->pid = std::move(pid);
 }
 
+Pid::operator bool() const noexcept
+{
+    return pid.get() != INVALID_DESCRIPTOR;
+}
+
 int Pid::kill(bool allowInterrupts)
 {
     assert(pid.get() != INVALID_DESCRIPTOR);

@@ -26,7 +26,6 @@ deps_public_maybe_subproject = [
   dependency('nix-fetchers'),
 ]
 subdir('nix-meson-build-support/subprojects')
-subdir('nix-meson-build-support/big-objs')
 
 # Check for each of these functions, and create a define like `#define HAVE_SYSCONF 1`.
 check_funcs = [

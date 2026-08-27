@@ -125,6 +125,7 @@ Attributes in nested attribute sets can be written using *attribute paths*.
 >
 > *attrset* → `{` { *attrpath* `=` *expr* `;` } `}`
 
+<div id="attrpath-literal"></div>
 An attribute path is a dot-separated list of [names][name].
 
 > **Syntax**
