@@ -56,11 +56,11 @@ struct CmdFlakePrefetchInputs : FlakeCommand
 
             for (auto & [inputName, input] : node.inputs) {
                 if (auto inputNode = std::get_if<0>(&input))
-                    pool.enqueue(std::bind(visit, **inputNode));
+                    pool.enqueue([&visit, inputNode(*inputNode)] { visit(*inputNode); });
             }
         };
 
-        pool.enqueue(std::bind(visit, *flake.lockFile.root));
+        pool.enqueue([&] { visit(*flake.lockFile.root); });
 
         pool.process();
 
