@@ -3,6 +3,7 @@
 
 #include "nix/store/build/derivation-builder.hh"
 #include "nix/store/local-store.hh"
+#include "nix/util/sync.hh"
 #ifndef _WIN32
 #  include "nix/store/user-lock.hh"
 #endif
@@ -115,6 +116,17 @@ protected:
      * For subclasses to call at the end of `unprepareBuild`.
      */
     SingleDrvOutputs registerOutputs();
+
+    /**
+     * Output paths from the `SubmitOutput` store command
+     */
+    Sync<OutputPathMap> submittedOutputs;
+
+    /**
+     * Check that the derivation outputs submitted by recursive-nix exist
+     * and attach them to the derivation
+     */
+    SingleDrvOutputs checkSubmittedOutputs();
 };
 
 } // namespace nix
