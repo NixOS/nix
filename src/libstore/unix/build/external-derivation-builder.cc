@@ -10,11 +10,11 @@ struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
     ExternalBuilder externalBuilder;
 
     ExternalDerivationBuilder(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         ExternalBuilder externalBuilder)
-        : UnixDerivationBuilderImpl(store, miscMethods, std::move(params))
+        : UnixDerivationBuilderImpl(std::move(store), miscMethods, std::move(params))
         , externalBuilder(std::move(externalBuilder))
     {
         experimentalFeatureSettings.require(Xp::ExternalBuilders);
@@ -58,7 +58,7 @@ struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
         json.emplace("tmpDir", tmpDir.native());
         json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
         json.emplace("storeDir", storeDirConfig.storeDir);
-        json.emplace("realStoreDir", store.config->realStoreDir.get());
+        json.emplace("realStoreDir", store->getRealStoreDir().native());
         json.emplace("system", drv.platform);
         {
             auto l = nlohmann::json::array();
@@ -114,12 +114,13 @@ struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
 } // namespace
 
 DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler)
 {
-    return DerivationBuilderUnique(new ExternalDerivationBuilder(store, miscMethods, std::move(params), handler));
+    return DerivationBuilderUnique(
+        new ExternalDerivationBuilder(std::move(store), miscMethods, std::move(params), handler));
 }
 
 } // namespace nix

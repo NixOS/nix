@@ -36,7 +36,7 @@ protected:
      */
     Pid pid;
 
-    LocalStore & store;
+    std::shared_ptr<BuildingStore> store;
 
     /**
      * Just the store layout, for FFI: a `StoreDirConfig` can be made
@@ -58,7 +58,7 @@ protected:
      */
     const derivation::Type derivationType;
 
-    const LocalSettings & localSettings = store.config->getLocalSettings();
+    const LocalSettings & localSettings = store->getLocalSettings();
 
 #ifndef _WIN32
     /**
@@ -98,17 +98,19 @@ protected:
      */
     virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
-        return store.toRealPath(storeDirConfig.parseStorePath(p.string()));
+        return store->toRealPath(storeDirConfig.parseStorePath(p.string()));
     }
 
 
 public:
 
     DerivationBuilderImpl(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , store{store}
-        , storeDirConfig{*store.config}
+        , store{std::move(store)}
+        , storeDirConfig{*this->store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{derivation::type(drv)}
     {
@@ -116,14 +118,14 @@ public:
 
 public:
 
-    SingleDrvOutputs registerOutputs() override;
+    SingleDrvOutputs registerOutputs(LocalStore & localStore) override;
 
     /**
      * Output paths from the `SubmitOutput` store command
      */
     Sync<OutputPathMap> submittedOutputs;
 
-    SingleDrvOutputs checkSubmittedOutputs() override;
+    SingleDrvOutputs checkSubmittedOutputs(LocalStore & localStore) override;
 };
 
 } // namespace nix

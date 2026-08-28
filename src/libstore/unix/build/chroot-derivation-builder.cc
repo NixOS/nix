@@ -21,7 +21,7 @@ std::filesystem::path ChrootDerivationBuilder::tmpDirInSandbox()
 {
     /* In a sandbox, for determinism, always use the same temporary
        directory. */
-    return store.config->getLocalSettings().sandboxBuildDir.get();
+    return store->getLocalSettings().sandboxBuildDir.get();
 }
 
 gid_t ChrootDerivationBuilder::sandboxGid()
@@ -33,7 +33,7 @@ void ChrootDerivationBuilder::prepareSandbox()
 {
     // Set up chroot parameters
     BuildChrootParams params{
-        .chrootParentDir = store.toRealPath(drvPath) + ".chroot",
+        .chrootParentDir = store->toRealPath(drvPath) + ".chroot",
         .useUidRange = drvOptions.useUidRange(drv),
         .isSandboxed = derivationType.isSandboxed(),
         .buildUser = buildUser.get(),
@@ -51,7 +51,7 @@ void ChrootDerivationBuilder::prepareSandbox()
 
     for (auto & i : inputPaths) {
         auto p = storeDirConfig.printStorePath(i);
-        pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
+        pathsInChroot.insert_or_assign(p, ChrootPath{.source = store->toRealPath(i)});
     }
 
     /* If we're repairing, checking or rebuilding part of a
@@ -59,7 +59,7 @@ void ChrootDerivationBuilder::prepareSandbox()
        rebuilding a path that is in settings.sandbox-paths
        (typically the dependencies of /bin/sh).  Throw them
        out. */
-    for (auto & i : outputsAndOptPaths(drv, store)) {
+    for (auto & i : outputsAndOptPaths(drv, storeDirConfig)) {
         /* If the name isn't known a priori (i.e. floating
            content-addressing derivation), the temporary location we use
            should be fresh.  Freshness means it is impossible that the path
@@ -80,7 +80,7 @@ std::filesystem::path ChrootDerivationBuilder::realPathInHost(const std::filesys
 {
     // FIXME: why the needsHashRewrite() conditional?
     return !needsHashRewrite() ? chrootRootDir / p.relative_path()
-                               : std::filesystem::path(store.toRealPath(storeDirConfig.parseStorePath(p.native())));
+                               : std::filesystem::path(store->toRealPath(storeDirConfig.parseStorePath(p.native())));
 }
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)
@@ -95,7 +95,7 @@ void ChrootDerivationBuilder::cleanupBuild(bool force)
                 continue;
             if (buildMode != bmCheck && status.known->isValid())
                 continue;
-            std::filesystem::path p = store.toRealPath(status.known->path);
+            std::filesystem::path p = store->toRealPath(status.known->path);
             std::filesystem::path chrootPath = chrootRootDir / p.relative_path();
             if (pathExists(chrootPath))
                 std::filesystem::rename(chrootPath, p);
@@ -109,7 +109,7 @@ ChrootDerivationBuilder::addDependencyPrep(const StorePath & path)
 {
     debug("materialising '%s' in the sandbox", storeDirConfig.printStorePath(path));
 
-    std::filesystem::path source = store.toRealPath(path);
+    std::filesystem::path source = store->toRealPath(path);
     auto targetRelPath = std::filesystem::path(storeDirConfig.printStorePath(path)).relative_path();
     std::filesystem::path target = chrootRootDir / targetRelPath;
 

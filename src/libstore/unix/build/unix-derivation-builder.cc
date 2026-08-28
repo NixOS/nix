@@ -194,8 +194,7 @@ bool UnixDerivationBuilderImpl::decideWhetherDiskFull()
     {
         uint64_t required = 8ULL * 1024 * 1024; // FIXME: make configurable
         struct statvfs st;
-        if (statvfs(store.config->realStoreDir.get().c_str(), &st) == 0
-            && (uint64_t) st.f_bavail * st.f_bsize < required)
+        if (statvfs(store->getRealStoreDir().c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
         if (statvfs(tmpDir.c_str(), &st) == 0 && (uint64_t) st.f_bavail * st.f_bsize < required)
             diskFull = true;
@@ -261,7 +260,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
        calls. */
     prepareUser();
 
-    auto buildDir = store.config->getBuildDir();
+    auto buildDir = store->getBuildDir();
 
     createDirs(buildDir);
 
@@ -678,16 +677,7 @@ void UnixDerivationBuilderImpl::startDaemon()
         experimentalFeatureSettings.require(Xp::RecursiveNix);
     }
 
-    auto store = makeRestrictedStore(
-        [&] {
-            auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize = 0;
-            config->stateDir = "/no-such-path";
-            config->logDir = "/no-such-path";
-            return config;
-        }(),
-        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-        *this);
+    auto store = this->store->makeRecursiveNixStore(*this);
 
     state_.lock()->addedPaths.clear();
 
@@ -806,7 +796,7 @@ void UnixDerivationBuilderImpl::submitOutput(const SingleDerivedPath & path, con
         throw Error(
             "Attempted to submit Built path '%s' for output '%s'.\n"
             " Only Opaque paths are supported, see https://github.com/NixOS/nix/issues/12727",
-            path.to_string(store),
+            path.to_string(storeDirConfig),
             output);
 
     if (submittedOutputs->contains(output))
@@ -992,7 +982,7 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
     if (force) {
         /* Delete unused redirected outputs (when doing hash rewriting). */
         for (auto & i : redirectedOutputs)
-            deletePath(store.toRealPath(i.second));
+            deletePath(store->toRealPath(i.second));
     }
 
     if (topTmpDir != "") {
@@ -1062,12 +1052,14 @@ void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept
 }
 
 std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuilder(
-    LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+    std::unique_ptr<BuildingStore> store,
+    std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+    DerivationBuilderParams params)
 {
     bool useSandbox = false;
 
-    const StoreDirConfig & storeDirConfig = *store.config;
-    const LocalSettings & localSettings = store.config->getLocalSettings();
+    const StoreDirConfig & storeDirConfig = *store;
+    const LocalSettings & localSettings = store->getLocalSettings();
 
     /* Are we doing a sandboxed build? */
     {
@@ -1092,7 +1084,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = type(params.drv).isSandboxed() && !params.drvOptions.noChroot;
     }
 
-    const bool isRelocatedStore = storeDirConfig.storeDir != store.config->realStoreDir.get();
+    const bool isRelocatedStore = storeDirConfig.storeDir != store->getRealStoreDir();
 
     if (isRelocatedStore) {
 #if defined(__linux__) || defined(__FreeBSD__)
@@ -1126,22 +1118,25 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__
-    return DerivationBuilderUnique(new DarwinDerivationBuilder(store, miscMethods, std::move(params), useSandbox));
+    return DerivationBuilderUnique(
+        new DarwinDerivationBuilder(std::move(store), miscMethods, std::move(params), useSandbox));
 #elif defined(__linux__)
     if (useSandbox)
-        return DerivationBuilderUnique(new ChrootLinuxDerivationBuilder(store, miscMethods, std::move(params)));
+        return DerivationBuilderUnique(
+            new ChrootLinuxDerivationBuilder(std::move(store), miscMethods, std::move(params)));
 
-    return DerivationBuilderUnique(new LinuxDerivationBuilder(store, miscMethods, std::move(params)));
+    return DerivationBuilderUnique(new LinuxDerivationBuilder(std::move(store), miscMethods, std::move(params)));
 #elif defined(__FreeBSD__)
     if (useSandbox)
-        return DerivationBuilderUnique(new ChrootFreeBSDDerivationBuilder(store, miscMethods, std::move(params)));
+        return DerivationBuilderUnique(
+            new ChrootFreeBSDDerivationBuilder(std::move(store), miscMethods, std::move(params)));
 
-    return DerivationBuilderUnique(new FreeBSDDerivationBuilder(store, miscMethods, std::move(params)));
+    return DerivationBuilderUnique(new FreeBSDDerivationBuilder(std::move(store), miscMethods, std::move(params)));
 #else
     if (useSandbox)
         throw Error("sandboxing builds is not supported on this platform");
 
-    return DerivationBuilderUnique(new UnixDerivationBuilderImpl(store, miscMethods, std::move(params)));
+    return DerivationBuilderUnique(new UnixDerivationBuilderImpl(std::move(store), miscMethods, std::move(params)));
 #endif
 }
 

@@ -967,13 +967,13 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                           throw UnimplementedError("external builders are not yet supported on Windows")
 #else
                           makeExternalDerivationBuilder(
-                              localBuildCap.localStore,
+                              makeBuildingStoreFromLocalStore(localBuildCap.localStore),
                               std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                               std::move(params),
                               *localBuildCap.externalBuilder)
 #endif
                           : makeDerivationBuilder(
-                                localBuildCap.localStore,
+                                makeBuildingStoreFromLocalStore(localBuildCap.localStore),
                                 std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
                                 std::move(params)
 #ifdef _WIN32
@@ -1052,9 +1052,11 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         /* Compute the FS closure of the outputs and register them as
            being valid. With builder-rpc-v0 the builder already submitted
            the outputs, so check those instead. */
+        auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
+        assert(localStoreP);
         builtOutputs = drvOptions.getRequiredSystemFeatures(*drv).count(std::string{drvFeatureBuilderRpcV0})
-                           ? builder->checkSubmittedOutputs()
-                           : builder->registerOutputs();
+                           ? builder->checkSubmittedOutputs(*localStoreP)
+                           : builder->registerOutputs(*localStoreP);
         builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();

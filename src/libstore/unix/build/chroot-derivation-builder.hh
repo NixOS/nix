@@ -11,8 +11,10 @@ private:
     void anchor() override;
 public:
     ChrootDerivationBuilder(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
-        : UnixDerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
+        : UnixDerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
     {
     }
 

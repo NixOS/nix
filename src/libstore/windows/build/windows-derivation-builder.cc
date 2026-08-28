@@ -92,11 +92,11 @@ class WindowsDerivationBuilderImpl : public DerivationBuilderImpl
 public:
 
     WindowsDerivationBuilderImpl(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         HANDLE ioport)
-        : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
+        : DerivationBuilderImpl{std::move(store), std::move(miscMethods), std::move(params)}
         , ioport{ioport}
     {
     }
@@ -154,6 +154,7 @@ public:
     {
         deletePath(tmpDir);
     }
+
     bool killChild() override;
 
 private:
@@ -326,7 +327,7 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)
         if (status.known)
-            deleteStalePath(store.toRealPath(status.known->path));
+            deleteStalePath(store->toRealPath(status.known->path));
 
     miscMethods->openLogFile();
 
@@ -368,13 +369,13 @@ BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 } // namespace
 
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     HANDLE ioport)
 {
     return DerivationBuilderUnique{
-        new WindowsDerivationBuilderImpl{store, std::move(miscMethods), std::move(params), ioport}};
+        new WindowsDerivationBuilderImpl{std::move(store), miscMethods, std::move(params), ioport}};
 }
 
 void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept

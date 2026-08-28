@@ -262,7 +262,7 @@ public:
      *
      * Not used with `builder-rpc-v0`; see `checkSubmittedOutputs`.
      */
-    virtual SingleDrvOutputs registerOutputs() = 0;
+    virtual SingleDrvOutputs registerOutputs(LocalStore & store) = 0;
 
     /**
      * Check that the derivation outputs submitted by recursive-nix
@@ -270,7 +270,7 @@ public:
      *
      * Only used with `builder-rpc-v0`.
      */
-    virtual SingleDrvOutputs checkSubmittedOutputs() = 0;
+    virtual SingleDrvOutputs checkSubmittedOutputs(LocalStore & store) = 0;
 
     /**
      * Delete the temporary directory, if we have one.
@@ -309,6 +309,42 @@ struct ExternalBuilder
     std::vector<std::string> args;
 };
 
+struct LocalSettings;
+
+/**
+ * This type exists to aid with FFI: we cannot make a full `LocalStore`
+ * with everything (including building, which uses this!) from FFI, but
+ * we do have a chance of making something that just has the methods we
+ * actually need from `LocalStore`.
+ */
+struct BuildingStore : StoreDirConfig
+{
+    BuildingStore(const std::string & storeDir)
+        : StoreDirConfig{storeDir}
+    {
+    }
+
+    virtual ~BuildingStore();
+
+    virtual std::filesystem::path getRealStoreDir() const = 0;
+
+    virtual std::filesystem::path getBuildDir() const = 0;
+
+    virtual const LocalSettings & getLocalSettings() const = 0;
+
+    /**
+     * Make the store that recursive-Nix daemon connections talk to.
+     */
+    virtual ref<Store> makeRecursiveNixStore(RestrictionContext & ctx) = 0;
+
+    std::filesystem::path toRealPath(const StorePath & storePath) const
+    {
+        return getRealStoreDir() / std::string(storePath.to_string());
+    }
+};
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore &);
+
 struct DerivationBuilderDeleter
 {
     void operator()(DerivationBuilder * builder) noexcept;
@@ -320,7 +356,7 @@ using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBui
  * @param ioport The worker's I/O completion port, which the log pipe is tied to.
  */
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params
 #ifdef _WIN32
@@ -335,7 +371,7 @@ DerivationBuilderUnique makeDerivationBuilder(
  * derivation.
  */
 DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);
