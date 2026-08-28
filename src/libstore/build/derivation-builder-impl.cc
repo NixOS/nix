@@ -152,7 +152,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         assert(scratchOutput);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInHost(storeDirConfig.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
@@ -174,7 +174,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at %s",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 outputName,
                 PathFmt(actualPath));
         PosixStat & st = *optSt;
@@ -244,7 +244,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 BuildResult::Failure::OutputRejected,
                 "no output reference for '%s' in build of '%s'",
                 name,
-                store.printStorePath(drvPath));
+                storeDirConfig.printStorePath(drvPath));
         return std::visit(
             overloaded{
                 /* Since we'll use the already installed versions of these, we
@@ -263,7 +263,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 throw BuildError(
                     BuildResult::Failure::OutputRejected,
                     "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
-                    store.printStorePath(drvPath),
+                    storeDirConfig.printStorePath(drvPath),
                     cycle.path,
                     cycle.parent);
             },
@@ -276,7 +276,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInHost(storeDirConfig.printStorePath(*scratchPath));
 
         /* An optional file descriptor of a directory used for intermediate
            operations. */
@@ -525,7 +525,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
            their usual "final destination" */
-        auto finalDestPath = store.printStorePath(newInfo.path);
+        auto finalDestPath = storeDirConfig.printStorePath(newInfo.path);
 
         /* Lock final output path, if not already locked. This happens with
            floating CA derivations and hash-mismatching fixed-output
@@ -533,7 +533,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
         auto optFixedPath = output->path(store, drv.name, outputName);
-        if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
+        if (!optFixedPath || storeDirConfig.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
 
             /* Don't wait on lock for the hash-mismatching fixed-output
@@ -545,7 +545,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             if (!locked) {
                 debug(
                     "failed to lock correct output path of %s, namely %s, not moving output",
-                    store.printStorePath(drvPath),
+                    storeDirConfig.printStorePath(drvPath),
                     PathFmt(store.toRealPath(newInfo.path)));
                 deletePath(actualPath);
                 /* Trigger the hash-mismatch error. */
@@ -597,19 +597,19 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 #endif
                                 finalDestPath,
                                 dst,
-                                store.printStorePath(drvPath),
+                                storeDirConfig.printStorePath(drvPath),
                                 tmpDir);
                         }
 
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output %s differs from %s",
-                            store.printStorePath(drvPath),
+                            storeDirConfig.printStorePath(drvPath),
                             PathFmt(store.toRealPath(newInfo.path)),
                             PathFmt(dst));
                     } else
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output %s differs",
-                            store.printStorePath(drvPath),
+                            storeDirConfig.printStorePath(drvPath),
                             PathFmt(store.toRealPath(newInfo.path)));
                 }
 
@@ -626,9 +626,9 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* For debugging, print out the referenced and unreferenced paths. */
             for (auto & i : inputPaths) {
                 if (references.count(i))
-                    debug("referenced input: '%1%'", store.printStorePath(i));
+                    debug("referenced input: '%1%'", storeDirConfig.printStorePath(i));
                 else
-                    debug("unreferenced input: '%1%'", store.printStorePath(i));
+                    debug("unreferenced input: '%1%'", storeDirConfig.printStorePath(i));
             }
 
             if (!store.isValidPath(newInfo.path))
@@ -732,7 +732,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to submit output path for '%s'",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 outputName);
         }
 

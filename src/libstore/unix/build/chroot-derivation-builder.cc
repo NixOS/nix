@@ -37,7 +37,7 @@ void ChrootDerivationBuilder::prepareSandbox()
         .useUidRange = drvOptions.useUidRange(drv),
         .isSandboxed = derivationType.isSandboxed(),
         .buildUser = buildUser.get(),
-        .storeDir = store.storeDir,
+        .storeDir = storeDirConfig.storeDir,
         .chownToBuilder = [this](const std::filesystem::path & path) { this->chownToBuilder(path); },
     };
 
@@ -50,7 +50,7 @@ void ChrootDerivationBuilder::prepareSandbox()
     pathsInChroot = getPathsInSandbox();
 
     for (auto & i : inputPaths) {
-        auto p = store.printStorePath(i);
+        auto p = storeDirConfig.printStorePath(i);
         pathsInChroot.insert_or_assign(p, ChrootPath{.source = store.toRealPath(i)});
     }
 
@@ -66,21 +66,21 @@ void ChrootDerivationBuilder::prepareSandbox()
            is already in the sandbox, so we don't need to worry about
            removing it.  */
         if (i.second.second)
-            pathsInChroot.erase(store.printStorePath(*i.second.second));
+            pathsInChroot.erase(storeDirConfig.printStorePath(*i.second.second));
     }
 }
 
 Strings ChrootDerivationBuilder::getPreBuildHookArgs()
 {
     assert(!chrootRootDir.empty());
-    return Strings({store.printStorePath(drvPath), chrootRootDir.native()});
+    return Strings({storeDirConfig.printStorePath(drvPath), chrootRootDir.native()});
 }
 
 std::filesystem::path ChrootDerivationBuilder::realPathInHost(const std::filesystem::path & p)
 {
     // FIXME: why the needsHashRewrite() conditional?
     return !needsHashRewrite() ? chrootRootDir / p.relative_path()
-                               : std::filesystem::path(store.toRealPath(store.parseStorePath(p.native())));
+                               : std::filesystem::path(store.toRealPath(storeDirConfig.parseStorePath(p.native())));
 }
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)
@@ -107,16 +107,16 @@ void ChrootDerivationBuilder::cleanupBuild(bool force)
 std::pair<std::filesystem::path, std::filesystem::path>
 ChrootDerivationBuilder::addDependencyPrep(const StorePath & path)
 {
-    debug("materialising '%s' in the sandbox", store.printStorePath(path));
+    debug("materialising '%s' in the sandbox", storeDirConfig.printStorePath(path));
 
     std::filesystem::path source = store.toRealPath(path);
-    auto targetRelPath = std::filesystem::path(store.printStorePath(path)).relative_path();
+    auto targetRelPath = std::filesystem::path(storeDirConfig.printStorePath(path)).relative_path();
     std::filesystem::path target = chrootRootDir / targetRelPath;
 
     if (pathExists(target)) {
         // There is a similar debug message in doBind, so only run it in this block to not have double messages.
         debug("bind-mounting %s -> %s", PathFmt(target), PathFmt(source));
-        throw Error("store path '%s' already exists in the sandbox", store.printStorePath(path));
+        throw Error("store path '%s' already exists in the sandbox", storeDirConfig.printStorePath(path));
     }
 
     return {source, targetRelPath};

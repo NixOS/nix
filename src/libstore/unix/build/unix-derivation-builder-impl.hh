@@ -197,7 +197,7 @@ protected:
 
     virtual Strings getPreBuildHookArgs()
     {
-        return Strings({store.printStorePath(drvPath)});
+        return Strings({storeDirConfig.printStorePath(drvPath)});
     }
 
     /**

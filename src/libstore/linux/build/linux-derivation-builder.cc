@@ -737,7 +737,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
 
        Marking chrootRootDir as MS_SHARED causes pivot_root()
        to fail with EINVAL. Don't know why. */
-    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
+    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(storeDirConfig.storeDir).relative_path();
 
     if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
         throw SysError("unable to bind mount the Nix store at %1%", PathFmt(chrootStoreDir));
@@ -982,7 +982,7 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
 
     int status = child.wait();
     if (!statusOk(status))
-        throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
+        throw Error("could not add path '%s' to sandbox: %s", storeDirConfig.printStorePath(path), statusToString(status));
 }
 
 } // namespace nix

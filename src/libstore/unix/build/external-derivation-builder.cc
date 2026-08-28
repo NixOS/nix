@@ -57,19 +57,19 @@ struct ExternalDerivationBuilder : UnixDerivationBuilderImpl
         json.emplace("topTmpDir", topTmpDir.native());
         json.emplace("tmpDir", tmpDir.native());
         json.emplace("tmpDirInSandbox", tmpDirInSandbox().native());
-        json.emplace("storeDir", store.storeDir);
+        json.emplace("storeDir", storeDirConfig.storeDir);
         json.emplace("realStoreDir", store.config->realStoreDir.get());
         json.emplace("system", drv.platform);
         {
             auto l = nlohmann::json::array();
             for (auto & i : inputPaths)
-                l.push_back(store.printStorePath(i));
+                l.push_back(storeDirConfig.printStorePath(i));
             json.emplace("inputPaths", std::move(l));
         }
         {
             auto l = nlohmann::json::object();
             for (auto & i : scratchOutputs)
-                l.emplace(i.first, store.printStorePath(i.second));
+                l.emplace(i.first, storeDirConfig.printStorePath(i.second));
             json.emplace("outputs", std::move(l));
         }
 

@@ -63,7 +63,7 @@ void DarwinDerivationBuilder::setUser()
 
         /* And we want the store in there regardless of how empty pathsInChroot. We include the innermost
            path component this time, since it's typically /nix/store and we care about that. */
-        std::filesystem::path cur = store.storeDir;
+        std::filesystem::path cur = storeDirConfig.storeDir;
         while (cur != "/") {
             ancestry.insert(cur.native());
             cur = cur.parent_path();
@@ -71,7 +71,7 @@ void DarwinDerivationBuilder::setUser()
 
         /* Add all our input paths to the chroot */
         for (auto & i : inputPaths) {
-            auto p = store.printStorePath(i);
+            auto p = storeDirConfig.printStorePath(i);
             pathsInChroot.insert_or_assign(p, ChrootPath{.source = p});
         }
 
@@ -95,7 +95,7 @@ void DarwinDerivationBuilder::setUser()
         /* Add the output paths we'll use at build-time to the chroot */
         sandboxProfile += "(allow file-read* file-write* process-exec\n";
         for (auto & [_, path] : scratchOutputs)
-            sandboxProfile += fmt("\t(subpath \"%s\")\n", store.printStorePath(path));
+            sandboxProfile += fmt("\t(subpath \"%s\")\n", storeDirConfig.printStorePath(path));
 
         sandboxProfile += ")\n";
 

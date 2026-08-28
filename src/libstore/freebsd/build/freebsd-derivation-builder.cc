@@ -478,7 +478,7 @@ void ChrootFreeBSDDerivationBuilder::enterChroot()
 void ChrootFreeBSDDerivationBuilder::addDependencyImpl(const StorePath & path)
 {
     throw UnimplementedError(
-        "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
+        "adding store path '%s' to the sandbox is not implemented (recursive-nix)", storeDirConfig.printStorePath(path));
 }
 
 } // namespace nix

@@ -38,6 +38,12 @@ protected:
 
     LocalStore & store;
 
+    /**
+     * Just the store layout, for FFI: a `StoreDirConfig` can be made
+     * over FFI where a whole `Store` cannot.
+     */
+    const StoreDirConfig & storeDirConfig;
+
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods;
 
     /**
@@ -92,7 +98,7 @@ protected:
      */
     virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
-        return store.toRealPath(store.parseStorePath(p.string()));
+        return store.toRealPath(storeDirConfig.parseStorePath(p.string()));
     }
 
 
@@ -102,6 +108,7 @@ public:
         LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
         , store{store}
+        , storeDirConfig{*store.config}
         , miscMethods{std::move(miscMethods)}
         , derivationType{derivation::type(drv)}
     {

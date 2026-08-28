@@ -208,7 +208,7 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     env[OS_STR("TMPDIR")] = tmpDir.native();
     env[OS_STR("TEMPDIR")] = tmpDir.native();
     env[OS_STR("PWD")] = tmpDir.native();
-    env[OS_STR("NIX_STORE")] = os(store.storeDir);
+    env[OS_STR("NIX_STORE")] = os(storeDirConfig.storeDir);
 
     /* Most Windows programs, `cmd.exe` included, will not start without these, and
        system tools live outside the store so `PATH` is needed to find them at all.
