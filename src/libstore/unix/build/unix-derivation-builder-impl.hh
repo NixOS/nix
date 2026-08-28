@@ -75,10 +75,6 @@ protected:
      * Whether or not derivation is using outputs submitted via recursive-nix
      */
     bool usingSubmitted;
-    /**
-     * Output paths from the `SubmitOutput` store command
-     */
-    Sync<OutputPathMap> submittedOutputs;
 
     static const std::filesystem::path homeDir;
 
@@ -313,13 +309,6 @@ protected:
      */
     virtual void execBuilder(const Strings & args, const Strings & envStrs);
 
-private:
-
-    /**
-     * Check that the derivation outputs submitted by recursive-nix exist
-     * and attach them to the derivation
-     */
-    SingleDrvOutputs checkSubmittedOutputs();
 protected:
 
     /**

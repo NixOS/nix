@@ -708,4 +708,60 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
+SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
+{
+    // Submitted outputs from the recursive nix daemon
+    // It's fine to lock here since all other threads with the reference have been shut down.
+    auto submittedOutputs(this->submittedOutputs.lock());
+
+    SingleDrvOutputs builtOutputs;
+
+    std::map<std::string, ValidPathInfo> infos;
+
+    for (auto & [outputName, outputPath] : *submittedOutputs) {
+        infos.emplace(outputName, *store.queryPathInfo(outputPath));
+    }
+
+    // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
+    // more verification steps needed afterward
+    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+
+    for (auto & [outputName, output] : drv.outputs) {
+        // For some reason cannot be moved to checkOutputs, needs debugging
+        if (!submittedOutputs->contains(outputName)) {
+            throw BuildError(
+                BuildResult::Failure::OutputRejected,
+                "builder for '%s' failed to submit output path for '%s'",
+                store.printStorePath(drvPath),
+                outputName);
+        }
+
+        // We should have already checked that the derivation is content-addressing in startBuild
+        // and that the outputs of a content-addressing derivation is content-addressed in checkOutputs.
+        // Add an assert here just in case, but it should never trigger.
+        assert(
+            std::get_if<DerivationOutput::CAFloating>(&output.raw)
+            || std::get_if<DerivationOutput::CAFixed>(&output.raw));
+
+        // No need to sign CA outputs, only the realisation matters
+        auto realisation = Realisation{
+            {
+                .outPath = *get(*submittedOutputs, outputName),
+            },
+            DrvOutput{
+                .drvPath = drvPath,
+                .outputName = outputName,
+            },
+        };
+
+        store.signRealisation(realisation);
+        store.registerDrvOutput(realisation, NoCheckSigs);
+        builtOutputs.emplace(outputName, realisation);
+
+        // TODO: handle --check
+    }
+
+    return builtOutputs;
+}
+
 } // namespace nix
