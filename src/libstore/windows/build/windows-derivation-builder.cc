@@ -149,6 +149,11 @@ public:
 
     std::optional<Descriptor> startBuild() override;
     SingleDrvOutputs unprepareBuild() override;
+
+    void cleanupBuild(bool force) override
+    {
+        deletePath(tmpDir);
+    }
     bool killChild() override;
 
 private:

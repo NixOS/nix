@@ -107,26 +107,16 @@ public:
     {
     }
 
-protected:
+public:
 
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     *
-     * For subclasses to call at the end of `unprepareBuild`.
-     */
-    SingleDrvOutputs registerOutputs();
+    SingleDrvOutputs registerOutputs() override;
 
     /**
      * Output paths from the `SubmitOutput` store command
      */
     Sync<OutputPathMap> submittedOutputs;
 
-    /**
-     * Check that the derivation outputs submitted by recursive-nix exist
-     * and attach them to the derivation
-     */
-    SingleDrvOutputs checkSubmittedOutputs();
+    SingleDrvOutputs checkSubmittedOutputs() override;
 };
 
 } // namespace nix

@@ -244,6 +244,30 @@ public:
     virtual SingleDrvOutputs unprepareBuild() = 0;
 
     /**
+     * Check that the derivation outputs all exist and register them
+     * as valid.
+     *
+     * Not used with `builder-rpc-v0`; see `checkSubmittedOutputs`.
+     */
+    virtual SingleDrvOutputs registerOutputs() = 0;
+
+    /**
+     * Check that the derivation outputs submitted by recursive-nix
+     * exist and attach them to the derivation.
+     *
+     * Only used with `builder-rpc-v0`.
+     */
+    virtual SingleDrvOutputs checkSubmittedOutputs() = 0;
+
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build succeeded, so don't attempt to
+     * preserve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force) = 0;
+
+    /**
      * Forcibly kill the child process, if any.
      *
      * @returns whether the child was still alive and needed to be
