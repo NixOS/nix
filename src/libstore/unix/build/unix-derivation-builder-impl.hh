@@ -131,27 +131,7 @@ protected:
         return !usingSubmitted;
     }
 
-    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override
-    {
-        auto submittedOutputs(this->submittedOutputs.lock());
-
-        auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&path.raw());
-        if (!opaque)
-            throw Error(
-                "Attempted to submit Built path '%s' for output '%s'.\n"
-                " Only Opaque paths are supported, see https://github.com/NixOS/nix/issues/12727",
-                path.to_string(store),
-                output);
-
-        if (submittedOutputs->contains(output))
-            throw Error(
-                "Attempted to submit duplicate output '%s' (old '%s', new '%s')",
-                output,
-                store.printStorePath(*get(*submittedOutputs, output)),
-                store.printStorePath(opaque->path));
-
-        submittedOutputs->insert_or_assign(output, opaque->path);
-    };
+    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
 
     friend struct RestrictedStore;
 
