@@ -118,6 +118,22 @@ void loadConfFile(AbstractConfig & config)
         }
     };
 
+    /* `NIX_SSL_CERT_FILE` / `SSL_CERT_FILE` used to be read in
+       `FileTransferSettings`' constructor. That runs during static
+       initialization, where a bad value cannot be reported: on Unix an escaping
+       exception reaches `std::terminate` before `main`, and on Windows the
+       loader absorbs it and the process dies having printed nothing (#16356).
+       Applying it here instead routes it through the normal `Setting`
+       conversion, so a non-absolute path is an ordinary error.
+
+       Before the config files, so that an `ssl-cert-file` in `nix.conf` keeps
+       the precedence it had when the constructor assigned during static
+       initialization. */
+    if (auto sslCertFile = getEnvOsNonEmpty(OS_STR("NIX_SSL_CERT_FILE")).or_else([] {
+            return getEnvOsNonEmpty(OS_STR("SSL_CERT_FILE"));
+        }))
+        config.set("ssl-cert-file", os_string_to_string(*sslCertFile));
+
     applyConfigFile(nixConfFile());
 
     /* We only want to send overrides to the daemon, i.e. stuff from

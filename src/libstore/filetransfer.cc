@@ -100,37 +100,6 @@ std::optional<std::filesystem::path> FileTransferSettings::getDefaultSSLCertFile
 
 void FileTransferSettings::anchor() {}
 
-FileTransferSettings::FileTransferSettings()
-{
-    /* This runs during static initialization, where an escaping exception
-       cannot be reported: on Unix it reaches `std::terminate` before `main`,
-       and on Windows the loader absorbs it and the process dies having printed
-       nothing at all (see #16356). `AbsolutePath` rejects a non-absolute value
-       by throwing, and the value comes from the environment, so it can be
-       invalid. Warn and carry on rather than dying undiagnosably. */
-    try {
-        std::optional<AbsolutePath> sslOverride =
-            getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
-                .or_else([] { return getEnvOs(OS_STR("SSL_CERT_FILE")); })
-                .and_then([](OsString s) -> std::optional<OsString> {
-                    return s.empty() ? std::nullopt : std::optional{std::move(s)};
-                })
-                .transform([](OsString s) { return AbsolutePath{std::filesystem::path{std::move(s)}}; });
-        if (sslOverride)
-            caFile = *sslOverride;
-    } catch (Error & e) {
-        e.addTrace(
-            {},
-            "while applying the 'NIX_SSL_CERT_FILE' or 'SSL_CERT_FILE' environment variable; "
-            "ignoring it for now, but this may become an error again in the future");
-        logWarning(e.info());
-    } catch (...) {
-        /* Nothing at all may escape a static initializer, so this is a
-           backstop for anything that is not an `Error`. */
-        ignoreExceptionExceptInterrupt();
-    }
-}
-
 FileTransferSettings fileTransferSettings;
 
 static GlobalConfig::Register rFileTransferSettings(&fileTransferSettings);
