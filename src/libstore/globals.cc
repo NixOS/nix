@@ -128,11 +128,25 @@ void loadConfFile(AbstractConfig & config)
 
        Before the config files, so that an `ssl-cert-file` in `nix.conf` keeps
        the precedence it had when the constructor assigned during static
-       initialization. */
-    if (auto sslCertFile = getEnvOsNonEmpty(OS_STR("NIX_SSL_CERT_FILE")).or_else([] {
-            return getEnvOsNonEmpty(OS_STR("SSL_CERT_FILE"));
-        }))
-        config.set("ssl-cert-file", os_string_to_string(*sslCertFile));
+       initialization.
+
+       `getEnvOs` rather than `getEnvOsNonEmpty`, with the empty check *after*
+       the fallback: setting `NIX_SSL_CERT_FILE` to the empty string suppresses
+       `SSL_CERT_FILE` rather than falling through to it, because `or_else` sees
+       the variable as present. `getEnvOsNonEmpty` cannot express that, since it
+       reports set-but-empty and unset identically. */
+    if (auto sslCertFile = getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
+                               .or_else([] { return getEnvOs(OS_STR("SSL_CERT_FILE")); })
+                               .and_then([](OsString s) -> std::optional<OsString> {
+                                   return s.empty() ? std::nullopt : std::optional{std::move(s)};
+                               })) {
+        try {
+            config.set("ssl-cert-file", os_string_to_string(*sslCertFile));
+        } catch (Error & e) {
+            e.addTrace({}, "while applying the 'NIX_SSL_CERT_FILE' or 'SSL_CERT_FILE' environment variable");
+            throw;
+        }
+    }
 
     applyConfigFile(nixConfFile());
 
