@@ -933,7 +933,7 @@ void ChrootLinuxDerivationBuilder::setUser()
     });
 }
 
-SingleDrvOutputs ChrootLinuxDerivationBuilder::unprepareBuild()
+BuilderExit ChrootLinuxDerivationBuilder::unprepareBuild()
 {
     sandboxMountNamespace = -1;
     sandboxUserNamespace = -1;
