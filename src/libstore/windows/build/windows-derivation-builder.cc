@@ -148,7 +148,7 @@ public:
     /* --- DerivationBuilder --- */
 
     std::optional<Descriptor> startBuild() override;
-    SingleDrvOutputs unprepareBuild() override;
+    BuilderExit unprepareBuild() override;
 
     void cleanupBuild(bool force) override
     {
@@ -353,7 +353,7 @@ bool WindowsDerivationBuilderImpl::killChild()
     return true;
 }
 
-SingleDrvOutputs WindowsDerivationBuilderImpl::unprepareBuild()
+BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 {
     /* The caller only gets here once the log pipe hit EOF, which means the
        builder closed its handles. Reap anyway, so the exit code is settled. */
@@ -362,20 +362,7 @@ SingleDrvOutputs WindowsDerivationBuilderImpl::unprepareBuild()
     miscMethods->closeLogFile();
     miscMethods->childTerminated();
 
-    if (exitCode != 0) {
-        deletePath(tmpDir);
-        throw BuilderFailureError{
-            BuildResult::Failure::PermanentFailure,
-            exitCode,
-            fmt("builder '%s' exited with status %d", drv.builder, exitCode),
-        };
-    }
-
-    auto builtOutputs = registerOutputs();
-
-    deletePath(tmpDir);
-
-    return builtOutputs;
+    return {.status = exitCode};
 }
 
 } // namespace

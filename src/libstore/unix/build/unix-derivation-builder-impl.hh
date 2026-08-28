@@ -143,7 +143,7 @@ public:
 
     std::optional<Descriptor> startBuild() override;
 
-    SingleDrvOutputs unprepareBuild() override;
+    BuilderExit unprepareBuild() override;
 
 protected:
 

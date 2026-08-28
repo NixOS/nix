@@ -131,7 +131,7 @@ bool UnixDerivationBuilderImpl::killChild()
     return ret;
 }
 
-SingleDrvOutputs UnixDerivationBuilderImpl::unprepareBuild()
+BuilderExit UnixDerivationBuilderImpl::unprepareBuild()
 {
     /* Since we got an EOF on the logger pipe, the builder is presumed
        to have terminated.  In fact, the builder could also have
@@ -173,33 +173,12 @@ SingleDrvOutputs UnixDerivationBuilderImpl::unprepareBuild()
     }
 
     /* Check the exit status. */
-    if (!statusOk(status)) {
-
-        /* Check *before* cleaning up. */
-        bool diskFull = decideWhetherDiskFull();
-
-        cleanupBuild(false);
-
-        throw BuilderFailureError{
-            !derivationType.isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
-                                                      : BuildResult::Failure::PermanentFailure,
-            status,
-            diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
-        };
-    }
-
-    SingleDrvOutputs builtOutputs;
-    if (usingSubmitted) {
-        builtOutputs = checkSubmittedOutputs();
+    if (statusOk(status)) {
+        return {.status = status};
     } else {
-        /* Compute the FS closure of the outputs and register them as
-           being valid. */
-        builtOutputs = registerOutputs();
+        /* Check *before* cleaning up. */
+        return {.status = status, .diskFull = decideWhetherDiskFull()};
     }
-
-    cleanupBuild(true);
-
-    return builtOutputs;
 }
 
 bool UnixDerivationBuilderImpl::decideWhetherDiskFull()

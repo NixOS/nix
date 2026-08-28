@@ -156,6 +156,23 @@ struct DerivationBuilderCallbacks
 };
 
 /**
+ * The outcome of tearing down the build environment, from
+ * `DerivationBuilder::unprepareBuild`.
+ */
+struct BuilderExit
+{
+    /**
+     * The builder's exit status.
+     */
+    int status;
+
+    /**
+     * Whether the disk seemed full when the builder exited.
+     */
+    bool diskFull = false;
+};
+
+/**
  * This class represents the state for building locally.
  *
  * @todo Ideally, it would not be a class, but a single function.
@@ -234,14 +251,10 @@ public:
      * Tear down build environment after the builder exits (either on
      * its own or if it is killed).
      *
-     * @returns The first case indicates failure during output
-     * processing. A status code and exception are returned, providing
-     * more information. The second case indicates success, and
-     * realisations for each output of the derivation are returned.
-     *
-     * @throws BuildError
+     * @returns The builder's exit status and whether the disk seemed
+     * full at exit time.
      */
-    virtual SingleDrvOutputs unprepareBuild() = 0;
+    virtual BuilderExit unprepareBuild() = 0;
 
     /**
      * Check that the derivation outputs all exist and register them

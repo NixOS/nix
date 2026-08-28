@@ -54,7 +54,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
 
     void setUser() override;
 
-    SingleDrvOutputs unprepareBuild() override;
+    BuilderExit unprepareBuild() override;
 
     void killSandbox(bool getStats) override;
 

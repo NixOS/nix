@@ -1030,9 +1030,32 @@ Goal::Co DerivationBuildingGoal::buildLocally(
 
     trace("build done");
 
+    auto [status, diskFull] = builder->unprepareBuild();
+
+    /* Check the exit status. */
+    if (!statusOk(status)) {
+        builder->cleanupBuild(false);
+        builder.reset();
+        outputLocks.unlock();
+        co_return doneFailure(fixupBuilderFailureErrorMessage(
+            {
+                !derivation::type(*drv).isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
+                                                                  : BuildResult::Failure::PermanentFailure,
+                status,
+                diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
+            },
+            *buildLog));
+    }
+
     SingleDrvOutputs builtOutputs;
     try {
-        builtOutputs = builder->unprepareBuild();
+        /* Compute the FS closure of the outputs and register them as
+           being valid. With builder-rpc-v0 the builder already submitted
+           the outputs, so check those instead. */
+        builtOutputs = drvOptions.getRequiredSystemFeatures(*drv).count(std::string{drvFeatureBuilderRpcV0})
+                           ? builder->checkSubmittedOutputs()
+                           : builder->registerOutputs();
+        builder->cleanupBuild(true);
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
