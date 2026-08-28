@@ -31,7 +31,9 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     std::optional<std::filesystem::path> cgroup;
 
     ChrootLinuxDerivationBuilder(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
         : UnixDerivationBuilderImpl{store, miscMethods, params}
         , ChrootDerivationBuilder{store, miscMethods, params}
         , LinuxDerivationBuilder{store, miscMethods, params}

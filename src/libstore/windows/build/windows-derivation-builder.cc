@@ -92,7 +92,7 @@ class WindowsDerivationBuilderImpl : public DerivationBuilderImpl
 public:
 
     WindowsDerivationBuilderImpl(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         HANDLE ioport)
@@ -209,7 +209,7 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     env[OS_STR("TMPDIR")] = tmpDir.native();
     env[OS_STR("TEMPDIR")] = tmpDir.native();
     env[OS_STR("PWD")] = tmpDir.native();
-    env[OS_STR("NIX_STORE")] = os(store.storeDir);
+    env[OS_STR("NIX_STORE")] = os(store->storeDir);
 
     /* Most Windows programs, `cmd.exe` included, will not start without these, and
        system tools live outside the store so `PATH` is needed to find them at all.
@@ -327,7 +327,7 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)
         if (status.known)
-            deleteStalePath(store.toRealPath(status.known->path));
+            deleteStalePath(store->toRealPath(status.known->path));
 
     miscMethods->openLogFile();
 
@@ -369,7 +369,7 @@ BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 } // namespace
 
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store,
+    std::shared_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     HANDLE ioport)
