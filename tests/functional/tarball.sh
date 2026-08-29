@@ -31,6 +31,33 @@ test_tarball() {
     nix-build  -o "$TEST_ROOT"/result -E "import (fetchTree { type = \"tarball\"; url = \"file://$tarball\"; })"
     nix-build  -o "$TEST_ROOT"/result -E "import (fetchTree { type = \"tarball\"; url = \"file://$tarball\"; narHash = \"$hash\"; })"
 
+    # Once a URL has been fetched with a given narHash, re-fetching the same
+    # URL after its cache entry has genuinely expired (a nonzero TTL that has
+    # elapsed) should not require re-reading it. Prove this by corrupting the
+    # file in place and expecting the fetch to still succeed. (`--tarball-ttl
+    # 0` is excluded here since that's the explicit "always re-verify"
+    # signal used by `--refresh`, which must NOT be short-circuited.)
+    cp "$tarball" "$tarball.bak"
+    echo garbage > "$tarball"
+    sleep 2
+    nix-build -o "$TEST_ROOT"/result --tarball-ttl 1 -E "import (fetchTree { type = \"tarball\"; url = \"file://$tarball\"; narHash = \"$hash\"; })"
+    mv "$tarball.bak" "$tarball"
+
+    # `--refresh` (tarball-ttl 0) must always re-verify against the source,
+    # even if a narHash is pinned, so a mismatch must still be reported.
+    # Use a different URL with different (but validly archived) content, so
+    # the failure is a hash mismatch rather than an unpack error, and so the
+    # cache entry for `$tarball` itself isn't disturbed by the expected
+    # failure.
+    otherRoot=$TEST_ROOT/tarball-other
+    rm -rf "$otherRoot"
+    mkdir -p "$otherRoot"
+    echo "different content" > "$otherRoot/default.nix"
+    cp "${config_nix}" dependencies.builder*.sh "$otherRoot/"
+    otherTarball=$TEST_ROOT/tarball-other.tar$ext
+    (cd "$TEST_ROOT" && GNUTAR_REPRODUCIBLE=1 tar --mtime="$otherRoot"/default.nix --owner=0 --group=0 --numeric-owner --sort=name -c -f - tarball-other) | $compressor > "$otherTarball"
+    expectStderr 102 nix eval --refresh --raw --expr "(fetchTree { type = \"tarball\"; url = \"file://$otherTarball\"; narHash = \"$hash\"; }).outPath" | grepQuiet "NAR hash mismatch"
+
     [[ $(nix eval --impure --expr "(fetchTree \"file://$tarball\").lastModified") = 1000000000 ]]
 
     nix-instantiate --strict --eval -E "!((import (fetchTree { type = \"tarball\"; url = \"file://$tarball\"; narHash = \"$hash\"; })) ? submodules)" >&2
