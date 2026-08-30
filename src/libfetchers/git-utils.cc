@@ -35,6 +35,7 @@
 #include <git2/status.h>
 #include <git2/submodule.h>
 #include <git2/sys/odb_backend.h>
+#include <git2/sys/errors.h>
 #include <git2/sys/repository.h>
 #include <git2/sys/mempack.h>
 #include <git2/tag.h>
@@ -137,6 +138,7 @@ typedef std::unique_ptr<git_blob, Deleter<git_blob_free>> Blob;
 typedef std::unique_ptr<git_object, Deleter<git_object_free>> Object;
 typedef std::unique_ptr<git_commit, Deleter<git_commit_free>> Commit;
 typedef std::unique_ptr<git_reference, Deleter<git_reference_free>> Reference;
+typedef std::unique_ptr<git_reference_iterator, Deleter<git_reference_iterator_free>> ReferenceIterator;
 typedef std::unique_ptr<git_describe_result, Deleter<git_describe_result_free>> DescribeResult;
 typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusList;
 typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> Remote;
@@ -777,6 +779,35 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             gitArgs.push_back(OS_STR("--depth"));
             gitArgs.push_back(OS_STR("1"));
         }
+
+        Object fetchHead;
+        auto fetchHeadErr = git_revparse_single(Setter(fetchHead), *this, "FETCH_HEAD^{commit}");
+        if (fetchHeadErr == GIT_OK) {
+            auto fetchHeadOid = toHash(*git_object_id(fetchHead.get())).gitRev();
+            // Exact revision fetches may leave the cached commit referenced only by FETCH_HEAD.
+            // Git normally negotiates from refs, so it does not advertise that cached history and
+            // downloads it again. --negotiation-tip replaces the default tip set, so preserve
+            // refs/* when present and add the previous commit's OID explicitly.
+            // TODO: when the minimum Git version is 2.55, replace this workaround with additive
+            // --negotiation-include=<oid>.
+            ReferenceIterator refIterator;
+            if (git_reference_iterator_glob_new(Setter(refIterator), *this, "refs/*"))
+                throw GitError("creating Git reference iterator");
+
+            const char * refName;
+            if (auto err = git_reference_next_name(&refName, refIterator.get()); err == GIT_OK)
+                gitArgs.push_back(OS_STR("--negotiation-tip=refs/*"));
+            else if (err != GIT_ITEROVER)
+                throw GitError("iterating Git references");
+
+            gitArgs.push_back(string_to_os_string(std::string("--negotiation-tip=") + fetchHeadOid));
+        } else if (
+            fetchHeadErr == GIT_ENOTFOUND || fetchHeadErr == GIT_EINVALIDSPEC || fetchHeadErr == GIT_EPEEL) {
+            git_error_clear();
+        } else {
+            throw GitError("resolving FETCH_HEAD");
+        }
+
         gitArgs.push_back(OS_STR("--"));
         gitArgs.push_back(string_to_os_string(url));
         gitArgs.push_back(string_to_os_string(refspec));
