@@ -1,4 +1,5 @@
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/unordered/unordered_flat_map.hpp>
 #include <nlohmann/json.hpp>
 #include <assert.h>
 #include <boost/unordered/unordered_flat_set_fwd.hpp>
@@ -187,14 +188,20 @@ std::pair<nlohmann::json, LockFile::KeyMap> LockFile::toJSON() const
     KeyMap nodeKeys;
     boost::unordered_flat_set<std::string> keys;
 
+    /* The next numeric suffix to try for a given base key. Suffixes start at 2, since the
+       unsuffixed key occupies the _1 slot. Used to amortise name deduplication by memoising
+       the lower bound of suffixes that definitely cannot be used. */
+    boost::unordered_flat_map<std::string, int> keySuffixes;
+
     auto dumpNode = [&](this auto & dumpNode, std::string key, ref<const Node> node) -> std::string {
         auto k = nodeKeys.find(node);
         if (k != nodeKeys.end())
             return k->second;
 
         if (!keys.insert(key).second) {
-            for (int n = 2;; ++n) {
-                auto k = fmt("%s_%d", key, n);
+            auto & suffix = keySuffixes.try_emplace(key, 2).first->second;
+            for (;;) {
+                auto k = fmt("%s_%d", key, suffix++);
                 if (keys.insert(k).second) {
                     key = k;
                     break;
