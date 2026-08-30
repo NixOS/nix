@@ -29,7 +29,7 @@ For each client-initiated Unix socket connection, the server:
 
 Example (with `\0` shown as newlines for clarity):
 ```
-/nix/store/s66mzxpvicwk07gjbjfw9izjfa797vsw-hello-2.12.1
+/nix/store/687659ychf9w7hg2k66wy3rzb64qch01-hello-2.12.1
 /nix/store/fvpr7x8l3illdnziggvkhdpf6vikg65w-git-2.44.0
 ```
 

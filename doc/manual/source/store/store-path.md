@@ -105,16 +105,16 @@ But if the store has a file system representation, the following should be true:
   The permissions and other metadata for these files in the store directory is in the normal form described in [Exposing in OS file systems](./file-system-object/os-file-system.md).
 
 The above properties mean that the following file accesses will work.
-Suppose we have a store available on the file system per the above rules, and `b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1` is the store path base name of a store object in that store.
+Suppose we have a store available on the file system per the above rules, and `q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1` is the store path base name of a store object in that store.
 
 - Suppose that the store directory (path) is `/foo/bar`.
-  Then, `/foo/bar/b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1` exists and is the file system object of that store object.
+  Then, `/foo/bar/q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1` exists and is the file system object of that store object.
 
 - Suppose that we don't know what the store directory path of the store is, but we do have a capability `storeDir` to the store directory on the file system.
   (This would be a "file descriptor" on Unix, or a "file handle" on Windows.)
   Then (using the Unix notation for this):
   ```
-  openat(storeDir, "b6gvzjyb2pg0kjfwrjmg1vfhh54ad73z-firefox-33.1", O_NOFOLLOW)
+  openat(storeDir, "q06x3jll2yfzckz2bzqak089p43ixkkq-firefox-33.1", O_NOFOLLOW)
   ```
   will succeed (so long as the file system object is not a symlink), and the yielded capability will point to the file system object of that store object.
 
