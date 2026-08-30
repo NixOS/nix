@@ -211,6 +211,9 @@ createGitRepo "$TEST_ROOT"/minimal
 git -C "$TEST_ROOT"/minimal fetch "$repo" "$rev2"
 git -C "$TEST_ROOT"/minimal checkout "$rev2"
 [[ $(nix eval --impure --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; }).rev") = "$rev2" ]]
+# Detached HEAD must not fall back to a guessed 'master' ref.
+expectStderr 0 nix eval --raw --expr "(builtins.fetchGit { url = $TEST_ROOT/minimal; rev = \"$rev2\"; }).outPath" \
+    | grepQuietInverse "could not read HEAD ref"
 
 # Explicit ref = "HEAD" should work, and produce the same outPath as without ref
 path7=$(nix eval --impure --raw --expr "(builtins.fetchGit { url = \"file://$repo\"; ref = \"HEAD\"; }).outPath")
