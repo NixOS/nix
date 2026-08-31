@@ -10,7 +10,7 @@ error:
 
        … while evaluating attribute 'args' of derivation 'foo'
          at /pwd/lang/eval-fail-derivationStrict-21.nix:6:3:
-            5|   outputs = "out";
+            5|   outputs = [ "out" ];
             6|   args = [
              |   ^
             7|     "a"
