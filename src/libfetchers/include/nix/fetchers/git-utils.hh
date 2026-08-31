@@ -5,6 +5,14 @@
 
 namespace nix {
 
+/**
+ * The git program used for all git invocations (build-time configurable
+ * via the `git-program` option; either a name resolved via PATH or an
+ * absolute path).
+ */
+const std::string & gitProgram();
+
+
 namespace fetchers {
 struct PublicKey;
 struct Settings;
