@@ -23,6 +23,7 @@
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
+#include <git2/index.h>
 #include <git2/indexer.h>
 #include <git2/object.h>
 #include <git2/odb.h>
@@ -117,6 +118,7 @@ typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> 
 typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
 typedef std::unique_ptr<git_indexer, Deleter<git_indexer_free>> Indexer;
+typedef std::unique_ptr<git_index, Deleter<git_index_free>> Index;
 
 static Hash toHash(const git_oid & oid)
 {
@@ -572,10 +574,27 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         if (git_status_foreach_ext(*this, &options, &statusCallbackTrampoline, &statusCallback))
             throw GitError("getting working directory status");
 
-        /* Get submodule info. */
+        /* Gitlinks in the index are the submodules; .gitmodules only
+           supplies their URLs. */
+        std::map<CanonPath, Submodule> configured;
         auto modulesFile = path / ".gitmodules";
         if (pathExists(modulesFile))
-            info.submodules = parseSubmodules(modulesFile);
+            for (auto & submodule : parseSubmodules(modulesFile))
+                configured.emplace(submodule.path, submodule);
+
+        Index index;
+        if (git_repository_index(Setter(index), *this))
+            throw GitError("opening index of Git repository %s", PathFmt(path));
+        for (size_t n = 0, count = git_index_entrycount(index.get()); n < count; ++n) {
+            auto entry = git_index_get_byindex(index.get(), n);
+            if (entry->mode != GIT_FILEMODE_COMMIT || git_index_entry_stage(entry) != 0)
+                continue;
+            CanonPath entryPath(entry->path);
+            if (auto it = configured.find(entryPath); it != configured.end())
+                info.submodules.push_back(std::move(it->second));
+            else
+                info.submodules.push_back(Submodule{.path = entryPath});
+        }
 
         return info;
     }
