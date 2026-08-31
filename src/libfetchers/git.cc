@@ -767,7 +767,10 @@ struct GitInputScheme : InputScheme
     {
         auto head = std::visit(
             overloaded{
-                [&](const std::filesystem::path & path) { return GitRepo::openRepo(path, {})->getWorkdirRef(); },
+                [&](const std::filesystem::path & path) -> std::optional<std::string> {
+                    /* A detached HEAD is still resolvable by libgit2. */
+                    return GitRepo::openRepo(path, {})->getWorkdirRef().value_or("HEAD");
+                },
                 [&](const ParsedURL & url) { return readHeadCached(settings, url.to_string(), shallow); }},
             repoInfo.location);
         if (!head) {
