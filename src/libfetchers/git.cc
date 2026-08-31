@@ -987,10 +987,9 @@ struct GitInputScheme : InputScheme
     {
         auto repoPath = repoInfo.getPath().value();
 
-        if (getSubmodulesAttr(input))
-            /* Create mountpoints for the submodules. */
-            for (auto & submodule : repoInfo.workdirInfo.submodules)
-                repoInfo.workdirInfo.files.insert(submodule.path);
+        /* Create mountpoints for the submodules. */
+        for (auto & submodule : repoInfo.workdirInfo.submodules)
+            repoInfo.workdirInfo.files.insert(submodule.path);
 
         auto repo = GitRepo::openRepo(repoPath, {});
 
@@ -1000,12 +999,19 @@ struct GitInputScheme : InputScheme
             repo->getAccessor(repoInfo.workdirInfo, {.exportIgnore = exportIgnore}, makeNotAllowedError(repoPath));
 
         /* If the repo has submodules, return a mounted input accessor
-           consisting of the accessor for the top-level repo and the
-           accessors for the submodule workdirs. */
-        if (getSubmodulesAttr(input) && !repoInfo.workdirInfo.submodules.empty()) {
+           consisting of the accessor for the top-level repo and, per
+           submodule, either its workdir accessor or an empty directory
+           where getAccessorFromCommit() would produce one (submodules
+           disabled, or a gitlink without a .gitmodules entry). */
+        if (!repoInfo.workdirInfo.submodules.empty()) {
             std::map<CanonPath, nix::ref<SourceAccessor>> mounts;
 
             for (auto & submodule : repoInfo.workdirInfo.submodules) {
+                if (!getSubmodulesAttr(input) || submodule.url.empty()) {
+                    mounts.insert_or_assign(submodule.path, makeEmptySourceAccessor());
+                    continue;
+                }
+
                 auto submodulePath = repoPath / submodule.path.rel();
                 fetchers::Attrs attrs;
                 attrs.insert_or_assign("type", "git");
