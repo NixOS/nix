@@ -98,8 +98,12 @@ configdata_pub.set(
 )
 
 if host_machine.system() == 'darwin'
-  sandbox = cxx.find_library('sandbox')
-  deps_other += [ sandbox ]
+  # sandbox_init* is exported by libSystem itself on all supported macOS versions.
+  # The way that nixpkgs darwin builds work means it has be added some of the time.
+  sandbox = cxx.find_library('sandbox', required : false, static : false)
+  if sandbox.found()
+    deps_other += [ sandbox ]
+  endif
 endif
 
 if host_machine.system() == 'windows'

@@ -33,6 +33,16 @@ let
         export PATH=$PATH:$pkg/bin
       done
 
+      # Mimic the structured attrs behavior of nixpkgs stdenv for `$out` and all other outputs.
+      # Without this, the test doesn't have an $out if run outside of Nix.
+      # One could argue that it shouldn't rely on that either!
+      if [ -n "''${NIX_ATTRS_SH_FILE:-}" ]; then
+        for o in "''${!outputs[@]}"; do
+          eval "''${o}=''${outputs[$o]}"
+          export "''${o}"
+        done
+      fi
+
       declare -a arr1=(1 2 "3 4" 5)
       declare -a arr2=(x $'\n' $'x\ny')
       fun() {
