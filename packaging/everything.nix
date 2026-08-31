@@ -166,7 +166,7 @@ stdenv.mkDerivation (finalAttrs: {
       ln -sT ${nix-manual} $doc
       ln -sT ${nix-manual.man} $man
     ''
-    + lib.optionalString stdenv.isLinux ''
+    + lib.optionalString stdenv.hostPlatform.isLinux ''
       lndir ${nix-nswrapper} $out
     '';
 
