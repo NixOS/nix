@@ -83,9 +83,9 @@ namespace {
 /**
  * Clear `FILE_ATTRIBUTE_READONLY` through an already-open handle.
  *
- * A file carrying it cannot be deleted, and the store is full of them:
- * canonicalisation chmods store contents to 0444, and `chmod()` on Windows is
- * `::_wchmod`, which turns a missing write bit into exactly this attribute.
+ * A file carrying it cannot be deleted. Anything that clears the write bit
+ * produces one, because `chmod()` on Windows is `::_wchmod`, which maps a
+ * missing write bit onto exactly this attribute.
  *
  * This is the counterpart of the Unix walk relaxing permissions with
  * `fchmodatTryNoFollow` before it recurses. Doing it through the handle rather
@@ -165,18 +165,31 @@ bool deleteByHandle(Descriptor fd)
  * entries while an enumeration of the same directory is in flight is not
  * defined to visit each entry exactly once.
  */
-std::vector<std::wstring> listByHandle(Descriptor fd, const std::filesystem::path & path)
+std::vector<OsString> listByHandle(Descriptor fd, const std::filesystem::path & path)
 {
-    std::vector<std::wstring> names;
+    std::vector<OsString> names;
 
-    /* Big enough that a typical directory needs one round trip, but the loop
-       below does not depend on that. */
-    std::vector<char> buf(64 * 1024);
+    /* The entries are read into this and then cast to `FILE_FULL_DIR_INFO`,
+       which has 8-byte members, so the storage has to be at least that aligned.
+       A `char` buffer would only be 1-byte aligned as a type and would be
+       relying on `operator new` handing back something better, which it does but
+       does not have to at that type. Carry the requirement in the element type
+       instead.
+
+       Sized so that a typical directory needs one round trip; the loop below
+       does not depend on that. */
+    struct alignas(alignof(FILE_FULL_DIR_INFO)) Chunk
+    {
+        char bytes[alignof(FILE_FULL_DIR_INFO)];
+    };
+
+    std::vector<Chunk> buf(64 * 1024 / sizeof(Chunk));
+    const auto bufBytes = buf.size() * sizeof(Chunk);
 
     while (true) {
         checkInterrupt();
 
-        if (!GetFileInformationByHandleEx(fd, FileFullDirectoryInfo, buf.data(), buf.size())) {
+        if (!GetFileInformationByHandleEx(fd, FileFullDirectoryInfo, buf.data(), bufBytes)) {
             auto lastError = GetLastError();
             if (lastError == ERROR_NO_MORE_FILES)
                 break;
@@ -185,7 +198,7 @@ std::vector<std::wstring> listByHandle(Descriptor fd, const std::filesystem::pat
 
         auto * info = reinterpret_cast<FILE_FULL_DIR_INFO *>(buf.data());
         while (true) {
-            std::wstring name(info->FileName, info->FileNameLength / sizeof(wchar_t));
+            OsString name(info->FileName, info->FileNameLength / sizeof(OsChar));
             if (name != L"." && name != L"..")
                 names.push_back(std::move(name));
             if (info->NextEntryOffset == 0)
