@@ -24,6 +24,26 @@ TEST(readNum, negativeValuesSerialiseWellDefined)
     EXPECT_EQ(readNum<uint64_t>(*makeNumSource(int16_t(-1))), std::numeric_limits<uint64_t>::max());
 }
 
+TEST(readString, roundTrip)
+{
+    for (auto & s : std::vector<std::string>{"", "x", "1234567", "12345678", "123456789", std::string(300'000, 'a')}) {
+        StringSink sink;
+        sink << s;
+        StringSource source(sink.s);
+        EXPECT_EQ(readString(source), s);
+    }
+}
+
+TEST(readString, bogusLengthDoesNotPreallocate)
+{
+    // 1 TiB length prefix followed by EOF: must fail on the read, not by
+    // allocating (and zeroing) the announced size up front.
+    StringSink sink;
+    sink << (uint64_t(1) << 40);
+    StringSource source(sink.s);
+    EXPECT_THROW(readString(source), EndOfFile);
+}
+
 TEST(readPadding, works)
 {
     for (unsigned i = 0; i < 8; ++i)
