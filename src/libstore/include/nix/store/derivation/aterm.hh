@@ -31,34 +31,58 @@ inline constexpr bool defaultSupportWindowsStoreDir =
 /**
  * Print a derivation.
  */
-std::string
-unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
+template<typename Out>
+std::string unparse(
+    const Derivation<std::set<SingleDerivedPath>, Out> & drv,
+    const StoreDirConfig & store,
+    bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
+
+extern template std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir);
+extern template std::string
+unparse(const FullDeferred & drv, const StoreDirConfig & store, bool supportWindowsStoreDir);
+extern template std::string
+unparse(const FullInputAddressed & drv, const StoreDirConfig & store, bool supportWindowsStoreDir);
 
 namespace masked {
 struct HashInputs;
 }
 
 /**
- * Print a derivation in one of the intermediate forms: with the inputs
+ * The derivation shapes `unparse` below can print: with the inputs
  * already flattened (`FullInputs`), or with them replaced by their
  * hashes modulo (`masked::HashInputs`), which is the form whose hash is
  * an input address.
+ *
+ * @note This is a named concept rather than a `requires` clause written
+ * out at each declaration because two atomic constraints are only
+ * identical when formed from the *same appearance* of an expression;
+ * spelling the same condition twice would declare two distinct
+ * overloads.
+ */
+template<typename Inputs, typename Out>
+concept RenderableDerivation =
+    // Regular `FullInputs` case takes the `Output` variant, or either of
+    // the input-addressing alternatives on their own
+    (std::is_same_v<Inputs, FullInputs>
+     && (std::is_same_v<Out, Output> || std::is_same_v<Out, Output::InputAddressed>
+         || std::is_same_v<Out, Output::Deferred>) )
+    // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
+    || (std::is_same_v<Inputs, masked::HashInputs>
+        && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) );
+
+/**
+ * Print a derivation in one of the intermediate forms.
  *
  * The `masked::HashInputs` cases are not round-trippable: `parse` cannot
  * read them back, as their input derivations are named by hash rather
  * than by store path.
  */
 template<typename Inputs, typename Out>
+    requires RenderableDerivation<Inputs, Out>
 std::string unparse(
     const Derivation<Inputs, Out> & drv,
     const StoreDirConfig & store,
-    bool supportWindowsStoreDir = defaultSupportWindowsStoreDir)
-    requires(
-        // Regular `FullInputs` case must have regular `Output` outputs
-        (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
-        // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, masked::HashInputs>
-            && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ));
+    bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
 
 /**
  * Read a derivation from a file.
