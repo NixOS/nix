@@ -783,16 +783,11 @@ static void unparseOutput(
 
 /**
  * This one, unlike the public one, is polymorphic on the output parameter to
- * support the hash modulo intermediate form.
+ * support the masked hash intermediate form.
  */
 template<typename Inputs, typename Out>
+    requires RenderableDerivation<Inputs, Out>
 std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
-    requires(
-        // Regular `FullInputs` case must have regular `Output` outputs
-        (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
-        // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, masked::HashInputs>
-            && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ))
 {
     using namespace std::literals::string_view_literals;
 
@@ -801,7 +796,7 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
 
     /* Use older unversioned form if possible, for wider compat. Use
        newer form only if we need it, which we do for
-       `Xp::DynamicDerivations`. (The hash modulo intermediate form
+       `Xp::DynamicDerivations`. (The masked hash intermediate form
        never has dynamic inputs; they are resolved away before it is
        constructed.) */
     bool dynDrvDep = false;
@@ -865,13 +860,13 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
     return s;
 }
 
-/* The hash modulo intermediate forms, unparsed by `masked.cc`. */
-template std::string
-unparse(const Derivation<masked::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
-template std::string
-unparse(const Derivation<masked::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
+/* The masked hash intermediate forms, unparsed by `masked.cc`. */
+template std::string unparse(const masked::Drv<Output::Deferred> & drv, const StoreDirConfig & store, bool);
+template std::string unparse(const masked::Drv<Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
 
-std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
+template<typename Out>
+std::string unparse(
+    const Derivation<std::set<SingleDerivedPath>, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {
     // Convert to FullInputs for ATerm serialization
     return unparse(
@@ -879,6 +874,10 @@ std::string unparse(const Full & drv, const StoreDirConfig & store, bool support
         store,
         supportWindowsStoreDir);
 }
+
+template std::string unparse(const Full & drv, const StoreDirConfig & store, bool);
+template std::string unparse(const FullDeferred & drv, const StoreDirConfig & store, bool);
+template std::string unparse(const FullInputAddressed & drv, const StoreDirConfig & store, bool);
 
 /* --------------------------------------------------------------------------
    Wire protocol serialisation
