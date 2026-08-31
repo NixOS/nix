@@ -118,6 +118,8 @@
 
   [derivation expression]: #gloss-derivation-expression
 
+  [directed acyclic graph]: #gloss-directed-acyclic-graph
+
 - [derivation path]{#gloss-derivation-path}
 
   A [store path] which uniquely identifies a [store derivation].
