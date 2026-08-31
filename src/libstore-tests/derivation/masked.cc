@@ -3,14 +3,15 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/masked.hh"
-#include "nix/store/dummy-store-impl.hh"
-#include "nix/store/tests/libstore.hh"
+#include "nix/store/store-dir-config.hh"
+#include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
 
 namespace nix::derivation::masked {
 
 /**
- * Tests for `hash` and `hashInput`.
+ * Tests for `bothMaskedDerivation`, `hashDerivation`, and
+ * `hashInput`.
  *
  * The point of "hash modulo" is that derivations which differ only in
  * the *provenance* of their fixed-output inputs are indistinguishable:
@@ -18,10 +19,11 @@ namespace nix::derivation::masked {
  * have different derivation paths, but everything downstream of them
  * should have the same output paths.
  *
- * Besides the derivations themselves, we characterize the intermediate
- * "modulo" ATerm --- the thing that is actually hashed --- so that the
- * input-addressing computation is reviewable, and not just a hash we
- * would have to take on faith.
+ * Besides the derivations themselves, we characterize the derivation
+ * masked both ways --- the thing that is actually hashed --- both structurally
+ * and as an ATerm golden master, so that the input-addressing
+ * computation is reviewable, and not just a hash we would have to take
+ * on faith.
  *
  * The graph, mirroring the one in issue #16307:
  *
@@ -38,7 +40,7 @@ namespace nix::derivation::masked {
  *   the intermediates are indistinguishable modulo, these two must have
  *   the same hash modulo.
  */
-class HashModuloTest : public LibStoreTest, public virtual CharacterizationTest
+class HashModuloTest : public virtual CharacterizationTest
 {
     std::filesystem::path unitTestData = getUnitTestData() / "derivation" / "hash-modulo";
 
@@ -61,21 +63,35 @@ public:
         return unitTestData / testStem;
     }
 
+private:
+    std::string storeDir{"/nix/store"};
 protected:
-    HashModuloTest()
-        : LibStoreTest([] {
-            auto config = make_ref<DummyStoreConfig>(DummyStoreConfig::Params{});
-            config->readOnly = false;
-            return config->openDummyStore();
-        }())
+    /**
+     * `StoreDirConfig` holds the store directory *by reference*, so the string
+     * has to outlive it; declared first so it is initialised first.
+     */
+    StoreDirConfig store{storeDir};
+
+    /**
+     * The input derivations this fixture has handed out references to.
+     *
+     * The library asks for a `ReadDerivation` rather than a whole
+     * store, so the test can be its own: no store is opened, nothing is
+     * written, and what the recursion sees is plainly whatever was put
+     * here.
+     */
+    using Written = std::map<StorePath, Full>;
+
+    static ReadDerivation readDrv(Written & written)
     {
+        return [&written](const StorePath & drvPath) { return written.at(drvPath); };
     }
 
     /**
      * A fixed-output derivation, whose output path (and therefore whose
      * hash modulo) does not depend on `builder`.
      */
-    Full makeSource(std::string_view builder)
+    Full makeSource(Written & written, std::string_view builder)
     {
         Full drv{
             .outputs{
@@ -93,7 +109,7 @@ protected:
             .builder = std::string{builder},
             .name = "source",
         };
-        fillInOutputPaths(drv, *store);
+        fillInOutputPaths(drv, store, readDrv(written));
         return drv;
     }
 
@@ -101,16 +117,17 @@ protected:
      * A regular (input-addressed) derivation with two outputs, taking
      * one of the sources as its only input derivation.
      */
-    Full makeIntermediate(const Full & source, std::string_view builder = "/bin/intermediate")
+    FullInputAddressed
+    makeIntermediate(Written & written, const Full & source, std::string_view builder = "/bin/intermediate")
     {
-        Full drv{
+        FullDeferred drv{
             .outputs{
-                {"dev", Output::Deferred{}},
-                {"out", Output::Deferred{}},
+                {"dev", {}},
+                {"out", {}},
             },
             .inputs{
                 SingleDerivedPath::Built{
-                    .drvPath = drvRef(source),
+                    .drvPath = drvRef(written, source),
                     .output = "out",
                 },
             },
@@ -118,14 +135,15 @@ protected:
             .builder = std::string{builder},
             .name = "intermediate",
         };
-        fillInOutputPaths(drv, *store);
-        return drv;
+        auto filledIn = fillInOutputPaths(std::move(drv), store, readDrv(written));
+        EXPECT_TRUE(filledIn);
+        return filledIn.value_or(FullInputAddressed{});
     }
 
     /**
      * A derivation depending on the given outputs of the given input
      * derivations, with its own output left deferred so that
-     * `hash` masks it.
+     * `bothMaskedDerivation` masks it.
      */
     Full makeParent(std::set<SingleDerivedPath> inputs)
     {
@@ -138,34 +156,68 @@ protected:
         };
     }
 
-    ref<const SingleDerivedPath> drvRef(const Full & drv)
+    /**
+     * The `Full`-taking helpers below want the `Output` variant, so a
+     * statically input-addressed derivation has to widen back to it.
+     */
+    static Full widen(const FullInputAddressed & drv)
     {
-        return makeConstantStorePathRef(store->writeDerivation(drv, NoRepair));
+        return drv.mapOutputs([](const Output::InputAddressed & o) -> Output { return o; });
+    }
+
+    ref<const SingleDerivedPath> drvRef(Written & written, const Full & drv)
+    {
+        auto drvPath = computeStorePath(store, drv);
+        written.insert_or_assign(drvPath, drv);
+        return makeConstantStorePathRef(std::move(drvPath));
+    }
+
+    ref<const SingleDerivedPath> drvRef(Written & written, const FullInputAddressed & drv)
+    {
+        return drvRef(written, widen(drv));
+    }
+
+    /**
+     * Every caller wants the same store directory and the same lookup,
+     * so that convenience belongs here rather than in the library.
+     */
+    std::optional<Drv<Output::Deferred>> bothMasked(Written & written, const Full & drv)
+    {
+        return bothMaskedDerivation(store, readDrv(written), drv);
+    }
+
+    HashModulo inputModulo(Written & written, const Full & drv)
+    {
+        return hashInput(store, readDrv(written), drv);
     }
 
     /**
      * The derivation each golden master stem stands for. Built on
      * demand so that each test gets its own store.
      */
-    Full named(std::string_view stem)
+    Full named(Written & written, std::string_view stem)
     {
         if (stem == "source-first")
-            return makeSource("/bin/first");
+            return makeSource(written, "/bin/first");
         if (stem == "source-second")
-            return makeSource("/bin/second");
+            return makeSource(written, "/bin/second");
         if (stem == "intermediate-first")
-            return makeIntermediate(makeSource("/bin/first"));
+            return widen(makeIntermediate(written, makeSource(written, "/bin/first")));
         if (stem == "intermediate-second")
-            return makeIntermediate(makeSource("/bin/second"));
+            return widen(makeIntermediate(written, makeSource(written, "/bin/second")));
         if (stem == "parent-split")
             return makeParent({
-                SingleDerivedPath::Built{.drvPath = drvRef(named("intermediate-first")), .output = "out"},
-                SingleDerivedPath::Built{.drvPath = drvRef(named("intermediate-second")), .output = "dev"},
+                SingleDerivedPath::Built{
+                    .drvPath = drvRef(written, named(written, "intermediate-first")), .output = "out"},
+                SingleDerivedPath::Built{
+                    .drvPath = drvRef(written, named(written, "intermediate-second")), .output = "dev"},
             });
         if (stem == "parent-joined")
             return makeParent({
-                SingleDerivedPath::Built{.drvPath = drvRef(named("intermediate-second")), .output = "out"},
-                SingleDerivedPath::Built{.drvPath = drvRef(named("intermediate-second")), .output = "dev"},
+                SingleDerivedPath::Built{
+                    .drvPath = drvRef(written, named(written, "intermediate-second")), .output = "out"},
+                SingleDerivedPath::Built{
+                    .drvPath = drvRef(written, named(written, "intermediate-second")), .output = "dev"},
             });
         ADD_FAILURE() << "no such derivation '" << stem << "'";
         return {};
@@ -179,12 +231,14 @@ struct HashModuloJsonTest : HashModuloTest,
 
 TEST_P(HashModuloJsonTest, from_json)
 {
-    readJsonTest(GetParam(), named(GetParam()));
+    Written written;
+    readJsonTest(GetParam(), named(written, GetParam()));
 }
 
 TEST_P(HashModuloJsonTest, to_json)
 {
-    writeJsonTest(GetParam(), named(GetParam()));
+    Written written;
+    writeJsonTest(GetParam(), named(written, GetParam()));
 }
 
 INSTANTIATE_TEST_SUITE_P(HashModuloJSON, HashModuloJsonTest, ::testing::ValuesIn(HashModuloTest::stems));
@@ -194,43 +248,48 @@ struct HashModuloATermTest : HashModuloTest, ::testing::WithParamInterface<std::
 
 TEST_P(HashModuloATermTest, parse)
 {
-    auto expected = named(GetParam());
+    Written written;
+    auto expected = named(written, GetParam());
     readTest(std::string{GetParam()} + ".drv", [&](auto encoded) {
-        auto parsed = parse(*store, std::move(encoded), expected.name);
+        auto parsed = parse(store, std::move(encoded), expected.name);
         EXPECT_EQ(parsed, expected);
     });
 }
 
 TEST_P(HashModuloATermTest, unparse)
 {
-    writeTest(std::string{GetParam()} + ".drv", [&] { return unparse(named(GetParam()), *store); });
+    Written written;
+    writeTest(std::string{GetParam()} + ".drv", [&] { return unparse(named(written, GetParam()), store); });
 }
 
 INSTANTIATE_TEST_SUITE_P(HashModuloATerm, HashModuloATermTest, ::testing::ValuesIn(HashModuloTest::stems));
 
 /**
- * The intermediate ATerm the input address is computed from. It is not
- * a derivation --- input derivations appear as bare hashes rather than
- * store paths --- so it is characterized in one direction only.
+ * The derivation masked both ways that the input address is computed
+ * from. It is not
+ * a derivation that can be built or written --- its input derivations
+ * are named by hash rather than by store path --- so it is characterized
+ * in one direction only.
  *
  * The fixed-output `source-*` derivations have no single hash modulo,
- * and so no intermediate ATerm either; they are not included.
+ * and so no masked form either; they are not included.
  */
-struct HashModuloModuloTest : HashModuloTest, ::testing::WithParamInterface<std::string_view>
+struct HashModuloBothMaskedTest : HashModuloTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(HashModuloModuloTest, unparse)
+TEST_P(HashModuloBothMaskedTest, unparse)
 {
-    writeTest(std::string{GetParam()} + "-modulo.drv", [&] {
-        auto encoded = unparseModulo(*store, named(GetParam()));
-        EXPECT_TRUE(encoded);
-        return encoded.value_or("");
+    Written written;
+    writeTest(std::string{GetParam()} + "-both-masked.drv", [&] {
+        auto m = bothMasked(written, named(written, GetParam()));
+        EXPECT_TRUE(m);
+        return m ? unparse(*m, store) : "";
     });
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    HashModuloModulo,
-    HashModuloModuloTest,
+    HashModuloBothMasked,
+    HashModuloBothMaskedTest,
     ::testing::Values("intermediate-first", "intermediate-second", "parent-split", "parent-joined"));
 
 /**
@@ -243,26 +302,31 @@ INSTANTIATE_TEST_SUITE_P(
  */
 TEST_F(HashModuloTest, collidingInputDrvsMergeOutputNames)
 {
-    auto first = named("intermediate-first");
-    auto second = named("intermediate-second");
+    Written written;
+    auto first = named(written, "intermediate-first");
+    auto second = named(written, "intermediate-second");
 
     /* Same output paths (that is the point), different derivations. */
     EXPECT_EQ(first.outputs, second.outputs);
-    EXPECT_NE(store->writeDerivation(first, NoRepair), store->writeDerivation(second, NoRepair));
+    EXPECT_NE(computeStorePath(store, first), computeStorePath(store, second));
 
-    /* ...and so the same intermediate ATerm, hence the same hash. */
-    EXPECT_EQ(unparseModulo(*store, first), unparseModulo(*store, second));
+    /* ...and so the same masked derivation, hence the same hash. */
+    EXPECT_EQ(bothMasked(written, first), bothMasked(written, second));
 
-    /* `out` from one and `dev` from the other therefore hashes the same
-       as both outputs from a single one of them. */
-    EXPECT_EQ(hash(*store, named("parent-split")), hash(*store, named("parent-joined")));
+    /* `out` from one and `dev` from the other therefore gives the same
+       masked derivation as both outputs from a single one of them:
+       one merged `inputDrvs` entry naming `dev` and `out`. Comparing
+       the structure rather than the hash means a regression here says
+       which output names went missing. */
+    EXPECT_EQ(
+        bothMasked(written, named(written, "parent-split")), bothMasked(written, named(written, "parent-joined")));
 
     /* ...and symmetrically, with the roles of the two swapped. */
     auto splitOther = makeParent({
-        SingleDerivedPath::Built{.drvPath = drvRef(first), .output = "dev"},
-        SingleDerivedPath::Built{.drvPath = drvRef(second), .output = "out"},
+        SingleDerivedPath::Built{.drvPath = drvRef(written, first), .output = "dev"},
+        SingleDerivedPath::Built{.drvPath = drvRef(written, second), .output = "out"},
     });
-    EXPECT_EQ(hash(*store, splitOther), hash(*store, named("parent-joined")));
+    EXPECT_EQ(bothMasked(written, splitOther), bothMasked(written, named(written, "parent-joined")));
 }
 
 /**
@@ -271,7 +335,8 @@ TEST_F(HashModuloTest, collidingInputDrvsMergeOutputNames)
  */
 TEST_F(HashModuloTest, differingOutputNamesDiffer)
 {
-    auto intermediate = drvRef(named("intermediate-first"));
+    Written written;
+    auto intermediate = drvRef(written, named(written, "intermediate-first"));
 
     auto justOut = makeParent({
         SingleDerivedPath::Built{.drvPath = intermediate, .output = "out"},
@@ -281,7 +346,7 @@ TEST_F(HashModuloTest, differingOutputNamesDiffer)
         SingleDerivedPath::Built{.drvPath = intermediate, .output = "dev"},
     });
 
-    EXPECT_NE(hash(*store, justOut), hash(*store, both));
+    EXPECT_NE(bothMasked(written, justOut), bothMasked(written, both));
 }
 
 /**
@@ -291,8 +356,9 @@ TEST_F(HashModuloTest, differingOutputNamesDiffer)
  */
 TEST_F(HashModuloTest, fixedOutputIsProvenanceFree)
 {
-    auto first = hashInput(*store, named("source-first"));
-    auto second = hashInput(*store, named("source-second"));
+    Written written;
+    auto first = inputModulo(written, named(written, "source-first"));
+    auto second = inputModulo(written, named(written, "source-second"));
 
     auto * outputHashes = std::get_if<HashModulo::CaOutputHashes>(&first.raw);
     ASSERT_TRUE(outputHashes);
@@ -306,19 +372,20 @@ TEST_F(HashModuloTest, fixedOutputIsProvenanceFree)
  */
 TEST_F(HashModuloTest, differingInputDrvsDiffer)
 {
-    auto source = makeSource("/bin/first");
+    Written written;
+    auto source = makeSource(written, "/bin/first");
 
     auto a = makeParent({
-        SingleDerivedPath::Built{.drvPath = drvRef(makeIntermediate(source)), .output = "out"},
+        SingleDerivedPath::Built{.drvPath = drvRef(written, makeIntermediate(written, source)), .output = "out"},
     });
     auto b = makeParent({
         SingleDerivedPath::Built{
-            .drvPath = drvRef(makeIntermediate(source, "/bin/something-else")),
+            .drvPath = drvRef(written, makeIntermediate(written, source, "/bin/something-else")),
             .output = "out",
         },
     });
 
-    EXPECT_NE(hash(*store, a), hash(*store, b));
+    EXPECT_NE(bothMasked(written, a), bothMasked(written, b));
 }
 
 } // namespace nix::derivation::masked

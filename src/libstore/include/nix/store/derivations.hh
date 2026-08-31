@@ -11,6 +11,7 @@
 #include "nix/store/parsed-derivations.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 #include <variant>
@@ -166,6 +167,42 @@ using Basic = Derivation<StorePathSet>;
  */
 using Full = Derivation<std::set<SingleDerivedPath>>;
 
+/**
+ * How to get a derivation's value from its store path.
+ *
+ * Several computations over derivations --- filling in output paths,
+ * checking invariants, hashing modulo --- need to recurse into input
+ * derivations, but that is *all* they need a store for; everything else
+ * they touch is `StoreDirConfig`, for printing paths. Taking just this
+ * much lets them be used (and tested) without a real store, and makes
+ * it evident from the signature that nothing else is queried.
+ */
+using ReadDerivation = fun<Full(const StorePath & drvPath)>;
+
+/**
+ * `Store::readInvalidDerivation` as a `ReadDerivation`, for callers
+ * that do have a whole store to hand.
+ */
+ReadDerivation readInvalid(Store & store);
+
+/**
+ * @brief `Full`, but statically known to have no output paths yet.
+ *
+ * The outputs are `Output::Deferred` rather than the `Output` variant,
+ * so "we have not computed the output paths" is carried in the type.
+ *
+ * @see fillInOutputPaths, which turns this into a `FullInputAddressed`.
+ */
+using FullDeferred = Derivation<std::set<SingleDerivedPath>, Output::Deferred>;
+
+/**
+ * @brief `Full`, but statically known to be input-addressed.
+ *
+ * The outputs are `Output::InputAddressed` rather than the `Output`
+ * variant, so "the output paths are computed" is carried in the type.
+ */
+using FullInputAddressed = Derivation<std::set<SingleDerivedPath>, Output::InputAddressed>;
+
 template<typename Inputs, typename Out>
 struct Derivation
 {
@@ -285,8 +322,14 @@ bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs);
  *
  * @param store The store to use for validation
  */
-void checkInvariants(const Basic & drv, Store & store);
+void checkInvariants(const Basic & drv, const StoreDirConfig & store);
 void checkInvariants(const Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void checkInvariants(const Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation);
 
 /**
  * This overload does everything the base `checkInvariants` does,
@@ -297,7 +340,21 @@ void checkInvariants(const Full & drv, Store & store);
  * @param drvPath The path to this derivation
  */
 template<typename Inputs>
-void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath);
+void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
+{
+    checkInvariants(drv, store, readInvalid(store), drvPath);
+}
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+template<typename Inputs>
+void checkInvariants(
+    const Derivation<Inputs, Output> & drv,
+    const StoreDirConfig & store,
+    auto && readDerivation,
+    const StorePath & drvPath);
 
 /**
  * Fill in output paths as needed.
@@ -319,8 +376,34 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
  *
  * @param store The store to use for path computation
  */
-void fillInOutputPaths(Basic & drv, Store & store);
+void fillInOutputPaths(Basic & drv, const StoreDirConfig & store);
 void fillInOutputPaths(Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void fillInOutputPaths(Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation);
+
+/**
+ * Functional, statically-typed variant of the above, for a derivation
+ * all of whose outputs are known to be `Deferred`.
+ *
+ * Rather than mutating in place --- which is only possible because
+ * `Output` is a variant able to hold either alternative --- this
+ * consumes its argument and returns a derivation whose outputs are
+ * statically `InputAddressed`, so the "outputs are filled in now" fact
+ * is carried in the type. Everything but the (small) outputs is moved
+ * through, so this is no more expensive than the mutating version.
+ *
+ * Returns `std::nullopt` if there is no input address to fill in yet,
+ * i.e. when the derivation (transitively) depends on a floating
+ * content-addressing derivation. That is the case `Deferred` exists
+ * for, and it is precisely the case this function cannot represent in
+ * its return type.
+ */
+std::optional<FullInputAddressed>
+fillInOutputPaths(FullDeferred drv, const StoreDirConfig & store, ReadDerivation readDerivation);
 
 /**
  * Parse a derivation from JSON, and also perform various

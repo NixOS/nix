@@ -205,7 +205,7 @@ TEST_F(FillInOutputPathsTest, throwsOnMixedOutputTypes)
         .name = "mixed-output-types",
     };
 
-    // Must throw, not panic (std::terminate) inside hashModulo.
+    // Must throw, not panic (std::terminate) inside bothMaskedDerivation.
     ASSERT_THROW(fillInOutputPaths(drv, *store), Error);
     ASSERT_THROW(checkInvariants(drv, *store), Error);
 }
