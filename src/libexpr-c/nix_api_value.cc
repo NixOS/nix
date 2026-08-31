@@ -121,7 +121,7 @@ PrimOp * nix_alloc_primop(
                     .name = name,
                     .args = {},
                     .arity = (size_t) arity,
-                    .doc = doc,
+                    .doc = doc ? std::optional<std::string>{doc} : std::nullopt,
                     .impl = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
         if (args)
             for (size_t i = 0; args[i]; i++)
