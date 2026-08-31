@@ -283,7 +283,7 @@ sources = files(
   'derivation/aterm.cc',
   'derivation/full-inputs.cc',
   'derivation/json.cc',
-  'derivation/modulo.cc',
+  'derivation/masked.cc',
   'derivation/output.cc',
   'derivation/resolution.cc',
   'derivations.cc',

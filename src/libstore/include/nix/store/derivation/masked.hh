@@ -9,7 +9,7 @@ namespace nix {
 
 class Store;
 
-namespace derivation::modulo {
+namespace derivation::masked {
 
 /**
  * Inputs in the intermediate form used to compute the hash modulo:
@@ -168,6 +168,6 @@ std::optional<std::string> unparseModulo(Store & store, const Full & drv);
  */
 std::string unparseModulo(Store & store, const Basic & drv);
 
-} // namespace derivation::modulo
+} // namespace derivation::masked
 
 } // namespace nix

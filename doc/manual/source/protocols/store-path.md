@@ -89,7 +89,7 @@ where
 
     - For input-addressed derivation outputs:
 
-      the [ATerm](@docroot@/protocols/derivation-aterm.md#input-address-encoding) serialization of the ["quotient derivation"](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv), in which fixed-output inputs are replaced by their content addresses.
+      the [ATerm](@docroot@/protocols/derivation-aterm.md#input-address-encoding) serialization of the ["fully masked derivation"](@docroot@/store/derivation/outputs/input-address.md#input-masked-drv), in which fixed-output inputs are replaced by their content addresses and the derivation's own output paths are blanked.
 
     - For content-addressed store paths:
 

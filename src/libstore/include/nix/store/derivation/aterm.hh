@@ -34,17 +34,17 @@ inline constexpr bool defaultSupportWindowsStoreDir =
 std::string
 unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir = defaultSupportWindowsStoreDir);
 
-namespace modulo {
+namespace masked {
 struct HashInputs;
 }
 
 /**
  * Print a derivation in one of the intermediate forms: with the inputs
  * already flattened (`FullInputs`), or with them replaced by their
- * hashes modulo (`modulo::HashInputs`), which is the form whose hash is
+ * hashes modulo (`masked::HashInputs`), which is the form whose hash is
  * an input address.
  *
- * The `modulo::HashInputs` cases are not round-trippable: `parse` cannot
+ * The `masked::HashInputs` cases are not round-trippable: `parse` cannot
  * read them back, as their input derivations are named by hash rather
  * than by store path.
  */
@@ -57,7 +57,7 @@ std::string unparse(
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
         // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, modulo::HashInputs>
+        || (std::is_same_v<Inputs, masked::HashInputs>
             && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ));
 
 /**

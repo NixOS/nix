@@ -6,7 +6,7 @@
 That is to say, an input-addressed output's store path is a function not of the output itself, but of the derivation that produced it.
 Even if two store paths have the same contents, if they are produced in different ways, and one is input-addressed, then they will have different store paths, and thus guaranteed to not be the same store object.
 
-## Modulo content addressed derivation outputs {#hash-quotient-drv}
+## Masking content addressed derivation outputs {#input-masked-drv}
 
 A naive implementation of an output hash computation for input-addressed outputs would be to hash the derivation hash and output together.
 This clearly has the uniqueness properties we want for input-addressed outputs, but suffers from an inefficiency.
@@ -14,13 +14,28 @@ Specifically, new builds would be required whenever a change is made to a fixed-
 Concretely, this would cause a "mass rebuild" whenever any fetching detail changes, including mirror lists, certificate authority certificates, etc.
 
 To solve this problem, we compute output hashes differently, so that certain output hashes become identical.
-We call this concept quotient hashing, in reference to quotient types or sets.
+We do this by *masking*: before hashing, we rewrite the parts of the derivation whose differences we do not want to see.
+
+There are two maskings, and they are independent:
+
+- *Input masking* replaces each input derivation's store path with a hash standing for what that input *produces*, rather than for the derivation that produces it.
+  This is what makes different fixed-output derivation inputs that produce the same outputs stop mattering.
+
+- *Output masking* blanks the derivation's own output paths --- in `outputs`, and in the environment variables named after them.
+  This is needed when those very paths are what we are computing; it is not wanted when the derivation is merely being hashed to stand in for an input to something else, where the paths it already has are exactly what identifies it.
+
+A derivation with only the first applied is an *input-masked derivation*; one with both is a *fully masked derivation*.
+
+Every non-injective function induces an equivalence relation on its domain, by saying two elements are equivalent if they map to the same value.
+But the equivalence relation induced by input masking is also pleasant to characterize directly, without reference to input masking at all.
+Intuitively this makes sense, because the details of how exactly inputs are hashed (which hash function, say) shouldn't matter (ignoring hash collisions and the like) --- all that matters is which derivations are deemed equivalent.
+The [semantic properties](#semantic-properties) section below develops this further.
 
 So how do we compute the [hash part](@docroot@/store/store-path.md#digest) of the output paths of an input-addressed derivation?
-This is done by the function `hashQuotientDerivation`, shown below.
+This is done by the function `hashInputMaskedDerivation`, shown below, which does the input masking itself; its callers do any output masking.
 
 First, a word on inputs.
-`hashQuotientDerivation` is only defined on derivations whose [inputs](@docroot@/store/derivation/index.md#inputs) take the first-order form:
+`hashInputMaskedDerivation` is only defined on derivations whose [inputs](@docroot@/store/derivation/index.md#inputs) take the first-order form:
 ```typescript
 type ConstantPath = {
   path: StorePath;
@@ -51,12 +66,12 @@ Those derivations must be (partially) [resolved](@docroot@/store/resolution.md) 
 Then, and only then, can input addresses be assigned.
 
 ```
-function hashQuotientDerivation(drv) -> Hash:
+function hashInputMaskedDerivation(drv) -> Hash:
     assert(drv.outputs are input-addressed)
     drv′ ← drv with {
         inputDrvOutputs = ⋃(
             assert(drvPath is store path)
-            case hashOutputsOrQuotientDerivation(readDrv(drvPath)) of
+            case hashOutputsOrInputMaskedDerivation(readDrv(drvPath)) of
                 drvHash : Hash →
                     (drvHash.toBase16(), output)
                 outputHashes : Map[String, Hash] →
@@ -66,7 +81,7 @@ function hashQuotientDerivation(drv) -> Hash:
     }
     return hashSHA256(printDrv(drv′))
 
-function hashOutputsOrQuotientDerivation(drv) -> Map[String, Hash] | Hash:
+function hashOutputsOrInputMaskedDerivation(drv) -> Map[String, Hash] | Hash:
     if drv.outputs are content-addressed:
         return {
             outputName ↦ hashSHA256(
@@ -77,18 +92,19 @@ function hashOutputsOrQuotientDerivation(drv) -> Map[String, Hash] | Hash:
             , ca = output.contentAddress // or get from build trace if floating
         }
     else: // drv.outputs are input-addressed
-        return hashQuotientDerivation(drv)
+        return hashInputMaskedDerivation(drv)
 ```
 
-### `hashQuotientDerivation`
+### `hashInputMaskedDerivation`
 
-We replace each element in the derivation's `inputDrvOutputs` using data from a call to `hashOutputsOrQuotientDerivation` on the `drvPath` of that element.
-When `hashOutputsOrQuotientDerivation` returns a single drv hash (because the input derivation in question is input-addressing), we simply swap out the `drvPath` for that hash, and keep the same output name.
-When `hashOutputsOrQuotientDerivation` returns a map of content addresses per-output, we look up the output in question, and pair it with the output name `out`.
+We replace each element in the derivation's `inputDrvOutputs` using data from a call to `hashOutputsOrInputMaskedDerivation` on the `drvPath` of that element.
+When `hashOutputsOrInputMaskedDerivation` returns a single drv hash (because the input derivation in question is input-addressing), we simply swap out the `drvPath` for that hash, and keep the same output name.
+When `hashOutputsOrInputMaskedDerivation` returns a map of content addresses per-output, we look up the output in question, and pair it with the output name `out`.
 
-The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm.md#input-address-encoding)) and hashed, and this becomes the hash of the "quotient derivation".
+That rewriting is the input masking.
+The resulting pseudo-derivation (with hashes instead of store paths in `inputDrvs`) is then printed (in the ["ATerm" format](@docroot@/protocols/derivation-aterm.md#input-address-encoding)) and hashed, and this becomes the hash of the input-masked derivation.
 
-When calculating output hashes, `hashQuotientDerivation` is called on an almost-complete input-addressing derivation, which is just missing its input-addressed outputs paths.
+When calculating output hashes, `hashInputMaskedDerivation` is called on an almost-complete input-addressing derivation, which is just missing its input-addressed outputs paths --- that is, one that is already output masked, making it fully masked.
 The derivation hash is then used to calculate output paths for each output, as the [complete store path calculation](@docroot@/protocols/store-path.md#fingerprint) specifies: it is the digest of the hashed ATerm that specification calls for, under the `"output:" id` case, where `id` is the output name.
 The store object's name is the derivation's name, with `-` and the output name appended --- unless the output is named `out`, in which case the derivation's name is used as-is.
 
@@ -102,20 +118,19 @@ Those output paths can then be substituted into the almost-complete input-addres
 > This is not fatal because the deviation would only apply for content-addressing derivations with more than one output, and that only occurs in the floating case, which is [experimental][xp-feature-ca-derivations].
 > Once this bug is fixed, this note will be removed.
 
-### `hashOutputsOrQuotientDerivation`
+### `hashOutputsOrInputMaskedDerivation`
 
-How does `hashOutputsOrQuotientDerivation` in turn work?
-It consists of two main cases, based on whether the outputs of the derivation are to be input-addressed or content-addressed.
+`hashOutputsOrInputMaskedDerivation` consists of two main cases, based on whether the outputs of the derivation are to be input-addressed or content-addressed.
 
 #### Input-addressed outputs case
 
-In the input-addressed case, it just calls `hashQuotientDerivation`, and returns that derivation hash.
-This makes `hashQuotientDerivation` and `hashOutputsOrQuotientDerivation` mutually-recursive.
+In the input-addressed case, it just calls `hashInputMaskedDerivation`, and returns that derivation hash.
+This makes `hashInputMaskedDerivation` and `hashOutputsOrInputMaskedDerivation` mutually-recursive.
 
 > **Note**
 >
-> In this case, `hashQuotientDerivation` is being called on a *complete* input-addressing derivation that already has its output paths calculated.
-> The `inputDrvs` substitution takes place anyways.
+> In this case, `hashInputMaskedDerivation` is being called on a *complete* input-addressing derivation that already has its output paths calculated: it is not output masked, so it is input-masked only, not fully masked.
+> The input masking takes place anyways.
 
 #### Content-addressed outputs case
 
@@ -130,11 +145,11 @@ If the outputs are [content-addressed](./content-address.md), then it computes a
 > This is what the "or get from [build trace](@docroot@/store/build-trace.md) if floating" comment refers to.
 > In this case, the algorithm is *stuck* until the input in question is built, and we know what the actual contents of the output in question is.
 >
-> That is OK however, because there is no problem with delaying the assigning of input addresses (which, remember, is what `hashQuotientDerivation` is ultimately for) until all inputs are known.
+> That is OK however, because there is no problem with delaying the assigning of input addresses (which, remember, is what `hashInputMaskedDerivation` is ultimately for) until all inputs are known.
 
 ### Deferring input-addressing when downstream of unknown CA store objects {#deferred}
 
-As the previous note says, the algorithm is *stuck* when an input is a [floating content-addressed](./content-address.md#floating) output that has not been built yet: there is no content address to substitute for it, so the quotient derivation cannot be completed and no input address can be computed.
+As the previous note says, the algorithm is *stuck* when an input is a [floating content-addressed](./content-address.md#floating) output that has not been built yet: there is no content address to substitute for it, so the input masking cannot be completed and no input address can be computed.
 
 The derivation is still written to the store, with its outputs *deferred*: an output in this state has no store path at all, and the environment variable named after it is empty.
 This costs nothing, because a derivation's own store path is [content-addressed](@docroot@/store/store-object/content-address.md#method-text) on the bytes of its serialization, which do not depend on its output paths being known.
@@ -143,7 +158,7 @@ A deferred output does not use a third kind of addressing alongside input- and c
 It is input-addressed; it just does not know its path yet.
 
 Being stuck is contagious.
-A derivation with deferred outputs has, for this purpose, unknown outputs of its own, so `hashOutputsOrQuotientDerivation` is stuck on it in turn, and anything depending on it must also defer.
+A derivation with deferred outputs has, for this purpose, unknown outputs of its own, so `hashOutputsOrInputMaskedDerivation` is stuck on it in turn, and anything depending on it must also defer.
 The condition therefore propagates downstream from the floating output that caused it.
 
 Deferral is resolved by building, not by revisiting the same derivation.
@@ -162,11 +177,12 @@ The recursion in the algorithm is potentially inefficient:
 it could call itself once for each path by which a subderivation can be reached, i.e., `O(V^k)` times for a derivation graph with `V` derivations and with out-degree of at most `k`.
 In the actual implementation, [memoisation](https://en.wikipedia.org/wiki/Memoization) is used to reduce this cost to be proportional to the total number of `inputDrvOutputs` encountered.
 
-### Semantic properties
+### Semantic properties {#semantic-properties}
 
 *See [this chapter's appendix](@docroot@/store/math-notation.md) on grammar and metavariable conventions.*
 
-In essence, `hashQuotientDerivation` partitions input-addressing derivations into equivalence classes: every derivation in that equivalence class is mapped to the same derivation hash.
+Masking is, mathematically, a quotient, in reference to quotient types or sets: what it discards is exactly what we want two derivations to be allowed to differ in.
+Accordingly, `hashInputMaskedDerivation` partitions input-addressing derivations into equivalence classes: every derivation in that equivalence class is mapped to the same derivation hash.
 We can characterize this equivalence relation directly, by working bottom up.
 
 We start by defining an equivalence relation on first-order output deriving paths that refer content-addressed derivation outputs. Two such paths are equivalent if they refer to the same store object:
@@ -245,7 +261,7 @@ where \\(\\mathrm{caInputs}(d)\\) returns the content-addressed inputs of \\(d\\
 > [Issue #9259](https://github.com/NixOS/nix/issues/9259) is about creating a coarser equivalence relation to address this.
 >
 > \\(\\sim_\mathrm{Drv}\\) from [derivation resolution](@docroot@/store/resolution.md) is such an equivalence relation.
-> It is coarser than this one: any two derivations which are "'hash quotient derivation'-equivalent" (\\(\\sim_\mathrm{IADrv}\\)) are also "resolution-equivalent" (\\(\\sim_\mathrm{Drv}\\)).
+> It is coarser than this one: any two derivations which are "'hash input-masked derivation'-equivalent" (\\(\\sim_\mathrm{IADrv}\\)) are also "resolution-equivalent" (\\(\\sim_\mathrm{Drv}\\)).
 > It also relates derivations whose `inputDrvOutputs` have been rewritten into `inputSrcs`.
 >
 > Input-addressing downstream of content addressing, as described above, anticipates this.
