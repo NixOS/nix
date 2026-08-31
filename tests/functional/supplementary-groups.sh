@@ -3,7 +3,7 @@
 source common.sh
 
 requireSandboxSupport
-[[ $busybox =~ busybox ]] || skipTest "no busybox"
+requireBusybox
 if ! command -p -v unshare; then skipTest "Need unshare"; fi
 needLocalStore "The test uses --store always so we would just be bypassing the daemon"
 
