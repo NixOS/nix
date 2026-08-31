@@ -1,4 +1,5 @@
 #include "nix/store/sqlite.hh"
+#include "nix/store/backoff.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
@@ -10,6 +11,9 @@
 
 #include <sqlite3.h>
 
+#include <atomic>
+#include <cstdint>
+#include <random>
 #include <thread>
 
 namespace nix {
@@ -258,6 +262,8 @@ bool SQLiteStmt::Use::isNull(int col)
 SQLiteTxn::SQLiteTxn(sqlite3 * db)
 {
     this->db = db;
+    // TODO: use "begin immediate" when multiple SQLite connections are used,
+    // to acquire the write lock early and avoid deferred-to-write deadlocks.
     if (sqlite3_exec(db, "begin;", 0, 0, 0) != SQLITE_OK)
         SQLiteError::throw_(db, "starting transaction");
     active = true;
@@ -280,19 +286,56 @@ SQLiteTxn::~SQLiteTxn()
     }
 }
 
-void handleSQLiteBusy(const SQLiteBusy & e, time_t & nextWarning)
+namespace {
+
+constexpr uint32_t backoffBaseUs = 500;
+constexpr uint32_t backoffCeilUs = 100'000;
+
+// Additive jitter up to ceiling >> backoffJitterShift (~12.5%), sampled once
+// per sequence. Intentionally weak decorrelation, not AWS-style "full jitter".
+constexpr uint32_t backoffJitterShift = 3;
+
+// Give up after this much monotonic retry time. Checked between calls only;
+// sqlite3_busy_timeout (1 hour) can block a single call for longer.
+constexpr auto sqliteRetryTimeout = std::chrono::minutes{10};
+
+void throttledWarning(const SQLiteBusy & e, SQLiteRetryState & state)
 {
     time_t now = time(nullptr);
-    if (now > nextWarning) {
-        nextWarning = now + 10;
+    if (now > state.nextWarning) {
+        state.nextWarning = now + 10;
         logWarning({.msg = e.info().msg});
     }
+}
 
-    /* Sleep for a while since retrying the transaction right away
-       is likely to fail again. */
+} // anonymous namespace
+
+SQLiteRetryState newSQLiteRetryState()
+{
+    thread_local std::mt19937 rng{std::random_device{}()};
+    return SQLiteRetryState{static_cast<uint32_t>(rng())};
+}
+
+std::chrono::microseconds sqliteRetryBackoff(uint32_t attempt, uint32_t jitter)
+{
+    auto ceiling = clampedExponential(backoffBaseUs, attempt, backoffCeilUs);
+    auto jitterAmount = static_cast<uint32_t>((static_cast<uint64_t>(ceiling >> backoffJitterShift) * jitter) >> 32);
+    return std::chrono::microseconds{ceiling + jitterAmount};
+}
+
+void handleSQLiteBusy(const SQLiteBusy & e, SQLiteRetryState & state)
+{
+    ++state.attempt;
+
+    // Only called from retrySQLite's catch block, so `throw;` re-raises the
+    // active SQLiteBusy; calling outside a handler would std::terminate().
+    if (std::chrono::steady_clock::now() - state.startTime > sqliteRetryTimeout)
+        throw;
+
+    throttledWarning(e, state);
     checkInterrupt();
-    /* <= 0.1s */
-    std::this_thread::sleep_for(std::chrono::milliseconds{rand() % 100});
+
+    std::this_thread::sleep_for(sqliteRetryBackoff(state.attempt, state.jitter));
 }
 
 } // namespace nix
