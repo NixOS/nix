@@ -1,5 +1,7 @@
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-env-desugar.hh"
+#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/daemon.hh"
 #ifndef _WIN32 // TODO enable build hook on Windows
@@ -9,6 +11,7 @@
 #include "nix/util/fun.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/file-system.hh"
 #include "nix/util/config-global.hh"
 #include "nix/store/build/worker.hh"
 #include "nix/util/util.hh"
@@ -152,7 +155,8 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
-    const StorePathSet & outputPaths);
+    const BasicDerivation & drv,
+    const SingleDrvOutputs & builtOutputs);
 #endif
 
 /* At least one of the output paths could not be
@@ -781,12 +785,8 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
             return validOutputs;
         }();
 
-    StorePathSet outputPaths;
-    for (auto & [_, output] : builtOutputs)
-        outputPaths.insert(output.outPath);
-
     if (worker.settings.postBuildHook.get() != "") {
-        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, *drv, builtOutputs);
         worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
         while (true) {
             auto event = co_await WaitForChildEvent{};
@@ -1044,7 +1044,6 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     }
     {
         builder.reset();
-        StorePathSet outputPaths;
         /* In the check case we install no store objects, and so
            `builtOutputs` is empty. However, per issue #14287, there is
            an expectation that the post-build hook is still executed.
@@ -1053,10 +1052,10 @@ Goal::Co DerivationBuildingGoal::buildLocally(
            In order to make that work, in the check case just load the
            (preexisting) infos from scratch, rather than relying on what
            `DerivationBuilder` returned to us. */
-        for (auto & [_, output] : buildMode == bmCheck ? checkPathValidity(initialOutputs).second : builtOutputs) {
+        auto registeredOutputs = buildMode == bmCheck ? checkPathValidity(initialOutputs).second : builtOutputs;
+        for (auto & [_, output] : registeredOutputs) {
             // for sake of `bmRepair`
             worker.markContentsGood(output.outPath);
-            outputPaths.insert(output.outPath);
         }
 
         if (worker.settings.postBuildHook.get() != "") {
@@ -1069,7 +1068,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                than silently skip the hook. */
             throw UnimplementedError("the post-build hook is not yet supported on Windows");
 #else
-            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
+            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, *drv, registeredOutputs);
             worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
             while (true) {
                 auto event = co_await WaitForChildEvent{};
@@ -1100,29 +1099,64 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StoreDirConfig & store,
     Logger & logger,
     const StorePath & drvPath,
-    const StorePathSet & outputPaths)
+    const BasicDerivation & drv,
+    const SingleDrvOutputs & builtOutputs)
 {
     auto state =
         std::make_unique<PostBuildHookState>(logger, workerSettings.postBuildHook.get(), store.printStorePath(drvPath));
 
     auto hook = workerSettings.postBuildHook.get();
 
+    StorePathSet outputPaths;
+    for (auto & [_, output] : builtOutputs)
+        outputPaths.insert(output.outPath);
+
     OsStringMap hookEnvironment = getEnvOs();
 
+    constexpr int drvAtermFdNum = 3;
+    constexpr int buildInfoJsonFdNum = 4;
+
+    auto fullDrv = unresolve(drv);
+
     hookEnvironment.emplace(OS_STR("DRV_PATH"), string_to_os_string(store.printStorePath(drvPath)));
+    hookEnvironment.emplace(OS_STR("DRV_NAME"), string_to_os_string(drv.name));
+    hookEnvironment.emplace(
+        OS_STR("RESOLVED_DRV_PATH"), string_to_os_string(store.printStorePath(computeStorePath(store, fullDrv))));
     hookEnvironment.emplace(
         OS_STR("OUT_PATHS"), string_to_os_string(chomp(concatStringsSep(" ", store.printStorePathSet(outputPaths)))));
     hookEnvironment.emplace(OS_STR("NIX_CONFIG"), string_to_os_string(globalConfig.toKeyValue()));
+    hookEnvironment.emplace(OS_STR("DRV_ATERM_FD"), string_to_os_string(std::to_string(drvAtermFdNum)));
+    hookEnvironment.emplace(OS_STR("BUILD_INFO_JSON_FD"), string_to_os_string(std::to_string(buildInfoJsonFdNum)));
+
+    auto outputsJson = nlohmann::json::object();
+    for (auto & [outputName, output] : builtOutputs)
+        outputsJson[outputName] = store.printStorePath(output.outPath);
+    nlohmann::json buildInfoJson{{"outputs", std::move(outputsJson)}};
+
+    /* Each descriptor is backed by a temporary file, since a single
+       environment string caps at 128 KiB on Linux at exec time and a pipe
+       would deadlock the daemon on a hook that never reads it. */
+    auto tempFileWith = [](std::string_view contents) {
+        AutoCloseFD fd = createAnonymousTempFile();
+        writeFull(fd.get(), contents);
+        if (lseek(fd.get(), 0, SEEK_SET) == -1)
+            throw SysError("rewinding post-build-hook input file");
+        return fd;
+    };
+    AutoCloseFD drvAtermFd = tempFileWith(unparse(fullDrv, store));
+    AutoCloseFD buildInfoJsonFd = tempFileWith(buildInfoJson.dump());
 
     ProcessOptions processOptions;
 
     state->pid = startProcess(
         [&] {
             replaceEnv(hookEnvironment);
-            if (dup2(state->out->writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                throw SysError("cannot dup stdout into stderr");
+            if (dup2(drvAtermFd.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping the derivation file onto stdin");
+            if (dup2(buildInfoJsonFd.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping the build info file onto stdout");
+            if (dup2(state->out->writeSide.get(), STDERR_FILENO) == -1)
+                throw SysError("dupping stderr");
 
             Strings args_;
             args_.push_front(hook);
@@ -1132,6 +1166,19 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
             /* On Linux, it's crucial that this is done after restoreProcessContext() since
                that needs an open mountns file descriptor (fdSavedMountNamespace). */
             unix::closeExtraFDs();
+
+            /* closeExtraFDs() closes everything above stderr, hence the detour via stdin and stdout. */
+            if (dup2(STDIN_FILENO, drvAtermFdNum) == -1)
+                throw SysError("dupping the derivation file onto fd %d", drvAtermFdNum);
+            if (dup2(STDOUT_FILENO, buildInfoJsonFdNum) == -1)
+                throw SysError("dupping the build info file onto fd %d", buildInfoJsonFdNum);
+            if (dup2(STDERR_FILENO, STDOUT_FILENO) == -1)
+                throw SysError("cannot dup stderr into stdout");
+            AutoCloseFD fdDevNull = open("/dev/null", O_RDONLY | O_CLOEXEC);
+            if (!fdDevNull)
+                throw SysError("opening /dev/null");
+            if (dup2(fdDevNull.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping /dev/null onto stdin");
 
             execvp(requireCString(hook), stringsToCharPtrs(args_).data());
 
