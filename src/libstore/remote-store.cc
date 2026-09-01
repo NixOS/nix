@@ -773,6 +773,9 @@ void RemoteStore::addTempRoots(const StorePathSet & paths)
            operation. Note that this is very slow for large sets of
            paths on high-latency links, due to a network round-trip per
            path. */
+        warn(
+            "the daemon is missing the '%s' protocol feature, needed to support batched gc root registration, falling back to sequential registration",
+            WorkerProto::featureAddTempRoots);
         for (auto & path : paths) {
             if (conn->tempRootsPinned.get(path))
                 continue;
