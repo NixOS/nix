@@ -23,6 +23,25 @@ struct Package
     }
 };
 
+typedef std::vector<Package> Packages;
+
+/**
+ * Encode `pkgs` for the `derivations` environment variable that
+ * `builtin:buildenv` reads.
+ *
+ * This lives next to `decodeBuildenvPackages` so that the two cannot drift.
+ * `src/nix/nix-env/buildenv.nix` produces the same format from the evaluator,
+ * and has to be kept in sync by hand.
+ */
+std::string encodeBuildenvPackages(const Packages & pkgs);
+
+/**
+ * Inverse of `encodeBuildenvPackages`.
+ *
+ * @throws Error if the encoding is malformed.
+ */
+Packages decodeBuildenvPackages(std::string_view s);
+
 class BuildEnvFileConflictError final : public CloneableError<BuildEnvFileConflictError, Error>
 {
 private:
@@ -47,8 +66,6 @@ public:
     {
     }
 };
-
-typedef std::vector<Package> Packages;
 
 void buildProfile(const std::filesystem::path & out, Packages && pkgs);
 
