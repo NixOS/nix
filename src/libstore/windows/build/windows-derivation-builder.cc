@@ -305,15 +305,14 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     if (drv.isBuiltin())
         throw UnimplementedError("builtin builders are not yet supported on Windows");
 
-    for (auto & [name, output] : drv.outputs) {
-        auto * ia = std::get_if<DerivationOutput::InputAddressed>(&output.raw);
-        if (!ia)
-            throw UnimplementedError(
-                "only input-addressed derivation outputs are supported on Windows, but output '%s' is not one", name);
-        /* Without a sandbox there is nowhere else to build, so the scratch
-           path is the final one and `registerOutputs` has nothing to rewrite. */
-        scratchOutputs.insert_or_assign(name, ia->path);
-    }
+    /* Decides the scratch path per output and fills in `inputRewrites`. This
+       replaces a loop that assumed every output was input-addressed and threw
+       otherwise, which is what previously kept content-addressed and
+       fixed-output derivations from building here at all: they were rejected
+       before the build started rather than by anything downstream. The shared
+       version works off `initialOutputs`, so it handles the cases where the
+       final path is not known up front. */
+    prepareScratchOutputs();
 
     /* A fresh build directory per attempt. */
     tmpDir = createTempDir(defaultTempDir(), "nix-build");
