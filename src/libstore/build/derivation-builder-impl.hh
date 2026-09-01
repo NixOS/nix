@@ -8,6 +8,10 @@
 #  include "nix/store/user-lock.hh"
 #endif
 
+#include <atomic>
+#include <list>
+#include <thread>
+
 namespace nix {
 
 /**
@@ -127,6 +131,94 @@ protected:
      * and attach them to the derivation
      */
     SingleDrvOutputs checkSubmittedOutputs();
+    /**
+     * The recursive Nix daemon socket.
+     */
+    AutoCloseFD daemonSocket;
+
+    /**
+     * The daemon main thread.
+     */
+    std::thread daemonThread;
+
+    struct DaemonWorkerState
+    {
+        std::thread thread;
+        ref<std::atomic_flag> done;
+    };
+
+    /**
+     * The daemon worker threads.
+     */
+    std::list<DaemonWorkerState> daemonWorkerThreads;
+
+    /**
+     * Start the recursive Nix daemon: a store the builder can talk to over a
+     * socket in its build directory.
+     *
+     * Platform-neutral apart from the three hooks below.
+     */
+    void startDaemon();
+
+    /**
+     * @see startDaemon
+     */
+    void stopDaemon();
+
+    /**
+     * Where the build directory appears from the builder's point of view.
+     *
+     * A sandbox can mount it somewhere else; without one it is just `tmpDir`.
+     */
+    virtual std::filesystem::path tmpDirInSandbox()
+    {
+        return tmpDir;
+    }
+
+    /**
+     * Make the daemon socket reachable by whoever runs the builder.
+     *
+     * On Unix that means handing it to the build user. Windows has no build
+     * users, so there is nothing to do.
+     */
+    virtual void prepareDaemonSocket(const std::filesystem::path & path) {}
+
+    /**
+     * Keep an accepted connection out of any child's descriptor table.
+     *
+     * Windows handles are not inherited unless explicitly marked, so this is
+     * only needed where `exec` would otherwise carry the descriptor over.
+     */
+    virtual void setCloseOnExec(Descriptor fd) {}
+
+    /**
+     * Record an output submitted by a recursive-nix client.
+     *
+     * Shared: it only touches `submittedOutputs` and the store's path
+     * printing.
+     */
+    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
+
+    /**
+     * Where the builder should reach the recursive Nix daemon, once
+     * `startDaemon` has bound the socket.
+     *
+     * `startDaemon` cannot write it into the environment itself: Unix keeps a
+     * `StringMap` it mutates, while Windows builds an `OsString` block from
+     * scratch. Each injects this instead.
+     */
+    std::optional<std::string> daemonRemoteUri;
+
+    /**
+     * Whether the outputs are being submitted by the builder rather than
+     * produced by it, which gates on a different experimental feature.
+     *
+     * Only the Unix builder supports dynamic derivations so far.
+     */
+    virtual bool usingSubmittedOutputs()
+    {
+        return false;
+    }
 };
 
 } // namespace nix

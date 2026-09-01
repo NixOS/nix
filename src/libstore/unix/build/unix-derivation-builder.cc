@@ -378,8 +378,13 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
         throw Error("The builder-rpc-v0 feature may only be used with content-addressing derivations");
     }
 
-    if (usingSubmitted || requiredFeatures.count("recursive-nix"))
+    if (usingSubmitted || requiredFeatures.count("recursive-nix")) {
         startDaemon();
+        /* `startDaemon` records the URI rather than writing it, since the two
+           platforms build their environments differently. */
+        if (daemonRemoteUri)
+            env["NIX_REMOTE"] = *daemonRemoteUri;
+    }
 
     /* Run the builder. */
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
@@ -689,155 +694,6 @@ void UnixDerivationBuilderImpl::initEnv()
 
     /* Trigger colored output in various tools. */
     env["TERM"] = "xterm-256color";
-}
-
-void UnixDerivationBuilderImpl::startDaemon()
-{
-    if (usingSubmitted) {
-        experimentalFeatureSettings.require(Xp::DynamicDerivations);
-    } else {
-        experimentalFeatureSettings.require(Xp::RecursiveNix);
-    }
-
-    auto store = makeRestrictedStore(
-        [&] {
-            auto config = make_ref<LocalStore::Config>(*this->store.config);
-            config->pathInfoCacheSize = 0;
-            config->stateDir = "/no-such-path";
-            config->logDir = "/no-such-path";
-            return config;
-        }(),
-        ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(this->store.shared_from_this())),
-        *this);
-
-    state_.lock()->addedPaths.clear();
-
-    auto socketName = ".nix-socket";
-    std::filesystem::path socketPath = tmpDir / socketName;
-    env["NIX_REMOTE"] = "unix://" + (tmpDirInSandbox() / socketName).native();
-
-    daemonSocket = createUnixDomainSocket(socketPath, 0600);
-
-    chownToBuilder(socketPath);
-
-    daemon::RecursiveFlag recursiveFlag;
-    if (usingSubmitted) {
-        recursiveFlag = daemon::RecursiveFlag::RecursiveSubmitted;
-    } else {
-        recursiveFlag = daemon::RecursiveFlag::Recursive;
-    }
-
-    daemonThread = std::thread([this, store, recursiveFlag]() {
-        while (true) {
-
-            /* Accept a connection. */
-            struct sockaddr_un remoteAddr;
-            socklen_t remoteAddrLen = sizeof(remoteAddr);
-
-            AutoCloseFD remote = accept(daemonSocket.get(), (struct sockaddr *) &remoteAddr, &remoteAddrLen);
-            if (!remote) {
-                if (errno == EINTR || errno == EAGAIN)
-                    continue;
-                if (errno == EINVAL || errno == ECONNABORTED)
-                    break;
-                throw SysError("accepting connection");
-            }
-
-            unix::closeOnExec(remote.get());
-
-            debug("received daemon connection");
-
-            auto doneFlag = make_ref<std::atomic_flag>();
-
-            auto workerThread = std::thread([this, doneFlag, store, remote{std::move(remote)}, recursiveFlag]() {
-                try {
-                    miscMethods->processDaemonConnection(
-                        store, FdSource(remote.get()), FdSink(remote.get()), *this, recursiveFlag);
-                    debug("terminated daemon connection");
-                } catch (const Interrupted &) {
-                    debug("interrupted daemon connection");
-                } catch (...) {
-                    /* Swallow all exceptions to avoid crashing the the process (exceptions that escape from the thread
-                     * trigger std::terminate()). */
-                    ignoreExceptionExceptInterrupt();
-                }
-
-                doneFlag->test_and_set(std::memory_order_relaxed);
-            });
-
-            daemonWorkerThreads.push_back(
-                DaemonWorkerState{
-                    .thread = std::move(workerThread),
-                    .done = std::move(doneFlag),
-                });
-
-            /* Prune threads eagerly to free up resources. Ideally we'd also limit the number of concurrent workers. */
-            for (auto it = daemonWorkerThreads.begin(), end = daemonWorkerThreads.end(); it != end;) {
-                auto & state = *it;
-                auto & thread = state.thread;
-                if (state.done->test(std::memory_order_relaxed) && thread.joinable()) {
-                    thread.join();
-                    it = daemonWorkerThreads.erase(it);
-                } else {
-                    ++it;
-                }
-            }
-        }
-
-        debug("daemon shutting down");
-    });
-}
-
-void UnixDerivationBuilderImpl::stopDaemon()
-{
-    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
-        // According to the POSIX standard, the 'shutdown' function should
-        // return an ENOTCONN error when attempting to shut down a socket that
-        // hasn't been connected yet. This situation occurs when the 'accept'
-        // function is called on a socket without any accepted connections,
-        // leaving the socket unconnected. While Linux doesn't seem to produce
-        // an error for sockets that have only been accepted, more
-        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
-        // return the ENOTCONN error. Therefore, we handle this error here to
-        // avoid raising an exception for compliant behaviour.
-        if (errno == ENOTCONN) {
-            daemonSocket.close();
-        } else {
-            throw SysError("shutting down daemon socket");
-        }
-    }
-
-    if (daemonThread.joinable())
-        daemonThread.join();
-
-    for (auto & [thread, doneFlag] : daemonWorkerThreads)
-        thread.join();
-    daemonWorkerThreads.clear();
-
-    // release the socket.
-    daemonSocket.close();
-}
-
-void UnixDerivationBuilderImpl::submitOutput(const SingleDerivedPath & path, const OutputName & output)
-{
-    auto submittedOutputs(this->submittedOutputs.lock());
-
-    auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&path.raw());
-    if (!opaque)
-        throw Error(
-            "Attempted to submit Built path '%s' for output '%s'.\n"
-            " Only Opaque paths are supported, see https://github.com/NixOS/nix/issues/12727",
-            path.to_string(store),
-            output);
-
-    if (submittedOutputs->contains(output))
-        throw Error(
-            "Attempted to submit duplicate output '%s' (old '%s', new '%s')",
-            output,
-            store.printStorePath(*get(*submittedOutputs, output)),
-            store.printStorePath(opaque->path));
-
-    submittedOutputs->insert_or_assign(output, opaque->path);
 }
 
 void UnixDerivationBuilderImpl::addDependencyImpl(const StorePath & path) {}
