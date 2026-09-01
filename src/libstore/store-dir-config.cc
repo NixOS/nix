@@ -10,14 +10,19 @@ StorePath StoreDirConfig::parseStorePath(std::string_view path) const
 {
     if (path.empty())
         throw BadStorePath("empty path is not a valid store path");
-    // On Windows, `/nix/store` is not a canonical path. More broadly it
-    // is unclear whether this function should be using the native
-    // notion of a canonical path at all. For example, it makes to
-    // support remote stores whose store dir is a non-native path (e.g.
-    // Windows <-> Unix ssh-ing).
+    /* Canonicalise in whatever syntax the store directory itself uses, not
+       necessarily the native one. A store dir is a *logical* path: a
+       Unix-style one stays Unix-style even on Windows -- that is what
+       `FilePathType::Unix` means, and it is what lets a Windows client talk to
+       a Unix store over ssh -- so normalising it with native semantics would
+       rewrite the separators to `\` and the comparison below would stop
+       matching. Previously Windows did not normalise at all, so
+       `<storeDir>/./x`, `<storeDir>/y/../x` and a trailing separator were all
+       rejected rather than accepted-and-normalised. */
     auto p =
 #ifdef _WIN32
-        std::filesystem::path(path)
+        storeDir.starts_with('/') ? std::filesystem::path(CanonPath(std::string(path)).abs())
+                                  : std::filesystem::path(path).lexically_normal()
 #else
         canonPath(std::string(path))
 #endif
