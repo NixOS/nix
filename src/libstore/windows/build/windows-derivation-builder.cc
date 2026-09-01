@@ -7,6 +7,7 @@
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/util.hh"
 
 #include <windows.h>
 
@@ -73,19 +74,23 @@ OsString escapeArg(OsString arg)
 }
 
 /**
- * A minimal, unsandboxed `DerivationBuilder` for Windows: enough to run a
- * builder and register its outputs, and no more. Missing, relative to Unix:
+ * An unsandboxed `DerivationBuilder` for Windows. Missing, relative to Unix:
  *
  * - no sandbox, chroot, or filesystem isolation
  * - no build user; the builder runs as whoever ran Nix
  * - no network isolation
  * - no recursive Nix (`submitOutput` throws)
- * - no content-addressed or fixed-output derivations
  *
  * Registering the outputs is `DerivationBuilderImpl::registerOutputs`, the
  * same code Unix runs, so reference scanning and the `allowedReferences`
- * checks do apply. Without a sandbox the scratch paths are the final ones,
- * so it finds nothing to rewrite.
+ * checks do apply.
+ *
+ * Scratch paths come from the shared `prepareScratchOutputs`, so an output
+ * whose final path is not known up front -- content-addressed, or fixed-output
+ * being repaired -- gets a temporary one and is rewritten afterwards, exactly
+ * as on Unix. Because there is no sandbox, the placeholder substitution in
+ * `inputRewrites` is the only way a derivation can name its own outputs, so
+ * both the environment block and the command line go through it.
  */
 class WindowsDerivationBuilderImpl : public DerivationBuilderImpl
 {
@@ -212,9 +217,14 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
         if (auto value = getEnvOs(os(name)))
             env[os(name)] = *value;
 
-    /* The derivation's own environment wins over all of the above. */
+    /* The derivation's own environment wins over all of the above.
+
+       `inputRewrites` substitutes each output placeholder with the scratch path
+       chosen for it, which is how a derivation refers to its own outputs. The
+       Unix builder does the same to its environment block; without it the
+       placeholder reaches the builder verbatim. */
     for (auto & [name, entry] : desugaredEnv.variables)
-        env[os(name)] = os(entry.value);
+        env[os(name)] = os(rewriteStrings(entry.value, inputRewrites));
 
     OsString block;
     for (auto & [name, value] : env) {
@@ -244,10 +254,11 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
     startInfo.hStdOutput = builderPipe.writeSide.get();
     startInfo.hStdError = builderPipe.writeSide.get();
 
-    OsString cmdline = escapeArg(string_to_os_string(std::string_view{drv.builder}));
+    /* Same placeholder substitution as the environment block above. */
+    OsString cmdline = escapeArg(string_to_os_string(rewriteStrings(drv.builder, inputRewrites)));
     for (auto & arg : drv.args) {
         cmdline += L' ';
-        cmdline += escapeArg(string_to_os_string(std::string_view{arg}));
+        cmdline += escapeArg(string_to_os_string(rewriteStrings(arg, inputRewrites)));
     }
 
     auto envBlock = makeEnvBlock();
