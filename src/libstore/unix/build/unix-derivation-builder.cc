@@ -1,5 +1,9 @@
 #include "nix/store/build/derivation-builder.hh"
+#include "nix/store/derivation/aterm.hh"
+#include "nix/store/derivation/resolution.hh"
 #include "nix/util/configuration.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/file-system.hh"
 #include "nix/store/local-store.hh"
@@ -449,7 +453,7 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
         auto state = stBegin;
-        auto lines = runProgram(localSettings.preBuildHook.get(), false, getPreBuildHookArgs());
+        auto lines = runPreBuildHook();
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
             auto line = lines.substr(lastPos, nlPos - lastPos);
@@ -475,6 +479,67 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
     }
 
     return pathsInChroot;
+}
+
+std::string UnixDerivationBuilderImpl::runPreBuildHook()
+{
+    auto hook = localSettings.preBuildHook.get();
+    auto fullDrv = unresolve(drv);
+
+    constexpr int drvAtermFdNum = 3;
+
+    auto hookEnvironment = getEnvOs();
+    hookEnvironment.insert_or_assign(OS_STR("DRV_PATH"), string_to_os_string(store->printStorePath(drvPath)));
+    hookEnvironment.insert_or_assign(OS_STR("DRV_NAME"), string_to_os_string(drv.name));
+    hookEnvironment.insert_or_assign(
+        OS_STR("RESOLVED_DRV_PATH"), string_to_os_string(store->printStorePath(computeStorePath(*store, fullDrv))));
+    hookEnvironment.insert_or_assign(OS_STR("DRV_ATERM_FD"), string_to_os_string(std::to_string(drvAtermFdNum)));
+
+    AutoCloseFD drvAtermFd = createAnonymousTempFile();
+    writeFull(drvAtermFd.get(), unparse(fullDrv, *store));
+    if (lseek(drvAtermFd.get(), 0, SEEK_SET) == -1)
+        throw SysError("rewinding pre-build-hook input file");
+
+    Pipe out;
+    out.create();
+
+    ProcessOptions processOptions;
+    Pid hookPid = startProcess(
+        [&] {
+            replaceEnv(hookEnvironment);
+            if (dup2(drvAtermFd.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping the derivation file onto stdin");
+            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+                throw SysError("dupping stdout");
+
+            auto args = getPreBuildHookArgs();
+            args.push_front(hook);
+
+            restoreProcessContext();
+            unix::closeExtraFDs();
+
+            if (dup2(STDIN_FILENO, drvAtermFdNum) == -1)
+                throw SysError("dupping the derivation file onto fd %d", drvAtermFdNum);
+            AutoCloseFD fdDevNull = open("/dev/null", O_RDONLY | O_CLOEXEC);
+            if (!fdDevNull)
+                throw SysError("opening /dev/null");
+            if (dup2(fdDevNull.get(), STDIN_FILENO) == -1)
+                throw SysError("dupping /dev/null onto stdin");
+
+            execv(requireCString(hook), stringsToCharPtrs(args).data());
+
+            throw SysError("executing %s", PathFmt(hook));
+        },
+        processOptions);
+
+    out.writeSide.close();
+    auto lines = drainFD(out.readSide.get());
+
+    auto status = hookPid.wait();
+    if (!statusOk(status))
+        throw ExecError(status, "program %s %s", PathFmt(hook), statusToString(status));
+
+    return lines;
 }
 
 void UnixDerivationBuilderImpl::prepareSandbox()
