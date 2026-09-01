@@ -299,6 +299,16 @@ primop_square(void * user_data, nix_c_context * context, EvalState * state, nix_
     nix_init_int(context, ret, i * i);
 }
 
+TEST_F(nix_api_expr_test, nix_alloc_primop_without_doc)
+{
+    PrimOp * primop = nix_alloc_primop(ctx, primop_square, 1, "undocumented", nullptr, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_NE(nullptr, primop);
+
+    nix_gc_decref(ctx, primop);
+    assert_ctx_ok();
+}
+
 TEST_F(nix_api_expr_test, nix_expr_primop)
 {
     PrimOp * primop = nix_alloc_primop(
