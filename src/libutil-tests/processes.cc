@@ -62,9 +62,9 @@ TEST(runProgram2, nonexistent)
 {
     ASSERT_THROW(
         {
-            runProgram2({
+            runProgram2({{
                 .program = "/this/path/really/should/not/exist/for/real" NIX_EXECUTABLE_EXTENSION,
-            });
+            }});
         },
         NIX_SPAWN_EXCEPTION);
 }
@@ -85,12 +85,12 @@ TEST(runProgram2, leakedFDsAreClosed)
        enough if the read side is assigned to 3 (also the fd of the relocated pipe in
        the child on linux that gets dup3-ed into). */
     ASSERT_NO_THROW(runProgram2({
-        .program = *self,
-        .args = {"__util_test_spawn_leaked_fds"},
-        .environment = OsStringMap{{
-            "NIX_CHILD_FDS_SHOULD_BE_CLOSED",
-            fmt("%d,%d", readSide.get(), writeSide.get()),
-        }},
+        {.program = *self,
+         .args = {"__util_test_spawn_leaked_fds"},
+         .environment = OsStringMap{{
+             "NIX_CHILD_FDS_SHOULD_BE_CLOSED",
+             fmt("%d,%d", readSide.get(), writeSide.get()),
+         }}},
     }));
 }
 

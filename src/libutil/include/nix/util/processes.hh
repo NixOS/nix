@@ -139,7 +139,10 @@ std::string runProgram(
     const OsStrings & args = OsStrings(),
     bool isInteractive = false);
 
-struct RunOptions
+/**
+ * Options for creating a new process running the specified program.
+ */
+struct SpawnOptions
 {
     std::filesystem::path program;
     bool lookupPath = true;
@@ -151,6 +154,11 @@ struct RunOptions
 #endif
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
+};
+
+struct RunOptions
+{
+    SpawnOptions spawnOptions;
     Sink * standardOut = nullptr;
     bool mergeStderrToStdout = false;
     bool isInteractive = false;
