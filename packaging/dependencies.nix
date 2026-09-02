@@ -98,9 +98,14 @@ scope: {
         "--with-iostreams"
         "--with-url"
       ];
-      patches = [
-        ./patches/0001-Fix-uncaught_exceptions-not-accounting-for-forced_un.patch
-      ];
+      patches = lib.optional (
+        lib.versionAtLeast pkgs.boost.version "1.88"
+        && lib.versionOlder pkgs.boost.version "1.92"
+        # may already be done in nixpkgs: https://github.com/NixOS/nixpkgs/pull/546405
+        && !lib.any (patch: lib.hasInfix "5883212311535a0046031d74d1568ae173c1e35b" (baseNameOf patch)) (
+          pkgs.boost.patches or [ ]
+        )
+      ) ./patches/0001-Fix-uncaught_exceptions-not-accounting-for-forced_un.patch;
       enableIcu = false;
     }).overrideAttrs
       (old: {
