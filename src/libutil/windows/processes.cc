@@ -98,9 +98,12 @@ std::string runProgram(std::filesystem::path program, bool lookupPath, const OsS
 {
     auto res = runProgram(
         RunOptions{
-            .program = program,
-            .lookupPath = lookupPath,
-            .args = args,
+            .spawnOptions =
+                {
+                    .program = program,
+                    .lookupPath = lookupPath,
+                    .args = args,
+                },
             .isInteractive = isInteractive,
         });
 
@@ -193,18 +196,21 @@ OsString windowsEscape(const OsString & str, bool cmd)
     return buffer + L'"';
 }
 
-Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & options, Pipe & out)
+Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & runOptions, Pipe & out)
 {
     using namespace nix::windows;
 
-    // Setup pipes.
-    if (options.standardOut) {
+    const auto & options = runOptions.spawnOptions;
+
+    // Setup pipes. FIXME: Move this into the caller once we can specify redirections properly.
+    if (runOptions.standardOut) {
         // Don't inherit the read end of the output pipe
         setHandleInheritability(out.readSide.get(), false);
     } else {
         out.writeSide = nullFD();
     }
 
+    // FIXME: POSIX case inherits the caller's stdin. Why the difference?
     AutoCloseFD in = nullFD();
 
     STARTUPINFOW startInfo = {0};
@@ -212,6 +218,7 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     startInfo.dwFlags = STARTF_USESTDHANDLES;
     startInfo.hStdInput = in.get();
     startInfo.hStdOutput = out.writeSide.get();
+    // FIXME: Shouldn't this be done only when mergeStderrToStdout is true?
     startInfo.hStdError = out.writeSide.get();
 
     auto env = getEnvOs();
@@ -277,30 +284,32 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     return process;
 }
 
-void runProgram2(const RunOptions & options)
+void runProgram2(const RunOptions & runOptions)
 {
     checkInterrupt();
+
+    const auto & options = runOptions.spawnOptions;
 
     /* Create a pipe. */
     Pipe out;
     // TODO: I copied this from unix but this is handled again in spawnProcess, so might be weird to split it up like
     // this
-    if (options.standardOut)
+    if (runOptions.standardOut)
         out.create();
 
     std::filesystem::path realProgram = options.program;
     // TODO: Implement shebang / program interpreter lookup on Windows
     auto interpreter = getProgramInterpreter(realProgram);
 
-    auto suspension = logger->suspendIf(options.isInteractive);
+    auto suspension = logger->suspendIf(runOptions.isInteractive);
 
-    Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, options, out);
+    Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, runOptions, out);
 
     // TODO: This is identical to unix, deduplicate?
     out.writeSide.close();
 
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
+    if (runOptions.standardOut)
+        drainFD(out.readSide.get(), *runOptions.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();

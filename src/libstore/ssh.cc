@@ -123,7 +123,11 @@ bool SSHMaster::isMasterRunning()
     OsStrings args = {OS_STR("-O"), OS_STR("check"), string_to_os_string(hostnameAndUser)};
     addCommonSSHOpts(args);
 
-    auto res = runProgram(RunOptions{.program = "ssh", .args = std::move(args), .mergeStderrToStdout = true});
+    auto res = runProgram(
+        RunOptions{
+            .spawnOptions = {.program = "ssh", .args = std::move(args)},
+            .mergeStderrToStdout = true,
+        });
     return res.first == 0;
 }
 

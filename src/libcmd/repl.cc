@@ -510,9 +510,12 @@ ProcessLineResult NixRepl::processLine(std::string line)
         // runProgram redirects stdout to a StringSink,
         // using runProgram2 to allow editors to display their UI
         runProgram2({
-            .program = editor,
-            .lookupPath = true,
-            .args = std::move(args),
+            .spawnOptions =
+                {
+                    .program = editor,
+                    .lookupPath = true,
+                    .args = std::move(args),
+                },
             .isInteractive = true,
         });
 

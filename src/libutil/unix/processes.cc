@@ -300,9 +300,12 @@ std::string runProgram(std::filesystem::path program, bool lookupPath, const OsS
 {
     auto res = runProgram(
         RunOptions{
-            .program = program,
-            .lookupPath = lookupPath,
-            .args = args,
+            .spawnOptions =
+                {
+                    .program = program,
+                    .lookupPath = lookupPath,
+                    .args = args,
+                },
             .isInteractive = isInteractive,
         });
 
@@ -314,27 +317,29 @@ std::string runProgram(std::filesystem::path program, bool lookupPath, const OsS
 
 #ifndef __linux__
 
-void runProgram2(const RunOptions & options)
+void runProgram2(const RunOptions & runOptions)
 {
     checkInterrupt();
 
+    const auto & options = runOptions.spawnOptions;
+
     /* Create a pipe. */
     Pipe out;
-    if (options.standardOut)
+    if (runOptions.standardOut)
         out.create();
 
     ProcessOptions processOptions;
 
-    auto suspension = logger->suspendIf(options.isInteractive);
+    auto suspension = logger->suspendIf(runOptions.isInteractive);
 
     /* Fork. */
     Pid pid = startProcess(
         [&] {
             if (options.environment)
                 replaceEnv(*options.environment);
-            if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
+            if (runOptions.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
                 throw SysError("dupping stdout");
-            if (options.mergeStderrToStdout)
+            if (runOptions.mergeStderrToStdout)
                 if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
                     throw SysError("cannot dup stdout into stderr");
 
@@ -374,8 +379,8 @@ void runProgram2(const RunOptions & options)
 
     out.writeSide.close();
 
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
+    if (runOptions.standardOut)
+        drainFD(out.readSide.get(), *runOptions.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();

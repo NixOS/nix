@@ -265,13 +265,15 @@ static Strings prepareEnvironmentStrings(const StringMap & environment)
 
 /* TODO: Factor this out into a `launchProgram` that returns a pid. That would be
    much more useful in more places. */
-void runProgram2(const RunOptions & options)
+void runProgram2(const RunOptions & runOptions)
 {
     checkInterrupt();
 
+    const auto & options = runOptions.spawnOptions;
+
     /* Create a pipe. */
     Pipe out;
-    if (options.standardOut)
+    if (runOptions.standardOut)
         out.create();
 
     /* Pipe that the child reports errors through. */
@@ -292,9 +294,9 @@ void runProgram2(const RunOptions & options)
         .chdir = options.chdir ? options.chdir->c_str() : nullptr,
         .environment = options.environment ? env.data() : environ,
         .args = args.data(),
-        .mergeStderrToStdout = options.mergeStderrToStdout,
+        .mergeStderrToStdout = runOptions.mergeStderrToStdout,
         .lookupPath = options.lookupPath,
-        .stdoutFd = options.standardOut ? out.writeSide.get() : INVALID_DESCRIPTOR,
+        .stdoutFd = runOptions.standardOut ? out.writeSide.get() : INVALID_DESCRIPTOR,
         .errorPipe = childErrorPipe.writeSide.get(),
         .setGid = options.gid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
@@ -305,7 +307,7 @@ void runProgram2(const RunOptions & options)
         .dieWithParent = true, /* TODO: Maybe we might want to expose this in RunOptions? */
     };
 
-    auto suspension = logger->suspendIf(options.isInteractive);
+    auto suspension = logger->suspendIf(runOptions.isInteractive);
 
     const auto savedErrno = errno;
 
@@ -349,8 +351,8 @@ void runProgram2(const RunOptions & options)
         throw std::move(execErr);
     }
 
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
+    if (runOptions.standardOut)
+        drainFD(out.readSide.get(), *runOptions.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();
