@@ -51,7 +51,8 @@ nix_err nix_path_info_get_nar_hash(
  *
  * @param[out] context Optional, stores error information
  * @param[in] path_info the nix_path_info to read from
- * @return NAR size in bytes, 0 if unknown
+ * @return NAR size in bytes, 0 on error. Note that a NAR always has a root object,
+ *         so an actual NAR stream is never empty.
  */
 uint64_t nix_path_info_get_nar_size(nix_c_context * context, const nix_path_info * path_info);
 
