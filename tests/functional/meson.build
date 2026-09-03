@@ -241,6 +241,9 @@ foreach suite : suites
       meson.current_build_dir() / 'asan-log',
     )
 
+    overrides = suite.get('overrides', {}).get(script, {})
+    protocol = overrides.get('protocol', 'exitcode')
+
     test(
       name,
       bash,
@@ -269,6 +272,7 @@ foreach suite : suites
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : deps,
       workdir : workdir,
+      protocol : protocol,
     )
   endforeach
 endforeach

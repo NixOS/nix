@@ -9,4 +9,7 @@ suites += {
   ],
   'workdir' : meson.current_source_dir(),
   'env' : {'BASH_ENV' : meson.current_source_dir() / 'common.sh'},
+  'overrides' : {
+    'characterisation.sh' : {'protocol' : 'tap'},
+  },
 }
