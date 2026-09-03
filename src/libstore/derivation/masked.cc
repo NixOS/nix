@@ -1,4 +1,4 @@
-#include "nix/store/derivation/modulo.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
@@ -9,7 +9,7 @@
 
 namespace nix {
 
-namespace derivation::modulo {
+namespace derivation::masked {
 
 /* --------------------------------------------------------------------------
    Derivation hash modulo
@@ -87,7 +87,7 @@ static bool inputModulo(
  * dynamic derivation whose outputs are not yet known).
  */
 template<typename Out>
-static std::optional<Derivation<HashInputs, Out>> derivationModulo(Store & store, Derivation<FullInputs, Out> drv)
+static std::optional<Derivation<HashInputs, Out>> maskInputDrvs(Store & store, Derivation<FullInputs, Out> drv)
 {
     Derivation<HashInputs, Out> masked{
         .outputs = std::move(drv.outputs),
@@ -164,7 +164,7 @@ HashModulo hashInput(Store & store, const Full & drv)
         if (!std::get_if<Output::InputAddressed>(&output.raw))
             return HashModulo::DeferredDrv{};
 
-    auto inputAddressingModulo = derivationModulo(
+    auto inputAddressingModulo = maskInputDrvs(
         store,
         drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
             .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
@@ -181,7 +181,7 @@ HashModulo hashInput(Store & store, const Full & drv)
  * derivations.
  */
 template<typename Inputs>
-static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<Inputs, Output> & drv)
+static Derivation<Inputs, Output::Deferred> maskOutputs(const Derivation<Inputs, Output> & drv)
 {
     auto masked = drv.mapOutputs([](const Output & output) -> Output::Deferred {
         std::visit(
@@ -212,10 +212,9 @@ static Derivation<Inputs, Output::Deferred> maskOutputsAndEnv(const Derivation<I
  */
 std::optional<std::string> unparseModulo(Store & store, const Full & drv)
 {
-    auto masked =
-        derivationModulo(store, maskOutputsAndEnv(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
-            return FullInputs::fromSet(inputs);
-        }));
+    auto masked = maskInputDrvs(store, maskOutputs(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
+        return FullInputs::fromSet(inputs);
+    }));
     if (!masked)
         return std::nullopt;
     return unparse(*masked, store);
@@ -225,7 +224,7 @@ std::string unparseModulo(Store & store, const Basic & drv)
 {
     /* A resolved derivation has no input derivations, so there is
        nothing to substitute. */
-    auto masked = maskOutputsAndEnv(drv).mapInputs([](const StorePathSet & srcs) {
+    auto masked = maskOutputs(drv).mapInputs([](const StorePathSet & srcs) {
         return HashInputs{
             .srcs = srcs,
             .drvs = {},
@@ -250,6 +249,6 @@ Hash hash(Store & store, const Basic & drv)
     return hashString(HashAlgorithm::SHA256, unparseModulo(store, drv));
 }
 
-} // namespace derivation::modulo
+} // namespace derivation::masked
 
 } // namespace nix

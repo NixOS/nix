@@ -1,6 +1,6 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/modulo.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -791,7 +791,7 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
         // Regular `FullInputs` case must have regular `Output` outputs
         (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
         // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, modulo::HashInputs>
+        || (std::is_same_v<Inputs, masked::HashInputs>
             && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ))
 {
     using namespace std::literals::string_view_literals;
@@ -865,11 +865,11 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
     return s;
 }
 
-/* The hash modulo intermediate forms, unparsed by `modulo.cc`. */
+/* The hash modulo intermediate forms, unparsed by `masked.cc`. */
 template std::string
-unparse(const Derivation<modulo::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
+unparse(const Derivation<masked::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
 template std::string
-unparse(const Derivation<modulo::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
+unparse(const Derivation<masked::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
 
 std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {

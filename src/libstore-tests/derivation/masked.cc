@@ -2,12 +2,12 @@
 
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/modulo.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/dummy-store-impl.hh"
 #include "nix/store/tests/libstore.hh"
 #include "nix/util/tests/json-characterization.hh"
 
-namespace nix::derivation::modulo {
+namespace nix::derivation::masked {
 
 /**
  * Tests for `hash` and `hashInput`.
@@ -321,4 +321,4 @@ TEST_F(HashModuloTest, differingInputDrvsDiffer)
     EXPECT_NE(hash(*store, a), hash(*store, b));
 }
 
-} // namespace nix::derivation::modulo
+} // namespace nix::derivation::masked

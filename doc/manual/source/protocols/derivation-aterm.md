@@ -192,14 +192,14 @@ Re-emitting it — even as equivalent JSON — would change the derivation.
 > Structured attributes have been in the wild for many years, so any such choice would also have to reckon with the encodings already out there.
 > Committing to one of them is therefore not a choice we are yet in a position to make with this format.
 
-## Quotient derivations {#input-address-encoding}
+## Masked derivations {#input-address-encoding}
 
-An [input-addressed](@docroot@/store/derivation/outputs/input-address.md) output path is computed by hashing this same ATerm, but of a derivation that has been rewritten first: its ["quotient derivation"](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv), so called because the rewriting partitions derivations into equivalence classes.
+An [input-addressed](@docroot@/store/derivation/outputs/input-address.md) output path is computed by hashing the ATerm representation of a derivation that has been [masked](@docroot@/store/derivation/outputs/input-address.md#input-masked-drv) first: parts of it are blanked out before hashing, so that derivations differing only in what was blanked hash alike.
 
 Their encoding differs from the grammar above in two productions:
 
 ```ebnf
-quotient-derivation = "Derive(" fields ")" ;
+masked-derivation   = "Derive(" fields ")" ;
 
 input-drv           = "(" drv-hash "," output-names ")" ;
 drv-hash            = verbatim ;   (* lowercase hexadecimal *)
@@ -208,15 +208,17 @@ drv-hash            = verbatim ;   (* lowercase hexadecimal *)
 That is:
 
 - There is no version header.
-  A quotient derivation is only ever constructed once dynamic derivations have been resolved away, so it never needs one, and `DrvWithVersion(...)` does not occur.
+  A masked derivation is only ever constructed once dynamic derivations have been resolved away, so it never needs one, and `DrvWithVersion(...)` does not occur.
 
 - An `inputDrvs` key is a hash rather than a store path, and its node is always the flat `output-names` — the nested form the `dynamic-derivations` version allows cannot appear, for the same reason.
 
-See [input addressing](@docroot@/store/derivation/outputs/input-address.md#hash-quotient-drv) for how those hashes are derived and why; in short, they identify an input derivation up to what it produces rather than how, so that changing where a fixed-output input is fetched from does not change anything downstream.
+See [input addressing](@docroot@/store/derivation/outputs/input-address.md#input-masked-drv) for how those hashes are derived and why; in short, they identify an input derivation up to what it produces rather than how, so that changing where a fixed-output input is fetched from does not change anything downstream.
+
+Replacing the input derivation paths with hashes like this is *input masking*, and is performed on all derivations.
 
 Whether the outputs carry their paths depends on what is being hashed.
-When computing a derivation's own output paths they are masked — `output-path`, and the environment variable named after each output, are empty — since those paths are what is being computed.
-When hashing a derivation to stand in for it as an *input* to another, they are left as they are.
+When computing a derivation's own output paths they are *output masked* too — `output-path`, and the environment variable named after each output, are empty — since those paths are what is being computed; the result is *fully masked*.
+When hashing a derivation to stand in for it as an *input* to another, they are left as they are, and the result is *input-masked* only.
 
 The result is not a derivation that can be built, written to the store, or read back by `parse`: its inputs name hashes, not paths.
 It exists only to be hashed.

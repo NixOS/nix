@@ -1,7 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation-options.hh"
 #include "nix/store/derivation/aterm.hh"
-#include "nix/store/derivation/modulo.hh"
+#include "nix/store/derivation/masked.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/types.hh"
@@ -344,7 +344,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     auto hashModulo = [&]() -> const std::optional<Hash> & {
         if (!hashModulo_) {
             // somewhat expensive so we do lazily
-            hashModulo_ = derivation::modulo::hash(store, drv);
+            hashModulo_ = derivation::masked::hash(store, drv);
         }
         return *hashModulo_;
     };
