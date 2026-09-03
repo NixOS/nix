@@ -480,7 +480,9 @@ nix_err nix_path_info_get_ca(
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        if (path_info->info->ca && callback) {
+        if (!path_info->info->ca)
+            return nix_set_err_msg(context, NIX_ERR_KEY, "Store path is not content-addressed");
+        if (callback) {
             auto res = renderContentAddress(*path_info->info->ca);
             return call_nix_get_string_callback(res, callback, user_data);
         }

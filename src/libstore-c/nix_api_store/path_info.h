@@ -107,16 +107,26 @@ nix_err nix_path_info_get_sigs(
     void (*callback)(nix_c_context * context, void * user_data, const char * sig, unsigned int sig_len));
 
 /**
- * @brief Get the content address of a store path, if any
+ * @brief Get the content address of a store path, if it has one
  *
- * If the path is content-addressed, calls the callback with the rendered
- * content address string. If not content-addressed, the callback is not called.
+ * If so, "returns" the hash as a string with method and algorithm prefix in Nix base-32 encoding,
+ * e.g. `"fixed:r:sha256:1i89icvvs2f3cym00414i3bbl1qidhg0b5yrmdlx9cjkj5is6ljg"`.
+ *
+ * If the store object referenced by `path_info` is not content-addressed,
+ * the return code is `NIX_ERR_KEY`, and the callback is not called.
+ *
+ * `NIX_ERR_KEY` is only returned when `path_info` is not content-addressed.
+ *
+ * Input-addressed store paths have a content hash (see `nix_path_info_get_nar_hash`,
+ * but no content *address*, so that results in NIX_ERR_KEY, distinguishable from
+ * other, perhaps more unexpected errors.
  *
  * @param[out] context Optional, stores error information
  * @param[in] path_info the nix_path_info to read from
- * @param[in] callback called with the content address string, if present
+ * @param[in] callback called with the content address string (only called when present)
  * @param[in] user_data arbitrary data, passed to the callback when it's called
- * @return NIX_OK on success, error code on failure
+ * @return NIX_OK on success, NIX_ERR_KEY if the path is not content-addressed,
+ *         another error code on failure
  */
 nix_err nix_path_info_get_ca(
     nix_c_context * context, const nix_path_info * path_info, nix_get_string_callback callback, void * user_data);

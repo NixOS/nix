@@ -1187,8 +1187,8 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_ca_absent)
     bool callbackCalled = false;
     auto ret = nix_path_info_get_ca(
         ctx, info, [](const char *, unsigned int, void * ud) { *static_cast<bool *>(ud) = true; }, &callbackCalled);
-    assert_ctx_ok();
-    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(ret, NIX_ERR_KEY);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_KEY);
     ASSERT_FALSE(callbackCalled);
 
     nix_path_info_free(info);
@@ -1208,9 +1208,19 @@ TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_null_callbacks)
     assert_ctx_ok();
     ASSERT_EQ(ret, NIX_OK);
 
+    // outPath is content-addressed, so it succeeds, but lackign a callback, it
+    // ignores the value of it.
     ret = nix_path_info_get_ca(ctx, info, nullptr, nullptr);
     assert_ctx_ok();
     ASSERT_EQ(ret, NIX_OK);
+
+    std::string ca;
+    ret = nix_path_info_get_ca(ctx, info, OBSERVE_STRING(ca));
+    // The fixture provides a straightforward NAR-hashed output.
+    // Other CA paths may use a different method and prefix.
+    // Since the derivation has no impurities and a constant output, we can
+    // simply check the whole thing in one go:
+    ASSERT_EQ(ca, "fixed:r:sha256:1i89icvvs2f3cym00414i3bbl1qidhg0b5yrmdlx9cjkj5is6ljg");
 
     nix_path_info_free(info);
 }
