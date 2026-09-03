@@ -21,11 +21,7 @@ repo=$TEST_ROOT/./git
 
 export _NIX_FORCE_HTTP=1
 
-rm -rf "$repo" "${repo}-tmp" "$TEST_HOME/.cache/nix"
-
-git init --initial-branch="master" "$repo"
-git -C "$repo" config user.email "nix-tests@example.com"
-git -C "$repo" config user.name "Nix Tests"
+createGitRepo "$repo"
 
 echo "hello world" > "$repo/hello_world"
 git -C "$repo" add hello_world
