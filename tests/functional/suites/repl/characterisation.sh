@@ -2,7 +2,36 @@
 # shellcheck source=/dev/null
 # shellcheck disable=SC2034
 
+{ set +x; } 2>/dev/null
+
 source "$_NIX_TEST_SOURCE_DIR"/common/characterisation/framework.sh
+
+testNumber=0
+
+# TODO: Convert all tests using characterisation tests to TAP and move this
+# to the framework.
+
+function skipTest() {
+    # TAP tests should always exit with 0.
+    exit 0
+}
+
+function reportDiffAcceptFailure() {
+    (( testNumber+=1 ))
+    local -r testName=$2
+    if [[ "${_NIX_TEST_ACCEPT-}" == 1 ]]; then
+        echo "ok $testNumber $testName # SKIP"
+    else
+        echo "not ok $testNumber $testName"
+    fi
+    echo "$1" >&2
+}
+
+function reportDiffAcceptSuccess() {
+    (( testNumber+=1 ))
+    # Do nothing by default
+    echo "ok $testNumber $testName"
+}
 
 testDir=$PWD
 
@@ -11,6 +40,9 @@ badDiff=0
 badExitCode=0
 
 testCases=( "$testDir"/cases/*.in )
+
+echo "TAP version 14"
+echo "1..${#testCases[@]}"
 
 for test in "${testCases[@]}"; do
     test="$(basename "$test" .in)"
