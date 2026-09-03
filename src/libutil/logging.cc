@@ -441,14 +441,23 @@ bool handleJSONLogMessage(
     try {
         std::string action = json["action"];
 
+        // XXX: UB provoking C-style casts to enums. Fuzz the hell out of this
+        // code!
         if (action == "start") {
             auto type = (ActivityType) json["type"];
-            if (trusted || type == actFileTransfer)
+            if (trusted || type == actFileTransfer) {
+                auto level = json["level"].get<nlohmann::json::number_unsigned_t>();
                 activities.emplace(
                     std::piecewise_construct,
                     std::forward_as_tuple(json["id"]),
                     std::forward_as_tuple(
-                        *logger, (Verbosity) json["level"], type, json["text"], getFields(json["fields"]), act.id));
+                        *logger,
+                        verbosityFromIntClamped(level),
+                        type,
+                        json["text"],
+                        getFields(json["fields"]),
+                        act.id));
+            }
         }
 
         else if (action == "stop")
@@ -466,8 +475,9 @@ bool handleJSONLogMessage(
         }
 
         else if (action == "msg") {
+            auto level = json["level"].get<nlohmann::json::number_unsigned_t>();
             std::string msg = json["msg"];
-            logger->log((Verbosity) json["level"], msg);
+            logger->log(verbosityFromIntClamped(level), msg);
         }
 
         return true;

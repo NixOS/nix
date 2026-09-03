@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #include <boost/coroutine2/coroutine.hpp>
 #include <boost/coroutine2/protected_fixedsize_stack.hpp>
@@ -564,8 +565,8 @@ Sink & operator<<(Sink & sink, const StringSet & s)
 Sink & operator<<(Sink & sink, const Error & ex)
 {
     auto & info = ex.info();
-    sink << "Error" << info.level << "Error" // removed
-         << info.msg.str() << 0              // FIXME: info.errPos
+    sink << "Error" << std::to_underlying(info.level) << "Error" // removed
+         << info.msg.str() << 0                                  // FIXME: info.errPos
          << info.traces.size();
     for (auto & trace : info.traces) {
         sink << 0; // FIXME: trace.pos
@@ -647,7 +648,7 @@ Error readError(Source & source)
     auto type = readString(source);
     if (type != "Error")
         throw SerialisationError("unexpected error type '%s'", type);
-    auto level = (Verbosity) readInt(source);
+    auto level = verbosityFromIntClamped(readInt(source));
     [[maybe_unused]] auto name = readString(source); // removed
     auto msg = readString(source);
     ErrorInfo info{

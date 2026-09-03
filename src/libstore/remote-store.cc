@@ -22,7 +22,9 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/socket.hh"
+
 #include <variant>
+#include <utility>
 
 #ifndef _WIN32
 #  include <sys/socket.h>
@@ -132,10 +134,10 @@ void RemoteStore::initConnection(Connection & conn)
 void RemoteStore::setOptions(Connection & conn)
 {
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
-            << settings.getWorkerSettings().tryFallback << verbosity << settings.getWorkerSettings().maxBuildJobs
-            << settings.getWorkerSettings().maxSilentTime << true << (settings.verboseBuild ? lvlError : lvlVomit)
-            << 0 // obsolete log type
-            << 0 /* obsolete print build trace */
+            << settings.getWorkerSettings().tryFallback << std::to_underlying(verbosity)
+            << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
+            << std::to_underlying(settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
+            << 0                                                                    /* obsolete print build trace */
             << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
 
     std::map<std::string, nix::Config::SettingInfo> overrides;
