@@ -16,7 +16,7 @@ function diffAndAcceptInner() {
     if test -e "$expected"; then
         local -r expectedOrEmpty="$expected"
     else
-        local -r expectedOrEmpty=common/characterisation/empty
+        local -r expectedOrEmpty=$_NIX_TEST_SOURCE_DIR/common/characterisation/empty
     fi
 
     # Diff so we get a nice message
