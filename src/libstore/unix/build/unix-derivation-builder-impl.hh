@@ -143,7 +143,7 @@ public:
 
     std::optional<Descriptor> startBuild() override;
 
-    SingleDrvOutputs unprepareBuild() override;
+    BuilderExit unprepareBuild() override;
 
 protected:
 
@@ -197,7 +197,7 @@ protected:
 
     virtual Strings getPreBuildHookArgs()
     {
-        return Strings({store.printStorePath(drvPath)});
+        return Strings({storeDirConfig.printStorePath(drvPath)});
     }
 
     /**
@@ -311,13 +311,9 @@ protected:
 
 protected:
 
-    /**
-     * Delete the temporary directory, if we have one.
-     *
-     * @param force We know the build succeeded, so don't attempt to
-     * preserve anything for debugging.
-     */
-    virtual void cleanupBuild(bool force);
+    void cleanupBuild(bool force) override;
+
+protected:
 
     /**
      * Kill any processes running under the build user UID or in the

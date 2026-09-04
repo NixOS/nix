@@ -36,7 +36,13 @@ protected:
      */
     Pid pid;
 
-    LocalStore & store;
+    std::shared_ptr<BuildingStore> store;
+
+    /**
+     * Just the store layout, for FFI: a `StoreDirConfig` can be made
+     * over FFI where a whole `Store` cannot.
+     */
+    const StoreDirConfig & storeDirConfig;
 
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods;
 
@@ -52,7 +58,7 @@ protected:
      */
     const derivation::Type derivationType;
 
-    const LocalSettings & localSettings = store.config->getLocalSettings();
+    const LocalSettings & localSettings = store->getLocalSettings();
 
 #ifndef _WIN32
     /**
@@ -92,41 +98,34 @@ protected:
      */
     virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
     {
-        return store.toRealPath(store.parseStorePath(p.string()));
+        return store->toRealPath(storeDirConfig.parseStorePath(p.string()));
     }
 
 
 public:
 
     DerivationBuilderImpl(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , store{store}
+        , store{std::move(store)}
+        , storeDirConfig{*this->store}
         , miscMethods{std::move(miscMethods)}
         , derivationType{derivation::type(drv)}
     {
     }
 
-protected:
+public:
 
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     *
-     * For subclasses to call at the end of `unprepareBuild`.
-     */
-    SingleDrvOutputs registerOutputs();
+    SingleDrvOutputs registerOutputs(LocalStore & localStore) override;
 
     /**
      * Output paths from the `SubmitOutput` store command
      */
     Sync<OutputPathMap> submittedOutputs;
 
-    /**
-     * Check that the derivation outputs submitted by recursive-nix exist
-     * and attach them to the derivation
-     */
-    SingleDrvOutputs checkSubmittedOutputs();
+    SingleDrvOutputs checkSubmittedOutputs(LocalStore & localStore) override;
 };
 
 } // namespace nix

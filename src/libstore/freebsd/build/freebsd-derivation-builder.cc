@@ -210,7 +210,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             .uid = 0,
             .gid = 0,
             .description = "Nix build user",
-            .home = store.config->getLocalSettings().sandboxBuildDir,
+            .home = store->getLocalSettings().sandboxBuildDir,
             .shell = "/noshell",
         },
         {
@@ -218,7 +218,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
             .uid = buildUser->getUID(),
             .gid = sandboxGid(),
             .description = "Nix build user",
-            .home = store.config->getLocalSettings().sandboxBuildDir,
+            .home = store->getLocalSettings().sandboxBuildDir,
             .shell = "/noshell",
         },
         {
@@ -303,7 +303,7 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
         debug("setting up a nullfs mount from %1% to %2%", PathFmt(chrootPath.source), PathFmt(path));
 
         int flags = 0;
-        if (store.isInStore(target.native()))
+        if (storeDirConfig.isInStore(target.native()))
             /* While we are at it, enforce invariants about store paths. Anything located at the "logical" store
                location must be readonly (file permission canonicalisation enforces this on the host filesystem).
                Also the store must never contain setuid binaries for the same reason. This is just defense-in-depth. */
@@ -478,7 +478,8 @@ void ChrootFreeBSDDerivationBuilder::enterChroot()
 void ChrootFreeBSDDerivationBuilder::addDependencyImpl(const StorePath & path)
 {
     throw UnimplementedError(
-        "adding store path '%s' to the sandbox is not implemented (recursive-nix)", store.printStorePath(path));
+        "adding store path '%s' to the sandbox is not implemented (recursive-nix)",
+        storeDirConfig.printStorePath(path));
 }
 
 } // namespace nix

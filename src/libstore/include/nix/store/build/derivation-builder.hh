@@ -156,6 +156,23 @@ struct DerivationBuilderCallbacks
 };
 
 /**
+ * The outcome of tearing down the build environment, from
+ * `DerivationBuilder::unprepareBuild`.
+ */
+struct BuilderExit
+{
+    /**
+     * The builder's exit status.
+     */
+    int status;
+
+    /**
+     * Whether the disk seemed full when the builder exited.
+     */
+    bool diskFull = false;
+};
+
+/**
  * This class represents the state for building locally.
  *
  * @todo Ideally, it would not be a class, but a single function.
@@ -234,14 +251,34 @@ public:
      * Tear down build environment after the builder exits (either on
      * its own or if it is killed).
      *
-     * @returns The first case indicates failure during output
-     * processing. A status code and exception are returned, providing
-     * more information. The second case indicates success, and
-     * realisations for each output of the derivation are returned.
-     *
-     * @throws BuildError
+     * @returns The builder's exit status and whether the disk seemed
+     * full at exit time.
      */
-    virtual SingleDrvOutputs unprepareBuild() = 0;
+    virtual BuilderExit unprepareBuild() = 0;
+
+    /**
+     * Check that the derivation outputs all exist and register them
+     * as valid.
+     *
+     * Not used with `builder-rpc-v0`; see `checkSubmittedOutputs`.
+     */
+    virtual SingleDrvOutputs registerOutputs(LocalStore & store) = 0;
+
+    /**
+     * Check that the derivation outputs submitted by recursive-nix
+     * exist and attach them to the derivation.
+     *
+     * Only used with `builder-rpc-v0`.
+     */
+    virtual SingleDrvOutputs checkSubmittedOutputs(LocalStore & store) = 0;
+
+    /**
+     * Delete the temporary directory, if we have one.
+     *
+     * @param force We know the build succeeded, so don't attempt to
+     * preserve anything for debugging.
+     */
+    virtual void cleanupBuild(bool force) = 0;
 
     /**
      * Forcibly kill the child process, if any.
@@ -272,6 +309,42 @@ struct ExternalBuilder
     std::vector<std::string> args;
 };
 
+struct LocalSettings;
+
+/**
+ * This type exists to aid with FFI: we cannot make a full `LocalStore`
+ * with everything (including building, which uses this!) from FFI, but
+ * we do have a chance of making something that just has the methods we
+ * actually need from `LocalStore`.
+ */
+struct BuildingStore : StoreDirConfig
+{
+    BuildingStore(const std::string & storeDir)
+        : StoreDirConfig{storeDir}
+    {
+    }
+
+    virtual ~BuildingStore();
+
+    virtual std::filesystem::path getRealStoreDir() const = 0;
+
+    virtual std::filesystem::path getBuildDir() const = 0;
+
+    virtual const LocalSettings & getLocalSettings() const = 0;
+
+    /**
+     * Make the store that recursive-Nix daemon connections talk to.
+     */
+    virtual ref<Store> makeRecursiveNixStore(RestrictionContext & ctx) = 0;
+
+    std::filesystem::path toRealPath(const StorePath & storePath) const
+    {
+        return getRealStoreDir() / std::string(storePath.to_string());
+    }
+};
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore &);
+
 struct DerivationBuilderDeleter
 {
     void operator()(DerivationBuilder * builder) noexcept;
@@ -283,7 +356,7 @@ using DerivationBuilderUnique = std::unique_ptr<DerivationBuilder, DerivationBui
  * @param ioport The worker's I/O completion port, which the log pipe is tied to.
  */
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params
 #ifdef _WIN32
@@ -298,7 +371,7 @@ DerivationBuilderUnique makeDerivationBuilder(
  * derivation.
  */
 DerivationBuilderUnique makeExternalDerivationBuilder(
-    LocalStore & store,
+    std::unique_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     const ExternalBuilder & handler);

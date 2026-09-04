@@ -2,6 +2,7 @@
 #include "build/derivation-check.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/local-store.hh"
+#include "nix/store/restricted-store.hh"
 #include "nix/store/path-references.hh"
 #include "nix/store/posix-fs-canonicalise.hh"
 #include "nix/util/archive.hh"
@@ -100,7 +101,7 @@ static void replaceValidPath(const std::filesystem::path & storePath, const std:
         deletePath(oldPath);
 }
 
-SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
+SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 {
     std::map<std::string, ValidPathInfo> infos;
 
@@ -152,7 +153,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         assert(scratchOutput);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInHost(storeDirConfig.printStorePath(*scratchOutput));
 
         outputsToSort.insert(outputName);
 
@@ -174,7 +175,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to produce output path for output '%s' at %s",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 outputName,
                 PathFmt(actualPath));
         PosixStat & st = *optSt;
@@ -244,7 +245,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 BuildResult::Failure::OutputRejected,
                 "no output reference for '%s' in build of '%s'",
                 name,
-                store.printStorePath(drvPath));
+                storeDirConfig.printStorePath(drvPath));
         return std::visit(
             overloaded{
                 /* Since we'll use the already installed versions of these, we
@@ -263,7 +264,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 throw BuildError(
                     BuildResult::Failure::OutputRejected,
                     "cycle detected in build of '%s' in the references of output '%s' from output '%s'",
-                    store.printStorePath(drvPath),
+                    storeDirConfig.printStorePath(drvPath),
                     cycle.path,
                     cycle.parent);
             },
@@ -276,7 +277,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInHost(storeDirConfig.printStorePath(*scratchPath));
 
         /* An optional file descriptor of a directory used for intermediate
            operations. */
@@ -326,7 +327,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 /* Put the temporary copy in a directory inaccessible to the builder.
                    actualPath might point inside the build chroot, which is controlled
                    by the derivation builder. */
-                auto [rewriteTempDir, rewriteTempDirFd] = store.createTempDirInStore();
+                auto [rewriteTempDir, rewriteTempDirFd] = localStore.createTempDirInStore();
                 AutoDelete delRewriteTempDir(rewriteTempDir);
                 std::filesystem::path tmpPath = rewriteTempDir / "x";
                 restorePath(tmpPath, *source);
@@ -410,7 +411,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             }();
 
             auto newInfo0 = ValidPathInfo::makeFromCA(
-                store,
+                storeDirConfig,
                 outputPathName(drv.name, outputName),
                 ContentAddressWithReferences::fromParts(outputHash.method, std::move(got), rewriteRefs()),
                 Hash::dummy);
@@ -438,7 +439,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
         auto moveOutputToTempDir = [&]() -> void {
             std::filesystem::path tempDir;
-            std::tie(tempDir, tempDirFd) = store.createTempDirInStore();
+            std::tie(tempDir, tempDirFd) = localStore.createTempDirInStore();
             delTempDir = AutoDelete(tempDir);
 
             auto tmpOutput = tempDir / "x";
@@ -446,7 +447,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* Copy files to break stale file descriptors. copyRecursive below will use
                reflinking to optimise the copying overhead. */
             auto pathAccessor = makeFSSourceAccessor(actualPath);
-            RestoreSink restoreSink{store.config->getLocalSettings().fsyncStorePaths};
+            RestoreSink restoreSink{store->getLocalSettings().fsyncStorePaths};
             restoreSink.dstPath = tmpOutput;
             copyRecursive(*pathAccessor, CanonPath::root, restoreSink, CanonPath::root);
             /* This makes it slightly harder to make sense of the control flow. The rule
@@ -471,7 +472,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                         {makeFSSourceAccessor(actualPath), CanonPath::root},
                         FileSerialisationMethod::NixArchive,
                         HashAlgorithm::SHA256);
-                    ValidPathInfo newInfo0{requiredFinalPath, {store, narHashAndSize.hash}};
+                    ValidPathInfo newInfo0{requiredFinalPath, {storeDirConfig, narHashAndSize.hash}};
                     newInfo0.narSize = narHashAndSize.numBytesDigested;
                     auto refs = rewriteRefs();
                     newInfo0.references = std::move(refs.others);
@@ -525,51 +526,51 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         /* Calculate where we'll move the output files. In the checking case we
            will leave leave them where they are, for now, rather than move to
            their usual "final destination" */
-        auto finalDestPath = store.printStorePath(newInfo.path);
+        auto finalDestPath = storeDirConfig.printStorePath(newInfo.path);
 
         /* Lock final output path, if not already locked. This happens with
            floating CA derivations and hash-mismatching fixed-output
            derivations. */
         PathLocks dynamicOutputLock;
         dynamicOutputLock.setDeletion(true);
-        auto optFixedPath = output->path(store, drv.name, outputName);
-        if (!optFixedPath || store.printStorePath(*optFixedPath) != finalDestPath) {
+        auto optFixedPath = output->path(storeDirConfig, drv.name, outputName);
+        if (!optFixedPath || storeDirConfig.printStorePath(*optFixedPath) != finalDestPath) {
             assert(newInfo.ca);
 
             /* Don't wait on lock for the hash-mismatching fixed-output
                derivation case, to avoid a deadlock in the case where a build
                with the correct hash is in progress. */
-            bool locked = dynamicOutputLock.lockPaths({store.toRealPath(newInfo.path)}, "", !optFixedPath);
+            bool locked = dynamicOutputLock.lockPaths({store->toRealPath(newInfo.path)}, "", !optFixedPath);
 
             /* If we can't lock the correct path, clean up and bail now. */
             if (!locked) {
                 debug(
                     "failed to lock correct output path of %s, namely %s, not moving output",
-                    store.printStorePath(drvPath),
-                    PathFmt(store.toRealPath(newInfo.path)));
+                    storeDirConfig.printStorePath(drvPath),
+                    PathFmt(store->toRealPath(newInfo.path)));
                 deletePath(actualPath);
                 /* Trigger the hash-mismatch error. */
-                checkCAOutput(store, drvPath, *output, newInfo, outputName);
+                checkCAOutput(storeDirConfig, drvPath, *output, newInfo, outputName);
                 unreachable();
             }
         }
 
         /* Move files, if needed */
-        if (store.toRealPath(newInfo.path) != actualPath) {
+        if (store->toRealPath(newInfo.path) != actualPath) {
             if (buildMode == bmRepair) {
                 /* Path already exists, need to replace it */
-                replaceValidPath(store.toRealPath(newInfo.path), actualPath);
+                replaceValidPath(store->toRealPath(newInfo.path), actualPath);
             } else if (buildMode == bmCheck) {
                 /* Path already exists, and we want to compare, so we leave out
                    new path in place. */
-            } else if (store.isValidPath(newInfo.path)) {
+            } else if (localStore.isValidPath(newInfo.path)) {
                 /* Path already exists because CA path produced by something
                    else. No moving needed. */
                 assert(newInfo.ca);
                 /* Can delete our scratch copy now. */
                 deletePath(actualPath);
             } else {
-                auto destPath = store.toRealPath(newInfo.path);
+                auto destPath = store->toRealPath(newInfo.path);
                 deletePath(destPath);
                 movePath(actualPath, destPath);
             }
@@ -578,12 +579,12 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         if (buildMode == bmCheck) {
             /* Check against already registered outputs */
 
-            if (store.isValidPath(newInfo.path)) {
-                ValidPathInfo oldInfo(*store.queryPathInfo(newInfo.path));
+            if (localStore.isValidPath(newInfo.path)) {
+                ValidPathInfo oldInfo(*localStore.queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
                     if (diffHook || settings.keepFailed) {
-                        auto dst = store.toRealPath(newInfo.path);
+                        auto dst = store->toRealPath(newInfo.path);
                         dst += ".check";
                         deletePath(dst);
                         movePath(actualPath, dst);
@@ -597,27 +598,27 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 #endif
                                 finalDestPath,
                                 dst,
-                                store.printStorePath(drvPath),
+                                storeDirConfig.printStorePath(drvPath),
                                 tmpDir);
                         }
 
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output %s differs from %s",
-                            store.printStorePath(drvPath),
-                            PathFmt(store.toRealPath(newInfo.path)),
+                            storeDirConfig.printStorePath(drvPath),
+                            PathFmt(store->toRealPath(newInfo.path)),
                             PathFmt(dst));
                     } else
                         throw NotDeterministic(
                             "derivation '%s' may not be deterministic: output %s differs",
-                            store.printStorePath(drvPath),
-                            PathFmt(store.toRealPath(newInfo.path)));
+                            storeDirConfig.printStorePath(drvPath),
+                            PathFmt(store->toRealPath(newInfo.path)));
                 }
 
                 /* Since we verified the build, it's now ultimately trusted. */
                 if (!oldInfo.ultimate) {
                     oldInfo.ultimate = true;
-                    store.signPathInfo(oldInfo);
-                    store.registerValidPaths({{oldInfo.path, oldInfo}});
+                    localStore.signPathInfo(oldInfo);
+                    localStore.registerValidPaths({{oldInfo.path, oldInfo}});
                 }
             }
         } else {
@@ -626,17 +627,18 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             /* For debugging, print out the referenced and unreferenced paths. */
             for (auto & i : inputPaths) {
                 if (references.count(i))
-                    debug("referenced input: '%1%'", store.printStorePath(i));
+                    debug("referenced input: '%1%'", storeDirConfig.printStorePath(i));
                 else
-                    debug("unreferenced input: '%1%'", store.printStorePath(i));
+                    debug("unreferenced input: '%1%'", storeDirConfig.printStorePath(i));
             }
 
-            if (!store.isValidPath(newInfo.path))
-                store.optimisePath(store.toRealPath(newInfo.path), NoRepair); // FIXME: combine with scanForReferences()
+            if (!localStore.isValidPath(newInfo.path))
+                localStore.optimisePath(
+                    store->toRealPath(newInfo.path), NoRepair); // FIXME: combine with scanForReferences()
 
             newInfo.deriver = drvPath;
             newInfo.ultimate = true;
-            store.signPathInfo(newInfo);
+            localStore.signPathInfo(newInfo);
 
             finish(newInfo.path);
 
@@ -651,7 +653,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                possibly quite slow thing it was) doesn't have to be done
                again. */
             if (newInfo.ca)
-                store.registerValidPaths({{newInfo.path, newInfo}});
+                localStore.registerValidPaths({{newInfo.path, newInfo}});
         }
 
         /* Do this in both the check and non-check cases, because we
@@ -662,7 +664,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
 
     if (buildMode == bmCheck) {
         return {};
@@ -676,7 +678,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         for (auto & [outputName, newInfo] : infos) {
             infos2.insert_or_assign(newInfo.path, newInfo);
         }
-        store.registerValidPaths(infos2);
+        localStore.registerValidPaths(infos2);
     }
 
     /* If we made it this far, we are sure the output matches the
@@ -699,8 +701,8 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
             },
         };
         if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !type(drv).isImpure()) {
-            store.signRealisation(thisRealisation);
-            store.registerDrvOutput(thisRealisation, NoCheckSigs);
+            localStore.signRealisation(thisRealisation);
+            localStore.registerDrvOutput(thisRealisation, NoCheckSigs);
         }
         builtOutputs.emplace(outputName, thisRealisation);
     }
@@ -708,7 +710,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     return builtOutputs;
 }
 
-SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
+SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs(LocalStore & localStore)
 {
     // Submitted outputs from the recursive nix daemon
     // It's fine to lock here since all other threads with the reference have been shut down.
@@ -719,12 +721,12 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
     std::map<std::string, ValidPathInfo> infos;
 
     for (auto & [outputName, outputPath] : *submittedOutputs) {
-        infos.emplace(outputName, *store.queryPathInfo(outputPath));
+        infos.emplace(outputName, *localStore.queryPathInfo(outputPath));
     }
 
     // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
     // more verification steps needed afterward
-    checkOutputs(store, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
 
     for (auto & [outputName, output] : drv.outputs) {
         // For some reason cannot be moved to checkOutputs, needs debugging
@@ -732,7 +734,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
             throw BuildError(
                 BuildResult::Failure::OutputRejected,
                 "builder for '%s' failed to submit output path for '%s'",
-                store.printStorePath(drvPath),
+                storeDirConfig.printStorePath(drvPath),
                 outputName);
         }
 
@@ -754,14 +756,65 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs()
             },
         };
 
-        store.signRealisation(realisation);
-        store.registerDrvOutput(realisation, NoCheckSigs);
+        localStore.signRealisation(realisation);
+        localStore.registerDrvOutput(realisation, NoCheckSigs);
         builtOutputs.emplace(outputName, realisation);
 
         // TODO: handle --check
     }
 
     return builtOutputs;
+}
+
+BuildingStore::~BuildingStore() = default;
+
+namespace {
+
+struct LocalBuildingStore : BuildingStore
+{
+    LocalStore & localStore;
+
+    LocalBuildingStore(LocalStore & localStore)
+        : BuildingStore{localStore.storeDir}
+        , localStore{localStore}
+    {
+    }
+
+    std::filesystem::path getRealStoreDir() const override
+    {
+        return localStore.config->realStoreDir.get();
+    }
+
+    std::filesystem::path getBuildDir() const override
+    {
+        return localStore.config->getBuildDir();
+    }
+
+    const LocalSettings & getLocalSettings() const override
+    {
+        return localStore.config->getLocalSettings();
+    }
+
+    ref<Store> makeRecursiveNixStore(RestrictionContext & ctx) override
+    {
+        return makeRestrictedStore(
+            [&] {
+                auto config = make_ref<LocalStore::Config>(*localStore.config);
+                config->pathInfoCacheSize = 0;
+                config->stateDir = "/no-such-path";
+                config->logDir = "/no-such-path";
+                return config;
+            }(),
+            ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(localStore.shared_from_this())),
+            ctx);
+    }
+};
+
+} // namespace
+
+std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore & localStore)
+{
+    return std::make_unique<LocalBuildingStore>(localStore);
 }
 
 } // namespace nix

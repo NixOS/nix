@@ -398,7 +398,7 @@ static const std::filesystem::path procPath = "/proc";
 
 void LinuxDerivationBuilder::enterChroot()
 {
-    auto & localSettings = store.config->getLocalSettings();
+    auto & localSettings = store->getLocalSettings();
 
     /* Set the NO_NEW_PRIVS before doing seccomp/landlock setup.
        landlock_restrict_self requires either NO_NEW_PRIVS or CAP_SYS_ADMIN.
@@ -441,12 +441,12 @@ gid_t ChrootLinuxDerivationBuilder::sandboxGid()
 std::unique_ptr<UserLock> ChrootLinuxDerivationBuilder::getBuildUser()
 {
     return acquireUserLock(
-        settings.nixStateDir, store.config->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
+        settings.nixStateDir, store->getLocalSettings(), drvOptions.useUidRange(drv) ? 65536 : 1, true);
 }
 
 void ChrootLinuxDerivationBuilder::prepareUser()
 {
-    if ((buildUser && buildUser->getUIDCount() != 1) || store.config->getLocalSettings().useCgroups) {
+    if ((buildUser && buildUser->getUIDCount() != 1) || store->getLocalSettings().useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
@@ -566,7 +566,7 @@ void ChrootLinuxDerivationBuilder::startChild()
             if (setgroups(0, 0) == -1) {
                 if (errno != EPERM)
                     throw SysError("setgroups failed");
-                if (store.config->getLocalSettings().requireDropSupplementaryGroups)
+                if (store->getLocalSettings().requireDropSupplementaryGroups)
                     throw Error(
                         "setgroups failed. Set the require-drop-supplementary-groups option to false to skip this step.");
             }
@@ -650,7 +650,7 @@ void ChrootLinuxDerivationBuilder::startChild()
             "nobody:x:65534:65534:Nobody:/:/noshell\n",
             sandboxUid(),
             sandboxGid(),
-            store.config->getLocalSettings().sandboxBuildDir.get().native()));
+            store->getLocalSettings().sandboxBuildDir.get().native()));
 
     writeFile(
         chrootRootDir / "etc" / "group",
@@ -737,7 +737,8 @@ void ChrootLinuxDerivationBuilder::enterChroot()
 
        Marking chrootRootDir as MS_SHARED causes pivot_root()
        to fail with EINVAL. Don't know why. */
-    std::filesystem::path chrootStoreDir = chrootRootDir / std::filesystem::path(store.storeDir).relative_path();
+    std::filesystem::path chrootStoreDir =
+        chrootRootDir / std::filesystem::path(storeDirConfig.storeDir).relative_path();
 
     if (mount(chrootStoreDir.c_str(), chrootStoreDir.c_str(), 0, MS_BIND, 0) == -1)
         throw SysError("unable to bind mount the Nix store at %1%", PathFmt(chrootStoreDir));
@@ -851,7 +852,7 @@ void ChrootLinuxDerivationBuilder::enterChroot()
                (chrootRootDir / "dev" / "shm").c_str(),
                "tmpfs",
                0,
-               fmt("size=%s", store.config->getLocalSettings().sandboxShmSize).c_str())
+               fmt("size=%s", store->getLocalSettings().sandboxShmSize).c_str())
                == -1)
         throw SysError("mounting /dev/shm");
 
@@ -933,7 +934,7 @@ void ChrootLinuxDerivationBuilder::setUser()
     });
 }
 
-SingleDrvOutputs ChrootLinuxDerivationBuilder::unprepareBuild()
+BuilderExit ChrootLinuxDerivationBuilder::unprepareBuild()
 {
     sandboxMountNamespace = -1;
     sandboxUserNamespace = -1;
@@ -982,7 +983,8 @@ void ChrootLinuxDerivationBuilder::addDependencyImpl(const StorePath & path)
 
     int status = child.wait();
     if (!statusOk(status))
-        throw Error("could not add path '%s' to sandbox: %s", store.printStorePath(path), statusToString(status));
+        throw Error(
+            "could not add path '%s' to sandbox: %s", storeDirConfig.printStorePath(path), statusToString(status));
 }
 
 } // namespace nix
