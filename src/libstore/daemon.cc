@@ -22,7 +22,9 @@
 #include "nix/util/args.hh"
 #include "nix/util/logging.hh"
 #include "nix/store/globals.hh"
+
 #include <variant>
+#include <utility>
 
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
 #  include "nix/util/monitor-fd.hh"
@@ -170,7 +172,7 @@ struct TunnelLogger : public Logger
         }
 
         StringSink buf;
-        buf << STDERR_START_ACTIVITY << act << lvl << type << s << fields << parent;
+        buf << STDERR_START_ACTIVITY << act << std::to_underlying(lvl) << type << s << fields << parent;
         enqueueMsg(buf.s);
     }
 
@@ -821,11 +823,11 @@ static void performOp(
         clientSettings.keepFailed = readInt(conn.from);
         clientSettings.keepGoing = readInt(conn.from);
         clientSettings.tryFallback = readInt(conn.from);
-        clientSettings.verbosity = (Verbosity) readInt(conn.from);
+        clientSettings.verbosity = WorkerProto::Serialise<Verbosity>::read(*store, conn);
         clientSettings.maxBuildJobs = readInt(conn.from);
         clientSettings.maxSilentTime = readInt(conn.from);
         readInt(conn.from); // obsolete useBuildHook
-        clientSettings.verboseBuild = lvlError == (Verbosity) readInt(conn.from);
+        clientSettings.verboseBuild = (readInt(conn.from) == 0);
         readInt(conn.from); // obsolete logType
         readInt(conn.from); // obsolete printBuildTrace
         clientSettings.buildCores = readInt(conn.from);

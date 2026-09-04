@@ -26,6 +26,9 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <algorithm>
+#include <concepts>
+#include <type_traits>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -36,7 +39,35 @@
 
 namespace nix {
 
-typedef enum { lvlError = 0, lvlWarn, lvlNotice, lvlInfo, lvlTalkative, lvlChatty, lvlDebug, lvlVomit } Verbosity;
+enum class Verbosity : unsigned {
+    lvlError = 0,
+    lvlWarn,
+    lvlNotice,
+    lvlInfo,
+    lvlTalkative,
+    lvlChatty,
+    lvlDebug,
+    lvlVomit,
+};
+
+/* For less churn. */
+using enum Verbosity;
+
+template<std::integral T>
+    requires(std::is_unsigned_v<T> && !std::is_same_v<bool, T>)
+inline Verbosity verbosityFromIntClamped(T val)
+{
+    /* Clamp, same as https://git.lix.systems/lix-project/lix/commit/f2fff1faa4c6a308ad30da691e18ceccf6626e0d and
+       what was effectively the behavior before b9f8c4af4057c2ed0ec5d1ff16ac49e0612ad57c because logErrorInfo
+       and friends do a <= nix::verbosity. */
+    return static_cast<Verbosity>(std::min<T>(val, std::to_underlying(lvlVomit)));
+}
+
+/* So that we don't accidentally run into 2s complement conversion issues.
+   Nothing actually needs this conversion. */
+template<std::integral T>
+    requires std::is_signed_v<T>
+Verbosity verbosityFromIntClamped(T) = delete;
 
 /**
  * The lines of code surrounding an error.

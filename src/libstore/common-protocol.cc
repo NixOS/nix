@@ -1,4 +1,5 @@
 #include "nix/util/serialise.hh"
+#include "nix/util/error.hh"
 #include "nix/store/path-with-outputs.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/common-protocol.hh"
@@ -8,6 +9,8 @@
 #include "nix/util/signature/local-keys.hh"
 
 #include <nlohmann/json.hpp>
+
+#include <utility>
 
 namespace nix {
 
@@ -134,6 +137,17 @@ void CommonProto::Serialise<BuildResultStatus>::write(
             return;
         }
     unreachable();
+}
+
+Verbosity CommonProto::Serialise<Verbosity>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
+{
+    return verbosityFromIntClamped(readInt(conn.from));
+}
+
+void CommonProto::Serialise<Verbosity>::write(
+    const StoreDirConfig & store, CommonProto::WriteConn conn, const Verbosity & verbosity)
+{
+    conn.to << std::to_underlying(verbosity);
 }
 
 } // namespace nix

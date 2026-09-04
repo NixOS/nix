@@ -3,7 +3,9 @@
 #include "nix/store/build/child.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
+
 #include <chrono>
+#include <utility>
 
 namespace nix {
 
@@ -32,7 +34,7 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
     for (auto & arg : buildHookArgs)
         args.push_back(arg);
 
-    args.push_back(std::to_string(verbosity));
+    args.push_back(std::to_string(std::to_underlying(verbosity)));
 
     /* Create a pipe to get the output of the child. */
     fromHook.create();

@@ -3,6 +3,9 @@
 
 #include <boost/context/detail/exception.hpp>
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
+
+#include <limits>
 
 namespace nix {
 
@@ -42,6 +45,30 @@ TEST(readString, bogusLengthDoesNotPreallocate)
     sink << (uint64_t(1) << 40);
     StringSource source(sink.s);
     EXPECT_THROW(readString(source), EndOfFile);
+}
+
+TEST(readError, bogusLevelIsClamped)
+{
+    for (uint64_t level : {
+             uint64_t(8),
+             uint64_t(1234),
+             uint64_t(std::numeric_limits<unsigned>::max()),
+         }) {
+        StringSink sink;
+        sink << "Error" << level << "Error" << "oops" << uint64_t(0) << uint64_t(0);
+        StringSource source(sink.s);
+        auto e = readError(source);
+        EXPECT_THAT(std::string(e.what()), ::testing::HasSubstr("oops"));
+        EXPECT_EQ(e.info().level, Verbosity::lvlVomit);
+    }
+}
+
+TEST(readError, uint64LevelError)
+{
+    StringSink sink;
+    sink << "Error" << std::numeric_limits<uint64_t>::max() << "Error" << "oops" << uint64_t(0) << uint64_t(0);
+    StringSource source(sink.s);
+    EXPECT_THROW(readError(source), SerialisationError);
 }
 
 TEST(readPadding, works)
