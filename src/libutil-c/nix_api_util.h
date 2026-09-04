@@ -323,7 +323,8 @@ nix_err nix_err_code(const nix_c_context * read_context);
 /**
  * @brief Set an error message on a nix context.
  *
- * This should be used when you want to throw an error from a PrimOp callback.
+ * Use this to report an error from a callback that receives a context,
+ * such as a PrimOp or iterator callback.
  *
  * All other use is internal to the API.
  *
