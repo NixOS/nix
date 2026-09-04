@@ -21,6 +21,14 @@ R""(
   # nix derivation show -r /run/current-system
   ```
 
+* Show a derivation that is not in the store, such as the one a
+  [`post-build-hook`](@docroot@/command-ref/conf-file.md#conf-post-build-hook)
+  receives in the ATerm format:
+
+  ```console
+  # nix derivation show --aterm-stdin "$DRV_NAME" <&"$DRV_ATERM_FD"
+  ```
+
 * Print all files fetched using `fetchurl` by Firefox's dependency
   graph:
 
@@ -45,6 +53,12 @@ a Nix expression evaluates.
 
 By default, this command only shows top-level derivations, but with
 `--recursive`, it also shows their dependencies.
+
+With `--aterm-stdin`, no installables are taken; instead a single
+derivation in the [ATerm format](@docroot@/protocols/derivation-aterm.md)
+is read from standard input and shown under the store path it would
+have. That format does not record the derivation's name, so it must
+be passed as the flag's argument.
 
 [store derivation]: @docroot@/glossary.md#gloss-store-derivation
 
