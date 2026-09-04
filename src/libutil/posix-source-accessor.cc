@@ -804,7 +804,23 @@ void WindowsSourceAccessor::assertNoSymlinks(CanonPath path)
 
 ref<SourceAccessor> getFSSourceAccessor()
 {
-    static auto rootFS = makeFSSourceAccessor("/", /*trackLastModified=*/false);
+    static auto rootFS = makeFSSourceAccessor(
+#ifdef _WIN32
+        /* Windows has no single filesystem root to anchor to: paths are rooted
+           per drive, so `/` is not an absolute path there --- it has a root
+           directory but no root name, and `is_absolute()` wants both. An empty
+           root is how this accessor already spells "no prefix, the paths handed
+           to me are absolute already"; see `WindowsSourceAccessor::makeAbsPath`,
+           and the `root.empty()` arm of the assertion in its constructor.
+
+           Passing `/` made that assertion fail, which aborted every command
+           that evaluates, since `EvalState` reaches here through
+           `getFSSourceAccessor`. */
+        std::filesystem::path{},
+#else
+        "/",
+#endif
+        /*trackLastModified=*/false);
     return rootFS;
 }
 

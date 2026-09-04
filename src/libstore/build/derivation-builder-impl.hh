@@ -127,6 +127,44 @@ protected:
      * and attach them to the derivation
      */
     SingleDrvOutputs checkSubmittedOutputs();
+
+    /**
+     * Whether we need to perform hash rewriting if there are valid output paths.
+     *
+     * Only a sandbox that can present the outputs at their final paths can skip
+     * this, which on Unix means a chroot. Windows has no such mechanism, so the
+     * default is the answer there.
+     */
+    virtual bool needsHashRewrite()
+    {
+        return true;
+    }
+
+    /**
+     * Create alternative path calculated from but distinct from the
+     * input, so we can avoid overwriting outputs (or other store paths)
+     * that already exist.
+     */
+    StorePath makeFallbackPath(const StorePath & path);
+
+    /**
+     * Make a path to another based on the output name along with the
+     * derivation hash.
+     *
+     * @todo Add option to randomize, so we can audit whether our
+     * rewrites caught everything
+     */
+    StorePath makeFallbackPath(OutputNameView outputName);
+
+    /**
+     * Decide the scratch path for each output and populate `inputRewrites`
+     * so the builder sees placeholders substituted.
+     *
+     * Platform-neutral, and needed by every builder: without it
+     * `hashPlaceholder(outputName)` is never substituted, so a derivation
+     * cannot refer to its own outputs.
+     */
+    void prepareScratchOutputs();
 };
 
 } // namespace nix

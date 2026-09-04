@@ -11,6 +11,9 @@
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/tests/test-data.hh"
 #include "nix/util/url.hh"
+#ifdef _WIN32
+#  include "nix/util/windows-known-folders.hh"
+#endif
 
 #include "store-tests-config.hh"
 
@@ -50,8 +53,17 @@ TEST_F(nix_api_util_context, nix_store_get_storedir_default)
     assert_ctx_ok();
     ASSERT_EQ(NIX_OK, ret);
 
-    // These tests run with a unique storeDir, but not a relocated store
+    // These tests run with a unique storeDir, but not a relocated store.
+    //
+    // The default store is a local store, whose store dir is a *native* path.
+    // `NIX_STORE_DIR` is the Unix spelling, and on Windows it is not even a
+    // valid absolute path, so the native default is used there instead. See
+    // `StoreConfigBase::StoreDirSetting` for where that default comes from.
+#ifdef _WIN32
+    ASSERT_EQ((nix::windows::known_folders::getProgramData() / "nix" / "store").string(), str);
+#else
     ASSERT_STREQ(NIX_STORE_DIR, str.c_str());
+#endif
 
     nix_store_free(store);
 }

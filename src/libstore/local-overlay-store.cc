@@ -39,7 +39,7 @@ StoreReference LocalOverlayStoreConfig::getReference() const
 
 std::filesystem::path LocalOverlayStoreConfig::toUpperPath(const StorePath & path) const
 {
-    return upperLayer.get() / path.to_string();
+    return *upperLayer.get() / path.to_string();
 }
 
 LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
@@ -49,7 +49,7 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
     , config{config}
     , lowerStore(openStore(config->lowerStoreUri.get()).dynamic_pointer_cast<LocalFSStore>())
 {
-    if (!config->upperLayer.isOverridden())
+    if (!config->upperLayer.get())
         throw Error("overlay store at %s requires the 'upper-layer' setting", PathFmt(config->realStoreDir.get()));
 
     if (config->checkMount.get()) {
@@ -70,9 +70,9 @@ LocalOverlayStore::LocalOverlayStore(ref<const Config> config)
         };
 
         auto expectedLowerDir = lowerStore->config.realStoreDir.get();
-        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", config->upperLayer.get())) {
+        if (!checkOption("lowerdir", expectedLowerDir) || !checkOption("upperdir", *config->upperLayer.get())) {
             debug("expected lowerdir: %s", PathFmt(lowerStore->config.realStoreDir.get()));
-            debug("expected upperdir: %s", PathFmt(config->upperLayer.get()));
+            debug("expected upperdir: %s", PathFmt(*config->upperLayer.get()));
             debug("actual mount: %s", mountInfo);
             throw Error("overlay filesystem %s mounted incorrectly", PathFmt(config->realStoreDir.get()));
         }

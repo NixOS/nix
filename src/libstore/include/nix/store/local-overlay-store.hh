@@ -35,9 +35,15 @@ public:
           Must be used as OverlayFS lower layer for this store's store dir.
         )"};
 
-    const Setting<AbsolutePath> upperLayer{
+    /* Has no default: the constructor rejects a config that leaves it unset.
+       Spelling that as `std::nullopt` rather than a sentinel path matters
+       because `AbsolutePath` validates on construction, and a POSIX-rooted
+       sentinel is not absolute on Windows -- `is_absolute()` wants a root name
+       as well as a root directory -- so the sentinel made the config
+       unconstructible there regardless of what the caller passed. */
+    const Setting<std::optional<AbsolutePath>> upperLayer{
         (StoreConfig *) this,
-        "/upper-layer-must-be-set",
+        std::nullopt,
         "upper-layer",
         R"(
           Directory containing the OverlayFS upper layer for this store's store dir.
