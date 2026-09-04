@@ -747,13 +747,46 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
-    auto conn(getConnection());
-    if (conn->tempRootsPinned.get(path))
+    if (paths.empty())
         return;
-    conn->addTempRoot(*this, &conn.daemonException, path);
-    conn->tempRootsPinned.upsert(path, true);
+
+    auto conn(getConnection());
+
+    if (conn->protoVersion.features.contains(WorkerProto::featureAddTempRoots)) {
+        StorePathSet newPaths;
+        for (auto & path : paths)
+            if (!conn->tempRootsPinned.get(path))
+                newPaths.insert(path);
+
+        if (newPaths.empty())
+            return;
+
+        conn->to << WorkerProto::Op::AddTempRoots;
+        WorkerProto::write(*this, *conn, newPaths);
+        conn.processStderr();
+        readInt(conn->from);
+
+        for (auto & path : newPaths)
+            conn->tempRootsPinned.upsert(path, true);
+    } else {
+        /* Fallback for daemons that don't support the batched
+           operation. Note that this is very slow for large sets of
+           paths on high-latency links, due to a network round-trip per
+           path. */
+        warn(
+            "the daemon is missing the '%s' protocol feature, needed to support batched gc root registration, falling back to sequential registration",
+            WorkerProto::featureAddTempRoots);
+        for (auto & path : paths) {
+            if (conn->tempRootsPinned.get(path))
+                continue;
+
+            conn->addTempRoot(*this, &conn.daemonException, path);
+
+            conn->tempRootsPinned.upsert(path, true);
+        }
+    }
 }
 
 Roots RemoteStore::findRoots(bool censor)

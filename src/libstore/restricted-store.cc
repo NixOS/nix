@@ -127,7 +127,7 @@ public:
     void queryRealisationUncached(
         const DrvOutput & id, Callback<std::shared_ptr<const UnkeyedRealisation>> callback) noexcept override;
 
-    void addTempRoot(const StorePath & path) override {}
+    void addTempRoots(const StorePathSet & paths) override {}
 
     void addIndirectRoot(const std::filesystem::path & path) override {}
 

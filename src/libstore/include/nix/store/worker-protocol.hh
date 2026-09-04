@@ -151,6 +151,11 @@ struct WorkerProto
      */
     static constexpr std::string_view featureSubmitOutput = "submit-output";
 
+    /*
+     * Feature for the addTempRoots() operation.
+     */
+    static constexpr std::string_view featureAddTempRoots = "addTempRoots";
+
     /**
      * A unidirectional read connection, to be used by the read half of the
      * canonical serializers below.
@@ -273,7 +278,7 @@ enum struct WorkerProto::Op : uint64_t {
     BuildPathsWithResults = 46,
     AddPermRoot = 47,
     // QueryActiveBuilds = 48, // reserved for https://github.com/NixOS/nix/pull/15979
-    // AddTempRoots = 49, // reserved for https://github.com/NixOS/nix/pull/16113
+    AddTempRoots = 49,
     // QueryPathInfos = 50, // reserved for https://github.com/DeterminateSystems/nix-src/pull/539
     SubmitOutput = 1000, // Only used within derivations with feature
     AddToStoreScanning = 1001,
