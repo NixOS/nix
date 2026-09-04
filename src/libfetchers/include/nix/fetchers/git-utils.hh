@@ -41,6 +41,12 @@ struct GitRepo
         bool create = false;
         bool bare = false;
         bool packfilesOnly = false;
+        /**
+         * Whether to avoid finding deltas when writing packfiles. It's an
+         * expensive operation, which should be avoided if no benefit is
+         * expected from possible deduplication in the same packfile.
+         */
+        bool dontFindDeltas = false;
     };
 
     static ref<GitRepo> openRepo(const std::filesystem::path & path, Options options);

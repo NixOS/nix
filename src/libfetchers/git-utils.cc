@@ -21,6 +21,7 @@
 #include <git2/branch.h>
 #include <git2/commit.h>
 #include <git2/config.h>
+#include <git2/sys/config.h>
 #include <git2/describe.h>
 #include <git2/errors.h>
 #include <git2/global.h>
@@ -142,6 +143,11 @@ typedef std::unique_ptr<git_describe_result, Deleter<git_describe_result_free>> 
 typedef std::unique_ptr<git_status_list, Deleter<git_status_list_free>> StatusList;
 typedef std::unique_ptr<git_remote, Deleter<git_remote_free>> Remote;
 typedef std::unique_ptr<git_config, Deleter<git_config_free>> GitConfig;
+typedef std::unique_ptr<git_config_backend, decltype([](git_config_backend * backend) {
+                            if (backend)
+                                backend->free(backend);
+                        })>
+    GitConfigBackend;
 typedef std::unique_ptr<git_config_iterator, Deleter<git_config_iterator_free>> ConfigIterator;
 typedef std::unique_ptr<git_odb, Deleter<git_odb_free>> ObjectDb;
 typedef std::unique_ptr<git_packbuilder, Deleter<git_packbuilder_free>> PackBuilder;
@@ -362,6 +368,28 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         initRepoAtomically(path, options);
         if (git_repository_open(Setter(repo), path.string().c_str()))
             throw GitError("opening Git repository %s", PathFmt(path));
+
+        GitConfig config;
+        if (git_repository_config(Setter(config), *this))
+            throw GitError("getting Git repository config");
+
+        /* Create an in-memory configuration so that we can set config options without modifying the
+           config file on-disk. */
+        git_config_backend_memory_options configOpts = GIT_CONFIG_BACKEND_MEMORY_OPTIONS_INIT;
+        configOpts.backend_type = "nix";
+
+        std::vector<const char *> configValues;
+        if (options.dontFindDeltas)
+            configValues.push_back("pack.deltacachesize=1");
+
+        GitConfigBackend memBackend;
+        if (git_config_backend_from_values(Setter(memBackend), configValues.data(), configValues.size(), &configOpts))
+            throw GitError("creating an in-memory Git config");
+
+        if (git_config_add_backend(config.get(), memBackend.get(), GIT_CONFIG_LEVEL_APP, *this, /*force=*/false))
+            throw GitError("adding the in-memory Git configuration backend");
+
+        memBackend.release();
 
         ObjectDb odb;
         if (options.packfilesOnly) {
@@ -1706,7 +1734,16 @@ ref<GitRepo> Settings::getTarballCache() const
      * for optimal packfiles.
      */
     static auto repoDir = std::filesystem::path(getCacheDir()) / "tarball-cache-v2";
-    return GitRepo::openRepo(repoDir, {.create = true, .bare = true, .packfilesOnly = true});
+    return GitRepo::openRepo(
+        repoDir,
+        {
+            .create = true,
+            .bare = true,
+            .packfilesOnly = true,
+            /* Tarball unpacking is not expected to benefit from deltas much,
+               compared to how much CPU times it takes to find. */
+            .dontFindDeltas = true,
+        });
 }
 
 } // namespace fetchers
