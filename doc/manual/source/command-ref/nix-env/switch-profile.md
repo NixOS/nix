@@ -11,6 +11,12 @@
 This operation makes *path* the current profile for the user. That is,
 the symlink `~/.nix-profile` is made to point to *path*.
 
+# Examples
+
+```console
+$ nix-env --switch-profile ~/my-profile
+```
+
 {{#include ./opt-common.md}}
 
 {{#include ../opt-common.md}}
@@ -18,9 +24,3 @@ the symlink `~/.nix-profile` is made to point to *path*.
 {{#include ./env-common.md}}
 
 {{#include ../env-common.md}}
-
-# Examples
-
-```console
-$ nix-env --switch-profile ~/my-profile
-```
