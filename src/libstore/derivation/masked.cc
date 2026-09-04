@@ -2,6 +2,7 @@
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/util/util.hh"
 
 #include <boost/unordered/concurrent_flat_map.hpp>
@@ -23,13 +24,14 @@ Hashes hashes;
 /**
  * Look up the derivation by value and memoize the `hashInput` call.
  */
-static HashModulo pathInputModulo(Store & store, const StorePath & drvPath)
+static HashModulo
+pathInputModulo(const StoreDirConfig & store, ReadDerivation readDerivation, const StorePath & drvPath)
 {
     std::optional<HashModulo> hash;
     if (hashes.cvisit(drvPath, [&hash](const auto & kv) { hash.emplace(kv.second); })) {
         return *hash;
     }
-    auto h = hashInput(store, store.readInvalidDerivation(drvPath));
+    auto h = hashInput(store, readDerivation, readDerivation(drvPath));
 
     // Cache it
     hashes.insert_or_assign(drvPath, h);
@@ -43,13 +45,14 @@ static HashModulo pathInputModulo(Store & store, const StorePath & drvPath)
  * Returns `true` if deferred and cannot mutate (the caller should bail out).
  */
 static bool inputModulo(
-    Store & store,
+    const StoreDirConfig & store,
+    ReadDerivation readDerivation,
     HashInputs::DrvMap & drvInputs,
     const StorePath & drvPath,
     const std::set<OutputName, std::less<>> & outputNames,
     std::string_view drvName)
 {
-    const auto & res = pathInputModulo(store, drvPath);
+    const auto & res = pathInputModulo(store, readDerivation, drvPath);
     return std::visit(
         overloaded{
             [&](const HashModulo::DeferredDrv &) { return true; },
@@ -74,44 +77,36 @@ static bool inputModulo(
 }
 
 /**
- * Replace each input derivation store path with its hash modulo,
- * producing the intermediate form used to compute the derivation hash.
+ * Input masking: replace each input derivation store path with its hash
+ * modulo, producing the inputs of the intermediate form whose ATerm is
+ * hashed.
  *
- * When `Out` is `DerivationOutput::Deferred`, outputs are masked:
- * output paths and matching env vars are blanked so the hash does not
- * depend on its own output paths.
- *
- * When `Out` is `DerivationOutput`, outputs are preserved as-is.
+ * Only the inputs are dealt with here; masking the outputs too, where
+ * that is wanted, is `maskOutputs`'s job and the caller's choice.
+ * `hashInput` wants input masking alone, because the hash it computes
+ * identifies the derivation *including* its own output paths;
+ * `bothMaskedDerivation` wants both.
  *
  * Returns `std::nullopt` if any input is deferred (depends on a CA or
  * dynamic derivation whose outputs are not yet known).
  */
-template<typename Out>
-static std::optional<Derivation<HashInputs, Out>> maskInputDrvs(Store & store, Derivation<FullInputs, Out> drv)
+static std::optional<HashInputs> maskInputDrvs(
+    const StoreDirConfig & store, ReadDerivation readDerivation, FullInputs inputs, std::string_view drvName)
 {
-    Derivation<HashInputs, Out> masked{
-        .outputs = std::move(drv.outputs),
-        .inputs{
-            .srcs = std::move(drv.inputs.srcs),
-            .drvs = {},
-        },
-        .platform = std::move(drv.platform),
-        .builder = std::move(drv.builder),
-        .args = std::move(drv.args),
-        .env = std::move(drv.env),
-        .structuredAttrs = std::move(drv.structuredAttrs),
-        .name = std::move(drv.name),
+    HashInputs substituted{
+        .srcs = std::move(inputs.srcs),
+        .drvs = {},
     };
 
-    for (auto & [drvPath, node] : drv.inputs.drvs.map) {
+    for (auto & [drvPath, node] : inputs.drvs.map) {
         /* Need to build and resolve dynamic derivations first */
         if (!node.childMap.empty())
             return std::nullopt;
-        if (inputModulo(store, masked.inputs.drvs.map, drvPath, node.value, masked.name))
+        if (inputModulo(store, readDerivation, substituted.drvs.map, drvPath, node.value, drvName))
             return std::nullopt;
     }
 
-    return masked;
+    return substituted;
 }
 
 /* See the header for interface details. These are the implementation details.
@@ -142,13 +137,13 @@ static std::optional<Derivation<HashInputs, Out>> maskInputDrvs(Store & store, D
  * - `DeferredDrv` for deferred, non-fixed CA, or impure derivations
  * - `DrvHash` for regular input-addressed derivations
  */
-HashModulo hashInput(Store & store, const Full & drv)
+HashModulo hashInput(const StoreDirConfig & store, ReadDerivation readDerivation, const Full & drv)
 {
     /* Return a fixed hash for fixed-output derivations. */
     if (type(drv).isFixed()) {
         std::map<std::string, Hash> outputHashes;
         for (const auto & i : drv.outputs) {
-            auto & dof = std::get<Output::CAFixed>(i.second.raw);
+            auto & dof = std::get<Output::CAFixed>(i.second.output.raw);
             auto hash = hashString(
                 HashAlgorithm::SHA256,
                 "fixed:out:" + dof.ca.printMethodAlgo() + ":" + dof.ca.hash.to_string(HashFormat::Base16, false) + ":"
@@ -158,96 +153,141 @@ HashModulo hashInput(Store & store, const Full & drv)
         return outputHashes;
     }
 
-    /* If any output is not InputAddressed, this derivation has no hash
-       modulo. */
-    for (auto & [name, output] : drv.outputs)
-        if (!std::get_if<Output::InputAddressed>(&output.raw))
+    /* Extract InputAddressed outputs. If any output is not
+       InputAddressed, this derivation has no hash modulo. */
+    Outputs<Output::InputAddressed> convertedOutputs;
+    for (auto & [name, output] : drv.outputs) {
+        auto * p = std::get_if<Output::InputAddressed>(&output.output.raw);
+        if (!p)
             return HashModulo::DeferredDrv{};
+        convertedOutputs.insert({name, *p});
+    }
 
-    auto inputAddressingModulo = maskInputDrvs(
-        store,
-        drv.mapOutputs([](const Output & output) { return std::get<Output::InputAddressed>(output.raw); })
-            .mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }));
-    if (!inputAddressingModulo)
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    auto substitutedInputs =
+        maskInputDrvs(store, readDerivation, FullInputs::fromSet(drv.inputs), drv.name);
+    if (!substitutedInputs)
         return HashModulo::DeferredDrv{};
 
-    return hashString(HashAlgorithm::SHA256, unparse(*inputAddressingModulo, store));
+    Drv<Output::InputAddressed> inputAddressingModulo{
+        .outputs = std::move(convertedOutputs),
+        .inputs = std::move(*substitutedInputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
+    return hashDerivation(store, inputAddressingModulo);
 }
 
 /**
- * Replace the outputs with `Deferred` and blank the env vars named
- * after them, so the hash does not depend on the derivation's own
- * output paths. Only valid for input-addressed (possibly deferred)
- * derivations.
+ * Output masking: build the ATerm-shaped intermediate whose outputs are
+ * replaced with `Deferred`, and whose env vars named after them are
+ * blanked --- the output paths appear in both places, so masking one
+ * without the other would leave the hash depending on the derivation's
+ * own output paths anyway.
+ *
+ * Only valid for input-addressed (possibly deferred) derivations.
+ *
+ * The inputs are already substituted by the caller, which is the only
+ * step that can fail.
  */
-template<typename Inputs>
-static Derivation<Inputs, Output::Deferred> maskOutputs(const Derivation<Inputs, Output> & drv)
+template<typename Input, typename Out>
+static Drv<Output::Deferred> maskOutputs(const Derivation<Input, Out> & drv, HashInputs inputs)
+    requires(
+        std::is_same_v<Out, Output> || std::is_same_v<Out, Output::InputAddressed>
+        || std::is_same_v<Out, Output::Deferred>)
 {
-    auto masked = drv.mapOutputs([](const Output & output) -> Output::Deferred {
-        std::visit(
-            overloaded{
-                [&](const Output::InputAddressed &) {},
-                [&](const Output::Deferred &) {
-                    /* Possibly pessimistically deferred --- we will fill in
-                       the output paths. */
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+
+    Outputs<Output::Deferred> maskedOutputs;
+    for (auto & [name, output] : drv.outputs) {
+        /* When the outputs are statically one of the input-addressing
+           alternatives there is nothing to check; only the variant can
+           be holding something else. */
+        if constexpr (std::is_same_v<Out, Output>)
+            std::visit(
+                overloaded{
+                    [&](const Output::InputAddressed &) {},
+                    [&](const Output::Deferred &) {
+                        /* Possibly pessimistically deferred --- we will fill in
+                           the output paths. */
+                    },
+                    [&](const auto &) {
+                        panic(
+                            "bothMaskedDerivation: unexpected output type, these derivation types are not input addressed");
+                    },
                 },
-                [&](const auto &) {
-                    panic("hash: unexpected output type, these derivation types are not input addressed");
-                },
-            },
-            output.raw);
-        return {};
-    });
-    for (auto & [name, output] : masked.outputs)
-        if (auto j = masked.env.find(name); j != masked.env.end())
+                output.output.raw);
+        maskedOutputs.insert({name, {}});
+        if (auto j = env.find(name); j != env.end())
             j->second = "";
-    return masked;
+    }
+
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    return {
+        .outputs = std::move(maskedOutputs),
+        .inputs = std::move(inputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
 }
 
-/**
- * Compute the hash with outputs masked (replaced with `Deferred`).
- * Used by `processDerivationOutputPaths` to compute a derivation's own
- * output paths. Only valid for input-addressed (possibly deferred)
- * derivations.
- */
-std::optional<std::string> unparseModulo(Store & store, const Full & drv)
+template<typename Out>
+std::optional<Drv<Output::Deferred>> bothMaskedDerivation(
+    const StoreDirConfig & store,
+    ReadDerivation readDerivation,
+    const Derivation<SingleDerivedPath, Out> & drv)
 {
-    auto masked = maskInputDrvs(store, maskOutputs(drv).mapInputs([](const std::set<SingleDerivedPath> & inputs) {
-        return FullInputs::fromSet(inputs);
-    }));
-    if (!masked)
+    auto substitutedInputs = maskInputDrvs(store, readDerivation, FullInputs::fromSet(drv.inputs), drv.name);
+    if (!substitutedInputs)
         return std::nullopt;
-    return unparse(*masked, store);
+    return maskOutputs(drv, std::move(*substitutedInputs));
 }
 
-std::string unparseModulo(Store & store, const Basic & drv)
+template std::optional<Drv<Output::Deferred>>
+bothMaskedDerivation(const StoreDirConfig & store, ReadDerivation readDerivation, const Full & drv);
+template std::optional<Drv<Output::Deferred>>
+bothMaskedDerivation(const StoreDirConfig & store, ReadDerivation readDerivation, const FullDeferred & drv);
+template std::optional<Drv<Output::Deferred>>
+bothMaskedDerivation(const StoreDirConfig & store, ReadDerivation readDerivation, const FullInputAddressed & drv);
+
+Drv<Output::Deferred> bothMaskedDerivation(const StoreDirConfig & store, const Basic & drv)
 {
     /* A resolved derivation has no input derivations, so there is
-       nothing to substitute. */
-    auto masked = maskOutputs(drv).mapInputs([](const StorePathSet & srcs) {
-        return HashInputs{
-            .srcs = srcs,
+       nothing to substitute, and this cannot fail. */
+    return maskOutputs(
+        drv,
+        HashInputs{
+            .srcs = drv.inputs,
             .drvs = {},
-        };
-    });
-
-    return unparse(masked, store);
+        });
 }
 
-std::optional<Hash> hash(Store & store, const Full & drv)
+template<typename Out>
+Hash hashDerivation(const StoreDirConfig & store, const Drv<Out> & drv)
 {
-    auto masked = unparseModulo(store, drv);
-    if (!masked)
-        return std::nullopt;
-    return hashString(HashAlgorithm::SHA256, *masked);
+    /* The derivation name is only needed to compute the paths of
+       fixed-output outputs, which the modulo form never has: its
+       outputs are input-addressed or masked. */
+    return hashString(HashAlgorithm::SHA256, drv.to_string(store, /*name=*/""));
 }
 
-Hash hash(Store & store, const Basic & drv)
-{
-    /* A resolved derivation has no input derivations, so the hash is
-       always computable. */
-    return hashString(HashAlgorithm::SHA256, unparseModulo(store, drv));
-}
+template Hash hashDerivation(const StoreDirConfig & store, const Drv<Output::Deferred> & drv);
+template Hash hashDerivation(const StoreDirConfig & store, const Drv<Output::InputAddressed> & drv);
 
 } // namespace derivation::masked
 

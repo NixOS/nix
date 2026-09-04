@@ -1,0 +1,12 @@
+{
+  "additionalSandboxProfile": "",
+  "allOutputChecks": null,
+  "allowLocalNetworking": false,
+  "allowSubstitutes": true,
+  "exportReferencesGraph": {},
+  "impureEnvVars": [],
+  "impureHostDeps": [],
+  "noChroot": false,
+  "preferLocalBuild": false,
+  "requiredSystemFeatures": []
+}

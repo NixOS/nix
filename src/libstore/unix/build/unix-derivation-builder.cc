@@ -370,7 +370,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 
     /* Fire up a Nix daemon to process recursive Nix calls from the
        builder. */
-    auto requiredFeatures = drvOptions.getRequiredSystemFeatures(drv);
+    auto requiredFeatures = drv.getRequiredSystemFeatures();
 
     usingSubmitted = requiredFeatures.count(drvFeatureBuilderRpcV0);
 
@@ -385,7 +385,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
     printMsg(lvlChatty, "executing builder '%1%'", drv.builder);
     printMsg(lvlChatty, "using builder args '%1%'", concatStringsSep(" ", drv.args));
     for (auto & i : drv.env)
-        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second);
+        printMsg(lvlVomit, "setting builder env variable '%1%'='%2%'", i.first, i.second.value);
 
     /* Create the log file. */
     miscMethods->openLogFile();
@@ -438,7 +438,7 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
     auto allowedPaths = localSettings.allowedImpureHostPrefixes.get();
 
     /* This works like the above, except on a per-derivation level */
-    auto impurePaths = drvOptions.impureHostDeps;
+    auto impurePaths = drv.options.impureHostDeps;
 
     for (auto & i : impurePaths) {
         bool found = false;
@@ -460,7 +460,7 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
                 store.printStorePath(drvPath),
                 i);
 
-        /* Allow files in drvOptions.impureHostDeps to be missing; e.g.
+        /* Allow files in drv.options.impureHostDeps to be missing; e.g.
            macOS 11+ has no /usr/lib/libSystem*.dylib */
         pathsInChroot[i] = {i, true};
     }
@@ -501,7 +501,7 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
 
 void UnixDerivationBuilderImpl::prepareSandbox()
 {
-    if (drvOptions.useUidRange(drv))
+    if (drv.useUidRange())
         throw Error("feature 'uid-range' is not supported on this platform");
 }
 
@@ -534,7 +534,7 @@ std::optional<AwsCredentials> UnixDerivationBuilderImpl::preResolveAwsCredential
         auto url = drv.env.find("url");
         if (url != drv.env.end()) {
             try {
-                auto parsedUrl = parseURL(url->second);
+                auto parsedUrl = parseURL(url->second.value);
                 if (parsedUrl.scheme == "s3") {
                     debug("Pre-resolving AWS credentials for S3 URL in builtin:fetchurl");
                     auto s3Url = ParsedS3URL::parse(parsedUrl);
@@ -672,7 +672,7 @@ void UnixDerivationBuilderImpl::initEnv()
         if (!impureEnv.empty())
             experimentalFeatureSettings.require(Xp::ConfigurableImpureEnv);
 
-        for (auto & i : drvOptions.impureEnvVars) {
+        for (auto & i : drv.options.impureEnvVars) {
             auto envVar = impureEnv.find(i);
             if (envVar != impureEnv.end()) {
                 env[i] = envVar->second;
@@ -1091,13 +1091,13 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     /* Are we doing a sandboxed build? */
     {
         if (localSettings.sandboxMode == smEnabled) {
-            if (params.drvOptions.noChroot)
+            if (params.drv.options.noChroot)
                 throw Error(
                     "derivation '%s' has '__noChroot' set, "
                     "but that's not allowed when 'sandbox' is 'true'",
                     store.printStorePath(params.drvPath));
 #ifdef __APPLE__
-            if (params.drvOptions.additionalSandboxProfile != "")
+            if (params.drv.options.additionalSandboxProfile != "")
                 throw Error(
                     "derivation '%s' specifies a sandbox profile, "
                     "but this is only allowed when 'sandbox' is 'relaxed'",
@@ -1108,7 +1108,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
             useSandbox = false;
         else if (localSettings.sandboxMode == smRelaxed)
             // FIXME: cache derivationType
-            useSandbox = type(params.drv).isSandboxed() && !params.drvOptions.noChroot;
+            useSandbox = type(params.drv).isSandboxed() && !params.drv.options.noChroot;
     }
 
     const bool isRelocatedStore = store.storeDir != store.config->realStoreDir.get();
@@ -1141,7 +1141,7 @@ std::unique_ptr<DerivationBuilder, DerivationBuilderDeleter> makeDerivationBuild
     }
 #endif
 
-    if (!useSandbox && params.drvOptions.useUidRange(params.drv))
+    if (!useSandbox && params.drv.useUidRange())
         throw Error("feature 'uid-range' is only supported in sandboxed builds");
 
 #ifdef __APPLE__

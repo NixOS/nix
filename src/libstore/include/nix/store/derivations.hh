@@ -9,8 +9,11 @@
 #include "nix/store/derivation/output.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/parsed-derivations.hh"
+#include "nix/store/derivation/output.hh"
+#include "nix/store/derivation-options.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/variant-wrapper.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 #include <variant>
@@ -24,6 +27,7 @@ static constexpr std::string_view drvFeatureBuilderRpcV0 = "builder-rpc-v0";
 
 struct StoreDirConfig;
 class Store;
+struct WorkerSettings;
 
 /* Abstract syntax of derivations. */
 
@@ -146,7 +150,7 @@ struct Type
     bool hasKnownOutputPaths() const;
 };
 
-template<typename Inputs, typename Out = Output>
+template<typename Input, typename Out = Output>
 struct Derivation;
 
 /**
@@ -156,7 +160,7 @@ struct Derivation;
  *
  * @see derivation::tryResolve.
  */
-using Basic = Derivation<StorePathSet>;
+using Basic = Derivation<StorePath>;
 
 /**
  * @brief Derivation that depends on the outputs of other derivations in addition.
@@ -164,16 +168,85 @@ using Basic = Derivation<StorePathSet>;
  * This type is what's constructed by the evaluator and written to the store in
  * ATerm format.
  */
-using Full = Derivation<std::set<SingleDerivedPath>>;
+using Full = Derivation<SingleDerivedPath>;
 
-template<typename Inputs, typename Out>
+/**
+ * How to get a derivation's value from its store path.
+ *
+ * Several computations over derivations --- filling in output paths,
+ * checking invariants, hashing modulo --- need to recurse into input
+ * derivations, but that is *all* they need a store for; everything else
+ * they touch is `StoreDirConfig`, for printing paths. Taking just this
+ * much lets them be used (and tested) without a real store, and makes
+ * it evident from the signature that nothing else is queried.
+ */
+using ReadDerivation = fun<Full(const StorePath & drvPath)>;
+
+/**
+ * `Store::readInvalidDerivation` as a `ReadDerivation`, for callers
+ * that do have a whole store to hand.
+ */
+ReadDerivation readInvalid(Store & store);
+
+/**
+ * @brief `Full`, but statically known to have no output paths yet.
+ *
+ * The outputs are `Output::Deferred` rather than the `Output` variant,
+ * so "we have not computed the output paths" is carried in the type.
+ *
+ * @see fillInOutputPaths, which turns this into a `FullInputAddressed`.
+ */
+using FullDeferred = Derivation<SingleDerivedPath, Output::Deferred>;
+
+/**
+ * @brief `Full`, but statically known to be input-addressed.
+ *
+ * The outputs are `Output::InputAddressed` rather than the `Output`
+ * variant, so "the output paths are computed" is carried in the type.
+ */
+using FullInputAddressed = Derivation<SingleDerivedPath, Output::InputAddressed>;
+
+template<typename Input, typename Out>
+struct OutputWithOptions
+{
+    Out output;
+    OutputOptions<Input> options;
+
+    bool operator==(const OutputWithOptions &) const = default;
+};
+
+/**
+ * Right-hand side of a VAR=VALUE definition in @see Derivation::env.
+ */
+struct EnvValue
+{
+    std::string value;
+
+    /**
+     * In non-structured mode, all bindings specified in the derivation
+     * go directly via the environment, except those listed in the
+     * passAsFile attribute. Those are instead passed as file names
+     * pointing to temporary files containing the contents.
+     *
+     * Note that passAsFile is ignored in structure mode because it's
+     * not needed (attributes are not passed through the environment, so
+     * there is no size constraint).
+     */
+    bool passAsFile = false;
+
+    bool operator==(const EnvValue &) const = default;
+};
+
+template<typename Input, typename Out>
 struct Derivation
 {
+    std::string name;
+
     /**
      * keyed on symbolic IDs
      */
-    Outputs<Out> outputs;
-    Inputs inputs;
+    std::map<std::string, OutputWithOptions<Input, Out>, std::less<>> outputs;
+    std::set<Input> inputs;
     std::string platform;
     /**
      * Probably should be an absolute path in the path format that `platform` uses
@@ -183,10 +256,10 @@ struct Derivation
     /**
      * Must not contain the key `__json`, at least in order to serialize to ATerm.
      */
-    StringPairs env;
+    std::map<std::string, EnvValue, std::less<>> env;
     std::optional<StructuredAttrs> structuredAttrs;
 
-    std::string name;
+    TopOptions<Input> options;
 
     bool operator==(const Derivation &) const = default;
 
@@ -199,6 +272,12 @@ struct Derivation
 
     static std::string_view nameFromPath(const StorePath & storePath);
 
+    StringSet getRequiredSystemFeatures() const
+        requires std::is_same_v<Out, Output>;
+
+    bool useUidRange() const
+        requires std::is_same_v<Out, Output>;
+
     /**
      * Apply string rewrites to the `env`, `args` and `builder`
      * fields.
@@ -207,58 +286,74 @@ struct Derivation
 
     /**
      * Return a derivation identical to this one, but with the inputs transformed by `f`.
+     *
+     * N.B. neither the top-level nor the per-output options are carried
+     * over (they may contain `Input`-typed references); they are
+     * default-initialized and must be filled in by the caller.
      */
     template<typename F>
-    Derivation<std::invoke_result_t<F, const Inputs &>, Out> mapInputs(F f) const
+    Derivation<typename std::invoke_result_t<F, const std::set<Input> &>::value_type, Out> mapInputs(F f) const
     {
-        return {
-            .outputs = outputs,
+        Derivation<typename std::invoke_result_t<F, const std::set<Input> &>::value_type, Out> res{
+            .name = name,
             .inputs = f(inputs),
             .platform = platform,
             .builder = builder,
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
-            .name = name,
         };
+        for (auto & [outputName, output] : outputs)
+            res.outputs.insert_or_assign(
+                outputName, typename decltype(res.outputs)::mapped_type{.output = output.output});
+        return res;
     }
 
     /**
      * Return a derivation identical to this one, but with each output
      * transformed by `f`.
+     *
+     * Only the output *payload* is transformed; the per-output options
+     * are `Input`-typed, which does not change here, so they are carried
+     * over as they are.
      */
     template<typename F>
-    Derivation<Inputs, std::invoke_result_t<F, const Out &>> mapOutputs(F f) const
+    Derivation<Input, std::invoke_result_t<F, const Out &>> mapOutputs(F f) const
     {
-        Outputs<std::invoke_result_t<F, const Out &>> newOutputs;
-        for (const auto & [name, output] : outputs)
-            newOutputs.insert_or_assign(name, f(output));
-        return {
-            .outputs = std::move(newOutputs),
+        Derivation<Input, std::invoke_result_t<F, const Out &>> res{
+            .name = name,
             .inputs = inputs,
             .platform = platform,
             .builder = builder,
             .args = args,
             .env = env,
             .structuredAttrs = structuredAttrs,
-            .name = name,
+            .options = options,
         };
+        for (auto & [outputName, output] : outputs)
+            res.outputs.insert_or_assign(
+                outputName,
+                typename decltype(res.outputs)::mapped_type{
+                    .output = f(output.output),
+                    .options = output.options,
+                });
+        return res;
     }
 };
 
 /**
  * Return true iff this is a fixed-output derivation.
  */
-template<typename Inputs>
-Type type(const Derivation<Inputs, Output> & drv);
+template<typename Input>
+Type type(const Derivation<Input, Output> & drv);
 
 /**
  * Calculates the maps that contains all the `Outputs`, but
  * augmented with knowledge of the Store paths they would be written
  * into.
  */
-template<typename Inputs>
-OutputsAndOptPaths outputsAndOptPaths(const Derivation<Inputs, Output> & drv, const StoreDirConfig & store);
+template<typename Input>
+OutputsAndOptPaths outputsAndOptPaths(const Derivation<Input, Output> & drv, const StoreDirConfig & store);
 
 /**
  * Does the derivation have a dependency on the output of a dynamic
@@ -285,8 +380,14 @@ bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs);
  *
  * @param store The store to use for validation
  */
-void checkInvariants(const Basic & drv, Store & store);
+void checkInvariants(const Basic & drv, const StoreDirConfig & store);
 void checkInvariants(const Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void checkInvariants(const Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation);
 
 /**
  * This overload does everything the base `checkInvariants` does,
@@ -296,8 +397,22 @@ void checkInvariants(const Full & drv, Store & store);
  * @param store The store to use for validation
  * @param drvPath The path to this derivation
  */
-template<typename Inputs>
-void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath);
+template<typename Input>
+void checkInvariants(const Derivation<Input, Output> & drv, Store & store, const StorePath & drvPath)
+{
+    checkInvariants(drv, store, readInvalid(store), drvPath);
+}
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+template<typename Input>
+void checkInvariants(
+    const Derivation<Input, Output> & drv,
+    const StoreDirConfig & store,
+    auto && readDerivation,
+    const StorePath & drvPath);
 
 /**
  * Fill in output paths as needed.
@@ -319,8 +434,96 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
  *
  * @param store The store to use for path computation
  */
-void fillInOutputPaths(Basic & drv, Store & store);
+void fillInOutputPaths(Basic & drv, const StoreDirConfig & store);
 void fillInOutputPaths(Full & drv, Store & store);
+
+/**
+ * Like the above, but instead of reading input derivations from a
+ * store, uses a given `ReadDerivation` to get them.
+ */
+void fillInOutputPaths(Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation);
+
+/**
+ * Functional, statically-typed variant of the above, for a derivation
+ * all of whose outputs are known to be `Deferred`.
+ *
+ * Rather than mutating in place --- which is only possible because
+ * `Output` is a variant able to hold either alternative --- this
+ * consumes its argument and returns a derivation whose outputs are
+ * statically `InputAddressed`, so the "outputs are filled in now" fact
+ * is carried in the type. Everything but the (small) outputs is moved
+ * through, so this is no more expensive than the mutating version.
+ *
+ * Returns `std::nullopt` if there is no input address to fill in yet,
+ * i.e. when the derivation (transitively) depends on a floating
+ * content-addressing derivation. That is the case `Deferred` exists
+ * for, and it is precisely the case this function cannot represent in
+ * its return type.
+ */
+std::optional<FullInputAddressed>
+fillInOutputPaths(FullDeferred drv, const StoreDirConfig & store, ReadDerivation readDerivation);
+
+/**
+ * JSON format version for derivation serialization.
+ *
+ * Used by `nix derivation show` and `nix derivation add`.
+ */
+enum class JsonFormat : uint64_t {
+    /**
+     * Legacy format: the derivation options are not first-class, but
+     * instead encoded in `env` (and `structuredAttrs`); relatedly,
+     * environment variable values are plain strings (the *pass as
+     * file* flag being part of the legacy encoding), and outputs
+     * carry no inline checks.
+     *
+     * Decoding this format requires a store, in order to parse the
+     * options out of the environment variables.
+     */
+    V4 = 4,
+    /**
+     * Current format: first-class `options` field, per-output checks
+     * inline in the `outputs` map, and environment variable values
+     * that may be objects carrying the *pass as file* flag.
+     *
+     * This format is "pure": it can be encoded and decoded without
+     * reference to any store.
+     */
+    V5 = 5,
+};
+
+/**
+ * Convert an integer version number to a `JsonFormat`.
+ * Throws Error if the version is not supported.
+ */
+JsonFormat parseJsonFormat(uint64_t version);
+
+/**
+ * Serialize a derivation to JSON in the given format.
+ *
+ * Note that the legacy `JsonFormat::V4` relies on the derivation
+ * options also being encoded in `env` (and `structuredAttrs`), in
+ * sync with the first-class fields — as is guaranteed for any
+ * derivation read from the store.
+ */
+template<typename Input>
+nlohmann::json toJSON(const Derivation<Input> & drv, JsonFormat format);
+
+/**
+ * Parse a derivation from JSON, in any supported format.
+ *
+ * Unlike the plain JSON decoder, which is store-independent and
+ * therefore only supports the current format, this can also decode
+ * the legacy `JsonFormat::V4`, using the store directory to parse the
+ * derivation options out of their legacy environment-variable
+ * encoding.
+ *
+ * Unlike `parseJsonAndValidate`, this does not fill in output paths
+ * or check invariants, and so does not need a full store.
+ */
+Full fromJSON(
+    const StoreDirConfig & store,
+    const nlohmann::json & json,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 /**
  * Parse a derivation from JSON, and also perform various
@@ -330,20 +533,22 @@ void fillInOutputPaths(Full & drv, Store & store);
  *
  * 2. Checking invariants in general.
  *
- * In the future it might also do things like:
- *
- * - assist with the migration from older JSON formats.
- *
- * - (a somewhat example of the above) initialize
- *   `DerivationOptions` from their traditional encoding inside the
- *   `env` and `structuredAttrs`.
+ * 3. Assisting with the migration from older JSON formats: for
+ *    `JsonFormat::V4` input, the derivation options are initialized
+ *    from their legacy encoding inside the `env` and
+ *    `structuredAttrs`, which is why this function, unlike the plain
+ *    JSON decoder (which only accepts the current format), needs a
+ *    store.
  *
  * @param store The store to use for path computation and validation
  * @param json The JSON representation of the derivation
  * @return A validated derivation with output paths filled in
  * @throws Error if parsing fails, output paths can't be computed, or validation fails
  */
-Full parseJsonAndValidate(Store & store, const nlohmann::json & json);
+Full parseJsonAndValidate(
+    Store & store,
+    const nlohmann::json & json,
+    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
 } // namespace derivation
 
@@ -383,15 +588,29 @@ std::string outputPathName(std::string_view drvName, OutputNameView outputName);
  */
 std::string hashPlaceholder(const OutputNameView outputName);
 
-/**
- * The expected JSON version for derivation serialization.
- * Used by `nix derivation show` and `nix derivation add`.
- */
-constexpr unsigned expectedJsonVersionDerivation = 4;
+template<>
+struct json_avoids_null<derivation::EnvValue> : std::true_type
+{};
+
+template<typename Input, typename Output>
+struct json_avoids_null<derivation::OutputWithOptions<Input, Output>> : std::true_type
+{};
 
 } // namespace nix
 
+JSON_IMPL(nix::derivation::EnvValue)
+
+namespace nix {
+/**
+ * Just to avoid a comma in a macro invocation below.
+ */
+template<typename Input>
+using OutputWithOptionsFor = derivation::OutputWithOptions<Input, derivation::Output>;
+} // namespace nix
+
 namespace nlohmann {
-template<typename Inputs>
-JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Inputs>);
+template<typename Input>
+JSON_IMPL_WITH_XP_FEATURES_INNER(nix::OutputWithOptionsFor<Input>);
+template<typename Input>
+JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Input>);
 } // namespace nlohmann

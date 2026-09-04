@@ -83,7 +83,6 @@ void checkOutputs(
     Store & store,
     const StorePath & drvPath,
     const BasicDerivation & drv,
-    const decltype(DerivationOptions<StorePath>::outputChecks) & outputChecks,
     const std::map<std::string, ValidPathInfo> & outputs)
 {
     std::map<StorePath, const ValidPathInfo &> outputsByPath;
@@ -117,7 +116,7 @@ void checkOutputs(
                 outputPathName(drv.name, outputName));
         }
 
-        checkCAOutput(store, drvPath, *outputSpec, info, outputName);
+        checkCAOutput(store, drvPath, outputSpec->output, info, outputName);
 
         /* Compute the closure and closure size of some output. This
            is slightly tricky because some of its references (namely
@@ -246,16 +245,10 @@ void checkOutputs(
             }
         };
 
-        std::visit(
-            overloaded{
-                [&](const derivation::OutputChecks<StorePath> & checks) { applyChecks(checks); },
-                [&](const std::map<std::string, derivation::OutputChecks<StorePath>, std::less<>> & checksPerOutput) {
-                    if (auto outputChecks = get(checksPerOutput, outputName))
-
-                        applyChecks(*outputChecks);
-                },
-            },
-            outputChecks);
+        if (auto * outputWithOpts = get(drv.outputs, outputName); outputWithOpts && outputWithOpts->options.checks)
+            applyChecks(*outputWithOpts->options.checks);
+        else if (drv.options.allOutputChecks)
+            applyChecks(*drv.options.allOutputChecks);
     }
 }
 

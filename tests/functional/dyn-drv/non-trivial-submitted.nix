@@ -70,7 +70,7 @@ let
             }
           },
           "system": "${system}",
-          "version": 4
+          "version": 5
         }
       EOF
         drvPath=$(echo "$json" | nix derivation add)

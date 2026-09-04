@@ -1,6 +1,7 @@
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/masked.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/downstream-placeholder.hh"
 #include "nix/store/store-api.hh"
@@ -304,7 +305,206 @@ static StorePathSet parseStorePaths(const StoreDirConfig & store, StringViewStre
     return res;
 }
 
-static Output parseOutput(
+/* Defined with the unparser below; the error message for a bad
+   `inputDrvs` entry renders its key the same way the printer would. */
+static std::string keyToString(const StoreDirConfig & store, const StorePath & key);
+static std::string keyToString(const StoreDirConfig &, const Hash & key);
+
+/**
+ * The inverse of `keyToString`: how an `inputDrvs` key is written, for
+ * each input type that has one.
+ */
+template<typename Key>
+static Key parseKey(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir);
+
+template<>
+StorePath parseKey<StorePath>(const StoreDirConfig & store, StringViewStream & str, bool supportWindowsStoreDir)
+{
+    auto drvPath = parseStorePath(store, str, supportWindowsStoreDir);
+    drvPath.requireDerivation();
+    return drvPath;
+}
+
+template<>
+Hash parseKey<Hash>(const StoreDirConfig &, StringViewStream & str, bool)
+{
+    return Hash::parseNonSRIUnprefixed(*parseString(str), HashAlgorithm::SHA256);
+}
+
+/**
+ * An `inputDrvs` entry with no outputs cannot be represented in the
+ * flat inputs set, and would thus be silently dropped rather than
+ * round-tripped. Nix itself never produces one.
+ */
+static bool nodeIsEmpty(const std::set<OutputName, std::less<>> & node)
+{
+    return node.empty();
+}
+
+/**
+ * The method and algorithm the three content-addressing alternatives
+ * all begin by parsing out of the `hashAlgo` field.
+ */
+static std::pair<ContentAddressMethod, HashAlgorithm>
+parseCaMethodAlgo(std::string_view hashAlgoStr, const ExperimentalFeatureSettings & xpSettings)
+{
+    if (hashAlgoStr.empty())
+        throw FormatError("content-addressing derivation output must specify a hash algorithm");
+    ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
+    if (method == ContentAddressMethod::Raw::Text)
+        xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output");
+    return {std::move(method), parseHashAlgo(hashAlgoStr)};
+}
+
+/**
+ * Parse the three output fields as the alternative the caller expects.
+ *
+ * There is one specialization per alternative, and the `Output` one
+ * dispatches on the syntax into them --- mirroring `unparseOutput`,
+ * which has one overload per alternative and a `std::visit` to pick
+ * between them.
+ */
+template<typename Out>
+static Out parseOutput(
+    const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings & xpSettings);
+
+template<>
+Output::Deferred parseOutput<Output::Deferred>(
+    const StoreDirConfig &,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings &)
+{
+    if (!hashAlgoStr.empty())
+        throw FormatError("deferred derivation output should not specify a hash algorithm");
+    if (!hashS.empty())
+        throw FormatError("deferred derivation output should not specify a hash");
+    if (!pathS.empty())
+        throw FormatError("deferred derivation output should not specify an output path");
+    return {};
+}
+
+template<>
+Output::InputAddressed parseOutput<Output::InputAddressed>(
+    const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings &)
+{
+    if (!hashAlgoStr.empty())
+        throw FormatError("input-addressed derivation output should not specify a hash algorithm");
+    if (!hashS.empty())
+        throw FormatError("input-addressed derivation output should not specify a hash");
+    return Output::InputAddressed{
+        .path = store.parseStorePathCanonical(pathS),
+    };
+}
+
+template<>
+Output::CAFixed parseOutput<Output::CAFixed>(
+    const StoreDirConfig & store,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    using namespace std::literals::string_view_literals;
+
+    auto [method, hashAlgo] = parseCaMethodAlgo(hashAlgoStr, xpSettings);
+    if (hashS.empty())
+        throw FormatError("fixed-output derivation output must specify a hash");
+    if (hashS == "impure"sv)
+        throw FormatError("fixed-output derivation output must not be marked 'impure'");
+    auto path = store.parseStorePathCanonical(pathS);
+    Output::CAFixed dof{
+        .ca =
+            ContentAddress{
+                .method = std::move(method),
+                .hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo),
+            },
+    };
+    /* The stated path is redundant --- it is a function of the
+       content address --- but it must still agree, lest two
+       derivations that mean the same thing hash differently.
+
+       Skipped when fuzzing: the check makes the path a preimage
+       of a hash of the rest of the output, which a fuzzer has no
+       way to solve, so leaving it in would make this branch
+       unreachable to it. `CAFixedPathMismatch` covers the check
+       itself. See "Checks that defeat fuzzing" in
+       doc/manual/source/development/testing.md. */
+#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+    if (path != dof.path(store, drvName, outputName))
+        throw FormatError(
+            "derivation output '%s' has path '%s', which does not match its content address", outputName, pathS);
+#else
+    (void) path;
+#endif
+    return dof;
+}
+
+template<>
+Output::CAFloating parseOutput<Output::CAFloating>(
+    const StoreDirConfig &,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    auto [method, hashAlgo] = parseCaMethodAlgo(hashAlgoStr, xpSettings);
+    if (!hashS.empty())
+        throw FormatError("floating content-addressing derivation output should not specify a hash");
+    xpSettings.require(Xp::CaDerivations);
+    if (!pathS.empty())
+        throw FormatError("content-addressing derivation output should not specify output path");
+    return Output::CAFloating{
+        .method = std::move(method),
+        .hashAlgo = std::move(hashAlgo),
+    };
+}
+
+template<>
+Output::Impure parseOutput<Output::Impure>(
+    const StoreDirConfig &,
+    std::string_view drvName,
+    OutputNameView outputName,
+    std::string_view pathS,
+    std::string_view hashAlgoStr,
+    std::string_view hashS,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    using namespace std::literals::string_view_literals;
+
+    auto [method, hashAlgo] = parseCaMethodAlgo(hashAlgoStr, xpSettings);
+    if (hashS != "impure"sv)
+        throw FormatError("impure derivation output must be marked 'impure'");
+    xpSettings.require(Xp::ImpureDerivations);
+    if (!pathS.empty())
+        throw FormatError("impure derivation output should not specify output path");
+    return Output::Impure{
+        .method = std::move(method),
+        .hashAlgo = std::move(hashAlgo),
+    };
+}
+
+template<>
+Output parseOutput<Output>(
     const StoreDirConfig & store,
     std::string_view drvName,
     OutputNameView outputName,
@@ -316,65 +516,16 @@ static Output parseOutput(
     using namespace std::literals::string_view_literals;
 
     if (!hashAlgoStr.empty()) {
-        ContentAddressMethod method = ContentAddressMethod::parsePrefix(hashAlgoStr);
-        if (method == ContentAddressMethod::Raw::Text)
-            xpSettings.require(Xp::DynamicDerivations, "text-hashed derivation output");
-        const auto hashAlgo = parseHashAlgo(hashAlgoStr);
-        if (hashS == "impure"sv) {
-            xpSettings.require(Xp::ImpureDerivations);
-            if (!pathS.empty())
-                throw FormatError("impure derivation output should not specify output path");
-            return Output::Impure{
-                .method = std::move(method),
-                .hashAlgo = std::move(hashAlgo),
-            };
-        } else if (!hashS.empty()) {
-            [[maybe_unused]] auto path = store.parseStorePathCanonical(pathS);
-            auto hash = Hash::parseNonSRIUnprefixed(hashS, hashAlgo);
-            Output::CAFixed dof{
-                .ca =
-                    ContentAddress{
-                        .method = std::move(method),
-                        .hash = std::move(hash),
-                    },
-            };
-            /* The stated path is redundant --- it is a function of the
-               content address --- but it must still agree, lest two
-               derivations that mean the same thing hash differently.
-
-               Skipped when fuzzing: the check makes the path a preimage
-               of a hash of the rest of the output, which a fuzzer has no
-               way to solve, so leaving it in would make this branch
-               unreachable to it. `CAFixedPathMismatch` covers the check
-               itself. See "Checks that defeat fuzzing" in
-               doc/manual/source/development/testing.md. */
-#ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-            if (path != dof.path(store, drvName, outputName))
-                throw FormatError(
-                    "derivation output '%s' has path '%s', which does not match its content address",
-                    outputName,
-                    pathS);
-#endif
-            return dof;
-        } else {
-            xpSettings.require(Xp::CaDerivations);
-            if (!pathS.empty())
-                throw FormatError("content-addressing derivation output should not specify output path");
-            return Output::CAFloating{
-                .method = std::move(method),
-                .hashAlgo = std::move(hashAlgo),
-            };
-        }
+        if (hashS == "impure"sv)
+            return parseOutput<Output::Impure>(store, drvName, outputName, pathS, hashAlgoStr, hashS, xpSettings);
+        else if (!hashS.empty())
+            return parseOutput<Output::CAFixed>(store, drvName, outputName, pathS, hashAlgoStr, hashS, xpSettings);
+        else
+            return parseOutput<Output::CAFloating>(store, drvName, outputName, pathS, hashAlgoStr, hashS, xpSettings);
+    } else if (pathS.empty()) {
+        return parseOutput<Output::Deferred>(store, drvName, outputName, pathS, hashAlgoStr, hashS, xpSettings);
     } else {
-        if (!hashS.empty()) {
-            throw FormatError("hash specified without hash algorithm");
-        }
-        if (pathS.empty()) {
-            return Output::Deferred{};
-        }
-        return Output::InputAddressed{
-            .path = store.parseStorePathCanonical(pathS),
-        };
+        return parseOutput<Output::InputAddressed>(store, drvName, outputName, pathS, hashAlgoStr, hashS, xpSettings);
     }
 }
 
@@ -438,18 +589,54 @@ parseDerivedPathMapNode(const StoreDirConfig & store, StringViewStream & str, AT
     return node;
 }
 
-Full parse(
+/**
+ * The inverse of `unparseDerivedPathMapNode`, for each node type an
+ * `inputDrvs` map has. The masked form has no nesting, so its version
+ * argument goes unused.
+ */
+template<typename Node>
+static Node parseNode(const StoreDirConfig & store, StringViewStream & str, ATermVersion version);
+
+template<>
+DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode
+parseNode<DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode>(
+    const StoreDirConfig & store, StringViewStream & str, ATermVersion version)
+{
+    return parseDerivedPathMapNode(store, str, version);
+}
+
+template<>
+std::set<OutputName, std::less<>>
+parseNode<std::set<OutputName, std::less<>>>(const StoreDirConfig &, StringViewStream & str, ATermVersion)
+{
+    auto outputNames = parseStrings(str);
+    return {outputNames.begin(), outputNames.end()};
+}
+
+static bool nodeIsEmpty(const DerivedPathMap<std::set<OutputName, std::less<>>>::ChildNode & node)
+{
+    return node.value.empty() && node.childMap.empty();
+}
+
+/**
+ * The type-specific parts --- how an `inputDrvs` key is written, what a
+ * node under it looks like, which output alternatives are admissible
+ * --- are the `parseKey`, `parseNode` and `parseOutput` specializations
+ * above, mirroring `keyToString`, `unparseDerivedPathMapNode` and
+ * `unparseOutput` on the printing side.
+ */
+template<typename Inputs, typename Out>
+ATermT<Inputs, Out> ATermT<Inputs, Out>::parse(
     const StoreDirConfig & store,
     std::string && s,
     std::string_view name,
     bool supportWindowsStoreDir,
     const ExperimentalFeatureSettings & xpSettings)
+    requires RenderableDerivation<Inputs, Out>
 {
     using namespace std::literals::string_view_literals;
 
-    Full drv{
-        .name = std::string{name},
-    };
+    ATermT drv;
 
     StringViewStream str{s};
     expect(str, 'D');
@@ -460,18 +647,25 @@ Full parse(
         version = ATermVersion::Traditional;
         break;
     case 'r': {
-        expect(str, "rvWithVersion("sv);
-        auto versionS = parseString(str);
-        if (*versionS == "xp-dyn-drv"sv) {
-            // Only version we have so far
-            version = ATermVersion::DynamicDerivations;
-            xpSettings.require(Xp::DynamicDerivations, [&] {
-                return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
-            });
-        } else {
-            throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
+        /* The masked form is constructed only after dynamic
+           derivations have been resolved away, so it never carries a
+           version header. */
+        if constexpr (!std::is_same_v<Inputs, FullInputs>)
+            throw FormatError("masked derivation must not be versioned");
+        else {
+            expect(str, "rvWithVersion("sv);
+            auto versionS = parseString(str);
+            if (*versionS == "xp-dyn-drv"sv) {
+                // Only version we have so far
+                version = ATermVersion::DynamicDerivations;
+                xpSettings.require(Xp::DynamicDerivations, [&] {
+                    return fmt("derivation '%s', ATerm format version 'xp-dyn-drv'", name);
+                });
+            } else {
+                throw FormatError("Unknown derivation ATerm format version '%s'", *versionS);
+            }
+            expect(str, ',');
         }
-        expect(str, ',');
         break;
     }
     default:
@@ -479,7 +673,10 @@ Full parse(
     }
 
     /* Parse the map of outputs. The value is three fields rather than
-       one, but the framing is a map's, so `parseMap` still applies. */
+       one, but the framing is a map's, so `parseMap` still applies.
+
+       Which alternatives an output may be is decided by `Out`, the
+       output type this derivation shape carries. */
     parseMap(
         str,
         drv.outputs,
@@ -490,35 +687,27 @@ Full parse(
             const auto hashAlgo = parseString(str);
             expect(str, ',');
             const auto hash = parseString(str);
-            return parseOutput(store, name, outputName, *pathS, *hashAlgo, *hash, xpSettings);
+            return parseOutput<Out>(store, name, outputName, *pathS, *hashAlgo, *hash, xpSettings);
         },
         [](const auto & outputName) { return fmt("output name '%s'", outputName); });
 
     /* Parse the list of input derivations. */
-    derivation::FullInputs fullInputs;
+    using DrvMap = std::remove_reference_t<decltype(drv.inputs.drvs.map)>;
     expect(str, ',');
     parseMap(
         str,
-        fullInputs.drvs.map,
-        [&] {
-            auto drvPath = parseStorePath(store, str, supportWindowsStoreDir);
-            drvPath.requireDerivation();
-            return drvPath;
-        },
-        [&](const StorePath & drvPath) {
-            auto node = parseDerivedPathMapNode(store, str, version);
-            /* Such an entry cannot be represented in the flat inputs set,
-               and would thus be silently dropped rather than round-tripped.
-               Nix itself never produces one. */
-            if (node.value.empty() && node.childMap.empty())
-                throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
+        drv.inputs.drvs.map,
+        [&] { return parseKey<std::remove_const_t<typename DrvMap::key_type>>(store, str, supportWindowsStoreDir); },
+        [&](const auto & key) {
+            auto node = parseNode<typename DrvMap::mapped_type>(store, str, version);
+            if (nodeIsEmpty(node))
+                throw FormatError("inputDrvs entry for '%s' specifies no outputs", keyToString(store, key));
             return node;
         },
-        [&](const StorePath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
+        [&](const auto & key) { return fmt("input derivation '%s'", keyToString(store, key)); });
 
     expect(str, ',');
-    fullInputs.srcs = parseStorePaths(store, str, supportWindowsStoreDir);
-    drv.inputs = fullInputs.toSet();
+    drv.inputs.srcs = parseStorePaths(store, str, supportWindowsStoreDir);
     expect(str, ',');
     drv.platform = parseUnquotedString(str).toOwned();
     expect(str, ',');
@@ -528,7 +717,7 @@ Full parse(
     expect(str, ',');
     parseList(str, [&] { drv.args.push_back(parseString(str).toOwned()); });
 
-    /* Parse the environment variables. */
+    /* Parse the environment variables, kept verbatim. */
     expect(str, ',');
     parseMap(
         str,
@@ -537,15 +726,29 @@ Full parse(
         [&](const auto &) { return parseString(str).toOwned(); },
         [](const auto & name) { return fmt("environment variable '%s'", name); });
 
-    /* Structured attrs are just an ordinary environment variable as far
-       as the ATerm is concerned, so only take them out once the whole
-       map is parsed, and the ordering checks have seen them. */
-    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
-
     expect(str, ')');
     if (!str.remaining.empty())
         throw FormatError("expected end of file, found '%s'", str.remaining);
+
     return drv;
+}
+
+/* The regular form, and the modulo one only so the tests can check that
+   the encoding is unambiguous. */
+template ATerm
+ATerm::parse(const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+template masked::Drv<Output::Deferred> masked::Drv<Output::Deferred>::parse(
+    const StoreDirConfig &, std::string &&, std::string_view, bool, const ExperimentalFeatureSettings &);
+
+Full parse(
+    const StoreDirConfig & store,
+    std::string && s,
+    std::string_view name,
+    bool supportWindowsStoreDir,
+    const ExperimentalFeatureSettings & xpSettings)
+{
+    return elaborate(
+        ATerm::parse(store, std::move(s), name, supportWindowsStoreDir, xpSettings), store, name, xpSettings);
 }
 
 /* --------------------------------------------------------------------------
@@ -691,6 +894,18 @@ static void printKey(const StoreDirConfig &, std::string & res, const Hash & key
     printUnquotedString(res, key.to_string(HashFormat::Base16, false));
 }
 
+/* The rendering `printKey` does, without the ATerm quoting, for error
+   messages about a bad `inputDrvs` entry. */
+static std::string keyToString(const StoreDirConfig & store, const StorePath & key)
+{
+    return store.printStorePath(key);
+}
+
+static std::string keyToString(const StoreDirConfig &, const Hash & key)
+{
+    return key.to_string(HashFormat::Base16, false);
+}
+
 static void unparseOutput(
     const StoreDirConfig & store,
     std::string & s,
@@ -781,18 +996,10 @@ static void unparseOutput(
         [&](const auto & o) { unparseOutput(store, s, o, drvName, outputName, supportWindowsStoreDir); }, output.raw);
 }
 
-/**
- * This one, unlike the public one, is polymorphic on the output parameter to
- * support the hash modulo intermediate form.
- */
 template<typename Inputs, typename Out>
-std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
-    requires(
-        // Regular `FullInputs` case must have regular `Output` outputs
-        (std::is_same_v<Inputs, FullInputs> && std::is_same_v<Out, Output>)
-        // Hash modulo is only for input addressing, with masked (`Deferred`) or unmasked (`InputAddressed`) outputs
-        || (std::is_same_v<Inputs, masked::HashInputs>
-            && (std::is_same_v<Out, Output::InputAddressed> || std::is_same_v<Out, Output::Deferred>) ))
+std::string ATermT<Inputs, Out>::to_string(
+    const StoreDirConfig & store, std::string_view drvName, bool supportWindowsStoreDir) const
+    requires RenderableDerivation<Inputs, Out>
 {
     using namespace std::literals::string_view_literals;
 
@@ -806,7 +1013,7 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
        constructed.) */
     bool dynDrvDep = false;
     if constexpr (std::is_same_v<Inputs, FullInputs>)
-        dynDrvDep = hasDynamicDrvDep(drv.inputs);
+        dynDrvDep = hasDynamicDrvDep(inputs);
     if (dynDrvDep) {
         s += "DrvWithVersion("sv;
         // Only version we have so far
@@ -818,66 +1025,106 @@ std::string unparse(const Derivation<Inputs, Out> & drv, const StoreDirConfig & 
 
     printMap(
         s,
-        drv.outputs,
+        outputs,
         [&](const auto & outputName) { printUnquotedString(s, outputName); },
         [&](const auto & outputName, const auto & output) {
-            unparseOutput(store, s, output, drv.name, outputName, supportWindowsStoreDir);
+            unparseOutput(store, s, output, drvName, outputName, supportWindowsStoreDir);
         });
 
     s += ',';
     printMap(
         s,
-        drv.inputs.drvs.map,
+        inputs.drvs.map,
         [&](const auto & key) { printKey(store, s, key, supportWindowsStoreDir); },
         [&](const auto &, const auto & node) { unparseDerivedPathMapNode(store, s, node); });
 
     s += ',';
-    printStorePaths(store, s, drv.inputs.srcs, supportWindowsStoreDir);
+    printStorePaths(store, s, inputs.srcs, supportWindowsStoreDir);
 
     s += ',';
-    printUnquotedString(s, drv.platform);
+    printUnquotedString(s, platform);
     s += ',';
-    printString(s, drv.builder);
+    printString(s, builder);
     s += ',';
-    printStrings(s, drv.args);
+    printStrings(s, args);
 
     s += ',';
 
-    auto unparseEnv = [&](const StringPairs & atermEnv) {
-        printMap(
-            s,
-            atermEnv,
-            [&](const auto & name) { printString(s, name); },
-            [&](const auto &, const auto & value) { printString(s, value); });
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        unparseEnv(scratch);
-    } else {
-        unparseEnv(drv.env);
-    }
+    printMap(
+        s,
+        env,
+        [&](const auto & name) { printString(s, name); },
+        [&](const auto &, const auto & value) { printString(s, value); });
 
     s += ')';
 
     return s;
 }
 
-/* The hash modulo intermediate forms, unparsed by `masked.cc`. */
+/* The regular form, and the two masked ones `masked.cc` hashes. */
+template std::string ATerm::to_string(const StoreDirConfig &, std::string_view, bool) const;
 template std::string
-unparse(const Derivation<masked::HashInputs, Output::Deferred> & drv, const StoreDirConfig & store, bool);
+masked::Drv<Output::Deferred>::to_string(const StoreDirConfig &, std::string_view, bool) const;
 template std::string
-unparse(const Derivation<masked::HashInputs, Output::InputAddressed> & drv, const StoreDirConfig & store, bool);
+masked::Drv<Output::InputAddressed>::to_string(const StoreDirConfig &, std::string_view, bool) const;
+
+/**
+ * The shared part of the two `lower` overloads: everything but the
+ * inputs, which are the one field whose shape differs.
+ */
+template<typename Inputs, typename Input>
+static ATermT<Inputs> lowerCommon(const Derivation<Input, Output> & drv)
+{
+    StringPairs env;
+    for (auto & [name, var] : drv.env)
+        env.insert_or_assign(name, var.value);
+    StructuredAttrs::checkKeyNotInUse(env);
+    if (drv.structuredAttrs)
+        env.insert(drv.structuredAttrs->unparse());
+
+    Outputs<Output> outputs;
+    for (auto & [outputName, output] : drv.outputs)
+        outputs.insert_or_assign(outputName, output.output);
+
+    return {
+        .outputs = std::move(outputs),
+        .platform = drv.platform,
+        .builder = drv.builder,
+        .args = drv.args,
+        .env = std::move(env),
+    };
+}
+
+ATerm lower(const Full & drv)
+{
+    auto res = lowerCommon<FullInputs>(drv);
+    res.inputs = FullInputs::fromSet(drv.inputs);
+    return res;
+}
+
+BasicATerm lower(const Basic & drv)
+{
+    auto res = lowerCommon<StorePathSet>(drv);
+    res.inputs = drv.inputs;
+    return res;
+}
 
 std::string unparse(const Full & drv, const StoreDirConfig & store, bool supportWindowsStoreDir)
 {
-    // Convert to FullInputs for ATerm serialization
-    return unparse(
-        drv.mapInputs([](const std::set<SingleDerivedPath> & inputs) { return FullInputs::fromSet(inputs); }),
-        store,
-        supportWindowsStoreDir);
+    auto lowered = lower(drv);
+
+    /* Lowering to the ATerm format drops the parsed options and
+       structured attributes; it is only faithful if re-parsing the
+       environment gets them back. This is the case for all derivations
+       whose options actually stem from the legacy environment-variable
+       encoding. */
+    if (elaborate(lowered, store, drv.name) != drv)
+        throw Error(
+            "derivation '%s' is not representable in the ATerm format: "
+            "its fields are not in sync with their environment-variable encoding",
+            drv.name);
+
+    return lowered.to_string(store, drv.name, supportWindowsStoreDir);
 }
 
 /* --------------------------------------------------------------------------
@@ -890,13 +1137,11 @@ static Output readOutput(Source & in, const StoreDirConfig & store, std::string_
     const auto hashAlgo = readString(in);
     const auto hash = readString(in);
 
-    return parseOutput(store, drvName, outputName, pathS, hashAlgo, hash, experimentalFeatureSettings);
+    return parseOutput<Output>(store, drvName, outputName, pathS, hashAlgo, hash, experimentalFeatureSettings);
 }
 
-Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::string_view name)
+Source & read(Source & in, const StoreDirConfig & store, BasicATerm & drv, std::string_view name)
 {
-    drv.name = name;
-
     drv.outputs.clear();
     auto nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
@@ -909,18 +1154,18 @@ Source & read(Source & in, const StoreDirConfig & store, Basic & drv, std::strin
     in >> drv.platform >> drv.builder;
     drv.args = readStrings<Strings>(in);
 
+    drv.env.clear();
     nr = readNum<size_t>(in);
     for (size_t n = 0; n < nr; n++) {
         auto key = readString(in);
         auto value = readString(in);
-        drv.env[key] = value;
+        drv.env.insert_or_assign(std::move(key), std::move(value));
     }
-    drv.structuredAttrs = StructuredAttrs::tryExtract(drv.env);
 
     return in;
 }
 
-void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
+void write(Sink & out, const StoreDirConfig & store, const BasicATerm & drv, std::string_view name)
 {
     out << drv.outputs.size();
     for (auto & i : drv.outputs) {
@@ -932,7 +1177,7 @@ void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
                         << "";
                 },
                 [&](const Output::CAFixed & dof) {
-                    out << store.printStorePath(dof.path(store, drv.name, i.first)) << dof.ca.printMethodAlgo()
+                    out << store.printStorePath(dof.path(store, name, i.first)) << dof.ca.printMethodAlgo()
                         << dof.ca.hash.to_string(HashFormat::Base16, false);
                 },
                 [&](const Output::CAFloating & dof) {
@@ -952,20 +1197,9 @@ void write(Sink & out, const StoreDirConfig & store, const Basic & drv)
     CommonProto::write(store, CommonProto::WriteConn{.to = out}, drv.inputs);
     out << drv.platform << drv.builder << drv.args;
 
-    auto writeEnv = [&](const StringPairs atermEnv) {
-        out << atermEnv.size();
-        for (auto & [k, v] : atermEnv)
-            out << k << v;
-    };
-
-    StructuredAttrs::checkKeyNotInUse(drv.env);
-    if (drv.structuredAttrs) {
-        StringPairs scratch = drv.env;
-        scratch.insert(drv.structuredAttrs->unparse());
-        writeEnv(scratch);
-    } else {
-        writeEnv(drv.env);
-    }
+    out << drv.env.size();
+    for (auto & [k, v] : drv.env)
+        out << k << v;
 }
 
 } // namespace derivation

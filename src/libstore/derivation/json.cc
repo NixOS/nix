@@ -1,9 +1,26 @@
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
 
 #include <nlohmann/json.hpp>
+
+namespace nix::derivation {
+
+JsonFormat parseJsonFormat(uint64_t version)
+{
+    switch (version) {
+    case 4:
+        return JsonFormat::V4;
+    case 5:
+        return JsonFormat::V5;
+    default:
+        throw Error("unsupported derivation JSON format version %d; supported versions are 4 and 5", version);
+    }
+}
+
+} // namespace nix::derivation
 
 namespace nlohmann {
 
@@ -46,6 +63,11 @@ nix::DerivationOutput adl_serializer<nix::DerivationOutput>::from_json(
 
     for (const auto & [key, _] : json)
         keys.insert(key);
+
+    /* These keys belong to `OutputWithOptions`, which shares the JSON
+       object with the output proper. */
+    keys.erase("checks");
+    keys.erase("unsafeDiscardReferences");
 
     auto methodAlgo = [&]() -> std::pair<ContentAddressMethod, HashAlgorithm> {
         ContentAddressMethod method = ContentAddressMethod::parse(getString(valueAt(json, "method")));
@@ -142,15 +164,126 @@ static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & in
     inputsToJson(res, FullInputs::fromSet(inputs));
 }
 
-template<typename Inputs>
-void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
-    json & res, const nix::derivation::Derivation<Inputs> & d)
+void adl_serializer<nix::derivation::EnvValue>::to_json(json & res, const nix::derivation::EnvValue & var)
+{
+    if (var.passAsFile) {
+        res = nlohmann::json::object();
+        res["value"] = var.value;
+        res["passAsFile"] = true;
+    } else {
+        res = var.value;
+    }
+}
+
+nix::derivation::EnvValue adl_serializer<nix::derivation::EnvValue>::from_json(const json & json)
 {
     using namespace nix;
+    if (json.is_string())
+        return {.value = getString(json)};
+    auto & obj = getObject(json);
+    return {
+        .value = getString(valueAt(obj, "value")),
+        .passAsFile = getBoolean(valueAt(obj, "passAsFile")),
+    };
+}
+
+template<typename Input>
+void adl_serializer<nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>>::to_json(
+    json & res, const nix::derivation::OutputWithOptions<Input, nix::DerivationOutput> & output)
+{
+    res = output.output;
+    res["checks"] = output.options.checks;
+    res["unsafeDiscardReferences"] = output.options.unsafeDiscardReferences;
+}
+
+template<typename Input>
+nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>
+adl_serializer<nix::derivation::OutputWithOptions<Input, nix::DerivationOutput>>::from_json(
+    const json & json_, const nix::ExperimentalFeatureSettings & xpSettings)
+{
+    using namespace nix;
+    auto & json = getObject(json_);
+    return {
+        .output = adl_serializer<DerivationOutput>::from_json(json_, xpSettings),
+        .options = {
+            .checks = [&]() -> std::optional<derivation::OutputChecks<Input>> {
+                if (auto * checks = optionalValueAt(json, "checks"))
+                    return ptrToOwned<derivation::OutputChecks<Input>>(getNullable(*checks));
+                return std::nullopt;
+            }(),
+            .unsafeDiscardReferences =
+                [&] {
+                    auto * b = optionalValueAt(json, "unsafeDiscardReferences");
+                    return b && getBoolean(*b);
+                }(),
+        },
+    };
+}
+
+template struct adl_serializer<nix::derivation::OutputWithOptions<nix::StorePath, nix::DerivationOutput>>;
+template struct adl_serializer<nix::derivation::OutputWithOptions<nix::SingleDerivedPath, nix::DerivationOutput>>;
+
+/**
+ * The fields common to all JSON format versions.
+ */
+template<typename Input>
+static void
+derivationToJsonCommon(json & res, const nix::derivation::Derivation<Input> & d, nix::derivation::JsonFormat format)
+{
     res = nlohmann::json::object();
 
     res["name"] = d.name;
-    res["version"] = expectedJsonVersionDerivation;
+    res["version"] = static_cast<uint64_t>(format);
+
+    inputsToJson(res["inputs"], d.inputs);
+
+    res["system"] = d.platform;
+    res["builder"] = d.builder;
+    res["args"] = d.args;
+
+    if (d.structuredAttrs)
+        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+}
+
+template<typename Input>
+static void derivationToJsonV4(json & res, const nix::derivation::Derivation<Input> & d)
+{
+    using namespace nix;
+
+    derivationToJsonCommon(res, d, derivation::JsonFormat::V4);
+
+    /* Project down to the ATerm shape, which is also the shape of the
+       legacy JSON format: plain outputs, and a verbatim environment
+       carrying the legacy encodings of the derivation options. The one
+       place the legacy JSON format is nicer than the ATerm format is
+       that the structured attributes are a first-class field, so they
+       are split back out of the `__json` environment variable that
+       `lower` produces. */
+    auto lowered = [&] {
+        if constexpr (std::is_same_v<Input, SingleDerivedPath>)
+            return derivation::lower(d);
+        else
+            return derivation::lower(d);
+    }();
+
+    {
+        nlohmann::json & outputsObj = res["outputs"];
+        outputsObj = nlohmann::json::object();
+        for (auto & [outputName, output] : lowered.outputs)
+            outputsObj[outputName] = output;
+    }
+
+    if (d.structuredAttrs)
+        lowered.env.erase(std::string{StructuredAttrs::envVarName});
+    res["env"] = lowered.env;
+}
+
+template<typename Input>
+static void derivationToJsonV5(json & res, const nix::derivation::Derivation<Input> & d)
+{
+    using namespace nix;
+
+    derivationToJsonCommon(res, d, derivation::JsonFormat::V5);
 
     {
         nlohmann::json & outputsObj = res["outputs"];
@@ -159,15 +292,37 @@ void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
             outputsObj[outputName] = output;
     }
 
-    inputsToJson(res["inputs"], d.inputs);
+    {
+        nlohmann::json & envObj = res["env"];
+        envObj = nlohmann::json::object();
+        for (auto & [name, var] : d.env)
+            envObj[name] = var;
+    }
 
-    res["system"] = d.platform;
-    res["builder"] = d.builder;
-    res["args"] = d.args;
-    res["env"] = d.env;
+    res["options"] = d.options;
+}
 
-    if (d.structuredAttrs)
-        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
+template<typename Input>
+static void
+derivationToJson(json & res, const nix::derivation::Derivation<Input> & d, nix::derivation::JsonFormat format)
+{
+    using nix::derivation::JsonFormat;
+
+    switch (format) {
+    case JsonFormat::V4:
+        derivationToJsonV4(res, d);
+        break;
+    case JsonFormat::V5:
+        derivationToJsonV5(res, d);
+        break;
+    }
+}
+
+template<typename Input>
+void adl_serializer<nix::derivation::Derivation<Input>>::to_json(
+    json & res, const nix::derivation::Derivation<Input> & d)
+{
+    derivationToJsonV5(res, d);
 }
 
 template<typename Inputs>
@@ -231,31 +386,37 @@ std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>
     return inputsFromJson<FullInputs>(inputsJson, xpSettings).toSet();
 }
 
-template<typename Inputs>
-nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<Inputs>>::from_json(
+template<typename Input>
+nix::derivation::Derivation<Input> adl_serializer<nix::derivation::Derivation<Input>>::from_json(
     const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
     using namespace derivation;
 
     auto & json = getObject(_json);
-    {
-        auto version = getUnsigned(valueAt(json, "version"));
-        if (version != expectedJsonVersionDerivation)
-            throw Error(
-                "Unsupported derivation JSON format version %d, only format version %d is currently supported.",
-                version,
-                expectedJsonVersionDerivation);
+    switch (parseJsonFormat(getUnsigned(valueAt(json, "version")))) {
+    case JsonFormat::V4:
+        /* The legacy format encodes the derivation options in the
+           environment variables, and decoding that requires a store —
+           see `parseJsonAndValidate`. */
+        throw Error(
+            "derivation JSON format version 4 cannot be decoded without a store; "
+            "use format version 5, or a decoder that takes a store (such as `nix derivation add`)");
+    case JsonFormat::V5:
+        break;
     }
 
-    return derivation::Derivation<Inputs>{
+    derivation::Derivation<Input> res{
+        .name = getString(valueAt(json, "name")),
         .outputs =
             [&] {
-                Outputs<> outputs;
+                decltype(res.outputs) outputs;
                 try {
                     for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
                         outputs.insert_or_assign(
-                            outputName, adl_serializer<DerivationOutput>::from_json(output, xpSettings));
+                            outputName,
+                            adl_serializer<derivation::OutputWithOptions<Input, DerivationOutput>>::from_json(
+                                output, xpSettings));
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'outputs'");
                     throw;
@@ -265,7 +426,7 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
         .inputs =
             [&] {
                 try {
-                    return inputsFromJson<Inputs>(valueAt(json, "inputs"), xpSettings);
+                    return inputsFromJson<std::set<Input>>(valueAt(json, "inputs"), xpSettings);
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'inputs'");
                     throw;
@@ -276,23 +437,135 @@ nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<I
         .args = getStringList(valueAt(json, "args")),
         .env =
             [&] {
+                decltype(res.env) env;
                 try {
-                    return getStringMap(valueAt(json, "env"));
+                    for (auto & [name, var] : getObject(valueAt(json, "env")))
+                        env.insert_or_assign(name, adl_serializer<derivation::EnvValue>::from_json(var));
                 } catch (Error & e) {
                     e.addTrace({}, "while reading key 'env'");
                     throw;
                 }
+                return env;
             }(),
         .structuredAttrs = [&]() -> std::optional<StructuredAttrs> {
             if (auto structuredAttrs = get(json, "structuredAttrs"))
                 return StructuredAttrs{*structuredAttrs};
             return std::nullopt;
         }(),
-        .name = getString(valueAt(json, "name")),
     };
+    /* Optional for leniency towards minimal (e.g. hand-written) JSON;
+       absent means all-default options. */
+    if (auto * options = optionalValueAt(json, "options"))
+        res.options = *options;
+    return res;
 }
 
 template struct adl_serializer<nix::BasicDerivation>;
 template struct adl_serializer<nix::Derivation>;
 
 } // namespace nlohmann
+
+namespace nix::derivation {
+
+template<typename Input>
+nlohmann::json toJSON(const Derivation<Input> & drv, JsonFormat format)
+{
+    nlohmann::json res;
+    nlohmann::derivationToJson(res, drv, format);
+    return res;
+}
+
+template nlohmann::json toJSON(const Derivation<StorePath> & drv, JsonFormat format);
+template nlohmann::json toJSON(const Derivation<SingleDerivedPath> & drv, JsonFormat format);
+
+/**
+ * Decode the legacy V4 format: parse into the ATerm shape, and then
+ * reuse its `elaborate` to decode the legacy environment-variable
+ * encodings of the derivation options — exactly as when reading a
+ * `.drv` file.
+ */
+static Full
+fromJsonV4(const StoreDirConfig & store, const nlohmann::json & _json, const ExperimentalFeatureSettings & xpSettings)
+{
+    auto & json = getObject(_json);
+
+    ATerm aterm{
+        .outputs =
+            [&] {
+                Outputs<Output> outputs;
+                try {
+                    for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
+                        outputs.insert_or_assign(
+                            outputName, nlohmann::adl_serializer<Output>::from_json(output, xpSettings));
+                } catch (Error & e) {
+                    e.addTrace({}, "while reading key 'outputs'");
+                    throw;
+                }
+                return outputs;
+            }(),
+        .inputs =
+            [&] {
+                try {
+                    return nlohmann::inputsFromJson<FullInputs>(valueAt(json, "inputs"), xpSettings);
+                } catch (Error & e) {
+                    e.addTrace({}, "while reading key 'inputs'");
+                    throw;
+                }
+            }(),
+        .platform = getString(valueAt(json, "system")),
+        .builder = getString(valueAt(json, "builder")),
+        .args = getStringList(valueAt(json, "args")),
+        .env =
+            [&] {
+                StringPairs env;
+                try {
+                    for (auto & [name, value] : getObject(valueAt(json, "env")))
+                        env.insert_or_assign(name, getString(value));
+                } catch (Error & e) {
+                    e.addTrace({}, "while reading key 'env'");
+                    throw;
+                }
+                return env;
+            }(),
+    };
+
+    /* Fold the first-class structured attributes back into their
+       `__json` environment-variable encoding, so that `elaborate` can
+       process the whole environment as it would for a `.drv` file. */
+    if (auto structuredAttrs = get(json, "structuredAttrs")) {
+        StructuredAttrs::checkKeyNotInUse(aterm.env);
+        aterm.env.insert(StructuredAttrs{*structuredAttrs}.unparse());
+    }
+
+    return elaborate(aterm, store, getString(valueAt(json, "name")), xpSettings);
+}
+
+Full fromJSON(const StoreDirConfig & store, const nlohmann::json & json, const ExperimentalFeatureSettings & xpSettings)
+{
+    switch (parseJsonFormat(getUnsigned(valueAt(getObject(json), "version")))) {
+    case JsonFormat::V4:
+        return fromJsonV4(store, json, xpSettings);
+    case JsonFormat::V5:
+        return nlohmann::adl_serializer<Full>::from_json(json, xpSettings);
+    }
+    unreachable();
+}
+
+Full parseJsonAndValidate(Store & store, const nlohmann::json & json, const ExperimentalFeatureSettings & xpSettings)
+{
+    auto drv = fromJSON(store, json, xpSettings);
+
+    auto readDerivation = derivation::readInvalid(store);
+    fillInOutputPaths(drv, store, readDerivation);
+
+    try {
+        checkInvariants(drv, store, readDerivation);
+    } catch (Error & e) {
+        e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
+        throw;
+    }
+
+    return drv;
+}
+
+} // namespace nix::derivation
