@@ -101,20 +101,22 @@ scope: {
         ];
       });
 
-  libgit2 =
-    if lib.versionAtLeast pkgs.libgit2.version "1.9.4" then
-      pkgs.libgit2
-    else
-      # Grab newer libgit2.
-      pkgs.libgit2.overrideAttrs rec {
-        version = "1.9.4";
-        src = pkgs.fetchFromGitHub {
-          owner = "libgit2";
-          repo = "libgit2";
-          tag = "v${version}";
-          hash = "sha256-ZKUiz3pdFE2SKxh53X2oyr7hs32Njj5YVA0OXDXz7h0=";
-        };
+  libgit2 = pkgs.libgit2.overrideAttrs (
+    finalAttrs: prevAttrs: {
+      version = "2.0.0-rc.1";
+      src = pkgs.fetchFromGitHub {
+        owner = "libgit2";
+        repo = "libgit2";
+        rev = "ae45d0d168f7e8dbfdb8c623589cb51caac96ab3";
+        hash = "sha256-3sbqHm37SOwBeFgtjI2DLN6kx1F7G2N1m6rRIkqDXNI=";
       };
+      patches = prevAttrs.patches or [ ] ++ [
+        ./patches/0001-zlib-ng-support.patch
+      ];
+      cmakeFlags = prevAttrs.cmakeFlags ++ [ "-DUSE_COMPRESSION=zlib-ng" ];
+      buildInputs = prevAttrs.buildInputs ++ [ pkgs.zlib-ng ];
+    }
+  );
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   boost =
