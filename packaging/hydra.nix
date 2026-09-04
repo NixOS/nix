@@ -440,12 +440,8 @@ rec {
     in
     pkgs.runCommand "install-tests" {
       againstSelf = testNixVersions pkgs pkgs.nix;
-      againstCurrentLatest =
-        # FIXME: temporarily disable this on macOS because of #3605.
-        if system == "x86_64-linux" then testNixVersions pkgs pkgs.nixVersions.latest else null;
-      # Disabled because the latest stable version doesn't handle
-      # `NIX_DAEMON_SOCKET_PATH` which is required for the tests to work
-      # againstLatestStable = testNixVersions pkgs pkgs.nixStable;
+      againstCurrentLatest = testNixVersions pkgs pkgs.nixVersions.latest;
+      againstLatestStable = testNixVersions pkgs pkgs.nixVersions.stable;
     } "touch $out"
   );
 

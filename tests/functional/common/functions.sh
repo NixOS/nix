@@ -374,7 +374,7 @@ initGitRepo() {
     local extraArgs="${2-}"
 
     # shellcheck disable=SC2086 # word splitting of extraArgs is intended
-    git -C "$repo" init $extraArgs
+    git -C "$repo" init --initial-branch=master $extraArgs
     git -C "$repo" config user.email "foobar@example.com"
     git -C "$repo" config user.name "Foobar"
 }
