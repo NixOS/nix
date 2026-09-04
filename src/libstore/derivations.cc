@@ -334,7 +334,16 @@ bool hasDynamicDrvDep(const std::set<SingleDerivedPath> & inputs)
  * mismatch).
  */
 template<bool fillIn>
-static void processDerivationOutputPaths(Store & store, auto && drv, std::string_view drvName)
+static void processDerivationOutputPaths(
+    const StoreDirConfig & store,
+    /* A `ReadDerivation` for `Full`, and `std::monostate` for `Basic`,
+       which has no input derivations to look one up for. Taking it as a
+       type parameter rather than an optional means the `Basic` case
+       cannot use it even by mistake: the branch that would is never
+       instantiated. */
+    auto && readDerivation,
+    auto && drv,
+    std::string_view drvName)
 {
     /* output optional is for whether we set it yet. Inner optional is
        for whether the input-addressed derivation has an input address
@@ -344,7 +353,16 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     auto hashModulo = [&]() -> const std::optional<Hash> & {
         if (!hashModulo_) {
             // somewhat expensive so we do lazily
-            hashModulo_ = derivation::masked::hash(store, drv);
+            auto modulo = [&] {
+                if constexpr (std::is_same_v<std::decay_t<decltype(drv)>, derivation::Basic>)
+                    /* A resolved derivation has no input derivations to
+                       substitute, so this cannot fail, and needs no
+                       lookup. */
+                    return std::optional{derivation::masked::fullyMaskDerivation(store, drv)};
+                else
+                    return derivation::masked::fullyMaskDerivation(store, readDerivation, drv);
+            }();
+            hashModulo_ = modulo ? std::optional{derivation::masked::hashDerivation(store, *modulo)} : std::nullopt;
         }
         return *hashModulo_;
     };
@@ -371,7 +389,7 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
     }();
 
     /* Throws on invalid output combinations. Must run before
-       `hashModulo`, which would panic instead. */
+       `fullyMaskDerivation`, which would panic instead. */
     auto drvType = type(drv);
 
     if (rpcOutputs && std::holds_alternative<Type::InputAddressed>(drvType.raw))
@@ -489,7 +507,11 @@ static void processDerivationOutputPaths(Store & store, auto && drv, std::string
 }
 
 template<typename Inputs>
-void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, const StorePath & drvPath)
+void checkInvariants(
+    const Derivation<Inputs, Output> & drv,
+    const StoreDirConfig & store,
+    auto && readDerivation,
+    const StorePath & drvPath)
 {
     assert(drvPath.isDerivation());
     std::string drvName(drvPath.name());
@@ -501,44 +523,105 @@ void checkInvariants(const Derivation<Inputs, Output> & drv, Store & store, cons
     }
 
     try {
-        checkInvariants(drv, store);
+        if constexpr (std::is_same_v<Inputs, StorePathSet>)
+            checkInvariants(drv, store);
+        else
+            checkInvariants(drv, store, readDerivation);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation '%s'", store.printStorePath(drvPath));
         throw;
     }
 }
 
-template void checkInvariants(const Basic & drv, Store & store, const StorePath & drvPath);
-template void checkInvariants(const Full & drv, Store & store, const StorePath & drvPath);
+template void checkInvariants(
+    const Basic & drv, const StoreDirConfig & store, std::monostate && readDerivation, const StorePath & drvPath);
+template void checkInvariants(
+    const Full & drv, const StoreDirConfig & store, ReadDerivation && readDerivation, const StorePath & drvPath);
 
-void checkInvariants(const Basic & drv, Store & store)
+void checkInvariants(const Basic & drv, const StoreDirConfig & store)
 {
-    processDerivationOutputPaths<false>(store, drv, drv.name);
+    processDerivationOutputPaths<false>(store, std::monostate{}, drv, drv.name);
+}
+
+void checkInvariants(const Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation)
+{
+    processDerivationOutputPaths<false>(store, readDerivation, drv, drv.name);
 }
 
 void checkInvariants(const Full & drv, Store & store)
 {
-    processDerivationOutputPaths<false>(store, drv, drv.name);
+    checkInvariants(drv, store, readInvalid(store));
 }
 
-void fillInOutputPaths(Basic & drv, Store & store)
+ReadDerivation readInvalid(Store & store)
 {
-    processDerivationOutputPaths<true>(store, drv, drv.name);
+    return [&store](const StorePath & drvPath) { return store.readInvalidDerivation(drvPath); };
+}
+
+void fillInOutputPaths(Basic & drv, const StoreDirConfig & store)
+{
+    processDerivationOutputPaths<true>(store, std::monostate{}, drv, drv.name);
+}
+
+void fillInOutputPaths(Full & drv, const StoreDirConfig & store, ReadDerivation readDerivation)
+{
+    processDerivationOutputPaths<true>(store, readDerivation, drv, drv.name);
 }
 
 void fillInOutputPaths(Full & drv, Store & store)
 {
-    processDerivationOutputPaths<true>(store, drv, drv.name);
+    fillInOutputPaths(drv, store, readInvalid(store));
+}
+
+std::optional<FullInputAddressed>
+fillInOutputPaths(FullDeferred drv, const StoreDirConfig & store, ReadDerivation readDerivation)
+{
+    /* Widen to the variant-typed form so there is just one
+       implementation of the actual work. Everything but the outputs is
+       moved through; the outputs are rebuilt, but they are small. */
+    Full full{
+        .inputs = std::move(drv.inputs),
+        .platform = std::move(drv.platform),
+        .builder = std::move(drv.builder),
+        .args = std::move(drv.args),
+        .env = std::move(drv.env),
+        .structuredAttrs = std::move(drv.structuredAttrs),
+        .name = std::move(drv.name),
+    };
+    for (auto & [outputName, output] : drv.outputs)
+        full.outputs.insert_or_assign(outputName, Output{output});
+
+    fillInOutputPaths(full, store, readDerivation);
+
+    /* Narrow back. If any output is still `Deferred`, there was no
+       input address to fill in, which this return type cannot say. */
+    FullInputAddressed res{
+        .inputs = std::move(full.inputs),
+        .platform = std::move(full.platform),
+        .builder = std::move(full.builder),
+        .args = std::move(full.args),
+        .env = std::move(full.env),
+        .structuredAttrs = std::move(full.structuredAttrs),
+        .name = std::move(full.name),
+    };
+    for (auto & [outputName, output] : full.outputs) {
+        auto * inputAddressed = std::get_if<Output::InputAddressed>(&output.raw);
+        if (!inputAddressed)
+            return std::nullopt;
+        res.outputs.insert_or_assign(outputName, *inputAddressed);
+    }
+    return res;
 }
 
 Full parseJsonAndValidate(Store & store, const nlohmann::json & json)
 {
     auto drv = static_cast<Full>(json);
 
-    fillInOutputPaths(drv, store);
+    auto readDerivation = derivation::readInvalid(store);
+    fillInOutputPaths(drv, store, readDerivation);
 
     try {
-        checkInvariants(drv, store);
+        checkInvariants(drv, store, readDerivation);
     } catch (Error & e) {
         e.addTrace({}, "while checking derivation from JSON with name '%s'", drv.name);
         throw;
