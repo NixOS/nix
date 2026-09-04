@@ -257,10 +257,32 @@ private:
     std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParentAndUpsert(const CanonPath & path, bool ignoreMissing);
 
     /**
-     * Get the parent directory of path. The second pair element might be an owning file descriptor
-     * if path.parent().isRoot() is false.
+     * Result of `openParent()`.
      */
-    std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> openParent(const CanonPath & path);
+    struct OpenedParent
+    {
+        Descriptor fd;
+
+        /**
+         * Owning file descriptor, unless `path.parent().isRoot()`.
+         */
+        std::shared_ptr<AutoCloseFD> fdOwning;
+
+        /**
+         * `path.parent()`, so that callers don't recompute it (which copies a string).
+         */
+        std::optional<CanonPath> parent;
+
+        /**
+         * Whether `fdOwning` came out of `dirFdCache` under exactly `parent`.
+         */
+        bool fromCache = false;
+    };
+
+    /**
+     * Get the parent directory of path.
+     */
+    OpenedParent openParent(const CanonPath & path);
 
     std::function<void(AutoCloseFD, CanonPath)> makeDirFdCallback();
 
@@ -339,12 +361,12 @@ std::function<void(AutoCloseFD, CanonPath)> PosixDirectorySourceAccessor::makeDi
     };
 }
 
-std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor::openParent(const CanonPath & path)
+PosixDirectorySourceAccessor::OpenedParent PosixDirectorySourceAccessor::openParent(const CanonPath & path)
 {
     assert(!path.isRoot());
     auto parent = path.parent().value();
     if (parent.isRoot())
-        return {dirFd.get(), nullptr};
+        return {dirFd.get(), nullptr, std::move(parent)};
 
     maybeEvictFromGlobalCaches();
 
@@ -357,7 +379,12 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
         while (true) {
             if (auto intermediateDirFdHit = cache->get(p)) {
                 if (p == parent)
-                    return {(*intermediateDirFdHit)->get(), *intermediateDirFdHit};
+                    return {
+                        .fd = (*intermediateDirFdHit)->get(),
+                        .fdOwning = *intermediateDirFdHit,
+                        .parent = std::move(parent),
+                        .fromCache = true,
+                    };
                 intermediateParentFd = intermediateDirFdHit->get_ptr();
                 anchor = p;
                 break;
@@ -397,7 +424,7 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
                 O_DIRECTORY | O_CLOEXEC,
             0,
             std::move(cb));
-        return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning))};
+        return {parentFdOwning.get(), make_ref<AutoCloseFD>(std::move(parentFdOwning)), std::move(parent)};
     } catch (SymlinkNotAllowed & e) {
         /* Need to fixup the error message to include the actual path relative to the (possibly) cached fd. */
         throw SymlinkNotAllowed(anchor / e.path, "path '%s' (or its ancestor) is a symlink", showPath(anchor / e.path));
@@ -407,7 +434,7 @@ std::pair<Descriptor, std::shared_ptr<AutoCloseFD>> PosixDirectorySourceAccessor
 std::pair<Descriptor, std::shared_ptr<AutoCloseFD>>
 PosixDirectorySourceAccessor::openParentAndUpsert(const CanonPath & path, bool ignoreMissing)
 {
-    auto [parentFd, parentFdOwning] = openParent(path);
+    auto [parentFd, parentFdOwning, parent, fromCache] = openParent(path);
     if (parentFd == INVALID_DESCRIPTOR) {
         if (errno == ENOENT || errno == ENOTDIR) /* Intermediate component might not exist. */ {
             if (ignoreMissing)
@@ -415,12 +442,13 @@ PosixDirectorySourceAccessor::openParentAndUpsert(const CanonPath & path, bool i
             else
                 throw FileNotFound("path '%s' does not exist", showPath(path));
         }
-        throw SysError("opening directory '%1%'", showPath(path.parent().value()));
+        throw SysError("opening directory '%1%'", showPath(*parent));
     }
 
-    if (dirFdCache && parentFdOwning) {
+    /* A cached fd needs no upsert: `LRUCache::get()` has already promoted it. */
+    if (dirFdCache && parentFdOwning && !fromCache) {
         assert(*parentFdOwning);
-        insertIntoDirFdCache(path.parent().value(), ref<AutoCloseFD>(parentFdOwning));
+        insertIntoDirFdCache(*parent, ref<AutoCloseFD>(parentFdOwning));
     }
 
     return {parentFd, parentFdOwning};
