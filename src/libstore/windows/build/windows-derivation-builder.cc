@@ -134,15 +134,10 @@ public:
         return false;
     }
 
-    void submitOutput(const SingleDerivedPath &, const OutputName &) override
-    {
-        throw UnimplementedError("recursive Nix is not yet supported on Windows");
-    }
-
     void addDependencyImpl(const StorePath &) override
     {
-        /* Only reachable through recursive Nix, which `submitOutput` rejects. */
-        throw UnimplementedError("recursive Nix is not yet supported on Windows");
+        /* Nothing to do, as on Unix: the restricted store already tracks the
+           path, and without a sandbox there is no mount to add. */
     }
 
     /* --- DerivationBuilder --- */
@@ -211,6 +206,11 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     for (std::string_view name : {"SystemRoot", "SystemDrive", "windir", "COMSPEC", "PATHEXT", "PATH"})
         if (auto value = getEnvOs(os(name)))
             env[os(name)] = *value;
+
+    /* Recursive Nix, when the daemon is running. Set before the derivation's
+       own variables so a derivation cannot shadow it by accident. */
+    if (daemonRemoteUri)
+        env[OS_STR("NIX_REMOTE")] = os(*daemonRemoteUri);
 
     /* The derivation's own environment wins over all of the above. */
     for (auto & [name, entry] : desugaredEnv.variables)
@@ -318,6 +318,14 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     /* A fresh build directory per attempt. */
     tmpDir = createTempDir(defaultTempDir(), "nix-build");
 
+    /* Recursive Nix, if the derivation asked for it. Uses the same shared
+       daemon as Unix: the socket type is already cross-platform, and the
+       accept loop runs on its own thread just as it does there. The
+       completion port this builder holds is for the log pipe, so the two do
+       not interact. */
+    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+        startDaemon();
+
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)
         if (status.known)
@@ -345,6 +353,9 @@ bool WindowsDerivationBuilderImpl::killChild()
        is no gentler option to try first. */
     pid.kill();
 
+    /* The builder may have had a daemon connection open. */
+    stopDaemon();
+
     return true;
 }
 
@@ -356,6 +367,8 @@ SingleDrvOutputs WindowsDerivationBuilderImpl::unprepareBuild()
 
     miscMethods->closeLogFile();
     miscMethods->childTerminated();
+
+    stopDaemon();
 
     if (exitCode != 0) {
         deletePath(tmpDir);

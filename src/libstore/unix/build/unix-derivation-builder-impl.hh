@@ -76,28 +76,12 @@ protected:
      */
     bool usingSubmitted;
 
-    static const std::filesystem::path homeDir;
-
-    /**
-     * The recursive Nix daemon socket.
-     */
-    AutoCloseFD daemonSocket;
-
-    /**
-     * The daemon main thread.
-     */
-    std::thread daemonThread;
-
-    struct DaemonWorkerState
+    bool usingSubmittedOutputs() override
     {
-        std::thread thread;
-        ref<std::atomic_flag> done;
-    };
+        return usingSubmitted;
+    }
 
-    /**
-     * The daemon worker threads.
-     */
-    std::list<DaemonWorkerState> daemonWorkerThreads;
+    static const std::filesystem::path homeDir;
 
     const StorePathSet & originalPaths() override
     {
@@ -126,8 +110,6 @@ protected:
     {
         return !usingSubmitted;
     }
-
-    void submitOutput(const SingleDerivedPath & path, const OutputName & output) override;
 
     friend struct RestrictedStore;
 
@@ -174,7 +156,7 @@ protected:
     /**
      * Return the path of the temporary directory in the sandbox.
      */
-    virtual std::filesystem::path tmpDirInSandbox()
+    std::filesystem::path tmpDirInSandbox() override
     {
         assert(!topTmpDir.empty());
         return topTmpDir;
@@ -239,13 +221,8 @@ private:
     /**
      * Start an in-process nix daemon thread for recursive-nix.
      */
-    void startDaemon();
 
-    /**
-     * Stop the in-process nix daemon thread.
-     * @see startDaemon
-     */
-    void stopDaemon();
+
 
 protected:
 
@@ -258,6 +235,18 @@ protected:
      * It's only safe to call in a child of a directory only visible to the owner.
      */
     void chownToBuilder(const std::filesystem::path & path);
+
+    /** Hand the daemon socket to the build user. */
+    void prepareDaemonSocket(const std::filesystem::path & path) override
+    {
+        chownToBuilder(path);
+    }
+
+    /** `exec` would otherwise carry the descriptor into the builder. */
+    void setCloseOnExec(Descriptor fd) override
+    {
+        unix::closeOnExec(fd);
+    }
 
     /**
      * Make a file owned by the builder addressed by its file descriptor.
