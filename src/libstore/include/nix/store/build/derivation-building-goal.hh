@@ -116,6 +116,8 @@ private:
     {
         return JobCategory::Build;
     };
+
+    size_t buildSlotLimit() const override;
 };
 
 } // namespace nix

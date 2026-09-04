@@ -632,6 +632,15 @@ public:
      */
     virtual JobCategory jobCategory() const = 0;
 
+    /**
+     * The number of build slots available to this goal.
+     *
+     * This is only meaningful for goals in the Build job category. Most build
+     * goals use the configured maximum directly, but goals that cannot be
+     * offloaded may override it.
+     */
+    virtual size_t buildSlotLimit() const;
+
 protected:
     Co await(Goals waitees);
 
