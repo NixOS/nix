@@ -1,12 +1,16 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/canon-path.hh"
+#include "nix/util/util.hh"
+#include "file-system-at-private.hh"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
 #include <boost/format.hpp>
 #include <chrono>
+#include <optional>
 
 // Verify that our S_IFLNK polyfill doesn't conflict with Windows file type constants
 static_assert((S_IFLNK & S_IFMT) == S_IFLNK, "S_IFLNK must fit within S_IFMT mask");
@@ -74,18 +78,275 @@ std::filesystem::path defaultTempDir()
     return std::filesystem::path(buf);
 }
 
-void deletePath(const std::filesystem::path & path)
+namespace {
+
+/**
+ * Clear `FILE_ATTRIBUTE_READONLY` through an already-open handle.
+ *
+ * A file carrying it cannot be deleted. Anything that clears the write bit
+ * produces one, because `chmod()` on Windows is `::_wchmod`, which maps a
+ * missing write bit onto exactly this attribute.
+ *
+ * This is the counterpart of the Unix walk relaxing permissions with
+ * `fchmodatTryNoFollow` before it recurses. Doing it through the handle rather
+ * than by path means the object whose attribute is cleared is necessarily the
+ * one about to be deleted.
+ *
+ * The attribute is not honoured on directories, so in practice this only
+ * matters for files, but it is harmless to apply uniformly.
+ */
+void clearReadOnly(Descriptor fd)
 {
-    std::error_code ec;
-    std::filesystem::remove_all(path, ec); // NOLINT(bugprone-unsafe-functions)
-    if (ec && ec != std::errc::no_such_file_or_directory)
-        throw SysError(ec.default_error_condition().value(), "recursively deleting %1%", PathFmt(path));
+    FILE_BASIC_INFO basic;
+    if (!GetFileInformationByHandleEx(fd, FileBasicInfo, &basic, sizeof(basic)))
+        return; /* Leave it; the deletion below will report the real problem. */
+
+    if (!(basic.FileAttributes & FILE_ATTRIBUTE_READONLY))
+        return;
+
+    basic.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
+    /* Clearing the last attribute leaves zero, which is not a valid value to
+       set; `FILE_ATTRIBUTE_NORMAL` is how you say "no attributes". */
+    if (basic.FileAttributes == 0)
+        basic.FileAttributes = FILE_ATTRIBUTE_NORMAL;
+
+    SetFileInformationByHandle(fd, FileBasicInfo, &basic, sizeof(basic));
 }
+
+/**
+ * Clear `FILE_ATTRIBUTE_READONLY` by path.
+ *
+ * The handle-based `clearReadOnly` needs `FILE_WRITE_ATTRIBUTES`, which Wine
+ * will not grant on a file that carries the attribute, so on Wine this is the
+ * only way to clear it. It re-resolves the path, which the rest of this walk
+ * exists to avoid, so it is used only where the handle route is unavailable.
+ *
+ * The Unix side has the same shape: it relaxes permissions with
+ * `fchmodatTryNoFollow`, by name, rather than through the object handle.
+ */
+void clearReadOnlyByPath(const std::filesystem::path & path)
+{
+    auto attrs = GetFileAttributesW(path.c_str());
+    if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_READONLY))
+        return;
+
+    attrs &= ~FILE_ATTRIBUTE_READONLY;
+    /* Clearing the last attribute leaves zero, which is not a valid value to
+       set; `FILE_ATTRIBUTE_NORMAL` is how you say "no attributes". */
+    if (attrs == 0)
+        attrs = FILE_ATTRIBUTE_NORMAL;
+
+    SetFileAttributesW(path.c_str(), attrs);
+}
+
+/**
+ * Delete through an already-open handle, so the name is never resolved twice.
+ *
+ * This marks the object for deletion on last-handle-close rather than unlinking
+ * the name immediately. `FileDispositionInfoEx` with
+ * `FILE_DISPOSITION_FLAG_POSIX_SEMANTICS` would do the latter, but it needs a
+ * newer API level than the `_WIN32_WINNT=0x0602` this project sets, and the
+ * distinction does not matter here: the caller closes the handle before moving
+ * on, so a child's name is gone before its parent is deleted.
+ *
+ * @return whether the object was marked for deletion.
+ */
+bool deleteByHandle(Descriptor fd)
+{
+    FILE_DISPOSITION_INFO disposition{};
+    disposition.DeleteFile = TRUE;
+    return SetFileInformationByHandle(fd, FileDispositionInfo, &disposition, sizeof(disposition));
+}
+
+/**
+ * List a directory through its own handle.
+ *
+ * The names are collected rather than acted on as they arrive, because deleting
+ * entries while an enumeration of the same directory is in flight is not
+ * defined to visit each entry exactly once.
+ */
+std::vector<OsString> listByHandle(Descriptor fd, const std::filesystem::path & path)
+{
+    std::vector<OsString> names;
+
+    /* The entries are read into this and then cast to `FILE_FULL_DIR_INFO`,
+       which has 8-byte members, so the storage has to be at least that aligned.
+       A `char` buffer would only be 1-byte aligned as a type and would be
+       relying on `operator new` handing back something better, which it does but
+       does not have to at that type. Carry the requirement in the element type
+       instead.
+
+       Sized so that a typical directory needs one round trip; the loop below
+       does not depend on that. */
+    struct alignas(alignof(FILE_FULL_DIR_INFO)) Chunk
+    {
+        char bytes[alignof(FILE_FULL_DIR_INFO)];
+    };
+
+    std::vector<Chunk> buf(64 * 1024 / sizeof(Chunk));
+    const auto bufBytes = buf.size() * sizeof(Chunk);
+
+    while (true) {
+        checkInterrupt();
+
+        if (!GetFileInformationByHandleEx(fd, FileFullDirectoryInfo, buf.data(), bufBytes)) {
+            auto lastError = GetLastError();
+            if (lastError == ERROR_NO_MORE_FILES)
+                break;
+            throw windows::WinError(lastError, "reading directory %1%", PathFmt(path));
+        }
+
+        auto * info = reinterpret_cast<FILE_FULL_DIR_INFO *>(buf.data());
+        while (true) {
+            OsString name(info->FileName, info->FileNameLength / sizeof(OsChar));
+            if (name != L"." && name != L"..")
+                names.push_back(std::move(name));
+            if (info->NextEntryOffset == 0)
+                break;
+            info = reinterpret_cast<FILE_FULL_DIR_INFO *>(reinterpret_cast<char *>(info) + info->NextEntryOffset);
+        }
+    }
+
+    return names;
+}
+
+/**
+ * Recursively delete `name` within the directory `parentFd` refers to.
+ *
+ * Mirrors the Unix `_deletePath`: every step is relative to a directory handle,
+ * so no path is resolved a second time and there is no window in which a
+ * component could be replaced. Reparse points are opened rather than followed,
+ * so a symlink is removed as a link and its target is left alone.
+ *
+ * Errors deleting individual entries are collected in `ex` rather than thrown
+ * immediately, so that one undeletable entry does not abandon the rest of the
+ * tree. This too matches Unix.
+ */
+void deletePathAt(
+    Descriptor parentFd, const std::filesystem::path & path, uint64_t & bytesFreed, std::exception_ptr & ex)
+{
+    checkInterrupt();
+
+    auto name = path.filename().native();
+
+    /* One handle, carrying everything the rest of this function needs:
+       classification, listing, clearing the attribute, and the deletion. Two
+       opens would mean resolving `name` twice, which is the race this is
+       written to avoid. */
+    constexpr ACCESS_MASK baseAccess = DELETE | FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES | SYNCHRONIZE;
+
+    /* `FILE_WRITE_ATTRIBUTES` is what lets `clearReadOnly` below drop
+       `FILE_ATTRIBUTE_READONLY`, which Windows requires before it will honour
+       `DELETE`.
+
+       Wine needs the opposite. It derives that attribute from the Unix write
+       bits (`get_file_attributes` in `dlls/ntdll/unix/file.c`), and refuses the
+       open outright when the mask asks for `FILE_WRITE_ATTRIBUTES` on a file
+       that lacks them -- while allowing `DELETE`, because unlinking is governed
+       by the directory. Measured on a mode-0444 file under Wine 11.0:
+       `FILE_WRITE_ATTRIBUTES` is `ERROR_ACCESS_DENIED`, `DELETE` and
+       `FILE_READ_ATTRIBUTES` both succeed.
+
+       So ask for it, and drop it if it is refused. Where it is refused the
+       attribute also cannot be set, but there it does not need to be. */
+    std::optional<AutoCloseFD> fd;
+    bool mayClearReadOnly = true;
+    try {
+        fd = windows::tryNtOpenAt(parentFd, name, baseAccess | FILE_WRITE_ATTRIBUTES, FILE_OPEN_REPARSE_POINT);
+    } catch (windows::WinError & e) {
+        if (e.lastError != ERROR_ACCESS_DENIED)
+            throw;
+        /* The fallback resolves `name` a second time, which is the one
+           concession to the single-open discipline above. It is still a single
+           component inside `parentFd`, which stays open across both attempts,
+           and nothing is modified in between. */
+        mayClearReadOnly = false;
+        fd = windows::tryNtOpenAt(parentFd, name, baseAccess, FILE_OPEN_REPARSE_POINT);
+    }
+    if (!fd)
+        return; /* Already gone. */
+
+    FILE_BASIC_INFO basic;
+    if (!GetFileInformationByHandleEx(fd->get(), FileBasicInfo, &basic, sizeof(basic)))
+        throw windows::WinError("getting attributes of %1%", PathFmt(path));
+
+    bool isDir = (basic.FileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    bool isReparsePoint = (basic.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+
+    if (!isDir) {
+        /* Will deleting this actually free space? Same policy as Unix: count it
+           at one or two links, nothing at three or more, on the assumption that
+           two means an optimised store entry. */
+        FILE_STANDARD_INFO standard;
+        if (GetFileInformationByHandleEx(fd->get(), FileStandardInfo, &standard, sizeof(standard))
+            && standard.NumberOfLinks <= 2)
+            bytesFreed += static_cast<uint64_t>(standard.EndOfFile.QuadPart);
+    }
+
+    /* Descend into real directories only. A directory symlink or junction is
+       deleted as itself. */
+    if (isDir && !isReparsePoint)
+        for (auto & child : listByHandle(fd->get(), path))
+            deletePathAt(fd->get(), path / child, bytesFreed, ex);
+
+    if (mayClearReadOnly)
+        clearReadOnly(fd->get());
+    else
+        /* The handle was opened without `FILE_WRITE_ATTRIBUTES`, so the
+           attribute has to go by path. The deletion below needs it gone either
+           way: `DELETE` access is granted on a read-only file but the
+           disposition is still refused while the attribute is set. */
+        clearReadOnlyByPath(path);
+
+    if (!deleteByHandle(fd->get())) {
+        auto lastError = GetLastError();
+        if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
+            return;
+        try {
+            throw windows::WinError(lastError, "cannot delete %1%", PathFmt(path));
+        } catch (...) {
+            if (!ex)
+                ex = std::current_exception();
+            else
+                ignoreExceptionExceptInterrupt();
+        }
+    }
+}
+
+} // namespace
 
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     bytesFreed = 0;
-    deletePath(path);
+
+    /* An empty path is a no-op. The `std::filesystem::remove_all` this replaces
+       treated it as one, and callers depend on that: `nix-fetchers-tests` reaches
+       here with an empty path while tearing down a skipped test. */
+    if (path.empty())
+        return;
+
+    /* Resolve rather than assert. `is_absolute()` on Windows is
+       `has_root_name() && has_root_directory()`, so a relative path -- or a
+       POSIX-rooted one like `/tmp/x` -- is not absolute even when it names a real
+       file, and `remove_all` accepted those too. */
+    auto absPath = path.is_absolute() ? path : std::filesystem::absolute(path);
+
+    auto parentPath = absPath.parent_path();
+    assert(parentPath != absPath);
+
+    auto parentFd = openDirectory(parentPath);
+    if (!parentFd) {
+        if (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND)
+            return;
+        throw windows::WinError("opening directory %1%", PathFmt(parentPath));
+    }
+
+    std::exception_ptr ex;
+
+    deletePathAt(parentFd.get(), absPath, bytesFreed, ex);
+
+    if (ex)
+        std::rethrow_exception(ex);
 }
 
 std::filesystem::path descriptorToPath(Descriptor handle)
