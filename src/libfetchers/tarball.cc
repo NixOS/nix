@@ -105,7 +105,11 @@ DownloadFileResult downloadFile(
 }
 
 static DownloadTarballResult downloadTarball_(
-    const Settings & settings, const std::string & urlS, const Headers & headers, const std::string & displayPrefix)
+    const Settings & settings,
+    const std::string & urlS,
+    const Headers & headers,
+    const std::string & displayPrefix,
+    const std::optional<Hash> & expectedNarHash)
 {
     ParsedURL url = parseURL(urlS);
 
@@ -150,10 +154,23 @@ static DownloadTarballResult downloadTarball_(
     if (cached && !settings.getTarballCache()->hasObject(getRevAttr(cached->value, "treeHash")))
         cached.reset();
 
-    if (cached && !cached->expired)
-        /* We previously downloaded this tarball and it's younger than
-           `tarballTtl`, so no need to check the server. */
-        return attrsToResult(cached->value);
+    if (cached) {
+        if (!cached->expired)
+            /* We previously downloaded this tarball and it's younger than
+               `tarballTtl`, so no need to check the server. */
+            return attrsToResult(cached->value);
+
+        /* The cached entry is stale, but if its content still matches
+           the pinned NAR hash, there's no need to re-check the server
+           either. Exception: a TTL of 0 (e.g. `--refresh`) means the
+           caller explicitly wants us to verify against the server, so
+           don't let a merely-matching old hash short-circuit that. */
+        if (expectedNarHash && settings.tarballTtl.get() != 0) {
+            auto treeHash = getRevAttr(cached->value, "treeHash");
+            if (settings.getTarballCache()->treeHashToNarHash(settings, treeHash) == *expectedNarHash)
+                return attrsToResult(cached->value);
+        }
+    }
 
     auto _res = std::make_shared<Sync<FileTransferResult>>();
 
@@ -491,7 +508,8 @@ struct TarballInputScheme : CurlInputScheme
     {
         auto input(_input);
 
-        auto result = downloadTarball_(settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»");
+        auto result = downloadTarball_(
+            settings, getStrAttr(input.attrs, "url"), {}, "«" + input.to_string() + "»", input.getNarHash());
 
         if (result.immutableUrl) {
             auto immutableInput = Input::fromURL(*result.immutableUrl);
