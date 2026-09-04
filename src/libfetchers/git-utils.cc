@@ -176,6 +176,12 @@ static void initLibGit2()
     std::call_once(initialized, []() {
         if (git_libgit2_init() < 0)
             throw GitError("initialising libgit2");
+
+        /* Nuke the "hashing on all reads" behavior, since that can lead to bad
+           performance https://github.com/libgit2/libgit2/issues/4951. It's a
+           compromise of course, but one that is mostly in line with git cli and
+           like how we don't recalculate narHash when reading from a store. */
+        git_libgit2_opts(GIT_OPT_ENABLE_STRICT_HASH_VERIFICATION, 0);
     });
 }
 
