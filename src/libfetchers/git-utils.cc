@@ -7,6 +7,7 @@
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/users.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
@@ -807,13 +808,31 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
             dir.native(),
             OS_STR("--git-dir"),
             OS_STR("."),
-            OS_STR("fetch"),
-            OS_STR("--progress"),
-            OS_STR("--force"),
         };
+        if (reference) {
+            /* By default, `git fetch` discovers and walks every ref in every
+               alternate to negotiate with the server, which is prohibitively
+               slow when the reference is a large full clone. Disable that
+               and instead negotiate only from the reference's own ref tips. */
+            gitArgs.push_back(OS_STR("-c"));
+            gitArgs.push_back(OS_STR("core.alternateRefsCommand=: #"));
+        }
+        gitArgs.push_back(OS_STR("fetch"));
+        gitArgs.push_back(OS_STR("--progress"));
+        gitArgs.push_back(OS_STR("--force"));
         if (shallow) {
             gitArgs.push_back(OS_STR("--depth"));
             gitArgs.push_back(OS_STR("1"));
+        }
+        if (reference) {
+            auto referenceRefs = runProgram(
+                "git", true, {OS_STR("-C"), reference->native(), OS_STR("for-each-ref"), OS_STR("--format=%(objectname)")});
+            for (auto & rev : splitString<std::vector<std::string>>(referenceRefs, "\n")) {
+                if (rev.empty())
+                    continue;
+                gitArgs.push_back(OS_STR("--negotiation-tip"));
+                gitArgs.push_back(string_to_os_string(rev));
+            }
         }
         gitArgs.push_back(OS_STR("--"));
         gitArgs.push_back(string_to_os_string(url));
