@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
 
@@ -137,12 +138,40 @@ TEST_F(DerivationTest, CborRejectsInvalidSchema)
 
 TEST_F(DerivationTest, CborNormalizesEncoding)
 {
+    auto expected = derivation::parseCbor(golden);
+    auto expectedPath = computeStorePath(*store, expected);
+    for (auto & bytes : {
+             encode(fixture()), // Maps ordered lexically instead of by encoded key length.
+             golden.substr(0, golden.size() - 1) + "\x18\x01"s,
+             golden.substr(0, golden.size() - 1) + "\x19\x00\x01"s,
+             golden.substr(0, golden.size() - 1) + "\x1a\x00\x00\x00\x01"s,
+             golden.substr(0, golden.size() - 1) + "\x1b\x00\x00\x00\x00\x00\x00\x00\x01"s,
+             "\xb8\x08" + golden.substr(1),
+         }) {
+        ASSERT_NE(bytes, golden);
+        auto drv = derivation::parseCbor(bytes);
+        EXPECT_EQ(derivation::toCbor(drv), golden);
+        EXPECT_EQ(computeStorePath(*store, drv), expectedPath);
+    }
+}
+
+TEST_F(DerivationTest, CborNormalizesSetsPreservingIdentity)
+{
     auto value = fixture();
-    EXPECT_EQ(derivation::toCbor(derivation::parseCbor(encode(value))), golden);
-    auto nonminimal = golden.substr(0, golden.size() - 1) + "\x18\x01";
-    EXPECT_EQ(derivation::toCbor(derivation::parseCbor(nonminimal)), golden);
-    nonminimal = "\xb8\x08" + golden.substr(1);
-    EXPECT_EQ(derivation::toCbor(derivation::parseCbor(nonminimal)), golden);
+    value["inputs"]["srcs"] = {"c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-a", "c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-z"};
+    auto & outputs = value["inputs"]["drvs"]["c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep.drv"];
+    outputs = {{"outputs", {"a", "z"}}, {"dynamicOutputs", json::object()}};
+    auto expected = derivation::parseCbor(encode(value));
+    auto canonical = derivation::toCbor(expected);
+    auto expectedPath = computeStorePath(*store, expected);
+
+    std::reverse(value["inputs"]["srcs"].begin(), value["inputs"]["srcs"].end());
+    std::reverse(outputs["outputs"].begin(), outputs["outputs"].end());
+    auto bytes = encode(value);
+    ASSERT_NE(bytes, canonical);
+    auto drv = derivation::parseCbor(bytes);
+    EXPECT_EQ(derivation::toCbor(drv), canonical);
+    EXPECT_EQ(computeStorePath(*store, drv), expectedPath);
 }
 
 TEST_F(DerivationTest, CborEnvironmentKeyTypesAndDuplicates)
