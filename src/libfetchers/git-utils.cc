@@ -833,6 +833,17 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
                 gitArgs.push_back(OS_STR("--negotiation-tip"));
                 gitArgs.push_back(string_to_os_string(rev));
             }
+            /* A rev-pinned fetch (refspec is a bare commit hash, no ':') never
+               corresponds to a ref in the reference either, so also negotiate
+               from the target rev itself, if the reference actually has it. */
+            if (refspec.find(':') == refspec.npos
+                && statusOk(runProgram(
+                               {.program = "git",
+                                .args = {OS_STR("-C"), reference->native(), OS_STR("cat-file"), OS_STR("-e"), string_to_os_string(refspec)}})
+                               .first)) {
+                gitArgs.push_back(OS_STR("--negotiation-tip"));
+                gitArgs.push_back(string_to_os_string(refspec));
+            }
         }
         gitArgs.push_back(OS_STR("--"));
         gitArgs.push_back(string_to_os_string(url));
