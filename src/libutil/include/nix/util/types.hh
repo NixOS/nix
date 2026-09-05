@@ -67,12 +67,7 @@ struct Explicit
 {
     T t;
 
-    bool operator==(const Explicit<T> & other) const = default;
-
-    bool operator<(const Explicit<T> & other) const
-    {
-        return t < other.t;
-    }
+    auto operator<=>(const Explicit<T> & other) const = default;
 };
 
 /**

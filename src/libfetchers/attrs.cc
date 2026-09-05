@@ -8,12 +8,34 @@ ResolvedAttr forceAttr(const Attr & attr)
 {
     return std::visit(
         overloaded{
-            [](const LazyAttr & lazy) -> ResolvedAttr { return lazy->compute(); },
+            [](const LazyAttr & lazy) -> ResolvedAttr { return lazy.compute(); },
             [](const std::string & v) -> ResolvedAttr { return v; },
             [](uint64_t v) -> ResolvedAttr { return v; },
             [](const Explicit<bool> & v) -> ResolvedAttr { return v; },
         },
         attr);
+}
+
+std::strong_ordering Attr::operator<=>(const Attr & other) const
+{
+    const auto * maybeLazyThis = std::get_if<LazyAttr>(this);
+    const auto * maybeLazyOther = std::get_if<LazyAttr>(&other);
+
+    if (maybeLazyThis && maybeLazyOther && (maybeLazyThis->isAvailable() == maybeLazyOther->isAvailable()))
+        return std::strong_ordering::equivalent;
+
+    return forceAttr(*this) <=> forceAttr(other);
+}
+
+bool Attr::operator==(const Attr & other) const
+{
+    const auto * maybeLazyThis = std::get_if<LazyAttr>(this);
+    const auto * maybeLazyOther = std::get_if<LazyAttr>(&other);
+
+    if (maybeLazyThis && maybeLazyOther && (maybeLazyThis->isAvailable() == maybeLazyOther->isAvailable()))
+        return true;
+
+    return forceAttr(*this) == forceAttr(other);
 }
 
 Attrs jsonToAttrs(const nlohmann::json & json)

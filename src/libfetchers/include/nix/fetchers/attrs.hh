@@ -29,9 +29,39 @@ struct LazyAttrComputation
     fun<ResolvedAttr()> compute;
 };
 
-using LazyAttr = ref<LazyAttrComputation>;
+class LazyAttr
+{
+    ref<LazyAttrComputation> inner;
+    bool available;
 
-using Attr = std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>;
+public:
+    LazyAttr(ref<LazyAttrComputation> inner, bool available = true)
+        : inner(std::move(inner))
+        , available(available)
+    {
+    }
+
+    bool isAvailable() const
+    {
+        return available;
+    }
+
+    ResolvedAttr compute() const
+    {
+        return inner->compute();
+    }
+
+    bool operator==(const LazyAttr & other) const = delete;
+    std::strong_ordering operator<=>(const LazyAttr & other) const = delete;
+};
+
+class Attr : public std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>
+{
+public:
+    using variant::variant;
+    std::strong_ordering operator<=>(const Attr & other) const;
+    bool operator==(const Attr & other) const;
+};
 
 /**
  * An `Attrs` can be thought of a JSON object restricted or simplified
