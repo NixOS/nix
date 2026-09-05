@@ -113,6 +113,7 @@ scope: {
       patches = prevAttrs.patches or [ ] ++ [
         ./patches/0001-zlib-ng-support.patch
         ./patches/0002-memory-config.patch
+        ./patches/0003-packbuilder-correct-config.patch
       ];
       cmakeFlags = prevAttrs.cmakeFlags ++ [ "-DUSE_COMPRESSION=zlib-ng" ];
       buildInputs = prevAttrs.buildInputs ++ [ pkgs.zlib-ng ];

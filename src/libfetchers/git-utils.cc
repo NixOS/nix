@@ -380,7 +380,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
         std::vector<const char *> configValues;
         if (options.dontFindDeltas)
-            configValues.push_back("pack.deltacachesize=1");
+            configValues.push_back("pack.window=0");
 
         GitConfigBackend memBackend;
         if (git_config_backend_from_values(Setter(memBackend), configValues.data(), configValues.size(), &configOpts))

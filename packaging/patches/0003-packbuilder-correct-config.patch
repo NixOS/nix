@@ -1,0 +1,45 @@
+diff --git a/src/libgit2/pack-objects.c b/src/libgit2/pack-objects.c
+index 0da84b657..d540795f9 100644
+--- a/src/libgit2/pack-objects.c
++++ b/src/libgit2/pack-objects.c
+@@ -115,8 +115,9 @@ static int packbuilder_config(git_packbuilder *pb)
+ 		   GIT_PACK_DELTA_CACHE_SIZE);
+ 	config_get("pack.deltaCacheLimit", pb->cache_max_small_delta_size,
+ 		   GIT_PACK_DELTA_CACHE_LIMIT);
+-	config_get("pack.deltaCacheSize", pb->big_file_threshold,
++	config_get("core.bigFileThreshold", pb->big_file_threshold,
+ 		   GIT_PACK_BIG_FILE_THRESHOLD);
++	config_get("pack.window", pb->window_size, GIT_PACK_WINDOW);
+ 	config_get("pack.windowMemory", pb->window_memory_limit, 0);
+ 
+ #undef config_get
+@@ -1341,7 +1342,7 @@ int git_packbuilder__prepare(git_packbuilder *pb)
+ 	size_t i, n = 0;
+ 	int error;
+ 
+-	if (pb->nr_objects == 0 || pb->done)
++	if (pb->nr_objects == 0 || pb->done || pb->window_size == 0)
+ 		return 0; /* nothing to do */
+ 
+ 	/*
+@@ -1369,7 +1370,7 @@ int git_packbuilder__prepare(git_packbuilder *pb)
+ 	if (n > 1) {
+ 		git__tsort((void **)delta_list, n, type_size_sort);
+ 		if ((error = ll_find_deltas(pb, delta_list, n,
+-				   GIT_PACK_WINDOW + 1,
++				   pb->window_size + 1,
+ 				   GIT_PACK_DEPTH)) < 0) {
+ 			git__free(delta_list);
+ 			return error;
+diff --git a/src/libgit2/pack-objects.h b/src/libgit2/pack-objects.h
+index ad04fb0ab..d9e03df60 100644
+--- a/src/libgit2/pack-objects.h
++++ b/src/libgit2/pack-objects.h
+@@ -94,6 +94,7 @@ struct git_packbuilder {
+ 	size_t cache_max_small_delta_size;
+ 	size_t big_file_threshold;
+ 	size_t window_memory_limit;
++	size_t window_size;
+ 
+ 	unsigned int nr_threads; /* nr of threads to use */
+ 
