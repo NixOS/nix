@@ -787,16 +787,19 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // from running. Note that we already have a repository-wide `PathLock` (see git.cc), so this is safe.
         tryUnlink(dir / "shallow.lock");
 
+        auto alternatesFile = dir / "objects" / "info" / "alternates";
         if (reference) {
             auto referenceObjects = *reference / "objects";
             createDirs(dir / "objects" / "info");
-            writeFile(dir / "objects" / "info" / "alternates", referenceObjects.string() + "\n");
+            writeFile(alternatesFile, referenceObjects.string() + "\n");
 
             ObjectDb odb;
             if (git_repository_odb(Setter(odb), repo.get()))
                 throw GitError("getting Git object database");
             if (git_odb_add_disk_alternate(odb.get(), referenceObjects.string().c_str()))
                 throw GitError("adding alternate object directory '%s'", PathFmt(referenceObjects));
+        } else {
+            tryUnlink(alternatesFile);
         }
 
         OsStrings gitArgs = {
