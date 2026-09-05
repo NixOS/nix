@@ -769,7 +769,11 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     ref<GitFileSystemObjectSink> getFileSystemObjectSink() override;
 
-    void fetch(const std::string & url, const std::string & refspec, bool shallow) override
+    void fetch(
+        const std::string & url,
+        const std::string & refspec,
+        bool shallow,
+        std::optional<std::filesystem::path> reference) override
     {
         Activity act(*logger, lvlTalkative, actFetchTree, fmt("fetching Git repository '%s'", url));
 
@@ -782,6 +786,18 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // Remove shallow.lock left behind by a previously interrupted `git fetch`, as it would prevent `git fetch`
         // from running. Note that we already have a repository-wide `PathLock` (see git.cc), so this is safe.
         tryUnlink(dir / "shallow.lock");
+
+        if (reference) {
+            auto referenceObjects = *reference / "objects";
+            createDirs(dir / "objects" / "info");
+            writeFile(dir / "objects" / "info" / "alternates", referenceObjects.string() + "\n");
+
+            ObjectDb odb;
+            if (git_repository_odb(Setter(odb), repo.get()))
+                throw GitError("getting Git object database");
+            if (git_odb_add_disk_alternate(odb.get(), referenceObjects.string().c_str()))
+                throw GitError("adding alternate object directory '%s'", PathFmt(referenceObjects));
+        }
 
         OsStrings gitArgs = {
             OS_STR("-C"),

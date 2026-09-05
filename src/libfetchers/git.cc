@@ -871,7 +871,14 @@ struct GitInputScheme : InputScheme
                                     : ref == "HEAD"                   ? "HEAD:HEAD"
                                                                       : fmt("%1%:%1%", "refs/heads/" + ref);
 
-                    repo->fetch(repoUrl.to_string(), fetchRef, shallow);
+                    std::optional<std::filesystem::path> reference;
+                    if (shallow) {
+                        auto fullCacheDir = getCachePath(repoUrl.to_string(), false);
+                        if (pathExists(fullCacheDir))
+                            reference = fullCacheDir;
+                    }
+
+                    repo->fetch(repoUrl.to_string(), fetchRef, shallow, reference);
                 } catch (Error & e) {
                     if (!std::filesystem::exists(localRefFile))
                         throw;

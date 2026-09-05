@@ -118,7 +118,16 @@ struct GitRepo
 
     virtual void flush() = 0;
 
-    virtual void fetch(const std::string & url, const std::string & refspec, bool shallow) = 0;
+    /**
+     * Fetch `refspec` from `url` into this repository. If `reference` is
+     * given, its objects directory is added as an alternate before
+     * fetching, so objects it already has aren't re-downloaded.
+     */
+    virtual void fetch(
+        const std::string & url,
+        const std::string & refspec,
+        bool shallow,
+        std::optional<std::filesystem::path> reference = {}) = 0;
 
     /**
      * Verify that commit `rev` is signed by one of the keys in
