@@ -143,6 +143,7 @@
     - [`nix-cache-info` Format](protocols/binary-cache/nix-cache-info.md)
     - [`.narinfo` Format](protocols/binary-cache/narinfo.md)
   - [Derivation "ATerm" file format](protocols/derivation-aterm.md)
+  - [Derivation CBOR format](protocols/derivation-cbor.md)
   - [Nix32 Encoding](protocols/nix32.md)
 - [C API](c-api.md)
 - [Glossary](glossary.md)

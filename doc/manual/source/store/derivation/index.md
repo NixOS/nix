@@ -268,11 +268,13 @@ There are two types of placeholder, corresponding to the two cases where this pr
 
 ### Derivation {#derivation-encoding}
 
-There are two formats, documented separately:
+The formats are documented separately:
 
 - The legacy ["ATerm" format](@docroot@/protocols/derivation-aterm.md)
 
 - The experimental, currently under development and changing [JSON format](@docroot@/protocols/json/derivation/index.md)
+
+- The experimental [CBOR interchange format](@docroot@/protocols/derivation-cbor.md), which preserves arbitrary bytes in builder, arguments, and environment fields
 
 Every derivation has a canonical choice of encoding used to serialize it to a store object.
 This ensures that there is a canonical [store path] used to refer to the derivation, as described in [Referencing derivations](#derivation-path).
