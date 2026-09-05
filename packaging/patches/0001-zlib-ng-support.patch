@@ -1,0 +1,379 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 87b33a9bc..19ec37c3c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -35,7 +35,7 @@ option(BUILD_FUZZERS           "Build the fuzz targets"
+    set(USE_AUTH_NEGOTIATE      "" CACHE STRING "Enable Negotiate (SPNEGO) authentication support. One of GSSAPI or win32.")
+ #  set(USE_XDIFF               "" CACHE STRING "Specifies the xdiff implementation; either system or builtin.")
+    set(USE_REGEX               "" CACHE STRING "Selects regex provider. One of regcomp_l, pcre2, pcre, regcomp, or builtin.")
+-   set(USE_COMPRESSION         "" CACHE STRING "Selects compression backend. Either builtin or zlib.")
++   set(USE_COMPRESSION         "" CACHE STRING "Selects compression backend. Either builtin, zlib or zlib-ng.")
+    set(USE_NSEC                "" CACHE STRING "Enable nanosecond precision timestamps. One of ON, OFF, or a specific provider: mtimespec, mtim, mtime, or win32. (Defaults to ON).")
+ 
+ if(APPLE)
+diff --git a/cmake/SelectCompression.cmake b/cmake/SelectCompression.cmake
+index d0a4b5664..764af5197 100644
+--- a/cmake/SelectCompression.cmake
++++ b/cmake/SelectCompression.cmake
+@@ -32,6 +32,19 @@ elseif(USE_COMPRESSION STREQUAL "zlib")
+ 	endif()
+ 
+ 	set(GIT_COMPRESSION_ZLIB 1)
++elseif(USE_COMPRESSION STREQUAL "zlib-ng")
++	find_package(zlib-ng)
++	find_package(ZLIB) # For reftable library
++
++	if(NOT zlib-ng_FOUND)
++		message(FATAL_ERROR "system zlib-ng was requested but not found")
++	endif()
++
++	if(NOT ZLIB_FOUND)
++		message(FATAL_ERROR "system zlib was requested but not found")
++	endif()
++
++	set(GIT_COMPRESSION_ZLIB_NG 1)
+ elseif(USE_COMPRESSION STREQUAL "builtin")
+ 	set(GIT_COMPRESSION_BUILTIN 1)
+ endif()
+@@ -45,6 +58,18 @@ if(GIT_COMPRESSION_ZLIB)
+ 		list(APPEND LIBGIT2_PC_REQUIRES "zlib")
+ 	endif()
+ 	add_feature_info("Compression" ON "using system zlib")
++elseif(GIT_COMPRESSION_ZLIB_NG)
++	list(APPEND LIBGIT2_SYSTEM_INCLUDES ${zlib-ng_INCLUDE_DIR})
++	list(APPEND LIBGIT2_SYSTEM_LIBS "z-ng") # FIXME
++	list(APPEND LIBGIT2_SYSTEM_INCLUDES ${ZLIB_INCLUDE_DIRS})
++	list(APPEND LIBGIT2_SYSTEM_LIBS ${ZLIB_LIBRARIES})
++	if(APPLE OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
++		list(APPEND LIBGIT2_PC_LIBS "-lz")
++	else()
++		list(APPEND LIBGIT2_PC_REQUIRES "zlib")
++	endif()
++	list(APPEND LIBGIT2_PC_REQUIRES "zlib-ng;zlib")
++	add_feature_info("Compression" ON "using system zlib-ng")
+ elseif(GIT_COMPRESSION_BUILTIN)
+ 	add_subdirectory("${PROJECT_SOURCE_DIR}/deps/zlib" "${PROJECT_BINARY_DIR}/deps/zlib")
+ 	list(APPEND LIBGIT2_DEPENDENCY_INCLUDES "${PROJECT_SOURCE_DIR}/deps/zlib")
+diff --git a/src/libgit2/indexer.c b/src/libgit2/indexer.c
+index 68f595696..580628e65 100644
+--- a/src/libgit2/indexer.c
++++ b/src/libgit2/indexer.c
+@@ -345,14 +345,14 @@ static int crc_object(uint32_t *crc_out, git_mwindow_file *mwf, off64_t start, o
+ 	unsigned int left, len;
+ 	git_mwindow *w = NULL;
+ 
+-	crc = crc32(0L, Z_NULL, 0);
++	crc = GIT_ZLIB_SYMBOL(crc32)(0L, Z_NULL, 0);
+ 	while (size) {
+ 		ptr = git_mwindow_open(mwf, &w, start, (size_t)size, &left);
+ 		if (ptr == NULL)
+ 			return -1;
+ 
+ 		len = min(left, (unsigned int)size);
+-		crc = crc32(crc, ptr, len);
++		crc = GIT_ZLIB_SYMBOL(crc32)(crc, ptr, len);
+ 		size -= len;
+ 		start += len;
+ 		git_mwindow_close(&w);
+@@ -606,7 +606,7 @@ static int hash_and_save(git_indexer *idx, git_rawobj *obj, off64_t entry_start)
+ 
+ 	git_oid_cpy(&pentry->id, &oid);
+ 	git_oid_cpy(&entry->oid, &oid);
+-	entry->crc = crc32(0L, Z_NULL, 0);
++	entry->crc = GIT_ZLIB_SYMBOL(crc32)(0L, Z_NULL, 0);
+ 
+ 	entry_size = (size_t)(idx->off - entry_start);
+ 	if (crc_object(&entry->crc, &idx->pack->mwf, entry_start, entry_size) < 0)
+@@ -1008,7 +1008,7 @@ static int inject_object(git_indexer *idx, git_oid *id)
+ 	entry = git__calloc(1, sizeof(*entry));
+ 	GIT_ERROR_CHECK_ALLOC(entry);
+ 
+-	entry->crc = crc32(0L, Z_NULL, 0);
++	entry->crc = GIT_ZLIB_SYMBOL(crc32)(0L, Z_NULL, 0);
+ 
+ 	/* Write out the object header */
+ 	if ((error = git_packfile__object_header(&hdr_len, hdr, len, git_odb_object_type(obj))) < 0 ||
+@@ -1016,7 +1016,7 @@ static int inject_object(git_indexer *idx, git_oid *id)
+ 		goto cleanup;
+ 
+ 	idx->pack->mwf.size += hdr_len;
+-	entry->crc = crc32(entry->crc, hdr, (uInt)hdr_len);
++	entry->crc = GIT_ZLIB_SYMBOL(crc32)(entry->crc, hdr, (uInt)hdr_len);
+ 
+ 	if ((error = git_zstream_deflatebuf(&buf, data, len)) < 0)
+ 		goto cleanup;
+@@ -1026,7 +1026,7 @@ static int inject_object(git_indexer *idx, git_oid *id)
+ 		goto cleanup;
+ 
+ 	idx->pack->mwf.size += buf.size;
+-	entry->crc = htonl(crc32(entry->crc, (unsigned char *)buf.ptr, (uInt)buf.size));
++	entry->crc = htonl(GIT_ZLIB_SYMBOL(crc32)(entry->crc, (unsigned char *)buf.ptr, (uInt)buf.size));
+ 	git_str_dispose(&buf);
+ 
+ 	/* Write a fake trailer so the pack functions play ball */
+diff --git a/src/libgit2/libgit2.c b/src/libgit2/libgit2.c
+index 081a25087..0c8a8ea81 100644
+--- a/src/libgit2/libgit2.c
++++ b/src/libgit2/libgit2.c
+@@ -233,6 +233,8 @@ const char *git_libgit2_feature_backend(git_feature_t feature)
+ 	case GIT_FEATURE_COMPRESSION:
+ #if defined(GIT_COMPRESSION_ZLIB)
+ 		return "zlib";
++#elif defined(GIT_COMPRESSION_ZLIB_NG)
++		return "zlib-ng";
+ #elif defined(GIT_COMPRESSION_BUILTIN)
+ 		return "builtin";
+ #else
+diff --git a/src/libgit2/odb.c b/src/libgit2/odb.c
+index 3b2306c3c..72bae5088 100644
+--- a/src/libgit2/odb.c
++++ b/src/libgit2/odb.c
+@@ -7,7 +7,6 @@
+ 
+ #include "odb.h"
+ 
+-#include <zlib.h>
+ #include "git2/object.h"
+ #include "git2/sys/odb_backend.h"
+ #include "futils.h"
+diff --git a/src/libgit2/odb_loose.c b/src/libgit2/odb_loose.c
+index 0b3a51732..ed0ebcc7c 100644
+--- a/src/libgit2/odb_loose.c
++++ b/src/libgit2/odb_loose.c
+@@ -7,7 +7,6 @@
+ 
+ #include "common.h"
+ 
+-#include <zlib.h>
+ #include "git2/object.h"
+ #include "git2/sys/odb_backend.h"
+ #include "futils.h"
+diff --git a/src/libgit2/odb_pack.c b/src/libgit2/odb_pack.c
+index 6fbc1952a..0ccce7c06 100644
+--- a/src/libgit2/odb_pack.c
++++ b/src/libgit2/odb_pack.c
+@@ -7,7 +7,6 @@
+ 
+ #include "common.h"
+ 
+-#include <zlib.h>
+ #include "git2/repository.h"
+ #include "git2/indexer.h"
+ #include "git2/sys/odb_backend.h"
+diff --git a/src/util/filebuf.c b/src/util/filebuf.c
+index 7afb76b88..a307dacd9 100644
+--- a/src/util/filebuf.c
++++ b/src/util/filebuf.c
+@@ -117,7 +117,11 @@ void git_filebuf_cleanup(git_filebuf *file)
+ 	/* use the presence of z_buf to decide if we need to deflateEnd */
+ 	if (file->z_buf) {
+ 		git__free(file->z_buf);
++#ifdef GIT_COMPRESSION_ZLIB_NG
++		zng_deflateEnd(&file->zs);
++#else
+ 		deflateEnd(&file->zs);
++#endif
+ 	}
+ 
+ 	if (file->path_original)
+@@ -158,7 +162,7 @@ static int write_normal(git_filebuf *file, void *source, size_t len)
+ 
+ static int write_deflate(git_filebuf *file, void *source, size_t len)
+ {
+-	z_stream *zs = &file->zs;
++	GIT_ZLIB_STREAM *zs = &file->zs;
+ 
+ 	if (len > 0 || file->flush_mode == Z_FINISH) {
+ 		zs->next_in = source;
+@@ -170,7 +174,7 @@ static int write_deflate(git_filebuf *file, void *source, size_t len)
+ 			zs->next_out = file->z_buf;
+ 			zs->avail_out = (uInt)file->buf_size;
+ 
+-			if (deflate(zs, file->flush_mode) == Z_STREAM_ERROR) {
++			if (GIT_ZLIB_SYMBOL(deflate)(zs, file->flush_mode) == Z_STREAM_ERROR) {
+ 				file->last_error = BUFERR_ZLIB;
+ 				return -1;
+ 			}
+@@ -319,7 +323,7 @@ int git_filebuf_open_withsize(git_filebuf *file, const char *path, int flags, mo
+ 	/* If we are deflating on-write, */
+ 	if (compression != 0) {
+ 		/* Initialize the ZLib stream */
+-		if (deflateInit(&file->zs, compression) != Z_OK) {
++		if (GIT_ZLIB_SYMBOL(deflateInit)(&file->zs, compression) != Z_OK) {
+ 			git_error_set(GIT_ERROR_ZLIB, "failed to initialize zlib");
+ 			goto cleanup;
+ 		}
+diff --git a/src/util/filebuf.h b/src/util/filebuf.h
+index e23b9ed2a..c4cb4cb02 100644
+--- a/src/util/filebuf.h
++++ b/src/util/filebuf.h
+@@ -11,7 +11,7 @@
+ 
+ #include "futils.h"
+ #include "hash.h"
+-#include <zlib.h>
++#include "zstream.h"
+ 
+ #ifdef GIT_THREADS
+ #	define GIT_FILEBUF_THREADS
+@@ -42,7 +42,7 @@ struct git_filebuf {
+ 	unsigned char *buffer;
+ 	unsigned char *z_buf;
+ 
+-	z_stream zs;
++	GIT_ZLIB_STREAM zs;
+ 	int flush_mode;
+ 
+ 	size_t buf_size, buf_pos;
+diff --git a/src/util/git2_features.h.in b/src/util/git2_features.h.in
+index e890670bb..8e8f5ae14 100644
+--- a/src/util/git2_features.h.in
++++ b/src/util/git2_features.h.in
+@@ -32,6 +32,7 @@
+ 
+ #cmakedefine GIT_COMPRESSION_BUILTIN 1
+ #cmakedefine GIT_COMPRESSION_ZLIB 1
++#cmakedefine GIT_COMPRESSION_ZLIB_NG 1
+ 
+ #cmakedefine GIT_NSEC 1
+ #cmakedefine GIT_NSEC_MTIM 1
+diff --git a/src/util/git2_util.h b/src/util/git2_util.h
+index 556671e6e..9803bd315 100644
+--- a/src/util/git2_util.h
++++ b/src/util/git2_util.h
+@@ -27,6 +27,9 @@ typedef struct git_str git_str;
+ #endif
+ #define GIT_INLINE(type) static GIT_INLINE_KEYWORD type
+ 
++#define GIT_CONCAT_RAW(a, b) a ## b
++#define GIT_CONCAT(a, b) GIT_CONCAT_RAW(a, b)
++
+ /** Support for gcc/clang __has_builtin intrinsic */
+ #ifndef __has_builtin
+ # define __has_builtin(x) 0
+diff --git a/src/util/zstream.c b/src/util/zstream.c
+index efc0883c9..7eabef36d 100644
+--- a/src/util/zstream.c
++++ b/src/util/zstream.c
+@@ -7,8 +7,6 @@
+ 
+ #include "zstream.h"
+ 
+-#include <zlib.h>
+-
+ #include "str.h"
+ 
+ #define ZSTREAM_BUFFER_SIZE (1024 * 1024)
+@@ -39,26 +37,26 @@ int git_zstream_init(git_zstream *zstream, git_zstream_t type)
+ 	zstream->type = type;
+ 
+ 	if (zstream->type == GIT_ZSTREAM_INFLATE)
+-		zstream->zerr = inflateInit(&zstream->z);
++		zstream->zerr = GIT_ZLIB_SYMBOL(inflateInit)(&zstream->z);
+ 	else
+-		zstream->zerr = deflateInit(&zstream->z, Z_DEFAULT_COMPRESSION);
++		zstream->zerr = GIT_ZLIB_SYMBOL(deflateInit)(&zstream->z, Z_DEFAULT_COMPRESSION);
+ 	return zstream_seterr(zstream);
+ }
+ 
+ void git_zstream_free(git_zstream *zstream)
+ {
+ 	if (zstream->type == GIT_ZSTREAM_INFLATE)
+-		inflateEnd(&zstream->z);
++		GIT_ZLIB_SYMBOL(inflateEnd)(&zstream->z);
+ 	else
+-		deflateEnd(&zstream->z);
++		GIT_ZLIB_SYMBOL(deflateEnd)(&zstream->z);
+ }
+ 
+ void git_zstream_reset(git_zstream *zstream)
+ {
+ 	if (zstream->type == GIT_ZSTREAM_INFLATE)
+-		inflateReset(&zstream->z);
++		GIT_ZLIB_SYMBOL(inflateReset)(&zstream->z);
+ 	else
+-		deflateReset(&zstream->z);
++		GIT_ZLIB_SYMBOL(deflateReset)(&zstream->z);
+ 	zstream->in = NULL;
+ 	zstream->in_len = 0;
+ 	zstream->zerr = Z_STREAM_END;
+@@ -120,9 +118,9 @@ int git_zstream_get_output_chunk(
+ 
+ 	/* compress next chunk */
+ 	if (zstream->type == GIT_ZSTREAM_INFLATE)
+-		zstream->zerr = inflate(&zstream->z, zstream->flush);
++		zstream->zerr = GIT_ZLIB_SYMBOL(inflate)(&zstream->z, zstream->flush);
+ 	else
+-		zstream->zerr = deflate(&zstream->z, zstream->flush);
++		zstream->zerr = GIT_ZLIB_SYMBOL(deflate)(&zstream->z, zstream->flush);
+ 
+ 	if (zstream_seterr(zstream))
+ 		return -1;
+diff --git a/src/util/zstream.h b/src/util/zstream.h
+index d78b11291..001036d4f 100644
+--- a/src/util/zstream.h
++++ b/src/util/zstream.h
+@@ -9,7 +9,15 @@
+ 
+ #include "git2_util.h"
+ 
++#ifdef GIT_COMPRESSION_ZLIB_NG
++#include <zlib-ng.h>
++# define GIT_ZLIB_SYMBOL(name) GIT_CONCAT(zng_, name)
++# define GIT_ZLIB_STREAM zng_stream
++#else
+ #include <zlib.h>
++# define GIT_ZLIB_SYMBOL(name) name
++# define GIT_ZLIB_STREAM z_stream
++#endif
+ 
+ #include "str.h"
+ 
+@@ -19,7 +27,7 @@ typedef enum {
+ } git_zstream_t;
+ 
+ typedef struct {
+-	z_stream z;
++	GIT_ZLIB_STREAM z;
+ 	git_zstream_t type;
+ 	const char *in;
+ 	size_t in_len;
+diff --git a/tests/libgit2/core/features.c b/tests/libgit2/core/features.c
+index 780d29853..5891be3bc 100644
+--- a/tests/libgit2/core/features.c
++++ b/tests/libgit2/core/features.c
+@@ -200,6 +200,8 @@ void test_core_features__backends(void)
+ 	cl_assert_equal_s("builtin", compression);
+ #elif defined(GIT_COMPRESSION_ZLIB)
+ 	cl_assert_equal_s("zlib", compression);
++#elif defined(GIT_COMPRESSION_ZLIB_NG)
++	cl_assert_equal_s("zlib-ng", compression);
+ #else
+ 	cl_assert(0);
+ #endif
+diff --git a/tests/util/zstream.c b/tests/util/zstream.c
+index ea7ffb1d0..9481676e7 100644
+--- a/tests/util/zstream.c
++++ b/tests/util/zstream.c
+@@ -10,7 +10,7 @@ static void assert_zlib_equal_(
+ 	const void *compressed, size_t c_len,
+ 	const char *msg, const char *file, const char *func, int line)
+ {
+-	z_stream stream;
++	GIT_ZLIB_STREAM stream;
+ 	char *expanded = git__calloc(1, e_len + INFLATE_EXTRA);
+ 	cl_assert(expanded);
+ 
+@@ -20,9 +20,9 @@ static void assert_zlib_equal_(
+ 	stream.next_in   = (Bytef *)compressed;
+ 	stream.avail_in  = (uInt)c_len;
+ 
+-	cl_assert(inflateInit(&stream) == Z_OK);
+-	cl_assert(inflate(&stream, Z_FINISH));
+-	inflateEnd(&stream);
++	cl_assert(GIT_ZLIB_SYMBOL(inflateInit)(&stream) == Z_OK);
++	cl_assert(GIT_ZLIB_SYMBOL(inflate)(&stream, Z_FINISH));
++	GIT_ZLIB_SYMBOL(inflateEnd)(&stream);
+ 
+ 	clar__assert_equal(
+ 		file, func, line, msg, 1,

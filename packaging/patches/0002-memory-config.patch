@@ -1,0 +1,22 @@
+diff --git a/include/git2/sys/config.h b/include/git2/sys/config.h
+index dcce18e6f..8945a3285 100644
+--- a/include/git2/sys/config.h
++++ b/include/git2/sys/config.h
+@@ -200,7 +200,7 @@ GIT_EXTERN(int) git_config_backend_memory_options_init(
+  * @param opts the options to initialize this backend with, or NULL
+  * @return 0 on success or an error code
+  */
+-extern int git_config_backend_from_string(
++GIT_EXTERN(int) git_config_backend_from_string(
+ 	git_config_backend **out,
+ 	const char *cfg,
+ 	size_t len,
+@@ -216,7 +216,7 @@ extern int git_config_backend_from_string(
+  * @param opts the options to initialize this backend with, or NULL
+  * @return 0 on success or an error code
+  */
+-extern int git_config_backend_from_values(
++GIT_EXTERN(int) git_config_backend_from_values(
+ 	git_config_backend **out,
+ 	const char **values,
+ 	size_t len,
