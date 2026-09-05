@@ -21,15 +21,17 @@ std::optional<std::string> getNameFromURL(const ParsedURL & url)
 {
     std::smatch match;
 
-    /* If there is a dir= argument, use its value */
-    if (url.query.count("dir") > 0)
-        return url.query.at("dir");
-
-    /* If the fragment isn't a "default" and contains two attribute elements, use the last one */
+    /* If the fragment isn't a "default" and contains two attribute elements, use the last one.
+       The fragment names a specific attribute, so it takes precedence over `dir=`, which only
+       indicates where the flake.nix lives inside the repository. */
     if (std::regex_match(url.fragment, match, lastAttributeRegex) && match.str(1) != "defaultPackage."
         && match.str(2) != "default") {
         return match.str(2);
     }
+
+    /* If there is a dir= argument, use its value */
+    if (url.query.count("dir") > 0)
+        return url.query.at("dir");
 
     /* This is not right, because special chars like slashes within the
        path fragments should be percent encoded, but I don't think any
