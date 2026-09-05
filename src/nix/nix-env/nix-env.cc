@@ -682,7 +682,7 @@ static void upgradeDerivations(Globals & globals, const Strings & args, UpgradeT
                     newElems.push_back(i);
 
             } catch (Error & e) {
-                e.addTrace(nullptr, "while trying to find an upgrade for '%s'", i.queryName());
+                e.addTrace({}, "while trying to find an upgrade for '%s'", i.queryName());
                 throw;
             }
         }
@@ -951,7 +951,7 @@ queryJSON(Globals & globals, std::vector<PackageInfo> & elems, bool printOutPath
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace({}, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }
@@ -1279,7 +1279,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         } catch (AssertionError & e) {
             printMsg(lvlTalkative, "skipping derivation named '%1%' which gives an assertion failure", i.queryName());
         } catch (Error & e) {
-            e.addTrace(nullptr, "while querying the derivation named '%1%'", i.queryName());
+            e.addTrace({}, "while querying the derivation named '%1%'", i.queryName());
             throw;
         }
     }

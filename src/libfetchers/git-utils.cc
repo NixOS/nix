@@ -1553,7 +1553,7 @@ struct GitFileSystemObjectSinkImpl final : GitFileSystemObjectSink
                         throw Error("cannot create a hard link to a directory");
                     addNode(path, {child.mode, child.getOid()});
                 } catch (Error & e) {
-                    e.addTrace(nullptr, "while creating a hard link from '%s' to '%s'", path, target);
+                    e.addTrace({}, "while creating a hard link from '%s' to '%s'", path, target);
                     throw;
                 }
             }

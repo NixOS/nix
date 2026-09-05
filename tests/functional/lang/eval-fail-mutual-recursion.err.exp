@@ -6,13 +6,6 @@ error:
              | ^
            41|
 
-       … while calling 'throwAfterA'
-         at /pwd/lang/eval-fail-mutual-recursion.nix:32:14:
-           31|   throwAfterA =
-           32|     recurse: n:
-             |              ^
-           33|     if n > 0 then
-
        … from call site
          at /pwd/lang/eval-fail-mutual-recursion.nix:34:7:
            33|     if n > 0 then
@@ -20,7 +13,7 @@ error:
              |       ^
            35|     else if recurse then
 
-       (19 duplicate frames omitted)
+       (9 duplicate frames omitted)
 
        … from call site
          at /pwd/lang/eval-fail-mutual-recursion.nix:36:7:
@@ -29,13 +22,6 @@ error:
              |       ^
            37|     else
 
-       … while calling 'throwAfterB'
-         at /pwd/lang/eval-fail-mutual-recursion.nix:23:14:
-           22|   throwAfterB =
-           23|     recurse: n:
-             |              ^
-           24|     if n > 0 then
-
        … from call site
          at /pwd/lang/eval-fail-mutual-recursion.nix:25:7:
            24|     if n > 0 then
@@ -43,7 +29,7 @@ error:
              |       ^
            26|     else if recurse then
 
-       (19 duplicate frames omitted)
+       (9 duplicate frames omitted)
 
        … from call site
          at /pwd/lang/eval-fail-mutual-recursion.nix:27:7:
@@ -52,7 +38,7 @@ error:
              |       ^
            28|     else
 
-       (21 duplicate frames omitted)
+       (10 duplicate frames omitted)
 
        … while calling the 'throw' builtin
          at /pwd/lang/eval-fail-mutual-recursion.nix:38:7:

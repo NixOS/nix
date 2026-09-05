@@ -98,7 +98,8 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
                             recurse(*attr.value, attr.pos, path / name);
                         } catch (Error & e) {
                             e.addTrace(
-                                state->positions[attr.pos], HintFmt("while evaluating the attribute '%s'", name));
+                                state->positions.getEntry(attr.pos),
+                                HintFmt("while evaluating the attribute '%s'", name));
                             throw;
                         }
                     }

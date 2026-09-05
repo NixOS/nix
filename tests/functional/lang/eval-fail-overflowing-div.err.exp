@@ -1,18 +1,4 @@
 error:
-       … while calling the 'seq' builtin
-         at /pwd/lang/eval-fail-overflowing-div.nix:8:1:
-            7| in
-            8| builtins.seq intMin (builtins.seq b (intMin / b))
-             | ^
-            9|
-
-       … while calling the 'seq' builtin
-         at /pwd/lang/eval-fail-overflowing-div.nix:8:22:
-            7| in
-            8| builtins.seq intMin (builtins.seq b (intMin / b))
-             |                      ^
-            9|
-
        … while calling the 'div' builtin
          at /pwd/lang/eval-fail-overflowing-div.nix:8:45:
             7| in

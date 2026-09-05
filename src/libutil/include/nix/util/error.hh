@@ -19,6 +19,7 @@
 #include "nix/util/fmt.hh"
 #include "nix/util/fun.hh"
 #include "nix/util/config.hh"
+#include "nix/util/pos-idx.hh"
 
 #include <concepts>
 #include <cstring>
@@ -133,6 +134,8 @@ struct ErrorInfo
     Suggestions suggestions;
 
     static std::optional<std::string> programName;
+
+    PosIdx lastTracePos = noPos;
 };
 
 std::ostream & showErrorInfo(std::ostream & out, const ErrorInfo & einfo, bool showTrace);
@@ -224,12 +227,15 @@ public:
         err.status = status;
     }
 
-    void atPos(std::shared_ptr<const Pos> pos)
+    void atPos(std::pair<PosIdx, std::shared_ptr<const Pos>> pos)
     {
-        err.pos = pos;
+        err.lastTracePos = pos.first;
+        err.pos = pos.second;
     }
 
     bool hasPos() const;
+
+    PosIdx getLastTracePosIdx() const;
 
     void pushTrace(Trace trace)
     {
@@ -244,7 +250,7 @@ public:
      * @param args Format string arguments.
      */
     template<typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, Args &&... args)
+    void addTrace(std::pair<PosIdx, std::shared_ptr<const Pos>> && pos, std::string_view fs, Args &&... args)
     {
         addTrace(std::move(pos), HintFmt(std::string(fs), std::forward<Args>(args)...));
     }
@@ -256,7 +262,8 @@ public:
      * @param hint Formatted error message
      * @param print Optional, whether to always print (used by `addErrorContext`)
      */
-    void addTrace(std::shared_ptr<const Pos> && pos, HintFmt hint, TracePrint print = TracePrint::Default);
+    void addTrace(
+        std::pair<PosIdx, std::shared_ptr<const Pos>> && pos, HintFmt hint, TracePrint print = TracePrint::Default);
 
     bool hasTrace() const
     {

@@ -671,7 +671,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             auto _level = addCallDepth(noPos);
             return getDoc(partiallyApplied);
         } catch (Error & e) {
-            e.addTrace(nullptr, "while partially calling '%1%' to retrieve documentation", "__functor");
+            e.addTrace({}, "while partially calling '%1%' to retrieve documentation", "__functor");
             throw;
         }
     }
@@ -871,13 +871,13 @@ void EvalState::runDebugRepl(const Error * error, const Env & env, const Expr & 
 template<typename... Args>
 void EvalState::addErrorTrace(Error & e, const Args &... formatArgs) const
 {
-    e.addTrace(nullptr, HintFmt(formatArgs...));
+    e.addTrace({}, HintFmt(formatArgs...));
 }
 
 template<typename... Args>
 void EvalState::addErrorTrace(Error & e, const PosIdx pos, const Args &... formatArgs) const
 {
-    e.addTrace(positions[pos], HintFmt(formatArgs...));
+    e.addTrace(positions.getEntry(pos), HintFmt(formatArgs...));
 }
 
 template<typename... Args>
@@ -1221,8 +1221,9 @@ inline bool EvalState::evalBool(Env & env, Expr * e, std::string_view errorCtx)
                 .withFrame(env, *e)
                 .debugThrow();
         return v.boolean();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+    } catch (Error & err) {
+        if (e->hasNewPos(err))
+            err.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1237,8 +1238,9 @@ inline void EvalState::evalAttrs(Env & env, Expr * e, Value & v, std::string_vie
                 "expected a set but found %1%: %2%", showType(v), ValuePrinter(*this, v, errorPrintOptions))
                 .withFrame(env, *e)
                 .debugThrow();
-    } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+    } catch (Error & err) {
+        if (e->hasNewPos(err))
+            err.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -1248,7 +1250,8 @@ void Expr::eval(EvalState & state, Env & env, Value & v, std::string_view errorC
     try {
         eval(state, env, v);
     } catch (Error & e) {
-        e.addTrace(state.positions[getPos()], errorCtx);
+        if (hasNewPos(e))
+            e.addTrace(state.positions.getEntry(getPos()), errorCtx);
         throw;
     }
 }
@@ -1467,6 +1470,7 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
     const AttrName * unresolvedOrEnd = attrPathStart;
     // cursor, result if successful
     Value * vAttrs = &vTmp;
+    Expr * thunkExpr = nullptr;
 
     e->eval(state, env, vTmp, "while selecting an attribute");
 
@@ -1510,11 +1514,12 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
                 state.attrSelects->try_emplace_or_visit(attrPos, 1, [](auto & i) { i.second++; });
         }
 
+        thunkExpr = vAttrs->maybeGetThunkExpr();
         state.forceValue(*vAttrs, (attrPos ? attrPos : this->pos));
 
     } catch (Error & e) {
         // Traces are printed in reverse, so we add context before the main item.
-        if (attrPos) {
+        if (attrPos && (thunkExpr == nullptr || thunkExpr->hasNewPos(e))) {
             auto attrPosR = state.positions[attrPos];
             auto origin = std::get_if<SourcePath>(&attrPosR.origin);
             if (!(origin && *origin == state.derivationInternal)) {
@@ -1524,8 +1529,10 @@ void ExprSelect::eval(EvalState & state, Env & env, Value & v)
             }
         }
         // Add main item: the selection site itself (`a.b`), ie the actual access
-        state.addErrorTrace(
-            e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        if (hasNewPos(e)) {
+            state.addErrorTrace(
+                e, getPos(), "while evaluating the attribute '%1%'", showAttrSelectionPath(state, env, getAttrPath()));
+        }
         throw;
     }
 
@@ -1575,7 +1582,8 @@ void ExprLambda::eval(EvalState & state, Env & env, Value & v)
     v.mkLambda(&env, this);
 }
 
-void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos)
+void EvalState::callFunction(
+    Value & fun, std::span<Value * const> args, Value & vRes, const PosIdx pos, const Expr * expr)
 {
     auto _level = addCallDepth(pos);
 
@@ -1619,8 +1627,10 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 try {
                     forceAttrs(*args[0], lambda.pos, "while evaluating the value passed for the lambda argument");
                 } catch (Error & e) {
-                    if (pos)
-                        e.addTrace(positions[pos], "from call site");
+                    // Do not trace the call site if it encloses the lambda
+                    // being called; the lambda already has a trace.
+                    if (pos && pos != lambda.pos && (expr == nullptr || expr->comparePos(lambda.pos) != 0))
+                        e.addTrace(positions.getEntry(pos), "from call site");
                     throw;
                 }
 
@@ -1697,12 +1707,16 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 lambda.body->eval(*this, env2, vCur);
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
-                    addErrorTrace(
-                        e,
-                        lambda.pos,
-                        "while calling %s",
-                        lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda");
-                    if (pos)
+                    if (lambda.hasNewPos(e)) {
+                        addErrorTrace(
+                            e,
+                            lambda.pos,
+                            "while calling %s",
+                            lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda");
+                    }
+                    // Do not trace the call site if it encloses the lambda
+                    // being called; the lambda already has a trace.
+                    if (pos && pos != lambda.pos && (expr == nullptr || expr->comparePos(lambda.pos) != 0))
                         addErrorTrace(e, pos, "from call site");
                 }
                 throw;
@@ -1730,7 +1744,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                 try {
                     fn->impl(*this, CallSite{pos}, args.data(), vCur);
                 } catch (Error & e) {
-                    if (fn->addTrace)
+                    if (fn->addTrace && (expr == nullptr || expr->hasNewPos(e)))
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
@@ -1780,7 +1794,7 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                     //    so the debugger allows to inspect the wrong parameters passed to the builtin.
                     fn->impl(*this, CallSite{pos}, vArgs, vCur);
                 } catch (Error & e) {
-                    if (fn->addTrace)
+                    if (fn->addTrace && (expr == nullptr || expr->hasNewPos(e)))
                         addErrorTrace(e, pos, "while calling the '%1%' builtin", fn->name);
                     throw;
                 }
@@ -1793,10 +1807,15 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
             /* 'vCur' may be allocated on the stack of the calling
                function, but for functors we may keep a reference, so
                heap-allocate a copy and use that instead. */
+            auto thunkExpr = functor->value->maybeGetThunkExpr();
             try {
                 callFunction(*functor->value, std::to_array({&(*allocValue() = vCur), args[0]}), vCur, functor->pos);
             } catch (Error & e) {
-                e.addTrace(positions[pos], "while calling a functor (an attribute set with a '__functor' attribute)");
+                if (thunkExpr == nullptr || thunkExpr->hasNewPos(e)) {
+                    e.addTrace(
+                        positions.getEntry(pos),
+                        "while calling a functor (an attribute set with a '__functor' attribute)");
+                }
                 throw;
             }
             args = args.subspan(1);
@@ -1832,7 +1851,7 @@ void ExprCall::eval(EvalState & state, Env & env, Value & v)
     for (size_t i = 0; i < args->size(); ++i)
         vArgs[i] = (*args)[i]->maybeThunk(state, env);
 
-    state.callFunction(vFun, vArgs, v, pos);
+    state.callFunction(vFun, vArgs, v, pos, this);
 }
 
 // Lifted out of callFunction() because it creates a temporary that
@@ -1926,7 +1945,10 @@ void ExprAssert::eval(EvalState & state, Env & env, Value & v)
                 eq->e2->eval(state, env, v2);
                 state.assertEqValues(v1, v2, eq->pos, "in an equality assertion");
             } catch (AssertionError & e) {
-                e.addTrace(state.positions[pos], "while evaluating the condition of the assertion '%s'", exprStr);
+                if (hasNewPos(e)) {
+                    e.addTrace(
+                        state.positions.getEntry(pos), "while evaluating the condition of the assertion '%s'", exprStr);
+                }
                 throw;
             }
         }
@@ -2271,8 +2293,7 @@ void EvalState::handleEvalExceptionForThunk(Env * env, Expr * expr, Value & v, c
         // 2. initial forcing of the thunk, which is where the cycle starts
         // Only the first force has an `env`, so we expect this entry to be added once.
         if (env && ir.v == &v)
-            ir.addTrace(
-                nullptr, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
+            ir.addTrace({}, HintFmt(ANSI_WARNING "entering the infinite recursion" ANSI_NORMAL), TracePrint::Always);
     } catch (const RecoverableEvalError & e) {
         recovery = allocValue();
     } catch (...) {
@@ -2323,7 +2344,7 @@ void EvalState::tryFixupBlackHolePos(Value & v, PosIdx pos)
         std::rethrow_exception(e);
     } catch (InfiniteRecursionError & e) {
         if (!e.hasPos())
-            e.atPos(positions[pos]);
+            e.atPos(positions.getEntry(pos));
     } catch (...) {
     }
 }
@@ -2341,7 +2362,8 @@ void EvalState::forceValueDeep(Value & v)
         state.forceValue(v, v.determinePos(noPos));
 
         if (v.type() == nAttrs) {
-            for (auto & i : *v.attrs())
+            for (auto & i : *v.attrs()) {
+                auto thunkExpr = i.value->maybeGetThunkExpr();
                 try {
                     // If the value is a thunk, we're evaling. Otherwise no trace necessary.
                     auto dts = state.debugRepl && i.value->isThunk() ? makeDebugTraceStacker(
@@ -2355,9 +2377,11 @@ void EvalState::forceValueDeep(Value & v)
 
                     recurse(*i.value);
                 } catch (Error & e) {
-                    state.addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", state.symbols[i.name]);
+                    if (thunkExpr == nullptr || thunkExpr->hasNewPos(e))
+                        state.addErrorTrace(e, i.pos, "while evaluating the attribute '%1%'", state.symbols[i.name]);
                     throw;
                 }
+            }
         }
 
         else if (v.isList()) {
@@ -2385,7 +2409,7 @@ NixInt EvalState::forceInt(Value & v, const PosIdx pos, std::string_view errorCt
                 .debugThrow();
         return v.integer();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 
@@ -2405,7 +2429,7 @@ NixFloat EvalState::forceFloat(Value & v, const PosIdx pos, std::string_view err
                 .debugThrow();
         return v.fpoint();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2421,7 +2445,7 @@ bool EvalState::forceBool(Value & v, const PosIdx pos, std::string_view errorCtx
                 .debugThrow();
         return v.boolean();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 
@@ -2452,7 +2476,7 @@ void EvalState::forceFunction(Value & v, const PosIdx pos, std::string_view erro
                 .atPos(pos)
                 .debugThrow();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2468,7 +2492,7 @@ std::string_view EvalState::forceString(Value & v, const PosIdx pos, std::string
                 .debugThrow();
         return v.string_view();
     } catch (Error & e) {
-        e.addTrace(positions[pos], errorCtx);
+        e.addTrace(positions.getEntry(pos), errorCtx);
         throw;
     }
 }
@@ -2582,7 +2606,7 @@ BackedStringView EvalState::coerceToString(
         try {
             return v.external()->coerceToString(*this, pos, context, coerceMore, copyToStore);
         } catch (Error & e) {
-            e.addTrace(nullptr, errorCtx);
+            e.addTrace({}, errorCtx);
             throw;
         }
     }
@@ -2615,7 +2639,7 @@ BackedStringView EvalState::coerceToString(
                         copyToStore,
                         canonicalizePath);
                 } catch (Error & e) {
-                    e.addTrace(positions[pos], errorCtx);
+                    e.addTrace(positions.getEntry(pos), errorCtx);
                     throw;
                 }
                 if (n < v.listSize() - 1
@@ -2839,7 +2863,7 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
             try {
                 assertEqValues(*v1.listView()[n], *v2.listView()[n], pos, errorCtx);
             } catch (Error & e) {
-                e.addTrace(positions[pos], "while comparing list element %d", n);
+                e.addTrace(positions.getEntry(pos), "while comparing list element %d", n);
                 throw;
             }
         }
@@ -2854,7 +2878,8 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                     assertEqValues(*i->value, *j->value, pos, errorCtx);
                     return;
                 } catch (Error & e) {
-                    e.addTrace(positions[pos], "while comparing a derivation by its '%s' attribute", "outPath");
+                    e.addTrace(
+                        positions.getEntry(pos), "while comparing a derivation by its '%s' attribute", "outPath");
                     throw;
                 }
                 assert(false);
@@ -2906,10 +2931,10 @@ void EvalState::assertEqValues(Value & v1, Value & v2, const PosIdx pos, std::st
                 //    at <pos>
                 //  while comparing attribute '<name>'
                 if (j->pos != noPos)
-                    e.addTrace(positions[j->pos], "where right hand side is");
+                    e.addTrace(positions.getEntry(j->pos), "where right hand side is");
                 if (i->pos != noPos)
-                    e.addTrace(positions[i->pos], "where left hand side is");
-                e.addTrace(positions[pos], "while comparing attribute '%s'", symbols[i->name]);
+                    e.addTrace(positions.getEntry(i->pos), "where left hand side is");
+                e.addTrace(positions.getEntry(pos), "while comparing attribute '%s'", symbols[i->name]);
                 throw;
             }
         }
@@ -3505,7 +3530,7 @@ void forceNoNullByte(std::string_view s, std::function<Pos()> pos)
         auto str = replaceStrings(std::string(s), "\0"sv, "␀"sv);
         Error error("input string '%s' cannot be represented as Nix string because it contains null bytes", str);
         if (pos) {
-            error.atPos(pos());
+            error.atPos({noPos, pos()});
         }
         throw std::move(error);
     }

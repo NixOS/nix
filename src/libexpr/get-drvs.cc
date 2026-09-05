@@ -73,7 +73,8 @@ std::optional<StorePath> PackageInfo::queryDrvPath() const
             try {
                 found.requireDerivation();
             } catch (Error & e) {
-                e.addTrace(state->positions[i->pos], "while evaluating the 'drvPath' attribute of a derivation");
+                e.addTrace(
+                    state->positions.getEntry(i->pos), "while evaluating the 'drvPath' attribute of a derivation");
                 throw;
             }
             drvPath = {std::move(found)};
@@ -420,6 +421,7 @@ static void getDerivations(
            precedence). */
         for (auto & i : v.attrs()->lexicographicOrder(state.symbols)) {
             std::string_view symbol{state.symbols[i->name]};
+            Expr * thunkExpr = i->value->maybeGetThunkExpr();
             try {
                 debug("evaluating attribute '%1%'", symbol);
                 if (!isAttrPathComponent(symbol))
@@ -441,7 +443,8 @@ static void getDerivations(
                     }
                 }
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while evaluating the attribute '%s'", symbol);
+                if (thunkExpr == nullptr || thunkExpr->hasNewPos(e))
+                    e.addTrace(state.positions.getEntry(i->pos), "while evaluating the attribute '%s'", symbol);
                 throw;
             }
         }

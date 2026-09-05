@@ -21,6 +21,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withExitStatus(unsigned int exitStatu
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(PosIdx pos)
 {
+    error.err.lastTracePos = pos;
     error.err.pos = error.state.positions[pos];
     return *this;
 }
@@ -34,7 +35,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::atPos(Value & value, PosIdx fallback)
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::withTrace(PosIdx pos, const std::string_view text)
 {
-    error.addTrace(error.state.positions[pos], text);
+    error.addTrace(error.state.positions.getEntry(pos), text);
     return *this;
 }
 
@@ -64,7 +65,7 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::withFrame(const Env & env, const Expr
 template<class T>
 EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint)
 {
-    error.addTrace(error.state.positions[pos], hint);
+    error.addTrace(error.state.positions.getEntry(pos), hint);
     return *this;
 }
 
@@ -74,7 +75,7 @@ EvalErrorBuilder<T> &
 EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const Args &... formatArgs)
 {
 
-    addTrace(error.state.positions[pos], HintFmt(std::string(formatString), formatArgs...));
+    addTrace(error.state.positions.getEntry(pos), HintFmt(std::string(formatString), formatArgs...));
     return *this;
 }
 

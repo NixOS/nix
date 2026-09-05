@@ -195,7 +195,7 @@ EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringRe
             try {
                 state.callFunction(*i->value, v, v1, i->pos);
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while calling the `__toString` attribute");
+                e.addTrace(state.positions.getEntry(i->pos), "while calling the `__toString` attribute");
                 throw;
             }
             cameThroughToString = true;
@@ -204,7 +204,9 @@ EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringRe
                 return peel(i->pos, v1);
             } catch (Error & e) {
                 e.addTrace(
-                    state.positions[i->pos], "while %s the result of the `__toString` attribute", WhileTryingToUse{v1});
+                    state.positions.getEntry(i->pos),
+                    "while %s the result of the `__toString` attribute",
+                    WhileTryingToUse{v1});
                 throw;
             }
         }
@@ -214,7 +216,8 @@ EvalState::peelToStringOutPath(const PosIdx pos, Value & v, bool checkToStringRe
                 auto _level = state.addCallDepth(pos);
                 return peel(i->pos, *i->value);
             } catch (Error & e) {
-                e.addTrace(state.positions[i->pos], "while %s the `outPath` attribute", WhileTryingToUse{*i->value});
+                e.addTrace(
+                    state.positions.getEntry(i->pos), "while %s the `outPath` attribute", WhileTryingToUse{*i->value});
                 throw;
             }
         }

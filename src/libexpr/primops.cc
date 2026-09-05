@@ -183,7 +183,7 @@ SourcePath EvalState::realisePath(
         }
         return resolveSymlinks ? path.resolveSymlinks(*resolveSymlinks) : path;
     } catch (Error & e) {
-        e.addTrace(nullptr, "while realising the context of path '%s'", path);
+        e.addTrace({}, "while realising the context of path '%s'", path);
         throw;
     }
 }
@@ -519,13 +519,13 @@ void prim_exec(EvalState & state, CallSite callSite, Value * const * args, Value
     try {
         parsed = state.parseExprFromString(std::move(output), state.rootPath(CanonPath::root));
     } catch (Error & e) {
-        e.addTrace(nullptr, "while parsing the output from '%1%'", program);
+        e.addTrace({}, "while parsing the output from '%1%'", program);
         throw;
     }
     try {
         state.eval(parsed, v);
     } catch (Error & e) {
-        e.addTrace(nullptr, "while evaluating the output from '%1%'", program);
+        e.addTrace({}, "while evaluating the output from '%1%'", program);
         throw;
     }
 }
@@ -780,7 +780,7 @@ struct CompareValues
             }
         } catch (Error & e) {
             if (!errorCtx.empty())
-                e.addTrace(nullptr, errorCtx);
+                e.addTrace({}, errorCtx);
             throw;
         }
     }
@@ -830,7 +830,7 @@ static void prim_genericClosure(EvalState & state, CallSite callSite, Value * co
         try {
             state.forceAttrs(*e, noPos, "");
         } catch (Error & err) {
-            err.addTrace(nullptr, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
+            err.addTrace({}, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
             throw;
         }
 
@@ -838,7 +838,7 @@ static void prim_genericClosure(EvalState & state, CallSite callSite, Value * co
         try {
             key = state.getAttr(state.s.key, e->attrs(), "");
         } catch (Error & err) {
-            err.addTrace(nullptr, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
+            err.addTrace({}, "in genericClosure element %s", ValuePrinter(state, *e, errorPrintOptions));
             throw;
         }
         state.forceValue(*key->value, noPos);
@@ -861,11 +861,11 @@ static void prim_genericClosure(EvalState & state, CallSite callSite, Value * co
             }
             if (otherElem) {
                 // Traces are printed in reverse order; pre-swap them.
-                err.addTrace(nullptr, "with element %s", ValuePrinter(state, *otherElem, errorPrintOptions));
-                err.addTrace(nullptr, "while comparing element %s", ValuePrinter(state, *e, errorPrintOptions));
+                err.addTrace({}, "with element %s", ValuePrinter(state, *otherElem, errorPrintOptions));
+                err.addTrace({}, "while comparing element %s", ValuePrinter(state, *e, errorPrintOptions));
             } else {
                 // Couldn't find the specific element, just show current
-                err.addTrace(nullptr, "while checking key of element %s", ValuePrinter(state, *e, errorPrintOptions));
+                err.addTrace({}, "while checking key of element %s", ValuePrinter(state, *e, errorPrintOptions));
             }
             throw;
         }
@@ -888,7 +888,7 @@ static void prim_genericClosure(EvalState & state, CallSite callSite, Value * co
             }
         } catch (Error & err) {
             err.addTrace(
-                nullptr,
+                {},
                 "while calling %s on genericClosure element %s",
                 state.symbols[state.s.operator_],
                 ValuePrinter(state, *e, errorPrintOptions));
@@ -1041,7 +1041,7 @@ static void prim_addErrorContext(EvalState & state, CallSite callSite, Value * c
                                false,
                                false)
                            .toOwned();
-        e.addTrace(nullptr, HintFmt(message), TracePrint::Always);
+        e.addTrace({}, HintFmt(message), TracePrint::Always);
         throw;
     }
 }
@@ -1437,7 +1437,7 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
         drvName = state.forceStringNoCtx(
             *nameAttr->value, noPos, "while evaluating the `name` attribute passed to builtins.derivationStrict");
     } catch (Error & e) {
-        e.addTrace(state.positions[nameAttr->pos], "while evaluating the derivation attribute 'name'");
+        e.addTrace(state.positions.getEntry(nameAttr->pos), "while evaluating the derivation attribute 'name'");
         throw;
     }
 
@@ -1469,7 +1469,7 @@ static void prim_derivationStrict(EvalState & state, CallSite callSite, Value * 
          * displaying the entire chain is worth the space.
          */
         e.addTrace(
-            nullptr,
+            {},
             HintFmt(
                 "while evaluating derivation '%s'\n"
                 "  whose name attribute is located at %s",
@@ -1768,7 +1768,8 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
 
         } catch (Error & e) {
             e.addTrace(
-                state.positions[i->pos], HintFmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName));
+                state.positions.getEntry(i->pos),
+                HintFmt("while evaluating attribute '%1%' of derivation '%2%'", key, drvName));
             throw;
         }
     }
@@ -2733,7 +2734,7 @@ static void prim_fromJSON(EvalState & state, CallSite callSite, Value * const * 
     try {
         parseJSON(state, s, v);
     } catch (JSONParseError & e) {
-        e.addTrace(nullptr, "while decoding a JSON string");
+        e.addTrace({}, "while decoding a JSON string");
         throw;
     }
 }
@@ -2963,7 +2964,7 @@ static void addPath(
         } else
             state.allowAndSetStorePathString(*expectedStorePath, v);
     } catch (Error & e) {
-        e.addTrace(nullptr, "while adding path '%s'", path);
+        e.addTrace({}, "while adding path '%s'", path);
         throw;
     }
 }
