@@ -162,7 +162,7 @@ std::vector<PublicKey> getPublicKeys(const Attrs & attrs)
 
 static const Hash nullRev{HashAlgorithm::SHA1};
 
-static LazyAttr makeLazyAttr(fun<ResolvedAttr()> compute)
+static LazyAttr makeLazyAttr(fun<ResolvedAttr()> compute, bool isAvailable)
 {
     return make_ref<LazyAttrComputation>(LazyAttrComputation{
         .compute = memo<ResolvedAttr>(std::move(compute)),
@@ -728,10 +728,9 @@ struct GitInputScheme : InputScheme
         return lastModified;
     }
 
-    uint64_t getRevCount(
-        ref<Cache> cache, const RepoInfo & repoInfo, const std::filesystem::path & repoDir, const Hash & rev) const
+    uint64_t getRevCount(ref<Cache> cache, const RepoInfo & repoInfo, ref<GitRepo> repo, const Hash & rev) const
     {
-        if (GitRepo::openRepo(repoDir, {})->isShallow())
+        if (repo->isShallow())
             throw Error("'%s' is a shallow Git repository, so 'revCount' is not available", repoInfo.locationToArg());
 
         Cache::Key key{"gitRevCount", {{"rev", rev.gitRev()}}};
@@ -742,7 +741,7 @@ struct GitInputScheme : InputScheme
         Activity act(
             *logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
 
-        auto revCount = GitRepo::openRepo(repoDir, {})->getRevCount(rev);
+        auto revCount = repo->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
@@ -753,12 +752,21 @@ struct GitInputScheme : InputScheme
         const Settings & settings,
         const RepoInfo & repoInfo,
         const std::filesystem::path & repoDir,
-        const Hash & rev) const
+        const Hash & rev,
+        bool isShallow) const
     {
         auto cache = settings.getCache();
-        return makeLazyAttr([this, cache, repoInfo, repoDir, rev]() -> ResolvedAttr {
-            return getRevCount(cache, repoInfo, repoDir, rev);
-        });
+        return makeLazyAttr(
+            [this, cache, repoInfo, repoDir, rev, isShallow]() -> ResolvedAttr {
+                /* Duplicates the error branch in getRevCount, but we better use the same value of isShallow
+                   as the LazyAttr. */
+                if (isShallow)
+                    throw Error(
+                        "'%s' is a shallow Git repository, so 'revCount' is not available", repoInfo.locationToArg());
+                auto repo = GitRepo::openRepo(repoDir, {});
+                return getRevCount(cache, repoInfo, repo, rev);
+            },
+            !isShallow);
     }
 
     std::string getDefaultRef(const Settings & settings, const RepoInfo & repoInfo, bool shallow) const
@@ -923,7 +931,8 @@ struct GitInputScheme : InputScheme
         if (!getShallowAttr(input)) {
             /* Like lastModified, skip revCount if supplied by the caller. */
             if (!input.attrs.contains("revCount"))
-                input.attrs.insert_or_assign("revCount", lazyRevCount(settings, repoInfo, repoDir, rev));
+                input.attrs.insert_or_assign(
+                    "revCount", lazyRevCount(settings, repoInfo, repoDir, rev, repo->isShallow()));
         }
 
         printTalkative("using revision %s of repo '%s'", rev.gitRev(), repoInfo.locationToArg());
@@ -1054,7 +1063,8 @@ struct GitInputScheme : InputScheme
                 if (rev == nullRev) {
                     input.attrs.insert_or_assign("revCount", uint64_t(0));
                 } else {
-                    input.attrs.insert_or_assign("revCount", lazyRevCount(settings, repoInfo, repoPath, rev));
+                    input.attrs.insert_or_assign(
+                        "revCount", lazyRevCount(settings, repoInfo, repoPath, rev, repo->isShallow()));
                 }
             }
 
