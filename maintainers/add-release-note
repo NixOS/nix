@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+log() {
+  echo >&2 "$@"
+}
+die() {
+  printf >&2 "add-release-note: \033[31;1merror:\033[0m"
+  echo >&2 "" "$@"
+  exit 1
+}
+warn() {
+  printf >&2 "add-release-note: \033[33;1mwarning:\033[0m"
+  echo >&2 "" "$@"
+}
+
+dir="$(dirname "${BASH_SOURCE[0]}")"/..
+cd $dir
+test -e .git || die "$(pwd) is not a git repo"
+test -e flake.nix || die "$(pwd) is not a flake, let alone the NixOS/nix flake"
+
+prompt_required() {
+  local prompt="$1"
+  local value
+  while read -r -p "$prompt (required) > " value; do
+    if [[ -z "$value" ]]; then
+      log "please enter a value"
+    else
+      echo $value
+      break
+    fi
+  done
+}
+
+prompt_default() {
+  local prompt="$1"
+  local default="$2"
+  local value
+  read -r -p "$prompt [default: $default] > " value
+  if [[ -z "$value" ]]; then
+    value="$default"
+  fi
+  echo $value
+}
+
+prompt_optional() {
+  prompt_default "$1 (optional)" ""
+}
+
+prompt_bool() {
+  local prompt="$1"
+  local value
+  while read -r -p "$prompt (y/n) > " value; do
+    case "$value" in
+      y|Y|yes|Yes|YES)
+        echo true
+        break
+        ;;
+      n|N|no|No|NO)
+        echo false
+        break
+        ;;
+      *)
+        log "please answer y or n"
+        ;;
+    esac
+  done
+}
+
+title="$(prompt_required "short title" version)"
+log
+log "Hint: https://github.com/NixOS/nix/issues"
+issues="$(prompt_optional "issue number(s) in #1234 format, space separated")"
+log
+log "Hint: https://github.com/NixOS/nix/pulls/@me"
+prs="$(prompt_optional "pr number(s) in #1234 format, space separated")"
+log
+log "Significant changes are moved to their own section at the start of the release notes."
+is_significant="$(prompt_bool "is this a significant change?")"
+
+if $is_significant; then
+  log
+  log "Great release notes describe what changed for users. You can use markdown and expand on this in your editor later."
+  description="$(prompt_required "longer description")"
+else
+  log
+  log "Great release notes describe what changed for users. You can use markdown and expand on this in your editor later."
+  description="$(prompt_optional "longer description")"
+
+  if [[ -z "$description" ]]; then
+    log
+    log ""
+    later="$(prompt_bool "Write a description later in your editor?")"
+    if $later; then
+      description="<!-- remove this markdown comment and write a description to inform users -->"
+    fi
+  fi
+fi
+
+if [[ -n "$issues" ]]; then
+  name="issue-$(sed -e 's/[^0-9]/-/g' -e 's/--*/-/g' -e 's/^-//g' -e 's/-$//g' <<< "$issues")"
+elif [[ -n "$prs" ]]; then
+  name="pr-$(sed -e 's/[^0-9]/-/g' -e 's/--*/-/g' -e 's/^-//g' -e 's/-$//g' <<< "$prs")"
+else
+  name="$(sed -e 's/[^a-zA-Z0-9]/-/g' -e 's/--*/-/g' -e 's/^-//g' -e 's/-$//g' <<< "$title" | tr '[:upper:]' '[:lower:]')"
+fi
+
+file="doc/manual/rl-next/$name.md"
+
+if [[ -e "$file" ]]; then
+  warn "file already exists: $file"
+  log "You may paste the following into an appropriate file, and edit it:"
+  log
+  file=/dev/stdout
+fi
+
+(
+  echo "synopsis: $title"
+  if [[ -n "$issues" ]]; then
+    echo "issues: $issues"
+  fi
+  if $is_significant; then
+    echo "significance: significant"
+  fi
+  if [[ -n "$prs" ]]; then
+    echo "prs: $prs"
+  fi
+  if [[ -n "$description" ]]; then
+    echo "description: {"
+    echo
+    echo "$description"
+    echo
+    echo "}"
+  fi
+) >"$file"
+
+log
+log "Release note written to $file"
+
+if [[ /dev/stdout != "$file" ]]; then
+  edit="$(prompt_bool "Edit in $EDITOR?")"
+  if $edit; then
+    "$EDITOR" "$file"
+  fi
+
+  git_add="$(prompt_bool "Add to git?")"
+  if $git_add; then
+    git add "$file"
+  fi
+else
+  die "file not written"
+fi
