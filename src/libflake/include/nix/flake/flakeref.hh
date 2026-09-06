@@ -55,9 +55,12 @@ struct FlakeRef
      */
     std::string subdir;
 
-    bool operator==(const FlakeRef & other) const = default;
+    bool operator==(const FlakeRef & other) const noexcept(false)
+    {
+        return std::tie(input, subdir) == std::tie(other.input, other.subdir);
+    }
 
-    bool operator<(const FlakeRef & other) const
+    bool operator<(const FlakeRef & other) const noexcept(false)
     {
         return std::tie(input, subdir) < std::tie(other.input, other.subdir);
     }
