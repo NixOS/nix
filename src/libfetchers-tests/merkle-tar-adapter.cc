@@ -567,6 +567,25 @@ TEST_F(MerkleTarAdapterTest, large_file)
     ASSERT_THAT(accessor, testing::HasContents(CanonPath("large.bin"), largeContent));
 }
 
+TEST_F(MerkleTarAdapterTest, large_file_in_chunks)
+{
+    auto pool = openWriterPool();
+    auto tarSink = merkle::makeTarSink(*pool);
+
+    // Create a file larger than the buffering threshold (1 MiB)
+    std::string largeContent(2 * 1024 * 1024, 'x');
+
+    tarSink->createRegularFile(CanonPath("large.bin"), false, [&](Sink & sink) {
+        sink(largeContent);
+        sink(largeContent);
+    });
+
+    auto result = tarSink->flush();
+
+    auto accessor = getAccessor(result.hash);
+    ASSERT_THAT(accessor, testing::HasContents(CanonPath("large.bin"), largeContent + largeContent));
+}
+
 TEST_F(MerkleTarAdapterTest, replacing_empty_directory)
 {
     auto pool = openWriterPool();
