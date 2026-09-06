@@ -10,6 +10,7 @@
 #include "nix/util/users.hh"
 #include "nix/util/fs-sink.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/util.hh"
 #include "nix/util/thread-pool.hh"
 #include "nix/util/pool.hh"
@@ -543,7 +544,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
 
     void setRemote(const std::string & name, const std::string & url) override
     {
-        if (git_remote_set_url(*this, name.c_str(), url.c_str()))
+        if (git_remote_set_url(*this, requireCString(name), requireCString(url)))
             throw GitError("setting remote '%s' URL to '%s'", name, url);
     }
 
@@ -556,7 +557,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
         // This is to handle the case where it may be an annotated tag which itself has
         // an object_id.
         std::string peeledRef = ref + "^{commit}";
-        if (git_revparse_single(Setter(object), *this, peeledRef.c_str()))
+        if (git_revparse_single(Setter(object), *this, requireCString(peeledRef)))
             throw GitError("resolving Git reference '%s'", ref);
         auto oid = git_object_id(object.get());
         return toHash(*oid);
@@ -683,7 +684,7 @@ struct GitRepoImpl : GitRepo, std::enable_shared_from_this<GitRepoImpl>
     std::string resolveSubmoduleUrl(const std::string & url) override
     {
         git_buf buf = GIT_BUF_INIT;
-        if (git_submodule_resolve_url(&buf, *this, url.c_str()))
+        if (git_submodule_resolve_url(&buf, *this, requireCString(url)))
             throw Error("resolving Git submodule URL '%s'", url);
         Finally cleanup = [&]() { git_buf_dispose(&buf); };
 
@@ -1353,7 +1354,11 @@ struct GitDirectorySinkImpl : merkle::DirectorySinkWithFinalize
     {
         auto oid = hashToOID(entry.hash);
         if (git_treebuilder_insert(
-                nullptr, builder.get(), std::string(name).c_str(), &oid, static_cast<git_filemode_t>(entry.mode)))
+                nullptr,
+                builder.get(),
+                requireCString(std::string(name)),
+                &oid,
+                static_cast<git_filemode_t>(entry.mode)))
             throw GitError("adding '%s' to a tree builder", name);
     }
 
@@ -1570,7 +1575,7 @@ struct GitRepoPoolImpl : GitRepoPool
     {
         auto handle = getRepo();
         git_oid oid;
-        if (git_blob_create_from_buffer(&oid, *handle, target.data(), target.size()))
+        if (git_blob_create_from_buffer(&oid, *handle, requireCString(target), target.size()))
             throw GitError("creating a blob object for symlink");
         return merkle::TreeEntry{.mode = merkle::Mode::Symlink, .hash = toHash(oid)};
     }
