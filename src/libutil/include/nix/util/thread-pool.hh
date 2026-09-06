@@ -2,8 +2,9 @@
 ///@file
 
 #include "nix/util/error.hh"
-#include "nix/util/fun.hh"
 #include "nix/util/sync.hh"
+
+#include <boost/compat/move_only_function.hpp>
 
 #include <queue>
 #include <functional>
@@ -30,9 +31,11 @@ public:
     /**
      * An individual work item.
      *
-     * \todo use std::packaged_task?
+     * Move-only, so that a work item can own what it operates on.
+     * `std::move_only_function` would do, but libc++ does not implement
+     * it yet.
      */
-    typedef fun<void()> work_t;
+    using work_t = boost::compat::move_only_function<void()>;
 
     /**
      * Enqueue a function to be executed by the thread pool.
