@@ -146,7 +146,7 @@ public:
 
     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
-    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets, Store * evalStore = nullptr) override;
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
