@@ -42,7 +42,7 @@ public:
 
     fetchers::ResolvedAttr force()
     {
-        return lazy->compute();
+        return lazy.compute();
     }
 
 protected:

@@ -29,9 +29,50 @@ struct LazyAttrComputation
     fun<ResolvedAttr()> compute;
 };
 
-using LazyAttr = ref<LazyAttrComputation>;
+class Attr;
 
-using Attr = std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>;
+class LazyAttr
+{
+    ref<LazyAttrComputation> inner;
+    /**
+     * Whether `inner` is expected to produce a value and not throw unconditionally.
+     * Some fetches produce an error, e.g. revCount when the repo is shallow,
+     * in which case this attribute holds no meaningful information that would
+     * e.g. affect equality.
+     * This field is not expected to affect the set of names that ends up in
+     * e.g. the fetchTree result.
+     */
+    bool available;
+    friend class Attr;
+
+public:
+    LazyAttr(ref<LazyAttrComputation> inner, bool available = true)
+        : inner(std::move(inner))
+        , available(available)
+    {
+    }
+
+    bool isAvailable() const
+    {
+        return available;
+    }
+
+    ResolvedAttr compute() const
+    {
+        return inner->compute();
+    }
+
+    bool operator==(const LazyAttr & other) const = delete;
+    std::strong_ordering operator<=>(const LazyAttr & other) const = delete;
+};
+
+class Attr : public std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>
+{
+public:
+    using variant::variant;
+    std::strong_ordering operator<=>(const Attr & other) const;
+    bool operator==(const Attr & other) const;
+};
 
 /**
  * An `Attrs` can be thought of a JSON object restricted or simplified

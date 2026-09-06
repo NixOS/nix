@@ -100,7 +100,7 @@ public:
      */
     bool isFinal() const;
 
-    bool operator==(const Input & other) const noexcept;
+    bool operator==(const Input & other) const;
 
     bool operator<(const Input & other) const
     {
