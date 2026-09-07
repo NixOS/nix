@@ -5,8 +5,12 @@ source common.sh
 case $system in
     *linux*)
         ;;
+    *darwin*)
+        # Older daemons lack libproc scanning, and tests disable their lsof fallback.
+        requireDaemonNewerThan "2.36pre"
+        ;;
     *)
-        skipTest "Not running Linux";
+        skipTest "Not running Linux or Darwin";
 esac
 
 set -m # enable job control, needed for kill
