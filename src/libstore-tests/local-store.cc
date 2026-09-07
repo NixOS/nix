@@ -106,7 +106,14 @@ protected:
         ASSERT_EQ(st.st_mtime, 1);
 
         if (S_ISLNK(st.st_mode)) {
-            /* Not much to check for symlinks. */
+            /* Linux e.g. always has 0777 permissions on proper symlinks (although not
+               magiclinks, but those cannot appear in the store). Other OS-es (macOS, BSDs)
+               do actually store the mode bits of a symlink and allow them to be modified.
+               On Darwin, it even affects the behavior of readlink by requiring read bit,
+               but does not require it for traversal. We match Linux's 0777 there. Write
+               bit is irrelevant, because the only way to modify symlink is to unlink and recreate
+               it. */
+            ASSERT_EQ(modeTypeMaskedOut, 0777);
         } else if (S_ISREG(st.st_mode)) {
             ASSERT_TRUE(modeTypeMaskedOut == 0555 || modeTypeMaskedOut == 0444);
         } else if (S_ISDIR(st.st_mode)) {
