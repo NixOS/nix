@@ -20,7 +20,8 @@ with import ./config.nix;
 
         cat > $out/program << 'EOF'
         #! ${shell}
-        sleep 10000 < "$1"
+        ${path}/env -i ${path}/sleep 10000 < "$1" &
+        wait
         EOF
 
         chmod +x $out/program
