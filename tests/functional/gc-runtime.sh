@@ -3,10 +3,10 @@
 source common.sh
 
 case $system in
-    *linux*)
+    *linux* | *darwin*)
         ;;
     *)
-        skipTest "Not running Linux";
+        skipTest "Not running Linux or Darwin";
 esac
 
 set -m # enable job control, needed for kill
