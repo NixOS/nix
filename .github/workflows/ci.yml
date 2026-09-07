@@ -146,7 +146,6 @@ jobs:
     needs: basic-checks
     name: windows unit tests
     runs-on: ubuntu-24.04
-    continue-on-error: true
     timeout-minutes: 60
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -159,7 +158,7 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
     - name: Build and test Windows components
       run: |
-        nix build --file ci/gha/tests/windows.nix crossBuild unitTests.nix-util-tests -L
+        nix build --file ci/gha/tests/windows.nix crossBuild unitTests.nix-util-tests unitTests.nix-store-tests -L
 
   installer_test:
     needs: [tests]

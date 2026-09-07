@@ -303,60 +303,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
 
     chownToBuilder(tmpDirFd.get(), tmpDir);
 
-    for (auto & [outputName, status] : initialOutputs) {
-        /* Set scratch path we'll actually use during the build.
-
-           If we're not doing a chroot build, but we have some valid
-           output paths.  Since we can't just overwrite or delete
-           them, we have to do hash rewriting: i.e. in the
-           environment/arguments passed to the build, we replace the
-           hashes of the valid outputs with unique dummy strings;
-           after the build, we discard the redirected outputs
-           corresponding to the valid outputs, and rewrite the
-           contents of the new outputs to replace the dummy strings
-           with the actual hashes. */
-        auto scratchPath = !status.known ? makeFallbackPath(outputName)
-                           : !needsHashRewrite()
-                               /* Can always use original path in sandbox */
-                               ? status.known->path
-                               : !status.known->isPresent()
-                                     /* If path doesn't yet exist can just use it */
-                                     ? status.known->path
-                                     : buildMode != bmRepair && !status.known->isValid()
-                                           /* If we aren't repairing we'll delete a corrupted path, so we
-                                              can use original path */
-                                           ? status.known->path
-                                           : /* If we are repairing or the path is totally valid, we'll need
-                                                to use a temporary path */
-                                           makeFallbackPath(status.known->path);
-        scratchOutputs.insert_or_assign(outputName, scratchPath);
-
-        /* Substitute output placeholders with the scratch output paths.
-           We'll use during the build. */
-        inputRewrites[hashPlaceholder(outputName)] = store.printStorePath(scratchPath);
-
-        /* Additional tasks if we know the final path a priori. */
-        if (!status.known)
-            continue;
-        auto fixedFinalPath = status.known->path;
-
-        /* Additional tasks if the final and scratch are both known and
-           differ. */
-        if (fixedFinalPath == scratchPath)
-            continue;
-
-        /* Ensure scratch path is ours to use. */
-        deletePath(store.printStorePath(scratchPath));
-
-        /* Rewrite and unrewrite paths */
-        {
-            std::string h1{fixedFinalPath.hashPart()};
-            std::string h2{scratchPath.hashPart()};
-            inputRewrites[h1] = h2;
-        }
-
-        redirectedOutputs.insert_or_assign(std::move(fixedFinalPath), std::move(scratchPath));
-    }
+    prepareScratchOutputs();
 
     /* Construct the environment passed to the builder. */
     initEnv();
@@ -1037,32 +984,6 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
         topTmpDir = "";
         tmpDir = "";
     }
-}
-
-StorePath UnixDerivationBuilderImpl::makeFallbackPath(OutputNameView outputName)
-{
-    // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/source/protocols/store-path.md for details
-    // TODO: We may want to separate the responsibilities of constructing the path fingerprint and of actually doing the
-    // hashing
-    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":name:" + std::string(outputName);
-    return store.makeStorePath(
-        pathType,
-        // pass an all-zeroes hash
-        Hash(HashAlgorithm::SHA256),
-        outputPathName(drv.name, outputName));
-}
-
-StorePath UnixDerivationBuilderImpl::makeFallbackPath(const StorePath & path)
-{
-    // This is a bogus path type, constructed this way to ensure that it doesn't collide with any other store path
-    // See doc/manual/source/protocols/store-path.md for details
-    auto pathType = "rewrite:" + std::string(drvPath.to_string()) + ":" + std::string(path.to_string());
-    return store.makeStorePath(
-        pathType,
-        // pass an all-zeroes hash
-        Hash(HashAlgorithm::SHA256),
-        path.name());
 }
 
 } // namespace nix

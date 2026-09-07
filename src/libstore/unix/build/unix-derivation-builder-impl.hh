@@ -131,14 +131,6 @@ protected:
 
     friend struct RestrictedStore;
 
-    /**
-     * Whether we need to perform hash rewriting if there are valid output paths.
-     */
-    virtual bool needsHashRewrite()
-    {
-        return true;
-    }
-
 public:
 
     std::optional<Descriptor> startBuild() override;
@@ -332,22 +324,6 @@ public:
 private:
 
     bool decideWhetherDiskFull();
-
-    /**
-     * Create alternative path calculated from but distinct from the
-     * input, so we can avoid overwriting outputs (or other store paths)
-     * that already exist.
-     */
-    StorePath makeFallbackPath(const StorePath & path);
-
-    /**
-     * Make a path to another based on the output name along with the
-     * derivation hash.
-     *
-     * @todo Add option to randomize, so we can audit whether our
-     * rewrites caught everything
-     */
-    StorePath makeFallbackPath(OutputNameView outputName);
 };
 
 } // namespace nix

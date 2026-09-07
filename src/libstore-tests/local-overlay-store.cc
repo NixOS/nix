@@ -44,14 +44,19 @@ TEST(LocalOverlayStore, upperLayer_notOverridden)
 
 TEST(LocalOverlayStore, upperLayer_overridden)
 {
+#ifdef _WIN32
+    constexpr std::string_view upper = "C:\\some\\upper";
+#else
+    constexpr std::string_view upper = "/some/upper";
+#endif
     LocalOverlayStoreConfig config{
         "",
         {
-            {"upper-layer", "/some/upper"},
+            {"upper-layer", std::string{upper}},
         },
     };
     EXPECT_TRUE(config.upperLayer.isOverridden());
-    EXPECT_EQ(config.upperLayer.get(), std::filesystem::path{"/some/upper"});
+    EXPECT_EQ(config.upperLayer.get(), std::optional<AbsolutePath>{std::string{upper}});
 }
 
 } // namespace nix
