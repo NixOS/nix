@@ -1,0 +1,14 @@
+diff --git a/source/tls_channel_handler.c b/source/tls_channel_handler.c
+index de516be..2784f5d 100644
+--- a/source/tls_channel_handler.c
++++ b/source/tls_channel_handler.c
+@@ -817,7 +817,8 @@ void aws_tls_init_vtable(struct aws_allocator *allocator) {
+ 
+ #    elif defined(__APPLE__) && defined(USE_S2N)
+     struct aws_string *use_non_fips_13 = aws_get_env_nonempty(allocator, "AWS_CRT_USE_NON_FIPS_TLS_13");
+-    if (use_non_fips_13) {
++    // nix#15857: use s2n TLS, not fork-unsafe Apple SecureTransport
++    if (true) {
+         s2n_init_tls_vtable(&s_tls_channel_handler_vtable);
+         aws_string_destroy(use_non_fips_13);
+     } else {
