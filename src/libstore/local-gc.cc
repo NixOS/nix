@@ -25,6 +25,7 @@ typedef boost::unordered_flat_map<
     std::equal_to<>>
     UncheckedRoots;
 
+#ifdef __linux__
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
     std::filesystem::path buf;
@@ -39,6 +40,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
     if (buf.is_absolute())
         roots[buf.string()].emplace(file.string());
 }
+#endif
 
 static std::string quoteRegexChars(const std::string & raw)
 {
@@ -62,6 +64,7 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
 {
     UncheckedRoots unchecked;
 
+#ifdef __linux__
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
@@ -120,7 +123,10 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
             throw SysError("iterating /proc");
     }
 
-#if !defined(__linux__)
+    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
+    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
+    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
+#else
     // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
     // See: https://github.com/NixOS/nix/issues/3011
     // Because of this we disable lsof when running the tests.
@@ -138,12 +144,6 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
             /* lsof not installed, lsof failed */
         }
     }
-#endif
-
-#ifdef __linux__
-    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
-    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
     Roots roots;
