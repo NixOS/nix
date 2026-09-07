@@ -1,9 +1,6 @@
 # These overrides are applied to the dependencies of the Nix components.
 
 {
-  # Flake inputs; used for sources
-  inputs,
-
   # The raw Nixpkgs, not affected by this scope
   pkgs,
 
