@@ -175,8 +175,12 @@ void findDarwinRuntimeRoots(const StoreDirConfig & config, UncheckedRoots & unch
                 tids.resize(tidBufSize / sizeof(uint64_t));
                 for (auto tid : tids) {
                     struct proc_threadwithpathinfo threadPathInfo;
-                    if (proc_pidinfo(pid, PROC_PIDTHREADPATHINFO, tid, &threadPathInfo, sizeof(threadPathInfo)) <= 0)
+                    if (proc_pidinfo(pid, PROC_PIDTHREADPATHINFO, tid, &threadPathInfo, sizeof(threadPathInfo)) <= 0) {
+                        // The thread may have exited since it was listed.
+                        if (errno == ESRCH)
+                            continue;
                         throw SysError("reading pid %1% thread %2% cwd", pid, tid);
+                    }
 
                     unchecked[std::string(threadPathInfo.pvip.vip_path)].emplace(
                         fmt("{libproc/%d/thread/%d/cwd}", pid, tid));
