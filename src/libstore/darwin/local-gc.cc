@@ -140,10 +140,16 @@ void findDarwinRuntimeRoots(const StoreDirConfig & config, UncheckedRoots & unch
                 continue;
 
             auto argsIter = args.begin() + sizeof(argc);
-            auto entriesToSkip = static_cast<std::size_t>(argc) + 1;
-            for (std::size_t i = 0; argsIter != args.end() && i < entriesToSkip; ++i) {
+            // Skip the executable and any padding before argv.
+            argsIter = std::find(argsIter, args.end(), '\0');
+            argsIter = std::find_if(argsIter, args.end(), [](char ch) { return ch != '\0'; });
+
+            // Empty arguments are significant, so skip exactly one
+            // NUL-terminated entry for each argument.
+            for (int i = 0; argsIter != args.end() && i < argc; ++i) {
                 argsIter = std::find(argsIter, args.end(), '\0');
-                argsIter = std::find_if(argsIter, args.end(), [](char ch) { return ch != '\0'; });
+                if (argsIter != args.end())
+                    ++argsIter;
             }
 
             if (argsIter != args.end()) {
