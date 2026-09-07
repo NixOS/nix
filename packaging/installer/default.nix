@@ -32,7 +32,7 @@ runCommand "installer-script"
           in
           ''
             \
-                   --replace '@tarballHash_${system}@' $(nix --experimental-features nix-command hash-file --base16 --type sha256 ${tarball}/*.tar.xz) \
+                   --replace '@tarballHash_${system}@' $(nix-hash --type sha256 --base16 --flat ${tarball}/*.tar.xz) \
                    --replace '@tarballPath_${system}@' $(tarballPath ${tarball}/*.tar.xz) \
           ''
         ) tarballs
