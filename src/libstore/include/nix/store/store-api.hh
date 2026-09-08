@@ -14,6 +14,7 @@
 #include "nix/util/repair-flag.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/store/store-reference.hh"
+#include "nix/store/substituter.hh"
 #include "nix/util/source-path.hh"
 
 #include <nlohmann/json_fwd.hpp>
@@ -27,7 +28,6 @@ namespace nix {
 
 MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
-MakeError(SubstituteGone, Error);
 MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreReference, Error);
@@ -54,8 +54,6 @@ class Store;
 typedef std::map<std::string, StorePath> OutputPathMap;
 
 enum CheckSigsFlag : bool { NoCheckSigs = false, CheckSigs = true };
-
-enum SubstituteFlag : bool { NoSubstitute = false, Substitute = true };
 
 enum BuildMode : uint8_t { bmNormal, bmRepair, bmCheck };
 
