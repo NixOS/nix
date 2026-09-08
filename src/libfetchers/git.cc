@@ -866,7 +866,7 @@ struct GitInputScheme : InputScheme
                 bool shallow = getShallowAttr(input);
                 try {
                     static constexpr std::string_view reservedRefNamespace =
-                        "__nix_internal_ref_namespace_reserved_for_fetchers_2c17c6393771ee3048ae34d6b380c5ec__";
+                        "__nix_internal_fetchers_48ae34d6b380c5ec__";
                     /* Fetch into a bucketed ref instead of leaving the rev
                        un-refed, so a later fetch of a nearby rev can
                        negotiate against it instead of re-downloading. */

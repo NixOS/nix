@@ -29,7 +29,8 @@ export _NIX_FORCE_HTTP=1
 
 nix-instantiate --eval --raw -E "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev1\"; }).outPath" >/dev/null
 
-reservedRefNamespace="__nix_internal_ref_namespace_reserved_for_fetchers_2c17c6393771ee3048ae34d6b380c5ec__"
+reservedRefNamespace="__nix_internal_fetchers_48ae34d6b380c5ec__";
+
 cacheDir=$(find "$TEST_HOME/.cache/nix/gitv3" -maxdepth 1 -mindepth 1 -type d)
 
 bucket1=${rev1:0:2}
