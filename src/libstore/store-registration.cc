@@ -4,6 +4,7 @@
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/thread-pool.hh"
 
 #include <filesystem>
 
@@ -114,22 +115,40 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
 std::list<ref<Store>> getDefaultSubstituters()
 {
     static auto stores([]() {
-        std::list<ref<Store>> stores;
-
         std::set<StoreReference> done;
-
-        auto addStore = [&](const StoreReference & ref) {
-            if (!done.insert(ref).second)
-                return;
-            try {
-                stores.push_back(openStore(StoreReference{ref}));
-            } catch (Error & e) {
-                logWarning(e.info());
-            }
-        };
-
+        std::vector<StoreReference> refs;
         for (const auto & ref : settings.getWorkerSettings().substituters.get())
-            addStore(ref);
+            if (done.insert(ref).second)
+                refs.push_back(ref);
+
+        /* Open them all at once. Opening an HTTP cache means fetching
+           its `nix-cache-info`, and an unreachable one takes a connect
+           timeout (or a few) to fail, so opening one after the other
+           makes the wait the sum of those rather than the longest. One
+           slot per reference keeps the order deterministic for the
+           sort below.
+
+           TODO: a thread per store is overkill for what is purely
+           waiting on network requests. The file transfer already has
+           its own thread; all that is missing is an async `openStore`.
+           With that, this becomes: queue them all, then block on them
+           all. */
+        std::vector<std::shared_ptr<Store>> opened(refs.size());
+        ThreadPool pool;
+        for (size_t i = 0; i < refs.size(); ++i)
+            pool.enqueue([&, i]() {
+                try {
+                    opened[i] = openStore(StoreReference{refs[i]}).get_ptr();
+                } catch (Error & e) {
+                    logWarning(e.info());
+                }
+            });
+        pool.process();
+
+        std::list<ref<Store>> stores;
+        for (auto & store : opened)
+            if (store)
+                stores.push_back(ref<Store>(store));
 
         stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
 
