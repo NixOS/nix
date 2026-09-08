@@ -122,7 +122,7 @@ protected:
 
     std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
-    void maybeDisable();
+    void disable();
 
     void checkEnabled();
 

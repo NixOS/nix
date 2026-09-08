@@ -141,10 +141,10 @@ std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const 
         return std::nullopt;
 }
 
-void HttpBinaryCacheStore::maybeDisable()
+void HttpBinaryCacheStore::disable()
 {
     auto state(_state.lock());
-    if (state->enabled && settings.getWorkerSettings().tryFallback) {
+    if (state->enabled) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
         state->enabled = false;
@@ -179,7 +179,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
            bucket is unlistable, so treat 403 as 404. */
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             return false;
-        maybeDisable();
+        disable();
         throw;
     }
 }
@@ -287,7 +287,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             throw NoSuchBinaryCacheFile(
                 "file '%s' does not exist in binary cache '%s'", path, config->getHumanReadableURI());
-        maybeDisable();
+        disable();
         throw;
     }
 }
@@ -308,7 +308,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
                                                   if (e.error == FileTransfer::NotFound
                                                       || e.error == FileTransfer::Forbidden)
                                                       return (*callbackPtr)({});
-                                                  maybeDisable();
+                                                  disable();
                                                   callbackPtr->rethrow();
                                               } catch (...) {
                                                   callbackPtr->rethrow();
@@ -329,7 +329,7 @@ std::optional<std::string> HttpBinaryCacheStore::getNixCacheInfo()
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound)
             return std::nullopt;
-        maybeDisable();
+        disable();
         throw;
     }
 }
