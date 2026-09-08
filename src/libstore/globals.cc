@@ -118,6 +118,36 @@ void loadConfFile(AbstractConfig & config)
         }
     };
 
+    /* `NIX_SSL_CERT_FILE` / `SSL_CERT_FILE` used to be read in
+       `FileTransferSettings`' constructor. That runs during static
+       initialization, where a bad value cannot be reported: on Unix an escaping
+       exception reaches `std::terminate` before `main`, and on Windows the
+       loader absorbs it and the process dies having printed nothing (#16356).
+       Applying it here instead routes it through the normal `Setting`
+       conversion, so a non-absolute path is an ordinary error.
+
+       Before the config files, so that an `ssl-cert-file` in `nix.conf` keeps
+       the precedence it had when the constructor assigned during static
+       initialization.
+
+       `getEnvOs` rather than `getEnvOsNonEmpty`, with the empty check *after*
+       the fallback: setting `NIX_SSL_CERT_FILE` to the empty string suppresses
+       `SSL_CERT_FILE` rather than falling through to it, because `or_else` sees
+       the variable as present. `getEnvOsNonEmpty` cannot express that, since it
+       reports set-but-empty and unset identically. */
+    if (auto sslCertFile = getEnvOs(OS_STR("NIX_SSL_CERT_FILE"))
+                               .or_else([] { return getEnvOs(OS_STR("SSL_CERT_FILE")); })
+                               .and_then([](OsString s) -> std::optional<OsString> {
+                                   return s.empty() ? std::nullopt : std::optional{std::move(s)};
+                               })) {
+        try {
+            config.set("ssl-cert-file", os_string_to_string(*sslCertFile));
+        } catch (Error & e) {
+            e.addTrace({}, "while applying the 'NIX_SSL_CERT_FILE' or 'SSL_CERT_FILE' environment variable");
+            throw;
+        }
+    }
+
     applyConfigFile(nixConfFile());
 
     /* We only want to send overrides to the daemon, i.e. stuff from
