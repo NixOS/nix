@@ -94,10 +94,20 @@ class HttpBinaryCacheStore : public virtual BinaryCacheStore
 {
     void anchor() override;
 
+    struct Disabled
+    {
+        std::chrono::steady_clock::time_point until;
+        /**
+         * The error that got the cache disabled. Rethrown, with a note,
+         * for every request until `until`, so callers learn the actual
+         * reason and not merely that the cache is disabled.
+         */
+        Error cause;
+    };
+
     struct State
     {
-        bool enabled = true;
-        std::chrono::steady_clock::time_point disabledUntil;
+        std::optional<Disabled> disabled;
     };
 
     Sync<State> _state;
@@ -122,7 +132,11 @@ protected:
 
     std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
-    void disable();
+    /**
+     * Stop talking to this cache for a while, because a request to it
+     * just failed with `cause`.
+     */
+    void disable(const Error & cause);
 
     void checkEnabled();
 

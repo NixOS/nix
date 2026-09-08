@@ -141,28 +141,33 @@ std::optional<CompressionAlgo> HttpBinaryCacheStore::getCompressionMethod(const 
         return std::nullopt;
 }
 
-void HttpBinaryCacheStore::disable()
+void HttpBinaryCacheStore::disable(const Error & cause)
 {
     auto state(_state.lock());
-    if (state->enabled) {
+    if (!state->disabled) {
         int t = 60;
         printError("disabling binary cache '%s' for %s seconds", config->getHumanReadableURI(), t);
-        state->enabled = false;
-        state->disabledUntil = std::chrono::steady_clock::now() + std::chrono::seconds(t);
+        state->disabled = Disabled{
+            .until = std::chrono::steady_clock::now() + std::chrono::seconds(t),
+            .cause = cause,
+        };
     }
 }
 
 void HttpBinaryCacheStore::checkEnabled()
 {
     auto state(_state.lock());
-    if (state->enabled)
+    if (!state->disabled)
         return;
-    if (std::chrono::steady_clock::now() > state->disabledUntil) {
-        state->enabled = true;
+    if (std::chrono::steady_clock::now() > state->disabled->until) {
+        state->disabled.reset();
         debug("re-enabling binary cache '%s'", config->getHumanReadableURI());
         return;
     }
-    throw SubstituterDisabled("substituter '%s' is disabled", config->getHumanReadableURI());
+    auto e = state->disabled->cause;
+    e.addTrace(
+        nullptr, "binary cache '%s' is temporarily disabled because of this error", config->getHumanReadableURI());
+    throw std::move(e);
 }
 
 bool HttpBinaryCacheStore::fileExists(const std::string & path)
@@ -179,7 +184,7 @@ bool HttpBinaryCacheStore::fileExists(const std::string & path)
            bucket is unlistable, so treat 403 as 404. */
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             return false;
-        disable();
+        disable(e);
         throw;
     }
 }
@@ -287,7 +292,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Sink & sink)
         if (e.error == FileTransfer::NotFound || e.error == FileTransfer::Forbidden)
             throw NoSuchBinaryCacheFile(
                 "file '%s' does not exist in binary cache '%s'", path, config->getHumanReadableURI());
-        disable();
+        disable(e);
         throw;
     }
 }
@@ -308,7 +313,7 @@ void HttpBinaryCacheStore::getFile(const std::string & path, Callback<std::optio
                                                   if (e.error == FileTransfer::NotFound
                                                       || e.error == FileTransfer::Forbidden)
                                                       return (*callbackPtr)({});
-                                                  disable();
+                                                  disable(e);
                                                   callbackPtr->rethrow();
                                               } catch (...) {
                                                   callbackPtr->rethrow();
@@ -329,7 +334,7 @@ std::optional<std::string> HttpBinaryCacheStore::getNixCacheInfo()
     } catch (FileTransferError & e) {
         if (e.error == FileTransfer::NotFound)
             return std::nullopt;
-        disable();
+        disable(e);
         throw;
     }
 }

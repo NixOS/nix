@@ -28,7 +28,6 @@ namespace nix {
 
 MakeError(InvalidPath, Error);
 MakeError(Unsupported, Error);
-MakeError(SubstituterDisabled, Error);
 
 MakeError(InvalidStoreReference, Error);
 
