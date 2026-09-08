@@ -62,8 +62,7 @@ TEST(XMLWriter, objectWithElementWithAttrsEscaping)
         t.openElement("foobar", attrs);
     }
 
-    // XXX: While "<value>" is escaped, "<key>" isn't which I think is a bug.
-    ASSERT_EQ(out.str(), "<?xml version='1.0' encoding='utf-8'?>\n<foobar <key>=\"&lt;value&gt;\"></foobar>");
+    ASSERT_EQ(out.str(), "<?xml version='1.0' encoding='utf-8'?>\n<foobar &lt;key&gt;=\"&lt;value&gt;\"></foobar>");
 }
 
 TEST(XMLWriter, objectWithElementWithAttrsIndented)
