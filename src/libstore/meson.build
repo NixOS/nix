@@ -339,6 +339,7 @@ sources = files(
   'store-reference.cc',
   'store-registration.cc',
   'submit-store.cc',
+  'substituter.cc',
   'uds-remote-store.cc',
   'worker-protocol-connection.cc',
   'worker-protocol.cc',

@@ -100,6 +100,7 @@ headers = [ config_pub_h ] + files(
   'store-reference.hh',
   'store-registration.hh',
   'submit-store.hh',
+  'substituter.hh',
   'uds-remote-store.hh',
   'worker-protocol-connection.hh',
   'worker-protocol-impl.hh',
