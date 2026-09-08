@@ -16,8 +16,6 @@ namespace nix {
 
 void FileSystemObjectSink::anchor() {}
 
-void ExtendedFileSystemObjectSink::anchor() {}
-
 void NullFileSystemObjectSink::anchor() {}
 
 void RegularFileSink::anchor() {}

@@ -238,12 +238,12 @@ let
           [[ \$(cat \$out) = foobar ]]
 
           if pgrep nix-daemon; then
-            MAYBESUDO="sudo"
+            MAYBESUDO="sudo --preserve-env=NIX_CONFIG"
           else
             MAYBESUDO=""
           fi
 
-
+          export NIX_CONFIG="substituters = "
           $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
           $MAYBESUDO \$(which nix-channel) --update
           [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]

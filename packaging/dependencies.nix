@@ -17,16 +17,16 @@ scope: {
   inherit stdenv;
 
   mimalloc =
-    if lib.versionAtLeast pkgs.mimalloc.version "3.3.2" then
+    if lib.versionAtLeast pkgs.mimalloc.version "3.5.1" then
       pkgs.mimalloc
     else
       pkgs.mimalloc.overrideAttrs rec {
-        version = "3.3.2";
+        version = "3.5.1";
         src = pkgs.fetchFromGitHub {
           owner = "microsoft";
           repo = "mimalloc";
           tag = "v${version}";
-          hash = "sha256-GZ37qQVDe9jgMb4Coe5oKvgaLTspZDlSkS5rdy1MfUU=";
+          hash = "sha256-hljle/jR2hNvy2ikdOna9QZiyqzAuMjNUfC7vxl7g7k=";
         };
       };
 
@@ -41,7 +41,7 @@ scope: {
         # small, run Nix with GC_PRINT_STATS=1 and look for messages
         # such as `Mark stack overflow`, `No room to copy back mark
         # stack`, and `Grew mark stack to ... frames`.
-        NIX_CFLAGS_COMPILE = "-DINITIAL_MARK_STACK_SIZE=1048576";
+        env.NIX_CFLAGS_COMPILE = "-DINITIAL_MARK_STACK_SIZE=1048576";
       });
 
   curl = pkgs.curl.override {
@@ -71,7 +71,8 @@ scope: {
     else
       let
         aws-c-io = pkgs.aws-c-io.overrideAttrs (old: {
-          patches = (old.patches or [ ]) ++ [ ./aws-c-io-s2n-darwin.patch ];
+          patches = (old.patches or [ ]) ++ [ ./patches/aws-c-io-s2n-darwin.patch ];
+          cmakeFlags = old.cmakeFlags ++ [ "-DAWS_USE_SECITEM=OFF" ];
         });
         aws-c-http = pkgs.aws-c-http.override { inherit aws-c-io; };
         aws-c-auth = pkgs.aws-c-auth.override { inherit aws-c-io aws-c-http; };
@@ -101,21 +102,6 @@ scope: {
         ];
       });
 
-  libgit2 =
-    if lib.versionAtLeast pkgs.libgit2.version "1.9.4" then
-      pkgs.libgit2
-    else
-      # Grab newer libgit2.
-      pkgs.libgit2.overrideAttrs rec {
-        version = "1.9.4";
-        src = pkgs.fetchFromGitHub {
-          owner = "libgit2";
-          repo = "libgit2";
-          tag = "v${version}";
-          hash = "sha256-ZKUiz3pdFE2SKxh53X2oyr7hs32Njj5YVA0OXDXz7h0=";
-        };
-      };
-
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
   boost =
     (pkgs.boost.override {
@@ -126,14 +112,6 @@ scope: {
         "--with-iostreams"
         "--with-url"
       ];
-      patches = lib.optional (
-        lib.versionAtLeast pkgs.boost.version "1.88"
-        && lib.versionOlder pkgs.boost.version "1.92"
-        # may already be done in nixpkgs: https://github.com/NixOS/nixpkgs/pull/546405
-        && !lib.any (patch: lib.hasInfix "5883212311535a0046031d74d1568ae173c1e35b" (baseNameOf patch)) (
-          pkgs.boost.patches or [ ]
-        )
-      ) ./patches/0001-Fix-uncaught_exceptions-not-accounting-for-forced_un.patch;
       enableIcu = false;
     }).overrideAttrs
       (old: {

@@ -742,7 +742,7 @@ struct GitInputScheme : InputScheme
         Activity act(
             *logger, lvlChatty, actUnknown, fmt("getting Git revision count of '%s'", repoInfo.locationToArg()));
 
-        auto revCount = GitRepo::openRepo(repoDir, {})->getRevCount(rev);
+        auto revCount = GitRepoPool::create(repoDir, {})->getRevCount(rev);
 
         cache->upsert(key, Attrs{{"revCount", revCount}});
 
@@ -865,8 +865,15 @@ struct GitInputScheme : InputScheme
             if (doFetch) {
                 bool shallow = getShallowAttr(input);
                 try {
-                    auto fetchRef = getAllRefsAttr(input)             ? "refs/*:refs/*"
-                                    : input.getRev()                  ? input.getRev()->gitRev()
+                    static constexpr std::string_view reservedRefNamespace =
+                        "__nix_internal_fetchers_48ae34d6b380c5ec__";
+                    /* Fetch into a bucketed ref instead of leaving the rev
+                       un-refed, so a later fetch of a nearby rev can
+                       negotiate against it instead of re-downloading. */
+                    auto rev = input.getRev();
+                    auto revStr = rev ? rev->gitRev() : "";
+                    auto fetchRef = getAllRefsAttr(input) ? "refs/*:refs/*"
+                                    : rev ? fmt("%s:refs/%s/tip-%s", revStr, reservedRefNamespace, revStr.substr(0, 2))
                                     : ref.compare(0, 5, "refs/") == 0 ? fmt("%1%:%1%", ref)
                                     : ref == "HEAD"                   ? "HEAD:HEAD"
                                                                       : fmt("%1%:%1%", "refs/heads/" + ref);

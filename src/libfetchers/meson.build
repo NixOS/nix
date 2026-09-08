@@ -47,6 +47,7 @@ sources = files(
   'indirect.cc',
   'input-cache.cc',
   'mercurial.cc',
+  'merkle-tar-adapter.cc',
   'path.cc',
   'register-library-versions.cc',
   'registry.cc',
