@@ -812,7 +812,10 @@ struct curlFileTransfer : public FileTransfer
                         ? s3Match[1].str()
                         : "";
 
-                if (std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode)
+                if (code == CURLE_OPERATION_TIMEDOUT) {
+                    err = Misc;
+                } else if (
+                    std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode)
                     != s3RetryableErrors.end()) {
                     debug("S3 error '%s', will retry", s3ErrorCode);
                 } else if (
