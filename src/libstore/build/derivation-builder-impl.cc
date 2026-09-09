@@ -152,7 +152,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
     for (auto & [outputName, _] : drv.outputs) {
         auto scratchOutput = get(scratchOutputs, outputName);
         assert(scratchOutput);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchOutput));
+        auto actualPath = realPathInHost(*scratchOutput);
 
         outputsToSort.insert(outputName);
 
@@ -276,7 +276,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
         auto output = get(drv.outputs, outputName);
         auto scratchPath = get(scratchOutputs, outputName);
         assert(output && scratchPath);
-        auto actualPath = realPathInHost(store.printStorePath(*scratchPath));
+        auto actualPath = realPathInHost(*scratchPath);
 
         /* An optional file descriptor of a directory used for intermediate
            operations. */

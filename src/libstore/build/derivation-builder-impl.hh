@@ -90,9 +90,9 @@ protected:
      * Sandboxing can put it somewhere other than its final home, so this
      * is a hook rather than just `Store::toRealPath`.
      */
-    virtual std::filesystem::path realPathInHost(const std::filesystem::path & p)
+    virtual std::filesystem::path realPathInHost(const StorePath & p)
     {
-        return store.toRealPath(store.parseStorePath(p.string()));
+        return store.toRealPath(p);
     }
 
 
