@@ -76,11 +76,11 @@ Strings ChrootDerivationBuilder::getPreBuildHookArgs()
     return Strings({store.printStorePath(drvPath), chrootRootDir.native()});
 }
 
-std::filesystem::path ChrootDerivationBuilder::realPathInHost(const std::filesystem::path & p)
+std::filesystem::path ChrootDerivationBuilder::realPathInHost(const StorePath & p)
 {
     // FIXME: why the needsHashRewrite() conditional?
-    return !needsHashRewrite() ? chrootRootDir / p.relative_path()
-                               : std::filesystem::path(store.toRealPath(store.parseStorePath(p.native())));
+    return !needsHashRewrite() ? chrootRootDir / std::filesystem::path{store.printStorePath(p)}.relative_path()
+                               : store.toRealPath(p);
 }
 
 void ChrootDerivationBuilder::cleanupBuild(bool force)
