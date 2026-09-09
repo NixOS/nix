@@ -6,12 +6,12 @@ Added 3 variables.
 fromB, fromBFails, funcFromB
 
 nix-repl> :l ./does-not-exist.nix
-error: path '/path/to/tests/functional/repl/does-not-exist.nix' does not exist
+error: path '/path/to/repl/suite/cases/does-not-exist.nix' does not exist
 
 nix-repl> :p fromBFails
 error:
        … while calling the 'throw' builtin
-         at /path/to/tests/functional/repl/file-b.nix:2:16:
+         at /path/to/repl/suite/cases/file-b.nix:2:16:
             1| {
             2|   fromBFails = throw "b";
              |                ^
@@ -21,7 +21,7 @@ error:
 
 nix-repl> :doc funcFromB
 Function `funcFromB`\
-  … defined at /path/to/tests/functional/repl/file-b.nix:7:15
+  … defined at /path/to/repl/suite/cases/file-b.nix:7:15
 
 
 Some documentation.

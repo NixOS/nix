@@ -5,9 +5,12 @@ nix-repl> :l doc-comments.nix
 Added 13 variables.
 compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, multiply, nonStrict, strict, strictPost, strictPre, unambiguous
 
-nix-repl> :doc measurement
-Function `measurement`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:15:17
+nix-repl> "Note that this is not yet complete"
+"Note that this is not yet complete"
+
+nix-repl> :doc documentedFormals
+Function `documentedFormals`\
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:104:5
 
 
-👈 precisely this wide 👉
+Finds x

@@ -8,7 +8,7 @@ nix-repl> :bt
 0: error: breakpoint reached
 
 1: while calling a function
-/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix:6:13
+/path/to/repl/suite/cases/debugger-okay-ignore-try.in.debugexpr.nix:6:13
 
      5| let
      6|   bricked = break tried;
@@ -19,7 +19,7 @@ nix-repl> :bt
 
 3: while evaluating a 'let' expression
 
-4: while evaluating the file '/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix':
+4: while evaluating the file '/path/to/repl/suite/cases/debugger-okay-ignore-try.in.debugexpr.nix':
 
 nix-repl> :st 3
 
@@ -71,7 +71,7 @@ nix-repl> :p tried
 nix-repl> :st 1
 
 1: while calling a function
-/path/to/tests/functional/repl/debugger-okay-ignore-try.in.debugexpr.nix:6:13
+/path/to/repl/suite/cases/debugger-okay-ignore-try.in.debugexpr.nix:6:13
 
      5| let
      6|   bricked = break tried;

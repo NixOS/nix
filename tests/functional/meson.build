@@ -7,7 +7,7 @@ project(
     'warning_level=1',
     'errorlogs=true', # Please print logs for tests that fail
   ],
-  meson_version : '>= 1.3',
+  meson_version : '>= 1.8',
   license : 'LGPL-2.1-or-later',
 )
 
@@ -206,27 +206,8 @@ if nix_store.found()
 
 endif
 
-# Plugin tests require shared libraries support.
-nix_expr = dependency('nix-expr', required : false)
-if nix_expr.found() and get_option('default_library') != 'static'
-  add_languages('cpp')
-  subdir('plugins')
-  plugin_test_deps = [ libplugintest ]
-  if get_option('plugin-c-api') and not host_machine.system().startswith(
-    'windows',
-  )
-    plugin_test_deps += [ libplugintest_dlsym ]
-  endif
-  suites += {
-    'name' : 'plugins',
-    'deps' : plugin_test_deps,
-    'tests' : [
-      'plugins.sh',
-    ],
-    'workdir' : meson.current_source_dir(),
-  }
-endif
-
+subdir('suites')
+# TODO: Lay out the tests suites in a less flat manner.
 subdir('ca')
 subdir('dyn-drv')
 subdir('flakes')
@@ -260,6 +241,9 @@ foreach suite : suites
       meson.current_build_dir() / 'asan-log',
     )
 
+    overrides = suite.get('overrides', {}).get(script, {})
+    protocol = overrides.get('protocol', 'exitcode')
+
     test(
       name,
       bash,
@@ -280,7 +264,7 @@ foreach suite : suites
         'TEST_NAME' : name,
         'NIX_REMOTE' : '',
         'PS4' : '+(${BASH_SOURCE[0]-$0}:$LINENO) ',
-      },
+      } + suite.get('env', {}),
       # Some tests take 15+ seconds even on an otherwise idle machine;
       # on a loaded machine this can easily drive them to failure. Give
       # them more time than the default of 30 seconds.
@@ -288,6 +272,7 @@ foreach suite : suites
       # Used for target dependency/ordering tracking, not adding compiler flags or anything.
       depends : deps,
       workdir : workdir,
+      protocol : protocol,
     )
   endforeach
 endforeach
