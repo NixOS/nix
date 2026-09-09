@@ -12,6 +12,7 @@ requireGit
 
 repo=$TEST_ROOT/repo
 trace=$TEST_ROOT/git-trace
+pack=$TEST_ROOT/received.pack
 
 createGitRepo "$repo"
 
@@ -44,8 +45,10 @@ if [[ $(git -C "$cacheDir" rev-parse "refs/$reservedRefNamespace/tip-$bucket1") 
 fi
 
 export GIT_TRACE_PACKET=$trace
+export GIT_TRACE_PACKFILE=$pack
 nix-instantiate --eval --raw -E "(builtins.fetchGit { url = \"file://$repo\"; rev = \"$rev2\"; }).outPath" >/dev/null
 unset GIT_TRACE_PACKET
+unset GIT_TRACE_PACKFILE
 
 if ! grep -q "fetch> have $rev1" "$trace"; then
     echo "Expected the second fetch to advertise $rev1 (via refs/$reservedRefNamespace/tip-$bucket1) as a negotiation tip." >&2
@@ -53,9 +56,16 @@ if ! grep -q "fetch> have $rev1" "$trace"; then
     exit 1
 fi
 
-totals=$(grep -oE 'sideband< .*Total [0-9]+' "$trace" | sed -E 's/.*Total ([0-9]+)/\1/')
-if [[ $totals -ge 6 ]]; then
-    echo "Expected the second fetch to receive only new objects (got Total $totals, same as a full re-fetch would)." >&2
+# rev2 adds 3 new objects over rev1; a non-negotiated re-fetch would
+# receive 6 (rev1's objects too). GIT_TRACE_PACKFILE creates an empty
+# file when nothing was received, so guard on size before indexing it.
+objectsReceived=0
+if [[ -s "$pack" ]]; then
+    git index-pack "$pack" >/dev/null
+    objectsReceived=$(git verify-pack -v "$pack" | grep -c '^[0-9a-f]\{40\} ')
+fi
+if [[ $objectsReceived -ge 6 ]]; then
+    echo "Expected the second fetch to receive only new objects (got $objectsReceived, same as a full re-fetch would)." >&2
     exit 1
 fi
 
