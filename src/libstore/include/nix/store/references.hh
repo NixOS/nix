@@ -51,7 +51,7 @@ public:
     void flush();
 };
 
-struct HashModuloSink : AbstractHashSink
+struct MaskedHashSink : AbstractHashSink
 {
 private:
     void anchor() override;
@@ -60,7 +60,7 @@ public:
     HashSink hashSink;
     RewritingSink rewritingSink;
 
-    HashModuloSink(HashAlgorithm ha, const std::string & modulus);
+    MaskedHashSink(HashAlgorithm ha, const std::string & modulus);
 
     void operator()(std::string_view data) override;
 

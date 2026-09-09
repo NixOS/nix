@@ -396,7 +396,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 switch (fim) {
                 case FileIngestionMethod::Flat:
                 case FileIngestionMethod::NixArchive: {
-                    HashModuloSink caSink{outputHash.hashAlgo, oldHashPart};
+                    MaskedHashSink caSink{outputHash.hashAlgo, oldHashPart};
                     auto fim = outputHash.method.getFileIngestionMethod();
                     dumpPath(
                         {makeFSSourceAccessor(actualPath), CanonPath::root}, caSink, (FileSerialisationMethod) fim);
@@ -418,7 +418,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs()
                 // If the path has some self-references, we need to rewrite
                 // them.
                 // (note that this doesn't invalidate the ca hash we calculated
-                // above because it's computed *modulo the self-references*, so
+                // above because it's computed *with the self-references masked*, so
                 // it already takes this rewrite into account).
                 rewriteOutput(StringMap{{oldHashPart, std::string(newInfo0.path.hashPart())}});
             }
