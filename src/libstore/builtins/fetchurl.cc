@@ -29,8 +29,11 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
         throw Error("'builtin:fetchurl' must be a fixed-output or impure derivation");
 
     auto storePath = ctx.outputs.at("out");
-    auto mainUrl = ctx.drv.env.at("url");
-    bool unpack = getOr(ctx.drv.env, "unpack", "") == "1";
+    auto mainUrl = ctx.drv.env.at("url").value;
+    bool unpack = [&] {
+        auto i = ctx.drv.env.find("unpack");
+        return i != ctx.drv.env.end() && i->second.value == "1";
+    }();
 
     /* Note: have to use a fresh fileTransfer here because we're in
        a forked process. */
@@ -66,13 +69,13 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
             writeFile(storePath, *source);
 
         auto executable = ctx.drv.env.find("executable");
-        if (executable != ctx.drv.env.end() && executable->second == "1") {
+        if (executable != ctx.drv.env.end() && executable->second.value == "1") {
             chmod(storePath, 0755);
         }
     };
 
     /* Try the hashed mirrors first. */
-    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->raw);
+    auto dof = std::get_if<DerivationOutput::CAFixed>(&out->output.raw);
     if (dof && dof->ca.method.getFileIngestionMethod() == FileIngestionMethod::Flat)
         for (auto hashedMirror : ctx.hashedMirrors)
             try {

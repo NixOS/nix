@@ -1,0 +1,46 @@
+{
+  "args": [],
+  "builder": "/bin/intermediate",
+  "env": {
+    "dev": "/nix/store/xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev",
+    "out": "/nix/store/jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate"
+  },
+  "inputs": {
+    "drvs": {
+      "q4mzjdlh5px6977h7v5fdsk1p33yg583-source.drv": {
+        "dynamicOutputs": {},
+        "outputs": [
+          "out"
+        ]
+      }
+    },
+    "srcs": []
+  },
+  "name": "intermediate",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
+  "outputs": {
+    "dev": {
+      "checks": null,
+      "path": "xgskw9kbh807ah56r4f4kxdh0fa1i0ip-intermediate-dev",
+      "unsafeDiscardReferences": false
+    },
+    "out": {
+      "checks": null,
+      "path": "jlzxv2xpqj0adi22cy93573vyf9xr6fw-intermediate",
+      "unsafeDiscardReferences": false
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 5
+}

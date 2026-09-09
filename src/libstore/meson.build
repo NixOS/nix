@@ -281,6 +281,7 @@ sources = files(
   'daemon.cc',
   'derivation-options.cc',
   'derivation/aterm.cc',
+  'derivation/elaborate.cc',
   'derivation/full-inputs.cc',
   'derivation/json.cc',
   'derivation/masked.cc',

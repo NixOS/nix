@@ -2,6 +2,8 @@
 ///@file
 
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/aterm.hh"
+#include "nix/util/fun.hh"
 
 #include <boost/unordered/concurrent_flat_map_fwd.hpp>
 
@@ -12,8 +14,8 @@ class Store;
 namespace derivation::masked {
 
 /**
- * Inputs in the intermediate form used to compute the hash modulo:
- * input derivations are identified by their hash modulo rather than by
+ * Inputs in the intermediate form used to compute the masked hash:
+ * input derivations are identified by their masked hash rather than by
  * store path.
  *
  * `Hash::operator<=>` compares bytes left-to-right, which matches
@@ -25,7 +27,7 @@ struct HashInputs
     StorePathSet srcs;
 
     /**
-     * No `DerivedPathMap` involved: the hash modulo is only ever
+     * No `DerivedPathMap` involved: the masked hash is only ever
      * computed after dynamic inputs are resolved away, so each input
      * derivation maps to a plain set of output names.
      */
@@ -34,22 +36,69 @@ struct HashInputs
     /**
      * Nesting just to match `DerivedPathMap` for easier templating.
      */
-    struct
+    struct Drvs
     {
         DrvMap map;
+
+        bool operator==(const Drvs &) const = default;
     } drvs;
 
-    // no operator== needed; nothing compares these yet
+    /* Needed so that `Drv`, and thus `ATermT<HashInputs, Out>`, is
+       comparable: the tests compare masked derivations structurally
+       rather than comparing their hashes. */
+    bool operator==(const HashInputs &) const = default;
 };
 
 /**
- * The hashes modulo of a derivation.
+ * An *input-masked* derivation: its input derivations are named by their
+ * masked hash rather than by store path. This is the intermediate form
+ * whose ATerm encoding is hashed to compute input addresses.
+ *
+ * `Out` says whether the outputs are masked too:
+ *
+ * - `Output::InputAddressed` --- input masking only. The derivation's
+ *   own output paths are still there, so its hash identifies it
+ *   including them. This is what `hashInput` hashes.
+ *
+ * - `Output::Deferred` --- input *and* output masking, i.e. a
+ *   [*fully masked*] derivation. This is the preimage of the
+ *   derivation's own input address, and what `fullyMaskDerivation`
+ *   computes.
+ *
+ * Neither is a derivation that can be built or written to the store ---
+ * their inputs name hashes, not paths --- but they are exactly what
+ * input addresses are computed from, so having them as values rather
+ * than only as hashes means the computation can be inspected and
+ * compared.
+ *
+ * Both are `ATermT` rather than `Derivation` because they only exist to
+ * be printed and hashed, and because output masking makes them *not*
+ * faithful derivations: with the outputs masked and the environment
+ * variables named after them blanked, the environment no longer encodes
+ * the options a `Derivation` would carry.
+ *
+ * "Output masking" is the traditional name --- it is the "masked" store
+ * derivation of `primops.cc`, blanking the output paths in the
+ * `outputs` field and in the env vars named after them alike. "Input
+ * masking" is the parallel name for the other half.
+ *
+ * @see fullyMaskDerivation, which computes the fully masked form,
+ * and hashDerivation, which hashes either.
+ *
+ * [*fully masked*]:
+ *   https://nix.dev/manual/nix/latest/store/derivation/outputs/input-address.html#input-masked-drv
+ */
+template<typename Out = Output::InputAddressed>
+using Drv = ATermT<HashInputs, Out>;
+
+/**
+ * The masked hashes of a derivation.
  *
  * Each output is given a hash, although in practice only the content-addressed
  * derivations (fixed-output or not) will have a different hash for each
  * output.
  */
-struct HashModulo
+struct MaskedHash
 {
     /**
      * Single hash for the derivation
@@ -77,10 +126,10 @@ struct HashModulo
 
     Raw raw;
 
-    bool operator==(const HashModulo &) const = default;
-    // auto operator <=> (const HashModulo &) const = default;
+    bool operator==(const MaskedHash &) const = default;
+    // auto operator <=> (const MaskedHash &) const = default;
 
-    MAKE_WRAPPER_CONSTRUCTOR(HashModulo);
+    MAKE_WRAPPER_CONSTRUCTOR(MaskedHash);
 };
 
 struct HashFct
@@ -96,7 +145,7 @@ struct HashFct
 /**
  * Memoisation of `hashInput`.
  */
-typedef boost::concurrent_flat_map<StorePath, HashModulo, HashFct> Hashes;
+typedef boost::concurrent_flat_map<StorePath, MaskedHash, HashFct> Hashes;
 
 // FIXME: global, though at least thread-safe.
 extern Hashes hashes;
@@ -127,46 +176,64 @@ extern Hashes hashes;
  *
  * When the derivation is itself, or (transitively) depends on, a
  * content-addressing derivation without a content address fixed in
- * advance (`CAFloating` or `Impure`), `HashModulo::DeferredDrv` is
+ * advance (`CAFloating` or `Impure`), `MaskedHash::DeferredDrv` is
  * returned indicating we cannot yet compute an input address, because
  * we don't yet know what all the inputs are.
  */
-HashModulo hashInput(Store & store, const Full & drv);
+MaskedHash hashInput(const StoreDirConfig & store, ReadDerivation & readDerivation, const Full & drv);
+
+MaskedHash hashInput(Store & store, const Full & drv);
 
 /**
- * Compute the hash with outputs masked (replaced with `Deferred`), for
- * computing a derivation's own output paths (rather than its identity
- * as an input to other derivations). Only valid for input-addressed
- * (possibly deferred) derivations.
+ * Compute the fully masked derivation, the preimage of a
+ * derivation's own input address: input masking and output masking both, i.e. each input
+ * derivation replaced by its own masked hash (in place of its store
+ * path), and the derivation's own outputs masked --- in the `outputs`
+ * field and in the env vars named after them alike.
  *
- * Returns `std::nullopt` if the hash cannot be computed yet because
- * inputs' output paths are not yet known.
+ * Returns `std::nullopt` when an input's output paths are not yet
+ * known, and so there is nothing to substitute for it.
  */
-std::optional<Hash> hash(Store & store, const Full & drv);
+template<typename Out>
+std::optional<Drv<Output::Deferred>> fullyMaskDerivation(
+    const StoreDirConfig & store,
+    ReadDerivation & readDerivation,
+    const Derivation<SingleDerivedPath, Out> & drv);
+
+extern template std::optional<Drv<Output::Deferred>>
+fullyMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const Full & drv);
+extern template std::optional<Drv<Output::Deferred>>
+fullyMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullDeferred & drv);
+extern template std::optional<Drv<Output::Deferred>>
+fullyMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullInputAddressed & drv);
+
+template<typename Out>
+std::optional<Drv<Output::Deferred>>
+fullyMaskDerivation(Store & store, const Derivation<SingleDerivedPath, Out> & drv)
+{
+    return fullyMaskDerivation(store, derivation::readInvalid(store), drv);
+}
 
 /**
  * Like the above, but for a resolved (basic) derivation, which has no
- * input derivations and therefore always has a computable hash.
+ * input derivations to substitute and so cannot fail.
  */
-Hash hash(Store & store, const Basic & drv);
+Drv<Output::Deferred> fullyMaskDerivation(const StoreDirConfig & store, const Basic & drv);
 
 /**
- * The intermediate ATerm that `hash` hashes: the derivation with
- * its outputs masked, and with each input derivation replaced by its
- * own hash modulo (in place of its store path).
+ * Hash a masked derivation. For the fully masked form this is what
+ * an input address *is*.
  *
- * This is not a real derivation --- it cannot be parsed back --- but it
- * is exactly what the input address is computed from, so exposing it
- * makes that computation reviewable rather than a black box.
+ * This is total: the masking can fail, hashing it cannot.
  *
- * Returns `std::nullopt` in the same cases `hash` does.
+ * The hash algorithm is not a parameter on purpose --- "SHA-256 of this
+ * ATerm" is part of the on-disk format, not a choice for callers.
  */
-std::optional<std::string> unparseModulo(Store & store, const Full & drv);
+template<typename Out>
+Hash hashDerivation(const StoreDirConfig & store, const Drv<Out> & drv);
 
-/**
- * Like the above, but for a resolved (basic) derivation.
- */
-std::string unparseModulo(Store & store, const Basic & drv);
+extern template Hash hashDerivation(const StoreDirConfig & store, const Drv<Output::Deferred> & drv);
+extern template Hash hashDerivation(const StoreDirConfig & store, const Drv<Output::InputAddressed> & drv);
 
 } // namespace derivation::masked
 

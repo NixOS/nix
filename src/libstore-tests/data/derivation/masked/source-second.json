@@ -1,0 +1,34 @@
+{
+  "args": [],
+  "builder": "/bin/second",
+  "env": {
+    "out": "/nix/store/i00sflxqsj37lfmf95m8mn0grv615hpj-source"
+  },
+  "inputs": {
+    "drvs": {},
+    "srcs": []
+  },
+  "name": "source",
+  "options": {
+    "additionalSandboxProfile": "",
+    "allOutputChecks": null,
+    "allowLocalNetworking": false,
+    "allowSubstitutes": true,
+    "exportReferencesGraph": {},
+    "impureEnvVars": [],
+    "impureHostDeps": [],
+    "noChroot": false,
+    "preferLocalBuild": false,
+    "requiredSystemFeatures": []
+  },
+  "outputs": {
+    "out": {
+      "checks": null,
+      "hash": "sha256-iUUXyRY8iW7DGirb0zwGgf1fRbLA7wimTJKgP7l/OQ8=",
+      "method": "nar",
+      "unsafeDiscardReferences": false
+    }
+  },
+  "system": "x86_64-linux",
+  "version": 5
+}

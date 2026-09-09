@@ -1,0 +1,157 @@
+"$schema": "http://json-schema.org/draft-04/schema"
+"$id": "https://nix.dev/manual/nix/latest/protocols/json/schema/derivation-output-checks-v1.json"
+title: Derivation Output Checks
+description: |
+  JSON representation of the per-output options of a derivation:
+  the [checks](@docroot@/store/derivation/outputs/index.md#output-checks) that must hold on the produced output,
+  and whether [reference scanning](@docroot@/store/derivation/outputs/index.md#unsafe-discard-references) is disabled.
+
+  These fields appear inline in each entry of a derivation's `outputs` map.
+
+  > **Warning**
+  >
+  > This JSON format is currently
+  > [**experimental**](@docroot@/development/experimental-features.md#xp-feature-nix-command)
+  > and subject to change.
+
+type: object
+required:
+  - checks
+  - unsafeDiscardReferences
+properties:
+  checks:
+    title: Output Checks
+    description: |
+      Checks on the produced output, or `null` if there are none.
+
+      When the derivation specifies [checks for all outputs](derivation-top-options-v1.yaml) instead, this is `null`.
+    oneOf:
+      - type: "null"
+      - "$ref": "#/$defs/outputChecks"
+  unsafeDiscardReferences:
+    type: boolean
+    title: Unsafe Discard References
+    description: |
+      Whether scanning the output for run-time references is disabled.
+
+      See [*unsafe discard references*](@docroot@/store/derivation/outputs/index.md#unsafe-discard-references).
+
+"$defs":
+  outputChecks:
+    type: object
+    title: Output Checks
+    description: |
+      Checks that must hold on a produced output for the build to be considered successful.
+
+      See [output checks](@docroot@/store/derivation/outputs/index.md#output-checks).
+    required:
+      - ignoreSelfRefs
+      - maxSize
+      - maxClosureSize
+      - allowedReferences
+      - disallowedReferences
+      - allowedRequisites
+      - disallowedRequisites
+    properties:
+      ignoreSelfRefs:
+        type: boolean
+        title: Ignore Self References
+        description: |
+          Whether references of the output to itself are exempted from the reference checks.
+      maxSize:
+        title: Max Size
+        description: |
+          Maximum size of the output's store object, in bytes, or `null` for no limit.
+        oneOf:
+          - type: "null"
+          - type: integer
+      maxClosureSize:
+        title: Max Closure Size
+        description: |
+          Maximum total size of the output's closure, in bytes, or `null` for no limit.
+        oneOf:
+          - type: "null"
+          - type: integer
+      allowedReferences:
+        title: Allowed References
+        description: |
+          The output's references must be a subset of this set, or `null` to skip the check.
+          Elements are deriving paths, or output names of the derivation itself.
+        oneOf:
+          - type: "null"
+          - type: array
+            items:
+              "$ref": "#/$defs/drvRef"
+      disallowedReferences:
+        title: Disallowed References
+        description: |
+          None of these may be a reference of the output.
+        type: array
+        items:
+          "$ref": "#/$defs/drvRef"
+      allowedRequisites:
+        title: Allowed Requisites
+        description: |
+          Like `allowedReferences`, but applying to the whole closure of the output.
+        oneOf:
+          - type: "null"
+          - type: array
+            items:
+              "$ref": "#/$defs/drvRef"
+      disallowedRequisites:
+        title: Disallowed Requisites
+        description: |
+          Like `disallowedReferences`, but applying to the whole closure of the output.
+        type: array
+        items:
+          "$ref": "#/$defs/drvRef"
+  outputChecksResolved:
+    title: Output Checks (resolved)
+    description: |
+      Like [output checks](#/$defs/outputChecks), but for a
+      [resolved derivation](derivation-resolved-v5.yaml):
+      all references are plain store paths (or outputs of the derivation itself),
+      since a resolved derivation has no derivation dependencies left to refer to.
+    allOf:
+      - "$ref": "#/$defs/outputChecks"
+      - properties:
+          allowedReferences:
+            items:
+              "$ref": "#/$defs/drvRefResolved"
+          disallowedReferences:
+            items:
+              "$ref": "#/$defs/drvRefResolved"
+          allowedRequisites:
+            items:
+              "$ref": "#/$defs/drvRefResolved"
+          disallowedRequisites:
+            items:
+              "$ref": "#/$defs/drvRefResolved"
+  drvRef:
+    title: Output Reference
+    description: |
+      A reference that an output check constrains: a deriving path,
+      or an output of the derivation being checked itself, denoted by the derivation path `self`.
+    anyOf:
+      - "$ref": "deriving-path-v1.yaml"
+      - "$ref": "#/$defs/selfOutput"
+  drvRefResolved:
+    title: Output Reference (resolved)
+    description: |
+      Like an [output reference](#/$defs/drvRef), but in a resolved derivation:
+      a plain store path, or an output of the derivation being checked itself.
+    anyOf:
+      - "$ref": "store-path-v1.yaml"
+      - "$ref": "#/$defs/selfOutput"
+  selfOutput:
+    title: Output of this derivation
+    type: object
+    required:
+      - drvPath
+      - output
+    properties:
+      drvPath:
+        enum: ["self"]
+      output:
+        type: string
+    additionalProperties: false

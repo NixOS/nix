@@ -2,7 +2,7 @@
 ///@file
 
 #include "nix/store/derivations.hh"
-#include "nix/store/derivation-options.hh"
+#include "nix/store/derivation/elaborate.hh"
 #include "nix/store/path-info.hh"
 
 namespace nix {
@@ -33,7 +33,6 @@ void checkOutputs(
     Store & store,
     const StorePath & drvPath,
     const BasicDerivation & drv,
-    const decltype(DerivationOptions<StorePath>::outputChecks) & drvOptions,
     const std::map<std::string, ValidPathInfo> & outputs);
 
 } // namespace nix
