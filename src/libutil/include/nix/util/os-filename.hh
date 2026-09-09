@@ -59,22 +59,6 @@ public:
         return name.c_str();
     }
 
-    /**
-     * Reinterpret a `std::filesystem::path` reference as an `OsFilename`
-     * reference, asserting the filename invariants.
-     *
-     * This avoids a copy when the path is already known to be stored
-     * somewhere with sufficient lifetime.
-     */
-    static const OsFilename & refFromPath(const std::filesystem::path & p)
-    {
-        static_assert(sizeof(OsFilename) == sizeof(std::filesystem::path));
-        static_assert(alignof(OsFilename) == alignof(std::filesystem::path));
-        auto & ref = reinterpret_cast<const OsFilename &>(p);
-        ref.validateAssert();
-        return ref;
-    }
-
     bool operator==(const OsFilename &) const = default;
     auto operator<=>(const OsFilename &) const = default;
 };

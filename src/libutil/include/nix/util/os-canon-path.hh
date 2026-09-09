@@ -125,7 +125,7 @@ public:
     OsCanonPath removePrefix(const OsCanonPath & prefix) const;
 
     /**
-     * Iterator that yields `OsFilename` for each path component.
+     * Iterator that yields an `OsFilename` for each path component.
      *
      * Safe because `OsCanonPath` invariants guarantee every component
      * is a valid `OsFilename` (no empty, `.`, `..`, or root components).
@@ -143,21 +143,16 @@ public:
 
     public:
         using value_type = OsFilename;
-        using reference = const OsFilename &;
-        using pointer = const OsFilename *;
+        using reference = OsFilename;
+        using pointer = void;
         using difference_type = std::ptrdiff_t;
         using iterator_category = std::bidirectional_iterator_tag;
 
         Iterator() = default;
 
-        const OsFilename & operator*() const
+        OsFilename operator*() const
         {
-            return OsFilename::refFromPath(*it);
-        }
-
-        const OsFilename * operator->() const
-        {
-            return &OsFilename::refFromPath(*it);
+            return OsFilename{*it};
         }
 
         Iterator & operator++()
