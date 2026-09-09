@@ -1,4 +1,5 @@
 #include "nix/store/daemon.hh"
+#include "nix/store/daemon-option-policy.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/file-content-address.hh"
 #include "nix/util/signals.hh"
@@ -1182,6 +1183,7 @@ void processConnection(
             // We and the underlying store both need to trust the client for
             // it to be trusted.
             .remoteTrustsUs = trusted ? store->isTrustedClient() : std::optional{NotTrusted},
+            .daemonOptionPolicy = getDaemonOptionPolicy(settings, fileTransferSettings, trusted),
         });
 
     /* Send startup error messages to the client. */

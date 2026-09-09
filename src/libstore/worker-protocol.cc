@@ -27,6 +27,7 @@ const WorkerProto::Version WorkerProto::latest = {
         {
             std::string{WorkerProto::featureRealisationWithPath},
             std::string{WorkerProto::featureDeleteDeadSpecificReferrers},
+            std::string{WorkerProto::featureDaemonOptionPolicy},
         },
 };
 
@@ -464,6 +465,9 @@ WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(const StoreDirCon
         res.remoteTrustsUs = std::nullopt;
     }
 
+    if (conn.version.features.contains(WorkerProto::featureDaemonOptionPolicy))
+        res.daemonOptionPolicy = WorkerProto::Serialise<StringMap>::read(store, conn);
+
     return res;
 }
 
@@ -477,6 +481,10 @@ void WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(
 
     if (conn.version >= WorkerProto::Version{.number = {1, 35}}) {
         WorkerProto::write(store, conn, info.remoteTrustsUs);
+    }
+    if (conn.version.features.contains(WorkerProto::featureDaemonOptionPolicy)) {
+        assert(info.daemonOptionPolicy);
+        WorkerProto::write(store, conn, *info.daemonOptionPolicy);
     }
 }
 
