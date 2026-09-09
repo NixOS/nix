@@ -43,7 +43,7 @@ public:
 
     Strings getPreBuildHookArgs() override;
 
-    std::filesystem::path realPathInHost(const std::filesystem::path & p) override;
+    std::filesystem::path realPathInHost(const StorePath & p) override;
 
     void cleanupBuild(bool force) override;
 
