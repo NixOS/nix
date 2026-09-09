@@ -1,6 +1,8 @@
 #include "nix/fetchers/filtering-source-accessor.hh"
 #include "nix/util/sync.hh"
+#include "nix/util/util.hh"
 
+#include <boost/unordered/concurrent_flat_map.hpp>
 #include <boost/unordered/concurrent_flat_set.hpp>
 
 namespace nix {
@@ -108,13 +110,19 @@ ref<AllowListSourceAccessor> AllowListSourceAccessor::create(
     return make_ref<AllowListSourceAccessorImpl>(next, allowedPrefixes, allowedPaths, std::move(makeNotAllowedError));
 }
 
+CachingFilteringSourceAccessor::CachingFilteringSourceAccessor(
+    const SourcePath & src, MakeNotAllowedError && makeNotAllowedError)
+    : FilteringSourceAccessor(src, std::move(makeNotAllowedError))
+    , cache(make_ref<boost::concurrent_flat_map<CanonPath, bool>>())
+{
+}
+
 bool CachingFilteringSourceAccessor::isAllowed(const CanonPath & path)
 {
-    auto i = cache.find(path);
-    if (i != cache.end())
-        return i->second;
+    if (auto allowed = getConcurrent(*cache, path))
+        return *allowed;
     auto res = isAllowedUncached(path);
-    cache.emplace(path, res);
+    cache->emplace(path, res);
     return res;
 }
 
