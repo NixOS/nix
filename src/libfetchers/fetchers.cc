@@ -70,7 +70,8 @@ Input Input::fromURL(const ParsedURL & url, bool requireTree)
         auto res = inputScheme->inputFromURL(url, requireTree);
         if (res) {
             experimentalFeatureSettings.require(inputScheme->experimentalFeature());
-            res->scheme = inputScheme;
+            if (!res->scheme)
+                res->scheme = inputScheme;
             fixupInput(*res);
             return std::move(*res);
         }
@@ -124,7 +125,8 @@ Input Input::fromAttrs(Attrs && attrs)
     auto res = inputScheme->inputFromAttrs(attrs);
     if (!res)
         return raw();
-    res->scheme = inputScheme;
+    if (!res->scheme)
+        res->scheme = inputScheme;
     fixupInput(*res);
     return std::move(*res);
 }

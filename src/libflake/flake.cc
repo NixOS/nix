@@ -393,6 +393,7 @@ static Flake getFlake(
         debug("refetching input '%s' due to self attribute", *newLockedRef);
         // FIXME: need to remove attrs that are invalidated by the changed input attrs, such as 'narHash'.
         newLockedRef->input.attrs.erase("narHash");
+        newLockedRef->input.attrs.erase("__final");
         auto cachedInput2 = state.inputCache->getAccessor(
             state.fetchSettings, *state.store, newLockedRef->input, fetchers::UseRegistries::No);
         cachedInput.accessor = cachedInput2.accessor;
