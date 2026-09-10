@@ -20,6 +20,22 @@ struct CmdStoreGC : StoreCommand, MixDryRun
             .labels = {"n"},
             .handler = {&options.maxFreed},
         });
+
+        addFlag({
+            .longName = "prune-older-than",
+            .description =
+                "Prune unused paths older than *n* seconds using fast SQL query. Only prunes leaf paths (no referrers) per round. Use --prune-rounds to run multiple rounds.",
+            .labels = {"n"},
+            .handler = {&options.pruneOlderThan},
+        });
+
+        addFlag({
+            .longName = "prune-rounds",
+            .description =
+                "Number of pruning rounds to run (default 1). Each round deletes current leaf paths. Multiple rounds amortize the expensive root-finding phase across deeper dependency chains.",
+            .labels = {"n"},
+            .handler = {&options.pruneRounds},
+        });
     }
 
     std::string description() override
