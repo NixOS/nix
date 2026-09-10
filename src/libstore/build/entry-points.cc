@@ -59,7 +59,7 @@ void Worker::buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMo
             if (auto i2 = dynamic_cast<DerivationTrampolineGoal *>(i.get()))
                 failed.insert(i2->drvReq->to_string(store));
             else if (auto i2 = dynamic_cast<PathSubstitutionGoal *>(i.get()))
-                failed.insert(store.printStorePath(i2->storePath));
+                failed.insert(store.printStorePath(i2->getStorePath()));
         }
     }
 
