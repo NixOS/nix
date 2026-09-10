@@ -118,10 +118,12 @@ struct DerivationTrampolineGoal : public Goal
 
 private:
 
-    BuildMode buildMode;
+    BasicCo<std::pair<StorePath, Derivation>> loadDerivation();
 
-    Co init();
+    Co haveToLoadFromStore();
     Co haveDerivation(StorePath drvPath, Derivation drv);
+
+    BuildMode buildMode;
 
     /**
      * Shared between both constructors

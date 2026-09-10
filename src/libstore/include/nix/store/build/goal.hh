@@ -595,6 +595,12 @@ public:
             return BasicCo<T>{HandleType<T>::from_promise(*this)};
         }
 
+        /**
+         * Does nothing, but provides an opportunity for
+         * @ref final_suspend to happen.
+         */
+        void return_value(Done &&) {}
+
         template<typename R>
         void return_value(R && r)
         {
