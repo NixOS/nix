@@ -15,7 +15,7 @@ struct DarwinDerivationBuilder : UnixDerivationBuilderImpl
     bool useSandbox;
 
     DarwinDerivationBuilder(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         bool useSandbox)

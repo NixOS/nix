@@ -7,7 +7,7 @@ compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, 
 
 nix-repl> :doc curriedArgs
 Function `curriedArgs`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:87:5
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:87:5
 
 
 A documented function.
@@ -19,7 +19,7 @@ nix-repl> "Note that users may not expect this to behave as it currently does"
 
 nix-repl> :doc x
 Function `curriedArgs`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:91:5
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:91:5
 
 
 The function returned by applying once

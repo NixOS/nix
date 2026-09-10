@@ -5,9 +5,9 @@ nix-repl> :l doc-comments.nix
 Added 13 variables.
 compact, constant, curriedArgs, documentedFormals, floatedIn, lib, measurement, multiply, nonStrict, strict, strictPost, strictPre, unambiguous
 
-nix-repl> :doc compact
-Function `compact`\
-  … defined at /path/to/tests/functional/repl/doc-comments.nix:27:5
+nix-repl> :doc unambiguous
+Function `unambiguous`\
+  … defined at /path/to/repl/suite/cases/doc-comments.nix:37:5
 
 
-boom
+Very close
