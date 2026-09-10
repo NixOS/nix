@@ -35,6 +35,15 @@ class PathSubstitutionGoal : public Goal
      */
     std::optional<ContentAddress> ca;
 
+    enum class SubstitutionResult {
+        SubstituterFailed,
+        SubstituteGone,
+        Ok,
+    };
+
+    BasicCo<SubstitutionResult>
+    tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info);
+
 public:
     PathSubstitutionGoal(
         const StorePath & storePath,
@@ -58,8 +67,6 @@ public:
      * The states.
      */
     Co init();
-    Co tryToRun(
-        StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed);
 
     /* Called by destructor, can't be overridden */
     void cleanup() override final;
