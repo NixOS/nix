@@ -23,8 +23,6 @@ class RemoteFSAccessor : public SourceAccessor
 
     NarCache narCache;
 
-    bool requireValidPath;
-
     std::pair<ref<SourceAccessor>, CanonPath> fetch(const CanonPath & path);
 
     friend struct BinaryCacheStore;
@@ -33,8 +31,6 @@ public:
 
     /**
      * @return nullptr if the store does not contain any object at that path.
-     *
-     * @todo This actually doesn't return nullptr, but throws on invalid paths.
      */
     std::shared_ptr<SourceAccessor> accessObject(const StorePath & path);
 
