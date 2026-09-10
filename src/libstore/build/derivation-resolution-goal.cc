@@ -11,10 +11,8 @@ namespace nix {
 
 DerivationResolutionGoal::DerivationResolutionGoal(
     const StorePath & drvPath, ref<const Derivation> drv, Worker & worker, BuildMode buildMode)
-    : Goal(worker, resolveDerivation())
+    : Goal(worker, init(std::move(drv), buildMode))
     , drvPath(drvPath)
-    , drv(std::move(drv))
-    , buildMode{buildMode}
 {
     name = fmt("resolving derivation '%s'", worker.store.printStorePath(drvPath));
     trace("created");
@@ -25,20 +23,21 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-Goal::Co DerivationResolutionGoal::resolveDerivation()
+Goal::BasicCo<DerivationResolutionGoal::InputsGoalMap>
+DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildMode)
 {
     Goals waitees;
-
-    std::map<ref<const SingleDerivedPath>, GoalPtr, RefDeepComparator> inputGoals;
+    InputsGoalMap inputGoals;
 
     /* Ensure that pure, non-fixed-output derivations don't depend on
        impure derivations. Only worth checking each input derivation
        once, however many of its outputs we depend on. */
     bool checkImpureInputs =
-        experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !type(*drv).isImpure() && !type(*drv).isFixed();
+        experimentalFeatureSettings.isEnabled(Xp::ImpureDerivations) && !type(drv).isImpure() && !type(drv).isFixed();
+
     StorePathSet checkedInputDrvs;
 
-    for (const auto & input : drv->inputs) {
+    for (const auto & input : drv.inputs) {
         std::visit(
             overloaded{
                 [&](const SingleDerivedPath::Opaque &) {
@@ -73,8 +72,6 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 
     co_await await(std::move(waitees));
 
-    trace("all inputs realised");
-
     if (nrFailed != 0) {
         auto msg =
             fmt("Cannot build '%s'.\n"
@@ -82,7 +79,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
                 Magenta(worker.store.printStorePath(drvPath)),
                 nrFailed,
                 nrFailed == 1 ? "dependency" : "dependencies");
-        msg += showKnownOutputs(worker.store, *drv);
+        msg += showKnownOutputs(worker.store, drv);
         co_return doneFailure(
             ecFailed,
             BuildResult::Failure{{
@@ -91,73 +88,75 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
             }});
     }
 
-    /* Gather information necessary for computing the closure and/or
-       running the build hook. */
+    trace("all inputs realised");
 
-    /* Determine the full set of input paths. */
+    co_return inputGoals;
+}
 
-    /* First, the input derivations. */
-    auto & fullDrv = *drv;
+Goal::BasicCo<decltype(DerivationResolutionGoal::resolvedDrv)>
+DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals)
+{
+    experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    if (derivation::shouldResolve(fullDrv)) {
-        experimentalFeatureSettings.require(Xp::CaDerivations);
+    /* We are be able to resolve this derivation based on the
+       now-known results of dependencies. If so, we become a
+       stub goal aliasing that resolved derivation goal. */
 
-        /* We are be able to resolve this derivation based on the
-           now-known results of dependencies. If so, we become a
-           stub goal aliasing that resolved derivation goal. */
-
-        auto attempt = tryResolve(
-            fullDrv,
-            worker.store,
-            [&](ref<const SingleDerivedPath> inputDrvPath, const std::string & outputName) -> std::optional<StorePath> {
-                auto inputDrvRef = make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrvPath, outputName});
-                auto mEntry = get(inputGoals, inputDrvRef);
-                if (!mEntry)
-                    return std::nullopt;
-                auto & buildResult = (*mEntry)->buildResult;
-                return std::visit(
-                    overloaded{
-                        [](const BuildResult::Failure &) -> std::optional<StorePath> { return std::nullopt; },
-                        [&](const BuildResult::Success & success) -> std::optional<StorePath> {
-                            auto i = get(success.builtOutputs, outputName);
-                            if (i)
-                                return i->outPath;
-                            return std::nullopt;
-                        },
+    auto attempt = tryResolve(
+        drv,
+        worker.store,
+        [&](ref<const SingleDerivedPath> inputDrvPath, const std::string & outputName) -> std::optional<StorePath> {
+            auto inputDrvRef = make_ref<SingleDerivedPath>(SingleDerivedPath::Built{inputDrvPath, outputName});
+            auto mEntry = get(inputGoals, inputDrvRef);
+            if (!mEntry)
+                return std::nullopt;
+            auto & buildResult = (*mEntry)->buildResult;
+            return std::visit(
+                overloaded{
+                    [](const BuildResult::Failure &) -> std::optional<StorePath> { return std::nullopt; },
+                    [&](const BuildResult::Success & success) -> std::optional<StorePath> {
+                        auto i = get(success.builtOutputs, outputName);
+                        if (i)
+                            return i->outPath;
+                        return std::nullopt;
                     },
-                    buildResult.inner);
-            });
+                },
+                buildResult.inner);
+        });
 
-        if (!attempt) {
-            /* TODO (impure derivations-induced tech debt) (see below):
-               The above attempt should have found it, but because we manage
-               inputDrvOutputs statefully, sometimes it gets out of sync with
-               the real source of truth (store). So we query the store
-               directly if there's a problem. */
-            attempt = tryResolve(fullDrv, worker.store, &worker.evalStore);
-        }
-        assert(attempt);
-
-        auto pathResolved = computeStorePath(worker.store, unresolve(*attempt));
-
-        auto msg =
-            fmt("resolved derivation: '%s' -> '%s'",
-                worker.store.printStorePath(drvPath),
-                worker.store.printStorePath(pathResolved));
-        act = std::make_unique<Activity>(
-            *logger,
-            lvlInfo,
-            actBuildWaiting,
-            msg,
-            std::to_array<Logger::Field>({
-                worker.store.printStorePath(drvPath),
-                worker.store.printStorePath(pathResolved),
-            }));
-
-        resolvedDrv =
-            std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
+    if (!attempt) {
+        /* TODO (impure derivations-induced tech debt) (see below):
+           The above attempt should have found it, but because we manage
+           inputDrvOutputs statefully, sometimes it gets out of sync with
+           the real source of truth (store). So we query the store
+           directly if there's a problem. */
+        attempt = tryResolve(drv, worker.store, &worker.evalStore);
     }
 
+    assert(attempt);
+
+    auto pathResolved = computeStorePath(worker.store, unresolve(*attempt));
+
+    Activity act(
+        *logger,
+        lvlInfo,
+        actBuildWaiting, /* TODO: Is this the right type of activity? */
+        fmt("resolved derivation: '%s' -> '%s'",
+            worker.store.printStorePath(drvPath),
+            worker.store.printStorePath(pathResolved)),
+        std::to_array<Logger::Field>({
+            worker.store.printStorePath(drvPath),
+            worker.store.printStorePath(pathResolved),
+        }));
+
+    co_return std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
+}
+
+Goal::Co DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
+{
+    auto inputGoals = co_await realiseInputs(*drv, buildMode);
+    if (shouldResolve(*drv))
+        resolvedDrv = co_await resolveDerivation(*drv, inputGoals);
     co_return amDone(ecSuccess);
 }
 
