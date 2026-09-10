@@ -29,12 +29,7 @@ Goal::Co DerivationResolutionGoal::resolveDerivation()
 {
     Goals waitees;
 
-    using ValueComparison = decltype([]<typename T>(const ref<T> & lhs, const ref<T> & rhs) {
-        /* Compare the values, not the pointers themselves. */
-        return *lhs < *rhs;
-    });
-
-    std::map<ref<const SingleDerivedPath>, GoalPtr, ValueComparison> inputGoals;
+    std::map<ref<const SingleDerivedPath>, GoalPtr, RefDeepComparator> inputGoals;
 
     /* Ensure that pure, non-fixed-output derivations don't depend on
        impure derivations. Only worth checking each input derivation
