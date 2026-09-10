@@ -9,6 +9,8 @@
 #include "nix/util/unix-domain-socket.hh"
 
 #include <atomic>
+#include <chrono>
+#include <map>
 #include <sstream>
 #include <nlohmann/json.hpp>
 
@@ -253,9 +255,27 @@ struct JSONLogger : Logger
     struct State
     {
         bool enabled = true;
+
+        /* resProgress is sampled per activity so that per-chunk updates
+           (e.g. from copyPaths) cannot back-pressure the log fd. */
+        std::map<ActivityId, std::chrono::steady_clock::time_point> lastProgress;
     };
 
     Sync<State> _state;
+
+    static constexpr std::chrono::milliseconds progressInterval{100};
+
+    /* resProgress fields are [done, expected, running, failed]. The update
+       that reaches `expected` is never dropped by the rate limit, otherwise
+       consumers could be left showing e.g. 97% for a finished copy. */
+    static bool isFinalProgress(std::span<const Field> fields)
+    {
+        if (fields.size() < 2)
+            return false;
+        auto done = std::get_if<uint64_t>(&fields[0]);
+        auto expected = std::get_if<uint64_t>(&fields[1]);
+        return done && expected && *expected && *done >= *expected;
+    }
 
     void write(const nlohmann::json & json)
     {
@@ -335,6 +355,8 @@ struct JSONLogger : Logger
 
     void stopActivity(ActivityId act) noexcept override
     {
+        _state.lock()->lastProgress.erase(act);
+
         nlohmann::json json;
         json["action"] = "stop";
         json["id"] = act;
@@ -348,6 +370,15 @@ struct JSONLogger : Logger
         json["id"] = act;
         json["type"] = type;
         addFields(json, fields);
+
+        if (type == resProgress && !isFinalProgress(fields)) {
+            auto now = std::chrono::steady_clock::now();
+            auto & last = _state.lock()->lastProgress[act];
+            if (now - last < progressInterval)
+                return;
+            last = now;
+        }
+
         write(json);
     }
 };
