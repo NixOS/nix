@@ -72,6 +72,8 @@ Co::Co(Co && rhs) noexcept
 
 Co & Co::operator=(Co && rhs) noexcept
 {
+    if (this == &rhs)
+        return *this;
     if (handle) {
         handle.promise().alive = false;
         handle.destroy();
