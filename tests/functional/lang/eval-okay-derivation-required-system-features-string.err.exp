@@ -1,0 +1,9 @@
+warning:
+         … while evaluating derivation 'eval-okay-derivation-required-system-features-string'
+
+         warning: setting the 'requiredSystemFeatures' attribute to a space-separated string is deprecated, and may be disallowed in future versions of Nix. Set it to a list of strings instead.
+         at /pwd/lang/eval-okay-derivation-required-system-features-string.nix:6:3:
+              5|   builder = "/dontcare";
+              6|   requiredSystemFeatures = "foo bar";
+               |   ^
+              7| }).out

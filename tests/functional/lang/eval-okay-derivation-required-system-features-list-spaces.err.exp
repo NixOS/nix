@@ -1,0 +1,11 @@
+warning:
+         … while evaluating derivation 'eval-okay-derivation-required-system-features-list-spaces'
+
+         … while evaluating the derivation attribute 'requiredSystemFeatures'
+           at /pwd/lang/eval-okay-derivation-required-system-features-list-spaces.nix:6:3:
+              5|   builder = "/dontcare";
+              6|   requiredSystemFeatures = [
+               |   ^
+              7|     "foo bar"
+
+         warning: the item 'foo bar' in the 'requiredSystemFeatures' attribute list will be split into multiple elements. This behaviour is deprecated, and may change in a future version of Nix; split into separate list items instead.
