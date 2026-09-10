@@ -45,6 +45,14 @@ Derivations can declare some infrequently used optional attributes.
     > [`disallowedReferences`](#adv-attr-disallowedReferences) and [`disallowedRequisites`](#adv-attr-disallowedRequisites)
     > will have no effect; use [`outputChecks`](#adv-attr-outputChecks) instead.
 
+    > **Warning**
+    >
+    > Attributes of the derivation whose type is `string`, `int`, `float`, or `null`
+    > remain declared as environment variables when sourcing `$NIX_ATTRS_SH_FILE`
+    > but are no longer exported.
+    > When using `stdenv.mkDerivation` from Nixpkgs,
+    > you can move them into the `env` attrset to keep exporting them.
+
 ## Output checks
 
 These attributes specify [checks on the derivation's outputs](@docroot@/store/derivation/outputs/index.md#output-checks).
