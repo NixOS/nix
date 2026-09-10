@@ -635,10 +635,6 @@ struct CmdDevelop : Common, MixEnvironment
                     fmt("[ -n \"$PS1\" ] && PS1+=%s;\n", escapeShellArgAlways(developSettings.bashPromptSuffix.get()));
         }
 
-        setEnviron();
-        // prevent garbage collection until shell exits
-        setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
-
         std::filesystem::path shell = "bash";
         bool foundInteractive = false;
 
@@ -682,7 +678,13 @@ struct CmdDevelop : Common, MixEnvironment
 
         // Override SHELL with the one chosen for this environment.
         // This is to make sure the system shell doesn't leak into the build environment.
-        setEnvOs(OS_STR("SHELL"), shell.c_str());
+        if (!setVars.contains("SHELL") && !keepVars.contains("SHELL"))
+            setVars["SHELL"] = shell;
+
+        setEnviron();
+        // prevent garbage collection until shell exits
+        setEnv("NIX_GCROOT", store->printStorePath(gcroot).c_str());
+
         /* See: https://github.com/NixOS/nix/issues/5873
            Format via .string() and not PathFmt intentionally. */
         script += fmt("SHELL=\"%s\"\n", shell.string());
