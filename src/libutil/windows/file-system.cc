@@ -289,6 +289,11 @@ void deletePathAt(
         for (auto & child : listByHandle(fd->get(), path))
             deletePathAt(fd->get(), path / child, bytesFreed, ex);
 
+    /* Cleared for good: nothing puts the attribute back if the deletion below
+       fails, so a failed `deletePath` leaves the tree more permissive than it
+       found it. The Unix walk behaves the same way: it ORs the owner rwx bits
+       into a directory's mode before descending and never restores the old mode,
+       so this is consistent across platforms rather than a Windows-only wart. */
     if (mayClearReadOnly)
         clearReadOnly(fd->get());
     else
@@ -328,7 +333,15 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
     /* Resolve rather than assert. `is_absolute()` on Windows is
        `has_root_name() && has_root_directory()`, so a relative path -- or a
        POSIX-rooted one like `/tmp/x` -- is not absolute even when it names a real
-       file, and `remove_all` accepted those too. */
+       file, and `remove_all` accepted those too.
+
+       Resolution is required, not merely defensive: the walk below is
+       descriptor-based, so it needs a parent directory to open and to delete
+       relative to. `parent_path()` of a bare name like `x` is empty, which is
+       not a directory `openDirectory` can open, and the `assert` below would
+       still pass because an empty path does compare unequal to `x`. Making the
+       path absolute first is what guarantees there is a real parent to hand to
+       `openDirectory`. */
     auto absPath = path.is_absolute() ? path : std::filesystem::absolute(path);
 
     auto parentPath = absPath.parent_path();
