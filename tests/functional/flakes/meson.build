@@ -6,6 +6,7 @@ suites += {
     'develop.sh',
     'edit.sh',
     'run.sh',
+    'run-mainprogram-error.sh',
     'mercurial.sh',
     'circular.sh',
     'init.sh',
