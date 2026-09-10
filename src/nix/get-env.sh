@@ -17,6 +17,7 @@ __functions="$(declare -F)"
 
 __dumpEnv() {
     printf '{\n'
+    printf '  "version": 1,\n'
 
     printf '  "bashFunctions": {\n'
     local __first=1
