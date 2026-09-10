@@ -46,6 +46,7 @@ sources = files(
   'github.cc',
   'indirect.cc',
   'input-cache.cc',
+  'jj.cc',
   'mercurial.cc',
   'merkle-tar-adapter.cc',
   'path.cc',

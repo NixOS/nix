@@ -5,6 +5,7 @@
 #include "nix/util/hash.hh"
 #include "nix/util/ref.hh"
 #include "nix/util/fun.hh"
+#include "nix/util/memo.hh"
 
 #include <variant>
 
@@ -30,6 +31,16 @@ struct LazyAttrComputation
 };
 
 using LazyAttr = ref<LazyAttrComputation>;
+
+/**
+ * Wrap a deferred computation in a memoized `LazyAttr`.
+ */
+inline LazyAttr makeLazyAttr(fun<ResolvedAttr()> compute)
+{
+    return make_ref<LazyAttrComputation>(LazyAttrComputation{
+        .compute = memo<ResolvedAttr>(std::move(compute)),
+    });
+}
 
 using Attr = std::variant<std::string, uint64_t, Explicit<bool>, LazyAttr>;
 
