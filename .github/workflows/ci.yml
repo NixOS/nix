@@ -159,8 +159,7 @@ jobs:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
     - name: Build and test Windows components
       run: |
-        # Add back crossBuild once https://github.com/NixOS/nixpkgs/pull/560726 is in nixpkgs input.
-        nix build --file ci/gha/tests/windows.nix unitTests.nix-util-tests -L
+        nix build --file ci/gha/tests/windows.nix crossBuild unitTests.nix-util-tests -L
 
   installer_test:
     needs: [tests]
