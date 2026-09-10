@@ -83,7 +83,7 @@ void Pipe::create(bool nonBlocking)
        up those descriptors on destruction. Mostly pedantic exception safety, I
        can't envision a case this would fail on a freshly created pipe. */
     for (auto fd : fds) {
-        unix::closeOnExec(fd);
+        closeOnExec(fd);
         if (nonBlocking && ::fcntl(fd, F_SETFL, O_NONBLOCK) == -1)
             throw SysError("making pipe non-blocking");
     }
@@ -141,7 +141,7 @@ void unix::closeExtraFDs()
         close(fd); /* ignore result */
 }
 
-void unix::closeOnExec(int fd)
+void closeOnExec(Descriptor fd)
 {
     int prev;
     if ((prev = fcntl(fd, F_GETFD, 0)) == -1 || fcntl(fd, F_SETFD, prev | FD_CLOEXEC) == -1)
