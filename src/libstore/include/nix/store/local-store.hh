@@ -317,7 +317,7 @@ public:
         RepairFlag repair,
         bool filterReferences);
 
-    void addTempRoot(const StorePath & path) override;
+    void addTempRoots(const StorePathSet & paths) override;
 
 private:
 
