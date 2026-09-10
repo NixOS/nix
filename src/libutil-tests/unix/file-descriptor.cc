@@ -2,6 +2,8 @@
 #include <gmock/gmock.h>
 
 #include "nix/util/file-descriptor.hh"
+#include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 
 #include <chrono>
@@ -9,6 +11,7 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/resource.h>
 
 namespace nix {
 
@@ -231,6 +234,38 @@ TEST(WriteFull, LoopsUntilAllBytesWritten)
 
     ASSERT_EQ(drained.size(), total);
     EXPECT_EQ(drained, payload);
+}
+
+TEST(PipeCreate, ThrowsWhenDescriptorLimitReached)
+{
+    struct rlimit orig;
+    ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &orig), 0);
+    // Restore via Finally rather than a bare trailing setrlimit call, so a
+    // failed assertion below still leaves the process at its original fd
+    // limit instead of a lowered one for the rest of the test binary.
+    Finally restoreLimit([&] { EXPECT_EQ(setrlimit(RLIMIT_NOFILE, &orig), 0); });
+
+    /* Lower the soft limit to just above the highest fd currently in use, so
+       the pipe2() call inside Pipe::create() below has no room left and
+       fails with EMFILE. */
+    int highest = -1;
+#ifdef __linux__
+    for (auto & entry : DirectoryIterator{"/proc/self/fd"}) {
+        highest = std::max(highest, std::stoi(entry.path().filename()));
+    }
+#else
+    // No /proc on macOS/BSD: probe each candidate fd directly instead.
+    int maxFD = sysconf(_SC_OPEN_MAX);
+    for (int fd = 0; fd < maxFD; ++fd)
+        if (fcntl(fd, F_GETFD) != -1)
+            highest = fd;
+#endif
+    struct rlimit lowered = orig;
+    lowered.rlim_cur = highest + 1;
+    ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &lowered), 0);
+
+    Pipe pipe;
+    EXPECT_THROW(pipe.create(), SysError);
 }
 
 TEST(closeExtraFDs, works)
