@@ -327,4 +327,66 @@ TEST(CloseOnExec, ThrowsOnInvalidDescriptor)
     EXPECT_THROW(unix::closeOnExec(INVALID_DESCRIPTOR), SysError);
 }
 
+TEST(SelfPipe, NotifyAndDrainRoundTrip)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    sp.notify();
+    EXPECT_NO_THROW(sp.drain());
+}
+
+TEST(SelfPipe, DrainOnEmptyPipeReturnsPromptly)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    // No notify() was called; the pipe is empty. Because create() makes it non-blocking,
+    // drain() must return immediately (on EAGAIN) rather than block waiting for data.
+    EXPECT_NO_THROW(sp.drain());
+}
+
+TEST(SelfPipe, NotifyWhenFullDoesNotThrow)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    // Notify comfortably past any default pipe capacity, driving the pipe to EAGAIN (full).
+    // notify() must swallow that, not throw.
+    for (int i = 0; i < 200000; i++) {
+        EXPECT_NO_THROW(sp.notify());
+    }
+    sp.drain();
+}
+
+TEST(SelfPipe, DrainEmptiesAllPendingNotifies)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    // More bytes than drain()'s 128-byte read buffer, forcing multiple read() calls inside
+    // a single drain().
+    for (int i = 0; i < 300; i++)
+        sp.notify();
+    sp.drain();
+
+    // The pipe must now be fully drained: a direct non-blocking read returns EAGAIN.
+    char c;
+    ssize_t n = ::read(sp.pipe.readSide.get(), &c, 1);
+    EXPECT_EQ(n, -1);
+    EXPECT_EQ(errno, EAGAIN);
+}
+
+TEST(SelfPipe, NotifyThrowsOnWriteFailureOtherThanEagain)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    sp.pipe.writeSide.close();
+    EXPECT_THROW(sp.notify(), SysError);
+}
+
+TEST(SelfPipe, DrainThrowsOnReadFailureOtherThanEagain)
+{
+    unix::SelfPipe sp;
+    sp.create();
+    sp.pipe.readSide.close();
+    EXPECT_THROW(sp.drain(), SysError);
+}
+
 } // namespace nix
