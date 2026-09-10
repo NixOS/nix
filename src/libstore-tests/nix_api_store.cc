@@ -977,4 +977,169 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
     nix_derivation_free(drv2);
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_derivation_get_outputs)
+{
+    std::set<std::string> seen;
+    auto ret = nix_derivation_get_outputs(
+        ctx, drv, &seen, +[](nix_c_context *, void * ud, const char * outputName) {
+            static_cast<std::set<std::string> *>(ud)->emplace(outputName);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    ASSERT_EQ(seen, std::set<std::string>{"out"});
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_derivation_get_outputs_callback_error)
+{
+    int call_count = 0;
+    auto ret = nix_derivation_get_outputs(
+        ctx, drv, &call_count, +[](nix_c_context * c, void * ud, const char *) {
+            ++*static_cast<int *>(ud);
+            nix_set_err_msg(c, NIX_ERR_UNKNOWN, "stop");
+        });
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+    ASSERT_EQ(call_count, 1) << "Iteration should stop after the first error";
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_derivation_accessors_reject_null_outputs)
+{
+    ASSERT_EQ(nix_derivation_get_outputs(ctx, drv, nullptr, nullptr), NIX_ERR_UNKNOWN);
+    ASSERT_EQ(nix_derivation_get_input_drv_outputs(ctx, drv, nullptr, nullptr), NIX_ERR_UNKNOWN);
+    ASSERT_EQ(nix_derivation_has_dynamic_inputs(ctx, drv, nullptr), NIX_ERR_UNKNOWN);
+}
+
+TEST_F(nix_api_store_test, nix_derivation_get_input_drv_outputs_static)
+{
+    nix::Derivation depDrv;
+    depDrv.name = "dependency";
+    depDrv.platform = nix::settings.thisSystem.get();
+    depDrv.builder = "/bin/sh";
+    depDrv.outputs = {
+        {"out", nix::DerivationOutput{nix::DerivationOutput::Deferred{}}},
+    };
+    depDrv.env = {{"out", ""}};
+    nix::derivation::fillInOutputPaths(depDrv, *store->ptr);
+
+    auto depDrvPath = store->ptr->writeDerivation(depDrv);
+
+    std::string json = R"({
+      "args": [],
+      "builder": "/bin/sh",
+      "env": { "out": "" },
+      "inputs": {
+        "drvs": {
+          ")" + std::string(depDrvPath.to_string())
+                       + R"(": {
+            "dynamicOutputs": {},
+            "outputs": ["out"]
+          }
+        },
+        "srcs": []
+      },
+      "name": "depends-on-drv",
+      "outputs": { "out": {} },
+      "system": ")" + nix::settings.thisSystem.get()
+                       + R"(",
+      "version": 4
+    })";
+
+    auto * drv = nix_derivation_from_json(ctx, store, json.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    std::set<std::pair<nix::StorePath, std::string>> seen;
+    auto ret = nix_derivation_get_input_drv_outputs(
+        ctx, drv, &seen, +[](nix_c_context *, void * ud, const StorePath * inputDrvPath, const char * outputName) {
+            static_cast<std::set<std::pair<nix::StorePath, std::string>> *>(ud)->emplace(
+                inputDrvPath->path, outputName);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    std::set<std::pair<nix::StorePath, std::string>> expected{
+        {depDrvPath, "out"},
+    };
+    ASSERT_EQ(seen, expected);
+
+    bool hasDyn = true;
+    auto r2 = nix_derivation_has_dynamic_inputs(ctx, drv, &hasDyn);
+    assert_ctx_ok();
+    ASSERT_EQ(r2, NIX_OK);
+    ASSERT_FALSE(hasDyn);
+
+    int callCount = 0;
+    auto r3 = nix_derivation_get_input_drv_outputs(
+        ctx, drv, &callCount, +[](nix_c_context * c, void * ud, const StorePath *, const char *) {
+            ++*static_cast<int *>(ud);
+            nix_set_err_msg(c, NIX_ERR_UNKNOWN, "stop");
+        });
+    ASSERT_EQ(r3, NIX_ERR_UNKNOWN);
+    ASSERT_EQ(callCount, 1) << "Iteration should stop after the first error";
+
+    nix_derivation_free(drv);
+}
+
+TEST_F(nix_api_store_test, nix_derivation_has_dynamic_inputs_true)
+{
+    // Hand-built JSON: real output + one static input drv-output + one
+    // dynamic input drv-output on the same input drv. Parses only with
+    // `dynamic-derivations` enabled.
+    nix::EnableExperimentalFeature enableDynDrv{"dynamic-derivations"};
+    nix::EnableExperimentalFeature enableCA{"ca-derivations"};
+
+    std::string json = R"({
+      "args": [],
+      "builder": "/bin/sh",
+      "env": { "out": "" },
+      "inputs": {
+        "drvs": {
+          "lg4c4b8r9hlczwprl6kgnzfd9mc1xmkk-dependency.drv": {
+            "dynamicOutputs": {
+              "cat": {
+                "dynamicOutputs": {},
+                "outputs": ["kitten"]
+              }
+            },
+            "outputs": ["out"]
+          }
+        },
+        "srcs": []
+      },
+      "name": "has-dyn",
+      "outputs": { "out": {} },
+      "system": ")" + nix::settings.thisSystem.get()
+                       + R"(",
+      "version": 4
+    })";
+
+    auto * drv = nix_derivation_from_json(ctx, store, json.c_str());
+    assert_ctx_ok();
+    ASSERT_NE(drv, nullptr);
+
+    bool hasDyn = false;
+    auto ret = nix_derivation_has_dynamic_inputs(ctx, drv, &hasDyn);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_TRUE(hasDyn);
+
+    // The static enumeration must still yield the static portion only —
+    // dynamic edges are deliberately invisible to it.
+    std::set<std::pair<nix::StorePath, std::string>> seen;
+    auto r2 = nix_derivation_get_input_drv_outputs(
+        ctx, drv, &seen, +[](nix_c_context *, void * ud, const StorePath * inputDrvPath, const char * outputName) {
+            static_cast<std::set<std::pair<nix::StorePath, std::string>> *>(ud)->emplace(
+                inputDrvPath->path, outputName);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(r2, NIX_OK);
+
+    std::set<std::pair<nix::StorePath, std::string>> expected{
+        {nix::StorePath{"lg4c4b8r9hlczwprl6kgnzfd9mc1xmkk-dependency.drv"}, "out"},
+    };
+    ASSERT_EQ(seen, expected) << "Dynamic edges must NOT appear in the static enumeration";
+
+    nix_derivation_free(drv);
+}
+
 } // namespace nixC
