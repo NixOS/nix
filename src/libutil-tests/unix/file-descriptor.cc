@@ -305,4 +305,26 @@ TEST(DupDescriptor, SetsCloseOnExecFlag)
     EXPECT_TRUE(flags & FD_CLOEXEC);
 }
 
+TEST(CloseOnExec, SetsFlag)
+{
+    Pipe pipe;
+    pipe.create();
+
+    // pipe.create() already sets close-on-exec via pipe2/O_CLOEXEC; clear it first so this
+    // test actually exercises unix::closeOnExec rather than observing pipe2's own flag.
+    ASSERT_NE(fcntl(pipe.writeSide.get(), F_SETFD, 0), -1);
+    ASSERT_EQ(fcntl(pipe.writeSide.get(), F_GETFD), 0);
+
+    unix::closeOnExec(pipe.writeSide.get());
+
+    int flags = fcntl(pipe.writeSide.get(), F_GETFD);
+    ASSERT_NE(flags, -1);
+    EXPECT_TRUE(flags & FD_CLOEXEC);
+}
+
+TEST(CloseOnExec, ThrowsOnInvalidDescriptor)
+{
+    EXPECT_THROW(unix::closeOnExec(INVALID_DESCRIPTOR), SysError);
+}
+
 } // namespace nix
