@@ -85,6 +85,14 @@ TEST(DrainFD, ExpectedSizeThrowsOnEarlyEOF)
     EXPECT_THROW(drainFD(pipe.readSide.get(), {.size = 10, .expected = true}), EndOfFile);
 }
 
+TEST(GetFileSize, ReturnsActualFileSize)
+{
+    auto fd = createAnonymousTempFile();
+    std::string data(12345, 'x');
+    writeFull(fd.get(), data);
+    EXPECT_EQ(getFileSize(fd.get()), data.size());
+}
+
 TEST(ReadLine, ReadsLinesFromPipe)
 {
     Pipe pipe;
