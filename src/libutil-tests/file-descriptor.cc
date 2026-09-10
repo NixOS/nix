@@ -113,6 +113,28 @@ TEST(ReadOffset, RespectsInterrupts)
     EXPECT_EQ(n, data.size());
 }
 
+TEST(DupDescriptor, DuplicateIsUsableAndIndependentlyCloseable)
+{
+    Pipe pipe;
+    pipe.create();
+
+    auto dup = dupDescriptor(pipe.writeSide.get());
+    ASSERT_TRUE(dup);
+    EXPECT_NE(dup.get(), pipe.writeSide.get());
+
+    writeFull(pipe.writeSide.get(), "hi", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+    // The pipe isn't at EOF yet: the duplicate still holds the write side open.
+    dup.close();
+
+    EXPECT_EQ(readLine(pipe.readSide.get(), /*eofOk=*/true), "hi");
+}
+
+TEST(DupDescriptor, ThrowsOnInvalidDescriptor)
+{
+    EXPECT_THROW(dupDescriptor(INVALID_DESCRIPTOR), NativeSysError);
+}
+
 TEST(ReadLine, ReadsLinesFromPipe)
 {
     Pipe pipe;

@@ -294,4 +294,15 @@ TEST(closeExtraFDs, works)
     ASSERT_TRUE(statusOk(pid.wait()));
 }
 
+TEST(DupDescriptor, SetsCloseOnExecFlag)
+{
+    Pipe pipe;
+    pipe.create();
+
+    auto dup = dupDescriptor(pipe.writeSide.get());
+    int flags = fcntl(dup.get(), F_GETFD);
+    ASSERT_NE(flags, -1);
+    EXPECT_TRUE(flags & FD_CLOEXEC);
+}
+
 } // namespace nix
