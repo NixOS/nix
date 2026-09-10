@@ -1,5 +1,6 @@
 {
   inputs,
+  darwinSystems,
   forAllCrossSystems,
   forAllSystems,
   lib,
@@ -165,6 +166,13 @@ rec {
         in
         pkgs.nixComponents2.overrideScope (
           self: super: {
+            # Build without precompiled headers to catch missing #includes. With
+            # PCH enabled, builds may silently rely on transitive includes.
+            mesonComponentOverrides = finalAttrs: prevAttrs: {
+              mesonFlags = (prevAttrs.mesonFlags or [ ]) ++ [
+                (lib.mesonBool "b_pch" false)
+              ];
+            };
             # Boost coroutines fail with ASAN on darwin.
             withASan = !pkgs.stdenv.buildPlatform.isDarwin;
             withUBSan = true;
@@ -202,7 +210,7 @@ rec {
     forAllPackages (pkgName: lib.genAttrs linux64BitSystems (system: (components system).${pkgName}));
 
   # Static analysis with clang-tidy
-  clangTidy = lib.genAttrs linux64BitSystems (
+  clangTidy = lib.genAttrs (linux64BitSystems ++ darwinSystems) (
     system:
     let
       pkgs = nixpkgsFor.${system}.nativeForStdenv.clangStdenv;

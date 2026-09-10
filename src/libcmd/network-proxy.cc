@@ -1,6 +1,7 @@
 #include "nix/cmd/network-proxy.hh"
 
 #include <algorithm>
+#include <iterator>
 
 #include "nix/util/environment-variables.hh"
 
