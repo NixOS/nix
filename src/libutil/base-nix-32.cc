@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 
 #include "nix/util/base-nix-32.hh"
@@ -8,8 +9,7 @@ namespace nix {
 constexpr const std::array<unsigned char, 256> BaseNix32::reverseMap = [] {
     std::array<unsigned char, 256> map{};
 
-    for (size_t i = 0; i < map.size(); ++i)
-        map[i] = invalid; // invalid
+    map.fill(invalid); // invalid
 
     for (unsigned char i = 0; i < 32; ++i)
         map[static_cast<unsigned char>(characters[i])] = i;
@@ -19,7 +19,7 @@ constexpr const std::array<unsigned char, 256> BaseNix32::reverseMap = [] {
 
 std::string BaseNix32::encode(std::span<const std::byte> bs)
 {
-    if (bs.size() == 0)
+    if (bs.empty())
         return {};
 
     size_t len = encodedLength(bs.size());
@@ -28,10 +28,10 @@ std::string BaseNix32::encode(std::span<const std::byte> bs)
     std::string s;
     s.reserve(len);
 
-    for (int n = (int) len - 1; n >= 0; n--) {
-        unsigned int b = n * 5;
-        unsigned int i = b / 8;
-        unsigned int j = b % 8;
+    for (size_t n = len; n-- > 0;) {
+        size_t b = n * 5;
+        size_t i = b / 8;
+        uint8_t j = b % 8;
         std::byte c = (bs.data()[i] >> j) | (i >= bs.size() - 1 ? std::byte{0} : bs.data()[i + 1] << (8 - j));
         s.push_back(characters[uint8_t(c & std::byte{0x1f})]);
     }
@@ -41,32 +41,38 @@ std::string BaseNix32::encode(std::span<const std::byte> bs)
 
 std::string BaseNix32::decode(std::string_view s)
 {
-    std::string res;
-    res.reserve((s.size() * 5 + 7) / 8); // ceiling(size * 5/8)
+    if (s.empty())
+        return {};
 
-    for (unsigned int n = 0; n < s.size(); ++n) {
+    const size_t maxSize = maxDecodedLength(s.size());
+    std::string res(maxSize, '\0');
+    auto * out = reinterpret_cast<uint8_t *>(res.data());
+    size_t used = 0;
+
+    for (size_t n = 0; n < s.size(); ++n) {
         char c = s[s.size() - n - 1];
-        auto digit_opt = BaseNix32::lookupReverse(c);
-
-        if (!digit_opt)
+        auto digit = BaseNix32::lookupReverse(c);
+        if (!digit)
             throw FormatError("invalid character in Nix32 (Nix's Base32 variation) string: '%c'", c);
 
-        uint8_t digit = *digit_opt;
+        size_t b = n * 5;
+        size_t i = b / 8;
+        uint8_t j = b % 8;
 
-        unsigned int b = n * 5;
-        unsigned int i = b / 8;
-        unsigned int j = b % 8;
+        uint8_t low = *digit << j;
+        uint8_t carry = *digit >> (8 - j);
 
-        // Ensure res has enough space
-        res.resize(i + 1);
-        res[i] |= digit << j;
+        out[i] |= low;
+        used = std::max(used, i + 1);
 
-        if (digit >> (8 - j)) {
-            res.resize(i + 2);
-            res[i + 1] |= digit >> (8 - j);
+        if (carry) {
+            out[i + 1] |= carry;
+            used = std::max(used, i + 2);
         }
     }
 
+    assert(used <= maxSize);
+    res.resize(used);
     return res;
 }
 
