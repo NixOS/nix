@@ -135,6 +135,18 @@ TEST(DupDescriptor, ThrowsOnInvalidDescriptor)
     EXPECT_THROW(dupDescriptor(INVALID_DESCRIPTOR), NativeSysError);
 }
 
+TEST(SyncDescriptor, SucceedsOnRegularFile)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "data", /*allowInterrupts=*/false);
+    EXPECT_NO_THROW(syncDescriptor(fd.get()));
+}
+
+TEST(SyncDescriptor, ThrowsOnInvalidDescriptor)
+{
+    EXPECT_THROW(syncDescriptor(INVALID_DESCRIPTOR), NativeSysError);
+}
+
 TEST(ReadLine, ReadsLinesFromPipe)
 {
     Pipe pipe;
