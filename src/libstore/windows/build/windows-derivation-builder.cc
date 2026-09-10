@@ -92,7 +92,7 @@ class WindowsDerivationBuilderImpl : public DerivationBuilderImpl
 public:
 
     WindowsDerivationBuilderImpl(
-        LocalStore & store,
+        std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
         DerivationBuilderParams params,
         HANDLE ioport)
@@ -148,7 +148,13 @@ public:
     /* --- DerivationBuilder --- */
 
     std::optional<Descriptor> startBuild() override;
-    SingleDrvOutputs unprepareBuild() override;
+    BuilderExit unprepareBuild() override;
+
+    void cleanupBuild(bool force) override
+    {
+        deletePath(tmpDir);
+    }
+
     bool killChild() override;
 
 private:
@@ -203,7 +209,7 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     env[OS_STR("TMPDIR")] = tmpDir.native();
     env[OS_STR("TEMPDIR")] = tmpDir.native();
     env[OS_STR("PWD")] = tmpDir.native();
-    env[OS_STR("NIX_STORE")] = os(store.storeDir);
+    env[OS_STR("NIX_STORE")] = os(store->storeDir);
 
     /* Most Windows programs, `cmd.exe` included, will not start without these, and
        system tools live outside the store so `PATH` is needed to find them at all.
@@ -321,7 +327,7 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)
         if (status.known)
-            deleteStalePath(store.toRealPath(status.known->path));
+            deleteStalePath(store->toRealPath(status.known->path));
 
     miscMethods->openLogFile();
 
@@ -348,7 +354,7 @@ bool WindowsDerivationBuilderImpl::killChild()
     return true;
 }
 
-SingleDrvOutputs WindowsDerivationBuilderImpl::unprepareBuild()
+BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 {
     /* The caller only gets here once the log pipe hit EOF, which means the
        builder closed its handles. Reap anyway, so the exit code is settled. */
@@ -357,26 +363,13 @@ SingleDrvOutputs WindowsDerivationBuilderImpl::unprepareBuild()
     miscMethods->closeLogFile();
     miscMethods->childTerminated();
 
-    if (exitCode != 0) {
-        deletePath(tmpDir);
-        throw BuilderFailureError{
-            BuildResult::Failure::PermanentFailure,
-            exitCode,
-            fmt("builder '%s' exited with status %d", drv.builder, exitCode),
-        };
-    }
-
-    auto builtOutputs = registerOutputs();
-
-    deletePath(tmpDir);
-
-    return builtOutputs;
+    return {.status = exitCode};
 }
 
 } // namespace
 
 DerivationBuilderUnique makeDerivationBuilder(
-    LocalStore & store,
+    std::shared_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
     DerivationBuilderParams params,
     HANDLE ioport)

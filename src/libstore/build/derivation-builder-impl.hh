@@ -36,7 +36,7 @@ protected:
      */
     Pid pid;
 
-    LocalStore & store;
+    std::shared_ptr<BuildingStore> store;
 
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods;
 
@@ -52,7 +52,7 @@ protected:
      */
     const derivation::Type derivationType;
 
-    const LocalSettings & localSettings = store.config->getLocalSettings();
+    const LocalSettings & localSettings = store->getLocalSettings();
 
 #ifndef _WIN32
     /**
@@ -92,41 +92,31 @@ protected:
      */
     virtual std::filesystem::path realPathInHost(const StorePath & p)
     {
-        return store.toRealPath(p);
+        return store->toRealPath(p);
     }
 
 
 public:
 
     DerivationBuilderImpl(
-        LocalStore & store, std::shared_ptr<DerivationBuilderCallbacks> miscMethods, DerivationBuilderParams params)
+        std::shared_ptr<BuildingStore> store,
+        std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
+        DerivationBuilderParams params)
         : DerivationBuilderParams{std::move(params)}
-        , store{store}
+        , store{std::move(store)}
         , miscMethods{std::move(miscMethods)}
         , derivationType{derivation::type(drv)}
     {
     }
 
-protected:
-
-    /**
-     * Check that the derivation outputs all exist and register them
-     * as valid.
-     *
-     * For subclasses to call at the end of `unprepareBuild`.
-     */
-    SingleDrvOutputs registerOutputs();
+    SingleDrvOutputs registerOutputs(LocalStore & localStore) override;
 
     /**
      * Output paths from the `SubmitOutput` store command
      */
     Sync<OutputPathMap> submittedOutputs;
 
-    /**
-     * Check that the derivation outputs submitted by recursive-nix exist
-     * and attach them to the derivation
-     */
-    SingleDrvOutputs checkSubmittedOutputs();
+    SingleDrvOutputs checkSubmittedOutputs(LocalStore & localStore) override;
 };
 
 } // namespace nix

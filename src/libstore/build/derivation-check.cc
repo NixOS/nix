@@ -10,7 +10,7 @@
 namespace nix {
 
 void checkCAOutput(
-    StoreDirConfig & store,
+    const StoreDirConfig & store,
     const StorePath & drvPath,
     const DerivationOutput & outputSpec,
     const ValidPathInfo & info,
