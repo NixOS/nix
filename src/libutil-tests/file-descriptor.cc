@@ -93,6 +93,26 @@ TEST(GetFileSize, ReturnsActualFileSize)
     EXPECT_EQ(getFileSize(fd.get()), data.size());
 }
 
+TEST(ReadOffset, RespectsInterrupts)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
+    auto fd = createAnonymousTempFile();
+    std::string data = "hello world";
+    writeFull(fd.get(), data);
+
+    setInterrupted(true);
+    std::array<std::byte, 16> buf;
+    EXPECT_THROW(readOffset(fd.get(), 0, buf), Interrupted);
+    setInterrupted(false);
+
+    // Confirm a normal call still works afterwards (interrupt flag was properly cleared,
+    // and the throw above didn't leave the fd or offset math in a bad state).
+    auto n = readOffset(fd.get(), 0, buf);
+    EXPECT_EQ(n, data.size());
+}
+
 TEST(ReadLine, ReadsLinesFromPipe)
 {
     Pipe pipe;
