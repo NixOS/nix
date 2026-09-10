@@ -33,6 +33,39 @@ cmp "$p" "${_NIX_TEST_SOURCE_DIR}/restricted.sh"
 
 nix eval --raw --expr "builtins.fetchurl \"file://${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "file://${_NIX_TEST_SOURCE_DIR}/restricted.sh"
 
+# `allowed-uris` should also grant `readFile`/`readDir` access, not just fetchers (#2596).
+(! nix eval --raw --expr "builtins.readFile \"${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval)
+[[ $(nix eval --raw --expr "builtins.readFile \"${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "${_NIX_TEST_SOURCE_DIR}") == "$(cat "${_NIX_TEST_SOURCE_DIR}/restricted.sh")" ]]
+[[ $(nix eval --expr "builtins.readDir \"${_NIX_TEST_SOURCE_DIR}\"" --impure --restrict-eval --allowed-uris "${_NIX_TEST_SOURCE_DIR}" --json | jq -r 'keys | length') -gt 0 ]]
+(! nix eval --raw --expr "builtins.readFile \"${_NIX_TEST_SOURCE_DIR}/restricted.sh\"" --impure --restrict-eval --allowed-uris "${_NIX_TEST_SOURCE_DIR}/other-dir")
+
+# A symlink under an `allowed-uris`-granted directory that points elsewhere in
+# that same directory should still resolve, not spuriously fail as unresolvable.
+mkdir -p "$TEST_ROOT/allowed-uris-dir"
+echo -n "hello" > "$TEST_ROOT/allowed-uris-dir/target"
+ln -sfn "$TEST_ROOT/allowed-uris-dir/target" "$TEST_ROOT/allowed-uris-dir/link"
+[[ $(nix eval --raw --expr "builtins.readFile \"$TEST_ROOT/allowed-uris-dir/link\"" --impure --restrict-eval --allowed-uris "$TEST_ROOT/allowed-uris-dir") == "hello" ]]
+
+# `allowed-uris` in `file://` form should also grant `readFile` etc., not just
+# fetchers, matching the bare-path form.
+[[ $(nix eval --raw --expr "builtins.readFile \"$TEST_ROOT/allowed-uris-dir/target\"" --impure --restrict-eval --allowed-uris "file://$TEST_ROOT/allowed-uris-dir") == "hello" ]]
+
+# `import` of a file reached through a symlink should also be granted by
+# `allowed-uris`, not just a direct, non-symlink path.
+echo '"imported-ok"' > "$TEST_ROOT/allowed-uris-dir/target.nix"
+ln -sfn "$TEST_ROOT/allowed-uris-dir/target.nix" "$TEST_ROOT/allowed-uris-dir/link.nix"
+[[ $(nix eval --raw --expr "import \"$TEST_ROOT/allowed-uris-dir/link.nix\"" --impure --restrict-eval --allowed-uris "$TEST_ROOT/allowed-uris-dir") == "imported-ok" ]]
+
+# A relative import inside a file reached through a symlinked directory
+# should resolve against the symlink's logical location, not the resolved
+# target's physical location, even when `allowed-uris` (not `-I`) is what
+# grants access.
+mkdir -p "$TEST_ROOT/allowed-uris-symlink/foo/lib" "$TEST_ROOT/allowed-uris-symlink/overlays"
+echo '"sibling-ok"' > "$TEST_ROOT/allowed-uris-symlink/foo/lib/default.nix"
+echo 'import ../lib' > "$TEST_ROOT/allowed-uris-symlink/overlays/overlay.nix"
+ln -sfn "../overlays" "$TEST_ROOT/allowed-uris-symlink/foo/overlays"
+[[ $(nix eval --raw --expr "import \"$TEST_ROOT/allowed-uris-symlink/foo/overlays/overlay.nix\"" --impure --restrict-eval --allowed-uris "$TEST_ROOT/allowed-uris-symlink") == "sibling-ok" ]]
+
 (! nix eval --raw --expr "builtins.fetchurl \"https://github.com/NixOS/patchelf/archive/master.tar.gz\"" --impure --restrict-eval)
 (! nix eval --raw --expr "builtins.fetchTarball \"https://github.com/NixOS/patchelf/archive/master.tar.gz\"" --impure --restrict-eval)
 (! nix eval --raw --expr "fetchGit \"git://github.com/NixOS/patchelf.git\"" --impure --restrict-eval)
