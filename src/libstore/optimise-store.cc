@@ -16,9 +16,21 @@
 #include <unistd.h>
 #include <errno.h>
 
+#if NIX_SUPPORT_ACL
+#  include <sys/xattr.h>
+#endif
+
 #include "store-config-private.hh"
 
 namespace nix {
+
+#if NIX_SUPPORT_ACL
+// Use trusted.* namespace:
+// - Works on all file types (including symlinks)
+// - Requires CAP_SYS_ADMIN (nix-daemon has this)
+// - Non-root users can't read it, so they get no optimization (acceptable)
+static constexpr const char* XATTR_OPTIMISED = "trusted.nix.optimised";
+#endif
 
 static void makeWritable(const std::filesystem::path & path)
 {
@@ -46,6 +58,53 @@ struct MakeReadOnly
         }
     }
 };
+
+bool LocalStore::isPathOptimised(const std::filesystem::path & path) const
+{
+#if NIX_SUPPORT_ACL
+    char buf[32];
+    ssize_t size = lgetxattr(path.c_str(), XATTR_OPTIMISED, buf, sizeof(buf));
+
+    if (size < 0) {
+        if (errno == ENOTSUP || errno == EOPNOTSUPP) {
+            // Filesystem doesn't support xattrs - feature disabled
+            static std::atomic<bool> warned{false};
+            if (!warned.exchange(true)) {
+                debug("filesystem at %s doesn't support extended attributes, optimization tracking disabled", path.string());
+            }
+            return false;
+        }
+        // EPERM/EACCES means trusted.* but no CAP_SYS_ADMIN (non-root user)
+        // Return false so non-root users re-process (slower but correct)
+        if (errno == EPERM || errno == EACCES) {
+            return false;
+        }
+        // No xattr (ENODATA/ENOATTR) = not optimised
+        return false;
+    }
+
+    return true;  // xattr exists = already optimised
+#else
+    return false;  // Platform doesn't support xattrs: always re-optimize
+#endif
+}
+
+void LocalStore::markPathOptimised(const std::filesystem::path & path)
+{
+#if NIX_SUPPORT_ACL
+    std::string timestamp = std::to_string(time(nullptr));
+
+    if (lsetxattr(path.c_str(), XATTR_OPTIMISED, timestamp.c_str(),
+                  timestamp.size(), 0) < 0) {
+        if (errno != ENOTSUP && errno != EOPNOTSUPP && errno != EROFS &&
+            errno != EPERM && errno != EACCES) {
+            // Log unexpected errors, but ignore permission errors (non-root users)
+            debug("failed to mark path optimised: %s", strerror(errno));
+        }
+        // Don't fail optimization if xattr fails
+    }
+#endif
+}
 
 LocalStore::InodeHash LocalStore::loadInodeHash()
 {
@@ -238,8 +297,18 @@ void LocalStore::optimisePath_(
 
     std::filesystem::path tempLink = makeTempPath(config->realStoreDir.get(), ".tmp-link");
 
+    /* RAII cleanup for tempLink */
+    bool tempLinkCreated = false;
+    Finally cleanupTempLink([&]() {
+        if (tempLinkCreated) {
+            std::error_code ec;
+            std::filesystem::remove(tempLink, ec);
+        }
+    });
+
     try {
         std::filesystem::create_hard_link(linkPath, tempLink);
+        tempLinkCreated = true;
         inodeHash.insert(stLink->st_ino);
     } catch (std::filesystem::filesystem_error & e) {
         if (e.code() == std::errc::too_many_links) {
@@ -256,13 +325,8 @@ void LocalStore::optimisePath_(
     /* Atomically replace the old file with the new hard link. */
     try {
         std::filesystem::rename(tempLink, path);
+        tempLinkCreated = false; /* Successfully renamed, no cleanup needed */
     } catch (std::filesystem::filesystem_error & e) {
-        {
-            std::error_code ec;
-            remove(tempLink, ec); /* Clean up after ourselves. */
-            if (ec)
-                printError("unable to unlink %1%: %2%", PathFmt(tempLink), ec.message());
-        }
         if (e.code() == std::errc::too_many_links) {
             /* Some filesystems generate too many links on the rename,
                rather than on the original link.  (Probably it
@@ -293,22 +357,68 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     Activity act(*logger, actOptimiseStore);
 
     auto paths = queryAllValidPaths();
-    InodeHash inodeHash = loadInodeHash();
+
+    // Check if xattrs are usable by trying to list xattrs on linksDir.
+    // If not usable, we need to pre-load the inode hash as a fallback.
+    InodeHash inodeHash;
+#if NIX_SUPPORT_ACL
+    // Try to list xattrs on linksDir to detect if they're usable
+    ssize_t size = llistxattr(linksDir.string().c_str(), nullptr, 0);
+    if (size < 0) {
+        // Any failure means we can't rely on xattrs for optimization tracking
+        // Load inode hash as fallback to avoid duplicate work
+        debug("cannot use xattrs for optimization tracking (%s), loading inode hash", strerror(errno));
+        inodeHash = loadInodeHash();
+    }
+    // Otherwise: xattrs work (size >= 0)
+    // Start with empty hash - xattr checks will skip already-optimised paths
+#else
+    // Platform doesn't support xattrs at compile time
+    inodeHash = loadInodeHash();
+#endif
 
     act.progress(0, paths.size());
 
     uint64_t done = 0;
+    uint64_t skipped = 0;
 
     for (auto & i : paths) {
+        checkInterrupt();
+
+        auto fullPath = config->realStoreDir.get() / i.to_string();
+
+        // Check xattr FIRST - if optimised, skip expensive DB operations
+        if (isPathOptimised(fullPath)) {
+            debug("skipping already-optimised path '%s'", printStorePath(i));
+            skipped++;
+            done++;
+            act.progress(done, paths.size());
+            continue;
+        }
+
+        // Only do DB operations for paths that need optimization
         addTempRoot(i);
-        if (!isValidPath(i))
-            continue; /* path was GC'ed, probably */
+        if (!isValidPath(i)) {
+            /* path was GC'ed, probably */
+            done++;
+            act.progress(done, paths.size());
+            continue;
+        }
+
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("optimising path '%s'", printStorePath(i)));
-            optimisePath_(&act, stats, config->realStoreDir.get() / i.to_string(), inodeHash, NoRepair);
+            optimisePath_(&act, stats, fullPath, inodeHash, NoRepair);
         }
+
+        // Mark path as optimised
+        markPathOptimised(fullPath);
+
         done++;
         act.progress(done, paths.size());
+    }
+
+    if (skipped > 0) {
+        printInfo("skipped %d already-optimised paths", skipped);
     }
 }
 

@@ -380,6 +380,16 @@ public:
      */
     void optimisePath(const std::filesystem::path & path, RepairFlag repair);
 
+    /**
+     * Check if a store path has been optimised using xattrs.
+     */
+    bool isPathOptimised(const std::filesystem::path & path) const;
+
+    /**
+     * Mark a store path as optimised using xattrs.
+     */
+    void markPathOptimised(const std::filesystem::path & path);
+
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
 protected:
