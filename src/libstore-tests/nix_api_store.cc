@@ -977,4 +977,242 @@ TEST_F(nix_api_store_test, nix_derivation_clone)
     nix_derivation_free(drv2);
 }
 
+TEST_F(NixApiStoreTestWithRealisedPath, nix_store_query_path_info)
+{
+    auto expected = store->ptr->queryPathInfo(outPath->path);
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    std::string narHash;
+    auto ret = nix_path_info_get_nar_hash(ctx, info, OBSERVE_STRING(narHash));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(narHash, expected->narHash.to_string(nix::HashFormat::Nix32, true));
+
+    auto narSize = nix_path_info_get_nar_size(ctx, info);
+    assert_ctx_ok();
+    ASSERT_EQ(narSize, expected->narSize);
+
+    nix::StorePathSet refs;
+
+    struct ReferenceCallbackData
+    {
+        nix::StorePathSet * refs;
+    };
+
+    ReferenceCallbackData refData{&refs};
+    ret = nix_path_info_get_references(
+        ctx, info, &refData, [](nix_c_context *, void * user_data, const StorePath * refPath) {
+            static_cast<ReferenceCallbackData *>(user_data)->refs->insert(refPath->path);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(refs, expected->references);
+
+    nix::Strings sigs;
+
+    struct SignatureCallbackData
+    {
+        nix::Strings * sigs;
+    };
+
+    SignatureCallbackData sigData{&sigs};
+    ret = nix_path_info_get_sigs(
+        ctx, info, &sigData, [](nix_c_context *, void * user_data, const char * sig, unsigned int sig_len) {
+            static_cast<SignatureCallbackData *>(user_data)->sigs->emplace_back(sig, sig_len);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(sigs, nix::Signature::toStrings(expected->sigs));
+
+    ASSERT_TRUE(expected->ca);
+    std::string ca;
+    ret = nix_path_info_get_ca(ctx, info, OBSERVE_STRING(ca));
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(ca, nix::renderContentAddress(*expected->ca));
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_deriver)
+{
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    StorePath * deriver = nix_path_info_get_deriver(ctx, info);
+    assert_ctx_ok();
+    ASSERT_NE(deriver, nullptr);
+    ASSERT_EQ(deriver->path, drvPath->path);
+
+    nix_store_path_free(deriver);
+    nix_path_info_free(info);
+}
+
+TEST_F(nix_api_store_test, nix_store_query_path_info_invalid_path)
+{
+    StorePath * path = nix_store_parse_path(ctx, store, (nixStoreDir + PATH_SUFFIX).c_str());
+    ASSERT_NE(path, nullptr);
+
+    nix_path_info * info = nix_store_query_path_info(ctx, store, path);
+    ASSERT_EQ(info, nullptr);
+    ASSERT_NE(nix_err_code(ctx), NIX_OK);
+
+    nix_store_path_free(path);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_references_early_exit)
+{
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->references.insert(outPath->path);
+    mutInfo->references.insert(drvPath->path);
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    struct CallbackData
+    {
+        int callCount = 0;
+    };
+
+    CallbackData data;
+    auto ret = nix_path_info_get_references(
+        ctx, info, &data, [](nix_c_context * context, void * user_data, const StorePath *) {
+            static_cast<CallbackData *>(user_data)->callCount++;
+            nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Test error from reference callback");
+        });
+
+    ASSERT_EQ(data.callCount, 1);
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_UNKNOWN);
+    ASSERT_STREQ(nix_err_msg(nullptr, ctx, nullptr), "Test error from reference callback");
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_sigs_early_exit)
+{
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->sigs.insert(nix::Signature::parse("key1:c2ln"));
+    mutInfo->sigs.insert(nix::Signature::parse("key2:c2ln"));
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    struct CallbackData
+    {
+        int callCount = 0;
+    };
+
+    CallbackData data;
+    auto ret = nix_path_info_get_sigs(
+        ctx, info, &data, [](nix_c_context * context, void * user_data, const char *, unsigned int) {
+            static_cast<CallbackData *>(user_data)->callCount++;
+            nix_set_err_msg(context, NIX_ERR_UNKNOWN, "Test error from signature callback");
+        });
+
+    ASSERT_EQ(data.callCount, 1);
+    ASSERT_EQ(ret, NIX_ERR_UNKNOWN);
+    ASSERT_EQ(nix_err_code(ctx), NIX_ERR_UNKNOWN);
+    ASSERT_STREQ(nix_err_msg(nullptr, ctx, nullptr), "Test error from signature callback");
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_iterates_all_references_and_sigs)
+{
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->references.insert(outPath->path);
+    mutInfo->references.insert(drvPath->path);
+    mutInfo->sigs.insert(nix::Signature::parse("key1:c2ln"));
+    mutInfo->sigs.insert(nix::Signature::parse("key2:c2ln"));
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    nix::StorePathSet refs;
+
+    struct ReferenceCallbackData
+    {
+        nix::StorePathSet * refs;
+    };
+
+    ReferenceCallbackData refData{&refs};
+    auto ret = nix_path_info_get_references(
+        ctx, info, &refData, [](nix_c_context *, void * user_data, const StorePath * refPath) {
+            static_cast<ReferenceCallbackData *>(user_data)->refs->insert(refPath->path);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(refs, mutInfo->references);
+
+    nix::Strings sigs;
+
+    struct SignatureCallbackData
+    {
+        nix::Strings * sigs;
+    };
+
+    SignatureCallbackData sigData{&sigs};
+    ret = nix_path_info_get_sigs(
+        ctx, info, &sigData, [](nix_c_context *, void * user_data, const char * sig, unsigned int sig_len) {
+            static_cast<SignatureCallbackData *>(user_data)->sigs->emplace_back(sig, sig_len);
+        });
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_EQ(sigs, nix::Signature::toStrings(mutInfo->sigs));
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_deriver_absent)
+{
+    nix_path_info * info = nix_store_query_path_info(ctx, store, drvPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    StorePath * deriver = nix_path_info_get_deriver(ctx, info);
+    assert_ctx_ok();
+    ASSERT_EQ(deriver, nullptr);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_get_ca_absent)
+{
+    auto cppInfo = store->ptr->queryPathInfo(outPath->path);
+    auto mutInfo = std::make_shared<nix::ValidPathInfo>(*cppInfo);
+    mutInfo->ca = std::nullopt;
+    auto * info = new nix_path_info{nix::ref<const nix::ValidPathInfo>(mutInfo)};
+
+    bool callbackCalled = false;
+    auto ret = nix_path_info_get_ca(
+        ctx, info, [](const char *, unsigned int, void * ud) { *static_cast<bool *>(ud) = true; }, &callbackCalled);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+    ASSERT_FALSE(callbackCalled);
+
+    nix_path_info_free(info);
+}
+
+TEST_F(NixApiStoreTestWithRealisedPath, nix_path_info_null_callbacks)
+{
+    nix_path_info * info = nix_store_query_path_info(ctx, store, outPath);
+    assert_ctx_ok();
+    ASSERT_NE(info, nullptr);
+
+    auto ret = nix_path_info_get_references(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    ret = nix_path_info_get_sigs(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    ret = nix_path_info_get_ca(ctx, info, nullptr, nullptr);
+    assert_ctx_ok();
+    ASSERT_EQ(ret, NIX_OK);
+
+    nix_path_info_free(info);
+}
+
 } // namespace nixC
