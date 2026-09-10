@@ -27,6 +27,12 @@ TEST(getNameFromURL, getNameFromURL)
     ASSERT_EQ(getNameFromURL(parseURL("github:NixOS/nix")), "nix");
     ASSERT_EQ(getNameFromURL(parseURL("github:cachix/devenv/main#packages.x86_64-linux.default")), "devenv");
     ASSERT_EQ(getNameFromURL(parseURL("github:edolstra/nix-warez?rev=1234&dir=blender&ref=master")), "blender");
+    /* Fragment takes precedence over dir=, since the fragment names a specific attribute. */
+    ASSERT_EQ(getNameFromURL(parseURL("github:org/repo?dir=ai#my-tool")), "my-tool");
+    ASSERT_EQ(getNameFromURL(parseURL("github:org/repo?dir=ai#packages.x86_64-linux.my-tool")), "my-tool");
+    /* dir= is still used when the fragment is empty, missing, or `default`. */
+    ASSERT_EQ(getNameFromURL(parseURL("github:org/repo?dir=ai#")), "ai");
+    ASSERT_EQ(getNameFromURL(parseURL("github:org/repo?dir=ai#packages.x86_64-linux.default")), "ai");
 
     ASSERT_EQ(getNameFromURL(parseURL("gitlab:NixOS/nixpkgs#packages.x86_64-linux.hello")), "hello");
     ASSERT_EQ(getNameFromURL(parseURL("gitlab:NixOS/nixpkgs#hello")), "hello");
