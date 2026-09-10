@@ -17,7 +17,7 @@ void TimedOut::anchor() {}
 void Goal::anchor() {}
 
 using Co = nix::Goal::Co;
-using promise_type = nix::Goal::promise_type;
+using PromiseType = nix::Goal::AwaitableFrame;
 
 void Goal::ChildEvents::pushChildEvent(ChildOutput event)
 {
@@ -61,7 +61,7 @@ Goal::ChildEvent Goal::ChildEvents::popChildEvent()
     unreachable();
 }
 
-using handle_type = nix::Goal::handle_type;
+using handle_type = nix::Goal::HandleType;
 using Suspend = nix::Goal::Suspend;
 
 Co::Co(Co && rhs) noexcept
@@ -91,13 +91,13 @@ Co::~Co()
     }
 }
 
-Co promise_type::get_return_object()
+Co PromiseType::get_return_object()
 {
-    auto handle = handle_type::from_promise(*this);
+    auto handle = HandleType::from_promise(*this);
     return Co{handle};
 };
 
-std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h) noexcept
+std::coroutine_handle<> PromiseType::final_awaiter::await_suspend(HandleType h) noexcept
 {
     auto & p = h.promise();
     auto goal = p.goal;
@@ -138,7 +138,7 @@ std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h
     }
 }
 
-void promise_type::return_value(Co && next)
+void PromiseType::return_value(Co && next)
 {
     goal->trace("return_value(Co&&)");
     // Save old continuation.
@@ -153,7 +153,7 @@ void promise_type::return_value(Co && next)
     continuation->handle.promise().continuation = std::move(old_continuation);
 }
 
-std::coroutine_handle<> nix::Goal::Co::await_suspend(handle_type caller)
+std::coroutine_handle<> nix::Goal::Co::await_suspend(HandleType caller)
 {
     assert(handle); // we must be a valid coroutine
     auto & p = handle.promise();

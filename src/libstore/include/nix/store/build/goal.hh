@@ -206,12 +206,12 @@ public:
     {};
 
     // forward declaration of promise_type, see below
-    struct promise_type;
+    struct AwaitableFrame;
 
     /**
      * Handle to coroutine using @ref Co and @ref promise_type.
      */
-    using handle_type = std::coroutine_handle<promise_type>;
+    using HandleType = std::coroutine_handle<AwaitableFrame>;
 
     /**
      * C++20 coroutine wrapper for use in goal logic.
@@ -259,9 +259,9 @@ public:
         /**
          * The underlying handle.
          */
-        handle_type handle;
+        HandleType handle;
 
-        explicit Co(handle_type handle)
+        explicit Co(HandleType handle)
             : handle(handle) {};
         Co & operator=(Co &&) noexcept;
         Co(Co && rhs) noexcept;
@@ -286,7 +286,7 @@ public:
          *
          * `goal` field of @ref promise_type is also set here by copying it from the caller.
          */
-        std::coroutine_handle<> await_suspend(handle_type handle);
+        std::coroutine_handle<> await_suspend(HandleType handle);
         void await_resume() {};
     };
 
@@ -306,14 +306,14 @@ public:
          * Handle of coroutine that does the
          * initial suspend
          */
-        handle_type handle;
+        HandleType handle;
 
         bool await_ready()
         {
             return false;
         };
 
-        void await_suspend(handle_type handle_)
+        void await_suspend(HandleType handle_)
         {
             handle = handle_;
         }
@@ -330,8 +330,11 @@ public:
     /**
      * Promise type for coroutines defined using @ref Co.
      * Attached to coroutine handle.
+     *
+     * @see boost::asio::detail::awaitable_frame for a reference implementation
+     * of a similar pattern.
      */
-    struct promise_type
+    struct AwaitableFrame
     {
         /**
          * Either this is who called us, or it is who we will tail-call.
@@ -367,7 +370,7 @@ public:
              * `h` is the handle for the coroutine that is finishing execution,
              * thus it must be destroyed.
              */
-            std::coroutine_handle<> await_suspend(handle_type h) noexcept;
+            std::coroutine_handle<> await_suspend(HandleType h) noexcept;
 
             void await_resume() noexcept
             {
@@ -454,7 +457,7 @@ public:
          */
         struct SuspendAwaiter
         {
-            promise_type & promise;
+            AwaitableFrame & promise;
 
             bool await_ready()
             {
@@ -462,7 +465,7 @@ public:
                 return false;
             }
 
-            void await_suspend(handle_type) {}
+            void await_suspend(HandleType) {}
 
             void await_resume() {}
         };
@@ -482,14 +485,14 @@ public:
          */
         struct ChildEventAwaiter
         {
-            handle_type handle;
+            HandleType handle;
 
             bool await_ready()
             {
                 return handle && handle.promise().goal->childEvents.hasChildEvent();
             }
 
-            void await_suspend(handle_type h)
+            void await_suspend(HandleType h)
             {
                 handle = h;
             }
@@ -506,7 +509,7 @@ public:
          */
         ChildEventAwaiter await_transform(WaitForChildEvent)
         {
-            return ChildEventAwaiter{handle_type::from_promise(*this)};
+            return ChildEventAwaiter{HandleType::from_promise(*this)};
         };
     };
 
@@ -659,5 +662,5 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p);
 template<typename... ArgTypes>
 struct std::coroutine_traits<nix::Goal::Co, ArgTypes...>
 {
-    using promise_type = nix::Goal::promise_type;
+    using promise_type = nix::Goal::AwaitableFrame;
 };

@@ -5,7 +5,7 @@
 namespace nix {
 
 template<typename T>
-auto Goal::promise_type::await_transform(AsyncCallback<T> && ac)
+auto Goal::AwaitableFrame::await_transform(AsyncCallback<T> && ac)
 {
     struct Awaiter
     {
@@ -17,7 +17,7 @@ auto Goal::promise_type::await_transform(AsyncCallback<T> && ac)
             return false;
         }
 
-        void await_suspend(handle_type h)
+        void await_suspend(HandleType h)
         {
             auto goal = h.promise().goal;
             promise = std::make_shared<std::promise<T>>();
