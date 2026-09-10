@@ -25,6 +25,14 @@ deps_public_maybe_subproject = [
 ]
 subdir('nix-meson-build-support/subprojects')
 
+configdata_priv = configuration_data()
+configdata_priv.set_quoted('GIT_PROGRAM', get_option('git-program'))
+configdata_priv.set('ENABLE_MERCURIAL', get_option('mercurial-fetcher') ? 1 : 0)
+config_priv_h = configure_file(
+  configuration : configdata_priv,
+  output : 'fetchers-config-private.hh',
+)
+
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
 deps_public += nlohmann_json
 
@@ -33,7 +41,7 @@ deps_private += libgit2
 
 subdir('nix-meson-build-support/common')
 
-sources = files(
+sources = [ config_priv_h ] + files(
   'attrs.cc',
   'cache.cc',
   'fetch-settings.cc',
