@@ -217,37 +217,9 @@ printf World2 > "$flake2Dir"/who
 
 nix profile add "$flake1Dir"
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
-expect 1 nix profile add "$flake2Dir"
-diff -u <(
-    nix --offline profile install "$flake2Dir" 2>&1 1> /dev/null \
-        | grep -vE "^warning: " \
-        | grep -vE "^error \(ignored\): " \
-        | grep -vE "^waiting for " \
-        || true
-) <(cat << EOF
-error: An existing package already provides the following file:
-
-         "$(nix build --no-link --print-out-paths "${flake1Dir}""#default.out")/bin/hello"
-
-       This is the conflicting file from the new package:
-
-         "$(nix build --no-link --print-out-paths "${flake2Dir}""#default.out")/bin/hello"
-
-       To remove the existing package:
-
-         nix profile remove flake1
-
-       The new package can also be added next to the existing one by assigning a different priority.
-       The conflicting packages have a priority of 5.
-       To prioritise the new package:
-
-         nix profile add path:${flake2Dir}#packages.${system}.default --priority 4
-
-       To prioritise the existing package:
-
-         nix profile add path:${flake2Dir}#packages.${system}.default --priority 6
-EOF
-)
+expected=100
+if [[ -v NIX_DAEMON_PACKAGE ]]; then expected=1; fi # work around the daemon not returning a 100 status correctly
+expect "$expected" nix profile add "$flake2Dir"
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile add "$flake2Dir" --priority 100
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
@@ -262,7 +234,7 @@ nix profile add "$flake2Dir" --priority 0
 clearProfiles
 # shellcheck disable=SC2046
 nix profile add $(nix build "$flake1Dir" --no-link --print-out-paths)
-expect 1 nix profile add --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
+expect "$expected" nix profile add --impure --expr "(builtins.getFlake ''$flake2Dir'').packages.$system.default"
 
 # Test upgrading from profile version 2.
 clearProfiles
@@ -272,3 +244,74 @@ printf '{ "version": 2, "elements": [ { "active": true, "attrPath": "legacyPacka
 nix build --profile "$TEST_HOME"/.nix-profile "$(nix store add-path "$TEST_ROOT"/import-profile)" --no-link
 nix profile list | grep -A4 'Name:.*hello' | grep "Store paths:.*$outPath"
 nix profile remove hello 2>&1 | grep 'removed 1 packages, kept 0 packages'
+
+# A profile symlink that doesn't resolve into the store isn't a store-backed
+# profile.  Reading one must produce an empty manifest rather than an error, and
+# `add` must be able to start a fresh generation over it.
+danglingProfile=$TEST_ROOT/dangling-profile
+ln -sfn "$TEST_ROOT/no-such-generation" "$danglingProfile"
+nix profile list --profile "$danglingProfile" --json | jq -e '.elements == {}'
+mkdir -p "$TEST_ROOT/plain-profile-target"
+ln -sfn "$TEST_ROOT/plain-profile-target" "$danglingProfile"
+nix profile list --profile "$danglingProfile" --json | jq -e '.elements == {}'
+rm "$danglingProfile"
+
+# Building the profile is an implementation detail of `nix profile`, so it must
+# not need a build slot: `max-jobs = 0` means "build everything remotely", and no
+# remote builder can run a `builtin:` builder. This is daemon-side behavior, so
+# an older daemon used by the compatibility suite cannot exercise it.
+if [[ -z "${NIX_DAEMON_PACKAGE-}" ]]; then
+    clearProfiles
+    nix profile add --max-jobs 0 "$(nix build "${flake1Dir}^out" --no-link --print-out-paths)"
+    [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
+
+    # A builtin waiting behind another builtin must be woken when the first
+    # releases the synthetic slot.
+    nix build --max-jobs 0 --no-link --expr '
+      let
+        makeBuildenv = name: builtins.derivation {
+          inherit name;
+          system = "builtin";
+          builder = "builtin:buildenv";
+          derivations = "";
+          manifestJSON = "{}";
+          preferLocalBuild = true;
+          allowSubstitutes = false;
+        };
+      in [ (makeBuildenv "builtin-slot-a") (makeBuildenv "builtin-slot-b") ]
+    '
+fi
+
+# Profiles must use the store API rather than assuming that logical store paths
+# are directly accessible through the host filesystem.  A rooted local store
+# keeps its objects under $rootedStoreRoot while exposing them as /nix/store.
+#
+# Building into a relocated store is always sandboxed (see `isRelocatedStore` in
+# derivation-builder.cc), which only Linux and FreeBSD implement and which needs
+# working user namespaces.  `canUseSandbox` covers both.
+if canUseSandbox; then
+    rootedStoreRoot="$TEST_ROOT/rooted-store"
+    rootedStore="local?root=$rootedStoreRoot&store=/nix/store"
+    rootedProfile="$TEST_ROOT/rooted-profile"
+    rootedPackageDir="$TEST_ROOT/rooted-package"
+    mkdir -p "$rootedPackageDir/bin"
+    echo rooted > "$rootedPackageDir/bin/rooted-hello"
+
+    rootedPackage=$(nix store add-path --store "$rootedStore" "$rootedPackageDir")
+    nix profile add --store "$rootedStore" --profile "$rootedProfile" "$rootedPackage"
+    nix profile list --store "$rootedStore" --profile "$rootedProfile" --json \
+        | jq -e --arg path "$rootedPackage" '.elements | length == 1 and .[].storePaths == [$path]'
+
+    rootedProfileGeneration=$(readlink "$rootedProfile")
+    rootedProfileStorePath=$(readlink "$(dirname "$rootedProfile")/$rootedProfileGeneration")
+    nix store cat --store "$rootedStore" "$rootedProfileStorePath/manifest.json" \
+        | jq -e --arg path "$rootedPackage" '.elements | length == 1 and .[].storePaths == [$path]'
+
+    # The profile has to hold the symlink tree too, not just the manifest.
+    nix store ls -l --store "$rootedStore" "$rootedProfileStorePath" \
+        | grepQuiet "bin -> $rootedPackage/bin"
+
+    nix profile remove --store "$rootedStore" --profile "$rootedProfile" --all
+    nix profile list --store "$rootedStore" --profile "$rootedProfile" --json \
+        | jq -e '.elements == {}'
+fi

@@ -258,7 +258,7 @@ void Worker::waitForBuildSlot(GoalPtr goal)
         if (goal->jobCategory() == JobCategory::Substitution)
             return getNrSubstitutions() < settings.maxSubstitutionJobs;
         else
-            return getNrLocalBuilds() < settings.maxBuildJobs;
+            return getNrLocalBuilds() < goal->buildSlotLimit();
     }();
 
     if (slotAvailable)
@@ -324,21 +324,29 @@ void Worker::run(const Goals & _topGoals)
                     break; // stuff may have been cancelled
             }
 
-            auto wakeSlotWaiters = [this](WeakGoals & waiting, size_t running, size_t limit) {
+            auto wakeSlotWaiters = [this](WeakGoals & waiting, size_t running, auto getLimit) {
                 auto it = waiting.begin();
-                while (it != waiting.end() && running < limit) {
+                while (it != waiting.end()) {
                     auto goal = it->lock();
-                    it = waiting.erase(it);
-                    if (!goal)
+                    if (!goal) {
+                        it = waiting.erase(it);
                         continue;
+                    }
+                    if (running >= getLimit(*goal)) {
+                        ++it;
+                        continue;
+                    }
+                    it = waiting.erase(it);
                     wakeUp(goal);
                     ++running;
                 }
             };
 
+            wakeSlotWaiters(wantingToSubstitute, getNrSubstitutions(), [&](const Goal &) {
+                return std::max<std::size_t>(1, settings.maxSubstitutionJobs);
+            });
             wakeSlotWaiters(
-                wantingToSubstitute, getNrSubstitutions(), std::max<std::size_t>(1, settings.maxSubstitutionJobs));
-            wakeSlotWaiters(wantingToBuild, getNrLocalBuilds(), settings.maxBuildJobs);
+                wantingToBuild, getNrLocalBuilds(), [&](const Goal & goal) { return goal.buildSlotLimit(); });
         }
 
         if (topGoals.empty())

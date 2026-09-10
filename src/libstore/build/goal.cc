@@ -16,6 +16,12 @@ void TimedOut::anchor() {}
 
 void Goal::anchor() {}
 
+size_t Goal::buildSlotLimit() const
+{
+    assert(jobCategory() == JobCategory::Build);
+    return worker.settings.maxBuildJobs;
+}
+
 using Co = nix::Goal::Co;
 using promise_type = nix::Goal::promise_type;
 

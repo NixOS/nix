@@ -2,6 +2,7 @@
 #include "nix/store/builtins.hh"
 #include "nix/store/derivations.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -11,6 +12,52 @@
 namespace nix {
 
 void BuildEnvFileConflictError::anchor() {}
+
+std::string encodeBuildenvPackages(const Packages & pkgs)
+{
+    std::string res;
+    for (auto & pkg : pkgs) {
+        if (!res.empty())
+            res += ' ';
+        /* A record is `active priority numOutputs path...`; we emit one output
+           per record, which decodes to the same flat list of packages. */
+        res += fmt("%s %d 1 %s", pkg.active ? "true" : "false", pkg.priority, pkg.path.string());
+    }
+    return res;
+}
+
+Packages decodeBuildenvPackages(std::string_view s)
+{
+    Packages pkgs;
+
+    auto tokens = tokenizeString<Strings>(s);
+    auto it = tokens.begin();
+
+    auto next = [&]() -> std::string {
+        if (it == tokens.end())
+            throw Error("'derivations' attribute of a buildenv derivation ends unexpectedly");
+        return std::move(*it++);
+    };
+
+    auto nextInt = [&]() {
+        auto tok = next();
+        if (auto n = string2Int<int>(tok))
+            return *n;
+        throw Error("'derivations' attribute of a buildenv derivation has '%s' where a number was expected", tok);
+    };
+
+    while (it != tokens.end()) {
+        const bool active = next() != "false";
+        const int priority = nextInt();
+        const int outputs = nextInt();
+        if (outputs < 0)
+            throw Error("'derivations' attribute of a buildenv derivation has a negative output count");
+        for (int n = 0; n < outputs; n++)
+            pkgs.emplace_back(next(), active, priority);
+    }
+
+    return pkgs;
+}
 
 RegisterBuiltinBuilder::BuiltinBuilders & RegisterBuiltinBuilder::builtinBuilders()
 {
@@ -182,28 +229,15 @@ static void builtinBuildenv(const BuiltinBuilderContext & ctx)
     auto out = ctx.outputs.at("out");
     createDirs(out);
 
-    /* Convert the stuff we get from the environment back into a
-     * coherent data type. */
-    Packages pkgs;
-    {
-        auto derivations = tokenizeString<Strings>(getAttr("derivations"));
+    buildProfile(out, decodeBuildenvPackages(getAttr("derivations")));
 
-        auto itemIt = derivations.begin();
-        while (itemIt != derivations.end()) {
-            /* !!! We're trusting the caller to structure derivations env var correctly */
-            const bool active = "false" != *itemIt++;
-            const int priority = stoi(*itemIt++);
-            const size_t outputs = stoul(*itemIt++);
-
-            for (size_t n{0}; n < outputs; n++) {
-                pkgs.emplace_back(std::move(*itemIt++), active, priority);
-            }
-        }
-    }
-
-    buildProfile(out, std::move(pkgs));
-
-    createSymlink(getAttr("manifest"), out + "/manifest.nix");
+    /* `nix profile` passes the manifest inline because it may be building
+       into a store that isn't mounted on this filesystem; `nix-env` passes
+       a store path to a Nix expression. Exactly one of the two is set. */
+    if (auto manifestJSON = ctx.drv.env.find("manifestJSON"); manifestJSON != ctx.drv.env.end())
+        writeFile(out + "/manifest.json", manifestJSON->second);
+    else
+        createSymlink(getAttr("manifest"), out + "/manifest.nix");
 }
 
 static RegisterBuiltinBuilder registerBuildenv("buildenv", builtinBuildenv);

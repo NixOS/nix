@@ -232,6 +232,20 @@ struct LogFile
     ~LogFile();
 };
 
+/**
+ * The local build limit that applies to `drv`.
+ *
+ * Builtin builders do no user work and cannot be offloaded, since their
+ * platform is `builtin`, which no machine advertises. So `max-jobs = 0`, which
+ * means "build everything remotely", must not make them unbuildable: `nix
+ * profile` and `nix-env` both need `builtin:buildenv` to run.
+ */
+size_t DerivationBuildingGoal::buildSlotLimit() const
+{
+    auto limit = worker.settings.maxBuildJobs.get();
+    return drv->isBuiltin() ? std::max(1u, limit) : limit;
+}
+
 struct LocalBuildRejection
 {
     bool maxJobsZero = false;
@@ -346,7 +360,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     checkPathValidity(initialOutputs);
 
     auto localBuildResult = [&]() -> std::variant<LocalBuildCapability, LocalBuildRejection> {
-        bool maxJobsZero = worker.settings.maxBuildJobs.get() == 0;
+        bool maxJobsZero = buildSlotLimit() == 0;
 
         auto * localStoreP = dynamic_cast<LocalStore *>(&worker.store);
         if (!localStoreP)
@@ -854,7 +868,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
     while (true) {
 
         unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= worker.settings.maxBuildJobs) {
+        if (curBuilds >= buildSlotLimit()) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
             co_return tryToBuild(std::move(inputPaths));

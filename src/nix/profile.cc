@@ -3,10 +3,10 @@
 #include "nix/cmd/installable-flake.hh"
 #include "nix/main/common-args.hh"
 #include "nix/main/shared.hh"
+#include "nix/store/build.hh"
+#include "nix/store/builtins/buildenv.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
-#include "nix/util/archive.hh"
-#include "nix/store/builtins/buildenv.hh"
 #include "nix/flake/flakeref.hh"
 #include "nix-env/user-env.hh"
 #include "nix/store/profiles.hh"
@@ -64,20 +64,6 @@ struct ProfileElement
         return dropEmptyInitThenConcatStringsSep(", ", names);
     }
 
-    /**
-     * Return a string representing an installable corresponding to the current
-     * element, either a flakeref or a plain store path
-     */
-    StringSet toInstallables(Store & store)
-    {
-        if (source)
-            return {source->to_string()};
-        StringSet rawPaths;
-        for (auto & path : storePaths)
-            rawPaths.insert(store.printStorePath(path));
-        return rawPaths;
-    }
-
     std::string versions() const
     {
         StringSet versions;
@@ -121,12 +107,67 @@ struct ProfileManifest
 
     ProfileManifest() {}
 
-    ProfileManifest(EvalState & state, const std::filesystem::path & profile)
+    ProfileManifest(EvalState & state, ref<Store> store, const std::filesystem::path & profile)
     {
         auto manifestPath = profile / "manifest.json";
+        std::optional<std::string> manifestContents;
+        /* Where the manifest was actually read from, for error messages. */
+        std::string manifestDesc = manifestPath.string();
 
-        if (std::filesystem::exists(manifestPath)) {
-            auto json = nlohmann::json::parse(readFile(manifestPath));
+        auto profileStorePath = store->maybeParseStorePath(profile.string());
+        if (!profileStorePath && std::filesystem::is_symlink(profile)) {
+            try {
+                profileStorePath = store->followLinksToStorePath(profile.string());
+            } catch (BadStorePath &) {
+                /* Dangling, or resolving outside the store: not a store-backed
+                   profile, so fall back to the host filesystem below. */
+            }
+        }
+
+        /* Null when this store holds no such object, in which case the profile
+           may still be readable through the host filesystem. */
+        std::shared_ptr<SourceAccessor> accessor;
+        if (profileStorePath)
+            accessor = store->getFSAccessor(*profileStorePath);
+
+        if (accessor) {
+            auto accessorPath = CanonPath("manifest.json");
+            if (accessor->maybeLstat(accessorPath)) {
+                manifestContents = accessor->readFile(accessorPath);
+                manifestDesc = store->printStorePath(*profileStorePath) + "/manifest.json";
+            }
+        }
+
+        /* Older daemons only know the `manifest` buildenv attribute and
+           expose it as manifest.nix.  New clients put the JSON manifest in
+           that store object as a compatibility fallback. */
+        auto useCompatibilityManifest = [&](std::string contents, std::string desc) {
+            auto json = nlohmann::json::parse(contents, nullptr, false);
+            if (json.is_object() && json.contains("version") && json.contains("elements")) {
+                manifestContents = std::move(contents);
+                manifestDesc = std::move(desc);
+            }
+        };
+
+        if (!manifestContents && accessor) {
+            auto accessorPath = CanonPath("manifest.nix");
+            if (auto stat = accessor->maybeLstat(accessorPath); stat && stat->type == SourceAccessor::tSymlink) {
+                auto compatibilityManifest = store->parseStorePath(accessor->readLink(accessorPath));
+                auto compatibilityAccessor = store->requireStoreObjectAccessor(compatibilityManifest);
+                useCompatibilityManifest(
+                    compatibilityAccessor->readFile(CanonPath::root),
+                    store->printStorePath(*profileStorePath) + "/manifest.nix");
+            }
+        }
+
+        if (!manifestContents && !std::filesystem::exists(manifestPath)) {
+            auto compatibilityManifestPath = profile / "manifest.nix";
+            if (std::filesystem::exists(compatibilityManifestPath))
+                useCompatibilityManifest(readFile(compatibilityManifestPath), compatibilityManifestPath.string());
+        }
+
+        if (manifestContents || std::filesystem::exists(manifestPath)) {
+            auto json = nlohmann::json::parse(manifestContents ? *manifestContents : readFile(manifestPath));
 
             auto version = json.value("version", 0);
             std::string sUrl;
@@ -142,7 +183,7 @@ struct ProfileManifest
                 sOriginalUrl = "originalUrl";
                 break;
             default:
-                throw Error("profile manifest %s has unsupported version %d", PathFmt(manifestPath), version);
+                throw Error("profile manifest '%s' has unsupported version %d", manifestDesc, version);
             }
 
             auto elems = json["elements"];
@@ -177,17 +218,33 @@ struct ProfileManifest
             }
         }
 
-        else if (std::filesystem::exists(profile / "manifest.nix")) {
-            // FIXME: needed because of pure mode; ugly.
-            state.allowPath(state.store->followLinksToStorePath(profile.string()));
-            state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
+        /* Legacy `nix-env` profile. Reading one means evaluating its
+           `manifest.nix`, which the evaluator can only do through the host
+           filesystem, so a store that isn't mounted there can be detected but
+           not read. Detecting it still matters: silently reading such a profile
+           as empty would drop every installed package on the next write. */
+        else {
+            auto hasLegacyManifest = accessor ? (bool) accessor->maybeLstat(CanonPath("manifest.nix"))
+                                              : std::filesystem::exists(profile / "manifest.nix");
 
-            auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
+            if (hasLegacyManifest) {
+                if (!std::filesystem::exists(profile / "manifest.nix"))
+                    throw Error(
+                        "profile '%s' was created by 'nix-env', which can only read it from a store mounted at '%s'",
+                        store->printStorePath(*profileStorePath),
+                        store->storeDir);
 
-            for (auto & packageInfo : packageInfos) {
-                ProfileElement element;
-                element.storePaths = {packageInfo.queryOutPath()};
-                addElement(std::move(element));
+                // FIXME: needed because of pure mode; ugly.
+                state.allowPath(state.store->followLinksToStorePath(profile.string()));
+                state.allowPath(state.store->followLinksToStorePath((profile / "manifest.nix").string()));
+
+                auto packageInfos = queryInstalled(state, state.store->followLinksToStore(profile.string()));
+
+                for (auto & packageInfo : packageInfos) {
+                    ProfileElement element;
+                    element.storePaths = {packageInfo.queryOutPath()};
+                    addElement(std::move(element));
+                }
             }
         }
     }
@@ -236,49 +293,54 @@ struct ProfileManifest
 
     StorePath build(ref<Store> store)
     {
-        auto tempDir = createTempDir();
-
-        StorePathSet references;
-
         Packages pkgs;
-        for (auto & [name, element] : elements) {
+        StorePathSet packagePaths;
+        Derivation drv{
+            .outputs = {{"out", DerivationOutput::Deferred{}}},
+            .platform = "builtin",
+            .builder = "builtin:buildenv",
+            .env =
+                {
+                    {"name", "profile"},
+                    {"out", ""},
+                    {"preferLocalBuild", "1"},
+                    {"allowSubstitutes", ""},
+                },
+            .name = "profile",
+        };
+
+        for (auto & [name, element] : elements)
             for (auto & path : element.storePaths) {
-                if (element.active)
-                    pkgs.emplace_back(store->printStorePath(path), true, element.priority);
-                references.insert(path);
+                pkgs.emplace_back(store->printStorePath(path), element.active, element.priority);
+                packagePaths.insert(path);
+                drv.inputs.insert(SingleDerivedPath::Opaque{path});
             }
-        }
 
-        buildProfile(tempDir, std::move(pkgs));
+        auto manifestJSON = toJSON(*store).dump();
+        StringSource manifestSource{manifestJSON};
+        auto compatibilityManifest = store->addToStoreFromDump(
+            manifestSource,
+            "profile-manifest.json",
+            FileSerialisationMethod::Flat,
+            ContentAddressMethod::Raw::Text,
+            HashAlgorithm::SHA256,
+            packagePaths);
 
-        writeFile(tempDir / "manifest.json", toJSON(*store).dump());
+        drv.env.insert_or_assign("derivations", encodeBuildenvPackages(pkgs));
+        drv.env.insert_or_assign("manifest", store->printStorePath(compatibilityManifest));
+        drv.env.insert_or_assign("manifestJSON", std::move(manifestJSON));
+        drv.inputs.insert(SingleDerivedPath::Opaque{compatibilityManifest});
+        fillInOutputPaths(drv, *store);
 
-        /* Add the symlink tree to the store. */
-        StringSink sink;
-        dumpPath(tempDir, sink);
+        auto outputPath = std::get<DerivationOutput::InputAddressed>(drv.outputs.at("out").raw).path;
+        auto drvPath = store->writeDerivation(drv);
 
-        auto narHash = hashString(HashAlgorithm::SHA256, sink.s);
+        store->getBuilder()->buildPaths({DerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(drvPath),
+            .outputs = OutputsSpec::All{},
+        }});
 
-        auto info = ValidPathInfo::makeFromCA(
-            *store,
-            "profile",
-            FixedOutputInfo{
-                .method = FileIngestionMethod::NixArchive,
-                .hash = narHash,
-                .references =
-                    {
-                        .others = std::move(references),
-                        // profiles never refer to themselves
-                        .self = false,
-                    },
-            },
-            narHash);
-        info.narSize = sink.s.size();
-
-        StringSource source(sink.s);
-        store->addToStore(info, source);
-
-        return std::move(info.path);
+        return outputPath;
     }
 
     static void printDiff(const ProfileManifest & prev, const ProfileManifest & cur, std::string_view indent)
@@ -363,7 +425,7 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
 
     void run(ref<Store> store, Installables && installables) override
     {
-        ProfileManifest manifest(*getEvalState(), *profile);
+        ProfileManifest manifest(*getEvalState(), store, *profile);
 
         auto builtPaths = builtPathsPerInstallable(
             Installable::build2(getEvalStore(), store, Realise::Outputs, installables, bmNormal));
@@ -413,65 +475,7 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
             manifest.addElement(elementName, std::move(element));
         }
 
-        try {
-            updateProfile(*store, manifest.build(store));
-        } catch (BuildEnvFileConflictError & conflictError) {
-            // FIXME use C++20 std::ranges once macOS has it
-            //       See
-            //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
-            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
-                for (auto it = begin; it != end; it++) {
-                    auto & [name, profileElement] = *it;
-                    for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
-                        }
-                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
-                        }
-                    }
-                }
-                throw conflictError;
-            };
-            // There are 2 conflicting files. We need to find out which one is from the already installed package and
-            // which one is the package that is the new package that is being installed.
-            // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
-                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
-            // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
-                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
-
-            throw Error(
-                "An existing package already provides the following file:\n"
-                "\n"
-                "  %1%\n"
-                "\n"
-                "This is the conflicting file from the new package:\n"
-                "\n"
-                "  %2%\n"
-                "\n"
-                "To remove the existing package:\n"
-                "\n"
-                "  nix profile remove %3%\n"
-                "\n"
-                "The new package can also be added next to the existing one by assigning a different priority.\n"
-                "The conflicting packages have a priority of %5%.\n"
-                "To prioritise the new package:\n"
-                "\n"
-                "  nix profile add %4% --priority %6%\n"
-                "\n"
-                "To prioritise the existing package:\n"
-                "\n"
-                "  nix profile add %4% --priority %7%\n",
-                PathFmt(originalConflictingFilePath),
-                PathFmt(newConflictingFilePath),
-                originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
-                conflictError.priority,
-                conflictError.priority - 1,
-                conflictError.priority + 1);
-        }
+        updateProfile(*store, manifest.build(store));
     }
 };
 
@@ -571,7 +575,7 @@ class MixProfileElementMatchers : virtual Args, virtual StoreCommand, public vir
             return;
 
         auto evalState = evalCmd->getEvalState();
-        ProfileManifest manifest(*evalState, *profile);
+        ProfileManifest manifest(*evalState, getStore(), *profile);
 
         for (auto & [name, element] : manifest.elements)
             if (name.starts_with(prefix))
@@ -667,7 +671,7 @@ struct CmdProfileRemove : virtual EvalCommand, MixProfileElementMatchers
 
     void run(ref<Store> store) override
     {
-        ProfileManifest oldManifest(*getEvalState(), *profile);
+        ProfileManifest oldManifest(*getEvalState(), store, *profile);
 
         ProfileManifest newManifest = oldManifest;
 
@@ -708,7 +712,7 @@ struct CmdProfileUpgrade : virtual SourceExprCommand, MixProfileElementMatchers,
     void run(ref<Store> store) override
     {
         fetchSettings.tarballTtl = 0;
-        ProfileManifest manifest(*getEvalState(), *profile);
+        ProfileManifest manifest(*getEvalState(), store, *profile);
 
         Installables installables;
         std::vector<ProfileElement *> elems;
@@ -818,7 +822,7 @@ struct CmdProfileList : virtual EvalCommand, virtual StoreCommand, MixDefaultPro
 
     void run(ref<Store> store) override
     {
-        ProfileManifest manifest(*getEvalState(), *profile);
+        ProfileManifest manifest(*getEvalState(), store, *profile);
 
         if (json) {
             printJSON(manifest.toJSON(*store));
@@ -905,7 +909,13 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
         bool first = true;
 
         for (auto & gen : gens) {
-            ProfileManifest manifest(*getEvalState(), gen.path);
+            std::optional<ProfileManifest> manifest;
+            try {
+                manifest.emplace(*getEvalState(), store, gen.path);
+            } catch (Error & e) {
+                warn("cannot read profile version %d: %s", gen.number, e.message());
+                continue;
+            }
 
             if (!first)
                 logger->cout("");
@@ -918,9 +928,9 @@ struct CmdProfileHistory : virtual StoreCommand, EvalCommand, MixDefaultProfile
                 std::put_time(std::gmtime(&gen.creationTime), "%Y-%m-%d"),
                 prevGen ? fmt(" <- %d", prevGen->first.number) : "");
 
-            ProfileManifest::printDiff(prevGen ? prevGen->second : ProfileManifest(), manifest, "  ");
+            ProfileManifest::printDiff(prevGen ? prevGen->second : ProfileManifest(), *manifest, "  ");
 
-            prevGen = {gen, std::move(manifest)};
+            prevGen = {gen, std::move(*manifest)};
         }
     }
 };
