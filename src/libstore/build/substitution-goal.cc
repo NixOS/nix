@@ -28,7 +28,14 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
     cleanup();
 }
 
-Goal::Co PathSubstitutionGoal::init()
+Goal::Co<Goal::ExitCode> PathSubstitutionGoal::init()
+{
+    auto result = co_await substitute();
+    buildResult = std::move(result.second);
+    co_return result.first;
+}
+
+Goal::Co<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
 {
     trace("init");
 
@@ -36,7 +43,10 @@ Goal::Co PathSubstitutionGoal::init()
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
-        co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::AlreadyValid});
+        co_return Result{
+            ecSuccess,
+            BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::AlreadyValid}},
+        };
     }
 
     if (worker.store.config.getReadOnly())
@@ -134,18 +144,24 @@ Goal::Co PathSubstitutionGoal::init()
         co_await await(std::move(waitees));
 
         if (nrFailed > 0) {
-            co_return doneFailure(
+            co_return Result{
                 nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
-                BuildResult::Failure{{
-                    .status = BuildResult::Failure::DependencyFailed,
-                    .msg = HintFmt(
-                        "some references of path '%s' could not be realised", worker.store.printStorePath(storePath)),
-                }});
+                BuildResult{
+                    .inner = BuildResult::Failure{{
+                        .status = BuildResult::Failure::DependencyFailed,
+                        .msg = HintFmt(
+                            "some references of path '%s' could not be realised",
+                            worker.store.printStorePath(storePath)),
+                    }}},
+            };
         }
 
         SubstitutionResult res = co_await tryToRun(subPath ? *subPath : storePath, sub, info);
         if (res == SubstitutionResult::Ok)
-            co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::Substituted});
+            co_return Result{
+                ecSuccess,
+                BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Substituted}},
+            };
 
         substituterFailed = substituterFailed || (res == SubstitutionResult::SubstituterFailed);
     }
@@ -167,17 +183,19 @@ Goal::Co PathSubstitutionGoal::init()
     /* Hack: don't indicate failure if there were no substituters.
        In that case the calling derivation should just do a
        build. */
-    co_return doneFailure(
+    co_return Result{
         substituterFailed ? ecFailed : ecNoSubstituters,
-        BuildResult::Failure{{
-            .status = BuildResult::Failure::NoSubstituters,
-            .msg = HintFmt(
-                "path '%s' is required, but there is no substituter that can build it",
-                worker.store.printStorePath(storePath)),
-        }});
+        BuildResult{
+            .inner = BuildResult::Failure{{
+                .status = BuildResult::Failure::NoSubstituters,
+                .msg = HintFmt(
+                    "path '%s' is required, but there is no substituter that can build it",
+                    worker.store.printStorePath(storePath)),
+            }}},
+    };
 }
 
-Goal::BasicCo<PathSubstitutionGoal::SubstitutionResult>
+Goal::Co<PathSubstitutionGoal::SubstitutionResult>
 PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info)
 {
     trace("all references realised");

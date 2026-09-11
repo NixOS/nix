@@ -179,26 +179,6 @@ public:
     {};
 
     /**
-     * Return from the current coroutine and suspend our goal
-     * if we're not busy anymore, or jump to the next coroutine
-     * set to be executed/resumed.
-     */
-    struct Return
-    {};
-
-    /**
-     * `co_return`-ing this will end the goal.
-     * If you're not inside a coroutine, you can safely discard this.
-     */
-    struct [[nodiscard]] Done
-    {
-    private:
-        Done() {}
-
-        friend Goal;
-    };
-
-    /**
      * Tag type for `co_await`-ing child events.
      * Returns a `ChildEvent` when resumed.
      */
@@ -216,10 +196,8 @@ public:
     using HandleType = std::coroutine_handle<AwaitableFrame<T>>;
     using HandleTypeBase = std::coroutine_handle<AwaitableFrameBase>;
 
-    template<typename T = void>
-    struct BasicCo;
-
-    using Co = BasicCo<void>;
+    template<typename T>
+    struct Co;
 
     class CoBase
     {
@@ -261,7 +239,8 @@ public:
      * The main functionality provided by `Co` is
      * - `co_await Suspend{}`: Suspends the goal.
      * - `co_await f()`: Waits until `f()` finishes.
-     * - `co_return Return{}`: Ends coroutine.
+     * - `co_return value`: Ends coroutine. The top-level `Co<ExitCode>` returns
+     *   the goal's exit code, which @ref work turns into goal completion.
      *
      * The idea is that you implement the goal logic using coroutines,
      * and do the core thing a goal can do, suspension, when you have
@@ -287,11 +266,11 @@ public:
      *       - https://www.scs.stanford.edu/~dm/blog/c++-coroutines.html
      */
     template<typename T>
-    struct [[nodiscard]] BasicCo : CoBase
+    struct [[nodiscard]] Co : CoBase
     {
-        BasicCo() noexcept = default;
+        Co() noexcept = default;
 
-        explicit BasicCo(HandleType<T> h) noexcept
+        explicit Co(HandleType<T> h) noexcept
             : CoBase(h)
         {
         }
@@ -303,7 +282,7 @@ public:
         }
     };
 
-    static_assert(sizeof(BasicCo<void>) == sizeof(CoBase));
+    static_assert(sizeof(Co<ExitCode>) == sizeof(CoBase));
 
     template<typename T>
     struct AsyncCallback
@@ -374,13 +353,13 @@ public:
         {
             CoAwaiterBase() = default;
 
-            CoAwaiterBase(BasicCo<T> c)
+            CoAwaiterBase(Co<T> c)
                 : co(std::move(c))
             {
             }
 
         public:
-            BasicCo<T> co;
+            Co<T> co;
 
             bool await_ready() const noexcept
             {
@@ -412,7 +391,7 @@ public:
         {
             CoAwaiter() = default;
 
-            explicit CoAwaiter(BasicCo<T> co)
+            explicit CoAwaiter(Co<T> co)
                 : CoAwaiterBase<T, CoAwaiter<T>>(std::move(co))
             {
             }
@@ -530,7 +509,7 @@ public:
         };
 
         template<typename T>
-        CoAwaiter<T> await_transform(BasicCo<T> && co)
+        CoAwaiter<T> await_transform(Co<T> && co)
         {
             return CoAwaiter<T>{std::move(co)};
         }
@@ -583,16 +562,10 @@ public:
          * Called by compiler generated code to construct the `Co`
          * that is returned from a `Co`-returning coroutine.
          */
-        BasicCo<T> get_return_object()
+        Co<T> get_return_object()
         {
-            return BasicCo<T>{HandleType<T>::from_promise(*this)};
+            return Co<T>{HandleType<T>::from_promise(*this)};
         }
-
-        /**
-         * Does nothing, but provides an opportunity for
-         * @ref final_suspend to happen.
-         */
-        void return_value(Done &&) {}
 
         template<typename R>
         void return_value(R && r)
@@ -613,29 +586,10 @@ protected:
     std::optional<CoBase> top_co;
 
     /**
-     * Signals that the goal is done.
-     * `co_return` the result. If you're not inside a coroutine, you can ignore
-     * the return value safely.
-     *
-     * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
-     * `buildResult` is set correctly.
+     * Where the top-level coroutine's `co_return`-ed exit code lands,
+     * consumed by @ref work once the coroutine has finished.
      */
-    Done amDone(ExitCode result);
-
-    /**
-     * Signals successful completion of the goal.
-     * Sets `buildResult` and calls `amDone`.
-     */
-    Done doneSuccess(BuildResult::Success success);
-
-    /**
-     * Signals failed completion of the goal.
-     * Sets `buildResult` and calls `amDone`.
-     *
-     * @param result The exit code (ecFailed or ecNoSubstituters)
-     * @param failure The failure details including status and error message
-     */
-    Done doneFailure(ExitCode result, BuildResult::Failure failure);
+    std::optional<ExitCode> finalExitCode;
 
 public:
     virtual void cleanup() {}
@@ -651,13 +605,18 @@ public:
      */
     bool preserveFailure = false;
 
-    Goal(Worker & worker, Co init);
+    Goal(Worker & worker, Co<ExitCode> init);
 
     virtual ~Goal()
     {
         trace("goal destroyed");
     }
 
+    /**
+     * Resume the goal's coroutine. If it ran to completion, finish the
+     * goal: record the exit code, notify waiters, and remove it from
+     * the worker.
+     */
     void work();
 
     /**
@@ -717,23 +676,23 @@ public:
     virtual JobCategory jobCategory() const = 0;
 
 protected:
-    Co await(Goals waitees);
+    Co<void> await(Goals waitees);
 
     /**
      * Awaiting on the resulting coroutine yields the goal for several seconds.
      * Used for retrying goals blocked on acquiring lockfiles.
      */
-    Co waitForAWhile();
+    Co<void> waitForAWhile();
 
     /**
      * Awaiting on the resulting coroutine yields the goal until it is
      * explicitly woken up via Worker::wakeUp. Wakeup can be queued from another
      * thread via Worker::Waker.
      */
-    Co waitUntilWoken();
+    Co<void> waitUntilWoken();
 
-    Co waitForBuildSlot();
-    Co yield();
+    Co<void> waitForBuildSlot();
+    Co<void> yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
@@ -770,9 +729,9 @@ std::coroutine_handle<> Goal::AwaitableFrameBase::FinalAwaiter::await_suspend(st
         // We resume `top_co`.
         return goal->top_co->handle;
     } else {
-        // We have no continuation, i.e. no more work to do,
-        // so the goal must not be busy anymore.
-        assert(goal->exitCode != ecBusy);
+        // We have no continuation, i.e. we are the top-level coroutine
+        // and just handed our exit code to the goal.
+        assert(p.resultSlot);
 
         // We reset `top_co` for good measure.
         p.goal->top_co = {};
@@ -788,7 +747,7 @@ struct Goal::AwaitableFrameBase::CoAwaiter<void> : CoAwaiterBase<void, CoAwaiter
 {
     CoAwaiter() = default;
 
-    explicit CoAwaiter(BasicCo<void> co)
+    explicit CoAwaiter(Co<void> co)
         : CoAwaiterBase<void, CoAwaiter<void>>(std::move(co))
     {
     }
@@ -799,28 +758,22 @@ struct Goal::AwaitableFrameBase::CoAwaiter<void> : CoAwaiterBase<void, CoAwaiter
 template<>
 struct Goal::AwaitableFrame<void> : Goal::AwaitableFrameBase
 {
-    Co get_return_object()
+    Co<void> get_return_object()
     {
-        return Co{HandleType<void>::from_promise(*this)};
+        return Co<void>{HandleType<void>::from_promise(*this)};
     }
 
     /**
      * Does nothing, but provides an opportunity for
      * @ref final_suspend to happen.
      */
-    void return_value(Return) {}
-
-    /**
-     * Does nothing, but provides an opportunity for
-     * @ref final_suspend to happen.
-     */
-    void return_value(Done) {}
+    void return_void() {}
 };
 
 } // namespace nix
 
 template<typename T, typename... ArgTypes>
-struct std::coroutine_traits<nix::Goal::BasicCo<T>, ArgTypes...>
+struct std::coroutine_traits<nix::Goal::Co<T>, ArgTypes...>
 {
     using promise_type = nix::Goal::AwaitableFrame<T>;
 };
