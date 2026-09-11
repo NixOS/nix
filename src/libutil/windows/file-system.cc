@@ -67,10 +67,12 @@ openNewFileForWrite(const std::filesystem::path & path, [[maybe_unused]] mode_t 
 
 std::filesystem::path defaultTempDir()
 {
+    using namespace nix::windows;
+
     wchar_t buf[MAX_PATH + 1];
     DWORD len = GetTempPathW(MAX_PATH + 1, buf);
     if (len == 0 || len > MAX_PATH)
-        throw windows::WinError("getting default temporary directory");
+        throw WinError("getting default temporary directory");
     return std::filesystem::path(buf);
 }
 
@@ -90,6 +92,8 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 
 std::filesystem::path descriptorToPath(Descriptor handle)
 {
+    using namespace nix::windows;
+
     std::vector<wchar_t> buf(0x100);
     DWORD dw = GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED);
     if (dw == 0) {
@@ -104,7 +108,7 @@ std::filesystem::path descriptorToPath(Descriptor handle)
     if (dw > buf.size()) {
         buf.resize(dw);
         if (GetFinalPathNameByHandleW(handle, buf.data(), buf.size(), FILE_NAME_OPENED) != dw - 1)
-            throw windows::WinError("GetFinalPathNameByHandleW");
+            throw WinError("GetFinalPathNameByHandleW");
         dw -= 1;
     }
     return std::filesystem::path{std::wstring{buf.data(), dw}};
@@ -161,8 +165,10 @@ void windows::statFromFileInfo(
 
 static PosixStat statFromFileInfo(const WIN32_FILE_ATTRIBUTE_DATA & attrData)
 {
+    using namespace nix::windows;
+
     PosixStat st;
-    windows::statFromFileInfo(
+    statFromFileInfo(
         st,
         attrData.dwFileAttributes,
         attrData.ftCreationTime,
@@ -175,20 +181,24 @@ static PosixStat statFromFileInfo(const WIN32_FILE_ATTRIBUTE_DATA & attrData)
 
 PosixStat lstat(const std::filesystem::path & path)
 {
+    using namespace nix::windows;
+
     WIN32_FILE_ATTRIBUTE_DATA attrData;
     if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attrData))
-        throw windows::WinError("getting status of %s", PathFmt(path));
+        throw WinError("getting status of %s", PathFmt(path));
     return statFromFileInfo(attrData);
 }
 
 std::optional<PosixStat> maybeLstat(const std::filesystem::path & path)
 {
+    using namespace nix::windows;
+
     WIN32_FILE_ATTRIBUTE_DATA attrData;
     if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attrData)) {
         auto lastError = GetLastError();
         if (lastError == ERROR_FILE_NOT_FOUND || lastError == ERROR_PATH_NOT_FOUND)
             return std::nullopt;
-        throw windows::WinError(lastError, "getting status of %s", PathFmt(path));
+        throw WinError(lastError, "getting status of %s", PathFmt(path));
     }
     return statFromFileInfo(attrData);
 }
@@ -200,15 +210,19 @@ void movePath(const std::filesystem::path & src, const std::filesystem::path & d
 
 void renameFile(const std::filesystem::path & src, const std::filesystem::path & dst)
 {
+    using namespace nix::windows;
+
     /* TODO: FileRenameInformationEx with FILE_RENAME_POSIX_SEMANTICS? */
     if (!::MoveFileExW(src.c_str(), dst.c_str(), MOVEFILE_REPLACE_EXISTING))
-        throw windows::WinError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
+        throw WinError("renaming %1% to %2%", PathFmt(src), PathFmt(dst));
 }
 
 void createDir(const std::filesystem::path & path, [[maybe_unused]] mode_t mode)
 {
+    using namespace nix::windows;
+
     if (!::CreateDirectoryW(path.c_str(), nullptr))
-        throw windows::WinError("creating directory %s", PathFmt(path));
+        throw WinError("creating directory %s", PathFmt(path));
 }
 
 } // namespace nix
