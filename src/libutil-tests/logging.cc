@@ -511,11 +511,7 @@ TEST_P(JSONLogMessageCharacterisationTest, writesExpectedLogs)
     while (true) {
         try {
             auto line = input.readLine();
-            try {
-                handleJSONLogMessage(line, act, activities, line, /*trusted=*/true);
-            } catch (std::exception &) {
-                /* FIXME: Invalid input shouldn't escape. */
-            }
+            handleJSONLogMessage(line, act, activities, line, /*trusted=*/true);
         } catch (EndOfFile &) {
             break;
         }

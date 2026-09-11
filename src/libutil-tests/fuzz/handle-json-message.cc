@@ -43,10 +43,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size)
         if (line.empty())
             continue;
 
-        try {
-            handleJSONLogMessage(std::string(line), act, activities, "dummy fuzzing source", /*trusted=*/true);
-        } catch (std::exception & e) {
-        }
+        handleJSONLogMessage(std::string(line), act, activities, "dummy fuzzing source", /*trusted=*/true);
 
         if (activities.size() > 128)
             break;
