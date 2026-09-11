@@ -4,6 +4,17 @@
 
 namespace nix {
 
+Goal::Goal(Worker & worker, Co init)
+    : worker(worker)
+    , top_co(std::move(init))
+{
+    // top_co shouldn't have a goal already, should be nullptr.
+    auto handle = HandleType<void>::from_address(top_co->handle.address());
+    assert(!handle.promise().goal);
+    // we set it such that top_co can pass it down to its subcoroutines.
+    handle.promise().goal = this;
+}
+
 void WorkerSettings::anchor() {}
 
 TimedOut::TimedOut(time_t maxDuration)
@@ -15,9 +26,6 @@ TimedOut::TimedOut(time_t maxDuration)
 void TimedOut::anchor() {}
 
 void Goal::anchor() {}
-
-using Co = nix::Goal::Co;
-using promise_type = nix::Goal::promise_type;
 
 void Goal::ChildEvents::pushChildEvent(ChildOutput event)
 {
@@ -61,82 +69,31 @@ Goal::ChildEvent Goal::ChildEvents::popChildEvent()
     unreachable();
 }
 
-using handle_type = nix::Goal::handle_type;
 using Suspend = nix::Goal::Suspend;
 
-Co::Co(Co && rhs) noexcept
+Goal::CoBase & Goal::CoBase::operator=(CoBase && rhs) noexcept
 {
-    this->handle = rhs.handle;
-    rhs.handle = nullptr;
-}
-
-Co & Co::operator=(Co && rhs) noexcept
-{
+    if (this == &rhs)
+        return *this;
     if (handle) {
-        handle.promise().alive = false;
+        auto baseHandle = HandleTypeBase::from_address(handle.address());
+        baseHandle.promise().alive = false;
         handle.destroy();
     }
-    handle = rhs.handle;
-    rhs.handle = nullptr;
+    handle = std::exchange(rhs.handle, nullptr);
     return *this;
 }
 
-Co::~Co()
+Goal::CoBase::~CoBase()
 {
     if (handle) {
-        handle.promise().alive = false;
+        auto baseHandle = HandleTypeBase::from_address(handle.address());
+        baseHandle.promise().alive = false;
         handle.destroy();
     }
 }
 
-Co promise_type::get_return_object()
-{
-    auto handle = handle_type::from_promise(*this);
-    return Co{handle};
-};
-
-std::coroutine_handle<> promise_type::final_awaiter::await_suspend(handle_type h) noexcept
-{
-    auto & p = h.promise();
-    auto goal = p.goal;
-    assert(goal);
-    goal->trace("in final_awaiter");
-    auto c = std::move(p.continuation);
-
-    if (c) {
-        // We still have a continuation, i.e. work to do.
-        // We assert that the goal is still busy.
-        assert(goal->exitCode == ecBusy);
-        assert(goal->top_co);              // Goal must have an active coroutine.
-        assert(goal->top_co->handle == h); // The active coroutine must be us.
-        assert(p.alive);                   // We must not have been destructed.
-
-        // we move continuation to the top,
-        // note: previous top_co is actually h, so by moving into it,
-        // we're calling the destructor on h, DON'T use h and p after this!
-
-        // We move our continuation into `top_co`, i.e. the marker for the active continuation.
-        // By doing this we destruct the old `top_co`, i.e. us, so `h` can't be used anymore.
-        // Be careful not to access freed memory!
-        goal->top_co = std::move(c);
-
-        // We resume `top_co`.
-        return goal->top_co->handle;
-    } else {
-        // We have no continuation, i.e. no more work to do,
-        // so the goal must not be busy anymore.
-        assert(goal->exitCode != ecBusy);
-
-        // We reset `top_co` for good measure.
-        p.goal->top_co = {};
-
-        // We jump to the noop coroutine, which doesn't do anything and immediately suspends.
-        // This passes control back to the caller of goal.work().
-        return std::noop_coroutine();
-    }
-}
-
-void promise_type::return_value(Co && next)
+void Goal::AwaitableFrame<void>::return_value(Co && next)
 {
     goal->trace("return_value(Co&&)");
     // Save old continuation.
@@ -144,25 +101,12 @@ void promise_type::return_value(Co && next)
     // We set next as our continuation.
     continuation = std::move(next);
     // We set next's goal, and thus it must not have one already.
-    assert(!continuation->handle.promise().goal);
-    continuation->handle.promise().goal = goal;
+    auto continuationHandle = HandleTypeBase::from_address(continuation->handle.address());
+    assert(!continuationHandle.promise().goal);
+    continuationHandle.promise().goal = goal;
     // Nor can next have a continuation, as we set it to our old one.
-    assert(!continuation->handle.promise().continuation);
-    continuation->handle.promise().continuation = std::move(old_continuation);
-}
-
-std::coroutine_handle<> nix::Goal::Co::await_suspend(handle_type caller)
-{
-    assert(handle); // we must be a valid coroutine
-    auto & p = handle.promise();
-    assert(!p.continuation); // we must have no continuation
-    assert(!p.goal);         // we must not have a goal yet
-    auto goal = caller.promise().goal;
-    assert(goal);
-    p.goal = goal;
-    p.continuation = std::move(goal->top_co); // we set our continuation to be top_co (i.e. caller)
-    goal->top_co = std::move(*this);          // we set top_co to ourselves, don't use this anymore after this!
-    return p.goal->top_co->handle;            // we execute ourselves
+    assert(!continuationHandle.promise().continuation);
+    continuationHandle.promise().continuation = std::move(old_continuation);
 }
 
 bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
@@ -177,7 +121,7 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-Co Goal::await(Goals new_waitees)
+Goal::Co Goal::await(Goals new_waitees)
 {
     assert(waitees.empty());
     if (!new_waitees.empty()) {
@@ -258,10 +202,11 @@ Goal::Done Goal::amDone(ExitCode result)
     cleanup();
 
     // We drop the continuation.
-    // In `final_awaiter` this will signal that there is no more work to be done.
-    top_co->handle.promise().continuation = {};
+    // In `FinalAwaiter` this will signal that there is no more work to be done.
+    auto baseHandle = HandleTypeBase::from_address(top_co->handle.address());
+    baseHandle.promise().continuation = {};
 
-    // won't return to caller because of logic in final_awaiter
+    // won't return to caller because of logic in FinalAwaiter
     return Done{};
 }
 
@@ -274,8 +219,9 @@ void Goal::work()
 {
     assert(top_co);
     assert(top_co->handle);
-    assert(top_co->handle.promise().alive);
-    top_co->handle.resume();
+    auto baseHandle = HandleTypeBase::from_address(top_co->handle.address());
+    assert(baseHandle.promise().alive);
+    baseHandle.resume();
     // We either should be in a state where we can be work()-ed again,
     // or we should be done.
     assert(top_co || exitCode != ecBusy);

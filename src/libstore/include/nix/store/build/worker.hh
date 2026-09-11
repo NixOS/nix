@@ -23,7 +23,7 @@ struct DerivationTrampolineGoal;
 struct DerivationGoal;
 struct DerivationResolutionGoal;
 struct DerivationBuildingGoal;
-struct PathSubstitutionGoal;
+class PathSubstitutionGoal;
 class DrvOutputSubstitutionGoal;
 
 /**

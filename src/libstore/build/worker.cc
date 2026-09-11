@@ -159,7 +159,7 @@ void Worker::removeGoal(GoalPtr goal)
     } else if (auto drvBuildingGoal = std::dynamic_pointer_cast<DerivationBuildingGoal>(goal)) {
         derivationBuildingGoals.erase(drvBuildingGoal->drvPath);
     } else if (auto subGoal = std::dynamic_pointer_cast<PathSubstitutionGoal>(goal)) {
-        substitutionGoals.erase(subGoal->storePath);
+        substitutionGoals.erase(subGoal->getStorePath());
     } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
         drvOutputSubstitutionGoals.erase(subGoal->id);
     } else {

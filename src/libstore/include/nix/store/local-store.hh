@@ -537,7 +537,7 @@ private:
 
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
-    friend struct PathSubstitutionGoal;
+    friend class PathSubstitutionGoal;
     friend struct DerivationGoal;
     /* Only used for createTempDirInStore. */
     friend class DerivationBuilderImpl;

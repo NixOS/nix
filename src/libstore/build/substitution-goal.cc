@@ -133,10 +133,21 @@ Goal::Co PathSubstitutionGoal::init()
 
         co_await await(std::move(waitees));
 
-        // FIXME: consider returning boolean instead of passing in reference
-        bool out = false; // is mutated by tryToRun
-        co_await tryToRun(subPath ? *subPath : storePath, sub, info, out);
-        substituterFailed = substituterFailed || out;
+        if (nrFailed > 0) {
+            co_return doneFailure(
+                nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
+                BuildResult::Failure{{
+                    .status = BuildResult::Failure::DependencyFailed,
+                    .msg = HintFmt(
+                        "some references of path '%s' could not be realised", worker.store.printStorePath(storePath)),
+                }});
+        }
+
+        SubstitutionResult res = co_await tryToRun(subPath ? *subPath : storePath, sub, info);
+        if (res == SubstitutionResult::Ok)
+            co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::Substituted});
+
+        substituterFailed = substituterFailed || (res == SubstitutionResult::SubstituterFailed);
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -166,20 +177,10 @@ Goal::Co PathSubstitutionGoal::init()
         }});
 }
 
-Goal::Co PathSubstitutionGoal::tryToRun(
-    StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info, bool & substituterFailed)
+Goal::BasicCo<PathSubstitutionGoal::SubstitutionResult>
+PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info)
 {
     trace("all references realised");
-
-    if (nrFailed > 0) {
-        co_return doneFailure(
-            nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
-            BuildResult::Failure{{
-                .status = BuildResult::Failure::DependencyFailed,
-                .msg = HintFmt(
-                    "some references of path '%s' could not be realised", worker.store.printStorePath(storePath)),
-            }});
-    }
 
     for (auto & i : info->references)
         /* ignore self-references */
@@ -274,12 +275,13 @@ Goal::Co PathSubstitutionGoal::tryToRun(
             /* Missing NARs are expected when they've been garbage collected.
                This is not a failure, so log as a warning instead of an error. */
             logWarning({.msg = sg.info().msg});
+            co_return SubstitutionResult::SubstituteGone;
         } catch (...) {
             printError(e.what());
-            substituterFailed = true;
+            co_return SubstitutionResult::SubstituterFailed;
         }
 
-        co_return Return{};
+        unreachable();
     }
 
     worker.markContentsGood(storePath);
@@ -303,7 +305,7 @@ Goal::Co PathSubstitutionGoal::tryToRun(
 
     worker.updateProgress();
 
-    co_return doneSuccess(BuildResult::Success{.status = BuildResult::Success::Substituted});
+    co_return SubstitutionResult::Ok;
 }
 
 void PathSubstitutionGoal::cleanup()
