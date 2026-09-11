@@ -478,8 +478,9 @@ retry:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 valid = true;
-                co_return buildWithHook(
+                co_await buildWithHook(
                     std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                unreachable();
             case rpDecline:
                 // We should do it ourselves.
                 co_return Return{};
@@ -528,8 +529,9 @@ retry:
         if (valid) {
             co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
         } else {
-            co_return buildWithHook(
+            co_await buildWithHook(
                 std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            unreachable();
         }
     };
 

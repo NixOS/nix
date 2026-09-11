@@ -138,7 +138,8 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
             co_return doneSuccess(BuildResult::Success::Substituted, checkResult->first);
         }
         if (buildMode == bmRepair && allValid) {
-            co_return repairClosure();
+            co_await repairClosure();
+            unreachable();
         }
         if (buildMode == bmCheck && !allValid)
             throw Error(
