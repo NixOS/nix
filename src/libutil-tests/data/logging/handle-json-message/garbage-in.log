@@ -1,0 +1,21 @@
+@nix {"action":"start","id":1,"level":7,"parent":0,"text":"","type":0}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix [1,2,3]: [json.exception.type_error.305] cannot use operator[] with a string argument with array"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix 42: [json.exception.type_error.305] cannot use operator[] with a string argument with number"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix null: [json.exception.type_error.302] type must be string, but is null"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix 1.2345: [json.exception.type_error.305] cannot use operator[] with a string argument with number"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {}: [json.exception.type_error.302] type must be string, but is null"}
+@nix {"action":"msg","level":0,"msg":"bad JSON log message from \u001b[0m@nix ][: [json.exception.parse_error.101] parse error at line 1, column 1: syntax error while parsing value - unexpected ']'; expected '[', '{', or a literal"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":\"stop\",\"id\":\"1\"}: [json.exception.type_error.302] type must be number, but is string"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":5}: [json.exception.type_error.302] type must be string, but is number"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":[\"hi\",\"there\",1.2345]}: [json.exception.type_error.302] type must be string, but is array"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\": null}: [json.exception.type_error.302] type must be string, but is null"}
+@nix {"action":"msg","level":7,"msg":"x"}
+@nix {"action":"start","id":2,"level":0,"parent":1,"text":"","type":42424242}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":\"start\",\"type\":-1,\"\":[]}: [json.exception.type_error.302] type must be number, but is null"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":\"start\",\"type\":4,\"\":[]}: [json.exception.type_error.302] type must be number, but is null"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":\"start\",\"type\":99,\"\":[]}: [json.exception.type_error.302] type must be number, but is null"}
+@nix {"action":"msg","level":1,"msg":"\u001b[35;1mwarning:\u001b[0m Unable to handle a JSON message from \u001b[0m@nix {\"action\":\"start\",\"type\":-1.256,\"\":[]}: [json.exception.type_error.302] type must be number, but is null"}
+@nix {"action":"start","fields":["something","something"],"id":3,"level":0,"parent":1,"text":"something","type":101}
+@nix {"action":"result","fields":["something"],"id":1,"type":104}
+@nix {"action":"result","fields":["somethingelse"],"id":1,"type":104}
+@nix {"action":"result","fields":["somethingelse"],"id":1,"type":104}
