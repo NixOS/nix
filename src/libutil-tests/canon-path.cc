@@ -83,27 +83,6 @@ TEST(CanonPath, from_existing)
     }
 }
 
-TEST(CanonPath, pop)
-{
-    CanonPath p("foo/bar/x");
-    ASSERT_EQ(p.abs(), "/foo/bar/x");
-    p.pop();
-    ASSERT_EQ(p.abs(), "/foo/bar");
-    p.pop();
-    ASSERT_EQ(p.abs(), "/foo");
-    p.pop();
-    ASSERT_EQ(p.abs(), "/");
-}
-
-TEST(CanonPath, removePrefix)
-{
-    CanonPath p1("foo/bar");
-    CanonPath p2("foo/bar/a/b/c");
-    ASSERT_EQ(p2.removePrefix(p1).abs(), "/a/b/c");
-    ASSERT_EQ(p1.removePrefix(p1).abs(), "/");
-    ASSERT_EQ(p1.removePrefix(CanonPath("/")).abs(), "/foo/bar");
-}
-
 TEST(CanonPath, iter)
 {
     {
@@ -123,26 +102,11 @@ TEST(CanonPath, iter)
     }
 }
 
-TEST(CanonPath, concat)
+/* The general algebra of `/` is covered by the shared `CanonicalPath` suite;
+   what is left here is the `std::string_view` overload, which `OsCanonPath`
+   has no counterpart for. */
+TEST(CanonPath, concatComponent)
 {
-    {
-        CanonPath p1("a//foo/bar//");
-        CanonPath p2("xyzzy/bla");
-        ASSERT_EQ((p1 / p2).abs(), "/a/foo/bar/xyzzy/bla");
-    }
-
-    {
-        CanonPath p1("/");
-        CanonPath p2("/a/b");
-        ASSERT_EQ((p1 / p2).abs(), "/a/b");
-    }
-
-    {
-        CanonPath p1("/a/b");
-        CanonPath p2("/");
-        ASSERT_EQ((p1 / p2).abs(), "/a/b");
-    }
-
     {
         CanonPath p("/foo/bar");
         ASSERT_EQ((p / "x").abs(), "/foo/bar/x");
@@ -152,26 +116,6 @@ TEST(CanonPath, concat)
         CanonPath p("/");
         ASSERT_EQ((p / "foo" / "bar").abs(), "/foo/bar");
     }
-}
-
-TEST(CanonPath, within)
-{
-    ASSERT_TRUE(CanonPath("foo").isWithin(CanonPath("foo")));
-    ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("bar")));
-    ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("fo")));
-    ASSERT_TRUE(CanonPath("foo/bar").isWithin(CanonPath("foo")));
-    ASSERT_FALSE(CanonPath("foo").isWithin(CanonPath("foo/bar")));
-    ASSERT_TRUE(CanonPath("/foo/bar/default.nix").isWithin(CanonPath("/")));
-    ASSERT_TRUE(CanonPath("/").isWithin(CanonPath("/")));
-}
-
-TEST(CanonPath, sort)
-{
-    ASSERT_FALSE(CanonPath("foo") < CanonPath("foo"));
-    ASSERT_TRUE(CanonPath("foo") < CanonPath("foo/bar"));
-    ASSERT_TRUE(CanonPath("foo/bar") < CanonPath("foo!"));
-    ASSERT_FALSE(CanonPath("foo!") < CanonPath("foo"));
-    ASSERT_TRUE(CanonPath("foo") < CanonPath("foo!"));
 }
 
 TEST(CanonPath, allowed)

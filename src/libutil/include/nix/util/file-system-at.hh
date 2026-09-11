@@ -16,6 +16,7 @@
 
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/os-canon-path.hh"
 
 #include <optional>
 
@@ -76,7 +77,7 @@ PosixStat fstatat(Descriptor dirFd, const std::filesystem::path & path);
  * @throws SystemError on any I/O errors.
  * @throws Interrupted if interrupted.
  */
-OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
+OsString readLinkAt(Descriptor dirFd, const OsCanonPath & path);
 
 /**
  * Open a file relative to @p dirFd, ensuring the path stays beneath
@@ -89,7 +90,7 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
  *
  * @param dirFdCallback Callback invoked that gets the ownership of an intermediate directory fd.
  *
- * @pre `path.isRoot()` is false
+ * @pre `path.empty()` is false
  *
  * @throws SymlinkNotAllowed if an interior path component is a
  *     symlink, or if the final component is a symlink and `O_PATH`
@@ -112,8 +113,8 @@ OsString readLinkAt(Descriptor dirFd, const CanonPath & path);
  *     to a `SymlinkNotAllowed` throw instead.
  */
 AutoCloseFD openFileEnsureBeneathNoSymlinks(
-    Descriptor dirFd,       /** Directory handle to open relative to */
-    const CanonPath & path, /** path Relative path (with no `..` or `.` components) */
+    Descriptor dirFd,         /** Directory handle to open relative to */
+    const OsCanonPath & path, /** path Relative path (with no `..` or `.` components) */
 #ifdef _WIN32
     ACCESS_MASK desiredAccess,           /** Windows `ACCESS_MASK` */
     ULONG createOptions,                 /** Windows create options */
@@ -122,7 +123,7 @@ AutoCloseFD openFileEnsureBeneathNoSymlinks(
     int flags,       /** `O_*` flags (must not include `O_NOFOLLOW`) */
     mode_t mode = 0, /** Mode for `O_{CREAT,TMPFILE}` */
 #endif
-    std::function<void(AutoCloseFD dirFd, CanonPath relPath)> dirFdCallback = nullptr);
+    std::function<void(AutoCloseFD dirFd, OsCanonPath relPath)> dirFdCallback = nullptr);
 
 #ifdef __linux__
 namespace linux {
@@ -154,10 +155,10 @@ namespace unix {
  * @note When on linux without fchmodat2 support and without procfs mounted falls back to fchmodat without
  * AT_SYMLINK_NOFOLLOW, since it's the best we can do without failing.
  *
- * @pre path.isRoot() is false
+ * @pre `path.empty()` is false
  * @throws SysError if any operation fails
  */
-void fchmodatTryNoFollow(Descriptor dirFd, const CanonPath & path, mode_t mode);
+void fchmodatTryNoFollow(Descriptor dirFd, const OsCanonPath & path, mode_t mode);
 
 } // namespace unix
 #endif
