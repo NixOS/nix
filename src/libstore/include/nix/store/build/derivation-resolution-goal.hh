@@ -59,7 +59,8 @@ private:
 
     using InputsGoalMap = std::map<ref<const SingleDerivedPath>, GoalPtr, RefDeepComparator>;
 
-    Co<void> init(ref<const Derivation> drv, BuildMode buildMode);
+    Co<ExitCode> init(ref<const Derivation> drv, BuildMode buildMode);
+    Co<BuildResult> resolve(ref<const Derivation> drv, BuildMode buildMode);
     Co<InputsGoalMap> realiseInputs(const Derivation & drv, BuildMode buildMode);
     Co<decltype(resolvedDrv)> resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals);
 

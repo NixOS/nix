@@ -163,7 +163,7 @@ public:
 
     /**
      * How the goal finished, once it has: set exactly once, by @ref
-     * amDone. Not set while the goal is still running, or if it never
+     * work. Not set while the goal is still running, or if it never
      * ran or was cancelled.
      */
     std::optional<ExitCode> exitCode;
@@ -179,26 +179,6 @@ public:
      */
     struct Suspend
     {};
-
-    /**
-     * Return from the current coroutine and suspend our goal
-     * if we're not busy anymore, or jump to the next coroutine
-     * set to be executed/resumed.
-     */
-    struct Return
-    {};
-
-    /**
-     * `co_return`-ing this will end the goal.
-     * If you're not inside a coroutine, you can safely discard this.
-     */
-    struct [[nodiscard]] Done
-    {
-    private:
-        Done() {}
-
-        friend Goal;
-    };
 
     /**
      * Tag type for `co_await`-ing child events.
@@ -261,7 +241,8 @@ public:
      * The main functionality provided by `Co` is
      * - `co_await Suspend{}`: Suspends the goal.
      * - `co_await f()`: Waits until `f()` finishes.
-     * - `co_return Return{}`: Ends coroutine.
+     * - `co_return value`: Ends coroutine. The top-level `Co<ExitCode>` returns
+     *   the goal's exit code, which @ref work turns into goal completion.
      *
      * The idea is that you implement the goal logic using coroutines,
      * and do the core thing a goal can do, suspension, when you have
@@ -303,7 +284,7 @@ public:
         }
     };
 
-    static_assert(sizeof(Co<void>) == sizeof(CoBase));
+    static_assert(sizeof(Co<ExitCode>) == sizeof(CoBase));
 
     template<typename T>
     struct AsyncCallback
@@ -588,12 +569,6 @@ public:
             return Co<T>{HandleType<T>::from_promise(*this)};
         }
 
-        /**
-         * Does nothing, but provides an opportunity for
-         * @ref final_suspend to happen.
-         */
-        void return_value(Done &&) {}
-
         template<typename R>
         void return_value(R && r)
         {
@@ -613,29 +588,10 @@ protected:
     std::optional<CoBase> top_co;
 
     /**
-     * Signals that the goal is done.
-     * `co_return` the result. If you're not inside a coroutine, you can ignore
-     * the return value safely.
-     *
-     * Prefer using `doneSuccess` or `doneFailure` instead, which ensure
-     * `buildResult` is set correctly.
+     * Where the top-level coroutine's `co_return`-ed exit code lands,
+     * consumed by @ref work once the coroutine has finished.
      */
-    Done amDone(ExitCode result);
-
-    /**
-     * Signals successful completion of the goal.
-     * Sets `buildResult` and calls `amDone`.
-     */
-    Done doneSuccess(BuildResult::Success success);
-
-    /**
-     * Signals failed completion of the goal.
-     * Sets `buildResult` and calls `amDone`.
-     *
-     * @param result The exit code (ecFailed or ecNoSubstituters)
-     * @param failure The failure details including status and error message
-     */
-    Done doneFailure(ExitCode result, BuildResult::Failure failure);
+    std::optional<ExitCode> finalExitCode;
 
 public:
     virtual void cleanup() {}
@@ -651,13 +607,18 @@ public:
      */
     bool preserveFailure = false;
 
-    Goal(Worker & worker, Co<void> init);
+    Goal(Worker & worker, Co<ExitCode> init);
 
     virtual ~Goal()
     {
         trace("goal destroyed");
     }
 
+    /**
+     * Resume the goal's coroutine. If it ran to completion, finish the
+     * goal: record the exit code, notify waiters, and remove it from
+     * the worker.
+     */
     void work();
 
     /**
@@ -770,9 +731,9 @@ std::coroutine_handle<> Goal::AwaitableFrameBase::FinalAwaiter::await_suspend(st
         // We resume `top_co`.
         return goal->top_co->handle;
     } else {
-        // We have no continuation, i.e. no more work to do,
-        // so the goal must not be busy anymore.
-        assert(goal->exitCode);
+        // We have no continuation, i.e. we are the top-level coroutine
+        // and just handed our exit code to the goal.
+        assert(p.resultSlot);
 
         // We reset `top_co` for good measure.
         p.goal->top_co = {};
@@ -808,13 +769,7 @@ struct Goal::AwaitableFrame<void> : Goal::AwaitableFrameBase
      * Does nothing, but provides an opportunity for
      * @ref final_suspend to happen.
      */
-    void return_value(Return) {}
-
-    /**
-     * Does nothing, but provides an opportunity for
-     * @ref final_suspend to happen.
-     */
-    void return_value(Done) {}
+    void return_void() {}
 };
 
 } // namespace nix

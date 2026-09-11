@@ -155,13 +155,31 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePathSet & outputPaths);
 #endif
 
-Goal::Co<void> DerivationBuildingGoal::init()
+Goal::Co<Goal::ExitCode> DerivationBuildingGoal::init()
 {
     auto result = co_await tryToBuild();
-    if (auto * success = std::get_if<BuildResult::Success>(&result))
-        co_return doneSuccess(success->status, std::move(success->builtOutputs));
-    else
-        co_return doneFailure(std::move(std::get<BuildError>(result)));
+
+    mcRunningBuilds.reset();
+
+    auto exitCode = std::visit(
+        overloaded{
+            [&](const BuildResult::Success & success) {
+                if (success.status == BuildResult::Success::Built)
+                    worker.doneBuilds++;
+                return ecSuccess;
+            },
+            [&](const BuildResult::Failure & failure) {
+                worker.exitStatusFlags.updateFromStatus(failure.status);
+                if (failure.status != BuildResult::Failure::DependencyFailed)
+                    worker.failedBuilds++;
+                return ecFailed;
+            },
+        },
+        result);
+
+    buildResult.inner = std::move(result);
+    worker.updateProgress();
+    co_return exitCode;
 }
 
 /**
@@ -484,7 +502,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                    EOF from the hook. */
                 co_return co_await buildWithHook(
                     std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
-                unreachable();
             case rpDecline:
                 // We should do it ourselves.
                 co_return std::nullopt;
@@ -539,7 +556,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
         } else {
             co_return co_await buildWithHook(
                 std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
-            unreachable();
         }
     };
 
@@ -1412,35 +1428,6 @@ DerivationBuildingGoal::checkPathValidity(std::map<std::string, InitialOutput> &
     }
 
     return {allValid, validOutputs};
-}
-
-Goal::Done DerivationBuildingGoal::doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs)
-{
-    mcRunningBuilds.reset();
-
-    if (status == BuildResult::Success::Built)
-        worker.doneBuilds++;
-
-    worker.updateProgress();
-
-    return Goal::doneSuccess(
-        BuildResult::Success{
-            .status = status,
-            .builtOutputs = std::move(builtOutputs),
-        });
-}
-
-Goal::Done DerivationBuildingGoal::doneFailure(BuildError ex)
-{
-    mcRunningBuilds.reset();
-
-    worker.exitStatusFlags.updateFromStatus(ex.status);
-    if (ex.status != BuildResult::Failure::DependencyFailed)
-        worker.failedBuilds++;
-
-    worker.updateProgress();
-
-    return Goal::doneFailure(ecFailed, std::move(ex));
 }
 
 } // namespace nix

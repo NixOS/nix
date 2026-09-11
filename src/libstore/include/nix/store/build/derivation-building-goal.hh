@@ -77,7 +77,7 @@ private:
 
     using LocalBuildOutcome = std::variant<Result, NeedsSlot>;
 
-    Co<void> init();
+    Co<ExitCode> init();
     Co<Result> tryToBuild();
     Co<Result> buildWithHook(
         StorePathSet inputPaths,
@@ -112,10 +112,6 @@ private:
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
     std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
-
-    Done doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs);
-
-    Done doneFailure(BuildError ex);
 
     BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg, BuildLog & buildLog);
 
