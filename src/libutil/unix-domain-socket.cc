@@ -22,7 +22,11 @@ namespace nix {
 
 AutoCloseFD createUnixDomainSocket()
 {
-    AutoCloseFD fdSocket = toDescriptor(socket(
+    /* `fromSocket`, not `toDescriptor`: `socket` yields a `SOCKET`, whereas
+       `toDescriptor` expects a CRT file descriptor and calls
+       `_get_osfhandle`. Both are the identity on Unix, so this only bites on
+       Windows — where it made every socket look like a creation failure. */
+    AutoCloseFD fdSocket = fromSocket(socket(
         PF_UNIX,
         SOCK_STREAM
 #ifdef SOCK_CLOEXEC
@@ -32,7 +36,17 @@ AutoCloseFD createUnixDomainSocket()
         0));
     if (!fdSocket)
         throw NativeSysError("cannot create Unix domain socket");
-#ifndef _WIN32
+#ifdef _WIN32
+    /* `SOCK_CLOEXEC` has no Windows equivalent, and Winsock hands back an
+       inheritable handle unless created with `WSA_FLAG_NO_HANDLE_INHERIT`, so
+       clear the flag explicitly to match the Unix behaviour above. Otherwise
+       any `CreateProcess` with `bInheritHandles = TRUE` duplicates this socket
+       into the child: for a listening socket that lets the child accept
+       connections intended for us, and it keeps the endpoint alive after we
+       close our own handle. */
+    if (!SetHandleInformation(fdSocket.get(), HANDLE_FLAG_INHERIT, 0))
+        throw NativeSysError("making Unix domain socket non-inheritable");
+#else
     unix::closeOnExec(fdSocket.get());
 #endif
     return fdSocket;
