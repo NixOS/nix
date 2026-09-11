@@ -23,6 +23,21 @@ SandboxMode BaseSetting<SandboxMode>::parse(const std::string & str) const;
 template<>
 std::string BaseSetting<SandboxMode>::to_string() const;
 
+/**
+ * How to deny a builder network access on Windows.
+ *
+ * Windows has no equivalent of `CLONE_NEWNET`, so unlike the Unix sandbox
+ * there is no single mechanism that is both correct and always available;
+ * hence a mode rather than a boolean. See the `sandbox-network` setting for
+ * what each mode costs and requires.
+ */
+typedef enum { snmNone, snmWfp, snmContainer } SandboxNetworkMode;
+
+template<>
+SandboxNetworkMode BaseSetting<SandboxNetworkMode>::parse(const std::string & str) const;
+template<>
+std::string BaseSetting<SandboxNetworkMode>::to_string() const;
+
 template<>
 PathsInChroot BaseSetting<PathsInChroot>::parse(const std::string & str) const;
 template<>
@@ -393,6 +408,45 @@ public:
           The default is `true` on Linux and `false` on all other platforms.
         )",
         {"build-use-chroot", "build-use-sandbox"}};
+
+#ifdef _WIN32
+    Setting<SandboxNetworkMode> sandboxNetworkMode{
+        this,
+        snmNone,
+        "sandbox-network",
+        R"(
+          How to deny a build network access.
+
+          On Linux, `sandbox` puts each build in a private network namespace,
+          so there is nothing to configure. Windows has no equivalent, and no
+          single available mechanism is both correct and unprivileged, so the
+          choice is exposed rather than decided here.
+
+          - `none` (default): builds are **not** isolated from the network. This
+            is today's behaviour, and it is the default so that enabling
+            sandboxing elsewhere does not silently start failing builds that
+            reach the network. Do not assume a Windows build is network-isolated
+            because `sandbox` is on.
+
+          - `wfp`: install Windows Filtering Platform block filters for the
+            build, scoped to the build user, and remove them when the build
+            ends. Requires rights to add WFP filters — membership in the
+            built-in Network Configuration Operators group is sufficient, full
+            administrator is not required. If those rights are missing the build
+            fails rather than running unprotected.
+
+          - `container`: not implemented. A network namespace on Windows is
+            attached to a *compute system*, so this would require running the
+            builder as a container via the Host Compute Service rather than as a
+            child process. Note also that Microsoft documents Windows containers
+            as not being a hostile security boundary, so this mode would be a
+            reproducibility measure and not a security control.
+
+          Fixed-output derivations are exempt in every mode, since they are
+          defined by their output hash and are expected to fetch from the
+          network.
+        )"};
+#endif
 
     Setting<PathsInChroot> sandboxPaths{
         this,

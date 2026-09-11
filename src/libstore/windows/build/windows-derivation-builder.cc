@@ -3,6 +3,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/store/local-store.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/local-settings.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/os-string.hh"
@@ -303,6 +304,49 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
     builderPipe.writeSide.close();
 }
 
+/**
+ * Honour the `sandbox-network` setting, or refuse the build if we cannot.
+ *
+ * Exempts the same derivations Linux does. There, `CLONE_NEWNET` is added only
+ * `if (derivationType.isSandboxed())`, which keeps fixed-output derivations on
+ * the network because they are defined by their output hash and are expected to
+ * fetch.
+ *
+ * Both non-default modes currently throw, and the messages say why rather than
+ * just that they are unimplemented, because in both cases the blocker is a
+ * missing prerequisite elsewhere rather than unwritten filter code.
+ */
+static void applyNetworkIsolation(SandboxNetworkMode mode, bool sandboxed)
+{
+    if (!sandboxed)
+        return;
+
+    switch (mode) {
+
+    case snmNone:
+        /* No isolation. Deliberately silent rather than a warning: this is the
+           documented default, and warning on every build would be noise. */
+        return;
+
+    case snmWfp:
+        /* Filters have to be scoped to something. Scoping by executable path
+           (`FWPM_CONDITION_ALE_APP_ID`) would block that binary for every
+           process on the machine, so a `cmd.exe` builder would take the host
+           off the network. Scoping by user is correct, and needs a build user
+           we do not have: `UserLock` is implemented only under
+           `src/libstore/unix`, so `buildUser` is always null here. */
+        throw UnimplementedError(
+            "'sandbox-network = wfp' cannot be honoured: WFP filters must be scoped to a build user's SID, "
+            "and Windows has no build users yet. Refusing rather than running the build unisolated");
+
+    case snmContainer:
+        throw UnimplementedError(
+            "'sandbox-network = container' is not implemented: a Windows network namespace attaches to a "
+            "compute system, so this needs the builder run as a container via the Host Compute Service "
+            "rather than as a child process");
+    }
+}
+
 std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
 {
     /* There are no build users to contend over, so this never has to ask the
@@ -310,6 +354,9 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
 
     if (drv.isBuiltin())
         throw UnimplementedError("builtin builders are not yet supported on Windows");
+
+    /* Before anything is created, so an unsupported mode costs nothing. */
+    applyNetworkIsolation(store.config->getLocalSettings().sandboxNetworkMode, derivationType.isSandboxed());
 
     for (auto & [name, output] : drv.outputs) {
         auto * ia = std::get_if<DerivationOutput::InputAddressed>(&output.raw);

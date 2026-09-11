@@ -53,6 +53,7 @@ sources = files(
   'local-binary-cache-store.cc',
   'local-fs-store.cc',
   'local-overlay-store.cc',
+  'local-settings.cc',
   'local-store.cc',
   'machines.cc',
   'main.cc',
