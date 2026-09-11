@@ -25,6 +25,34 @@ Since `nix-copy-closure` calls `ssh`, you may need to authenticate with the remo
 In fact, you may be asked for authentication _twice_ because `nix-copy-closure` currently connects twice to the remote machine: first to get the set of paths missing on the target machine, and second to send the dump of those paths.
 When using public key authentication, you can avoid typing the passphrase with `ssh-agent`.
 
+# Examples
+
+> **Example**
+>
+> Copy GNU Hello with all its dependencies to a remote machine:
+>
+> ```shell-session
+> $ storePath="$(nix-build '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello --no-out-link)"
+> $ nix-copy-closure --to alice@itchy.example.org "$storePath"
+> copying 5 paths...
+> copying path '/nix/store/h6q8sqsqfbd3252f9gixqn3z282wds7m-xgcc-13.2.0-libgcc' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/imnwvn96lw355giswsk36hx105j4wnpj-libunistring-1.1' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/85301indj7scg34spnfczkz72jgv8wa9-libidn2-2.3.7' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/ypwfsaljwhzw9iffiysxmxnhjj8v7np0-glibc-2.39-31' to 'ssh://alice@itchy.example.org'...
+> copying path '/nix/store/0dklv59zppdsqdvgf0qdvjgzcs5wbwxa-hello-2.12.1' to 'ssh://alice@itchy.example.org'...
+> ```
+
+> **Example**
+>
+> Copy GNU Hello from a remote machine using a known store path, and run it:
+>
+> ```shell-session
+> $ storePath="$(nix-instantiate --eval --raw '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello.outPath)"
+> $ nix-copy-closure --from alice@itchy.example.org "$storePath"
+> $ "$storePath"/bin/hello
+> Hello, world!
+> ```
+
 # Options
 
 - `--to`
@@ -61,31 +89,3 @@ When using public key authentication, you can avoid typing the passphrase with `
   Additional options to be passed to `ssh` on the command line.
 
 {{#include ./env-common.md}}
-
-# Examples
-
-> **Example**
->
-> Copy GNU Hello with all its dependencies to a remote machine:
->
-> ```shell-session
-> $ storePath="$(nix-build '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello --no-out-link)"
-> $ nix-copy-closure --to alice@itchy.example.org "$storePath"
-> copying 5 paths...
-> copying path '/nix/store/h6q8sqsqfbd3252f9gixqn3z282wds7m-xgcc-13.2.0-libgcc' to 'ssh://alice@itchy.example.org'...
-> copying path '/nix/store/imnwvn96lw355giswsk36hx105j4wnpj-libunistring-1.1' to 'ssh://alice@itchy.example.org'...
-> copying path '/nix/store/85301indj7scg34spnfczkz72jgv8wa9-libidn2-2.3.7' to 'ssh://alice@itchy.example.org'...
-> copying path '/nix/store/ypwfsaljwhzw9iffiysxmxnhjj8v7np0-glibc-2.39-31' to 'ssh://alice@itchy.example.org'...
-> copying path '/nix/store/0dklv59zppdsqdvgf0qdvjgzcs5wbwxa-hello-2.12.1' to 'ssh://alice@itchy.example.org'...
-> ```
-
-> **Example**
->
-> Copy GNU Hello from a remote machine using a known store path, and run it:
->
-> ```shell-session
-> $ storePath="$(nix-instantiate --eval --raw '<nixpkgs>' -I nixpkgs=channel:nixpkgs-unstable -A hello.outPath)"
-> $ nix-copy-closure --from alice@itchy.example.org "$storePath"
-> $ "$storePath"/bin/hello
-> Hello, world!
-> ```

@@ -49,33 +49,6 @@ derivation).
 > Nix garbage collector. This root disappears automatically when the
 > `result` symlink is deleted or renamed. So don’t rename the symlink.
 
-# Options
-
-All options not listed here are passed to
-[`nix-store --realise`](./nix-store/realise.md),
-except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](./nix-instantiate.md).
-
-- <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
-
-  Do not create a symlink to the output path. Note that as a result
-  the output does not become a root of the garbage collector, and so
-  might be deleted by `nix-store --gc`.
-
-- <span id="opt-dry-run">[`--dry-run`](#opt-dry-run)</span>
-
-  Show what store paths would be built or downloaded.
-
-- <span id="opt-out-link">[`--out-link`](#opt-out-link)</span> / `-o` *outlink*
-
-  Change the name of the symlink to the output path created from
-  `result` to *outlink*.
-
-{{#include ./status-build-failure.md}}
-
-{{#include ./opt-common.md}}
-
-{{#include ./env-common.md}}
-
 # Examples
 
 ```console
@@ -123,3 +96,30 @@ branch of Nixpkgs:
 ```console
 $ nix-build https://github.com/NixOS/nixpkgs/archive/master.tar.gz --attr hello
 ```
+
+# Options
+
+All options not listed here are passed to
+[`nix-store --realise`](./nix-store/realise.md),
+except for `--arg` and `--attr` / `-A` which are passed to [`nix-instantiate`](./nix-instantiate.md).
+
+- <span id="opt-no-out-link">[`--no-out-link`](#opt-no-out-link)<span>
+
+  Do not create a symlink to the output path. Note that as a result
+  the output does not become a root of the garbage collector, and so
+  might be deleted by `nix-store --gc`.
+
+- <span id="opt-dry-run">[`--dry-run`](#opt-dry-run)</span>
+
+  Show what store paths would be built or downloaded.
+
+- <span id="opt-out-link">[`--out-link`](#opt-out-link)</span> / `-o` *outlink*
+
+  Change the name of the symlink to the output path created from
+  `result` to *outlink*.
+
+{{#include ./status-build-failure.md}}
+
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}

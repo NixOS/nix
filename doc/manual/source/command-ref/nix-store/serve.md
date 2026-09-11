@@ -20,12 +20,6 @@ The following flags are available:
   derivations. In effect, this can be used to make the host act as a
   remote builder.
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 To turn a host into a build server, the `authorized_keys` file can be
@@ -37,3 +31,9 @@ command="nice -n20 nix-store --serve --write" ssh-rsa AAAAB3NzaC1yc2EAAAA...
 EOF
 ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ../env-common.md}}

@@ -37,6 +37,25 @@ in which case it's printed using base-16.
 Additionally, if the option `--print-path` is used,
 the path of the downloaded file in the Nix store is also printed.
 
+# Examples
+
+```console
+$ nix-prefetch-url ftp://ftp.gnu.org/pub/gnu/hello/hello-2.10.tar.gz
+0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
+```
+
+```console
+$ nix-prefetch-url --print-path mirror://gnu/hello/hello-2.10.tar.gz
+0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
+/nix/store/8alrpdaasjd1x6g1fczchmzbpqm936a3-hello-2.10.tar.gz
+```
+
+```console
+$ nix-prefetch-url --unpack --print-path https://github.com/NixOS/patchelf/archive/0.8.tar.gz
+079agjlv0hrv7fxnx9ngipx14gyncbkllxrp9cccnh3a50fxcmy7
+/nix/store/19zrmhm3m40xxaw81c8cqm6aljgrnwj2-0.8.tar.gz
+```
+
 # Options
 
 - `--type` *hashAlgo*
@@ -65,22 +84,3 @@ the path of the downloaded file in the Nix store is also printed.
   `hash-basename`, where *basename* is the last component of *url*.
   Overriding the name is necessary when *basename* contains characters
   that are not allowed in Nix store paths.
-
-# Examples
-
-```console
-$ nix-prefetch-url ftp://ftp.gnu.org/pub/gnu/hello/hello-2.10.tar.gz
-0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
-```
-
-```console
-$ nix-prefetch-url --print-path mirror://gnu/hello/hello-2.10.tar.gz
-0ssi1wpaf7plaswqqjwigppsg5fyh99vdlb9kzl7c9lng89ndq1i
-/nix/store/8alrpdaasjd1x6g1fczchmzbpqm936a3-hello-2.10.tar.gz
-```
-
-```console
-$ nix-prefetch-url --unpack --print-path https://github.com/NixOS/patchelf/archive/0.8.tar.gz
-079agjlv0hrv7fxnx9ngipx14gyncbkllxrp9cccnh3a50fxcmy7
-/nix/store/19zrmhm3m40xxaw81c8cqm6aljgrnwj2-0.8.tar.gz
-```
