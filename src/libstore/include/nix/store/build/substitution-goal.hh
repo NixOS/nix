@@ -41,6 +41,9 @@ class PathSubstitutionGoal : public Goal
         Ok,
     };
 
+    using Result = std::pair<ExitCode, BuildResult>;
+
+    Co<Result> substitute();
     Co<SubstitutionResult> tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info);
 
 public:
@@ -65,7 +68,7 @@ public:
     /**
      * The states.
      */
-    Co<void> init();
+    Co<ExitCode> init();
 
     /* Called by destructor, can't be overridden */
     void cleanup() override final;
