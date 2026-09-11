@@ -6,6 +6,7 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
 
+#include <chrono>
 #include <cstring>
 #include <random>
 #include <algorithm>
@@ -41,6 +42,110 @@ protected:
         return n;
     }
 };
+
+TEST(DrainFD, BlockingReadsUntilEOF)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hello", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    auto got = drainFD(pipe.readSide.get());
+    EXPECT_EQ(got, "hello");
+}
+
+TEST(DrainFD, ExpectedSizeReadsExactly)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "0123456789", /*allowInterrupts=*/false);
+    // Don't close the write side: with .expected=true and a matching size,
+    // drainFD must return as soon as it has read the requested bytes.
+
+    auto got = drainFD(pipe.readSide.get(), {.size = 5, .expected = true});
+    EXPECT_EQ(got, "01234");
+
+    // The pipe is still open with five bytes remaining; a follow-up drain
+    // should pick them up.
+    pipe.writeSide.close();
+    auto got2 = drainFD(pipe.readSide.get());
+    EXPECT_EQ(got2, "56789");
+}
+
+TEST(DrainFD, ExpectedSizeThrowsOnEarlyEOF)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "abc", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    EXPECT_THROW(drainFD(pipe.readSide.get(), {.size = 10, .expected = true}), EndOfFile);
+}
+
+TEST(GetFileSize, ReturnsActualFileSize)
+{
+    auto fd = createAnonymousTempFile();
+    std::string data(12345, 'x');
+    writeFull(fd.get(), data);
+    EXPECT_EQ(getFileSize(fd.get()), data.size());
+}
+
+TEST(ReadOffset, RespectsInterrupts)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "Broken on Windows";
+#endif
+    auto fd = createAnonymousTempFile();
+    std::string data = "hello world";
+    writeFull(fd.get(), data);
+
+    setInterrupted(true);
+    std::array<std::byte, 16> buf;
+    EXPECT_THROW(readOffset(fd.get(), 0, buf), Interrupted);
+    setInterrupted(false);
+
+    // Confirm a normal call still works afterwards (interrupt flag was properly cleared,
+    // and the throw above didn't leave the fd or offset math in a bad state).
+    auto n = readOffset(fd.get(), 0, buf);
+    EXPECT_EQ(n, data.size());
+}
+
+TEST(DupDescriptor, DuplicateIsUsableAndIndependentlyCloseable)
+{
+    Pipe pipe;
+    pipe.create();
+
+    auto dup = dupDescriptor(pipe.writeSide.get());
+    ASSERT_TRUE(dup);
+    EXPECT_NE(dup.get(), pipe.writeSide.get());
+
+    writeFull(pipe.writeSide.get(), "hi", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+    // The pipe isn't at EOF yet: the duplicate still holds the write side open.
+    dup.close();
+
+    EXPECT_EQ(readLine(pipe.readSide.get(), /*eofOk=*/true), "hi");
+}
+
+TEST(DupDescriptor, ThrowsOnInvalidDescriptor)
+{
+    EXPECT_THROW(dupDescriptor(INVALID_DESCRIPTOR), NativeSysError);
+}
+
+TEST(SyncDescriptor, SucceedsOnRegularFile)
+{
+    auto fd = createAnonymousTempFile();
+    writeFull(fd.get(), "data", /*allowInterrupts=*/false);
+    EXPECT_NO_THROW(syncDescriptor(fd.get()));
+}
+
+TEST(SyncDescriptor, ThrowsOnInvalidDescriptor)
+{
+    EXPECT_THROW(syncDescriptor(INVALID_DESCRIPTOR), NativeSysError);
+}
 
 TEST(ReadLine, ReadsLinesFromPipe)
 {
@@ -300,6 +405,123 @@ TEST(BufferedSourceReadLine, BufferExhaustedThenEof)
 
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "abcdefgh");
     EXPECT_EQ(source.readLine(/*eofOk=*/true), "");
+}
+
+TEST(WriteLine, AppendsNewlineAndWrites)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeLine(pipe.writeSide.get(), "first");
+    writeLine(pipe.writeSide.get(), "second");
+    pipe.writeSide.close();
+
+    EXPECT_EQ(readLine(pipe.readSide.get()), "first");
+    EXPECT_EQ(readLine(pipe.readSide.get()), "second");
+}
+
+TEST(WriteLine, EmptyPayloadStillWritesNewline)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeLine(pipe.writeSide.get(), "");
+    pipe.writeSide.close();
+
+    // The empty payload + newline should produce a single empty line.
+    EXPECT_EQ(readLine(pipe.readSide.get()), "");
+}
+
+TEST(ReadFull, ReadsExactlyRequestedBytes)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hello world", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    char buf[5];
+    readFull(pipe.readSide.get(), buf, 5);
+    EXPECT_EQ(std::string_view(buf, 5), "hello");
+
+    char buf2[6];
+    readFull(pipe.readSide.get(), buf2, 6);
+    EXPECT_EQ(std::string_view(buf2, 6), " world");
+}
+
+TEST(ReadFull, ThrowsOnEofBeforeFullRead)
+{
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "hi", /*allowInterrupts=*/false);
+    pipe.writeSide.close();
+
+    char buf[10];
+    EXPECT_THROW(readFull(pipe.readSide.get(), buf, 10), EndOfFile);
+}
+
+TEST(ReadFull, ZeroCountIsNoop)
+{
+    Pipe pipe;
+    pipe.create();
+    pipe.writeSide.close();
+
+    // count=0 must not read or throw, even on a closed pipe.
+    char buf[1] = {'X'};
+    readFull(pipe.readSide.get(), buf, 0);
+    EXPECT_EQ(buf[0], 'X');
+}
+
+TEST(ReadFull, HonoursInterruptFlag)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "no checkInterrupt on Windows readFull path";
+#endif
+    Pipe pipe;
+    pipe.create();
+    // No data written; readFull would block. The interrupt flag must
+    // make it throw before any read.
+    setInterrupted(true);
+    char buf[1];
+    EXPECT_THROW(readFull(pipe.readSide.get(), buf, 1), Interrupted);
+    setInterrupted(false);
+}
+
+TEST(ReadFull, AdvancesBufferAcrossShortReads)
+{
+#ifdef _WIN32
+    GTEST_SKIP() << "pipe-write semantics differ on Windows";
+#endif
+    // Force at least two reads by writing the second chunk only after the
+    // first read has consumed the pipe. Done in a thread so readFull sees
+    // a short read first, then blocks waiting for the rest.
+    Pipe pipe;
+    pipe.create();
+
+    writeFull(pipe.writeSide.get(), "AAAA", /*allowInterrupts=*/false);
+
+    std::thread writer([&]() {
+        // Small delay to ensure the reader has consumed the first chunk.
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        writeFull(pipe.writeSide.get(), "BBBB", /*allowInterrupts=*/false);
+        pipe.writeSide.close();
+    });
+
+    char buf[8] = {};
+    readFull(pipe.readSide.get(), buf, 8);
+    EXPECT_EQ(std::string_view(buf, 8), "AAAABBBB");
+    writer.join();
+}
+
+TEST(WriteFull, EmptyStringIsNoop)
+{
+    Pipe pipe;
+    pipe.create();
+    pipe.writeSide.close();
+
+    // An empty payload must not even attempt to write; the loop never enters.
+    EXPECT_NO_THROW(writeFull(pipe.writeSide.get(), "", /*allowInterrupts=*/false));
 }
 
 TEST(WriteFull, RespectsAllowInterrupts)
