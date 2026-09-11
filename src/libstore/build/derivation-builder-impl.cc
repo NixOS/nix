@@ -952,21 +952,22 @@ void DerivationBuilderImpl::startDaemon()
 
             auto doneFlag = make_ref<std::atomic_flag>();
 
-            auto workerThread = std::thread([this, doneFlag, storeForDaemon, remote{std::move(remote)}, recursiveFlag]() {
-                try {
-                    miscMethods->processDaemonConnection(
-                        storeForDaemon, FdSource(remote.get()), FdSink(remote.get()), *this, recursiveFlag);
-                    debug("terminated daemon connection");
-                } catch (const Interrupted &) {
-                    debug("interrupted daemon connection");
-                } catch (...) {
-                    /* Swallow all exceptions to avoid crashing the the process (exceptions that escape from the thread
-                     * trigger std::terminate()). */
-                    ignoreExceptionExceptInterrupt();
-                }
+            auto workerThread =
+                std::thread([this, doneFlag, storeForDaemon, remote{std::move(remote)}, recursiveFlag]() {
+                    try {
+                        miscMethods->processDaemonConnection(
+                            storeForDaemon, FdSource(remote.get()), FdSink(remote.get()), *this, recursiveFlag);
+                        debug("terminated daemon connection");
+                    } catch (const Interrupted &) {
+                        debug("interrupted daemon connection");
+                    } catch (...) {
+                        /* Swallow all exceptions to avoid crashing the the process (exceptions that escape from the
+                         * thread trigger std::terminate()). */
+                        ignoreExceptionExceptInterrupt();
+                    }
 
-                doneFlag->test_and_set(std::memory_order_relaxed);
-            });
+                    doneFlag->test_and_set(std::memory_order_relaxed);
+                });
 
             daemonWorkerThreads.push_back(
                 DaemonWorkerState{
