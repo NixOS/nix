@@ -50,7 +50,9 @@ enum struct HttpStatus : long {
     Gone = 410,
     TooManyRequests = 429,
     NotImplemented = 501,
+    BadGateway = 502,
     ServiceUnavailable = 503,
+    GatewayTimeout = 504,
     HttpVersionNotSupported = 505,
     NetworkAuthRequired = 511,
 };
@@ -834,10 +836,14 @@ struct curlFileTransfer : public FileTransfer
                     //   * 408 means the server timed out waiting for us, so we try again
                     err = Misc;
                 } else if (
-                    httpStatus == HttpStatus::NotImplemented || httpStatus == HttpStatus::HttpVersionNotSupported
+                    httpStatus == HttpStatus::NotImplemented || httpStatus == HttpStatus::BadGateway
+                    || httpStatus == HttpStatus::GatewayTimeout || httpStatus == HttpStatus::HttpVersionNotSupported
                     || httpStatus == HttpStatus::NetworkAuthRequired) {
                     // Let's treat most 5xx (server) errors as transient, except for a handful:
                     //   * 501 not implemented
+                    //   * 502 bad gateway: a proxy can't reach the server behind it. That is a
+                    //     deployment problem, not going to fix itself within one Nix invocation.
+                    //   * 504 gateway timeout: likewise, and each retry costs a full proxy timeout
                     //   * 505 http version not supported
                     //   * 511 we're behind a captive portal
                     err = Misc;

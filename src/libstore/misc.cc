@@ -143,7 +143,6 @@ querySubstitutablePathInfosAsync(Store & store, const StorePathCAMap & paths, Su
 
                 break; /* We are done. */
             } catch (InvalidPath &) {
-            } catch (SubstituterDisabled &) {
             } catch (Error & e) {
                 lastStoresException = std::make_optional(std::move(e));
             }
