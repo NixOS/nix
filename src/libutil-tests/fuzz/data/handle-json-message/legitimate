@@ -1,0 +1,67 @@
+# copying path between stores
+@nix {"action":"start","fields":["/ca/eval-store/store/q4mzb058sxbik66ccd439p7rihfj6f9m-builder-dependencies-input-0.sh","local","local"],"id":13023380223557638,"level":3,"parent":0,"text":"copying path '/ca/eval-store/store/q4mzb058sxbik66ccd439p7rihfj6f9m-builder-dependencies-input-0.sh' to 'local'","type":100}
+@nix {"action":"result","fields":[8,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[21,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[24,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[32,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[33,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[40,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[48,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[52,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[56,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[64,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[71,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[72,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[80,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[88,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[96,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[185,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[192,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[200,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[201,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"result","fields":[208,208,0,0],"id":13023380223557638,"type":105}
+@nix {"action":"stop","id":13023380223557638}
+
+# downloading files
+@nix {"action":"start","fields":["file:///ca/substitute/binary-cache/67q2fggydy3zwj2hdqfdivfhyhk7342m.narinfo"],"id":13087358056398869,"level":4,"parent":13087358056398865,"text":"downloading 'file:///ca/substitute/binary-cache/67q2fggydy3zwj2hdqfdivfhyhk7342m.narinfo'","type":101}
+@nix {"action":"stop","id":13087358056398865}
+
+# building paths
+@nix {"action":"start","fields":["/main/build-dry/store/ankm5d2n0n5bmv18pxxwlfqlp60ryhbn-dependencies-top.drv","",1,1],"id":12781715298713609,"level":3,"parent":0,"text":"building '/main/build-dry/store/ankm5d2n0n5bmv18pxxwlfqlp60ryhbn-dependencies-top.drv'","type":105}
+@nix {"action":"result","fields":["FOO"],"id":12781715298713609,"type":101}
+@nix {"action":"stop","id":12781715298713609}
+
+# substituting paths
+@nix {"action":"start","fields":["/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed","file:///ca/signatures/binary-cache"],"id":13082436023877637,"level":0,"parent":0,"text":"","type":108}
+@nix {"action":"start","fields":["/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed","file:///ca/signatures/binary-cache","local"],"id":13082436023877638,"level":3,"parent":13082436023877637,"text":"copying path '/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed' from 'file:///ca/signatures/binary-cache'","type":100}
+@nix {"action":"result","fields":[296,296,0,0],"id":13082436023877638,"type":105}
+@nix {"action":"stop","id":13082436023877638}
+@nix {"action":"stop","id":13082436023877637}
+
+# querying path info
+@nix {"action":"start","fields":["/main/compression-levels/store/4db7d3s0h74w4lnhpqqhfhpj21c92bgm-dependencies-top","file:///main/compression-levels/binary-cache"],"id":12808696283267076,"level":4,"parent":0,"text":"querying info about '/main/compression-levels/store/4db7d3s0h74w4lnhpqqhfhpj21c92bgm-dependencies-top' on 'file:///main/compression-levels/binary-cache'","type":109}
+@nix {"action":"start","fields":["/main/compression-levels/store/hxcb8hfrag31fj66qss42b6clzr0bdm9-dependencies-input-2","file:///main/compression-levels/binary-cache"],"id":12808696283267078,"level":4,"parent":0,"text":"querying info about '/main/compression-levels/store/hxcb8hfrag31fj66qss42b6clzr0bdm9-dependencies-input-2' on 'file:///main/compression-levels/binary-cache'","type":109}
+@nix {"action":"stop","id":12808696283267076}
+@nix {"action":"stop","id":12808696283267078}
+
+# running post-build-hook
+@nix {"action":"start","fields":["/flakes/config/store/acnvzpblkzr7a2kx0yy6g2g0v6zcfn23-simple.drv"],"id":13131600514514953,"level":4,"parent":0,"text":"running post-build-hook '/flakes/config/store/7pfv6wdgg7d4gil01zz9jxmzqkqyal2d-source'","type":110}
+@nix {"action":"stop","id":13131600514514953}
+
+# fetch-tree
+@nix {"action":"start","id":13187443679297542,"level":4,"parent":0,"text":"fetching Git repository 'file:///flakes/flakes/flake1'","type":112}
+@nix {"action":"stop","id":13187443679297542}
+
+# hashing paths
+@nix {"action":"start","fields":["/flakes/symlink-paths/flake1",1],"id":13144760294309888,"level":5,"parent":0,"text":"hashing '/flakes/symlink-paths/flake1'","type":113}
+@nix {"action":"result","fields":["/flakes/symlink-paths/store/g9vvajn9qyyidqg1pjqgprbmnzkkpbga-source"],"id":13144760294309888,"type":109}
+@nix {"action":"stop","id":13144760294309888}
+
+# copying paths
+@nix {"action":"start","fields":["«git+file:///flakes/flake-in-submodule/rootRepo?ref=refs/heads/master&rev=eaa9366e218e9b76354c8fd179f1e9e3049dcd11&submodules=1»/",0],"id":13138210469183490,"level":5,"parent":0,"text":"copying '«git+file:///flakes/flake-in-submodule/rootRepo?ref=refs/heads/master&rev=eaa9366e218e9b76354c8fd179f1e9e3049dcd11&submodules=1»/' to the store","type":113}
+@nix {"action":"result","fields":["/flakes/flake-in-submodule/store/qsib7mf8w7490daxwc95w5qgk66n5ki5-source"],"id":13138210469183490,"type":109}
+@nix {"action":"stop","id":13138210469183490}
+
+# unknown activity type
+@nix {"action":"start","id":12904336615014400,"level":6,"parent":0,"text":"querying info about missing paths","type":0}
+@nix {"action":"stop","id":12904336615014400}

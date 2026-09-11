@@ -6,7 +6,7 @@
 mkFuzzSeedCheck {
   inherit package;
   targets =
-    map
+    (map
       (name: {
         inherit name;
         corpus = ./data/nars;
@@ -15,5 +15,12 @@ mkFuzzSeedCheck {
       [
         "fuzz-parse-dump"
         "fuzz-parse-dump-case-hacked"
-      ];
+      ]
+    )
+    ++ [
+      {
+        name = "fuzz-handle-json-message";
+        corpus = ./data/handle-json-message;
+      }
+    ];
 }
