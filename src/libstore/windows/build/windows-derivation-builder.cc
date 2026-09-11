@@ -14,15 +14,6 @@ namespace nix {
 
 namespace {
 
-/** Like `windows/processes.cc`'s version, which is file-local rather than exported. */
-void setInheritable(AutoCloseFD & fd, bool inherit)
-{
-    using namespace nix::windows;
-
-    if (!SetHandleInformation(fd.get(), HANDLE_FLAG_INHERIT, inherit ? HANDLE_FLAG_INHERIT : 0))
-        throw WinError("cannot change handle inheritability");
-}
-
 /** The builder's stdin. */
 AutoCloseFD openNullDevice()
 {
@@ -244,8 +235,8 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
     using namespace nix::windows;
 
     /* The child must not inherit the side we read from. */
-    setInheritable(builderPipe.readSide, false);
-    setInheritable(builderPipe.writeSide, true);
+    setHandleInheritability(builderPipe.readSide.get(), false);
+    setHandleInheritability(builderPipe.writeSide.get(), true);
 
     AutoCloseFD stdIn = openNullDevice();
 

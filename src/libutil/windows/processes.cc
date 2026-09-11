@@ -123,18 +123,6 @@ std::optional<std::filesystem::path> getProgramInterpreter(const std::filesystem
     throw UnimplementedError("getProgramInterpreter unimplemented");
 }
 
-// TODO: Not sure if this is needed in the unix version but it might be useful as a member func
-void setFDInheritable(AutoCloseFD & fd, bool inherit)
-{
-    using namespace nix::windows;
-
-    if (fd.get() != INVALID_DESCRIPTOR) {
-        if (!SetHandleInformation(fd.get(), HANDLE_FLAG_INHERIT, inherit ? HANDLE_FLAG_INHERIT : 0)) {
-            throw WinError("Couldn't disable inheriting of handle");
-        }
-    }
-}
-
 AutoCloseFD nullFD()
 {
     using namespace nix::windows;
@@ -151,11 +139,11 @@ AutoCloseFD nullFD()
         OPEN_EXISTING,
         0,
         NULL);
-    if (!nul.get()) {
+    if (!nul) {
         throw WinError("Couldn't open NUL device");
     }
     // Let this handle be inheritable by child processes
-    setFDInheritable(nul, true);
+    setHandleInheritability(nul.get(), true);
     return nul;
 }
 
@@ -212,7 +200,7 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     // Setup pipes.
     if (options.standardOut) {
         // Don't inherit the read end of the output pipe
-        setFDInheritable(out.readSide, false);
+        setHandleInheritability(out.readSide.get(), false);
     } else {
         out.writeSide = nullFD();
     }
