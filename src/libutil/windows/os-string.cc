@@ -1,17 +1,26 @@
 #include <algorithm>
-#include <codecvt>
 #include <iostream>
-#include <locale>
 
 #include "nix/util/os-string.hh"
 #include "nix/util/strings-inline.hh"
+#include "nix/util/wtf8.hh"
 
 namespace nix {
 
+#ifdef _WIN32
+/* Windows file names are arbitrary 16-bit code units, so `wchar_t` has to be
+   exactly that wide for the conversions below to be lossless. Guarded because
+   `wchar_t` is 32 bits on Linux, where this file is not built. */
+static_assert(sizeof(wchar_t) == 2, "Windows paths are UTF-16; wchar_t must be 16 bits");
+#endif
+
 std::string os_string_to_string(OsStringView s)
 {
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    return converter.to_bytes(s.data(), s.data() + s.size());
+    /* `wchar_t` and `char16_t` are distinct types with the same
+       representation here, so this copy is a reinterpretation without the
+       aliasing question a cast would raise. */
+    std::u16string units(s.begin(), s.end());
+    return wtf8FromUtf16(units);
 }
 
 std::string os_string_to_string(OsString s)
@@ -21,8 +30,8 @@ std::string os_string_to_string(OsString s)
 
 OsString string_to_os_string(std::string_view s)
 {
-    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
-    return converter.from_bytes(s.data(), s.data() + s.size());
+    auto units = utf16FromWtf8(s);
+    return OsString(units.begin(), units.end());
 }
 
 OsString string_to_os_string(std::string s)
