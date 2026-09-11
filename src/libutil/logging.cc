@@ -1,6 +1,7 @@
 #include "nix/util/logging.hh"
 #include "nix/util/file-descriptor.hh"
 #include "nix/util/environment-variables.hh"
+#include "nix/util/split.hh"
 #include "nix/util/terminal.hh"
 #include "nix/util/util.hh"
 #include "nix/util/config-global.hh"
@@ -429,10 +430,10 @@ static std::vector<Logger::Field> maybeGetFields(const nlohmann::json::array_t *
 
 std::optional<nlohmann::json> parseJSONMessage(std::string_view msg, std::string_view source)
 {
-    if (!hasPrefix(msg, "@nix "))
+    if (!splitPrefix(msg, "@nix "))
         return std::nullopt;
     try {
-        return nlohmann::json::parse(msg.substr(5));
+        return nlohmann::json::parse(msg);
     } catch (std::exception & e) {
         printError("bad JSON log message from %s: %s", Uncolored(source), e.what());
     }
