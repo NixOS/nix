@@ -93,22 +93,6 @@ Goal::CoBase::~CoBase()
     }
 }
 
-void Goal::AwaitableFrame<void>::return_value(Co && next)
-{
-    goal->trace("return_value(Co&&)");
-    // Save old continuation.
-    auto old_continuation = std::move(continuation);
-    // We set next as our continuation.
-    continuation = std::move(next);
-    // We set next's goal, and thus it must not have one already.
-    auto continuationHandle = HandleTypeBase::from_address(continuation->handle.address());
-    assert(!continuationHandle.promise().goal);
-    continuationHandle.promise().goal = goal;
-    // Nor can next have a continuation, as we set it to our old one.
-    assert(!continuationHandle.promise().continuation);
-    continuationHandle.promise().continuation = std::move(old_continuation);
-}
-
 bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
 {
     return a->keyCached() < b->keyCached();

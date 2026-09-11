@@ -261,7 +261,6 @@ public:
      * The main functionality provided by `Co` is
      * - `co_await Suspend{}`: Suspends the goal.
      * - `co_await f()`: Waits until `f()` finishes.
-     * - `co_return f()`: Tail-calls `f()`.
      * - `co_return Return{}`: Ends coroutine.
      *
      * The idea is that you implement the goal logic using coroutines,
@@ -280,17 +279,12 @@ public:
      *       `await_suspend` can either say "cancel suspension", in which case execution resumes,
      *       "suspend", in which case control is passed back to the caller of `coroutine_handle.resume()`
      *       or the place where the coroutine function is initially executed in the case of the initial
-     *       suspension, or `await_suspend` can specify another coroutine to jump to, which is
-     *       how tail calls are implemented.
+     *       suspension, or `await_suspend` can specify another coroutine to jump to.
      *
      * @note Resources:
      *       - https://lewissbaker.github.io/
      *       - https://www.chiark.greenend.org.uk/~sgtatham/quasiblog/coroutines-c++20/
      *       - https://www.scs.stanford.edu/~dm/blog/c++-coroutines.html
-     *
-     * @todo Allocate explicitly on stack since HALO thing doesn't really work,
-     *       specifically, there's no way to uphold the requirements when trying to do
-     *       tail-calls without using a trampoline AFAICT.
      */
     template<typename T>
     struct [[nodiscard]] BasicCo : CoBase
@@ -323,8 +317,7 @@ public:
 
     protected:
         /**
-         * Either this is who called us, or it is who we will tail-call.
-         * It is what we "jump" to once we are done.
+         * The coroutine that called us. It is what we "jump" to once we are done.
          */
         std::optional<CoBase> continuation;
 
@@ -822,21 +815,6 @@ struct Goal::AwaitableFrame<void> : Goal::AwaitableFrameBase
      * @ref final_suspend to happen.
      */
     void return_value(Done) {}
-
-    /**
-     * When "returning" another coroutine, what happens is that
-     * we set it as our own continuation, thus once the final suspend
-     * happens, we transfer control to it.
-     * The original continuation we had is set as the continuation
-     * of the coroutine passed in.
-     * @ref final_suspend is called after this, and @ref FinalAwaiter will
-     * pass control off to @ref continuation.
-     *
-     * If we already have a continuation, that continuation is set as
-     * the continuation of the new continuation. Thus, the continuation
-     * passed to @ref return_value must not have a continuation set.
-     */
-    void return_value(Co &&);
 };
 
 } // namespace nix
