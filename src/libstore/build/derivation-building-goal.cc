@@ -484,6 +484,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                    EOF from the hook. */
                 co_return co_await buildWithHook(
                     std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                unreachable();
             case rpDecline:
                 // We should do it ourselves.
                 co_return std::nullopt;
@@ -538,6 +539,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
         } else {
             co_return co_await buildWithHook(
                 std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            unreachable();
         }
     };
 
