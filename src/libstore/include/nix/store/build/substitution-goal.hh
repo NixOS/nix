@@ -22,11 +22,6 @@ class PathSubstitutionGoal : public Goal
      */
     RepairFlag repair;
 
-    /**
-     * The substituter thread.
-     */
-    std::thread thr;
-
     std::unique_ptr<MaintainCount<uint64_t>> maintainExpectedSubstitutions, maintainRunningSubstitutions,
         maintainExpectedNar, maintainExpectedDownload;
 
@@ -43,8 +38,9 @@ class PathSubstitutionGoal : public Goal
 
     using Result = std::pair<ExitCode, BuildResult>;
 
-    Co<Result> substitute();
-    Co<SubstitutionResult> tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info);
+    asio::awaitable<Result> substitute();
+    asio::awaitable<SubstitutionResult>
+    tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info);
 
 public:
     PathSubstitutionGoal(
@@ -68,10 +64,7 @@ public:
     /**
      * The states.
      */
-    Co<ExitCode> init();
-
-    /* Called by destructor, can't be overridden */
-    void cleanup() override final;
+    asio::awaitable<ExitCode> init();
 
     JobCategory jobCategory() const override
     {

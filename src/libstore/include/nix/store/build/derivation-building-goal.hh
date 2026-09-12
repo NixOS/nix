@@ -9,6 +9,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/build/worker.hh"
 #include "nix/store/build/build-log.hh"
 
 namespace nix {
@@ -77,22 +78,26 @@ private:
 
     using LocalBuildOutcome = std::variant<Result, NeedsSlot>;
 
-    Co<ExitCode> init();
-    Co<void> realiseInputs();
-    Co<Result> tryToBuild();
-    Co<Result> buildWithHook(
+    asio::awaitable<ExitCode> init();
+    asio::awaitable<void> realiseInputs();
+    asio::awaitable<Result> tryToBuild();
+    asio::awaitable<Result> buildWithHook(
         const StorePathSet & inputPaths, std::map<std::string, InitialOutput> & initialOutputs, PathLocks outputLocks);
-    Co<LocalBuildOutcome> buildLocally(
+    asio::awaitable<LocalBuildOutcome> buildLocally(
         LocalBuildCapability localBuildCap,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs,
         const DerivationOptions<StorePath> & drvOptions,
-        PathLocks outputLocks);
+        PathLocks outputLocks,
+        std::optional<AsyncSemaphore::Handle> & buildSlot);
 
     /**
      * Is the build hook willing to perform the build?
+     *
+     * @param canBuildLocally Whether we could start a local build right
+     * now, which the hook uses to decide whether to postpone.
      */
-    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
+    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions, bool canBuildLocally);
 
     BuildError logLimitExceeded();
 
