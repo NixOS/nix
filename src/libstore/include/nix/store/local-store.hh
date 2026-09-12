@@ -11,6 +11,7 @@
 #include <chrono>
 #include <future>
 #include <string>
+#include <atomic>
 #include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
@@ -508,6 +509,17 @@ private:
     std::pair<std::filesystem::path, AutoCloseFD> createTempDirInStore();
 
     typedef boost::unordered_flat_set<ino_t> InodeHash;
+
+    /**
+     * Cached result of whether xattrs are usable for optimisation
+     * tracking on this store (see isPathOptimised()/markPathOptimised()).
+     * Starts optimistic (false = "not known to be unsupported"); once a
+     * permanent failure (ENOTSUP/EOPNOTSUPP/EPERM/EACCES) is observed on
+     * any path, flips to true for the remaining lifetime of this
+     * LocalStore, so subsequent calls short-circuit without issuing a
+     * syscall that's known to fail again.
+     */
+    mutable std::atomic<bool> xattrsUnsupported{false};
 
     InodeHash loadInodeHash();
     Strings readDirectoryIgnoringInodes(const std::filesystem::path & path, const InodeHash & inodeHash);

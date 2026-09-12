@@ -62,21 +62,29 @@ struct MakeReadOnly
 bool LocalStore::isPathOptimised(const std::filesystem::path & path) const
 {
 #if NIX_SUPPORT_ACL
+    if (xattrsUnsupported.load(std::memory_order_relaxed))
+        return false;
+
     char buf[32];
     ssize_t size = lgetxattr(path.c_str(), XATTR_OPTIMISED, buf, sizeof(buf));
 
     if (size < 0) {
         if (errno == ENOTSUP || errno == EOPNOTSUPP) {
-            // Filesystem doesn't support xattrs - feature disabled
-            static std::atomic<bool> warned{false};
-            if (!warned.exchange(true)) {
+            // Filesystem doesn't support xattrs - disable further attempts
+            // for the lifetime of this store, so we don't retry a syscall
+            // that's known to fail on every remaining path.
+            if (!xattrsUnsupported.exchange(true, std::memory_order_relaxed)) {
                 debug("filesystem at %s doesn't support extended attributes, optimization tracking disabled", path.string());
             }
             return false;
         }
-        // EPERM/EACCES means trusted.* but no CAP_SYS_ADMIN (non-root user)
-        // Return false so non-root users re-process (slower but correct)
+        // EPERM/EACCES means trusted.* but no CAP_SYS_ADMIN (non-root user).
+        // Our credentials won't change for the lifetime of this process,
+        // so this is just as permanent as ENOTSUP - cache it the same way.
         if (errno == EPERM || errno == EACCES) {
+            if (!xattrsUnsupported.exchange(true, std::memory_order_relaxed)) {
+                debug("no permission to read extended attributes at %s, optimization tracking disabled", path.string());
+            }
             return false;
         }
         // No xattr (ENODATA/ENOATTR) = not optimised
@@ -92,13 +100,21 @@ bool LocalStore::isPathOptimised(const std::filesystem::path & path) const
 void LocalStore::markPathOptimised(const std::filesystem::path & path)
 {
 #if NIX_SUPPORT_ACL
+    if (xattrsUnsupported.load(std::memory_order_relaxed))
+        return;
+
     std::string timestamp = std::to_string(time(nullptr));
 
     if (lsetxattr(path.c_str(), XATTR_OPTIMISED, timestamp.c_str(),
                   timestamp.size(), 0) < 0) {
-        if (errno != ENOTSUP && errno != EOPNOTSUPP && errno != EROFS &&
-            errno != EPERM && errno != EACCES) {
-            // Log unexpected errors, but ignore permission errors (non-root users)
+        if (errno == ENOTSUP || errno == EOPNOTSUPP || errno == EPERM || errno == EACCES) {
+            // Same permanent conditions as isPathOptimised() - stop retrying.
+            xattrsUnsupported.store(true, std::memory_order_relaxed);
+        } else if (errno != EROFS) {
+            // Log unexpected errors, but ignore read-only filesystem
+            // (also permanent, but not worth a dedicated flag - EROFS
+            // only matters for markPathOptimised, and failing silently
+            // there is already the correct behaviour).
             debug("failed to mark path optimised: %s", strerror(errno));
         }
         // Don't fail optimization if xattr fails
@@ -359,7 +375,9 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
     auto paths = queryAllValidPaths();
 
     // Check if xattrs are usable by trying to list xattrs on linksDir.
-    // If not usable, we need to pre-load the inode hash as a fallback.
+    // If not usable, we need to pre-load the inode hash as a fallback,
+    // and can skip the per-path isPathOptimised()/markPathOptimised()
+    // syscalls entirely for the rest of this run.
     InodeHash inodeHash;
 #if NIX_SUPPORT_ACL
     // Try to list xattrs on linksDir to detect if they're usable
@@ -369,6 +387,7 @@ void LocalStore::optimiseStore(OptimiseStats & stats)
         // Load inode hash as fallback to avoid duplicate work
         debug("cannot use xattrs for optimization tracking (%s), loading inode hash", strerror(errno));
         inodeHash = loadInodeHash();
+        xattrsUnsupported.store(true, std::memory_order_relaxed);
     }
     // Otherwise: xattrs work (size >= 0)
     // Start with empty hash - xattr checks will skip already-optimised paths
