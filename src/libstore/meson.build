@@ -99,12 +99,12 @@ configdata_pub.set(
 
 if host_machine.system() == 'darwin'
   sandbox = cxx.find_library('sandbox')
-  deps_other += [ sandbox ]
+  deps_private_no_pkgconfig += [ sandbox ]
 endif
 
 if host_machine.system() == 'windows'
   wsock32 = cxx.find_library('wsock32')
-  deps_other += [ wsock32 ]
+  deps_private_no_pkgconfig += [ wsock32 ]
 endif
 
 subdir('nix-meson-build-support/libatomic')
@@ -119,9 +119,8 @@ boost = dependency(
   ],
   include_type : 'system',
 )
-# boost is a public dependency, but not a pkg-config dependency unfortunately, so we
-# put in `deps_other`.
-deps_other += boost
+# boost is a public dependency, but not a pkg-config dependency unfortunately.
+deps_public_no_pkgconfig += boost
 
 # This is quite new, but curl has a bunch of known issues with write pausing and decompression.
 # Please use libcurl >= 8.17. See https://github.com/curl/curl/issues/19334, https://github.com/curl/curl/issues/16280, https://github.com/curl/curl/issues/16955 if in doubt.
@@ -153,7 +152,7 @@ deps_private += seccomp
 if host_machine.system() == 'freebsd'
   # libjail is not in freebsd.libc, but there's no discovery mechanism
   libjail = declare_dependency(link_args : [ '-ljail' ])
-  deps_other += libjail
+  deps_private_no_pkgconfig += libjail
 endif
 
 nlohmann_json = dependency('nlohmann_json', version : '>= 3.9')
@@ -171,7 +170,7 @@ aws_crt_cpp = dependency(
 )
 
 if s3_aws_auth.enabled()
-  deps_other += aws_crt_cpp
+  deps_private_no_pkgconfig += aws_crt_cpp
 endif
 
 configdata_pub.set('NIX_WITH_AWS_AUTH', s3_aws_auth.enabled().to_int())
@@ -378,7 +377,7 @@ this_library = library(
   sources,
   config_priv_h,
   soversion : nix_soversion,
-  dependencies : deps_public + deps_private + deps_other,
+  dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
   include_directories : include_dirs,
   link_args : linker_export_flags,
   prelink : true, # For C++ static initializers

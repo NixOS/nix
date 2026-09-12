@@ -14,32 +14,43 @@
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
 
+#include <boost/asio/bind_cancellation_slot.hpp>
+#include <boost/asio/detached.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/signal_set.hpp>
+
 namespace nix {
+
+/* FIXME: Dedup a lot. */
+static bool isCancellationException(std::exception_ptr ex)
+{
+    try {
+        std::rethrow_exception(ex);
+    } catch (const Interrupted &) {
+        return true;
+    } catch (const Cancelled &) {
+        return true;
+    } catch (const boost::system::system_error & e) {
+        return e.code() == asio::error::operation_aborted;
+    } catch (...) {
+        return false;
+    }
+}
 
 Worker::Worker(Store & store, Store & evalStore)
     /* Can't use make_ref, because the constructor is private. */
-    : wakerState(ref<Waker>(new Waker{}))
+    : settings(nix::settings.getWorkerSettings())
+    , buildSemaphore(ex, settings.maxBuildJobs)
+    , substitutionSemaphore(ex, std::max<std::size_t>(settings.maxSubstitutionJobs, 1))
     , act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
-#ifdef _WIN32
-    , ioport{CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)}
-#endif
     , store(store)
     , evalStore(evalStore)
-    , settings(nix::settings.getWorkerSettings())
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
 {
-#ifdef _WIN32
-    if (!ioport)
-        throw windows::WinError("CreateIoCompletionPort");
-    wakerState->ioport = ioport.get();
-#endif
-    nrLocalBuilds = 0;
-    nrSubstitutions = 0;
-    lastWokenUp = steady_time_point::min();
 }
 
 Worker::~Worker()
@@ -63,7 +74,6 @@ std::shared_ptr<G> Worker::initGoalIfNeeded(std::weak_ptr<G> & goal_weak, Args &
 
     auto goal = std::make_shared<G>(std::forward<Args>(args)...);
     goal_weak = goal;
-    wakeUp(goal);
     return goal;
 }
 
@@ -175,378 +185,57 @@ void Worker::removeGoal(GoalPtr goal)
     }
 }
 
-void Worker::wakeUp(GoalPtr goal)
+asio::awaitable<void> Worker::awaitTopGoals()
 {
-    goal->trace("woken up");
-    addToWeakGoals(awake, goal);
-}
-
-size_t Worker::getNrLocalBuilds()
-{
-    return nrLocalBuilds;
-}
-
-size_t Worker::getNrSubstitutions()
-{
-    return nrSubstitutions;
-}
-
-void Worker::childStarted(
-    GoalPtr goal, const std::set<MuxablePipePollState::CommChannel> & channels, bool inBuildSlot, bool respectTimeouts)
-{
-    Child child;
-    child.goal = goal;
-    child.goal2 = goal.get();
-    child.channels = channels;
-    child.timeStarted = child.lastOutput = steady_time_point::clock::now();
-    child.inBuildSlot = inBuildSlot;
-    child.respectTimeouts = respectTimeouts;
-    children.emplace_back(child);
-    if (inBuildSlot) {
-        switch (goal->jobCategory()) {
-        case JobCategory::Substitution:
-            nrSubstitutions++;
-            break;
-        case JobCategory::Build:
-            nrLocalBuilds++;
-            break;
-        case JobCategory::Administration:
-        default:
-            /* Doesn't make sense, since there are only building and substitution slots. */
-            unreachable();
-        }
-    }
-}
-
-void Worker::childTerminated(Goal * goal)
-{
-    childTerminated(goal, goal->jobCategory());
-}
-
-void Worker::childTerminated(Goal * goal, JobCategory jobCategory)
-{
-    // FIXME: Inefficient. Make children a map from Goal -> Child instead.
-    auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
-    if (i == children.end())
-        return;
-
-    if (i->inBuildSlot) {
-        switch (jobCategory) {
-        case JobCategory::Substitution:
-            assert(nrSubstitutions > 0);
-            nrSubstitutions--;
-            break;
-        case JobCategory::Build:
-            assert(nrLocalBuilds > 0);
-            nrLocalBuilds--;
-            break;
-        case JobCategory::Administration:
-        default:
-            /* Doesn't make sense, since there are only building and substitution slots. */
-            unreachable();
-        }
-    }
-
-    children.erase(i);
-}
-
-void Worker::waitForBuildSlot(GoalPtr goal)
-{
-    goal->trace("wait for build slot");
-
-    bool slotAvailable = [&] {
-        if (goal->jobCategory() == JobCategory::Substitution)
-            return getNrSubstitutions() < settings.maxSubstitutionJobs;
-        else
-            return getNrLocalBuilds() < settings.maxBuildJobs;
-    }();
-
-    if (slotAvailable)
-        wakeUp(goal); /* Can do it right away. */
-    else
-        addToWeakGoals(goal->jobCategory() == JobCategory::Substitution ? wantingToSubstitute : wantingToBuild, goal);
-}
-
-void Worker::waitForAWhile(GoalPtr goal)
-{
-    goal->trace("wait for a while");
-    addToWeakGoals(waitingForAWhile, goal);
-}
-
-void Worker::waitForCompletion(GoalPtr goal)
-{
-    goal->trace("waiting for completion callback");
-    addToWeakGoals(waitingForCompletion, goal);
+    co_await Goal::join(topGoals, settings.keepGoing);
 }
 
 void Worker::run(const Goals & _topGoals)
 {
-    debug("entered goal loop");
-    for (std::shared_ptr<Goal> goal : _topGoals)
-        topGoals.insert(std::move(goal));
+    /* The same worker may be run more than once (see `repairPath`), and
+       a stopped `io_context` must be restarted before it does work again. */
+    ioContext.restart();
 
-    while (1) {
-        checkInterrupt();
+    for (auto & goal : _topGoals)
+        topGoals.insert(goal);
 
-        // TODO GC interface?
-        if (auto localStore = dynamic_cast<LocalStore *>(&store))
-            localStore->autoGC(false);
+    std::exception_ptr runError;
+    asio::cancellation_signal interrupted;
 
-        /* Call every wake goal (in the ordering established by
-           CompareGoalPtrs). */
-        while (!awake.empty() && !topGoals.empty()) {
-            Goals awake2;
-            for (auto & i : awake) {
-                GoalPtr goal = i.lock();
-                if (goal)
-                    awake2.insert(goal);
+    auto callback = createInterruptCallback(
+        [&]() { asio::post(ex, [&interrupted] { interrupted.emit(asio::cancellation_type::terminal); }); });
+
+    /* Periodically give the local store a chance to collect garbage while
+       builds are running (see `min-free`). Stops once the top-level goals
+       are done. */
+    asio::cancellation_signal stopBackground;
+    asio::co_spawn(
+        ex,
+        [this]() -> asio::awaitable<void> {
+            // TODO GC interface?
+            auto localStore = dynamic_cast<LocalStore *>(&store);
+            if (!localStore)
+                co_return;
+            asio::steady_timer timer(co_await asio::this_coro::executor);
+            while (true) {
+                localStore->autoGC(false);
+                timer.expires_after(std::chrono::seconds(10));
+                co_await timer.async_wait(asio::use_awaitable);
             }
-            awake.clear();
+        },
+        asio::bind_cancellation_slot(stopBackground.slot(), asio::detached));
 
-            for (auto & goal : awake2) {
-                checkInterrupt();
+    asio::co_spawn(ex, awaitTopGoals(), asio::bind_cancellation_slot(interrupted.slot(), [&](std::exception_ptr e) {
+                       if (e && !isCancellationException(e))
+                           runError = e;
+                       stopBackground.emit(asio::cancellation_type::terminal);
+                   }));
 
-                std::chrono::time_point<std::chrono::steady_clock> startTime;
-                if (verbosity >= lvlVomit)
-                    startTime = std::chrono::steady_clock::now();
+    ioContext.run();
 
-                goal->work();
-
-                /* Useful for tracing which goals hod the event loop. */
-                vomit(
-                    "worker event loop worked goal '%1%' for %2$.3fms",
-                    goal->name,
-                    std::chrono::duration_cast<std::chrono::duration<float, std::milli>>(
-                        std::chrono::steady_clock::now() - startTime)
-                        .count());
-
-                if (topGoals.empty())
-                    break; // stuff may have been cancelled
-            }
-
-            auto wakeSlotWaiters = [this](WeakGoals & waiting, size_t running, size_t limit) {
-                auto it = waiting.begin();
-                while (it != waiting.end() && running < limit) {
-                    auto goal = it->lock();
-                    it = waiting.erase(it);
-                    if (!goal)
-                        continue;
-                    wakeUp(goal);
-                    ++running;
-                }
-            };
-
-            wakeSlotWaiters(
-                wantingToSubstitute, getNrSubstitutions(), std::max<std::size_t>(1, settings.maxSubstitutionJobs));
-            wakeSlotWaiters(wantingToBuild, getNrLocalBuilds(), settings.maxBuildJobs);
-        }
-
-        if (topGoals.empty())
-            break;
-
-        /* Wait for input or completion callbacks. */
-        if (!children.empty() || !waitingForAWhile.empty() || !waitingForCompletion.empty())
-            waitForInput();
-        else if (awake.empty() && 0U == settings.maxBuildJobs) {
-            if (Machine::parseConfig({nix::settings.thisSystem}, nix::settings.getWorkerSettings().builders).empty())
-                throw Error(
-                    "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
-                    "\n"
-                    "For more information run 'man nix.conf' and search for '/machines'.");
-            else
-                throw Error(
-                    "Unable to start any build; remote machines may not have all required system features.\n"
-                    "\n"
-                    "For more information run 'man nix.conf' and search for '/machines'.");
-        } else
-            assert(!awake.empty());
-    }
-
-    /* If --keep-going is not set, it's possible that the main goal
-       exited while some of its subgoals were still active.  But if
-       --keep-going *is* set, then they must all be finished now. */
-    assert(!settings.keepGoing || awake.empty());
-    assert(!settings.keepGoing || wantingToBuild.empty());
-    assert(!settings.keepGoing || wantingToSubstitute.empty());
-    assert(!settings.keepGoing || children.empty());
-}
-
-void Worker::waitForInput()
-{
-    printMsg(lvlVomit, "waiting for children");
-
-    /* Process output from the file descriptors attached to the
-       children, namely log output and output path creation commands.
-       We also use this to detect child termination: if we get EOF on
-       the logger pipe of a build, we assume that the builder has
-       terminated. */
-
-    bool useTimeout = false;
-    long timeout = 0;
-    auto before = steady_time_point::clock::now();
-
-    /* If we're monitoring for silence on stdout/stderr, or if there
-       is a build timeout, then wait for input until the first
-       deadline for any child. */
-    auto nearest = steady_time_point::max(); // nearest deadline
-
-    auto localStore = dynamic_cast<LocalStore *>(&store);
-    if (localStore && localStore->config->getLocalSettings().getGCSettings().minFree.get() != 0)
-        // If we have a local store (and thus are capable of automatically collecting garbage) and configured to do so,
-        // periodically wake up to see if we need to run the garbage collector. (See the `autoGC` call site above in
-        // this file, also gated on having a local store. when we wake up, we intended to reach that call site.)
-        nearest = before + std::chrono::seconds(10);
-    for (auto & i : children) {
-        if (!i.respectTimeouts)
-            continue;
-        if (0 != settings.maxSilentTime)
-            nearest = std::min(nearest, i.lastOutput + std::chrono::seconds(settings.maxSilentTime));
-        if (0 != settings.buildTimeout)
-            nearest = std::min(nearest, i.timeStarted + std::chrono::seconds(settings.buildTimeout));
-    }
-    if (nearest != steady_time_point::max()) {
-        timeout = std::max(1L, (long) std::chrono::duration_cast<std::chrono::seconds>(nearest - before).count());
-        useTimeout = true;
-    }
-
-    /* If we are polling goals that are waiting for a lock, then wake
-       up after a few seconds at most. */
-    if (!waitingForAWhile.empty()) {
-        useTimeout = true;
-        if (lastWokenUp == steady_time_point::min() || lastWokenUp > before)
-            lastWokenUp = before;
-        timeout = std::max(
-            1L,
-            (long) std::chrono::duration_cast<std::chrono::seconds>(
-                lastWokenUp + std::chrono::seconds(settings.pollInterval) - before)
-                .count());
-    } else
-        lastWokenUp = steady_time_point::min();
-
-    if (useTimeout)
-        vomit("sleeping %d seconds", timeout);
-
-    MuxablePipePollState state;
-
-#ifndef _WIN32
-    /* Use select() to wait for the input side of any logger pipe to
-       become `available'.  Note that `available' (i.e., non-blocking)
-       includes EOF. */
-    for (auto & i : children) {
-        for (auto & j : i.channels) {
-            state.pollStatus.push_back((struct pollfd) {.fd = j, .events = POLLIN});
-            state.fdToPollStatus[j] = state.pollStatus.size() - 1;
-        }
-    }
-
-    {
-        auto wakeupPipeFd = wakerState->wakeupPipe.pipe.readSide.get();
-        state.pollStatus.push_back(
-            pollfd{
-                .fd = wakeupPipeFd,
-                .events = POLLIN,
-            });
-
-        state.fdToPollStatus[wakeupPipeFd] = state.pollStatus.size() - 1;
-    }
-#endif
-
-    state.poll(
-#ifdef _WIN32
-        ioport.get(),
-#endif
-        useTimeout ? (std::optional{timeout * 1000}) : std::nullopt);
-
-    auto after = steady_time_point::clock::now();
-
-    /* Process all available file descriptors. FIXME: this is
-       O(children * fds). */
-    decltype(children)::iterator i;
-    for (auto j = children.begin(); j != children.end(); j = i) {
-        i = std::next(j);
-
-        checkInterrupt();
-
-        GoalPtr goal = j->goal.lock();
-        assert(goal);
-
-        state.iterate(
-            j->channels,
-            [&](Descriptor k, std::string_view data) {
-                printMsg(lvlVomit, "%1%: read %2% bytes", goal->getName(), data.size());
-                j->lastOutput = after;
-                goal->handleChildOutput(k, data);
-            },
-            [&](Descriptor k) {
-                debug("%1%: got EOF", goal->getName());
-                goal->handleEOF(k);
-            });
-
-        if (goal->exitCode == Goal::ecBusy && 0 != settings.maxSilentTime && j->respectTimeouts
-            && after - j->lastOutput >= std::chrono::seconds(settings.maxSilentTime)) {
-            goal->timedOut(TimedOut(settings.maxSilentTime));
-        }
-
-        else if (
-            goal->exitCode == Goal::ecBusy && 0 != settings.buildTimeout && j->respectTimeouts
-            && after - j->timeStarted >= std::chrono::seconds(settings.buildTimeout)) {
-            goal->timedOut(TimedOut(settings.buildTimeout));
-        }
-    }
-
-#ifndef _WIN32
-    std::set<MuxablePipePollState::CommChannel> wakerChannels{wakerState->wakeupPipe.pipe.readSide.get()};
-    state.iterate(
-        wakerChannels,
-        [&](Descriptor k, std::string_view data) { wakerState->wakeAll(*this); },
-        [](Descriptor fd) { unreachable(); });
-#else
-    /* Slightly less optimal on windows. We don't use a wakeup pipe and signal the ioport directly. */
-    wakerState->wakeAll(*this);
-#endif
-
-    if (!waitingForAWhile.empty() && lastWokenUp + std::chrono::seconds(settings.pollInterval) <= after) {
-        lastWokenUp = after;
-        for (auto & i : waitingForAWhile) {
-            GoalPtr goal = i.lock();
-            if (goal)
-                wakeUp(goal);
-        }
-        waitingForAWhile.clear();
-    }
-}
-
-std::weak_ptr<Worker::Waker> Worker::getCrossThreadWaker()
-{
-    return wakerState.get_ptr();
-}
-
-void Worker::Waker::wakeAll(Worker & worker)
-{
-    /* Wake up all goals that have been enqueued by asynchronous completion callbacks. */
-    auto wakeupQueue(wakeupQueue_.lock());
-#ifndef _WIN32
-    wakeupPipe.drain();
-#endif
-    while (!wakeupQueue->empty()) {
-        auto ptr = wakeupQueue->front().lock();
-        wakeupQueue->pop();
-        if (ptr) {
-            worker.waitingForCompletion.erase(ptr);
-            worker.wakeUp(ptr);
-        }
-    }
-}
-
-void Worker::Waker::enqueue(WeakGoalPtr goal)
-{
-    wakeupQueue_.lock()->push(goal);
-#ifdef _WIN32
-    PostQueuedCompletionStatus(
-        ioport, /*dwNumberOfBytesTransferred=*/0, /*dwCompletionKey=*/0, /*lpOverlapped=*/nullptr);
-#else
-    wakeupPipe.notify();
-#endif
+    checkInterrupt();
+    if (runError)
+        std::rethrow_exception(runError);
 }
 
 bool Worker::pathContentsGood(const StorePath & path)

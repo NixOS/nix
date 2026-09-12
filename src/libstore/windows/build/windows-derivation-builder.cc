@@ -4,7 +4,7 @@
 #include "nix/store/local-store.hh"
 #include "nix/store/globals.hh"
 #include "nix/util/file-system.hh"
-#include "nix/util/muxable-pipe.hh"
+#include "nix/util/windows-async-pipe.hh"
 #include "nix/util/os-string.hh"
 #include "nix/util/processes.hh"
 
@@ -94,22 +94,16 @@ public:
     WindowsDerivationBuilderImpl(
         std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
-        DerivationBuilderParams params,
-        HANDLE ioport)
+        DerivationBuilderParams params)
         : DerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}
-        , ioport{ioport}
     {
     }
 
-    /** The worker's I/O completion port, which the log pipe must be tied to. */
-    HANDLE ioport;
-
     /**
-     * The builder's merged stdout/stderr. A `MuxablePipe` because the worker
-     * waits on I/O completion ports, and `MuxablePipePollState::iterate` reads
-     * the pipe's `overlapped` state directly.
+     * The builder's merged stdout/stderr. An overlapped pipe, so that the
+     * read side can be handed to Boost.Asio; see `builderOut`.
      */
-    MuxablePipe builderPipe;
+    windows::AsyncPipe builderPipe;
 
     /* --- RestrictionContext --- */
 
@@ -331,15 +325,13 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
 
     miscMethods->openLogFile();
 
-    builderPipe.createAsyncPipe(ioport);
+    builderPipe.createAsyncPipe();
 
     spawnBuilder();
 
-    /* The pipe owns the read handle, so the caller gets the pipe itself rather
-       than a duplicate that would be closed twice. */
-    builderOut = &builderPipe;
+    builderOut = std::move(builderPipe.readSide);
 
-    return builderPipe.readSide.get();
+    return builderOut.get();
 }
 
 bool WindowsDerivationBuilderImpl::killChild()
@@ -360,8 +352,9 @@ BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
        builder closed its handles. Reap anyway, so the exit code is settled. */
     int exitCode = pid.wait();
 
+    builderOut.close();
+
     miscMethods->closeLogFile();
-    miscMethods->childTerminated();
 
     return {.status = exitCode};
 }
@@ -371,11 +364,9 @@ BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 DerivationBuilderUnique makeDerivationBuilder(
     std::shared_ptr<BuildingStore> store,
     std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
-    DerivationBuilderParams params,
-    HANDLE ioport)
+    DerivationBuilderParams params)
 {
-    return DerivationBuilderUnique{
-        new WindowsDerivationBuilderImpl{store, std::move(miscMethods), std::move(params), ioport}};
+    return DerivationBuilderUnique{new WindowsDerivationBuilderImpl{store, std::move(miscMethods), std::move(params)}};
 }
 
 void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept

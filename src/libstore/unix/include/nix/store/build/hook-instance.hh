@@ -44,12 +44,6 @@ struct HookInstance
 
     std::map<ActivityId, Activity> activities;
 
-    /**
-     * Callback to run when the hook process is killed in the destructor.
-     * Used to call `Worker::childTerminated`.
-     */
-    std::function<void()> onKillChild;
-
     HookInstance(const Strings & buildHook, std::chrono::milliseconds timeout);
 
     ~HookInstance();

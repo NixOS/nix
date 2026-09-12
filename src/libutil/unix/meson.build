@@ -82,7 +82,6 @@ sources += files(
   'file-path.cc',
   'file-system-at.cc',
   'file-system.cc',
-  'muxable-pipe.cc',
   'processes.cc',
   'signals.cc',
   'users.cc',

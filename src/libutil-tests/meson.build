@@ -26,15 +26,9 @@ subdir('nix-meson-build-support/subprojects')
 subdir('nix-meson-build-support/export-all-symbols')
 subdir('nix-meson-build-support/windows-version')
 
-if host_machine.system() == 'windows'
-  # Boost.ASIO needs this unconditionally.
-  socket = cxx.find_library('ws2_32')
-  deps_other += socket
-endif
-
 subdir('nix-meson-build-support/common')
 
-fuzz_dependencies = deps_private + deps_other
+fuzz_dependencies = deps_private + deps_private_no_pkgconfig
 
 sources = files(
   'alignment.cc',

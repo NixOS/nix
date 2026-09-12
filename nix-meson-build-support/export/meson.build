@@ -70,7 +70,7 @@ meson.override_dependency(
     include_directories : include_dirs,
     link_with : this_library,
     compile_args : [ '-std=c++23' ],
-    dependencies : deps_public_subproject + deps_public,
+    dependencies : deps_public_subproject + deps_public + deps_public_no_pkgconfig,
     variables : extra_pkg_config_variables,
   ),
 )
@@ -82,7 +82,7 @@ if installed_whole_archive_link_arg != ''
       include_directories : include_dirs,
       link_whole : [ this_static_library ],
       compile_args : [ '-std=c++23' ],
-      dependencies : deps_public_subproject + deps_public,
+      dependencies : deps_public_subproject + deps_public + deps_public_no_pkgconfig,
       variables : extra_pkg_config_variables,
     ),
   )
