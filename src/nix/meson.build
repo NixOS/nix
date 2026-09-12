@@ -199,7 +199,7 @@ include_dirs = [ include_directories('.') ]
 this_exe = executable(
   meson.project_name(),
   sources,
-  dependencies : deps_private_subproject + deps_private + deps_other + deps_plugin_c_apis,
+  dependencies : deps_private_subproject + deps_private + deps_private_no_pkgconfig + deps_plugin_c_apis,
   include_directories : include_dirs,
   link_args : linker_export_flags,
   export_dynamic : get_option('plugin-c-api'),

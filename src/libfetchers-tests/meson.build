@@ -59,7 +59,7 @@ include_dirs = [ include_directories('.') ]
 this_exe = executable(
   meson.project_name(),
   sources,
-  dependencies : deps_private_subproject + deps_private + deps_other,
+  dependencies : deps_private_subproject + deps_private + deps_private_no_pkgconfig,
   include_directories : include_dirs,
   # TODO: -lrapidcheck, see ../libutil-support/build.meson
   link_args : linker_export_flags + [ '-lrapidcheck' ],
