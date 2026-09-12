@@ -113,6 +113,30 @@ is_os_freebsd() {
     fi
 }
 
+is_init_systemd() {
+    if [ -e /run/systemd/system ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_init_openrc() {
+    if command -v rc-status > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+is_cp_busybox() {
+    if [ "$(cp --help 2>&1 | awk '{print $1; exit}')" = "BusyBox" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 contact_us() {
     echo "You can open an issue at"
     echo "https://github.com/NixOS/nix/issues/new?labels=installer&template=installer.md"
@@ -503,10 +527,10 @@ EOF
         fi
     done
 
-    if is_os_linux && [ ! -e /run/systemd/system ]; then
+    if is_os_linux && (is_init_systemd || is_init_openrc); then
         warning <<EOF
-We did not detect systemd on your system. With a multi-user install
-without systemd you will have to manually configure your init system to
+We did not detect systemd or openrc on your system. With a multi-user install
+without systemd/openrc, you will have to manually configure your init system to
 launch the Nix daemon after installation.
 EOF
         if ! ui_confirm "Do you want to proceed with a multi-user installation?"; then
@@ -856,7 +880,7 @@ install_from_extracted_nix() {
     (
         cd "$EXTRACTED_NIX_PATH"
 
-        if is_os_darwin || is_os_freebsd; then
+        if is_os_darwin || is_os_freebsd || is_cp_busybox; then
             _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
                   cp -RPp ./store/* "$NIX_ROOT/store/"
         else
@@ -1012,9 +1036,17 @@ main() {
         . "$EXTRACTED_NIX_PATH/install-darwin-multi-user.sh"
         check_required_system_specific_settings "install-darwin-multi-user.sh"
     elif is_os_linux; then
-        # shellcheck source=./install-systemd-multi-user.sh
-        . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
-        check_required_system_specific_settings "install-systemd-multi-user.sh"
+        if is_init_systemd; then
+            # shellcheck source=./install-systemd-multi-user.sh
+            . "$EXTRACTED_NIX_PATH/install-systemd-multi-user.sh" # most of this works on non-systemd distros also
+            check_required_system_specific_settings "install-systemd-multi-user.sh"
+        elif is_init_openrc; then
+            # shellcheck source=./install-openrc-multi-user.sh
+            . "$EXTRACTED_NIX_PATH/install-openrc-multi-user.sh"
+            check_required_system_specific_settings "install-openrc-multi-user.sh"
+        else
+            reminder "I don't support your init system yet; you may want to add nix-daemon manually."
+        fi
     elif is_os_freebsd; then
         # shellcheck source=./install-freebsd-multi-user.sh
         . "$EXTRACTED_NIX_PATH/install-freebsd-multi-user.sh"
