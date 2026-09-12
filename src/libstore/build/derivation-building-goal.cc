@@ -548,10 +548,14 @@ retry:
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
             valid = true;
-            co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks), needsSlot);
-            if (needsSlot)
+            auto outcome = co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks));
+            if (std::holds_alternative<NeedsSlot>(outcome)) {
+                /* Start over from `tryToBuild` so that a build hook gets
+                   another chance before we build locally. */
+                needsSlot = true;
                 co_return Return{};
-            unreachable(); /* Keep in mind that we *still* end coroutines early. */
+            }
+            co_return done(std::move(std::get<Result>(outcome)));
         }
 
         co_return Return{};
@@ -830,13 +834,12 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
 #endif
 }
 
-Goal::Co<void> DerivationBuildingGoal::buildLocally(
+Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
     const StorePathSet & inputPaths,
     std::map<std::string, InitialOutput> & initialOutputs,
     const DerivationOptions<StorePath> & drvOptions,
-    PathLocks outputLocks,
-    bool & needsSlot)
+    PathLocks outputLocks)
 {
     co_await yield();
 
@@ -877,10 +880,7 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
         if (curBuilds >= worker.settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            /* Start over from `tryToBuild` so that a build hook gets
-               another chance before we build locally. */
-            needsSlot = true;
-            co_return Return{};
+            co_return NeedsSlot{};
         }
 
         if (!builder) {
@@ -965,7 +965,7 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
                 desugaredEnv = DesugaredEnv::create(worker.store, *drv, drvOptions, inputPaths);
             } catch (BuildError & e) {
                 outputLocks.unlock();
-                co_return doneFailure(std::move(e));
+                co_return std::move(e);
             }
 
             DerivationBuilderParams params{
@@ -1036,7 +1036,7 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
                 logSize += output->data.size();
                 if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     builder->killChild();
-                    co_return doneFailure(logLimitExceeded());
+                    co_return logLimitExceeded();
                 }
                 (*buildLog)(output->data);
                 if (logFile->sink)
@@ -1047,7 +1047,7 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
             break;
         } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
             builder->killChild();
-            co_return doneFailure(std::move(**timeout));
+            co_return std::move(**timeout);
         }
     }
 
@@ -1060,14 +1060,14 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
         builder->cleanupBuild(false);
         builder.reset();
         outputLocks.unlock();
-        co_return doneFailure(fixupBuilderFailureErrorMessage(
+        co_return fixupBuilderFailureErrorMessage(
             {
                 !derivation::type(*drv).isSandboxed() || diskFull ? BuildResult::Failure::TransientFailure
                                                                   : BuildResult::Failure::PermanentFailure,
                 status,
                 diskFull ? "\nnote: build failure may have been caused by lack of free disk space" : "",
             },
-            *buildLog));
+            *buildLog);
     }
 
     SingleDrvOutputs builtOutputs;
@@ -1082,11 +1082,11 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
     } catch (BuilderFailureError & e) {
         builder.reset();
         outputLocks.unlock();
-        co_return doneFailure(fixupBuilderFailureErrorMessage(std::move(e), *buildLog));
+        co_return fixupBuilderFailureErrorMessage(std::move(e), *buildLog);
     } catch (BuildError & e) {
         builder.reset();
         outputLocks.unlock();
-        co_return doneFailure(std::move(e));
+        co_return std::move(e);
     }
     {
         builder.reset();
@@ -1136,7 +1136,10 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
            (unlinked) lock files. */
         outputLocks.setDeletion(true);
         outputLocks.unlock();
-        co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
+        co_return BuildResult::Success{
+            .status = BuildResult::Success::Built,
+            .builtOutputs = std::move(builtOutputs),
+        };
     }
 }
 

@@ -72,20 +72,23 @@ private:
      */
     using Result = decltype(BuildResult::inner);
 
+    struct NeedsSlot
+    {};
+
+    using LocalBuildOutcome = std::variant<Result, NeedsSlot>;
+
     Co<void> tryToBuild();
     Co<Result> buildWithHook(
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
-    Co<void> buildLocally(
+    Co<LocalBuildOutcome> buildLocally(
         LocalBuildCapability localBuildCap,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs,
         const DerivationOptions<StorePath> & drvOptions,
-        PathLocks outputLocks,
-        /* Set (and the coroutine returns) if a build slot has to be waited for. */
-        bool & needsSlot);
+        PathLocks outputLocks);
 
     /**
      * Is the build hook willing to perform the build?
