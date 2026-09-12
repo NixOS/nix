@@ -29,7 +29,7 @@ void CommonProto::Serialise<std::string>::write(
 
 StorePath CommonProto::Serialise<StorePath>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    return store.parseStorePath(readString(conn.from));
+    return store.parseStorePathCanonical(readString(conn.from, store.maxCanonicalStorePathLen()));
 }
 
 void CommonProto::Serialise<StorePath>::write(
@@ -52,8 +52,8 @@ void CommonProto::Serialise<ContentAddress>::write(
 std::optional<StorePath>
 CommonProto::Serialise<std::optional<StorePath>>::read(const StoreDirConfig & store, CommonProto::ReadConn conn)
 {
-    auto s = readString(conn.from);
-    return s == "" ? std::optional<StorePath>{} : store.parseStorePath(s);
+    auto s = readString(conn.from, store.maxCanonicalStorePathLen());
+    return s == "" ? std::optional<StorePath>{} : store.parseStorePathCanonical(s);
 }
 
 void CommonProto::Serialise<std::optional<StorePath>>::write(
