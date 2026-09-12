@@ -86,6 +86,20 @@ INSTANTIATE_TEST_SUITE_P(
             R"(Derive([("bar","/nix/store/foo/../aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","","")",
             "store path basename 'foo/../aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo' contains illegal base-32 character 'o'",
             "bad_store_path_non_canonical",
+        },
+        /* A hash without the algorithm it was computed with, with and
+           without a path. Said before the alternative is chosen, since
+           the alternatives a lone hash would otherwise go to complain
+           about something else. */
+        MalformedATermTestCase{
+            R"(Derive([("out","","","abc")],)",
+            "hash specified without hash algorithm",
+            "hash_without_hash_algo",
+        },
+        MalformedATermTestCase{
+            R"(Derive([("out","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo","","abc")],)",
+            "hash specified without hash algorithm",
+            "hash_without_hash_algo_with_path",
         }),
     [](const ::testing::TestParamInfo<MalformedATermTestCase> & info) { return info.param.description; });
 
@@ -130,6 +144,31 @@ TEST_F(DerivationTest, BadJSON_inputDrvNotDerivation)
     drvs.erase("c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv");
     drvs["c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2"] = std::move(node);
     ASSERT_THROW(nlohmann::adl_serializer<Derivation>::from_json(j, mockXpSettings), FormatError);
+}
+
+/**
+ * An input derivation from which no outputs are taken cannot be
+ * represented in the flat inputs set, nor written as ATerm, so the JSON
+ * reader rejects it, as the ATerm one does.
+ */
+TEST_F(DerivationTest, BadJSON_inputDrvNoOutputs)
+{
+    auto j = nlohmann::json::parse(readFile(goldenMaster("simple-derivation.json")));
+    j["inputs"]["drvs"]["c015dhfh5l0lp6wxyvdn7bmwhbbr6hr9-dep2.drv"]["outputs"] = nlohmann::json::array();
+    ASSERT_THROW(nlohmann::adl_serializer<Derivation>::from_json(j, mockXpSettings), FormatError);
+}
+
+/**
+ * A basic derivation's inputs are an array of store paths. Anything
+ * else is a `nix::Error`, like every other malformed field, rather than
+ * an exception from the JSON library that would escape the trace added
+ * for the field.
+ */
+TEST_F(DerivationTest, BadJSON_basicInputsNotArray)
+{
+    auto j = nlohmann::json::parse(readFile(goldenMaster("simple-derivation.json")));
+    j["inputs"] = nlohmann::json::object();
+    ASSERT_THROW(nlohmann::adl_serializer<BasicDerivation>::from_json(j, mockXpSettings), Error);
 }
 
 class RoundtripATermTest : public DerivationTest, public ::testing::WithParamInterface<std::string_view>
@@ -198,8 +237,8 @@ TEST_F(RoundtripATermTest, everythingGoes)
  * function of the content address, so a stated path that disagrees is
  * rejected rather than silently kept.
  *
- * This is also the coverage for the check itself, which `parseOutput`
- * compiles out under `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`.
+ * This is also the coverage for the check itself, which
+ * `ATermSerializer<Output::CAFixed>::parse` compiles out under `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`.
  */
 TEST_F(DerivationTest, CAFixedPathMismatch)
 {

@@ -1,17 +1,21 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cctype>
+
 #include "nix/store/derivations.hh"
 #include "nix/store/derivation/aterm.hh"
 #include "nix/store/derivation/masked.hh"
 #include "nix/store/store-dir-config.hh"
 #include "nix/util/tests/characterization.hh"
 #include "nix/util/tests/json-characterization.hh"
+#include "nix/util/util.hh"
 
 namespace nix::derivation::masked {
 
 /**
- * Tests for `fullyMaskDerivation`, `hashDerivation`, and
- * `hashInput`.
+ * Tests for `fullyMaskDerivation`, `inputMaskDerivation`,
+ * `hashDerivation`, and `hashInput`.
  *
  * The point of "masked hash" is that derivations which differ only in
  * the *provenance* of their fixed-output inputs are indistinguishable:
@@ -189,6 +193,18 @@ protected:
         return fullyMaskDerivation(store, readDerivation, drv);
     }
 
+    /**
+     * Only for the input-addressed stems, whose outputs this narrows
+     * from the `Output` variant to the one alternative they all are.
+     */
+    std::optional<Drv<Output::InputAddressed>> inputMasked(Written & written, const Full & drv)
+    {
+        auto readDerivation = readDrv(written);
+        return inputMaskDerivation(store, readDerivation, drv.mapOutputs([](const Output & output) {
+            return std::get<Output::InputAddressed>(output.raw);
+        }));
+    }
+
     MaskedHash inputHash(Written & written, const Full & drv)
     {
         auto readDerivation = readDrv(written);
@@ -250,7 +266,7 @@ INSTANTIATE_TEST_SUITE_P(MaskedHashJSON, MaskedHashJsonTest, ::testing::ValuesIn
 struct MaskedHashATermTest : MaskedHashTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(MaskedHashATermTest, parse)
+TEST_P(MaskedHashATermTest, from_aterm)
 {
     Written written;
     auto expected = named(written, GetParam());
@@ -260,7 +276,7 @@ TEST_P(MaskedHashATermTest, parse)
     });
 }
 
-TEST_P(MaskedHashATermTest, unparse)
+TEST_P(MaskedHashATermTest, to_aterm)
 {
     Written written;
     writeTest(std::string{GetParam()} + ".drv", [&] { return unparse(named(written, GetParam()), store); });
@@ -270,10 +286,9 @@ INSTANTIATE_TEST_SUITE_P(MaskedHashATerm, MaskedHashATermTest, ::testing::Values
 
 /**
  * The fully masked derivation that the input address is computed
- * from. It is not
- * a derivation that can be built or written --- its input derivations
- * are named by hash rather than by store path --- so it is characterized
- * in one direction only.
+ * from. It is not a derivation that can be built or written --- its
+ * input derivations are named by hash rather than by store path --- but
+ * it can be read back, so it is characterized in both directions.
  *
  * The fixed-output `source-*` derivations have no single masked hash,
  * and so no masked form either; they are not included.
@@ -281,13 +296,31 @@ INSTANTIATE_TEST_SUITE_P(MaskedHashATerm, MaskedHashATermTest, ::testing::Values
 struct MaskedHashFullyMaskedTest : MaskedHashTest, ::testing::WithParamInterface<std::string_view>
 {};
 
-TEST_P(MaskedHashFullyMaskedTest, unparse)
+TEST_P(MaskedHashFullyMaskedTest, to_aterm)
 {
     Written written;
-    writeTest(std::string{GetParam()} + "-fully-masked.drv", [&] {
-        auto m = bothMasked(written, named(written, GetParam()));
-        EXPECT_TRUE(m);
-        return m ? unparse(*m, store) : "";
+    auto m = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(m);
+    writeTest(std::string{GetParam()} + "-fully-masked.drv", [&] { return unparse(*m, store); });
+}
+
+/**
+ * Reading a masked derivation back yields what was printed.
+ *
+ * That printing loses nothing matters most about this format: if two
+ * distinct masked derivations could ever print the same bytes, they
+ * would hash the same, and two derivations that mean different things
+ * would share an output path. These fixtures only show it for
+ * themselves, though; that each value has only one accepted spelling
+ * is checked by the malformed-input tests instead.
+ */
+TEST_P(MaskedHashFullyMaskedTest, from_aterm)
+{
+    Written written;
+    auto expected = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readTest(std::string{GetParam()} + "-fully-masked.drv", [&](auto encoded) {
+        EXPECT_EQ((parse<masked::HashInputs, Output::Deferred>(store, std::move(encoded), expected->name)), *expected);
     });
 }
 
@@ -295,6 +328,137 @@ INSTANTIATE_TEST_SUITE_P(
     MaskedHashFullyMasked,
     MaskedHashFullyMaskedTest,
     ::testing::Values("intermediate-first", "intermediate-second", "parent-split", "parent-joined"));
+
+/**
+ * The same value in JSON. Unlike the ATerm encoding, this one is not
+ * what anything is hashed from; it exists so that the masked form can
+ * be inspected in the format the rest of the derivation tooling speaks.
+ */
+struct MaskedHashFullyMaskedJsonTest : MaskedHashTest,
+                                       JsonCharacterizationTest<Drv<Output::Deferred>>,
+                                       ::testing::WithParamInterface<std::string_view>
+{};
+
+TEST_P(MaskedHashFullyMaskedJsonTest, from_json)
+{
+    Written written;
+    auto expected = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readJsonTest(std::string{GetParam()} + "-fully-masked", *expected);
+}
+
+TEST_P(MaskedHashFullyMaskedJsonTest, to_json)
+{
+    Written written;
+    auto m = bothMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(m);
+    writeJsonTest(std::string{GetParam()} + "-fully-masked", *m);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MaskedHashFullyMaskedJSON,
+    MaskedHashFullyMaskedJsonTest,
+    ::testing::Values("intermediate-first", "intermediate-second", "parent-split", "parent-joined"));
+
+/**
+ * The input-masked derivation, which is what `hashInput` hashes for a
+ * regular input-addressed derivation: input derivations masked, but the
+ * derivation's own outputs kept. Only the intermediates are both
+ * input-addressed and have input derivations to mask.
+ */
+struct MaskedHashInputMaskedTest : MaskedHashTest,
+                                   JsonCharacterizationTest<Drv<Output::InputAddressed>>,
+                                   ::testing::WithParamInterface<std::string_view>
+{};
+
+TEST_P(MaskedHashInputMaskedTest, to_aterm)
+{
+    Written written;
+    auto m = inputMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(m);
+    writeTest(std::string{GetParam()} + "-input-masked.drv", [&] { return unparse(*m, store); });
+}
+
+TEST_P(MaskedHashInputMaskedTest, from_aterm)
+{
+    Written written;
+    auto expected = inputMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readTest(std::string{GetParam()} + "-input-masked.drv", [&](auto encoded) {
+        EXPECT_EQ((parse<HashInputs, Output::InputAddressed>(store, std::move(encoded), expected->name)), *expected);
+    });
+}
+
+TEST_P(MaskedHashInputMaskedTest, from_json)
+{
+    Written written;
+    auto expected = inputMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(expected);
+    readJsonTest(std::string{GetParam()} + "-input-masked", *expected);
+}
+
+TEST_P(MaskedHashInputMaskedTest, to_json)
+{
+    Written written;
+    auto m = inputMasked(written, named(written, GetParam()));
+    ASSERT_TRUE(m);
+    writeJsonTest(std::string{GetParam()} + "-input-masked", *m);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    MaskedHashInputMasked, MaskedHashInputMaskedTest, ::testing::Values("intermediate-first", "intermediate-second"));
+
+/**
+ * An input derivation hash has exactly one accepted spelling, the
+ * lower-case base-16 it is printed in. Upper-case base-16 and nix32
+ * spell the same hash, so accepting either would give one masked
+ * derivation a second encoding --- which a round trip cannot catch,
+ * since the printer only ever produces the one.
+ */
+TEST_F(MaskedHashTest, nonCanonicalInputDrvHashRejected)
+{
+    Written written;
+    auto m = bothMasked(written, named(written, "parent-split"));
+    ASSERT_TRUE(m);
+    ASSERT_EQ(m->inputs.drvs.map.size(), 1u);
+    auto & hash = m->inputs.drvs.map.begin()->first;
+    auto canonical = hash.to_string(HashFormat::Base16, false);
+
+    auto upper = canonical;
+    std::transform(upper.begin(), upper.end(), upper.begin(), [](unsigned char c) { return std::toupper(c); });
+
+    auto aterm = unparse(*m, store);
+    nlohmann::json json = *m;
+
+    for (auto & other : {upper, hash.to_string(HashFormat::Nix32, false)}) {
+        SCOPED_TRACE(other);
+
+        EXPECT_THROW(
+            (parse<HashInputs, Output::Deferred>(store, replaceStrings(aterm, canonical, other), m->name)), Error);
+
+        auto bad = json;
+        auto & drvs = bad["inputs"]["drvs"];
+        drvs[other] = drvs[canonical];
+        drvs.erase(canonical);
+        EXPECT_THROW(nlohmann::adl_serializer<Drv<Output::Deferred>>::from_json(bad), Error);
+    }
+}
+
+/**
+ * Likewise for an input derivation from which no outputs are taken,
+ * which the ATerm reader rejects, so the JSON one must too, lest a
+ * masked derivation read from JSON print an ATerm that cannot be read.
+ */
+TEST_F(MaskedHashTest, inputDrvWithoutOutputsRejectedInJson)
+{
+    Written written;
+    auto m = bothMasked(written, named(written, "parent-split"));
+    ASSERT_TRUE(m);
+    nlohmann::json json = *m;
+    auto & drvs = json["inputs"]["drvs"];
+    drvs.begin().value() = nlohmann::json::array();
+    EXPECT_THROW(nlohmann::adl_serializer<Drv<Output::Deferred>>::from_json(json), FormatError);
+}
 
 /**
  * `intermediate-first` and `intermediate-second` are distinct

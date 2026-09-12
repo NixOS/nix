@@ -482,6 +482,10 @@ constexpr unsigned expectedJsonVersionDerivation = 4;
 } // namespace nix
 
 namespace nlohmann {
-template<typename Inputs>
-JSON_IMPL_WITH_XP_FEATURES_INNER(nix::derivation::Derivation<Inputs>);
+
+#define ARG nix::derivation::Derivation<Inputs, Out>
+template<typename Inputs, typename Out>
+JSON_IMPL_WITH_XP_FEATURES_INNER(ARG);
+#undef ARG
+
 } // namespace nlohmann

@@ -1,0 +1,20 @@
+{
+  "args": [],
+  "builder": "/bin/parent",
+  "env": {},
+  "inputs": {
+    "drvs": {
+      "6df335a6cafec6b08aa38163a4a3d1b8f04bc8dc10de4ad35d677f911f2d3b5a": [
+        "dev",
+        "out"
+      ]
+    },
+    "srcs": []
+  },
+  "name": "parent",
+  "outputs": {
+    "out": {}
+  },
+  "system": "x86_64-linux",
+  "version": 4
+}

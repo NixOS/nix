@@ -214,6 +214,18 @@ fullyMaskDerivation(Store & store, const Derivation<std::set<SingleDerivedPath>,
 Drv<Output::Deferred> fullyMaskDerivation(const StoreDirConfig & store, const Basic & drv);
 
 /**
+ * Compute the input-masked derivation: each input derivation replaced
+ * by its own masked hash, as in `fullyMaskDerivation`, but the
+ * derivation's own outputs left as they are. This is the preimage
+ * `hashInput` hashes for a regular input-addressed derivation.
+ *
+ * Returns `std::nullopt` under the same condition as
+ * `fullyMaskDerivation`.
+ */
+std::optional<Drv<Output::InputAddressed>>
+inputMaskDerivation(const StoreDirConfig & store, ReadDerivation & readDerivation, const FullInputAddressed & drv);
+
+/**
  * Hash a masked derivation. For the fully masked form this is what
  * an input address *is*.
  *
@@ -231,3 +243,5 @@ extern template Hash hashDerivation(const StoreDirConfig & store, const Drv<Outp
 } // namespace derivation::masked
 
 } // namespace nix
+
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::masked::HashInputs)

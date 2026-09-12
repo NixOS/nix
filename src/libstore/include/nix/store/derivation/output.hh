@@ -149,3 +149,12 @@ using DerivationOutput = derivation::Output;
 } // namespace nix
 
 JSON_IMPL_WITH_XP_FEATURES(nix::DerivationOutput)
+
+/* One per alternative as well, as on the ATerm side: the variant
+   dispatches into these, and the masked forms, whose type says that
+   every output is a particular alternative, use them directly. */
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::Output::InputAddressed)
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::Output::CAFixed)
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::Output::CAFloating)
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::Output::Deferred)
+JSON_IMPL_WITH_XP_FEATURES(nix::derivation::Output::Impure)
