@@ -12,11 +12,13 @@
 #  include "nix/store/build/hook-instance.hh"
 #endif
 #include "nix/util/signals.hh"
+#include "nix/util/finally.hh"
 #include "nix/store/globals.hh"
 
 #include <boost/asio/bind_cancellation_slot.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/steady_timer.hpp>
+#include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/signal_set.hpp>
 
 namespace nix {
@@ -37,16 +39,17 @@ static bool isCancellationException(std::exception_ptr ex)
     }
 }
 
-Worker::Worker(Store & store, Store & evalStore)
-    /* Can't use make_ref, because the constructor is private. */
+Worker::Worker(ref<Store> store, ref<Store> evalStore)
     : settings(nix::settings.getWorkerSettings())
     , buildSemaphore(ex, settings.maxBuildJobs)
     , substitutionSemaphore(ex, std::max<std::size_t>(settings.maxSubstitutionJobs, 1))
     , act(*logger, actRealise)
     , actDerivations(*logger, actBuilds)
     , actSubstitutions(*logger, actCopyPaths)
-    , store(store)
-    , evalStore(evalStore)
+    , storeRef(std::move(store))
+    , evalStoreRef(std::move(evalStore))
+    , store(*storeRef)
+    , evalStore(*evalStoreRef)
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
@@ -55,12 +58,14 @@ Worker::Worker(Store & store, Store & evalStore)
 
 Worker::~Worker()
 {
-    /* Explicitly get rid of all strong pointers now.  After this all
-       goals that refer to this worker should be gone.  (Otherwise we
-       are in trouble, since goals may call childTerminated() etc. in
-       their destructors). */
-    topGoals.clear();
+    /* Let the I/O threads drain whatever is left (e.g. goals still
+       unwinding after a cancellation) and finish, so that nothing runs
+       while the members below are destroyed. */
+    workGuard.reset();
+    for (auto & thread : ioThreads)
+        thread.join();
 
+    assert(topGoals.empty());
     assert(expectedSubstitutions == 0);
     assert(expectedDownloadSize == 0);
     assert(expectedNarSize == 0);
@@ -176,66 +181,105 @@ void Worker::removeGoal(GoalPtr goal)
         unreachable();
     }
 
-    if (topGoals.find(goal) != topGoals.end()) {
-        topGoals.erase(goal);
-        /* If a top-level goal failed, then kill all other goals
-           (unless keepGoing was set). */
-        if (goal->exitCode == Goal::ecFailed && !settings.keepGoing)
-            topGoals.clear();
+    topGoals.erase(goal);
+}
+
+void Worker::ensureRunning()
+{
+    std::lock_guard lock(startMutex);
+    if (!ioThreads.empty())
+        return;
+    workGuard.emplace(asio::make_work_guard(ioContext));
+    for (std::size_t i = 0; i < nrIoThreads; ++i)
+        ioThreads.emplace_back([this] { ioContext.run(); });
+}
+
+asio::awaitable<void> Worker::autoGCLoop()
+{
+    // TODO GC interface?
+    auto localStore = dynamic_cast<LocalStore *>(&store);
+    if (!localStore)
+        co_return;
+    asio::steady_timer timer(co_await asio::this_coro::executor);
+    while (true) {
+        localStore->autoGC(false);
+        timer.expires_after(std::chrono::seconds(10));
+        co_await timer.async_wait(asio::use_awaitable);
     }
 }
 
-asio::awaitable<void> Worker::awaitTopGoals()
+asio::awaitable<void> Worker::awaitTopGoals(Goals goals)
 {
-    co_await Goal::join(topGoals, settings.keepGoing);
-}
-
-void Worker::run(const Goals & _topGoals)
-{
-    /* The same worker may be run more than once (see `repairPath`), and
-       a stopped `io_context` must be restarted before it does work again. */
-    ioContext.restart();
-
-    for (auto & goal : _topGoals)
+    for (auto & goal : goals)
         topGoals.insert(goal);
 
-    std::exception_ptr runError;
-    asio::cancellation_signal interrupted;
+    /* Goals that finished have already been removed by `removeGoal`;
+       this takes care of the ones that were cancelled instead. */
+    Finally cleanup([&] {
+        for (auto & goal : goals)
+            topGoals.erase(goal);
+    });
 
-    auto callback = createInterruptCallback(
-        [&]() { asio::post(ex, [&interrupted] { interrupted.emit(asio::cancellation_type::terminal); }); });
+    co_await Goal::join(goals, settings.keepGoing);
+}
 
-    /* Periodically give the local store a chance to collect garbage while
-       builds are running (see `min-free`). Stops once the top-level goals
-       are done. */
-    asio::cancellation_signal stopBackground;
+void Worker::lendBuildSlot()
+{
+    asio::post(ex, [this] { buildSemaphore.lend(); });
+}
+
+void Worker::reclaimBuildSlot()
+{
+    asio::post(ex, [this] { buildSemaphore.reclaim(); });
+}
+
+void Worker::run(fun<asio::awaitable<void>()> body)
+{
+    if (ex.running_in_this_thread())
+        throw Error("Worker::run() called from within a goal, which would deadlock");
+
+    ensureRunning();
+
+    std::promise<void> done;
+    auto future = done.get_future();
+
+    /* Shared with the interrupt callback, which may still have a post in
+       flight when this function returns. */
+    auto interrupted = std::make_shared<asio::cancellation_signal>();
+    auto callback = createInterruptCallback([this, interrupted]() {
+        asio::post(ex, [interrupted] { interrupted->emit(asio::cancellation_type::terminal); });
+    });
+
     asio::co_spawn(
         ex,
-        [this]() -> asio::awaitable<void> {
-            // TODO GC interface?
-            auto localStore = dynamic_cast<LocalStore *>(&store);
-            if (!localStore)
-                co_return;
-            asio::steady_timer timer(co_await asio::this_coro::executor);
-            while (true) {
-                localStore->autoGC(false);
-                timer.expires_after(std::chrono::seconds(10));
-                co_await timer.async_wait(asio::use_awaitable);
+        [this, body = std::move(body)]() -> asio::awaitable<void> {
+            /* Periodically give the local store a chance to collect garbage
+               while anything is running (see `min-free`). The signal is kept
+               alive by the loop's completion handler. */
+            if (activeRuns++ == 0) {
+                stopAutoGC = std::make_shared<asio::cancellation_signal>();
+                asio::co_spawn(
+                    ex,
+                    autoGCLoop(),
+                    asio::bind_cancellation_slot(stopAutoGC->slot(), [keepAlive = stopAutoGC](std::exception_ptr) {}));
             }
+            Finally cleanup([this] {
+                if (--activeRuns == 0)
+                    std::exchange(stopAutoGC, nullptr)->emit(asio::cancellation_type::terminal);
+            });
+
+            co_await body();
         },
-        asio::bind_cancellation_slot(stopBackground.slot(), asio::detached));
+        asio::bind_cancellation_slot(interrupted->slot(), [&done](std::exception_ptr e) {
+            if (e && !isCancellationException(e))
+                done.set_exception(e);
+            else
+                done.set_value();
+        }));
 
-    asio::co_spawn(ex, awaitTopGoals(), asio::bind_cancellation_slot(interrupted.slot(), [&](std::exception_ptr e) {
-                       if (e && !isCancellationException(e))
-                           runError = e;
-                       stopBackground.emit(asio::cancellation_type::terminal);
-                   }));
-
-    ioContext.run();
+    future.get();
 
     checkInterrupt();
-    if (runError)
-        std::rethrow_exception(runError);
 }
 
 bool Worker::pathContentsGood(const StorePath & path)

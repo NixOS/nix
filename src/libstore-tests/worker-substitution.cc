@@ -14,6 +14,20 @@
 
 namespace nix {
 
+/**
+ * Create a goal on the worker's strand, run it to completion as a
+ * top-level goal, and hand it back for inspection.
+ */
+static GoalPtr runGoal(Worker & worker, fun<GoalPtr()> makeGoal)
+{
+    GoalPtr goal;
+    worker.run([&]() -> asio::awaitable<void> {
+        goal = makeGoal();
+        co_await worker.awaitTopGoals(Goals{goal});
+    });
+    return goal;
+}
+
 class WorkerSubstitutionTest : public LibStoreTest, public JsonCharacterizationTest<ref<DummyStore>>
 {
     std::filesystem::path unitTestData = getUnitTestData() / "worker-substitution";
@@ -78,20 +92,15 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     ASSERT_FALSE(dummyStore->isValidPath(pathInSubstituter));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{dummyStore, dummyStore};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituerAsStore = substituter;
     worker.getSubstituters = [substituerAsStore]() -> std::list<ref<Store>> { return {substituerAsStore}; };
 
-    // Create a substitution goal for the path
-    auto goal = worker.makePathSubstitutionGoal(pathInSubstituter);
-
-    // Run the worker with -j0 semantics (no local builds, only substitution)
-    // The worker.run() takes a set of goals
-    Goals goals;
-    goals.insert(upcast_goal(goal));
-    worker.run(goals);
+    // Create a substitution goal for the path and run the worker with -j0
+    // semantics (no local builds, only substitution)
+    auto goal = runGoal(worker, [&] { return upcast_goal(worker.makePathSubstitutionGoal(pathInSubstituter)); });
 
     // Snapshot the destination store after (should match the substituter)
     checkpointJson("single/substituter", dummyStore);
@@ -100,7 +109,7 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     ASSERT_TRUE(dummyStore->isValidPath(pathInSubstituter));
 
     // Verify the goal succeeded
-    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
 }
 
 TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
@@ -150,7 +159,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
     ASSERT_FALSE(dummyStore->isValidPath(mainPath));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{dummyStore, dummyStore};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;
@@ -158,12 +167,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
 
     // Create a substitution goal for the main path only
     // The worker should automatically substitute the dependency as well
-    auto goal = worker.makePathSubstitutionGoal(mainPath);
-
-    // Run the worker
-    Goals goals;
-    goals.insert(upcast_goal(goal));
-    worker.run(goals);
+    auto goal = runGoal(worker, [&] { return upcast_goal(worker.makePathSubstitutionGoal(mainPath)); });
 
     // Snapshot the destination store after (should match the substituter)
     checkpointJson("with-dep/substituter", dummyStore);
@@ -173,7 +177,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
     ASSERT_TRUE(dummyStore->isValidPath(mainPath));
 
     // Verify the goal succeeded
-    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
 }
 
 TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
@@ -236,7 +240,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     ASSERT_FALSE(dummyStore->queryRealisation(drvOutput));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{dummyStore, dummyStore};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;
@@ -244,12 +248,9 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
 
     // Create a derivation goal for the CA derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(drvPath, make_ref<Derivation>(drv), "out", bmNormal, true);
-
-    // Run the worker
-    Goals goals;
-    goals.insert(upcast_goal(goal));
-    worker.run(goals);
+    auto goal = runGoal(worker, [&] {
+        return upcast_goal(worker.makeDerivationGoal(drvPath, make_ref<Derivation>(drv), "out", bmNormal, true));
+    });
 
     // Snapshot the destination store after
     checkpointJson("ca-drv/store-after", dummyStore);
@@ -263,7 +264,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     ASSERT_EQ(realisation->outPath, outputPath);
 
     // Verify the goal succeeded
-    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
 }
 
 /**
@@ -405,7 +406,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_FALSE(dummyStore->queryRealisation(resolvedRootDrvOutput));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{dummyStore, dummyStore};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;
@@ -413,12 +414,10 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
 
     // Create a derivation goal for the root derivation output
     // The worker should substitute the output rather than building
-    auto goal = worker.makeDerivationGoal(rootDrvPath, make_ref<Derivation>(rootDrv), "out", bmNormal, false);
-
-    // Run the worker
-    Goals goals;
-    goals.insert(upcast_goal(goal));
-    worker.run(goals);
+    auto goal = runGoal(worker, [&] {
+        return upcast_goal(
+            worker.makeDerivationGoal(rootDrvPath, make_ref<Derivation>(rootDrv), "out", bmNormal, false));
+    });
 
     // Snapshot the destination store after
     checkpointJson("issue-11928/store-after", dummyStore);
@@ -441,7 +440,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_TRUE(dummyStore->isValidPath(depOutputPath));
 
     // Verify the goal succeeded
-    ASSERT_EQ(upcast_goal(goal)->exitCode, Goal::ecSuccess);
+    ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
 }
 
 } // namespace nix

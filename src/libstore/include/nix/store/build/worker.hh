@@ -12,31 +12,61 @@
 
 #include <boost/asio/strand.hpp>
 #include <boost/asio/thread_pool.hpp>
-#include <boost/asio/experimental/channel.hpp>
+#include <boost/asio/executor_work_guard.hpp>
+#include <boost/asio/error.hpp>
 
+#include <deque>
 #include <functional>
 #include <future>
+#include <mutex>
 #include <thread>
 #include <queue>
 
 namespace nix {
 
+/**
+ * A counting semaphore for coroutines. Not thread-safe by itself: all
+ * operations must run on the executor it was created with, which is the
+ * worker's strand.
+ */
 class AsyncSemaphore
 {
-    asio::experimental::channel<asio::any_io_executor, void(boost::system::error_code, int)> channel;
+    asio::any_io_executor ex;
+
+    /**
+     * Number of slots that can be acquired right now.
+     */
+    std::size_t available;
+
+    /**
+     * Acquirers waiting for a slot, in FIFO order. A waiter that has been
+     * cancelled is a null function and is skipped.
+     */
+    std::deque<std::move_only_function<void()>> waiters;
 
     void release()
     {
-        channel.try_send(boost::system::error_code{}, 42);
+        while (!waiters.empty()) {
+            auto waiter = std::move(waiters.front());
+            waiters.pop_front();
+            if (waiter) {
+                asio::post(ex, std::move(waiter));
+                return;
+            }
+        }
+        ++available;
     }
 
 public:
     AsyncSemaphore(asio::any_io_executor ex, std::size_t initialCount)
-        : channel(ex, initialCount)
+        : ex(std::move(ex))
+        , available(initialCount)
     {
-        channel.try_send_n(initialCount, boost::system::error_code{}, 42);
     }
 
+    /**
+     * An acquired slot; releases it when destroyed.
+     */
     struct Handle
     {
         friend class AsyncSemaphore;
@@ -58,41 +88,31 @@ public:
         {
             if (this == &other)
                 return *this;
-            if (sem) {
+            if (sem)
                 sem->release();
-                sem = nullptr;
-            }
             sem = std::exchange(other.sem, nullptr);
             return *this;
         }
 
-        Handle(const Handle &);
-
+        Handle(const Handle &) = delete;
         Handle & operator=(const Handle &) = delete;
 
         ~Handle()
         {
-            if (sem) {
+            if (sem)
                 sem->release();
-                sem = nullptr;
-            }
         }
     };
-
-    asio::awaitable<Handle> asyncAcquire()
-    {
-        co_await channel.async_receive(asio::use_awaitable);
-        co_return Handle(*this);
-    }
 
     /**
      * Acquire a slot if one is free right now.
      */
     std::optional<Handle> tryAcquire()
     {
-        if (channel.try_receive([](boost::system::error_code, int) {}))
-            return Handle(*this);
-        return std::nullopt;
+        if (available == 0)
+            return std::nullopt;
+        --available;
+        return Handle(*this);
     }
 
     /**
@@ -100,7 +120,62 @@ public:
      */
     bool canAcquireNow() const noexcept
     {
-        return channel.ready();
+        return available > 0;
+    }
+
+    /**
+     * Wait for a slot to become free and acquire it.
+     */
+    asio::awaitable<Handle> asyncAcquire()
+    {
+        if (auto handle = tryAcquire())
+            co_return std::move(*handle);
+
+        co_await asio::async_initiate<decltype(asio::use_awaitable), void(boost::system::error_code)>(
+            [&](auto handler) {
+                using Handler = std::decay_t<decltype(handler)>;
+                auto state = std::make_shared<std::optional<Handler>>(std::move(handler));
+                auto slot = asio::get_associated_cancellation_slot(**state);
+
+                waiters.push_back([state] {
+                    if (auto h = std::exchange(*state, std::nullopt))
+                        (*std::move(h))(boost::system::error_code{});
+                });
+
+                if (slot.is_connected())
+                    slot.assign([state, ex = ex](asio::cancellation_type) {
+                        if (auto h = std::exchange(*state, std::nullopt))
+                            asio::post(ex, [h = std::move(*h)]() mutable {
+                                std::move(h)(boost::system::error_code(asio::error::operation_aborted));
+                            });
+                    });
+            },
+            asio::use_awaitable);
+
+        co_return Handle(*this);
+    }
+
+    /**
+     * Add a slot, for the duration until @ref reclaim is called. Used to
+     * let a build that is itself waiting on nested builds hand its slot
+     * down to them.
+     */
+    void lend()
+    {
+        release();
+    }
+
+    /**
+     * Take back a slot added by @ref lend, waiting for one to be released
+     * if none is free right now.
+     */
+    void reclaim()
+    {
+        if (available > 0) {
+            --available;
+            return;
+        }
+        waiters.push_back([] {});
     }
 };
 
@@ -135,41 +210,17 @@ struct HookInstance;
 #endif
 
 /**
- * Owns a worker. Optimization around ensurePath to prevent a Worker from
- * being constructed when it's not needed.
- */
-class LocalBuilder : public Builder
-{
-public:
-    LocalBuilder(ref<Store> store, ref<Store> evalStore)
-        : store(store)
-        , evalStore(evalStore) {};
-
-    /* Builder interface — see `Builder` for documentation. */
-
-    void buildPaths(const std::vector<DerivedPath> & reqs, BuildMode buildMode) override;
-    std::vector<KeyedBuildResult>
-    buildPathsWithResults(const std::vector<DerivedPath> & reqs, BuildMode buildMode) override;
-    BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
-    void ensurePath(const StorePath & path) override;
-    void repairPath(const StorePath & path) override;
-
-private:
-    /**
-     * Intentionally construct a new worker for each operation, to avoid
-     * reusing a worker between calls, allowing for thread safety.
-     */
-    inline std::shared_ptr<Worker> getWorker()
-    {
-        return std::make_shared<Worker>(*store, *evalStore);
-    }
-
-    ref<Store> store;
-    ref<Store> evalStore;
-};
-
-/**
- * Coordinates one or more realisations and their interdependencies.
+ * Coordinates one or more realisations and their interdependencies:
+ * the local build scheduler, and the `Builder` for local stores.
+ *
+ * Thread safety: the `Builder` methods may be called concurrently from
+ * any thread. All goal state lives on a single strand, `ex`, of an
+ * `io_context` that the worker runs on its own fixed pool of threads,
+ * so goals are serialised with respect to each other while I/O,
+ * timers and completions are serviced in parallel. Only the strand ever
+ * touches goals, the goal maps, or the counters below.
+ *
+ * @todo Rename to `LocalBuilder`.
  */
 class Worker : public Builder
 {
@@ -182,14 +233,55 @@ private:
     /* Note: the worker should only have strong pointers to the
        top-level goals. */
 
-    /* TODO: Once we are more done with asyncification, this should be
-       be gone and the executer should be a strand on a shared event loop. */
     asio::io_context ioContext;
 
     /**
-     * Executer on which all the coroutines are run.
+     * Executor on which all the coroutines are run.
      */
     asio::strand<asio::any_io_executor> ex = asio::make_strand(ioContext.get_executor());
+
+    /**
+     * How many threads run `ioContext`.
+     */
+    static constexpr std::size_t nrIoThreads = 4;
+
+    /**
+     * The threads running `ioContext`, started lazily by @ref ensureRunning
+     * so that a worker that never has anything to do costs nothing.
+     */
+    std::vector<std::thread> ioThreads;
+
+    /**
+     * Keeps `ioContext` alive between runs. Reset by the destructor to let
+     * the threads finish.
+     */
+    std::optional<asio::executor_work_guard<asio::io_context::executor_type>> workGuard;
+
+    /**
+     * Guards the lazy start of @ref ioThreads.
+     */
+    std::mutex startMutex;
+
+    /**
+     * Number of @ref run calls currently in progress. Strand-only.
+     */
+    std::size_t activeRuns = 0;
+
+    /**
+     * Stops the background auto-GC loop, which runs while @ref activeRuns
+     * is non-zero. Strand-only.
+     */
+    std::shared_ptr<asio::cancellation_signal> stopAutoGC;
+
+    /**
+     * Start the I/O threads if they are not running yet.
+     */
+    void ensureRunning();
+
+    /**
+     * The periodic auto-GC loop; see @ref run.
+     */
+    asio::awaitable<void> autoGCLoop();
 
     /**
      * Thread pool to run blocking work on.
@@ -197,7 +289,7 @@ private:
     asio::thread_pool threadPool;
 
     /**
-     * The top-level goals of the worker.
+     * The top-level goals of all @ref run calls in progress. Strand-only.
      */
     Goals topGoals;
 
@@ -245,6 +337,13 @@ public:
      */
     ExitStatusFlags exitStatusFlags;
 
+private:
+    ref<Store> storeRef, evalStoreRef;
+
+public:
+    /**
+     * Aliases of @ref storeRef and @ref evalStoreRef.
+     */
     Store & store;
     Store & evalStore;
 
@@ -280,7 +379,7 @@ public:
      */
     bool tryBuildHook = true;
 
-    Worker(Store & store, Store & evalStore);
+    Worker(ref<Store> store, ref<Store> evalStore);
     ~Worker();
 
     /**
@@ -340,12 +439,33 @@ public:
      */
     void removeGoal(GoalPtr goal);
 
-    asio::awaitable<void> awaitTopGoals();
+    /**
+     * Run `body` on the worker's strand and block until it has finished,
+     * rethrowing any exception it threw. This is the only way in: goals
+     * must be created, awaited (see @ref awaitTopGoals) and inspected
+     * inside `body`, since all of that touches strand-only state.
+     *
+     * Interrupting the calling thread cancels this call's goals only.
+     *
+     * Must not be called from the strand itself, i.e. from inside a
+     * goal, since that would block the very thread that has to run it.
+     */
+    void run(fun<asio::awaitable<void>()> body);
 
     /**
-     * Loop until the specified top-level goals have finished.
+     * Await a set of top-level goals, cancelling the rest on the first
+     * failure unless `keep-going` is set. To be called from within
+     * @ref run.
      */
-    void run(const Goals & topGoals);
+    asio::awaitable<void> awaitTopGoals(Goals goals);
+
+    /**
+     * Lend the build slot of a running build to the builds it requests
+     * recursively (see `DerivationBuilderCallbacks::processDaemonConnection`),
+     * and take it back. Thread-safe.
+     */
+    void lendBuildSlot();
+    void reclaimBuildSlot();
 
     /**
      * Check whether the given valid path exists and has the right

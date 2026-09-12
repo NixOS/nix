@@ -7,6 +7,7 @@
 #  include "nix/store/build/derivation-builder.hh"
 #endif
 #include "nix/util/fun.hh"
+#include "nix/util/finally.hh"
 #include "nix/util/processes.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/config-global.hh"
@@ -1141,15 +1142,15 @@ asio::awaitable<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoa
                     RestrictionContext & context,
                     daemon::RecursiveFlag recursiveFlag) override
                 {
-                    /**
-                     * TODO: We create a fresh Worker here because the
-                     * parent Worker is blocked waiting for the current
-                     * build to finish, so we can't reuse it from a
-                     * daemon thread. Ideally we should reuse the same
-                     * Worker to share scheduling state.
-                     */
-                    Worker freshWorker{goal.worker.store, goal.worker.evalStore};
-                    auto builder = makeRestrictedBuilder(freshWorker, context);
+                    /* The daemon thread is just another caller of the
+                       (thread-safe) worker, whose goal for this build is
+                       suspended waiting on the builder, so the recursive
+                       builds share its scheduling state. This build holds
+                       a build slot while it waits, so lend it to them, or
+                       with `max-jobs = 1` they could never start. */
+                    goal.worker.lendBuildSlot();
+                    Finally reclaim([this] { goal.worker.reclaimBuildSlot(); });
+                    auto builder = makeRestrictedBuilder(goal.worker, context);
                     daemon::processConnection(
                         store, std::move(from), std::move(to), NotTrusted, recursiveFlag, builder.get_ptr());
                 }
