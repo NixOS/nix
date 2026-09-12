@@ -192,6 +192,15 @@ TEST_F(StorePathTest, mustBeDashAfterHashPart)
     EXPECT_NO_THROW(StorePath(hashPart + "-" + "name"));
 }
 
+TEST_F(StorePathTest, maximumLength)
+{
+    EXPECT_NO_THROW({
+        auto path = StorePath(StorePath::dummy.hashPart() + "-" + std::string(211, 'x'));
+        ASSERT_EQ(path.to_string().size(), StorePath::MaxBasenameLen);
+    });
+    EXPECT_THROW(StorePath(StorePath::dummy.hashPart() + "-" + std::string(212, 'x')), BadStorePath);
+}
+
 /* ----------------------------------------------------------------------------
  * JSON
  * --------------------------------------------------------------------------*/
