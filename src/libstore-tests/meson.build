@@ -30,7 +30,7 @@ subdir('nix-meson-build-support/windows-version')
 
 subdir('nix-meson-build-support/common')
 
-fuzz_dependencies = deps_private + deps_other
+fuzz_dependencies = deps_private + deps_private_no_pkgconfig
 
 sources = files(
   'build-result.cc',

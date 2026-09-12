@@ -4,5 +4,5 @@
 # We did not manage to test this reliably on all platforms, so we hardcode
 # it for now.
 if host_machine.cpu_family() in [ 'arm', 'ppc' ]
-  deps_other += cxx.find_library('atomic')
+  deps_private_no_pkgconfig += cxx.find_library('atomic')
 endif
