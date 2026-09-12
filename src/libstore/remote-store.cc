@@ -133,9 +133,10 @@ void RemoteStore::initConnection(Connection & conn)
 
 void RemoteStore::setOptions(Connection & conn)
 {
-    conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
-            << settings.getWorkerSettings().tryFallback << std::to_underlying(verbosity)
-            << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
+    conn.to << WorkerProto::Op::SetOptions << settings.getWorkerSettings().keepFailed
+            << settings.getWorkerSettings().keepGoing << settings.getWorkerSettings().tryFallback
+            << std::to_underlying(verbosity) << settings.getWorkerSettings().maxBuildJobs
+            << settings.getWorkerSettings().maxSilentTime << true
             << std::to_underlying(settings.verboseBuild ? lvlError : lvlVomit) << 0 // obsolete log type
             << 0                                                                    /* obsolete print build trace */
             << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
@@ -143,7 +144,7 @@ void RemoteStore::setOptions(Connection & conn)
     std::map<std::string, nix::Config::SettingInfo> overrides;
     settings.getSettings(overrides, true); // libstore settings
     fileTransferSettings.getSettings(overrides, true);
-    overrides.erase(settings.keepFailed.name);
+    overrides.erase(settings.getWorkerSettings().keepFailed.name);
     overrides.erase(settings.getWorkerSettings().keepGoing.name);
     overrides.erase(settings.getWorkerSettings().tryFallback.name);
     overrides.erase(settings.getWorkerSettings().maxBuildJobs.name);
@@ -739,6 +740,21 @@ void RemoteBuilder::ensurePath(const StorePath & path)
 void RemoteBuilder::repairPath(const StorePath & path)
 {
     throw Unsupported("operation 'repairPath' is not supported by store '%s'", store->config.getHumanReadableURI());
+}
+
+BuildResult RemoteStore::buildDerivationWithLog(
+    const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode, fun<void(std::string_view)> logLine)
+{
+    auto conn(getConnection());
+    conn->resultHook = [&](ActivityId, ResultType type, std::span<const Logger::Field> fields) {
+        if (type == resBuildLogLine && !fields.empty())
+            if (auto * s = std::get_if<std::string>(&fields[0]))
+                logLine(*s);
+    };
+    Finally resetHook([&] { conn->resultHook = nullptr; });
+    conn->putBuildDerivationRequest(*this, &conn.daemonException, drvPath, drv, buildMode);
+    conn.processStderr();
+    return WorkerProto::Serialise<BuildResult>::read(*this, *conn);
 }
 
 ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)

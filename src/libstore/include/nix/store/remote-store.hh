@@ -128,6 +128,18 @@ public:
 
     ref<Builder> getBuilder(std::shared_ptr<Store> evalStore) override;
 
+    /**
+     * Like `getBuilder()->buildDerivation()`, but also passes the lines
+     * of the build log that the daemon relays to `logLine`, so that the
+     * caller can keep its own log of a build done on the remote side, as
+     * the local build scheduler does for its remote builders.
+     */
+    BuildResult buildDerivationWithLog(
+        const StorePath & drvPath,
+        const BasicDerivation & drv,
+        BuildMode buildMode,
+        fun<void(std::string_view)> logLine);
+
     void addTempRoot(const StorePath & path) override;
 
     Roots findRoots(bool censor) override;

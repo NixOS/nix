@@ -8,12 +8,10 @@
 #include "nix/store/build/derivation-resolution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
-#ifndef _WIN32 // TODO Enable building on Windows
-#  include "nix/store/build/hook-instance.hh"
-#endif
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/local-fs-store.hh"
 
 #include <boost/asio/bind_cancellation_slot.hpp>
 #include <boost/asio/detached.hpp>
@@ -39,6 +37,15 @@ static bool isCancellationException(std::exception_ptr ex)
     }
 }
 
+/* It would be more appropriate to use $XDG_RUNTIME_DIR, since that gets
+   cleared on reboot, but it wouldn't work on macOS. */
+static std::filesystem::path currentLoadDir(Store & store)
+{
+    if (auto * localStore = dynamic_cast<LocalFSStore *>(&store))
+        return localStore->config.stateDir.get() / "current-load";
+    return std::filesystem::path{nix::settings.nixStateDir} / "current-load";
+}
+
 Worker::Worker(ref<Store> store, ref<Store> evalStore)
     : settings(nix::settings.getWorkerSettings())
     , buildSemaphore(ex, settings.maxBuildJobs)
@@ -53,6 +60,10 @@ Worker::Worker(ref<Store> store, ref<Store> evalStore)
     , getSubstituters{[] {
         return nix::settings.getWorkerSettings().useSubstitutes ? getDefaultSubstituters() : std::list<ref<Store>>{};
     }}
+    , getRemoteBuilders{[] {
+        return Machine::parseConfig({nix::settings.thisSystem}, nix::settings.getWorkerSettings().builders);
+    }}
+    , currentLoad(currentLoadDir(*storeRef))
 {
 }
 
@@ -319,6 +330,19 @@ GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal)
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal)
 {
     return subGoal;
+}
+
+} // namespace nix
+
+namespace nix {
+
+Machines & Worker::machines()
+{
+    if (!remoteBuilders) {
+        remoteBuilders = getRemoteBuilders();
+        debug("got %d remote builders", remoteBuilders->size());
+    }
+    return *remoteBuilders;
 }
 
 } // namespace nix

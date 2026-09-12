@@ -2,6 +2,9 @@
 ///@file
 
 #include "nix/store/worker-protocol.hh"
+#include "nix/util/logging.hh"
+
+#include <functional>
 #include "nix/store/store-api.hh"
 
 namespace nix {
@@ -58,6 +61,13 @@ struct WorkerProto::BasicConnection
 
 struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 {
+    /**
+     * If set, called for every result the daemon relays through the
+     * connection, in addition to passing it to the logger. Used to
+     * capture the build log of a build done on the remote side.
+     */
+    std::function<void(ActivityId, ResultType, std::span<const Logger::Field>)> resultHook;
+
     /**
      * Flush to direction
      */

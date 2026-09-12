@@ -19,11 +19,8 @@ using std::map;
 struct BuilderFailureError;
 struct ExternalBuilder;
 #ifndef _WIN32 // TODO enable build hook on Windows
-struct HookInstance;
 struct DerivationBuilder;
 #endif
-
-typedef enum { rpAccept, rpDecline, rpPostpone } HookReply;
 
 /**
  * A goal for building a derivation. Substitution, (or any other method of
@@ -80,26 +77,36 @@ private:
 
     asio::awaitable<ExitCode> init();
     asio::awaitable<Result> tryToBuild();
-    asio::awaitable<Result> buildWithHook(
+    /**
+     * Build on a builder from `builders` (what the build hook used to
+     * do): copy the inputs over, build there, copy the outputs back.
+     * Returns nothing if the builder turned out to be unusable, so that
+     * the caller can pick another one.
+     */
+    asio::awaitable<std::optional<Result>> buildRemotely(
+        Machine & machine,
+        AutoCloseFD slotLock,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
+
+    /**
+     * Copy the outputs of a build done in another store into ours, and
+     * register their realisations.
+     */
+    asio::awaitable<void>
+    copyOutputsFromBuilder(Store & builderStore, std::string_view builderName, const SingleDrvOutputs & outputs);
     asio::awaitable<LocalBuildOutcome> buildLocally(
         LocalBuildCapability localBuildCap,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs,
         const DerivationOptions<StorePath> & drvOptions,
         PathLocks outputLocks,
-        std::optional<AsyncSemaphore::Handle> & buildSlot);
-
-    /**
-     * Is the build hook willing to perform the build?
-     *
-     * @param canBuildLocally Whether we could start a local build right
-     * now, which the hook uses to decide whether to postpone.
-     */
-    HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions, bool canBuildLocally);
+        /* Null when no local build slot is needed (building in another store). */
+        std::optional<AsyncSemaphore::Handle> * buildSlot,
+        /* Name of the builder, if not building in our own store. */
+        std::optional<std::string> builderName);
 
     BuildError logLimitExceeded();
 

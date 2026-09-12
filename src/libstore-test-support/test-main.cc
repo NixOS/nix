@@ -9,13 +9,8 @@ namespace nix {
 
 int testMainForBuidingPre(int argc, char ** argv)
 {
-    if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
-        printError("test-build-remote: not supported in libexpr unit tests");
-        return EXIT_FAILURE;
-    }
-
-    // Disable build hook. We won't be testing remote builds in these unit tests. If we do, fix the above build hook.
-    settings.getWorkerSettings().buildHook = {};
+    // No remote builders. We won't be testing remote builds in these unit tests.
+    settings.getWorkerSettings().builders = "";
 
     // No substituters, unless a test specifically requests.
     settings.getWorkerSettings().substituters = {};

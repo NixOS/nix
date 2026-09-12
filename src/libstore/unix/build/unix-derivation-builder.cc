@@ -993,7 +993,7 @@ void UnixDerivationBuilderImpl::cleanupBuild(bool force)
 
         /* Don't keep temporary directories for builtins because they
            might have privileged stuff (like a copy of netrc). */
-        if (settings.keepFailed && !force && !drv.isBuiltin()) {
+        if (settings.getWorkerSettings().keepFailed && !force && !drv.isBuiltin()) {
             printError("note: keeping build directory %s", PathFmt(tmpDir));
             chmod(topTmpDir, 0755);
             chmod(tmpDir, 0755);

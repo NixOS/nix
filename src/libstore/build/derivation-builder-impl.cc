@@ -583,7 +583,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
                 ValidPathInfo oldInfo(*localStore.queryPathInfo(newInfo.path));
                 if (newInfo.narHash != oldInfo.narHash) {
                     auto * diffHook = localSettings.getDiffHook();
-                    if (diffHook || settings.keepFailed) {
+                    if (diffHook || settings.getWorkerSettings().keepFailed) {
                         auto dst = store->toRealPath(newInfo.path);
                         dst += ".check";
                         deletePath(dst);
