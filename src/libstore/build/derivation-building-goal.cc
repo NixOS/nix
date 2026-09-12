@@ -36,7 +36,7 @@ namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
     const StorePath & drvPath, ref<const BasicDerivation> drv, Worker & worker, BuildMode buildMode)
-    : Goal(worker, gaveUpOnSubstitution())
+    : Goal(worker, tryToBuild())
     , drvPath(drvPath)
     , drv{std::move(drv)}
     , buildMode(buildMode)
@@ -155,70 +155,6 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePathSet & outputPaths);
 #endif
 
-/* At least one of the output paths could not be
-   produced using a substitute.  So we have to build instead. */
-Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
-{
-    Goals waitees;
-
-    /* Copy the input sources from the eval store to the build
-       store.
-
-       Note that some inputs might not be in the eval store because they
-       are (resolved) derivation outputs in a resolved derivation. */
-    if (&worker.evalStore != &worker.store) {
-        RealisedPath::Set inputSrcs;
-        for (auto & i : drv->inputs)
-            if (worker.evalStore.isValidPath(i))
-                inputSrcs.insert(i);
-        copyClosure(worker.evalStore, worker.store, inputSrcs);
-    }
-
-    for (auto & i : drv->inputs) {
-        if (worker.store.isValidPath(i))
-            continue;
-        if (!worker.settings.useSubstitutes)
-            throw Error(
-                "dependency '%s' of '%s' does not exist, and substitution is disabled",
-                worker.store.printStorePath(i),
-                worker.store.printStorePath(drvPath));
-        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
-    }
-
-    co_await await(std::move(waitees));
-
-    trace("all inputs realised");
-
-    if (nrFailed != 0) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                nrFailed,
-                nrFailed == 1 ? "dependency" : "dependencies");
-        msg += showKnownOutputs(worker.store, *drv);
-        co_return doneFailure(BuildError(BuildResult::Failure::DependencyFailed, msg));
-    }
-
-    /* Gather information necessary for computing the closure and/or
-       running the build hook. */
-
-    /* Determine the full set of input paths. */
-
-    StorePathSet inputPaths;
-    worker.store.computeFSClosure(drv->inputs, inputPaths);
-
-    debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
-              return "'" + worker.store.printStorePath(p) + "'";
-          }));
-
-    /* Okay, try to build.  Note that here we don't wait for a build
-       slot to become available, since we don't need one if there is a
-       build hook. */
-    co_await yield();
-    co_return tryToBuild(std::move(inputPaths));
-}
-
 /**
  * RAII wrapper for build log file.
  * Constructor opens the log file, destructor closes it.
@@ -308,8 +244,73 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
     return BuildError(BuildResult::Failure::InputRejected, std::move(msg));
 }
 
-Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
+/* At least one of the output paths could not be
+   produced using a substitute.  So we have to build instead. */
+Goal::Co DerivationBuildingGoal::tryToBuild()
 {
+    Goals waitees;
+
+    /* Copy the input sources from the eval store to the build
+       store.
+
+       Note that some inputs might not be in the eval store because they
+       are (resolved) derivation outputs in a resolved derivation. */
+    if (&worker.evalStore != &worker.store) {
+        RealisedPath::Set inputSrcs;
+        for (auto & i : drv->inputs)
+            if (worker.evalStore.isValidPath(i))
+                inputSrcs.insert(i);
+        copyClosure(worker.evalStore, worker.store, inputSrcs);
+    }
+
+    for (auto & i : drv->inputs) {
+        if (worker.store.isValidPath(i))
+            continue;
+        if (!worker.settings.useSubstitutes)
+            throw Error(
+                "dependency '%s' of '%s' does not exist, and substitution is disabled",
+                worker.store.printStorePath(i),
+                worker.store.printStorePath(drvPath));
+        waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(i)));
+    }
+
+    co_await await(std::move(waitees));
+
+    trace("all inputs realised");
+
+    if (nrFailed != 0) {
+        auto msg =
+            fmt("Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
+                Magenta(worker.store.printStorePath(drvPath)),
+                nrFailed,
+                nrFailed == 1 ? "dependency" : "dependencies");
+        msg += showKnownOutputs(worker.store, *drv);
+        co_return doneFailure(BuildError(BuildResult::Failure::DependencyFailed, msg));
+    }
+
+    /* Gather information necessary for computing the closure and/or
+       running the build hook. */
+
+    /* Determine the full set of input paths. */
+
+    StorePathSet inputPaths;
+    worker.store.computeFSClosure(drv->inputs, inputPaths);
+
+    debug("added input paths %s", concatMapStringsSep(", ", inputPaths, [&](auto & p) {
+              return "'" + worker.store.printStorePath(p) + "'";
+          }));
+
+    /* Okay, try to build.  Note that here we don't wait for a build
+       slot to become available, since we don't need one if there is a
+       build hook. */
+    co_await yield();
+
+    /* We come back here if a local build turns out to need a build slot
+       that is not free yet (see `buildLocally`). */
+retry:
+    bool needsSlot = false;
+
     auto drvOptions = [&] {
         try {
             return derivationOptionsFromStructuredAttrs(worker.store, drv->env, get(drv->structuredAttrs));
@@ -540,8 +541,10 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
             valid = true;
-            co_return buildLocally(
-                *cap, std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks), needsSlot);
+            if (needsSlot)
+                co_return Return{};
+            unreachable(); /* Keep in mind that we *still* end coroutines early. */
         }
 
         co_return Return{};
@@ -552,6 +555,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         // so they must always build locally.
         bool valid = false;
         co_await tryBuildLocally(valid);
+        if (needsSlot)
+            goto retry;
         if (valid)
             co_return Return{};
     } else if (drvOptions.preferLocalBuild) {
@@ -559,6 +564,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         {
             bool valid = false;
             co_await tryBuildLocally(valid);
+            if (needsSlot)
+                goto retry;
             if (valid)
                 co_return Return{};
         }
@@ -580,6 +587,8 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         {
             bool valid = false;
             co_await tryBuildLocally(valid);
+            if (needsSlot)
+                goto retry;
             if (valid)
                 co_return Return{};
         }
@@ -813,10 +822,11 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 
 Goal::Co DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
-    StorePathSet inputPaths,
-    std::map<std::string, InitialOutput> initialOutputs,
-    DerivationOptions<StorePath> drvOptions,
-    PathLocks outputLocks)
+    const StorePathSet & inputPaths,
+    std::map<std::string, InitialOutput> & initialOutputs,
+    const DerivationOptions<StorePath> & drvOptions,
+    PathLocks outputLocks,
+    bool & needsSlot)
 {
     co_await yield();
 
@@ -857,7 +867,10 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         if (curBuilds >= worker.settings.maxBuildJobs) {
             outputLocks.unlock();
             co_await waitForBuildSlot();
-            co_return tryToBuild(std::move(inputPaths));
+            /* Start over from `tryToBuild` so that a build hook gets
+               another chance before we build locally. */
+            needsSlot = true;
+            co_return Return{};
         }
 
         if (!builder) {
