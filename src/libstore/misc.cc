@@ -404,6 +404,10 @@ StorePath resolveDerivedPath(Store & store, const SingleDerivedPath & req, Store
                 auto outPath = deepQueryPartialDerivationOutput(store, drvPath, bfd.output, evalStore_);
                 if (!outPath)
                     throw MissingRealisation(store, *bfd.drvPath, drvPath, bfd.output);
+                /* The realisation of a dynamic derivation can outlive the .drv file it names (garbage collection). */
+                if (outPath->isDerivation() && !store.isValidPath(*outPath)
+                    && !(evalStore_ && evalStore_->isValidPath(*outPath)))
+                    throw MissingRealisation(store, *bfd.drvPath, drvPath, bfd.output);
                 return *outPath;
             },
         },
