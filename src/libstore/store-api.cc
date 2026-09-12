@@ -154,7 +154,7 @@ ref<Builder> Store::getBuilder(std::shared_ptr<Store> evalStore)
 {
     auto store = ref<Store>(shared_from_this());
     auto evalStoreRef = evalStore ? ref<Store>(std::move(evalStore)) : store;
-    return make_ref<LocalBuilder>(store, evalStoreRef);
+    return make_ref<Worker>(store, evalStoreRef);
 }
 
 std::filesystem::path Store::followLinksToStore(std::string_view _path) const
