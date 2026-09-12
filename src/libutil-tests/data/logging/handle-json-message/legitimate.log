@@ -1,0 +1,48 @@
+@nix {"action":"start","id":1,"level":7,"parent":0,"text":"","type":0}
+@nix {"action":"start","fields":["/ca/eval-store/store/q4mzb058sxbik66ccd439p7rihfj6f9m-builder-dependencies-input-0.sh","local","local"],"id":2,"level":3,"parent":1,"text":"copying path '/ca/eval-store/store/q4mzb058sxbik66ccd439p7rihfj6f9m-builder-dependencies-input-0.sh' to 'local'","type":100}
+@nix {"action":"result","fields":[8,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[21,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[24,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[32,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[33,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[40,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[48,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[52,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[56,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[64,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[71,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[72,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[80,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[88,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[96,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[185,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[192,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[200,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[201,208,0,0],"id":2,"type":105}
+@nix {"action":"result","fields":[208,208,0,0],"id":2,"type":105}
+@nix {"action":"stop","id":2}
+@nix {"action":"start","fields":["file:///ca/substitute/binary-cache/67q2fggydy3zwj2hdqfdivfhyhk7342m.narinfo"],"id":3,"level":4,"parent":1,"text":"downloading 'file:///ca/substitute/binary-cache/67q2fggydy3zwj2hdqfdivfhyhk7342m.narinfo'","type":101}
+@nix {"action":"start","fields":["/main/build-dry/store/ankm5d2n0n5bmv18pxxwlfqlp60ryhbn-dependencies-top.drv","",1,1],"id":4,"level":3,"parent":1,"text":"building '/main/build-dry/store/ankm5d2n0n5bmv18pxxwlfqlp60ryhbn-dependencies-top.drv'","type":105}
+@nix {"action":"result","fields":["FOO"],"id":4,"type":101}
+@nix {"action":"stop","id":4}
+@nix {"action":"start","fields":["/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed","file:///ca/signatures/binary-cache"],"id":5,"level":0,"parent":1,"text":"","type":108}
+@nix {"action":"start","fields":["/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed","file:///ca/signatures/binary-cache","local"],"id":6,"level":3,"parent":1,"text":"copying path '/ca/signatures/store/69awl844gj1zqkgr496fq2ma0xl8sda4-simple-input-addressed' from 'file:///ca/signatures/binary-cache'","type":100}
+@nix {"action":"result","fields":[296,296,0,0],"id":6,"type":105}
+@nix {"action":"stop","id":6}
+@nix {"action":"stop","id":5}
+@nix {"action":"start","fields":["/main/compression-levels/store/4db7d3s0h74w4lnhpqqhfhpj21c92bgm-dependencies-top","file:///main/compression-levels/binary-cache"],"id":7,"level":4,"parent":1,"text":"querying info about '/main/compression-levels/store/4db7d3s0h74w4lnhpqqhfhpj21c92bgm-dependencies-top' on 'file:///main/compression-levels/binary-cache'","type":109}
+@nix {"action":"start","fields":["/main/compression-levels/store/hxcb8hfrag31fj66qss42b6clzr0bdm9-dependencies-input-2","file:///main/compression-levels/binary-cache"],"id":8,"level":4,"parent":1,"text":"querying info about '/main/compression-levels/store/hxcb8hfrag31fj66qss42b6clzr0bdm9-dependencies-input-2' on 'file:///main/compression-levels/binary-cache'","type":109}
+@nix {"action":"stop","id":7}
+@nix {"action":"stop","id":8}
+@nix {"action":"start","fields":["/flakes/config/store/acnvzpblkzr7a2kx0yy6g2g0v6zcfn23-simple.drv"],"id":9,"level":4,"parent":1,"text":"running post-build-hook '/flakes/config/store/7pfv6wdgg7d4gil01zz9jxmzqkqyal2d-source'","type":110}
+@nix {"action":"stop","id":9}
+@nix {"action":"start","id":10,"level":4,"parent":1,"text":"fetching Git repository 'file:///flakes/flakes/flake1'","type":112}
+@nix {"action":"stop","id":10}
+@nix {"action":"start","fields":["/flakes/symlink-paths/flake1",1],"id":11,"level":5,"parent":1,"text":"hashing '/flakes/symlink-paths/flake1'","type":113}
+@nix {"action":"result","fields":["/flakes/symlink-paths/store/g9vvajn9qyyidqg1pjqgprbmnzkkpbga-source"],"id":11,"type":109}
+@nix {"action":"stop","id":11}
+@nix {"action":"start","fields":["«git+file:///flakes/flake-in-submodule/rootRepo?ref=refs/heads/master&rev=eaa9366e218e9b76354c8fd179f1e9e3049dcd11&submodules=1»/",0],"id":12,"level":5,"parent":1,"text":"copying '«git+file:///flakes/flake-in-submodule/rootRepo?ref=refs/heads/master&rev=eaa9366e218e9b76354c8fd179f1e9e3049dcd11&submodules=1»/' to the store","type":113}
+@nix {"action":"result","fields":["/flakes/flake-in-submodule/store/qsib7mf8w7490daxwc95w5qgk66n5ki5-source"],"id":12,"type":109}
+@nix {"action":"stop","id":12}
+@nix {"action":"start","id":13,"level":6,"parent":1,"text":"querying info about missing paths","type":0}
+@nix {"action":"stop","id":13}

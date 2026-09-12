@@ -1,12 +1,13 @@
-#if 0
+#include "nix/util/logging.hh"
+#include "nix/util/tests/characterization.hh"
+#include "nix/util/serialise.hh"
+#include "nix/util/tests/capture-logging.hh"
 
-#  include "nix/util/logging.hh"
-#  include "nix/expr/nixexpr.hh"
-#  include <fstream>
-
-#  include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 namespace nix {
+
+#if 0
 
     /* ----------------------------------------------------------------------------
      * logEI
@@ -363,7 +364,167 @@ namespace nix {
       ep = invalid;
 
     }
+#endif
 
+namespace {
+
+class DeterministicActivityIdLogger : public Logger
+{
+    std::unique_ptr<Logger> inner;
+    ActivityId currentId = 1;
+    /* Remap activities to be deterministic. */
+    std::map<ActivityId, ActivityId> actIdMap;
+
+    ActivityId remapActivityId(ActivityId act)
+    {
+        auto [it, inserted] = actIdMap.emplace(act, currentId);
+        if (inserted)
+            ++currentId;
+        return it->second;
+    }
+
+public:
+    DeterministicActivityIdLogger(std::unique_ptr<Logger> inner)
+        : inner(std::move(inner))
+    {
+        actIdMap.insert({0, 0}); /* 0 stands for "no activity". */
+    }
+
+    void stop() override
+    {
+        inner->stop();
+    }
+
+    void pause() override
+    {
+        inner->pause();
+    }
+
+    void resume() override
+    {
+        inner->resume();
+    }
+
+    bool isVerbose() override
+    {
+        return inner->isVerbose();
+    }
+
+    void log(Verbosity lvl, std::string_view s) noexcept override
+    {
+        inner->log(lvl, s);
+    }
+
+    void logEI(const ErrorInfo & ei) noexcept override
+    {
+        inner->logEI(ei);
+    }
+
+    void warn(const std::string & msg) noexcept override
+    {
+        inner->warn(msg);
+    }
+
+    void startActivity(
+        ActivityId act,
+        Verbosity lvl,
+        ActivityType type,
+        const std::string & s,
+        std::span<const Field> fields,
+        ActivityId parent) noexcept override
+    {
+        act = remapActivityId(act);
+        parent = remapActivityId(parent);
+        inner->startActivity(act, lvl, type, s, fields, parent);
+    }
+
+    void stopActivity(ActivityId act) noexcept override
+    {
+        inner->stopActivity(remapActivityId(act));
+    }
+
+    void result(ActivityId act, ResultType type, std::span<const Field> fields) noexcept override
+    {
+        inner->result(remapActivityId(act), type, fields);
+    }
+
+    void result(ActivityId act, ResultType type, const nlohmann::json & json) noexcept override
+    {
+        inner->result(remapActivityId(act), type, json);
+    }
+
+    /* Functions below aren't supposed to be execrised and thus are marked unreachble to catch cases
+       when they are called accidentally. */
+
+    void writeToStdout(std::string_view s) override
+    {
+        unreachable();
+    }
+
+    std::optional<char> ask(std::string_view s) override
+    {
+        unreachable();
+    }
+
+    void setPrintBuildLogs(bool printBuildLogs) override
+    {
+        unreachable();
+    }
+};
+
+class JSONLogMessageCharacterisationTest : public CharacterizationTest,
+                                           public ::testing::WithParamInterface<std::string_view>
+{
+    std::filesystem::path unitTestData = getUnitTestData() / "logging" / "handle-json-message";
+
+protected:
+    std::filesystem::path goldenMaster(std::string_view testStem) const override
+    {
+        return unitTestData / testStem;
+    }
+};
+
+TEST_P(JSONLogMessageCharacterisationTest, writesExpectedLogs)
+{
+    auto testStem = GetParam();
+    auto inputFd = openFileReadonly(goldenMaster(testStem));
+
+    ASSERT_TRUE(inputFd) << "could not open input test file '" << testStem << "'";
+
+    auto tempFile = createAnonymousTempFile();
+    auto jsonLogger =
+        std::make_unique<DeterministicActivityIdLogger>(makeJSONLogger(tempFile.get(), /*includeNixPrefix=*/true));
+    Finally restoreLogger([oldLogger = logger] { logger = oldLogger; });
+    logger = jsonLogger.get();
+
+    Activity act(
+        *logger,
+        lvlVomit,
+        actUnknown,
+        /*s=*/"",
+        /*fields=*/{},
+        /*parent=*/0);
+
+    std::map<ActivityId, Activity> activities;
+    FdSource input(inputFd.get());
+
+    while (true) {
+        try {
+            auto line = input.readLine();
+            handleJSONLogMessage(line, act, activities, line, /*trusted=*/true);
+        } catch (EndOfFile &) {
+            break;
+        }
+    }
+
+    lseek(tempFile.get(), 0, SEEK_SET);
+
+    writeTest(testStem + ".log", [expected = readFile(tempFile.get())]() -> std::string { return expected; });
 }
 
-#endif
+INSTANTIATE_TEST_SUITE_P(
+    JSONLogMessageCharacterisation, JSONLogMessageCharacterisationTest, ::testing::Values("garbage-in", "legitimate"));
+
+} // namespace
+
+} // namespace nix
