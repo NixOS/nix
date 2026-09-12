@@ -167,9 +167,11 @@ void Store::querySubstitutablePathInfos(const StorePathCAMap & paths, Substituta
         std::rethrow_exception(ex);
 }
 
-MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
+MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets, Store * evalStore_)
 {
     Activity act(*logger, lvlDebug, actUnknown, "querying info about missing paths");
+
+    auto & evalStore = evalStore_ ? *evalStore_ : *this;
 
     MissingPaths res;
 
@@ -202,7 +204,8 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                     }
                     auto & drvPath = drvPathP->path;
 
-                    if (!isValidPath(drvPath)) {
+                    auto * drvStore = evalStore.isValidPath(drvPath) ? &evalStore : this;
+                    if (!drvStore->isValidPath(drvPath)) {
                         // FIXME: we could try to substitute the derivation.
                         res.unknown.insert(drvPath);
                         co_return;
@@ -212,7 +215,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                     /* true for regular derivations, and CA derivations for which we
                        have a trust mapping for all wanted outputs. */
                     auto knownOutputPaths = true;
-                    for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(drvPath)) {
+                    for (auto & [outputName, pathOpt] : queryPartialDerivationOutputMap(drvPath, drvStore)) {
                         if (!pathOpt) {
                             knownOutputPaths = false;
                             break;
@@ -223,7 +226,7 @@ MissingPaths Store::queryMissing(const std::vector<DerivedPath> & targets)
                     if (knownOutputPaths && invalid.empty())
                         co_return;
 
-                    auto drv = make_ref<Derivation>(derivationFromPath(drvPath));
+                    auto drv = make_ref<Derivation>(drvStore->readDerivation(drvPath));
                     DerivationOptions<SingleDerivedPath> drvOptions;
                     try {
                         // FIXME: this is a lot of work just to get the value

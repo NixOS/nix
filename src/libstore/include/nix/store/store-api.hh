@@ -944,8 +944,11 @@ public:
      * Given a set of paths that are to be built, return the set of
      * derivations that will be built, and the set of output paths that
      * will be substituted.
+     *
+     * @param evalStore If given, derivations not (yet) present in this
+     * store are read from there, like the builder does.
      */
-    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets);
+    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets, Store * evalStore = nullptr);
 
     /**
      * Sort a set of paths topologically under the references
