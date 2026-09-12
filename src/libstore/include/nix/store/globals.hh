@@ -195,8 +195,6 @@ public:
 
     Setting<bool> useSQLiteWAL{this, !isWSL1(), "use-sqlite-wal", "Whether SQLite should use WAL mode."};
 
-    Setting<bool> keepFailed{this, false, "keep-failed", "Whether to keep temporary directories of failed builds."};
-
     /**
      * Whether to show build log output in real time.
      */

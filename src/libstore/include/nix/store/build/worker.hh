@@ -7,6 +7,7 @@
 #include "nix/store/build.hh"
 #include "nix/store/derived-path-map.hh"
 #include "nix/store/build/goal.hh"
+#include "nix/store/machines.hh"
 #include "nix/store/build-result.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/async.hh"
@@ -17,6 +18,7 @@
 #include <boost/asio/error.hpp>
 
 #include <deque>
+#include <filesystem>
 #include <functional>
 #include <future>
 #include <mutex>
@@ -209,11 +211,6 @@ GoalPtr upcast_goal(std::shared_ptr<PathSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DrvOutputSubstitutionGoal> subGoal);
 GoalPtr upcast_goal(std::shared_ptr<DerivationGoal> subGoal);
 
-#ifndef _WIN32 // TODO Enable building on Windows
-/* Forward definition. */
-struct HookInstance;
-#endif
-
 /**
  * Coordinates one or more realisations and their interdependencies:
  * the local build scheduler, and the `Builder` for local stores.
@@ -370,9 +367,36 @@ public:
      */
     fun<std::list<ref<Store>>()> getSubstituters;
 
-#ifndef _WIN32 // TODO Enable building on Windows
-    std::unique_ptr<HookInstance> hook;
-#endif
+    /**
+     * Function to get the remote builders to use, as the build hook
+     * (`nix __build-remote`) used to. Defaults to parsing the `builders`
+     * setting. This allows tests to inject custom builders.
+     */
+    fun<Machines()> getRemoteBuilders;
+
+private:
+    /**
+     * The remote builders, obtained from @ref getRemoteBuilders on first
+     * use and kept, since goals hold references into the list and
+     * disable machines they cannot connect to. Strand-only.
+     */
+    std::optional<Machines> remoteBuilders;
+
+public:
+    /**
+     * Directory holding the lock files that track the load of the
+     * remote builders (one per slot) and serialise uploads to them, so
+     * that concurrent workers, in this process or others, see each
+     * other's builds. See `DerivationBuildingGoal`.
+     */
+    const std::filesystem::path currentLoad;
+
+    /**
+     * The remote builders (see @ref getRemoteBuilders). Strand-only.
+     */
+    Machines & machines();
+
+public:
 
     uint64_t expectedBuilds = 0;
     uint64_t doneBuilds = 0;
@@ -387,12 +411,6 @@ public:
     uint64_t doneDownloadSize = 0;
     uint64_t expectedNarSize = 0;
     uint64_t doneNarSize = 0;
-
-    /**
-     * Whether to ask the build hook if it can build a derivation. If
-     * it answers with "decline-permanently", we don't try again.
-     */
-    bool tryBuildHook = true;
 
     Worker(ref<Store> store, ref<Store> evalStore);
     ~Worker();

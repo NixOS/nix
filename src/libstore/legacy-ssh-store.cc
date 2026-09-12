@@ -241,7 +241,7 @@ static ServeProto::BuildOptions buildSettings()
         .maxLogSize = settings.getWorkerSettings().maxLogSize,
         .nrRepeats = 0, // buildRepeat hasn't worked for ages anyway
         .enforceDeterminism = 0,
-        .keepFailed = settings.keepFailed,
+        .keepFailed = settings.getWorkerSettings().keepFailed,
     };
 }
 

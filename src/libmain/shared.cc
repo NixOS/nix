@@ -256,7 +256,7 @@ LegacyArgs::LegacyArgs(
         .longName = "keep-failed",
         .shortName = 'K',
         .description = "Keep temporary directories of failed builds.",
-        .handler = {&(bool &) settings.keepFailed, true},
+        .handler = {&(bool &) settings.getWorkerSettings().keepFailed, true},
     });
 
     addFlag({

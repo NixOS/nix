@@ -255,8 +255,11 @@ private:
 public:
 
     /**
-     * Hack for build-remote.cc. Synchronised because builds add to it
-     * while substitutions, on other threads, read it in `addToStore`.
+     * Output paths whose locks the build scheduler already holds, so
+     * that `addToStore` must not lock them again when copying the
+     * outputs of a remote build back. Synchronised because builds add
+     * to it while substitutions, on other threads, read it in
+     * `addToStore`.
      */
     Sync<PathSet> locksHeld;
 

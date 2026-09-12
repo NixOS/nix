@@ -234,7 +234,7 @@ struct ClientSettings
 
     void apply(TrustedFlag trusted)
     {
-        settings.keepFailed = keepFailed;
+        settings.getWorkerSettings().keepFailed = keepFailed;
         settings.getWorkerSettings().keepGoing = keepGoing;
         settings.getWorkerSettings().tryFallback = tryFallback;
         nix::verbosity = verbosity;
