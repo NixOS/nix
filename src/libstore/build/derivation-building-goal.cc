@@ -686,7 +686,7 @@ Goal::Co<void> DerivationBuildingGoal::buildWithHook(
                 logSize += data.size();
                 if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     hook.reset();
-                    co_return doneFailureLogTooLong(*buildLog);
+                    co_return doneFailure(logLimitExceeded());
                 }
                 (*buildLog)(data);
                 if (logFile->sink)
@@ -1026,7 +1026,7 @@ Goal::Co<void> DerivationBuildingGoal::buildLocally(
                 logSize += output->data.size();
                 if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     builder->killChild();
-                    co_return doneFailureLogTooLong(*buildLog);
+                    co_return doneFailure(logLimitExceeded());
                 }
                 (*buildLog)(output->data);
                 if (logFile->sink)
@@ -1328,13 +1328,13 @@ LogFile::~LogFile()
     }
 }
 
-Goal::Done DerivationBuildingGoal::doneFailureLogTooLong(BuildLog & buildLog)
+BuildError DerivationBuildingGoal::logLimitExceeded()
 {
-    return doneFailure(BuildError(
+    return BuildError(
         BuildResult::Failure::LogLimitExceeded,
         "%s killed after writing more than %d bytes of log output",
         getName(),
-        worker.settings.maxLogSize));
+        worker.settings.maxLogSize);
 }
 
 std::map<std::string, std::optional<StorePath>> DerivationBuildingGoal::queryPartialDerivationOutputMap()
