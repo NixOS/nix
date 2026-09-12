@@ -155,6 +155,14 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePathSet & outputPaths);
 #endif
 
+Goal::Done DerivationBuildingGoal::done(Result result)
+{
+    if (auto * success = std::get_if<BuildResult::Success>(&result))
+        return doneSuccess(success->status, std::move(success->builtOutputs));
+    else
+        return doneFailure(std::move(std::get<BuildError>(result)));
+}
+
 /**
  * RAII wrapper for build log file.
  * Constructor opens the log file, destructor closes it.
@@ -477,8 +485,8 @@ retry:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
                 valid = true;
-                co_return buildWithHook(
-                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+                co_return done(co_await buildWithHook(
+                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks)));
             case rpDecline:
                 // We should do it ourselves.
                 co_return Return{};
@@ -527,8 +535,8 @@ retry:
         if (valid) {
             co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
         } else {
-            co_return buildWithHook(
-                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
+            co_return done(co_await buildWithHook(
+                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks)));
         }
     };
 
@@ -599,7 +607,7 @@ retry:
     co_return doneFailure(reject(*rejection, storePath));
 }
 
-Goal::Co<void> DerivationBuildingGoal::buildWithHook(
+Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -685,7 +693,7 @@ Goal::Co<void> DerivationBuildingGoal::buildWithHook(
                 logSize += data.size();
                 if (worker.settings.maxLogSize && logSize > worker.settings.maxLogSize) {
                     hook.reset();
-                    co_return doneFailure(logLimitExceeded());
+                    co_return logLimitExceeded();
                 }
                 (*buildLog)(data);
                 if (logFile->sink)
@@ -731,7 +739,7 @@ Goal::Co<void> DerivationBuildingGoal::buildWithHook(
             break;
         } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
             hook.reset();
-            co_return doneFailure(std::move(**timeout));
+            co_return std::move(**timeout);
         }
     }
 
@@ -766,7 +774,7 @@ Goal::Co<void> DerivationBuildingGoal::buildWithHook(
 
         /* TODO (once again) support fine-grained error codes, see issue #12641. */
 
-        co_return doneFailure(std::move(e));
+        co_return std::move(e);
     }
 
     /* Compute the FS closure of the outputs and register them as
@@ -815,7 +823,10 @@ Goal::Co<void> DerivationBuildingGoal::buildWithHook(
     outputLocks.setDeletion(true);
     outputLocks.unlock();
 
-    co_return doneSuccess(BuildResult::Success::Built, std::move(builtOutputs));
+    co_return BuildResult::Success{
+        .status = BuildResult::Success::Built,
+        .builtOutputs = std::move(builtOutputs),
+    };
 #endif
 }
 
