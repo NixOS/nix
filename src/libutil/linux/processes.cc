@@ -9,6 +9,7 @@
 #include "linux/linux-namespaces-private.hh"
 #include "unix/signals-private.hh"
 #include "unix/current-process-private.hh"
+#include "unix/processes-private.hh"
 #include "util-unix-config-private.hh"
 
 #include <cstring>
@@ -49,6 +50,13 @@ struct ExecChildParams
     bool setUid;
     uid_t uid;
     bool dieWithParent;
+    /* Plain pointer plus count rather than a container, per the note above.
+       Both point into storage owned by the caller's frame, which stays alive
+       because vfork suspends the calling thread until exec or _exit. */
+    const RunOptions::Redirection * redirections;
+    size_t numRedirections;
+    const long * caps;
+    size_t numCaps;
 };
 
 /*
@@ -151,17 +159,45 @@ struct ExecChildParams
         errorPipe = relocatedErrorPipeFD;
     }
 
+    /* Wire the caller's extra descriptors *before* the sweep below, because
+       their sources are arbitrary descriptors in the parent and the sweep would
+       close them. `validateRedirections` has already guaranteed in the parent
+       that no target is a standard stream, that no target is
+       `relocatedErrorPipeFD`, and that no target is another redirection's
+       source — so applying them in order needs no bookkeeping here, which is
+       what makes it safe to do after vfork. */
+    int maxKeptFD = relocatedErrorPipeFD;
+    for (size_t i = 0; i < params.numRedirections; ++i) {
+        const auto & redirection = params.redirections[i];
+        if (::dup2(redirection.sourceFd, redirection.targetFd) == -1)
+            dieWithErrno("dupping redirected fd");
+        if (redirection.targetFd > maxKeptFD)
+            maxKeptFD = redirection.targetFd;
+    }
+
 #if HAVE_CLOSEFROM
     /* glibc uses this in its posix_spawn implementation and also exposes it
        in <unistd.h>. Notably, it has a fallback for kernels that don't support
        close_range. */
-    ::closefrom(relocatedErrorPipeFD + 1);
+    ::closefrom(maxKeptFD + 1);
 #elifdef SYS_close_range
     /* This is mostly best-effort. This code should only be used on musl and it
        would only fail on older kernels. Reimplementing /proc/self/fd iteration
        like what glibc does in __closefrom_fallback is a lot of complex code. */
-    ::syscall(SYS_close_range, relocatedErrorPipeFD + 1, ~0u, 0);
+    ::syscall(SYS_close_range, maxKeptFD + 1, ~0u, 0);
 #endif
+
+    /* The sweep above could only start above the highest descriptor we are
+       keeping, so anything between the error pipe and that high-water mark that
+       is not itself a redirection target still has to go individually. */
+    for (int fd = relocatedErrorPipeFD + 1; fd < maxKeptFD; ++fd) {
+        bool isTarget = false;
+        for (size_t i = 0; i < params.numRedirections; ++i)
+            if (params.redirections[i].targetFd == fd)
+                isTarget = true;
+        if (!isTarget)
+            ::close(fd); /* Ignore errors; it may not have been open. */
+    }
 
     /* Important! Calling syscalls directly and not libc functions because of a
        discrepancy in POSIX specification (i.e. POSIX setgid/setuid has to apply
@@ -180,6 +216,10 @@ struct ExecChildParams
 #  define NIX_SYS_setgroups SYS_setgroups
 #endif
 
+    /* Capabilities have to survive the setuid below, so ask for that first. */
+    if (params.numCaps > 0 && ::prctl(PR_SET_KEEPCAPS, 1) < 0)
+        dieWithErrno("setting keep-caps failed");
+
     if (params.setGid && ::syscall(NIX_SYS_setgid, params.gid) == -1)
         dieWithErrno("setgid failed");
 
@@ -189,6 +229,47 @@ struct ExecChildParams
 
     if (params.setUid && ::syscall(NIX_SYS_setuid, params.uid) == -1)
         dieWithErrno("setuid failed");
+
+    if (params.numCaps > 0) {
+        if (::prctl(PR_SET_KEEPCAPS, 0))
+            dieWithErrno("clearing keep-caps failed");
+
+        /* Done by hand rather than through libcap, which has a large build
+           closure and many features we do not need. */
+        static constexpr uint32_t LINUX_CAPABILITY_VERSION_3 = 0x20080522;
+        static constexpr uint32_t LINUX_CAPABILITY_U32S_3 = 2;
+
+        struct user_cap_header_struct
+        {
+            uint32_t version;
+            int pid;
+        } hdr = {LINUX_CAPABILITY_VERSION_3, 0};
+
+        struct user_cap_data_struct
+        {
+            uint32_t effective;
+            uint32_t permitted;
+            uint32_t inheritable;
+        } data[LINUX_CAPABILITY_U32S_3] = {};
+
+        for (size_t i = 0; i < params.numCaps; ++i) {
+            long cap = params.caps[i];
+            /* Not an assert: this runs after vfork, where aborting would take
+               the parent's address space with it. The parent has already
+               range-checked, so this is belt and braces. */
+            if (cap < 0 || static_cast<unsigned long>(cap) / 32 >= LINUX_CAPABILITY_U32S_3)
+                die(EINVAL, "capability out of range");
+            data[cap / 32].permitted |= 1u << (cap % 32);
+            data[cap / 32].inheritable |= 1u << (cap % 32);
+        }
+
+        if (::syscall(SYS_capset, &hdr, data))
+            dieWithErrno("couldn't set capabilities");
+
+        for (size_t i = 0; i < params.numCaps; ++i)
+            if (::prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_RAISE, params.caps[i], 0, 0) < 0)
+                dieWithErrno("couldn't set ambient caps");
+    }
 
     /* Technically slightly racy, we might want to do something like what
        preserveDeathSignal does. */
@@ -261,16 +342,9 @@ static Strings prepareEnvironmentStrings(const StringMap & environment)
 
 } // namespace
 
-/* TODO: Factor this out into a `launchProgram` that returns a pid. That would be
-   much more useful in more places. */
-void runProgram2(const RunOptions & options)
+Pid startProgram(const RunOptions & options, std::shared_ptr<Pipe> out)
 {
-    checkInterrupt();
-
-    /* Create a pipe. */
-    Pipe out;
-    if (options.standardOut)
-        out.create();
+    unix::validateRedirections(options);
 
     /* Pipe that the child reports errors through. */
     Pipe childErrorPipe;
@@ -285,6 +359,13 @@ void runProgram2(const RunOptions & options)
     const auto env = stringsToCharPtrs(env_);
     const auto args = stringsToCharPtrs(args_);
 
+    /* Flattened for the child, which cannot walk a `std::set`. Range-checked
+       here so that the post-vfork code never has to fail on bad input. */
+    const std::vector<long> caps(options.caps.begin(), options.caps.end());
+    for (auto cap : caps)
+        if (cap < 0 || cap >= 64)
+            throw UsageError("capability %1% is out of range", cap);
+
     const ExecChildParams params = {
         .program = options.program.c_str(),
         .chdir = options.chdir ? options.chdir->c_str() : nullptr,
@@ -292,7 +373,7 @@ void runProgram2(const RunOptions & options)
         .args = args.data(),
         .mergeStderrToStdout = options.mergeStderrToStdout,
         .lookupPath = options.lookupPath,
-        .stdoutFd = options.standardOut ? out.writeSide.get() : INVALID_DESCRIPTOR,
+        .stdoutFd = options.standardOut ? out->writeSide.get() : options.standardOutFd.value_or(INVALID_DESCRIPTOR),
         .errorPipe = childErrorPipe.writeSide.get(),
         .setGid = options.gid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
@@ -300,7 +381,11 @@ void runProgram2(const RunOptions & options)
         .setUid = options.uid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
         .uid = options.uid.value_or(65534),
-        .dieWithParent = true, /* TODO: Maybe we might want to expose this in RunOptions? */
+        .dieWithParent = options.dieWithParent,
+        .redirections = options.redirections.data(),
+        .numRedirections = options.redirections.size(),
+        .caps = caps.data(),
+        .numCaps = caps.size(),
     };
 
     auto suspension = logger->suspendIf(options.isInteractive);
@@ -318,7 +403,6 @@ void runProgram2(const RunOptions & options)
     if (pid == -1)
         throw SysError(forkErrno, "unable to vfork");
 
-    out.writeSide.close();
     childErrorPipe.writeSide.close();
 
     StringSink childErrorSink;
@@ -347,8 +431,24 @@ void runProgram2(const RunOptions & options)
         throw std::move(execErr);
     }
 
+    return pid;
+}
+
+void runProgram2(const RunOptions & options)
+{
+    checkInterrupt();
+
+    /* Create a pipe. */
+    auto out = std::make_shared<Pipe>();
     if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
+        out->create();
+
+    auto pid = startProgram(options, out);
+
+    out->writeSide.close();
+
+    if (options.standardOut)
+        drainFD(out->readSide.get(), *options.standardOut);
 
     /* Wait for the child to finish. */
     int status = pid.wait();

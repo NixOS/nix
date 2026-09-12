@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <span>
 #include <atomic>
+#include <algorithm>
 
 #include "util-unix-config-private.hh"
 #include "../file-descriptor-private.hh"
@@ -102,6 +103,43 @@ static int unix_close_range(unsigned int first, unsigned int last, int flags)
 #  endif
 }
 #endif
+
+void unix::closeExtraFDs(std::span<const Descriptor> keep)
+{
+    constexpr int MAX_KEPT_FD = 2;
+    static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == MAX_KEPT_FD);
+
+    if (keep.empty()) {
+        closeExtraFDs();
+        return;
+    }
+
+    auto kept = [&](int fd) { return std::find(keep.begin(), keep.end(), fd) != keep.end(); };
+
+    /* Everything strictly above the highest descriptor we are keeping can go
+       in one sweep; the range below it has to be walked so the kept ones
+       survive. */
+    int maxKeep = MAX_KEPT_FD;
+    for (auto fd : keep)
+        maxKeep = std::max(maxKeep, static_cast<int>(fd));
+
+    bool sweptAbove = false;
+#if defined(__linux__) || defined(__FreeBSD__)
+    sweptAbove = unix_close_range(maxKeep + 1, ~0U, 0) == 0;
+#endif
+    if (!sweptAbove) {
+        int maxFD = 0;
+#if HAVE_SYSCONF
+        maxFD = sysconf(_SC_OPEN_MAX);
+#endif
+        for (int fd = maxKeep + 1; fd < maxFD; ++fd)
+            close(fd); /* ignore result */
+    }
+
+    for (int fd = MAX_KEPT_FD + 1; fd <= maxKeep; ++fd)
+        if (!kept(fd))
+            close(fd); /* ignore result */
+}
 
 void unix::closeExtraFDs()
 {

@@ -87,6 +87,7 @@ public:
     void setKillSignal(int signal);
     void setKillTimeout(std::chrono::milliseconds duration);
     pid_t release();
+    pid_t get();
 #endif
 
     friend void swap(Pid & lhs, Pid & rhs) noexcept
@@ -141,6 +142,34 @@ std::string runProgram(
 
 struct RunOptions
 {
+    /**
+     * Wire one of the parent's descriptors onto a specific descriptor
+     * number in the child, for descriptors other than stdin/stdout/stderr
+     * (which have their own fields).
+     *
+     * `sourceFd` is the descriptor in *this* process to duplicate;
+     * `targetFd` is the number it will have in the child. So
+     * `{.sourceFd = pipe.writeSide.get(), .targetFd = 4}` makes the child's
+     * fd 4 a copy of that pipe.
+     *
+     * Named this way rather than `from`/`to` deliberately: those read
+     * ambiguously enough that the original implementation duplicated them
+     * the opposite way round from what its own error message claimed.
+     *
+     * Constraints, checked by `startProgram` before forking:
+     *
+     * - `targetFd` must be greater than `STDERR_FILENO`; use `standardOut` and
+     *   `mergeStderrToStdout` for the standard streams.
+     * - No `targetFd` may appear as another redirection's `sourceFd`, because the
+     *   duplications are applied in order and would clobber each other.
+     * - On Linux `targetFd` may not be `STDERR_FILENO + 1`, which the vfork child
+     *   reserves for its error-reporting pipe.
+     */
+    struct Redirection
+    {
+        int sourceFd, targetFd;
+    };
+
     std::filesystem::path program;
     bool lookupPath = true;
     OsStrings args;
@@ -152,14 +181,54 @@ struct RunOptions
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
     Sink * standardOut = nullptr;
+
+    /**
+     * Wire an existing descriptor onto the child's stdout, instead of
+     * collecting stdout into a `Sink` via `standardOut`.
+     *
+     * `Redirection` cannot express this, because it deliberately refuses any
+     * `targetFd` at or below `STDERR_FILENO`. Callers that already own the
+     * write end of a pipe want exactly this and nothing else.
+     *
+     * Mutually exclusive with `standardOut`; setting both is a `UsageError`,
+     * since the child has one stdout and the two options disagree about who
+     * owns it.
+     */
+    std::optional<Descriptor> standardOutFd;
+
     bool mergeStderrToStdout = false;
     bool isInteractive = false;
+    std::vector<Redirection> redirections;
+
+    /**
+     * Kill the child when this process dies (`PR_SET_PDEATHSIG` on Linux).
+     *
+     * Defaults to true, matching what `startProgram` did when this was
+     * hardcoded. Long-lived helpers that must outlive the process which
+     * spawned them — an `ssh -M` control master, for instance — set this
+     * false, which is why `ProcessOptions` has always had the same field.
+     */
+    bool dieWithParent = true;
+#ifdef __linux__
+    std::set<long> caps;
+#endif
 };
 
 // Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options);
 
 void runProgram2(const RunOptions & options);
+
+#ifndef _WIN32
+/**
+ * Start a program and return its pid without waiting for it, applying the
+ * same `RunOptions` that `runProgram2` does. `out` must have been created
+ * iff `options.standardOut` is set; the caller owns draining and waiting.
+ *
+ * Not available on Windows, which has no equivalent child-setup path.
+ */
+Pid startProgram(const RunOptions & options, std::shared_ptr<Pipe> out);
+#endif
 
 class ExecError final : public CloneableError<ExecError, Error>
 {

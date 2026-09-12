@@ -30,6 +30,7 @@
 #endif
 
 #include "util-unix-config-private.hh"
+#include "unix/processes-private.hh"
 
 namespace nix {
 
@@ -167,6 +168,11 @@ pid_t Pid::release()
     pid = INVALID_PID;
     *this = Pid();
     return p;
+}
+
+pid_t Pid::get()
+{
+    return pid;
 }
 
 void killUser(uid_t uid)
@@ -319,24 +325,50 @@ void runProgram2(const RunOptions & options)
     checkInterrupt();
 
     /* Create a pipe. */
-    Pipe out;
+    auto out = std::make_shared<Pipe>();
     if (options.standardOut)
-        out.create();
+        out->create();
+
+    auto pid = startProgram(options, out);
+
+    out->writeSide.close();
+
+    if (options.standardOut)
+        drainFD(out->readSide.get(), *options.standardOut);
+
+    /* Wait for the child to finish. */
+    int status = pid.wait();
+    if (status)
+        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+}
+
+Pid startProgram(const RunOptions & options, std::shared_ptr<Pipe> out)
+{
+    unix::validateRedirections(options);
 
     ProcessOptions processOptions;
+    processOptions.dieWithParent = options.dieWithParent;
 
     auto suspension = logger->suspendIf(options.isInteractive);
 
-    /* Fork. */
-    Pid pid = startProcess(
+    return startProcess(
         [&] {
             if (options.environment)
                 replaceEnv(*options.environment);
-            if (options.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
+            /* Either the `Sink` path owns stdout or the caller handed us a
+               descriptor for it; `validateRedirections` has already rejected
+               both being set at once. */
+            if (auto stdoutFd = options.standardOut ? std::optional{out->writeSide.get()} : options.standardOutFd)
+                if (dup2(*stdoutFd, STDOUT_FILENO) == -1)
+                    throw SysError("dupping stdout");
             if (options.mergeStderrToStdout)
                 if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
                     throw SysError("cannot dup stdout into stderr");
+            for (auto redirection : options.redirections) {
+                if (dup2(redirection.sourceFd, redirection.targetFd) == -1) {
+                    throw SysError("dupping fd %i onto fd %i", redirection.sourceFd, redirection.targetFd);
+                }
+            }
 
             if (options.chdir && chdir((*options.chdir).c_str()) == -1)
                 throw SysError("chdir failed");
@@ -359,7 +391,16 @@ void runProgram2(const RunOptions & options)
                the FDs before or after restoreProcessContext(), but on Linux
                it's crucial that it happens *after* restoreProcessContext() call
                because that re-enters the saved mountns. */
-            unix::closeExtraFDs();
+            /* The redirections above wired descriptors above stderr, and the
+               argument-less overload closes exactly those, so the targets have
+               to be exempted or the wiring is undone here. Sources that are not
+               themselves targets are deliberately *not* kept: the child has no
+               use for the original descriptor number. */
+            std::vector<Descriptor> keepFDs;
+            keepFDs.reserve(options.redirections.size());
+            for (auto redirection : options.redirections)
+                keepFDs.push_back(redirection.targetFd);
+            unix::closeExtraFDs(keepFDs);
 
             if (options.lookupPath)
                 execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -371,16 +412,6 @@ void runProgram2(const RunOptions & options)
             throw SysError("executing %s", PathFmt(options.program));
         },
         processOptions);
-
-    out.writeSide.close();
-
-    if (options.standardOut)
-        drainFD(out.readSide.get(), *options.standardOut);
-
-    /* Wait for the child to finish. */
-    int status = pid.wait();
-    if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
 }
 
 #endif // __linux__

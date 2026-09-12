@@ -127,7 +127,7 @@ bool SSHMaster::isMasterRunning()
     return res.first == 0;
 }
 
-Strings createSSHEnv()
+StringMap createSSHEnvMap()
 {
     // Copy the environment and set SHELL=/bin/sh
     StringMap env = getEnv();
@@ -140,8 +140,13 @@ Strings createSSHEnv()
     // solved; refer to the development history of nixExePath in libstore/globals.cc.
     env.insert_or_assign("SHELL", "/bin/sh");
 
+    return env;
+}
+
+Strings createSSHEnv()
+{
     Strings r;
-    for (auto & [k, v] : env) {
+    for (auto & [k, v] : createSSHEnvMap()) {
         r.push_back(k + "=" + v);
     }
 
@@ -246,33 +251,33 @@ std::filesystem::path SSHMaster::startMaster()
     Pipe out;
     out.create();
 
-    ProcessOptions options;
-    options.dieWithParent = false;
-
     auto suspension = logger->suspend();
 
     if (isMasterRunning())
         return state->socketPath;
 
-    state->sshMaster = startProcess(
-        [&]() {
-            restoreProcessContext();
+    /* `startProgram` supplies argv[0] from `program`, so this is everything
+       after it. */
+    OsStrings args = {hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
+    if (verbosity >= lvlChatty)
+        args.push_back("-v");
+    addCommonSSHOpts(args);
 
-            close(out.readSide.get());
-
-            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("duping over stdout");
-
-            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
-            if (verbosity >= lvlChatty)
-                args.push_back("-v");
-            addCommonSSHOpts(args);
-            auto env = createSSHEnv();
-            nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
-
-            throw SysError("unable to execute '%s'", args.front());
+    /* Everything the old `startProcess` child did is now declared rather than
+       run by hand: `restoreProcessContext()` is what `startProgram`'s own child
+       already does, `close(out.readSide)` is subsumed by its descriptor sweep,
+       and the stdout dup is `standardOutFd`. */
+    state->sshMaster = startProgram(
+        RunOptions{
+            .program = "ssh",
+            .args = std::move(args),
+            .environment = createSSHEnvMap(),
+            .standardOutFd = out.writeSide.get(),
+            /* The control master deliberately outlives the process that starts
+               it; that is the entire point of `-M -N`. */
+            .dieWithParent = false,
         },
-        options);
+        nullptr);
 
     out.writeSide = INVALID_DESCRIPTOR;
 
