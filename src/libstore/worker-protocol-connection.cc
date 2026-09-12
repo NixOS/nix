@@ -100,6 +100,8 @@ WorkerProto::BasicClientConnection::processStderrReturn(Sink * sink, Source * so
             auto type = (ResultType) readInt(from);
             auto fields = readFields(from);
             logger->result(act, type, fields);
+            if (resultHook)
+                resultHook(act, type, fields);
         }
 
         else if (msg == STDERR_LAST) {

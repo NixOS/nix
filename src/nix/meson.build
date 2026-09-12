@@ -144,9 +144,6 @@ nix_sources += [
 # The rest of the subdirectories aren't separate components,
 # just source files in another directory, so we process them here.
 
-build_remote_sources = files(
-  'build-remote/build-remote.cc',
-)
 nix_build_sources = files(
   'nix-build/nix-build.cc',
 )
@@ -189,7 +186,6 @@ sources = [
 
 if host_machine.system() != 'windows'
   sources += [
-    build_remote_sources,
     nix_channel_sources,
   ]
 endif
@@ -251,24 +247,6 @@ foreach linkname : nix_symlinks
   #meson.override_find_program(linkname, t)
   nix_symlinks_targets += symlink_target
 endforeach
-
-install_symlink(
-  'build-remote',
-  pointing_to : '..' / '..' / get_option('bindir') / fs.name(this_exe),
-  install_dir : get_option('libexecdir') / fs.name(this_exe),
-  # The 'runtime' tag is what executables default to, which we want to emulate here.
-  install_tag : 'runtime',
-)
-
-custom_target(
-  command : [ 'ln', '-sf', fs.name(this_exe), '@OUTPUT@' ],
-  output : 'build-remote' + executable_suffix,
-  # native doesn't allow dangling symlinks, but the target executable often doesn't exist at this time
-  env : {'MSYS' : 'winsymlinks:lnk'},
-  # TODO(Ericson2314): Don't do this once we have the `meson.override_find_program` working)
-  build_by_default : true,
-  depends : this_exe,
-)
 # TODO(Ericson3214): Doesn't yet work
 #meson.override_find_program(linkname, t)
 

@@ -1088,7 +1088,7 @@ void LocalStore::addToStore(const ValidPathInfo & info, Source & source, RepairF
             /* Lock the output path.  But don't lock if we're being called
                from a build hook (whose parent process already acquired a
                lock on this path). */
-            if (!locksHeld.count(printStorePath(info.path)))
+            if (!locksHeld.lock()->count(printStorePath(info.path)))
                 outputLock.lockPaths({realPath});
 
             /* The path may have been created by another process in the meantime, so check again. */

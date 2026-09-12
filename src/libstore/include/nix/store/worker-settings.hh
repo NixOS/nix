@@ -35,6 +35,8 @@ public:
     Setting<bool> keepGoing{
         this, false, "keep-going", "Whether to keep building derivations when another build fails."};
 
+    Setting<bool> keepFailed{this, false, "keep-failed", "Whether to keep temporary directories of failed builds."};
+
     Setting<bool> tryFallback{
         this,
         false,
@@ -116,27 +118,6 @@ public:
           default.
         )",
         {"build-timeout"}};
-
-    Setting<Strings> buildHook{
-        this,
-        {"nix", "__build-remote"},
-        "build-hook",
-        R"(
-          The path to the helper program that executes remote builds.
-
-          Nix communicates with the build hook over `stdio` using a custom protocol to request builds that cannot be performed directly by the Nix daemon.
-          The default value is the internal Nix binary that implements remote building.
-
-          > **Important**
-          >
-          > Change this setting only if you really know what you’re doing.
-        )"};
-
-    Setting<uint32_t> buildHookKillTimeout{
-        this,
-        500,
-        "build-hook-kill-timeout",
-        "How long to wait in milliseconds for build hooks to exit on interrupt before sending SIGKILL."};
 
     Setting<std::string> builders{
         this,

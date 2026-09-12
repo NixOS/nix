@@ -253,9 +253,11 @@ private:
 public:
 
     /**
-     * Hack for build-remote.cc.
+     * Output paths whose locks the build scheduler already holds, so
+     * that `addToStore` must not lock them again when copying the
+     * outputs of a remote build back.
      */
-    PathSet locksHeld;
+    Sync<PathSet> locksHeld;
 
     /**
      * Initialise the local store, upgrading the schema if

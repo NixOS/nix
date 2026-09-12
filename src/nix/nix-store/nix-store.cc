@@ -937,7 +937,7 @@ static void opServe(Strings opFlags, Strings opArgs)
             settings.getLocalSettings().runDiffHook = true;
         }
         if (clientVersion >= ServeProto::Version{2, 7}) {
-            settings.keepFailed = options.keepFailed;
+            settings.getWorkerSettings().keepFailed = options.keepFailed;
         }
     };
 
