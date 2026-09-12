@@ -23,7 +23,7 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-Goal::BasicCo<DerivationResolutionGoal::InputsGoalMap>
+Goal::Co<DerivationResolutionGoal::InputsGoalMap>
 DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildMode)
 {
     Goals waitees;
@@ -93,7 +93,7 @@ DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildM
     co_return inputGoals;
 }
 
-Goal::BasicCo<decltype(DerivationResolutionGoal::resolvedDrv)>
+Goal::Co<decltype(DerivationResolutionGoal::resolvedDrv)>
 DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -152,7 +152,7 @@ DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const Inputs
     co_return std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
 }
 
-Goal::Co DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
+Goal::Co<void> DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
 {
     auto inputGoals = co_await realiseInputs(*drv, buildMode);
     if (shouldResolve(*drv))

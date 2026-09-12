@@ -70,14 +70,14 @@ private:
     /**
      * The states.
      */
-    Co gaveUpOnSubstitution();
-    Co tryToBuild(StorePathSet inputPaths);
-    Co buildWithHook(
+    Co<void> gaveUpOnSubstitution();
+    Co<void> tryToBuild(StorePathSet inputPaths);
+    Co<void> buildWithHook(
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
-    Co buildLocally(
+    Co<void> buildLocally(
         LocalBuildCapability localBuildCap,
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,

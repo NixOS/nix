@@ -41,7 +41,7 @@ public:
      */
     std::shared_ptr<const UnkeyedRealisation> outputInfo;
 
-    Co init();
+    Co<void> init();
 
     std::string key() override;
 

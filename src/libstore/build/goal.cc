@@ -4,7 +4,7 @@
 
 namespace nix {
 
-Goal::Goal(Worker & worker, Co init)
+Goal::Goal(Worker & worker, Co<void> init)
     : worker(worker)
     , top_co(std::move(init))
 {
@@ -93,7 +93,7 @@ Goal::CoBase::~CoBase()
     }
 }
 
-void Goal::AwaitableFrame<void>::return_value(Co && next)
+void Goal::AwaitableFrame<void>::return_value(Co<void> && next)
 {
     goal->trace("return_value(Co&&)");
     // Save old continuation.
@@ -121,7 +121,7 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-Goal::Co Goal::await(Goals new_waitees)
+Goal::Co<void> Goal::await(Goals new_waitees)
 {
     assert(waitees.empty());
     if (!new_waitees.empty()) {
@@ -245,28 +245,28 @@ void Goal::timedOut(TimedOut && ex)
     worker.wakeUp(shared_from_this());
 }
 
-Goal::Co Goal::yield()
+Goal::Co<void> Goal::yield()
 {
     worker.wakeUp(shared_from_this());
     co_await Suspend{};
     co_return Return{};
 }
 
-Goal::Co Goal::waitForAWhile()
+Goal::Co<void> Goal::waitForAWhile()
 {
     worker.waitForAWhile(shared_from_this());
     co_await Suspend{};
     co_return Return{};
 }
 
-Goal::Co Goal::waitUntilWoken()
+Goal::Co<void> Goal::waitUntilWoken()
 {
     worker.waitForCompletion(shared_from_this());
     co_await Suspend{};
     co_return Return{};
 }
 
-Goal::Co Goal::waitForBuildSlot()
+Goal::Co<void> Goal::waitForBuildSlot()
 {
     worker.waitForBuildSlot(shared_from_this());
     co_await Suspend{};
