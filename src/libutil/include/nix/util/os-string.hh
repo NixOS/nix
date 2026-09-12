@@ -50,6 +50,22 @@ using OsStringMap = std::map<OsString, OsString, std::less<>>;
  */
 using OsStrings = std::list<OsString>;
 
+/**
+ * Convert between the native path encoding and an 8-bit one.
+ *
+ * On Unix both are the same arbitrary byte string and these are the
+ * identity. On Windows the 8-bit form is WTF-8, not strict UTF-8, because a
+ * Windows file name is an arbitrary sequence of 16-bit code units and may
+ * contain an unpaired surrogate that UTF-8 cannot represent. WTF-8 encodes
+ * those, so every name round-trips.
+ *
+ * Neither direction throws. They previously went through
+ * `std::codecvt_utf8_utf16`, which raised `std::range_error` on an unpaired
+ * surrogate -- so a file with such a name could not be named at all, and the
+ * failure surfaced far from the conversion.
+ *
+ * @see nix/util/wtf8.hh
+ */
 std::string os_string_to_string(OsStringView s);
 std::string os_string_to_string(OsString s);
 

@@ -60,6 +60,7 @@ headers = [ config_pub_h ] + files(
   'json-utils.hh',
   'library-versions.hh',
   'logging.hh',
+  'logical-path.hh',
   'lru-cache.hh',
   'memo.hh',
   'memory-source-accessor.hh',
@@ -104,5 +105,6 @@ headers = [ config_pub_h ] + files(
   'users.hh',
   'util.hh',
   'variant-wrapper.hh',
+  'wtf8.hh',
   'xml-writer.hh',
 )
