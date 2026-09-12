@@ -157,7 +157,7 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-Goal::Co DerivationBuildingGoal::gaveUpOnSubstitution()
+Goal::Co<void> DerivationBuildingGoal::gaveUpOnSubstitution()
 {
     Goals waitees;
 
@@ -308,7 +308,7 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
     return BuildError(BuildResult::Failure::InputRejected, std::move(msg));
 }
 
-Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
+Goal::Co<void> DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
 {
     auto drvOptions = [&] {
         try {
@@ -385,7 +385,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         return LocalBuildCapability{*localStoreP, ext};
     }();
 
-    auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co {
+    auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co<void> {
         trace("trying to build");
 
         /**
@@ -465,7 +465,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         co_return Return{};
     };
 
-    auto tryHookLoop = [&](bool & valid) -> Goal::Co {
+    auto tryHookLoop = [&](bool & valid) -> Goal::Co<void> {
         {
             PathLocks outputLocks;
             co_await acquireResources(valid, outputLocks);
@@ -532,7 +532,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
         }
     };
 
-    auto tryBuildLocally = [&](bool & valid) -> Goal::Co {
+    auto tryBuildLocally = [&](bool & valid) -> Goal::Co<void> {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;
             co_await acquireResources(valid, outputLocks);
@@ -591,7 +591,7 @@ Goal::Co DerivationBuildingGoal::tryToBuild(StorePathSet inputPaths)
     co_return doneFailure(reject(*rejection, storePath));
 }
 
-Goal::Co DerivationBuildingGoal::buildWithHook(
+Goal::Co<void> DerivationBuildingGoal::buildWithHook(
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -811,7 +811,7 @@ Goal::Co DerivationBuildingGoal::buildWithHook(
 #endif
 }
 
-Goal::Co DerivationBuildingGoal::buildLocally(
+Goal::Co<void> DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,

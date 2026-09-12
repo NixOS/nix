@@ -218,10 +218,8 @@ public:
     using HandleType = std::coroutine_handle<AwaitableFrame<T>>;
     using HandleTypeBase = std::coroutine_handle<AwaitableFrameBase>;
 
-    template<typename T = void>
-    struct BasicCo;
-
-    using Co = BasicCo<void>;
+    template<typename T>
+    struct Co;
 
     class CoBase
     {
@@ -295,11 +293,11 @@ public:
      *       tail-calls without using a trampoline AFAICT.
      */
     template<typename T>
-    struct [[nodiscard]] BasicCo : CoBase
+    struct [[nodiscard]] Co : CoBase
     {
-        BasicCo() noexcept = default;
+        Co() noexcept = default;
 
-        explicit BasicCo(HandleType<T> h) noexcept
+        explicit Co(HandleType<T> h) noexcept
             : CoBase(h)
         {
         }
@@ -311,7 +309,7 @@ public:
         }
     };
 
-    static_assert(sizeof(BasicCo<void>) == sizeof(CoBase));
+    static_assert(sizeof(Co<void>) == sizeof(CoBase));
 
     template<typename T>
     struct AsyncCallback
@@ -383,13 +381,13 @@ public:
         {
             CoAwaiterBase() = default;
 
-            CoAwaiterBase(BasicCo<T> c)
+            CoAwaiterBase(Co<T> c)
                 : co(std::move(c))
             {
             }
 
         public:
-            BasicCo<T> co;
+            Co<T> co;
 
             bool await_ready() const noexcept
             {
@@ -421,7 +419,7 @@ public:
         {
             CoAwaiter() = default;
 
-            explicit CoAwaiter(BasicCo<T> co)
+            explicit CoAwaiter(Co<T> co)
                 : CoAwaiterBase<T, CoAwaiter<T>>(std::move(co))
             {
             }
@@ -539,7 +537,7 @@ public:
         };
 
         template<typename T>
-        CoAwaiter<T> await_transform(BasicCo<T> && co)
+        CoAwaiter<T> await_transform(Co<T> && co)
         {
             return CoAwaiter<T>{std::move(co)};
         }
@@ -592,9 +590,9 @@ public:
          * Called by compiler generated code to construct the `Co`
          * that is returned from a `Co`-returning coroutine.
          */
-        BasicCo<T> get_return_object()
+        Co<T> get_return_object()
         {
-            return BasicCo<T>{HandleType<T>::from_promise(*this)};
+            return Co<T>{HandleType<T>::from_promise(*this)};
         }
 
         /**
@@ -660,7 +658,7 @@ public:
      */
     bool preserveFailure = false;
 
-    Goal(Worker & worker, Co init);
+    Goal(Worker & worker, Co<void> init);
 
     virtual ~Goal()
     {
@@ -726,23 +724,23 @@ public:
     virtual JobCategory jobCategory() const = 0;
 
 protected:
-    Co await(Goals waitees);
+    Co<void> await(Goals waitees);
 
     /**
      * Awaiting on the resulting coroutine yields the goal for several seconds.
      * Used for retrying goals blocked on acquiring lockfiles.
      */
-    Co waitForAWhile();
+    Co<void> waitForAWhile();
 
     /**
      * Awaiting on the resulting coroutine yields the goal until it is
      * explicitly woken up via Worker::wakeUp. Wakeup can be queued from another
      * thread via Worker::Waker.
      */
-    Co waitUntilWoken();
+    Co<void> waitUntilWoken();
 
-    Co waitForBuildSlot();
-    Co yield();
+    Co<void> waitForBuildSlot();
+    Co<void> yield();
 };
 
 void addToWeakGoals(WeakGoals & goals, GoalPtr p);
@@ -797,7 +795,7 @@ struct Goal::AwaitableFrameBase::CoAwaiter<void> : CoAwaiterBase<void, CoAwaiter
 {
     CoAwaiter() = default;
 
-    explicit CoAwaiter(BasicCo<void> co)
+    explicit CoAwaiter(Co<void> co)
         : CoAwaiterBase<void, CoAwaiter<void>>(std::move(co))
     {
     }
@@ -808,9 +806,9 @@ struct Goal::AwaitableFrameBase::CoAwaiter<void> : CoAwaiterBase<void, CoAwaiter
 template<>
 struct Goal::AwaitableFrame<void> : Goal::AwaitableFrameBase
 {
-    Co get_return_object()
+    Co<void> get_return_object()
     {
-        return Co{HandleType<void>::from_promise(*this)};
+        return Co<void>{HandleType<void>::from_promise(*this)};
     }
 
     /**
@@ -838,13 +836,13 @@ struct Goal::AwaitableFrame<void> : Goal::AwaitableFrameBase
      * the continuation of the new continuation. Thus, the continuation
      * passed to @ref return_value must not have a continuation set.
      */
-    void return_value(Co &&);
+    void return_value(Co<void> &&);
 };
 
 } // namespace nix
 
 template<typename T, typename... ArgTypes>
-struct std::coroutine_traits<nix::Goal::BasicCo<T>, ArgTypes...>
+struct std::coroutine_traits<nix::Goal::Co<T>, ArgTypes...>
 {
     using promise_type = nix::Goal::AwaitableFrame<T>;
 };

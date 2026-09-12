@@ -28,7 +28,7 @@ PathSubstitutionGoal::~PathSubstitutionGoal()
     cleanup();
 }
 
-Goal::Co PathSubstitutionGoal::init()
+Goal::Co<void> PathSubstitutionGoal::init()
 {
     trace("init");
 
@@ -177,7 +177,7 @@ Goal::Co PathSubstitutionGoal::init()
         }});
 }
 
-Goal::BasicCo<PathSubstitutionGoal::SubstitutionResult>
+Goal::Co<PathSubstitutionGoal::SubstitutionResult>
 PathSubstitutionGoal::tryToRun(StorePath subPath, nix::ref<Store> sub, std::shared_ptr<const ValidPathInfo> info)
 {
     trace("all references realised");

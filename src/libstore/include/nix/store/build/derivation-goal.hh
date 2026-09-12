@@ -77,7 +77,7 @@ private:
     /**
      * The states.
      */
-    Co haveDerivation(bool storeDerivation);
+    Co<void> haveDerivation(bool storeDerivation);
 
     /**
      * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
@@ -94,7 +94,7 @@ private:
      */
     UnkeyedRealisation assertPathValidity();
 
-    Co repairClosure();
+    Co<void> repairClosure();
 
     Done doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
 

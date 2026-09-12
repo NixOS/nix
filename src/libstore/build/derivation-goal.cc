@@ -46,7 +46,7 @@ std::string DerivationGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
+Goal::Co<void> DerivationGoal::haveDerivation(bool storeDerivation)
 {
     trace("have derivation");
 
@@ -327,7 +327,7 @@ Goal::Co DerivationGoal::haveDerivation(bool storeDerivation)
     co_return amDone(*g->exitCode);
 }
 
-Goal::Co DerivationGoal::repairClosure()
+Goal::Co<void> DerivationGoal::repairClosure()
 {
     assert(!type(*drv).isImpure());
 

@@ -66,14 +66,14 @@ std::string DerivationTrampolineGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co DerivationTrampolineGoal::haveToLoadFromStore()
+Goal::Co<void> DerivationTrampolineGoal::haveToLoadFromStore()
 {
     auto [drvPath, drv] = co_await loadDerivation();
     co_await haveDerivation(std::move(drvPath), std::move(drv));
     unreachable(); /* Keep in mind that we *still* end coroutines early. */
 }
 
-Goal::BasicCo<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDerivation()
+Goal::Co<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDerivation()
 {
     trace("need to load derivation from file");
 
@@ -138,7 +138,7 @@ Goal::BasicCo<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDe
     co_return std::pair{std::move(drvPath), std::move(drv)};
 }
 
-Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
+Goal::Co<void> DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
 {
     trace("have derivation, will kick off derivations goals per wanted output");
 
