@@ -287,7 +287,7 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
         if (auto attr = i.value->attrs()->get(sAllOutputs)) {
             if (state.forceBool(
                     *attr->value, attr->pos, "while evaluating the `allOutputs` attribute of a string context")) {
-                if (!isDerivation(name)) {
+                if (!namePath.isDerivation()) {
                     state
                         .error<EvalError>(
                             "tried to add all-outputs context of %s, which is not a derivation, to a string", name)
@@ -303,7 +303,7 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
 
         if (auto attr = i.value->attrs()->get(state.s.outputs)) {
             state.forceList(*attr->value, attr->pos, "while evaluating the `outputs` attribute of a string context");
-            if (attr->value->listSize() && !isDerivation(name)) {
+            if (attr->value->listSize() && !namePath.isDerivation()) {
                 state
                     .error<EvalError>(
                         "tried to add derivation output context of %s, which is not a derivation, to a string", name)

@@ -294,7 +294,7 @@ static void import(EvalState & state, Value & vPath, Value * vScope, Value & v)
         if (!state.store->isStorePath(path2))
             return std::nullopt;
         auto storePath = state.store->parseStorePath(path2);
-        if (!(state.store->isValidPath(storePath) && isDerivation(path2)))
+        if (!(state.store->isValidPath(storePath) && storePath.isDerivation()))
             return std::nullopt;
         return storePath;
     };
@@ -1821,7 +1821,7 @@ static void derivationStrictInternal(EvalState & state, std::string_view drvName
         state.error<EvalError>("required attribute 'system' missing").atPos(v).debugThrow();
 
     /* Check whether the derivation name is valid. */
-    if (isDerivation(drvName)
+    if (isDerivationFileName(drvName)
         && !(
             ingestionMethod == ContentAddressMethod::Raw::Text && outputs.size() == 1 && *(outputs.begin()) == "out")) {
         state

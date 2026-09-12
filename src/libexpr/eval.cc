@@ -2667,7 +2667,7 @@ BackedStringView EvalState::coerceToString(
 
 StorePath EvalState::copyPathToStore(NixStringContext & context, const SourcePath & path)
 {
-    if (nix::isDerivation(path.path.abs()))
+    if (isDerivationFileName(path.path.abs()))
         error<EvalError>("file names are not allowed to end in '%1%'", drvExtension).debugThrow();
 
     auto dstPath = fetchToStore(
