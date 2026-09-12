@@ -70,8 +70,7 @@ private:
     /**
      * The states.
      */
-    Co<void> gaveUpOnSubstitution();
-    Co<void> tryToBuild(StorePathSet inputPaths);
+    Co<void> tryToBuild();
     Co<void> buildWithHook(
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
@@ -79,10 +78,12 @@ private:
         PathLocks outputLocks);
     Co<void> buildLocally(
         LocalBuildCapability localBuildCap,
-        StorePathSet inputPaths,
-        std::map<std::string, InitialOutput> initialOutputs,
-        DerivationOptions<StorePath> drvOptions,
-        PathLocks outputLocks);
+        const StorePathSet & inputPaths,
+        std::map<std::string, InitialOutput> & initialOutputs,
+        const DerivationOptions<StorePath> & drvOptions,
+        PathLocks outputLocks,
+        /* Set (and the coroutine returns) if a build slot has to be waited for. */
+        bool & needsSlot);
 
     /**
      * Is the build hook willing to perform the build?
