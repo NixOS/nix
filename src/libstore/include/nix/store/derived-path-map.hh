@@ -3,6 +3,7 @@
 
 #include "nix/util/types.hh"
 #include "nix/store/derived-path.hh"
+#include "nix/store/derivation/path.hh"
 
 namespace nix {
 
@@ -62,7 +63,7 @@ struct DerivedPathMap
     /**
      * The map type for the root node.
      */
-    using Map = std::map<StorePath, ChildNode>;
+    using Map = std::map<DerivationPath, ChildNode>;
 
     /**
      * The map of root node.

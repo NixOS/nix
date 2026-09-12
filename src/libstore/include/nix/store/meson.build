@@ -38,6 +38,7 @@ headers = [ config_pub_h ] + files(
   'derivation/full-inputs.hh',
   'derivation/masked.hh',
   'derivation/output.hh',
+  'derivation/path.hh',
   'derivation/resolution.hh',
   'derivations.hh',
   'derived-path-map.hh',

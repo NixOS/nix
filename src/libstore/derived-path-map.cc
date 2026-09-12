@@ -11,8 +11,11 @@ typename DerivedPathMap<V>::ChildNode & DerivedPathMap<V>::ensureSlot(const Sing
         return std::visit(
             overloaded{
                 [&](const SingleDerivedPath::Opaque & bo) -> auto & {
+                    /* The root of a chain with outputs under it is a
+                       derivation; anything else is a caller error,
+                       which the conversion reports. */
                     // will not overwrite if already there
-                    return map[bo.path];
+                    return map[DerivationPath::require(bo.path)];
                 },
                 [&](const SingleDerivedPath::Built & bfd) -> auto & {
                     auto & n = initIter(*bfd.drvPath);
@@ -30,14 +33,17 @@ typename DerivedPathMap<V>::ChildNode * DerivedPathMap<V>::findSlot(const Single
     fun<ChildNode *(const SingleDerivedPath &)> initIter = [&](const auto & k) {
         return std::visit(
             overloaded{
-                [&](const SingleDerivedPath::Opaque & bo) {
-                    auto it = map.find(bo.path);
+                [&](const SingleDerivedPath::Opaque & bo) -> ChildNode * {
+                    auto key = DerivationPath::tryFrom(bo.path);
+                    if (!key)
+                        return nullptr;
+                    auto it = map.find(*key);
                     return it != map.end() ? &it->second : nullptr;
                 },
-                [&](const SingleDerivedPath::Built & bfd) {
+                [&](const SingleDerivedPath::Built & bfd) -> ChildNode * {
                     auto * n = initIter(*bfd.drvPath);
                     if (!n)
-                        return (ChildNode *) nullptr;
+                        return nullptr;
 
                     auto it = n->childMap.find(bfd.output);
                     return it != n->childMap.end() ? &it->second : nullptr;
@@ -56,7 +62,10 @@ void DerivedPathMap<V>::removeSlot(const SingleDerivedPath & k, fun<bool(ChildNo
         std::visit(
             overloaded{
                 [&](const SingleDerivedPath::Opaque & bo) {
-                    if (auto it = map.find(bo.path); it != map.end() && !onNode(it->second))
+                    auto key = DerivationPath::tryFrom(bo.path);
+                    if (!key)
+                        return;
+                    if (auto it = map.find(*key); it != map.end() && !onNode(it->second))
                         map.erase(it);
                 },
                 [&](const SingleDerivedPath::Built & bfd) {

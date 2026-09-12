@@ -501,12 +501,8 @@ Full parse(
     parseMap(
         str,
         fullInputs.drvs.map,
-        [&] {
-            auto drvPath = parseStorePath(store, str, supportWindowsStoreDir);
-            drvPath.requireDerivation();
-            return drvPath;
-        },
-        [&](const StorePath & drvPath) {
+        [&] { return DerivationPath::require(parseStorePath(store, str, supportWindowsStoreDir)); },
+        [&](const DerivationPath & drvPath) {
             auto node = parseDerivedPathMapNode(store, str, version);
             /* Such an entry cannot be represented in the flat inputs set,
                and would thus be silently dropped rather than round-tripped.
@@ -515,7 +511,7 @@ Full parse(
                 throw FormatError("inputDrvs entry for '%s' specifies no outputs", store.printStorePath(drvPath));
             return node;
         },
-        [&](const StorePath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
+        [&](const DerivationPath & drvPath) { return fmt("input derivation '%s'", store.printStorePath(drvPath)); });
 
     expect(str, ',');
     fullInputs.srcs = parseStorePaths(store, str, supportWindowsStoreDir);

@@ -133,7 +133,7 @@ static void inputsToJson(json & res, const nix::derivation::FullInputs & inputs)
     auto & inputDrvsObj = res["drvs"];
     inputDrvsObj = nlohmann::json::object();
     for (auto & [inputDrv, inputNode] : inputs.drvs.map)
-        inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
+        inputDrvsObj[inputDrv->to_string()] = doInput(inputNode);
 }
 
 static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & inputs)
@@ -214,7 +214,7 @@ nix::derivation::FullInputs inputsFromJson<nix::derivation::FullInputs>(
             return node;
         };
         for (auto & [inputDrvPath, inputOutputs] : getObject(valueAt(inputsObj, "drvs")))
-            inputs.drvs.map[StorePath{inputDrvPath}] = doInput(inputOutputs);
+            inputs.drvs.map[DerivationPath::require(StorePath{inputDrvPath})] = doInput(inputOutputs);
     } catch (Error & e) {
         e.addTrace({}, "while reading key 'drvs'");
         throw;
