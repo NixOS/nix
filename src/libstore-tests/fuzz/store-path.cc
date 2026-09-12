@@ -21,12 +21,10 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t * data, size_t size)
 
     auto parsedView = parsed->to_string();
 
-    /* Now actually check invariants. See nameRegexStr. MaxPathLen is actually
-       a misnomer - it's the maximum length of the store object name, not the
-       pathname. Pathname length includes the hash len + `-`.
+    /* Now actually check invariants. See nameRegexStr.
        Is the following checks a bit overkill? Maybe - but StorePath is also used
        everywhere so we better get it right. */
-    assert(parsedView.size() <= StorePath::MaxPathLen + StorePath::HashLen + 1);
+    assert(parsedView.size() <= StorePath::MaxBasenameLen);
 
     /* Name can't be empty, so strict comparison. */
     assert(parsedView.size() > StorePath::HashLen + 1);

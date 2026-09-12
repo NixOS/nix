@@ -48,6 +48,12 @@ struct StoreDirConfig
 
     StringSet printStorePathSet(const StorePathSet & path) const;
 
+    std::size_t maxCanonicalStorePathLen() const noexcept
+    {
+        /* storeDir itself must be canonical + "/" + StorePath basename. */
+        return storeDir.size() + 1 + StorePath::MaxBasenameLen;
+    }
+
     /**
      * Display a set of paths in human-readable form (i.e., between quotes
      * and separated by commas).

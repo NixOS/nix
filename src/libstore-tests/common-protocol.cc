@@ -152,4 +152,65 @@ CHARACTERIZATION_TEST(
         },
     }))
 
+class CommonProtoStorePathTest : public ::testing::Test
+{
+    std::string storeDir = "/nix/store";
+
+protected:
+    StoreDirConfig store{storeDir};
+
+    std::string makeBasename(std::size_t nameLength) const
+    {
+        return std::string(StorePath::dummy.hashPart()) + "-" + std::string(nameLength, 'x');
+    }
+};
+
+TEST_F(CommonProtoStorePathTest, maximum_length)
+{
+    auto baseName = makeBasename(StorePath::MaxNameLen);
+    auto storePath = store.storeDir + "/" + baseName;
+    StringSource from{[&] {
+        StringSink sink;
+        writeString(storePath, sink);
+        return sink.s;
+    }()};
+    EXPECT_EQ(CommonProto::Serialise<StorePath>::read(store, {.from = from}), StorePath(baseName));
+}
+
+TEST_F(CommonProtoStorePathTest, too_long)
+{
+    std::string storePath = store.storeDir + "/" + std::string(StorePath::dummy.hashPart()) + "-"
+                            + std::string(StorePath::MaxNameLen + 1, 'x');
+    StringSource from{[&] {
+        StringSink sink;
+        writeString(storePath, sink);
+        return sink.s;
+    }()};
+    EXPECT_THROW(CommonProto::Serialise<StorePath>::read(store, {.from = from}), SerialisationError);
+}
+
+TEST_F(CommonProtoStorePathTest, wrong_store_dir)
+{
+    std::string storePath = "/gnu/store/" + makeBasename(StorePath::MaxNameLen);
+    StringSource from{[&] {
+        StringSink sink;
+        writeString(storePath, sink);
+        return sink.s;
+    }()};
+    EXPECT_THROW(CommonProto::Serialise<StorePath>::read(store, {.from = from}), BadStorePath);
+}
+
+TEST_F(CommonProtoStorePathTest, no_dot_dots)
+{
+    /* Everything immediately following the `/` is interpreted as a CanonPath, so `/` or `..`
+       has no special meaning. */
+    std::string storePath = store.storeDir + "/../" + makeBasename(8);
+    StringSource from{[&] {
+        StringSink sink;
+        writeString(storePath, sink);
+        return sink.s;
+    }()};
+    EXPECT_THROW(CommonProto::Serialise<StorePath>::read(store, {.from = from}), BadStorePath);
+}
+
 } // namespace nix
