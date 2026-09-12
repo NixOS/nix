@@ -152,7 +152,7 @@ Goal::Done Goal::amDone(ExitCode result)
 {
     trace("done");
     assert(top_co);
-    assert(exitCode == ecBusy);
+    assert(!exitCode);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
 
@@ -224,7 +224,7 @@ void Goal::work()
     baseHandle.resume();
     // We either should be in a state where we can be work()-ed again,
     // or we should be done.
-    assert(top_co || exitCode != ecBusy);
+    assert(top_co || exitCode);
 }
 
 void Goal::handleChildOutput(Descriptor fd, std::string_view data)
