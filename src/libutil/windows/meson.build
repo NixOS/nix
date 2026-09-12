@@ -6,7 +6,6 @@ sources += files(
   'file-system-at.cc',
   'file-system.cc',
   'known-folders.cc',
-  'muxable-pipe.cc',
   'os-string.cc',
   'processes.cc',
   'signals.cc',

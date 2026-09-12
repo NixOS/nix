@@ -122,10 +122,10 @@ private:
     using LoadResult = std::variant<LoadedDerivation, BuildResult::Failure>;
     using Result = std::pair<ExitCode, BuildResult>;
 
-    Co<ExitCode> init(Co<Result> work);
-    Co<LoadResult> loadDerivation();
-    Co<Result> haveToLoadFromStore();
-    Co<Result> haveDerivation(StorePath drvPath, Derivation drv);
+    asio::awaitable<ExitCode> init(asio::awaitable<Result> work);
+    asio::awaitable<LoadResult> loadDerivation();
+    asio::awaitable<Result> haveToLoadFromStore();
+    asio::awaitable<Result> haveDerivation(StorePath drvPath, Derivation drv);
 
     BuildMode buildMode;
 

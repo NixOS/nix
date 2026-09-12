@@ -66,14 +66,14 @@ std::string DerivationTrampolineGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co<Goal::ExitCode> DerivationTrampolineGoal::init(Co<Result> work)
+asio::awaitable<Goal::ExitCode> DerivationTrampolineGoal::init(asio::awaitable<Result> work)
 {
     auto result = co_await std::move(work);
     buildResult = std::move(result.second);
     co_return result.first;
 }
 
-Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveToLoadFromStore()
+asio::awaitable<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveToLoadFromStore()
 {
     auto loadResult = co_await loadDerivation();
     if (auto * failure = std::get_if<BuildResult::Failure>(&loadResult))
@@ -83,7 +83,7 @@ Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveToLoadF
     co_return co_await haveDerivation(std::move(drvPath), std::move(drv));
 }
 
-Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDerivation()
+asio::awaitable<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDerivation()
 {
     trace("need to load derivation from file");
 
@@ -146,7 +146,8 @@ Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDer
     co_return std::pair{std::move(drvPath), std::move(drv)};
 }
 
-Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
+asio::awaitable<DerivationTrampolineGoal::Result>
+DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
 {
     trace("have derivation, will kick off derivations goals per wanted output");
 

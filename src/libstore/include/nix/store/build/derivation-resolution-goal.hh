@@ -59,10 +59,10 @@ private:
 
     using InputsGoalMap = std::map<ref<const SingleDerivedPath>, GoalPtr, RefDeepComparator>;
 
-    Co<ExitCode> init(ref<const Derivation> drv, BuildMode buildMode);
-    Co<BuildResult> resolve(ref<const Derivation> drv, BuildMode buildMode);
-    Co<InputsGoalMap> realiseInputs(const Derivation & drv, BuildMode buildMode);
-    Co<decltype(resolvedDrv)> resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals);
+    asio::awaitable<ExitCode> init(ref<const Derivation> drv, BuildMode buildMode);
+    asio::awaitable<BuildResult> resolve(ref<const Derivation> drv, BuildMode buildMode);
+    asio::awaitable<InputsGoalMap> realiseInputs(const Derivation & drv, BuildMode buildMode);
+    asio::awaitable<decltype(resolvedDrv)> resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals);
 
     JobCategory jobCategory() const override
     {

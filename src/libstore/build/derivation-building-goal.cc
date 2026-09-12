@@ -18,6 +18,7 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/machines.hh"
 #include "nix/util/current-process.hh"
 
 #include <chrono>
@@ -29,6 +30,17 @@
 #include <unistd.h>
 
 #include <nlohmann/json.hpp>
+
+#include <boost/asio/deferred.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/experimental/parallel_group.hpp>
+#ifndef _WIN32
+#  include <boost/asio/posix/stream_descriptor.hpp>
+#else
+#  include <boost/asio/windows/stream_handle.hpp>
+#endif
+
+#include <deque>
 
 #include "nix/util/strings.hh"
 
@@ -145,9 +157,217 @@ struct PostBuildHookState
     }
 };
 
+namespace {
+
+/**
+ * Output read from one of a child process's pipes.
+ */
+struct ChildOutput
+{
+    Descriptor fd;
+    std::string data;
+};
+
+/**
+ * End of file on one of a child process's pipes.
+ */
+struct ChildEOF
+{
+    Descriptor fd;
+};
+
+using ChildEvent = std::variant<ChildOutput, ChildEOF, TimedOut>;
+
+/**
+ * Timeouts to enforce while waiting for a child's output. Zero means
+ * no limit.
+ */
+struct ChildTimeouts
+{
+    time_t maxSilentTime;
+    time_t buildTimeout;
+};
+
+#ifndef _WIN32
+using ChildStream = asio::posix::stream_descriptor;
+#else
+using ChildStream = asio::windows::stream_handle;
+#endif
+
+/**
+ * Asynchronously reads the pipes of a child process, delivering one
+ * @ref ChildEvent at a time from @ref next.
+ *
+ * The descriptors stay owned by the caller; they are only registered
+ * with the reactor (or I/O completion port) for the lifetime of this
+ * object. On Windows they must have been opened for overlapped I/O.
+ */
+class ChildEvents
+{
+    using Clock = std::chrono::steady_clock;
+
+    /**
+     * One pipe and the buffer its reads land in. Heap-allocated so that
+     * the addresses stay stable while reads are in flight.
+     */
+    struct Stream
+    {
+        ChildStream stream;
+        std::array<char, 4096> buf;
+
+        Stream(asio::any_io_executor ex, Descriptor fd)
+            : stream(ex, fd)
+        {
+        }
+
+        ~Stream()
+        {
+            stream.release();
+        }
+    };
+
+    std::vector<std::unique_ptr<Stream>> streams;
+    std::optional<ChildTimeouts> timeouts;
+    asio::steady_timer timer;
+    Clock::time_point timeStarted = Clock::now();
+    Clock::time_point lastOutput = timeStarted;
+
+    /**
+     * Events already received but not yet handed out by @ref next.
+     */
+    std::deque<ChildEvent> pending;
+
+    /**
+     * Whether a read error means that the child has closed its end.
+     */
+    static bool isEOF(const boost::system::error_code & ec)
+    {
+        if (ec == asio::error::eof)
+            return true;
+#ifndef _WIN32
+        /* Reading the master side of a pseudoterminal fails with EIO once
+           the child has closed the slave side. */
+        return ec == boost::system::error_code(EIO, boost::system::system_category());
+#else
+        return ec == boost::system::error_code(ERROR_BROKEN_PIPE, boost::system::system_category());
+#endif
+    }
+
+    /**
+     * The nearest timeout deadline, paired with the number of seconds
+     * of the limit that produced it.
+     */
+    std::optional<std::pair<Clock::time_point, time_t>> deadline() const
+    {
+        std::optional<std::pair<Clock::time_point, time_t>> res;
+        if (!timeouts)
+            return res;
+        auto consider = [&](time_t seconds, Clock::time_point from) {
+            if (seconds == 0)
+                return;
+            auto at = from + std::chrono::seconds(seconds);
+            if (!res || at < res->first)
+                res = {at, seconds};
+        };
+        consider(timeouts->maxSilentTime, lastOutput);
+        consider(timeouts->buildTimeout, timeStarted);
+        return res;
+    }
+
+    /**
+     * Wait until at least one stream has produced output or EOF, or the
+     * timeout has expired, and queue the corresponding events.
+     *
+     * All streams are read concurrently. Once one read completes the
+     * others are cancelled, but a read that completed in the meantime
+     * still has its data, so every completion is looked at rather than
+     * just the first.
+     */
+    asio::awaitable<void> waitForEvents()
+    {
+        assert(!streams.empty());
+
+        auto dl = deadline();
+        /* Check explicitly, since a child that never stops writing would
+           otherwise always win the race against the timer. */
+        if (dl && Clock::now() >= dl->first) {
+            pending.push_back(TimedOut(dl->second));
+            co_return;
+        }
+
+        using ReadOp =
+            decltype(streams.front()->stream.async_read_some(asio::buffer(streams.front()->buf), asio::deferred));
+        std::vector<ReadOp> reads;
+        for (auto & s : streams)
+            reads.push_back(s->stream.async_read_some(asio::buffer(s->buf), asio::deferred));
+        auto readAny = asio::experimental::make_parallel_group(std::move(reads))
+                           .async_wait(asio::experimental::wait_for_one(), asio::deferred);
+
+        timer.expires_at(dl ? dl->first : Clock::time_point::max());
+
+        auto results =
+            co_await asio::experimental::make_parallel_group(std::move(readAny), timer.async_wait(asio::deferred))
+                .async_wait(asio::experimental::wait_for_one(), asio::use_awaitable);
+        auto & readOrder = std::get<1>(results);
+        auto & readErrors = std::get<2>(results);
+        auto & readSizes = std::get<3>(results);
+        auto & timerError = std::get<4>(results);
+
+        auto now = Clock::now();
+        std::vector<Descriptor> closed;
+        for (auto idx : readOrder) {
+            auto & s = *streams[idx];
+            auto fd = s.stream.native_handle();
+            auto & ec = readErrors[idx];
+            if (auto n = readSizes[idx]) {
+                lastOutput = now;
+                pending.push_back(ChildOutput{fd, std::string(s.buf.data(), n)});
+            }
+            if (ec == asio::error::operation_aborted)
+                continue;
+            if (isEOF(ec)) {
+                pending.push_back(ChildEOF{fd});
+                closed.push_back(fd);
+            } else if (ec)
+                throw boost::system::system_error(ec, "reading from child process");
+        }
+
+        std::erase_if(
+            streams, [&](auto & s) { return std::ranges::find(closed, s->stream.native_handle()) != closed.end(); });
+
+        if (dl && !timerError)
+            pending.push_back(TimedOut(dl->second));
+    }
+
+public:
+    ChildEvents(asio::any_io_executor ex, const std::set<Descriptor> & fds, std::optional<ChildTimeouts> timeouts)
+        : timeouts(timeouts)
+        , timer(ex)
+    {
+        for (auto fd : fds)
+            streams.push_back(std::make_unique<Stream>(ex, fd));
+    }
+
+    asio::awaitable<ChildEvent> next()
+    {
+        while (pending.empty())
+            co_await waitForEvents();
+        auto event = std::move(pending.front());
+        pending.pop_front();
+        co_return event;
+    }
+};
+
+} // namespace
+
 /* Only used on Unix; on Windows every call site throws instead. */
 #ifndef _WIN32
-static std::unique_ptr<PostBuildHookState> runPostBuildHook(
+
+/**
+ * Run the post-build hook for `drvPath`, streaming its output to the
+ * logger, and wait for it to finish.
+ */
+static asio::awaitable<void> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
@@ -155,7 +375,7 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePathSet & outputPaths);
 #endif
 
-Goal::Co<Goal::ExitCode> DerivationBuildingGoal::init()
+asio::awaitable<Goal::ExitCode> DerivationBuildingGoal::init()
 {
     auto result = co_await tryToBuild();
 
@@ -273,7 +493,7 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
+asio::awaitable<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
 {
     Goals waitees;
 
@@ -331,7 +551,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
     /* Okay, try to build.  Note that here we don't wait for a build
        slot to become available, since we don't need one if there is a
        build hook. */
-    co_await yield();
 
     auto drvOptions = [&] {
         try {
@@ -408,7 +627,11 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
         return LocalBuildCapability{*localStoreP, ext};
     }();
 
-    auto acquireResources = [&](PathLocks & outputLocks) -> Goal::Co<bool> {
+    /* A local build slot, kept across retries of the loop below so that
+       waiting for one does not turn into a livelock with other goals. */
+    std::optional<AsyncSemaphore::Handle> buildSlot;
+
+    auto acquireResources = [&](PathLocks & outputLocks) -> asio::awaitable<bool> {
         trace("trying to build");
 
         /**
@@ -487,7 +710,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
         co_return false;
     };
 
-    auto tryHookLoop = [&]() -> Goal::Co<std::optional<Result>> {
+    auto tryHookLoop = [&]() -> asio::awaitable<std::optional<Result>> {
         {
             PathLocks outputLocks;
             if (co_await acquireResources(outputLocks))
@@ -496,10 +719,12 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     .builtOutputs = checkPathValidity(initialOutputs).second,
                 }};
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (tryBuildHook(drvOptions, buildSlot || worker.buildSemaphore.canAcquireNow())) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
-                   EOF from the hook. */
+                   EOF from the hook. The local build slot, if any, is
+                   not needed for a remote build. */
+                buildSlot.reset();
                 co_return co_await buildWithHook(
                     std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
             case rpDecline:
@@ -529,10 +754,12 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (tryBuildHook(drvOptions, buildSlot || worker.buildSemaphore.canAcquireNow())) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
-                       EOF from the hook. */
+                       EOF from the hook. The local build slot, if any, is
+                       not needed for a remote build. */
+                    buildSlot.reset();
                     break;
                 case rpPostpone:
                     /* Not now; wait until at least one child finishes or
@@ -559,7 +786,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
         }
     };
 
-    auto tryBuildLocally = [&]() -> Goal::Co<std::optional<LocalBuildOutcome>> {
+    auto tryBuildLocally = [&]() -> asio::awaitable<std::optional<LocalBuildOutcome>> {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;
             if (co_await acquireResources(outputLocks))
@@ -568,7 +795,8 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     .builtOutputs = checkPathValidity(initialOutputs).second,
                 }};
 
-            co_return co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks));
+            co_return co_await buildLocally(
+                *cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks), buildSlot);
         }
 
         co_return std::nullopt;
@@ -607,7 +835,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
     co_return reject(*rejection, storePath);
 }
 
-Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
+asio::awaitable<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     StorePathSet inputPaths,
     std::map<std::string, InitialOutput> initialOutputs,
     DerivationOptions<StorePath> drvOptions,
@@ -617,10 +845,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     unreachable();
 #else
     std::unique_ptr<HookInstance> hook = std::move(worker.hook);
-
-    /* Set up callback so childTerminated is called if the hook is
-       destroyed (e.g., during failure cascades). */
-    hook->onKillChild = [this]() { worker.childTerminated(this, JobCategory::Build); };
 
     std::string machineName = [&hook]() {
         try {
@@ -656,10 +880,10 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     /* Create the log file and pipe. */
     std::unique_ptr<LogFile> logFile = std::make_unique<LogFile>(worker.store, drvPath, settings.getLogFileSettings());
 
-    std::set<MuxablePipePollState::CommChannel> fds;
-    fds.insert(hook->fromHook.readSide.get());
-    fds.insert(hook->builderOut.readSide.get());
-    worker.childStarted(shared_from_this(), fds, false, false);
+    ChildEvents events(
+        co_await asio::this_coro::executor,
+        {hook->fromHook.readSide.get(), hook->builderOut.readSide.get()},
+        std::nullopt);
 
     buildResult.startTime = time(nullptr); // inexact
 
@@ -685,7 +909,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     uint64_t logSize = 0;
 
     while (true) {
-        auto event = co_await WaitForChildEvent{};
+        auto event = co_await events.next();
         if (auto * output = std::get_if<ChildOutput>(&event)) {
             auto & fd = output->fd;
             auto & data = output->data;
@@ -737,9 +961,9 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
         } else if (std::get_if<ChildEOF>(&event)) {
             buildLog->flush();
             break;
-        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
+        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
             hook.reset();
-            co_return std::move(**timeout);
+            co_return std::move(*timeout);
         }
     }
 
@@ -755,9 +979,6 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(nullptr);
-
-    /* So the child is gone now. */
-    worker.childTerminated(this);
 
     /* Close the read side of the logger pipe. */
     hook->builderOut.readSide.close();
@@ -801,20 +1022,8 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     for (auto & [_, output] : builtOutputs)
         outputPaths.insert(output.outPath);
 
-    if (worker.settings.postBuildHook.get() != "") {
-        auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
-        worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
-        while (true) {
-            auto event = co_await WaitForChildEvent{};
-            if (auto * output = std::get_if<ChildOutput>(&event)) {
-                (*hookState->sink)(output->data);
-            } else if (std::get_if<ChildEOF>(&event)) {
-                hookState->complete();
-                worker.childTerminated(this);
-                break;
-            }
-        }
-    }
+    if (worker.settings.postBuildHook.get() != "")
+        co_await runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 
     /* It is now safe to delete the lock files, since all future
        lockers will see that the output paths are valid; they will
@@ -830,15 +1039,14 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
 #endif
 }
 
-Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buildLocally(
+asio::awaitable<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buildLocally(
     LocalBuildCapability localBuildCap,
     const StorePathSet & inputPaths,
     std::map<std::string, InitialOutput> & initialOutputs,
     const DerivationOptions<StorePath> & drvOptions,
-    PathLocks outputLocks)
+    PathLocks outputLocks,
+    std::optional<AsyncSemaphore::Handle> & buildSlot)
 {
-    co_await yield();
-
     std::unique_ptr<BuildLog> buildLog;
     std::unique_ptr<LogFile> logFile;
 
@@ -872,10 +1080,26 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
     // Will continue here while waiting for a build user below
     while (true) {
 
-        unsigned int curBuilds = worker.getNrLocalBuilds();
-        if (curBuilds >= worker.settings.maxBuildJobs) {
+        if (!buildSlot)
+            buildSlot = worker.buildSemaphore.tryAcquire();
+        if (!buildSlot) {
+            if (worker.settings.maxBuildJobs == 0U) {
+                if (Machine::parseConfig({nix::settings.thisSystem}, worker.settings.builders).empty())
+                    throw Error(
+                        "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
+                        "\n"
+                        "For more information run 'man nix.conf' and search for '/machines'.");
+                else
+                    throw Error(
+                        "Unable to start any build; remote machines may not have all required system features.\n"
+                        "\n"
+                        "For more information run 'man nix.conf' and search for '/machines'.");
+            }
             outputLocks.unlock();
-            co_await waitForBuildSlot();
+            /* Wait for a slot to open up, then start over so that a build
+               hook gets another chance before we build locally. We keep
+               the slot while retrying. */
+            buildSlot = co_await worker.buildSemaphore.asyncAcquire();
             co_return NeedsSlot{};
         }
 
@@ -899,11 +1123,6 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
                 }
 
                 ~DerivationBuildingGoalCallbacks() override = default;
-
-                void childTerminated() override
-                {
-                    goal.worker.childTerminated(&goal, JobCategory::Build);
-                }
 
                 void openLogFile() override
                 {
@@ -994,13 +1213,7 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
                           : makeDerivationBuilder(
                                 makeBuildingStoreFromLocalStore(localBuildCap.localStore),
                                 std::make_shared<DerivationBuildingGoalCallbacks>(*this, openLogFile, closeLogFile),
-                                std::move(params)
-#ifdef _WIN32
-                                    ,
-                                /* The Windows builder needs the worker's I/O completion port. */
-                                worker.ioport.get()
-#endif
-                            );
+                                std::move(params));
         }
 
         if (!builder->startBuild()) {
@@ -1019,14 +1232,20 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
 
     actLock.reset();
 
-    worker.childStarted(shared_from_this(), {builder->logChannel()}, true, true);
+    ChildEvents events(
+        co_await asio::this_coro::executor,
+        {builder->logDescriptor()},
+        ChildTimeouts{
+            .maxSilentTime = worker.settings.maxSilentTime,
+            .buildTimeout = worker.settings.buildTimeout,
+        });
 
     started();
 
     uint64_t logSize = 0;
 
     while (true) {
-        auto event = co_await WaitForChildEvent{};
+        auto event = co_await events.next();
         if (auto * output = std::get_if<ChildOutput>(&event)) {
             if (output->fd == builder->logDescriptor()) {
                 logSize += output->data.size();
@@ -1041,9 +1260,9 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
         } else if (std::get_if<ChildEOF>(&event)) {
             buildLog->flush();
             break;
-        } else if (auto * timeout = std::get_if<std::unique_ptr<TimedOut>>(&event)) {
+        } else if (auto * timeout = std::get_if<TimedOut>(&event)) {
             builder->killChild();
-            co_return std::move(**timeout);
+            co_return std::move(*timeout);
         }
     }
 
@@ -1105,24 +1324,11 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
 #ifdef _WIN32
             /* Nothing here needs `fork`: the child only sets the environment,
                redirects stdout/stderr and execs, which `spawnProcess` already
-               does. What is missing is that `spawnProcess` is not exported,
-               and that the worker needs an `AsyncPipe` tied to the completion
-               port rather than the plain `Pipe` this produces. Throw rather
-               than silently skip the hook. */
+               does. What is missing is that `spawnProcess` is not exported.
+               Throw rather than silently skip the hook. */
             throw UnimplementedError("the post-build hook is not yet supported on Windows");
 #else
-            auto hookState = runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
-            worker.childStarted(shared_from_this(), {hookState->out->readSide.get()}, false, false);
-            while (true) {
-                auto event = co_await WaitForChildEvent{};
-                if (auto * output = std::get_if<ChildOutput>(&event)) {
-                    (*hookState->sink)(output->data);
-                } else if (std::get_if<ChildEOF>(&event)) {
-                    hookState->complete();
-                    worker.childTerminated(this);
-                    break;
-                }
-            }
+            co_await runPostBuildHook(worker.settings, worker.store, *logger, drvPath, outputPaths);
 #endif
         }
 
@@ -1140,7 +1346,7 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
 }
 
 #ifndef _WIN32
-static std::unique_ptr<PostBuildHookState> runPostBuildHook(
+static asio::awaitable<void> runPostBuildHook(
     const WorkerSettings & workerSettings,
     const StoreDirConfig & store,
     Logger & logger,
@@ -1186,7 +1392,16 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
 
     state->out->writeSide.close();
 
-    return state;
+    ChildEvents events(co_await asio::this_coro::executor, {state->out->readSide.get()}, std::nullopt);
+    while (true) {
+        auto event = co_await events.next();
+        if (auto * output = std::get_if<ChildOutput>(&event)) {
+            (*state->sink)(output->data);
+        } else if (std::get_if<ChildEOF>(&event)) {
+            state->complete();
+            break;
+        }
+    }
 }
 #endif
 
@@ -1223,7 +1438,7 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions, bool canBuildLocally)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
     return rpDecline;
@@ -1240,8 +1455,7 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
     try {
 
         /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
-                          << drv->platform << worker.store.printStorePath(drvPath)
+        worker.hook->sink << "try" << (canBuildLocally ? 1 : 0) << drv->platform << worker.store.printStorePath(drvPath)
                           << drvOptions.getRequiredSystemFeatures(*drv);
         worker.hook->sink.flush();
 

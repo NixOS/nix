@@ -2,13 +2,8 @@
 
 namespace nix::windows {
 
-void AsyncPipe::createAsyncPipe(HANDLE iocp)
+void AsyncPipe::createAsyncPipe()
 {
-    // std::cerr << (format("-----AsyncPipe::createAsyncPipe(%x)") % iocp) << std::endl;
-
-    buffer.resize(0x1000);
-    memset(&overlapped, 0, sizeof(overlapped));
-
     std::string pipeName = fmt("\\\\.\\pipe\\nix-%d-%p", GetCurrentProcessId(), (void *) this);
 
     readSide = CreateNamedPipeA(
@@ -23,10 +18,10 @@ void AsyncPipe::createAsyncPipe(HANDLE iocp)
     if (!readSide)
         throw WinError("CreateNamedPipeA(%s)", pipeName);
 
-    HANDLE hIocp = CreateIoCompletionPort(readSide.get(), iocp, (ULONG_PTR) (readSide.get()) ^ 0x5555, 0);
-    if (hIocp != iocp)
-        throw WinError("CreateIoCompletionPort(%x[%s], %x, ...) returned %x", readSide.get(), pipeName, iocp, hIocp);
-
+    /* Connecting is asynchronous on an overlapped pipe; it completes once
+       the write side below has been opened, so wait for it right after. */
+    OVERLAPPED overlapped;
+    memset(&overlapped, 0, sizeof(overlapped));
     if (!ConnectNamedPipe(readSide.get(), &overlapped) && GetLastError() != ERROR_IO_PENDING)
         throw WinError("ConnectNamedPipe(%s)", pipeName);
 
@@ -35,8 +30,12 @@ void AsyncPipe::createAsyncPipe(HANDLE iocp)
     psa2.bInheritHandle = TRUE;
 
     writeSide = CreateFileA(pipeName.c_str(), GENERIC_WRITE, 0, &psa2, OPEN_EXISTING, 0, NULL);
-    if (!readSide)
+    if (!writeSide)
         throw WinError("CreateFileA(%s)", pipeName);
+
+    DWORD ignored;
+    if (!GetOverlappedResult(readSide.get(), &overlapped, &ignored, TRUE) && GetLastError() != ERROR_PIPE_CONNECTED)
+        throw WinError("GetOverlappedResult(ConnectNamedPipe(%s))", pipeName);
 }
 
 void AsyncPipe::close()

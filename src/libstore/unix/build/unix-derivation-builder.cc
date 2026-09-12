@@ -125,8 +125,6 @@ bool UnixDerivationBuilderImpl::killChild()
         killSandbox(true);
 
         pid.wait();
-
-        miscMethods->childTerminated();
     }
     return ret;
 }
@@ -143,9 +141,6 @@ BuilderExit UnixDerivationBuilderImpl::unprepareBuild()
 
     buildResult.timesBuilt++;
     buildResult.stopTime = time(nullptr);
-
-    /* So the child is gone now. */
-    miscMethods->childTerminated();
 
     /* Close the read side of the logger pipe. */
     builderOut.close();
