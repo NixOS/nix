@@ -257,11 +257,6 @@ static void fetchTree(
             attrs.emplace("exportIgnore", Explicit<bool>{true});
         }
 
-        // fetchTree should fetch git repos with shallow = true by default
-        if (type == "git" && !params.isFetchGit && !attrs.contains("shallow")) {
-            attrs.emplace("shallow", Explicit<bool>{true});
-        }
-
         if (!params.allowNameArgument)
             if (auto nameIter = attrs.find("name"); nameIter != attrs.end())
                 state.error<EvalError>("argument 'name' isn’t supported in call to '%s'", fetcher)
@@ -299,6 +294,11 @@ static void fetchTree(
             input = fetchers::Input::fromURL(url);
         }
     }
+
+    // fetchTree should fetch git repos with shallow = true by default,
+    // regardless of whether the input was passed as a URL or an attribute set.
+    if (input.getType() == "git" && !params.isFetchGit && !input.attrs.contains("shallow"))
+        input.attrs.emplace("shallow", Explicit<bool>{true});
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
         input = lookupInRegistries(state.fetchSettings, *state.store, input, fetchers::UseRegistries::Limited).first;
@@ -424,6 +424,7 @@ static RegisterPrimOp primop_fetchTree({
           - `"mercurial"`
 
          *input* can also be a [URL-like reference](@docroot@/command-ref/new-cli/nix3-flake.md#flake-references).
+         Passing a URL-like reference directly is equivalent to passing the attribute set returned by [`builtins.parseFlakeRef`](@docroot@/language/builtins.md#builtins-parseFlakeRef).
          The additional input types and the URL-like syntax requires the [`flakes` experimental feature](@docroot@/development/experimental-features.md#xp-feature-flakes) to be enabled.
 
           > **Example**
