@@ -51,6 +51,13 @@ By default, this command only shows top-level derivations, but with
 `nix derivation show` outputs a JSON map of [store path]s to derivations in JSON format.
 See [the manual](@docroot@/protocols/json/derivation/index.md) for a documentation of this format.
 
+With `--cbor`, it writes the
+[CBOR format](@docroot@/protocols/derivation-cbor.md), which preserves arbitrary
+bytes in the builder, arguments, and environment names and values.
+A single derivation without `--recursive` can be piped directly to
+`nix derivation add --cbor`. Multiple derivations or `--recursive` produce
+a collection.
+
 [store path]: @docroot@/store/store-path.md
 
 )""
