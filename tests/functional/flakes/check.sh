@@ -66,6 +66,87 @@ EOF
 
 (! nix flake check "$flakeDir")
 
+# Test generic modules.<kind>.<name> output — grouped by kind, modules can be attrsets, lambdas, or paths
+cat > "$flakeDir"/mymodule.nix <<EOF
+{ config, pkgs, ... }: { }
+EOF
+
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    modules.nixos.attrset-module = {
+      a.b.c = 123;
+      foo = true;
+    };
+    modules.home-manager.lambda-module = { config, ... }: {
+      home.stateVersion = "23.11";
+    };
+    modules.nixos.path-module = ./mymodule.nix;
+  };
+}
+EOF
+
+nix flake check "$flakeDir"
+
+# modules.<kind>.<name> should fail when a module fails to evaluate
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    modules.nixos.bad = assert false; { };
+  };
+}
+EOF
+
+(! nix flake check "$flakeDir")
+
+# Test generic configurations.<kind>.<name> output — requires config.build.toplevel derivation
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    configurations.nixos.myMachine = {
+      config.build.toplevel = derivation {
+        name = "toplevel";
+        system = "$system";
+        builder = "/bin/sh";
+      };
+    };
+    configurations.home-manager.myHome = {
+      config.build.toplevel = derivation {
+        name = "toplevel";
+        system = "$system";
+        builder = "/bin/sh";
+      };
+    };
+  };
+}
+EOF
+
+nix flake check "$flakeDir"
+
+# configurations.<kind>.<name> should fail when config.build.toplevel is missing
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    configurations.nixos.bad = { system = "x86_64-linux"; };
+  };
+}
+EOF
+
+(! nix flake check "$flakeDir")
+
+# configurations.<kind>.<name> should fail when config.build.toplevel is not a derivation
+cat > "$flakeDir"/flake.nix <<EOF
+{
+  outputs = { self }: {
+    configurations.nixos.bad = {
+      config.build.toplevel = "not-a-derivation";
+    };
+  };
+}
+EOF
+
+(! nix flake check "$flakeDir")
+
 cat > "$flakeDir"/flake.nix <<EOF
 {
   outputs = { self }: {
