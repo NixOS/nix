@@ -386,7 +386,7 @@ retry:
         return LocalBuildCapability{*localStoreP, ext};
     }();
 
-    auto acquireResources = [&](bool & done, PathLocks & outputLocks) -> Goal::Co<void> {
+    auto acquireResources = [&](PathLocks & outputLocks) -> Goal::Co<bool> {
         trace("trying to build");
 
         /**
@@ -447,8 +447,7 @@ retry:
             debug("skipping build of derivation '%s', someone beat us to it", worker.store.printStorePath(drvPath));
             outputLocks.setDeletion(true);
             outputLocks.unlock();
-            done = true;
-            co_return Return{};
+            co_return true;
         }
 
         /* If any of the outputs already exist but are not valid, delete
@@ -463,13 +462,13 @@ retry:
             }
         }
 
-        co_return Return{};
+        co_return false;
     };
 
     auto tryHookLoop = [&](bool & valid) -> Goal::Co<void> {
         {
             PathLocks outputLocks;
-            co_await acquireResources(valid, outputLocks);
+            valid = co_await acquireResources(outputLocks);
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
@@ -502,7 +501,7 @@ retry:
 
             while (true) {
                 co_await waitForAWhile();
-                co_await acquireResources(valid, outputLocks);
+                valid = co_await acquireResources(outputLocks);
                 if (valid)
                     break;
 
@@ -536,7 +535,7 @@ retry:
     auto tryBuildLocally = [&](bool & valid) -> Goal::Co<void> {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;
-            co_await acquireResources(valid, outputLocks);
+            valid = co_await acquireResources(outputLocks);
             if (valid)
                 co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
 
