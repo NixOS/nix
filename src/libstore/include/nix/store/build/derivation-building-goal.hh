@@ -70,27 +70,30 @@ private:
     /**
      * The states.
      */
-    Co<void> tryToBuild();
-    Co<void> buildWithHook(
-        StorePathSet inputPaths,
-        std::map<std::string, InitialOutput> initialOutputs,
-        DerivationOptions<StorePath> drvOptions,
-        PathLocks outputLocks);
-    Co<void> buildLocally(
+    using Result = decltype(BuildResult::inner);
+
+    struct NeedsSlot
+    {};
+
+    using LocalBuildOutcome = std::variant<Result, NeedsSlot>;
+
+    Co<void> init();
+    Co<Result> tryToBuild();
+    Co<Result> buildWithHook(
+        const StorePathSet & inputPaths, std::map<std::string, InitialOutput> & initialOutputs, PathLocks outputLocks);
+    Co<LocalBuildOutcome> buildLocally(
         LocalBuildCapability localBuildCap,
         const StorePathSet & inputPaths,
         std::map<std::string, InitialOutput> & initialOutputs,
         const DerivationOptions<StorePath> & drvOptions,
-        PathLocks outputLocks,
-        /* Set (and the coroutine returns) if a build slot has to be waited for. */
-        bool & needsSlot);
+        PathLocks outputLocks);
 
     /**
      * Is the build hook willing to perform the build?
      */
     HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
 
-    Done doneFailureLogTooLong(BuildLog & buildLog);
+    BuildError logLimitExceeded();
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
