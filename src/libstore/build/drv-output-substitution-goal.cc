@@ -14,13 +14,13 @@ DrvOutputSubstitutionGoal::DrvOutputSubstitutionGoal(const DrvOutput & id, Worke
     trace("created");
 }
 
-Goal::Co DrvOutputSubstitutionGoal::init()
+Goal::Co<Goal::ExitCode> DrvOutputSubstitutionGoal::init()
 {
     trace("init");
 
     /* If the derivation already exists, we’re done */
     if ((outputInfo = worker.store.queryRealisation(id))) {
-        co_return amDone(ecSuccess);
+        co_return ecSuccess;
     }
 
     auto subs = worker.getSubstituters();
@@ -51,7 +51,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
         }
 
         trace("finished");
-        co_return amDone(ecSuccess);
+        co_return ecSuccess;
     }
 
     /* None left.  Terminate this goal and let someone else deal
@@ -67,7 +67,7 @@ Goal::Co DrvOutputSubstitutionGoal::init()
     /* Hack: don't indicate failure if there were no substituters.
        In that case the calling derivation should just do a
        build. */
-    co_return amDone(substituterFailed ? ecFailed : ecNoSubstituters);
+    co_return substituterFailed ? ecFailed : ecNoSubstituters;
 }
 
 std::string DrvOutputSubstitutionGoal::key()

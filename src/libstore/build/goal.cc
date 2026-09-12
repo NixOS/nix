@@ -4,15 +4,17 @@
 
 namespace nix {
 
-Goal::Goal(Worker & worker, Co init)
+Goal::Goal(Worker & worker, Co<ExitCode> init)
     : worker(worker)
     , top_co(std::move(init))
 {
     // top_co shouldn't have a goal already, should be nullptr.
-    auto handle = HandleType<void>::from_address(top_co->handle.address());
+    auto handle = HandleType<ExitCode>::from_address(top_co->handle.address());
     assert(!handle.promise().goal);
     // we set it such that top_co can pass it down to its subcoroutines.
     handle.promise().goal = this;
+    // Nobody awaits the top-level coroutine, so its result goes to us.
+    handle.promise().resultSlot = &finalExitCode;
 }
 
 void WorkerSettings::anchor() {}
@@ -93,22 +95,6 @@ Goal::CoBase::~CoBase()
     }
 }
 
-void Goal::AwaitableFrame<void>::return_value(Co && next)
-{
-    goal->trace("return_value(Co&&)");
-    // Save old continuation.
-    auto old_continuation = std::move(continuation);
-    // We set next as our continuation.
-    continuation = std::move(next);
-    // We set next's goal, and thus it must not have one already.
-    auto continuationHandle = HandleTypeBase::from_address(continuation->handle.address());
-    assert(!continuationHandle.promise().goal);
-    continuationHandle.promise().goal = goal;
-    // Nor can next have a continuation, as we set it to our old one.
-    assert(!continuationHandle.promise().continuation);
-    continuationHandle.promise().continuation = std::move(old_continuation);
-}
-
 bool CompareGoalPtrs::operator()(const GoalPtr & a, const GoalPtr & b) const
 {
     return a->keyCached() < b->keyCached();
@@ -121,7 +107,7 @@ void addToWeakGoals(WeakGoals & goals, GoalPtr p)
     goals.insert(p);
 }
 
-Goal::Co Goal::await(Goals new_waitees)
+Goal::Co<void> Goal::await(Goals new_waitees)
 {
     assert(waitees.empty());
     if (!new_waitees.empty()) {
@@ -132,27 +118,29 @@ Goal::Co Goal::await(Goals new_waitees)
         co_await Suspend{};
         assert(waitees.empty());
     }
-    co_return Return{};
 }
 
-Goal::Done Goal::doneSuccess(BuildResult::Success success)
+void Goal::trace(std::string_view s)
 {
-    buildResult.inner = std::move(success);
-    return amDone(ecSuccess);
+    debug("%1%: %2%", name, s);
 }
 
-Goal::Done Goal::doneFailure(ExitCode result, BuildResult::Failure failure)
+void Goal::work()
 {
-    assert(result == ecFailed || result == ecNoSubstituters);
-    buildResult.inner = std::move(failure);
-    return amDone(result);
-}
-
-Goal::Done Goal::amDone(ExitCode result)
-{
-    trace("done");
     assert(top_co);
+    assert(top_co->handle);
+    auto baseHandle = HandleTypeBase::from_address(top_co->handle.address());
+    assert(baseHandle.promise().alive);
+    baseHandle.resume();
+
+    /* Still suspended somewhere, so we'll be work()-ed again. */
+    if (top_co)
+        return;
+
+    trace("done");
+    assert(finalExitCode);
     assert(exitCode == ecBusy);
+    auto result = *std::exchange(finalExitCode, std::nullopt);
     assert(result == ecSuccess || result == ecFailed || result == ecNoSubstituters);
     exitCode = result;
 
@@ -200,31 +188,6 @@ Goal::Done Goal::amDone(ExitCode result)
     worker.removeGoal(shared_from_this());
 
     cleanup();
-
-    // We drop the continuation.
-    // In `FinalAwaiter` this will signal that there is no more work to be done.
-    auto baseHandle = HandleTypeBase::from_address(top_co->handle.address());
-    baseHandle.promise().continuation = {};
-
-    // won't return to caller because of logic in FinalAwaiter
-    return Done{};
-}
-
-void Goal::trace(std::string_view s)
-{
-    debug("%1%: %2%", name, s);
-}
-
-void Goal::work()
-{
-    assert(top_co);
-    assert(top_co->handle);
-    auto baseHandle = HandleTypeBase::from_address(top_co->handle.address());
-    assert(baseHandle.promise().alive);
-    baseHandle.resume();
-    // We either should be in a state where we can be work()-ed again,
-    // or we should be done.
-    assert(top_co || exitCode != ecBusy);
 }
 
 void Goal::handleChildOutput(Descriptor fd, std::string_view data)
@@ -245,32 +208,28 @@ void Goal::timedOut(TimedOut && ex)
     worker.wakeUp(shared_from_this());
 }
 
-Goal::Co Goal::yield()
+Goal::Co<void> Goal::yield()
 {
     worker.wakeUp(shared_from_this());
     co_await Suspend{};
-    co_return Return{};
 }
 
-Goal::Co Goal::waitForAWhile()
+Goal::Co<void> Goal::waitForAWhile()
 {
     worker.waitForAWhile(shared_from_this());
     co_await Suspend{};
-    co_return Return{};
 }
 
-Goal::Co Goal::waitUntilWoken()
+Goal::Co<void> Goal::waitUntilWoken()
 {
     worker.waitForCompletion(shared_from_this());
     co_await Suspend{};
-    co_return Return{};
 }
 
-Goal::Co Goal::waitForBuildSlot()
+Goal::Co<void> Goal::waitForBuildSlot()
 {
     worker.waitForBuildSlot(shared_from_this());
     co_await Suspend{};
-    co_return Return{};
 }
 
 } // namespace nix
