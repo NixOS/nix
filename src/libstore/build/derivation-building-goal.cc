@@ -36,7 +36,7 @@ namespace nix {
 
 DerivationBuildingGoal::DerivationBuildingGoal(
     const StorePath & drvPath, ref<const BasicDerivation> drv, Worker & worker, BuildMode buildMode)
-    : Goal(worker, tryToBuild())
+    : Goal(worker, init())
     , drvPath(drvPath)
     , drv{std::move(drv)}
     , buildMode(buildMode)
@@ -155,12 +155,13 @@ static std::unique_ptr<PostBuildHookState> runPostBuildHook(
     const StorePathSet & outputPaths);
 #endif
 
-Goal::Done DerivationBuildingGoal::done(Result result)
+Goal::Co<void> DerivationBuildingGoal::init()
 {
+    auto result = co_await tryToBuild();
     if (auto * success = std::get_if<BuildResult::Success>(&result))
-        return doneSuccess(success->status, std::move(success->builtOutputs));
+        co_return doneSuccess(success->status, std::move(success->builtOutputs));
     else
-        return doneFailure(std::move(std::get<BuildError>(result)));
+        co_return doneFailure(std::move(std::get<BuildError>(result)));
 }
 
 /**
@@ -254,7 +255,7 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
 
 /* At least one of the output paths could not be
    produced using a substitute.  So we have to build instead. */
-Goal::Co<void> DerivationBuildingGoal::tryToBuild()
+Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
 {
     Goals waitees;
 
@@ -294,7 +295,7 @@ Goal::Co<void> DerivationBuildingGoal::tryToBuild()
                 nrFailed,
                 nrFailed == 1 ? "dependency" : "dependencies");
         msg += showKnownOutputs(worker.store, *drv);
-        co_return doneFailure(BuildError(BuildResult::Failure::DependencyFailed, msg));
+        co_return BuildError(BuildResult::Failure::DependencyFailed, msg);
     }
 
     /* Gather information necessary for computing the closure and/or
@@ -313,11 +314,6 @@ Goal::Co<void> DerivationBuildingGoal::tryToBuild()
        slot to become available, since we don't need one if there is a
        build hook. */
     co_await yield();
-
-    /* We come back here if a local build turns out to need a build slot
-       that is not free yet (see `buildLocally`). */
-retry:
-    bool needsSlot = false;
 
     auto drvOptions = [&] {
         try {
@@ -473,23 +469,24 @@ retry:
         co_return false;
     };
 
-    auto tryHookLoop = [&](bool & valid) -> Goal::Co<void> {
+    auto tryHookLoop = [&]() -> Goal::Co<std::optional<Result>> {
         {
             PathLocks outputLocks;
-            valid = co_await acquireResources(outputLocks);
-            if (valid)
-                co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+            if (co_await acquireResources(outputLocks))
+                co_return Result{BuildResult::Success{
+                    .status = BuildResult::Success::AlreadyValid,
+                    .builtOutputs = checkPathValidity(initialOutputs).second,
+                }};
 
             switch (tryBuildHook(drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
-                valid = true;
-                co_return done(co_await buildWithHook(
-                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks)));
+                co_return co_await buildWithHook(
+                    std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
             case rpDecline:
                 // We should do it ourselves.
-                co_return Return{};
+                co_return std::nullopt;
             case rpPostpone:
                 /* Not now; wait until at least one child finishes or
                    the wake-up timeout expires. */
@@ -498,6 +495,7 @@ retry:
         }
 
         PathLocks outputLocks;
+        bool valid = false;
         {
             // First attempt was postponed. Retry in a loop with an activity
             // that lives until accept or decline.
@@ -525,7 +523,7 @@ retry:
                     continue;
                 case rpDecline:
                     // We should do it ourselves.
-                    co_return Return{};
+                    co_return std::nullopt;
                 }
 
                 break;
@@ -533,82 +531,62 @@ retry:
         }
 
         if (valid) {
-            co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+            co_return Result{BuildResult::Success{
+                .status = BuildResult::Success::AlreadyValid,
+                .builtOutputs = checkPathValidity(initialOutputs).second,
+            }};
         } else {
-            co_return done(co_await buildWithHook(
-                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks)));
+            co_return co_await buildWithHook(
+                std::move(inputPaths), std::move(initialOutputs), std::move(drvOptions), std::move(outputLocks));
         }
     };
 
-    auto tryBuildLocally = [&](bool & valid) -> Goal::Co<void> {
+    auto tryBuildLocally = [&]() -> Goal::Co<std::optional<LocalBuildOutcome>> {
         if (auto * cap = std::get_if<LocalBuildCapability>(&localBuildResult)) {
             PathLocks outputLocks;
-            valid = co_await acquireResources(outputLocks);
-            if (valid)
-                co_return doneSuccess(BuildResult::Success::AlreadyValid, checkPathValidity(initialOutputs).second);
+            if (co_await acquireResources(outputLocks))
+                co_return Result{BuildResult::Success{
+                    .status = BuildResult::Success::AlreadyValid,
+                    .builtOutputs = checkPathValidity(initialOutputs).second,
+                }};
 
-            valid = true;
-            auto outcome = co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks));
-            if (std::holds_alternative<NeedsSlot>(outcome)) {
-                /* Start over from `tryToBuild` so that a build hook gets
-                   another chance before we build locally. */
-                needsSlot = true;
-                co_return Return{};
-            }
-            co_return done(std::move(std::get<Result>(outcome)));
+            co_return co_await buildLocally(*cap, inputPaths, initialOutputs, drvOptions, std::move(outputLocks));
         }
 
-        co_return Return{};
+        co_return std::nullopt;
     };
 
-    if (buildMode != bmNormal) {
-        // Check and repair modes operate on the state of this store specifically,
-        // so they must always build locally.
-        bool valid = false;
-        co_await tryBuildLocally(valid);
-        if (needsSlot)
-            goto retry;
-        if (valid)
-            co_return Return{};
-    } else if (drvOptions.preferLocalBuild) {
-        // Local is preferred, so try it first. If it's not available, fall back to the hook.
-        {
-            bool valid = false;
-            co_await tryBuildLocally(valid);
-            if (needsSlot)
-                goto retry;
-            if (valid)
-                co_return Return{};
+    while (true) {
+        std::optional<LocalBuildOutcome> local;
+
+        if (buildMode != bmNormal) {
+            // Check and repair modes operate on the state of this store specifically,
+            // so they must always build locally.
+            local = co_await tryBuildLocally();
+        } else if (drvOptions.preferLocalBuild) {
+            // Local is preferred, so try it first. If it's not available, fall back to the hook.
+            local = co_await tryBuildLocally();
+            if (!local)
+                if (auto result = co_await tryHookLoop())
+                    co_return std::move(*result);
+        } else {
+            // Default preference is a remote build: they tend to be faster and preserve local
+            // resources for other tasks. Fall back to local if no remote is available.
+            if (auto result = co_await tryHookLoop())
+                co_return std::move(*result);
+            local = co_await tryBuildLocally();
         }
-        {
-            bool valid = false;
-            co_await tryHookLoop(valid);
-            if (valid)
-                co_return Return{};
-        }
-    } else {
-        // Default preference is a remote build: they tend to be faster and preserve local
-        // resources for other tasks. Fall back to local if no remote is available.
-        {
-            bool valid = false;
-            co_await tryHookLoop(valid);
-            if (valid)
-                co_return Return{};
-        }
-        {
-            bool valid = false;
-            co_await tryBuildLocally(valid);
-            if (needsSlot)
-                goto retry;
-            if (valid)
-                co_return Return{};
-        }
+
+        if (!local)
+            break;
+        if (auto * result = std::get_if<Result>(&*local))
+            co_return std::move(*result);
     }
 
     std::string storePath = worker.store.printStorePath(drvPath);
     auto * rejection = std::get_if<LocalBuildRejection>(&localBuildResult);
     assert(rejection);
-    co_return doneFailure(reject(*rejection, storePath));
+    co_return reject(*rejection, storePath);
 }
 
 Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
