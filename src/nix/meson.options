@@ -21,3 +21,10 @@ option(
   value : false,
   description : 'Embed the public C API into nix so plugins can resolve those symbols from the executable',
 )
+
+option(
+  'bash-program',
+  type : 'string',
+  value : 'bash',
+  description : 'the bash used as the fallback interactive shell for nix develop / nix-shell when bashInteractive from nixpkgs is unavailable (a name resolved via PATH, or an absolute path)',
+)

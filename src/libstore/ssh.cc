@@ -1,4 +1,6 @@
 #include "nix/store/ssh.hh"
+
+#include "store-config-private.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/util/os-string.hh"
@@ -123,7 +125,7 @@ bool SSHMaster::isMasterRunning()
     OsStrings args = {OS_STR("-O"), OS_STR("check"), string_to_os_string(hostnameAndUser)};
     addCommonSSHOpts(args);
 
-    auto res = runProgram(RunOptions{.program = "ssh", .args = std::move(args), .mergeStderrToStdout = true});
+    auto res = runProgram(RunOptions{.program = SSH_PROGRAM, .args = std::move(args), .mergeStderrToStdout = true});
     return res.first == 0;
 }
 
@@ -185,7 +187,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
             OsStrings args;
 
             if (!fakeSSH) {
-                args = {"ssh", hostnameAndUser.c_str(), "-x"};
+                args = {SSH_PROGRAM, hostnameAndUser.c_str(), "-x"};
                 addCommonSSHOpts(args);
                 if (!socketPath.empty())
                     args.insert(args.end(), {"-S", socketPath.string()});

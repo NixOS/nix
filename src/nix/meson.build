@@ -66,6 +66,8 @@ mandir = get_option('mandir')
 mandir = fs.is_absolute(mandir) ? mandir : prefix / mandir
 configdata.set_quoted('NIX_MAN_DIR', mandir)
 
+configdata.set_quoted('FALLBACK_BASH', get_option('bash-program'))
+
 config_priv_h = configure_file(
   configuration : configdata,
   output : 'cli-config-private.hh',
