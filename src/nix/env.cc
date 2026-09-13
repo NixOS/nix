@@ -1,6 +1,7 @@
 #include <queue>
 
 #include <boost/unordered/unordered_flat_set.hpp>
+#include <boost/algorithm/string/join.hpp>
 
 #include "nix/cmd/command.hh"
 #include "nix/expr/eval.hh"
@@ -78,9 +79,8 @@ struct CmdShell : InstallablesCommand, MixEnvironment
         for (auto & path : outPaths)
             todo.push(path);
 
-        setEnviron();
-
         std::vector<std::string> pathAdditions;
+        std::vector<std::string> packageNames;
 
         while (!todo.empty()) {
             auto path = todo.front();
@@ -100,7 +100,16 @@ struct CmdShell : InstallablesCommand, MixEnvironment
                 for (auto & p : tokenizeString<Strings>(state->storeFS->readFile(propPath)))
                     todo.push(store->parseStorePath(p));
             }
+
+            packageNames.push_back(std::string(path.name()));
         }
+
+        auto existingPackagesVar = getEnvOs(OS_STR("NIX_SHELL_PACKAGES")).value_or(OS_STR(""));
+        if (!existingPackagesVar.empty())
+            packageNames.push_back(existingPackagesVar);
+        setVars["NIX_SHELL_PACKAGES"] = boost::algorithm::join(packageNames, " ");
+
+        setEnviron();
 
         // TODO: split losslessly; empty means .
         auto unixPath = ExecutablePath::load();
