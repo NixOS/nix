@@ -359,8 +359,24 @@ rec {
         }
       );
 
-  # docker image with Nix inside
-  dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
+  /**
+    Docker image with Nix inside.
+  */
+  dockerImage = lib.genAttrs linux64BitSystems (
+    system:
+    let
+      pkgs = nixpkgsFor.${system}.native;
+      image = pkgs.callPackage ../docker.nix { tag = pkgs.nix.version; };
+    in
+    pkgs.runCommand "docker-image-tarball-${pkgs.nix.version}"
+      { meta.description = "Docker image with Nix for ${system}"; }
+      ''
+        mkdir -p $out/nix-support
+        image=$out/image.tar.gz
+        ln -s ${image} $image
+        echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
+      ''
+  );
 
   # Line coverage analysis.
   coverage =

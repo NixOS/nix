@@ -393,22 +393,8 @@
         // lib.optionalAttrs (self.hydraJobs.rustInstaller ? ${system}) {
           rustInstaller = self.hydraJobs.rustInstaller.${system};
         }
-        // lib.optionalAttrs (builtins.elem system linux64BitSystems) {
-          dockerImage =
-            let
-              pkgs = nixpkgsFor.${system}.native;
-              image = pkgs.callPackage ./docker.nix {
-                tag = pkgs.nix.version;
-              };
-            in
-            pkgs.runCommand "docker-image-tarball-${pkgs.nix.version}"
-              { meta.description = "Docker image with Nix for ${system}"; }
-              ''
-                mkdir -p $out/nix-support
-                image=$out/image.tar.gz
-                ln -s ${image} $image
-                echo "file binary-dist $image" >> $out/nix-support/hydra-build-products
-              '';
+        // lib.optionalAttrs (self.hydraJobs.dockerImage ? ${system}) {
+          dockerImage = self.hydraJobs.dockerImage.${system};
         }
       );
 
