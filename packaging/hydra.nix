@@ -6,7 +6,6 @@
   linux64BitSystems,
   nixpkgsFor,
   self,
-  officialRelease,
 }:
 let
   inherit (inputs) nixpkgs nixpkgs-regression;

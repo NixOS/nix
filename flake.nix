@@ -245,7 +245,6 @@
           linux64BitSystems
           nixpkgsFor
           self
-          officialRelease
           ;
       };
 
