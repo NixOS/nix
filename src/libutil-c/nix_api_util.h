@@ -14,6 +14,8 @@
  * Also contains error handling utilities
  */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -362,6 +364,220 @@ void nix_clear_err(nix_c_context * context);
  * @param[in] level Verbosity level
  */
 nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level);
+
+/**
+ *  @}
+ */
+
+/** @defgroup logger Logger
+ * @brief Capture Nix log output via C callbacks
+ *
+ * The functions in this section let an embedder replace Nix's global
+ * logger with one driven by user-supplied callbacks. This is the
+ * intended way to surface `builtins.trace` calls, builder output,
+ * warnings, and other diagnostic messages produced by libnixutil,
+ * libnixstore and libnixexpr to a host language.
+ *  @{
+ */
+
+/**
+ * @brief Activity identifier.
+ *
+ * `0` means "no activity" (used as the parent of top-level activities).
+ */
+typedef uint64_t nix_activity_id;
+
+/**
+ * @brief Activity type.
+ *
+ * @note Must be kept in sync with `nix::ActivityType`.
+ */
+enum nix_activity_type {
+    NIX_ACTIVITY_TYPE_NONE = 0,
+    NIX_ACTIVITY_TYPE_COPY_PATH = 100,
+    NIX_ACTIVITY_TYPE_FILE_TRANSFER = 101,
+    NIX_ACTIVITY_TYPE_REALISE = 102,
+    NIX_ACTIVITY_TYPE_COPY_PATHS = 103,
+    NIX_ACTIVITY_TYPE_BUILDS = 104,
+    NIX_ACTIVITY_TYPE_BUILD = 105,
+    NIX_ACTIVITY_TYPE_OPTIMISE_STORE = 106,
+    NIX_ACTIVITY_TYPE_VERIFY_PATHS = 107,
+    NIX_ACTIVITY_TYPE_SUBSTITUTE = 108,
+    NIX_ACTIVITY_TYPE_QUERY_PATH_INFO = 109,
+    NIX_ACTIVITY_TYPE_POST_BUILD_HOOK = 110,
+    NIX_ACTIVITY_TYPE_BUILD_WAITING = 111,
+    NIX_ACTIVITY_TYPE_FETCH_TREE = 112,
+};
+typedef enum nix_activity_type nix_activity_type;
+
+/**
+ * @brief Activity result type.
+ *
+ * @note Must be kept in sync with `nix::ResultType`.
+ */
+enum nix_result_type {
+    NIX_RESULT_TYPE_FILE_LINKED = 100,
+    NIX_RESULT_TYPE_BUILD_LOG_LINE = 101,
+    NIX_RESULT_TYPE_UNTRUSTED_PATH = 102,
+    NIX_RESULT_TYPE_CORRUPTED_PATH = 103,
+    NIX_RESULT_TYPE_SET_PHASE = 104,
+    NIX_RESULT_TYPE_PROGRESS = 105,
+    NIX_RESULT_TYPE_SET_EXPECTED = 106,
+    NIX_RESULT_TYPE_POST_BUILD_LOG_LINE = 107,
+    NIX_RESULT_TYPE_FETCH_STATUS = 108,
+    NIX_RESULT_TYPE_HASH_MISMATCH = 109,
+    NIX_RESULT_TYPE_BUILD_RESULT = 110,
+};
+typedef enum nix_result_type nix_result_type;
+
+/**
+ * @brief Logger field type.
+ *
+ * @note Must be kept in sync with `nix::Logger::Field::type`.
+ */
+enum nix_logger_field_type {
+    NIX_LOGGER_FIELD_TYPE_INT = 0,
+    NIX_LOGGER_FIELD_TYPE_STR = 1,
+};
+typedef enum nix_logger_field_type nix_logger_field_type;
+
+/**
+ * @brief String value for a logger field.
+ */
+struct nix_logger_field_value_string
+{
+    const char * value;
+    unsigned int len;
+};
+typedef struct nix_logger_field_value_string nix_logger_field_value_string;
+
+/**
+ * @brief Value held inside of a logger field.
+ */
+union nix_logger_field_value
+{
+    uint64_t i;
+    nix_logger_field_value_string str;
+};
+typedef union nix_logger_field_value nix_logger_field_value;
+
+/**
+ * @brief Logger field.
+ */
+struct nix_logger_field
+{
+    nix_logger_field_type type;
+    nix_logger_field_value value;
+};
+typedef struct nix_logger_field nix_logger_field;
+
+/**
+ * @brief Vtable of callbacks for a custom logger.
+ *
+ * Any field may be NULL, missing callbacks are treated as no-ops.
+ *
+ * @warning Callbacks may be invoked concurrently from multiple threads
+ * (notably during parallel builds). Implementations are responsible
+ * for their own synchronization.
+ *
+ * @warning Callbacks must not throw exceptions across the C boundary.
+ */
+typedef struct nix_logger
+{
+    /**
+     * @brief Ordinary log message.
+     *
+     * Receives `builtins.trace` output, warnings, errors (after
+     * formatting), and any message produced through the `printError` /
+     * `printInfo` / `debug` / etc. macros in the C++ API.
+     *
+     * @param[in] userdata The user-supplied opaque pointer.
+     * @param[in] level Verbosity level of the message.
+     * @param[in] msg Borrowed message body.
+     * @param[in] n Number of bytes in msg.
+     */
+    void (*log)(void * userdata, nix_verbosity level, const char * msg, unsigned int n);
+
+    /**
+     * @brief An activity (e.g. a build, a substitution) has started.
+     *
+     * @param[in] userdata The user-supplied opaque pointer.
+     * @param[in] activity_id Unique identifier for the new activity.
+     * @param[in] level Verbosity level associated with this activity.
+     * @param[in] type Activity type. See ::nix_activity_type.
+     * @param[in] s Borrowed description.
+     * @param[in] ns Number of bytes in s.
+     * @param[in] field Borrowed list of fields.
+     * @param[in] nf Number of fields.
+     * @param[in] parent_id ID of the parent activity, or `0` if none.
+     */
+    void (*start_activity)(
+        void * userdata,
+        nix_activity_id activity_id,
+        nix_verbosity level,
+        nix_activity_type type,
+        const char * s,
+        unsigned int ns,
+        const nix_logger_field ** fields,
+        unsigned int nf,
+        nix_activity_id parent_id);
+
+    /**
+     * @brief An activity has stopped.
+     */
+    void (*stop_activity)(void * userdata, nix_activity_id activity_id);
+
+    /**
+     * @brief An activity reported a result.
+     *
+     * Covers in particular:
+     * - ::NIX_RESULT_TYPE_BUILD_LOG_LINE - a line of builder output
+     * - ::NIX_RESULT_TYPE_POST_BUILD_LOG_LINE - a line of post-build hook output
+     * - ::NIX_RESULT_TYPE_SET_PHASE - current build phase
+     * - ::NIX_RESULT_TYPE_PROGRESS - progress in an activity
+     *
+     * @param[in] userdata The user-supplied opaque pointer.
+     * @param[in] activity_id The activity reporting this result.
+     * @param[in] type The result type.
+     * @param[in] field Borrowed list of fields.
+     * @param[in] n Number of fields.
+     */
+    void (*result)(
+        void * userdata,
+        nix_activity_id activity_id,
+        nix_result_type type,
+        const nix_logger_field ** fields,
+        unsigned int n);
+
+    /**
+     * @brief Called when the logger is destroyed.
+     *
+     * Invoked when the logger is replaced by a subsequent call to
+     * ::nix_set_logger, or when Nix's global logger is torn
+     * down at program exit. Use this to free resources owned by
+     * `userdata`.
+     */
+    void (*destroy)(void * userdata);
+} nix_logger;
+
+/**
+ * @brief Replace the global Nix logger with one driven by C callbacks.
+ *
+ * After this call, log messages, activities and supported results
+ * produced anywhere in Nix are routed to the supplied callbacks.
+ *
+ * The vtable is copied; only the function pointers it contains need to
+ * remain valid for the lifetime of the logger. `userdata` is borrowed
+ * and passed unmodified to every callback. When the logger is later
+ * destroyed (by another call to this function, or at program shutdown),
+ * `vtable->destroy(userdata)` is invoked if non-NULL.
+ *
+ * @param[out] context Optional, stores error information.
+ * @param[in] vtable Required, callback vtable.
+ * @param[in] userdata Optional opaque pointer passed to every callback.
+ * @return NIX_OK on success, an error code otherwise.
+ */
+nix_err nix_set_logger(nix_c_context * context, const nix_logger * vtable, void * userdata);
 
 /**
  *  @}
