@@ -18,4 +18,12 @@ void printValueAsXML(
     NixStringContext & context,
     const PosIdx pos);
 
-}
+void printValueAsXML(
+    EvalState & state,
+    bool strict,
+    bool location,
+    Value & v,
+    XMLWriter & doc,
+    NixStringContext & context,
+    const PosIdx pos);
+} // namespace nix
