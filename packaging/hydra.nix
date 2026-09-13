@@ -362,7 +362,7 @@ rec {
   # docker image with Nix inside
   dockerImage = lib.genAttrs linux64BitSystems (system: self.packages.${system}.dockerImage);
 
-  # # Line coverage analysis.
+  # Line coverage analysis.
   coverage =
     (import ./../ci/gha/tests rec {
       withCoverage = true;
@@ -426,27 +426,37 @@ rec {
           nix = nixpkgsFor.${system}.native.nixComponents2.nix-cli;
         }
       );
+
+      /**
+        Run functional tests with against set of nix daemon versions to catch
+        protocol incompatibilities.
+      */
+      daemonCompat = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+        in
+        pkgs.runCommand "daemon-compat-tests" {
+          againstSelf = testNixVersions pkgs pkgs.nix;
+          againstCurrentLatest = testNixVersions pkgs pkgs.nixVersions.latest;
+          againstLatestStable = testNixVersions pkgs pkgs.nixVersions.stable;
+        } "touch $out"
+      );
+
+      /**
+        Test the installer in QEMU VMs. Doesn't operate on the user-facing
+        installation script https://nixos.org/nix/install, which downloads
+        the binaries for the system architecture but the second-stage tarballs
+        directly.
+      */
+      installer = import ../tests/installer {
+        binaryTarballs = self.hydraJobs.binaryTarball;
+        inherit nixpkgsFor;
+      };
     };
 
   metrics.nixpkgs = import "${nixpkgs-regression}/pkgs/top-level/metrics.nix" {
     pkgs = nixpkgsFor.x86_64-linux.native;
     nixpkgs = nixpkgs-regression;
-  };
-
-  installTests = forAllSystems (
-    system:
-    let
-      pkgs = nixpkgsFor.${system}.native;
-    in
-    pkgs.runCommand "install-tests" {
-      againstSelf = testNixVersions pkgs pkgs.nix;
-      againstCurrentLatest = testNixVersions pkgs pkgs.nixVersions.latest;
-      againstLatestStable = testNixVersions pkgs pkgs.nixVersions.stable;
-    } "touch $out"
-  );
-
-  installerTests = import ../tests/installer {
-    binaryTarballs = self.hydraJobs.binaryTarball;
-    inherit nixpkgsFor;
   };
 }

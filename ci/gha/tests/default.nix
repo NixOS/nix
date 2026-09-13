@@ -89,7 +89,7 @@ rec {
   */
   topLevel = {
     installerScriptForGHA = hydraJobs.installerScriptForGHA.${system};
-    installTests = hydraJobs.installTests.${system};
+    daemonCompat = hydraJobs.tests.daemonCompat.${system};
     nixpkgsLibTests = hydraJobs.tests.nixpkgsLibTests.${system};
     filetransfer-retry-backoff = hydraJobs.tests.filetransfer-retry-backoff.${system};
     rl-next = pkgs.buildPackages.runCommand "test-rl-next-release-notes" { } ''
