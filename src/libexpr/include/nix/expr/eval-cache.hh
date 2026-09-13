@@ -85,17 +85,46 @@ typedef uint64_t AttrId;
 typedef std::pair<AttrId, Symbol> AttrKey;
 typedef std::pair<std::string, NixStringContext> string_t;
 
-typedef std::variant<
-    std::vector<Symbol>,
-    string_t,
-    placeholder_t,
-    missing_t,
-    misc_t,
-    failed_t,
-    bool,
-    int_t,
-    std::vector<std::string>>
-    AttrValue;
+/// A vector of Symbols sorted by their string content.
+struct SortedSymbols
+{
+    /// Symbols sort order.
+    struct Compare
+    {
+        const SymbolTable & symbols;
+
+        bool operator()(Symbol a, Symbol b) const
+        {
+            return std::string_view{symbols[a]} < std::string_view{symbols[b]};
+        }
+    };
+
+    std::vector<Symbol> symbols;
+
+    auto begin() const
+    {
+        return symbols.begin();
+    }
+
+    auto end() const
+    {
+        return symbols.end();
+    }
+
+    auto size() const
+    {
+        return symbols.size();
+    }
+
+    bool empty() const
+    {
+        return symbols.empty();
+    }
+};
+
+typedef std::
+    variant<SortedSymbols, string_t, placeholder_t, missing_t, misc_t, failed_t, bool, int_t, std::vector<std::string>>
+        AttrValue;
 
 class AttrCursor : public std::enable_shared_from_this<AttrCursor>
 {
@@ -162,7 +191,7 @@ public:
 
     std::vector<std::string> getListOfStrings();
 
-    std::vector<Symbol> getAttrs();
+    SortedSymbols getAttrs();
 
     bool isDerivation();
 
