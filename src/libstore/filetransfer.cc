@@ -774,6 +774,7 @@ struct curlFileTransfer : public FileTransfer
             case CURLE_WRITE_ERROR:
             case CURLE_UNSUPPORTED_PROTOCOL:
             case CURLE_BAD_CONTENT_ENCODING:
+            case CURLE_OPERATION_TIMEDOUT:
                 return Misc;
             default: // Shut up warnings
                 break;
