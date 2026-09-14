@@ -1,0 +1,6 @@
+# COM: Multi-line if in binding should trigger continuation
+enable = true
+message = if enable
+  then "true"
+  else "false"
+message
