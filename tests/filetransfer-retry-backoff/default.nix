@@ -2,7 +2,7 @@
 {
   runCommand,
   python3,
-  nix,
+  nix-cli,
   writeText,
 }:
 
@@ -19,7 +19,7 @@ in
 runCommand "filetransfer-retry-backoff"
   {
     nativeBuildInputs = [
-      nix
+      nix-cli
       python3
     ];
     # macOS sandbox blocks network by default; this allows localhost access
