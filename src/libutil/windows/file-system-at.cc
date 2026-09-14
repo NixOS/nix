@@ -3,6 +3,7 @@
 #include "nix/util/signals.hh"
 #include "nix/util/file-path.hh"
 #include "nix/util/source-accessor.hh"
+#include "file-system-at-private.hh"
 
 #include <fileapi.h>
 #include <error.h>
@@ -14,8 +15,6 @@
 namespace nix {
 
 namespace windows {
-
-namespace {
 
 /**
  * Open a file/directory relative to a directory handle using NtCreateFile.
@@ -32,7 +31,7 @@ AutoCloseFD ntOpenAt(
     std::wstring_view pathComponent,
     ACCESS_MASK desiredAccess,
     ULONG createOptions,
-    ULONG createDisposition = FILE_OPEN)
+    ULONG createDisposition)
 {
     /* Set up UNICODE_STRING for the relative path */
     UNICODE_STRING pathStr;
@@ -73,6 +72,27 @@ AutoCloseFD ntOpenAt(
 
     return AutoCloseFD{h};
 }
+
+std::optional<AutoCloseFD> tryNtOpenAt(
+    Descriptor dirFd,
+    std::wstring_view pathComponent,
+    ACCESS_MASK desiredAccess,
+    ULONG createOptions,
+    ULONG createDisposition)
+{
+    try {
+        return ntOpenAt(dirFd, pathComponent, desiredAccess, createOptions, createDisposition);
+    } catch (WinError & e) {
+        /* Absence is not a failure, matching the `ENOENT`/`ENOTDIR` cases that
+           the Unix `maybeFstatat` reports as `std::nullopt`. */
+        if (e.lastError == ERROR_FILE_NOT_FOUND || e.lastError == ERROR_PATH_NOT_FOUND || e.lastError == ERROR_DIRECTORY
+            || e.lastError == ERROR_INVALID_NAME)
+            return std::nullopt;
+        throw;
+    }
+}
+
+namespace {
 
 /**
  * Open a symlink relative to a directory handle without following it.
@@ -226,6 +246,20 @@ PosixStat fstat(Descriptor fd)
         info.nNumberOfLinks);
 
     return st;
+}
+
+std::optional<PosixStat> maybeFstatat(Descriptor dirFd, const std::filesystem::path & path)
+{
+    assert(path.is_relative());
+    assert(!path.empty());
+
+    /* No-follow, so that a symlink is reported as itself rather than as its
+       target. This is what `AT_SYMLINK_NOFOLLOW` gives the Unix version. */
+    auto fd = windows::tryNtOpenAt(dirFd, path.native(), FILE_READ_ATTRIBUTES | SYNCHRONIZE, FILE_OPEN_REPARSE_POINT);
+    if (!fd)
+        return std::nullopt;
+
+    return fstat(fd->get());
 }
 
 AutoCloseFD openFileEnsureBeneathNoSymlinks(

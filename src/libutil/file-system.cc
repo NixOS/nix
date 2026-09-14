@@ -408,6 +408,12 @@ AutoDelete::AutoDelete(const std::filesystem::path & p, bool recursive)
 {
 }
 
+void deletePath(const std::filesystem::path & path)
+{
+    uint64_t dummy;
+    deletePath(path, dummy);
+}
+
 void AutoDelete::deletePath()
 {
     if (del) {
