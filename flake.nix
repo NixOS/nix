@@ -93,40 +93,71 @@
           };
       };
 
-      # Memoize nixpkgs for different platforms for efficiency.
+      /**
+        Memoized nixpkgs for different platforms for efficiency.
+      */
       nixpkgsFor = forAllSystems (
         system:
         let
-          make-pkgs =
+          makePkgs =
             crossSystem:
-            forAllStdenvs (
-              stdenv:
-              import nixpkgs {
-                localSystem = {
-                  inherit system;
-                };
-                crossSystem =
-                  if crossSystem == null then
-                    null
-                  else
-                    {
-                      config = crossSystem;
-                    }
-                    // lib.optionalAttrs (crossSystem == "x86_64-w64-mingw32") {
-                      emulator = pkgs: "${pkgs.buildPackages.wineWow64Packages.stable}/bin/wine";
-                    };
-                overlays = [
-                  (overlayFor (pkgs: pkgs.${stdenv}))
-                ];
-              }
-            );
+            import nixpkgs {
+              localSystem = {
+                inherit system;
+              };
+              crossSystem =
+                if crossSystem == null then
+                  null
+                else
+                  {
+                    config = crossSystem;
+                  }
+                  // lib.optionalAttrs (crossSystem == "x86_64-w64-mingw32") {
+                    emulator = pkgs: "${pkgs.buildPackages.wineWow64Packages.stable}/bin/wine";
+                  };
+            };
+        in
+        {
+          native = makePkgs null;
+          cross = forAllCrossSystems makePkgs;
+        }
+      );
+
+      /**
+        Memoised nix component scopes for different platforms and stdenvs.
+      */
+      nixComponentsFor = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgsFor.${system}.native;
+          makePackageSet =
+            pkgs: stdenv:
+            (packageSetsFor {
+              inherit pkgs;
+              getStdenv = pkgs: pkgs.${stdenv};
+            }).nixComponents
+            // {
+              # This is not the nixpkgs fixpoint, but just for easier plubming in hydraJobs and such.
+              # Technically you can extract the fixpoint with `callPackage {pkgs}: pkgs`, but that's
+              # a little too verbose. And in hydraJobs and flake output definitions no overriding should
+              # happen anyway.
+              _pkgs = pkgs;
+            };
         in
         rec {
-          nativeForStdenv = make-pkgs null;
-          crossForStdenv = forAllCrossSystems make-pkgs;
-          # Alias for convenience
+          nativeForStdenv = forAllStdenvs (stdenv: makePackageSet pkgs stdenv);
+          nativeStaticForStdenv = forAllStdenvs (
+            stdenv: makePackageSet nixpkgsFor.${system}.native.pkgsStatic stdenv
+          );
+          nativeLLVMForStdenv = forAllStdenvs (
+            stdenv: makePackageSet nixpkgsFor.${system}.native.pkgsLLVM stdenv
+          );
           native = nativeForStdenv.stdenv;
-          cross = forAllCrossSystems (crossSystem: crossForStdenv.${crossSystem}.stdenv);
+          cross = forAllCrossSystems (
+            crossSystem: makePackageSet nixpkgsFor.${system}.cross.${crossSystem} "stdenv"
+          );
+          nativeStatic = nativeStaticForStdenv.stdenv;
+          nativeLLVM = nativeLLVMForStdenv.stdenv;
         }
       );
 
@@ -139,33 +170,8 @@
           inherit officialRelease lib;
           src = self;
         }).packageSetsFor;
-
-      overlayFor =
-        getStdenv: final: prev:
-        let
-          packageSets = packageSetsFor {
-            inherit getStdenv;
-            pkgs = final;
-          };
-        in
-        {
-          nixStable = prev.nix;
-
-          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
-          nixComponents2 = packageSets.nixComponents;
-
-          # The dependencies are in their own scope, so that they don't have to be
-          # in Nixpkgs top level `pkgs` or `nixComponents2`.
-          # The `2` suffix is here because otherwise it interferes with `nixVersions.latest`, which is used in daemon compat tests.
-          nixDependencies2 = packageSets.nixDependencies;
-
-          nix = final.nixComponents2.nix-cli;
-        };
-
     in
     {
-      overlays.internal = overlayFor (p: p.stdenv);
-
       /**
         A Nixpkgs overlay that sets `nix` to something like `packages.<system>.nix-everything`,
         except dependencies aren't taken from (flake) `nix.inputs.nixpkgs`, but from the Nixpkgs packages
@@ -188,6 +194,7 @@
           lib
           linux64BitSystems
           nixpkgsFor
+          nixComponentsFor
           self
           ;
       };
@@ -234,15 +241,17 @@
           inherit (nixpkgsFor.${system}.native)
             changelog-d
             ;
-          default = self.packages.${system}.nix;
           installerScriptForGHA = self.hydraJobs.installerScriptForGHA.${system};
           binaryTarball = self.hydraJobs.binaryTarball.${system};
           # TODO probably should be `nix-cli`
-          nix = self.packages.${system}.nix-everything;
-          nix-manual = nixpkgsFor.${system}.native.nixComponents2.nix-manual;
-          nix-manual-manpages-only = nixpkgsFor.${system}.native.nixComponents2.nix-manual-manpages-only;
-          nix-internal-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-internal-api-docs;
-          nix-external-api-docs = nixpkgsFor.${system}.native.nixComponents2.nix-external-api-docs;
+          nix = nixComponentsFor.${system}.native.nix-everything;
+          default = nixComponentsFor.${system}.native.nix-everything;
+          inherit (nixComponentsFor.${system}.native)
+            nix-manual
+            nix-manual-manpages-only
+            nix-internal-api-docs
+            nix-external-api-docs
+            ;
         }
         # We need to flatten recursive attribute sets of derivations to pass `flake check`.
         //
@@ -306,17 +315,17 @@
               lib.optionalAttrs (linuxOnly -> nixpkgsFor.${system}.native.stdenv.hostPlatform.isLinux) (
                 {
                   # These attributes go right into `packages.<system>`.
-                  "${pkgName}" = nixpkgsFor.${system}.native.nixComponents2.${pkgName};
-                  "${pkgName}-static" = nixpkgsFor.${system}.native.pkgsStatic.nixComponents2.${pkgName};
-                  "${pkgName}-llvm" = nixpkgsFor.${system}.native.pkgsLLVM.nixComponents2.${pkgName};
+                  "${pkgName}" = nixComponentsFor.${system}.native.${pkgName};
+                  "${pkgName}-static" = nixComponentsFor.${system}.nativeStatic.${pkgName};
+                  # FIXME: These don't actually evaluate on darwin.
+                  "${pkgName}-llvm" = nixComponentsFor.${system}.nativeLLVM.${pkgName};
                 }
                 // flatMapAttrs (lib.genAttrs stdenvs (_: { })) (
                   stdenvName:
                   { }:
                   {
                     # These attributes go right into `packages.<system>`.
-                    "${pkgName}-${stdenvName}" =
-                      nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.nixComponents2.${pkgName};
+                    "${pkgName}-${stdenvName}" = nixComponentsFor.${system}.nativeForStdenv.${stdenvName}.${pkgName};
                   }
                 )
               )
@@ -328,7 +337,7 @@
                     (linuxOnly -> nixpkgsFor.${system}.cross.${crossSystem}.stdenv.hostPlatform.isLinux)
                     {
                       # These attributes go right into `packages.<system>`.
-                      "${pkgName}-${crossSystem}" = nixpkgsFor.${system}.cross.${crossSystem}.nixComponents2.${pkgName};
+                      "${pkgName}-${crossSystem}" = nixComponentsFor.${system}.cross.${crossSystem}.${pkgName};
                     }
                 )
               )
@@ -366,10 +375,10 @@
         let
           makeShell = import ./packaging/dev-shell.nix { inherit lib devFlake; };
           makeShell' =
-            { pkgs }:
+            components:
             makeShell {
-              inherit pkgs;
-              nixComponents = pkgs.nixComponents2.overrideScope (
+              pkgs = components._pkgs;
+              nixComponents = components.overrideScope (
                 finalScope: prevScope: {
                   withUnityBuild = false;
                 }
@@ -380,37 +389,19 @@
         forAllSystems (
           system:
           prefixAttrs "native" (
-            forAllStdenvs (
-              stdenvName:
-              makeShell' {
-                pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName};
-              }
-            )
+            forAllStdenvs (stdenvName: makeShell' nixComponentsFor.${system}.nativeForStdenv.${stdenvName})
           )
           // lib.optionalAttrs (!nixpkgsFor.${system}.native.stdenv.isDarwin) (
             prefixAttrs "static" (
               forAllStdenvs (
-                stdenvName:
-                makeShell' {
-                  pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsStatic;
-                }
+                stdenvName: makeShell' nixComponentsFor.${system}.nativeStaticForStdenv.${stdenvName}
               )
             )
             // prefixAttrs "llvm" (
-              forAllStdenvs (
-                stdenvName:
-                makeShell' {
-                  pkgs = nixpkgsFor.${system}.nativeForStdenv.${stdenvName}.pkgsLLVM;
-                }
-              )
+              forAllStdenvs (stdenvName: makeShell' nixComponentsFor.${system}.nativeLLVMForStdenv.${stdenvName})
             )
             // prefixAttrs "cross" (
-              forAllCrossSystems (
-                crossSystem:
-                makeShell' {
-                  pkgs = nixpkgsFor.${system}.cross.${crossSystem};
-                }
-              )
+              forAllCrossSystems (crossSystem: makeShell' nixComponentsFor.${system}.cross.${crossSystem})
             )
           )
           // {

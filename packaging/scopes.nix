@@ -39,12 +39,12 @@ rec {
           };
 
       # The dependencies are in their own scope, so that they don't have to be
-      # in Nixpkgs top level `pkgs` or `nixComponents2`.
+      # in Nixpkgs top level `pkgs` or `nixComponents`.
       nixDependencies =
         lib.makeScopeWithSplicing'
           {
             inherit (pkgs) splicePackages;
-            inherit (pkgs) newScope; # layered directly on pkgs, unlike nixComponents2 above
+            inherit (pkgs) newScope; # layered directly on pkgs, unlike nixComponents above
           }
           {
             otherSplices = lib.renameCrossIndexTo "self" nixDependenciesSplices;
