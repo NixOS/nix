@@ -101,6 +101,42 @@ public:
     {
     }
 
+    /**
+     * Cleanup to run when destroying the builder, mirroring
+     * `UnixDerivationBuilderImpl::cleanupOnDestruction`.
+     *
+     * Without this, a throw anywhere after `startDaemon()` in `startBuild()`
+     * --- `spawnBuilder()` failing on a missing builder executable is the
+     * common one --- destroys the builder while `daemonThread` is still
+     * joinable, and `~std::thread` on a joinable thread calls
+     * `std::terminate()`. `killChild()` alone is not enough: it returns early
+     * when no process was ever spawned, which is exactly that window.
+     */
+    void cleanupOnDestruction() noexcept
+    {
+        /* Careful: never throw from a noexcept function. Each step is guarded
+           separately so one failure cannot skip the others. */
+        try {
+            killChild();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            stopDaemon();
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+        try {
+            /* `unprepareBuild` deletes this on the success and non-zero-exit
+               paths, but not when `startBuild` throws, which would otherwise
+               leak a `nix-build*` directory in `%TEMP%` per attempt. */
+            if (!tmpDir.empty())
+                deletePath(tmpDir);
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+    }
+
     /** The worker's I/O completion port, which the log pipe must be tied to. */
     HANDLE ioport;
 
@@ -134,15 +170,10 @@ public:
         return false;
     }
 
-    void submitOutput(const SingleDerivedPath &, const OutputName &) override
-    {
-        throw UnimplementedError("recursive Nix is not yet supported on Windows");
-    }
-
     void addDependencyImpl(const StorePath &) override
     {
-        /* Only reachable through recursive Nix, which `submitOutput` rejects. */
-        throw UnimplementedError("recursive Nix is not yet supported on Windows");
+        /* Nothing to do, as on Unix: the restricted store already tracks the
+           path, and without a sandbox there is no mount to add. */
     }
 
     /* --- DerivationBuilder --- */
@@ -217,6 +248,11 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     for (std::string_view name : {"SystemRoot", "SystemDrive", "windir", "COMSPEC", "PATHEXT", "PATH"})
         if (auto value = getEnvOs(os(name)))
             env[os(name)] = *value;
+
+    /* Recursive Nix, when the daemon is running. Set before the derivation's
+       own variables so a derivation cannot shadow it by accident. */
+    if (daemonRemoteUri)
+        env[OS_STR("NIX_REMOTE")] = os(*daemonRemoteUri);
 
     /* The derivation's own environment wins over all of the above. */
     for (auto & [name, entry] : desugaredEnv.variables)
@@ -324,6 +360,14 @@ std::optional<Descriptor> WindowsDerivationBuilderImpl::startBuild()
     /* A fresh build directory per attempt. */
     tmpDir = createTempDir(defaultTempDir(), "nix-build");
 
+    /* Recursive Nix, if the derivation asked for it. Uses the same shared
+       daemon as Unix: the socket type is already cross-platform, and the
+       accept loop runs on its own thread just as it does there. The
+       completion port this builder holds is for the log pipe, so the two do
+       not interact. */
+    if (drvOptions.getRequiredSystemFeatures(drv).count("recursive-nix"))
+        startDaemon();
+
     /* Clear anything a previous failed build left at the output paths. */
     for (auto & [name, status] : initialOutputs)
         if (status.known)
@@ -351,6 +395,9 @@ bool WindowsDerivationBuilderImpl::killChild()
        is no gentler option to try first. */
     pid.kill();
 
+    /* The builder may have had a daemon connection open. */
+    stopDaemon();
+
     return true;
 }
 
@@ -362,6 +409,9 @@ BuilderExit WindowsDerivationBuilderImpl::unprepareBuild()
 
     miscMethods->closeLogFile();
     miscMethods->childTerminated();
+
+    /* Terminate the recursive Nix daemon. */
+    stopDaemon();
 
     return {.status = exitCode};
 }
@@ -380,6 +430,14 @@ DerivationBuilderUnique makeDerivationBuilder(
 
 void DerivationBuilderDeleter::operator()(DerivationBuilder * builder) noexcept
 {
+    if (!builder) /* Idempotent and handles nullptr as any deleter must. */
+        return;
+
+    if (auto builderImpl = dynamic_cast<WindowsDerivationBuilderImpl *>(builder))
+        /* Note that this might call into virtual functions, which we can't do
+           in a destructor of the WindowsDerivationBuilderImpl itself. */
+        builderImpl->cleanupOnDestruction();
+
     delete builder;
 }
 
