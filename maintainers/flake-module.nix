@@ -82,6 +82,9 @@
               ''^tests/functional/lang/eval-fail-bad-string-interpolation-3\.nix$''
               ''^tests/functional/lang/eval-fail-bad-string-interpolation-4\.nix$''
               ''^tests/functional/lang/eval-okay-regex-match2\.nix$''
+              ''^tests/functional/lang/eval-okay-scope-1\.nix$''
+              ''^tests/functional/lang/eval-okay-scope-2\.nix$''
+              ''^tests/functional/lang/eval-okay-scope-3\.nix$''
 
               # URL literal tests - nixfmt converts unquoted URLs to strings
               ''^tests/functional/lang/eval-fail-url-literal\.nix$''
