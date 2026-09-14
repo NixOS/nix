@@ -538,7 +538,7 @@ struct curlFileTransfer : public FileTransfer
 #if !defined(_WIN32)
         static int cloexec_callback(void *, curl_socket_t curlfd, curlsocktype purpose)
         {
-            unix::closeOnExec(curlfd);
+            closeOnExec(curlfd);
             vomit("cloexec set for fd %i", curlfd);
             return CURL_SOCKOPT_OK;
         }

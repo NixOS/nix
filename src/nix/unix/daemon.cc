@@ -329,7 +329,7 @@ static void daemonLoop(
                     },
             },
             [&](AutoCloseFD remote, std::function<void()> closeListeners) {
-                unix::closeOnExec(remote.get());
+                closeOnExec(remote.get());
 
                 unix::PeerInfo peer;
                 TrustedFlag trusted;

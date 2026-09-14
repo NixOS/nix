@@ -142,6 +142,18 @@ void syncDescriptor(Descriptor fd)
     }
 }
 
+void closeOnExec(Descriptor fd)
+{
+    /* Windows has no `exec`, so there is nothing to close on. The nearest
+       equivalent is handle inheritance, which a child only receives when
+       the handle is marked inheritable and the parent passes
+       `bInheritHandles`. Clearing the flag is therefore usually a no-op,
+       but doing it keeps the guarantee the Unix version makes: after this
+       returns, the descriptor is not handed to a child. */
+    if (!::SetHandleInformation(fd, HANDLE_FLAG_INHERIT, 0))
+        throw windows::WinError("clearing the inherit flag");
+}
+
 bool tryCopyFdRangeFast(Descriptor from, Descriptor to, off_t offset, size_t nbytes, size_t & written)
 {
     /* TODO: Implement if this becomes relevant. Seems like windows maybe has some reflinking capabilities:
