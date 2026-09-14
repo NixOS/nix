@@ -15,4 +15,8 @@ a Nix expression evaluates.
 `nix derivation add` takes a single derivation in the JSON format.
 See [the manual](@docroot@/protocols/json/derivation/index.md) for a documentation of this format.
 
+With `--cbor`, it reads a single derivation in the
+[CBOR format](@docroot@/protocols/derivation-cbor.md), which preserves arbitrary
+bytes in the builder, arguments, and environment names and values.
+
 )""

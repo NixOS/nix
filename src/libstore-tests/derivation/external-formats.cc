@@ -35,6 +35,25 @@ TEST_F(DerivationTest, UnterminatedString)
         FormatError);
 }
 
+TEST_F(DerivationTest, ATermArbitraryBytes)
+{
+    std::string allBytes;
+    for (unsigned i = 0; i < 256; ++i)
+        allBytes += static_cast<char>(i);
+
+    Derivation drv;
+    drv.name = "bytes";
+    drv.platform = "s";
+    drv.builder = allBytes;
+    drv.args = {allBytes};
+    drv.env = {{allBytes, allBytes}};
+
+    auto encoded = derivation::unparse(drv, *store);
+    auto decoded = derivation::parse(
+        *store, std::move(encoded), drv.name, derivation::defaultSupportWindowsStoreDir, mockXpSettings);
+    EXPECT_EQ(decoded, drv);
+}
+
 /**
  * A fixed-output derivation states its output path, but that path is a
  * function of the content address, so a stated path that disagrees is
