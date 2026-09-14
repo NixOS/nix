@@ -747,6 +747,99 @@ struct curlFileTransfer : public FileTransfer
             result.bodySize = 0;
         }
 
+        /**
+         * Classify a failed transfer, which decides whether it is worth retrying.
+         */
+        static Error classifyError(CURLcode code, long httpStatus, std::string_view responseBody)
+        {
+// Allow selecting a subset of enum values
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wswitch-enum"
+            switch (code) {
+            case CURLE_FILE_COULDNT_READ_FILE:
+                // The file is definitely not there
+                return NotFound;
+            // Don't bother retrying on certain cURL errors
+            case CURLE_FAILED_INIT:
+            case CURLE_URL_MALFORMAT:
+            case CURLE_NOT_BUILT_IN:
+            case CURLE_REMOTE_ACCESS_DENIED:
+            case CURLE_FUNCTION_NOT_FOUND:
+            case CURLE_ABORTED_BY_CALLBACK:
+            case CURLE_BAD_FUNCTION_ARGUMENT:
+            case CURLE_INTERFACE_FAILED:
+            case CURLE_UNKNOWN_OPTION:
+            case CURLE_SSL_CACERT_BADFILE:
+            case CURLE_TOO_MANY_REDIRECTS:
+            case CURLE_WRITE_ERROR:
+            case CURLE_UNSUPPORTED_PROTOCOL:
+            case CURLE_BAD_CONTENT_ENCODING:
+            case CURLE_OPERATION_TIMEDOUT:
+                return Misc;
+            default: // Shut up warnings
+                break;
+            }
+#pragma GCC diagnostic pop
+
+            // S3 returns certain retryable errors as HTTP 400/500/503 with XML error codes.
+            // These take precedence over the generic HTTP status handling below.
+            // Only parse the response body on status codes where S3 XML errors can appear.
+            static constexpr std::array<std::string_view, 12> s3RetryableErrors{{
+                "IncompleteBody",       // HTTP 400 - network issue
+                "InternalError",        // HTTP 500 - S3 internal failure
+                "InternalFailure",      // HTTP 500 - alias for InternalError
+                "InternalServerError",  // HTTP 500 - alias for InternalError
+                "RequestExpired",       // HTTP 400 - clock skew / slow upload
+                "RequestTimeout",       // HTTP 400 - stale connection reuse
+                "RequestTimeTooSkewed", // HTTP 403 - clock drift
+                "RequestThrottled",     // HTTP 400 - throttling variant
+                "SlowDown",             // HTTP 503 - throttling
+                "ServiceUnavailable",   // HTTP 503 - temporary unavailability
+                "Throttling",           // HTTP 400 - throttling variant
+                "ThrottledException",   // HTTP 400 - throttling variant
+            }};
+            // S3 error responses have the form <Error><Code>...</Code>...</Error>.
+            // Require the <Error> root to avoid matching unrelated XML with a <Code> element.
+            static std::regex s3ErrorCodeRegex("<Error>[^]*<Code>([^<]+)</Code>");
+            std::match_results<std::string_view::const_iterator> s3Match;
+            bool isS3XmlStatus = httpStatus == 400 || httpStatus == 403 || httpStatus == 500 || httpStatus == 503;
+            auto s3ErrorCode =
+                (isS3XmlStatus
+                 && std::regex_search(responseBody.begin(), responseBody.end(), s3Match, s3ErrorCodeRegex))
+                    ? s3Match[1].str()
+                    : "";
+
+            if (std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode) != s3RetryableErrors.end()) {
+                debug("S3 error '%s', will retry", s3ErrorCode);
+                return Transient;
+            }
+
+            switch (httpStatus) {
+            case std::to_underlying(HttpStatus::Unauthorized):
+            case std::to_underlying(HttpStatus::ProxyAuthRequired):
+                return Unauthorized;
+            case std::to_underlying(HttpStatus::Forbidden):
+                // Note: the only reason we treat this differently from 401/407 is S3 returns 403 if a file
+                // doesn't exist and the bucket is unlistable.
+                return Forbidden;
+            case std::to_underlying(HttpStatus::NotFound):
+            case std::to_underlying(HttpStatus::Gone):
+                // The file is definitely not there
+                return NotFound;
+            case std::to_underlying(HttpStatus::RequestTimeout): // server timed out waiting for us
+            case std::to_underlying(HttpStatus::TooManyRequests):
+                return Transient;
+            case std::to_underlying(HttpStatus::NotImplemented):
+            case std::to_underlying(HttpStatus::HttpVersionNotSupported):
+            case std::to_underlying(HttpStatus::NetworkAuthRequired): // captive portal
+                return Misc;
+            default:
+                // Other 4xx are client errors and probably not worth retrying. Everything else, most 5xx
+                // (server) errors included, is transient, since we only stop retrying when it looks hopeless.
+                return httpStatus >= 400 && httpStatus < 500 ? Misc : Transient;
+            }
+        }
+
         void finish(CURLcode code)
         {
             auto finishTime = std::chrono::steady_clock::now();
@@ -782,94 +875,7 @@ struct curlFileTransfer : public FileTransfer
             }
 
             else {
-                // We treat most errors as transient, but won't retry when hopeless
-                Error err = Transient;
-
-                // S3 returns certain retryable errors as HTTP 400/500/503 with XML error codes.
-                // These take precedence over the generic HTTP status handling below.
-                // Only parse the response body on status codes where S3 XML errors can appear.
-                static constexpr std::array<std::string_view, 12> s3RetryableErrors{{
-                    "IncompleteBody",       // HTTP 400 - network issue
-                    "InternalError",        // HTTP 500 - S3 internal failure
-                    "InternalFailure",      // HTTP 500 - alias for InternalError
-                    "InternalServerError",  // HTTP 500 - alias for InternalError
-                    "RequestExpired",       // HTTP 400 - clock skew / slow upload
-                    "RequestTimeout",       // HTTP 400 - stale connection reuse
-                    "RequestTimeTooSkewed", // HTTP 403 - clock drift
-                    "RequestThrottled",     // HTTP 400 - throttling variant
-                    "SlowDown",             // HTTP 503 - throttling
-                    "ServiceUnavailable",   // HTTP 503 - temporary unavailability
-                    "Throttling",           // HTTP 400 - throttling variant
-                    "ThrottledException",   // HTTP 400 - throttling variant
-                }};
-                // S3 error responses have the form <Error><Code>...</Code>...</Error>.
-                // Require the <Error> root to avoid matching unrelated XML with a <Code> element.
-                static std::regex s3ErrorCodeRegex("<Error>[^]*<Code>([^<]+)</Code>");
-                std::smatch s3Match;
-                bool isS3XmlStatus = httpStatus == 400 || httpStatus == 403 || httpStatus == 500 || httpStatus == 503;
-                auto s3ErrorCode =
-                    (isS3XmlStatus && errorSink && std::regex_search(errorSink->s, s3Match, s3ErrorCodeRegex))
-                        ? s3Match[1].str()
-                        : "";
-
-                if (std::find(s3RetryableErrors.begin(), s3RetryableErrors.end(), s3ErrorCode)
-                    != s3RetryableErrors.end()) {
-                    debug("S3 error '%s', will retry", s3ErrorCode);
-                } else if (
-                    httpStatus == HttpStatus::NotFound || httpStatus == HttpStatus::Gone
-                    || code == CURLE_FILE_COULDNT_READ_FILE) {
-                    // The file is definitely not there
-                    err = NotFound;
-                } else if (httpStatus == HttpStatus::Unauthorized || httpStatus == HttpStatus::ProxyAuthRequired) {
-                    err = Unauthorized;
-                } else if (httpStatus == HttpStatus::Forbidden) {
-                    // Don't retry on authentication/authorization failures.
-                    // Note: the only reason we treat this differently from 401/407 is S3 returns 403 if a file doesn't
-                    // exist and the bucket is unlistable.
-                    err = Forbidden;
-                } else if (
-                    httpStatus >= 400 && httpStatus < 500 && httpStatus != HttpStatus::RequestTimeout
-                    && httpStatus != HttpStatus::TooManyRequests) {
-                    // Most 4xx errors are client errors and are probably not worth retrying:
-                    //   * 408 means the server timed out waiting for us, so we try again
-                    err = Misc;
-                } else if (
-                    httpStatus == HttpStatus::NotImplemented || httpStatus == HttpStatus::HttpVersionNotSupported
-                    || httpStatus == HttpStatus::NetworkAuthRequired) {
-                    // Let's treat most 5xx (server) errors as transient, except for a handful:
-                    //   * 501 not implemented
-                    //   * 505 http version not supported
-                    //   * 511 we're behind a captive portal
-                    err = Misc;
-                } else {
-// Don't bother retrying on certain cURL errors either
-
-// Allow selecting a subset of enum values
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wswitch-enum"
-                    switch (code) {
-                    case CURLE_FAILED_INIT:
-                    case CURLE_URL_MALFORMAT:
-                    case CURLE_NOT_BUILT_IN:
-                    case CURLE_REMOTE_ACCESS_DENIED:
-                    case CURLE_FILE_COULDNT_READ_FILE:
-                    case CURLE_FUNCTION_NOT_FOUND:
-                    case CURLE_ABORTED_BY_CALLBACK:
-                    case CURLE_BAD_FUNCTION_ARGUMENT:
-                    case CURLE_INTERFACE_FAILED:
-                    case CURLE_UNKNOWN_OPTION:
-                    case CURLE_SSL_CACERT_BADFILE:
-                    case CURLE_TOO_MANY_REDIRECTS:
-                    case CURLE_WRITE_ERROR:
-                    case CURLE_UNSUPPORTED_PROTOCOL:
-                    case CURLE_BAD_CONTENT_ENCODING:
-                        err = Misc;
-                        break;
-                    default: // Shut up warnings
-                        break;
-                    }
-#pragma GCC diagnostic pop
-                }
+                auto err = classifyError(code, httpStatus, errorSink ? std::string_view(errorSink->s) : "");
 
                 attempt++;
 

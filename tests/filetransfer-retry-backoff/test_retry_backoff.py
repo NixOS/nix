@@ -18,13 +18,18 @@ fail_count = 0
 retry_after = "1"
 fail_status = 503
 fail_body = b""
+stall_response = 0.0
+request_count = 0
 lock = threading.Lock()
 
 
 class FlakyHandler(http.server.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def do_GET(self):
-        global fail_count
+        global fail_count, request_count
         with lock:
+            request_count += 1
             n = fail_count
             if n > 0:
                 fail_count = n - 1
@@ -34,10 +39,15 @@ class FlakyHandler(http.server.BaseHTTPRequestHandler):
                 self.send_header("Retry-After", retry_after)
             if fail_body:
                 self.send_header("Content-Type", "application/xml")
-                self.send_header("Content-Length", str(len(fail_body)))
+                if not stall_response:
+                    self.send_header("Content-Length", str(len(fail_body)))
+            else:
+                self.send_header("Content-Length", "0")
             self.end_headers()
             if fail_body:
                 self.wfile.write(fail_body)
+            if stall_response:
+                time.sleep(stall_response)
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
@@ -55,13 +65,17 @@ def s3_error_xml(code: str, message: str = "test") -> bytes:
             f'<Message>{message}</Message></Error>').encode()
 
 
-def set_failures(n: int, ra: int = 1, status: int = 503, body: bytes = b"") -> None:
-    global fail_count, retry_after, fail_status, fail_body
+def set_failures(
+    n: int, ra: int = 1, status: int = 503, body: bytes = b"", stall: float = 0
+) -> None:
+    global fail_count, retry_after, fail_status, fail_body, stall_response, request_count
     with lock:
         fail_count = n
         retry_after = str(ra)
         fail_status = status
         fail_body = body
+        stall_response = stall
+        request_count = 0
 
 
 def fetch(extra_opts: str = "") -> tuple[int, str, list[int]]:
@@ -88,6 +102,7 @@ def main() -> None:
         test_raised_retry_attempts()
         test_download_attempts_alias()
         test_s3_xml_error_retried()
+        test_timeout_with_s3_error_not_retried()
     finally:
         httpd.shutdown()
 
@@ -162,6 +177,17 @@ def test_s3_xml_error_retried():
     )
     assert rc == 0, f"Expected success: {out}"
     assert len(delays) == 2, f"Expected 2 retries, got {len(delays)}: {out}"
+
+
+def test_timeout_with_s3_error_not_retried():
+    """A transfer timeout is not retried even with a retryable S3 error body."""
+    set_failures(100, status=500, body=s3_error_xml("InternalError"), stall=2)
+    rc, out, delays = fetch(
+        "--option filetransfer-retry-attempts 4 --option stalled-download-timeout 1"
+    )
+    assert rc != 0, f"Expected failure: {out}"
+    assert not delays, f"Expected no retries, got {len(delays)}: {out}"
+    assert request_count == 1, f"Expected 1 request, got {request_count}: {out}"
 
 
 
