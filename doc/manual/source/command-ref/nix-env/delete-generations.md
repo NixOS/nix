@@ -54,14 +54,6 @@ The is because profiles are also garbage collection roots — any [store object]
 
 [store object]: @docroot@/store/store-object.md
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ./env-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 ## Delete explicit generation numbers
@@ -96,3 +88,11 @@ This command will delete all generations older than 30 days, except for the gene
 ```console
 $ nix-env --profile other_profile --delete-generations old
 ```
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ./env-common.md}}
+
+{{#include ../env-common.md}}
