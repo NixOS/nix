@@ -70,18 +70,25 @@ private:
     /**
      * The states.
      */
-    Co gaveUpOnSubstitution();
-    Co tryToBuild(StorePathSet inputPaths);
-    Co buildWithHook(
+    using Result = decltype(BuildResult::inner);
+
+    struct NeedsSlot
+    {};
+
+    using LocalBuildOutcome = std::variant<Result, NeedsSlot>;
+
+    Co<ExitCode> init();
+    Co<Result> tryToBuild();
+    Co<Result> buildWithHook(
         StorePathSet inputPaths,
         std::map<std::string, InitialOutput> initialOutputs,
         DerivationOptions<StorePath> drvOptions,
         PathLocks outputLocks);
-    Co buildLocally(
+    Co<LocalBuildOutcome> buildLocally(
         LocalBuildCapability localBuildCap,
-        StorePathSet inputPaths,
-        std::map<std::string, InitialOutput> initialOutputs,
-        DerivationOptions<StorePath> drvOptions,
+        const StorePathSet & inputPaths,
+        std::map<std::string, InitialOutput> & initialOutputs,
+        const DerivationOptions<StorePath> & drvOptions,
         PathLocks outputLocks);
 
     /**
@@ -89,7 +96,7 @@ private:
      */
     HookReply tryBuildHook(const DerivationOptions<StorePath> & drvOptions);
 
-    Done doneFailureLogTooLong(BuildLog & buildLog);
+    BuildError logLimitExceeded();
 
     /**
      * Wrappers around the corresponding Store methods that first consult the
@@ -105,10 +112,6 @@ private:
      * 'SingleDrvOutputs' structure containing the valid outputs.
      */
     std::pair<bool, SingleDrvOutputs> checkPathValidity(std::map<std::string, InitialOutput> & initialOutputs);
-
-    Done doneSuccess(BuildResult::Success::Status status, SingleDrvOutputs builtOutputs);
-
-    Done doneFailure(BuildError ex);
 
     BuildError fixupBuilderFailureErrorMessage(BuilderFailureError msg, BuildLog & buildLog);
 
