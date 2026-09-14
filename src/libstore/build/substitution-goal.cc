@@ -78,8 +78,6 @@ Goal::Co PathSubstitutionGoal::init()
                 [sub, path = subPath.value_or(storePath)](auto cb) { sub->queryPathInfo(path, std::move(cb)); });
         } catch (InvalidPath &) {
             continue;
-        } catch (SubstituterDisabled & e) {
-            continue;
         } catch (Error & e) {
             lastStoresException = std::make_optional(std::move(e));
             continue;

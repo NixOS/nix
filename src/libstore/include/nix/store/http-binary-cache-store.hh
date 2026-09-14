@@ -7,6 +7,7 @@
 #include "nix/util/sync.hh"
 
 #include <chrono>
+#include <exception>
 
 namespace nix {
 
@@ -94,10 +95,22 @@ class HttpBinaryCacheStore : public virtual BinaryCacheStore
 {
     void anchor() override;
 
+    struct Disabled
+    {
+        std::chrono::steady_clock::time_point until;
+        /**
+         * A copy of the error that got the cache disabled, with a note
+         * saying so already attached. Rethrown as-is for every request
+         * until `until`, so callers learn the actual reason and not
+         * merely that the cache is disabled. An `std::exception_ptr`
+         * rather than an `Error` so the dynamic type is kept.
+         */
+        std::exception_ptr cause;
+    };
+
     struct State
     {
-        bool enabled = true;
-        std::chrono::steady_clock::time_point disabledUntil;
+        std::optional<Disabled> disabled;
     };
 
     Sync<State> _state;
@@ -122,7 +135,11 @@ protected:
 
     std::optional<CompressionAlgo> getCompressionMethod(const std::string & path);
 
-    void maybeDisable();
+    /**
+     * Stop talking to this cache for a while, because a request to it
+     * just failed with `cause`.
+     */
+    void disable(const Error & cause);
 
     void checkEnabled();
 
