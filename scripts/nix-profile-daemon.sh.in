@@ -1,7 +1,7 @@
 # Only execute this file once per shell.
 # This file is tested by tests/installer/default.nix.
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
-export __ETC_PROFILE_NIX_SOURCED=1
+__ETC_PROFILE_NIX_SOURCED=1
 
 NIX_LINK=$HOME/.nix-profile
 if [ -n "${XDG_STATE_HOME-}" ]; then
