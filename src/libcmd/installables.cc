@@ -599,7 +599,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     case Realise::Nothing:
     case Realise::Derivation:
-        printMissing(store, pathsToBuild, lvlError);
+        printMissing(store, pathsToBuild, lvlError, &*evalStore);
 
         for (auto & path : pathsToBuild) {
             for (auto & aux : backmap[path]) {
@@ -629,7 +629,7 @@ std::vector<std::pair<ref<Installable>, BuiltPathWithResult>> Installable::build
 
     case Realise::Outputs: {
         if (settings.printMissing)
-            printMissing(store, pathsToBuild, lvlInfo);
+            printMissing(store, pathsToBuild, lvlInfo, &*evalStore);
 
         auto buildResults = store->getBuilder(evalStore)->buildPathsWithResults(pathsToBuild, bMode);
         throwBuildErrors(buildResults, *store);

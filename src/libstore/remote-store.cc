@@ -840,9 +840,9 @@ void RemoteStore::addSignatures(const StorePath & storePath, const std::set<Sign
     readInt(conn->from);
 }
 
-MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
+MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets, Store * evalStore)
 {
-    {
+    if (!evalStore || evalStore == this) {
         auto conn(getConnection());
         if (conn->protoVersion.number < WorkerProto::Version::Number{1, 19})
             // Don't hold the connection handle in the fallback case
@@ -860,7 +860,8 @@ MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
     }
 
 fallback:
-    return Store::queryMissing(targets);
+    // The daemon cannot see the eval store, so do the traversal here.
+    return Store::queryMissing(targets, evalStore);
 }
 
 void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)
