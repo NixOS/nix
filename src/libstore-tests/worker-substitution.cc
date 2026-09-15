@@ -443,4 +443,79 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_EQ(goal->exitCode, Goal::ecSuccess);
 }
 
+TEST_F(WorkerSubstitutionTest, queryMissingSubstitutable)
+{
+    // A dependency and a root referencing it, both only in the substituter
+    auto dependencyPath = substituter->addToStore(
+        "dependency",
+        SourcePath{
+            [] {
+                auto sc = make_ref<MemorySourceAccessor>();
+                sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+                    .executable = false,
+                    .contents = "I am a dependency",
+                }};
+                return sc;
+            }(),
+        },
+        ContentAddressMethod::Raw::NixArchive,
+        HashAlgorithm::SHA256);
+
+    auto rootPath = substituter->addToStore(
+        "root",
+        SourcePath{
+            [&] {
+                auto sc = make_ref<MemorySourceAccessor>();
+                sc->root = MemorySourceAccessor::File{MemorySourceAccessor::File::Regular{
+                    .executable = false,
+                    .contents = "I reference " + substituter->printStorePath(dependencyPath),
+                }};
+                return sc;
+            }(),
+        },
+        ContentAddressMethod::Raw::NixArchive,
+        HashAlgorithm::SHA256,
+        StorePathSet{dependencyPath});
+
+    Worker worker{dummyStore, dummyStore};
+    ref<Store> substituerAsStore = substituter;
+    worker.getSubstituters = [substituerAsStore]() -> std::list<ref<Store>> { return {substituerAsStore}; };
+
+    auto missing = worker.queryMissing({DerivedPath::Opaque{rootPath}});
+
+    // Both would be substituted, and their sizes are accounted for
+    EXPECT_EQ(missing.willSubstitute, (StorePathSet{rootPath, dependencyPath}));
+    EXPECT_TRUE(missing.willBuild.empty());
+    EXPECT_TRUE(missing.unknown.empty());
+    EXPECT_EQ(
+        missing.narSize,
+        substituter->queryPathInfo(rootPath)->narSize + substituter->queryPathInfo(dependencyPath)->narSize);
+
+    // But nothing was actually substituted
+    EXPECT_FALSE(dummyStore->isValidPath(rootPath));
+    EXPECT_FALSE(dummyStore->isValidPath(dependencyPath));
+}
+
+TEST_F(WorkerSubstitutionTest, queryMissingUnknown)
+{
+    // A path that exists nowhere
+    auto path = dummyStore->makeFixedOutputPathFromCA(
+        "nowhere",
+        ContentAddressWithReferences::withoutRefs(
+            ContentAddress{
+                .method = ContentAddressMethod::Raw::NixArchive,
+                .hash = hashString(HashAlgorithm::SHA256, "nowhere"),
+            }));
+
+    Worker worker{dummyStore, dummyStore};
+    ref<Store> substituerAsStore = substituter;
+    worker.getSubstituters = [substituerAsStore]() -> std::list<ref<Store>> { return {substituerAsStore}; };
+
+    auto missing = worker.queryMissing({DerivedPath::Opaque{path}});
+
+    EXPECT_EQ(missing.unknown, StorePathSet{path});
+    EXPECT_TRUE(missing.willSubstitute.empty());
+    EXPECT_TRUE(missing.willBuild.empty());
+}
+
 } // namespace nix

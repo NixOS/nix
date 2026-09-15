@@ -81,11 +81,7 @@ private:
     asio::awaitable<BuildResult> haveDerivation(bool storeDerivation);
 
     /**
-     * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
-     * floating content-addressing derivation. Otherwise, returns a pair
-     * of a `Realisation`, containing among other things the store path
-     * of the wanted output, and a `PathStatus` with the
-     * current status of that output.
+     * See the free function of the same name.
      */
     std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity();
 
@@ -101,5 +97,19 @@ private:
 
     BuildResult failure(BuildError ex);
 };
+
+/**
+ * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
+ * floating content-addressing derivation. Otherwise, returns a pair
+ * of a `Realisation`, containing among other things the store path
+ * of the wanted output, and a `PathStatus` with the
+ * current status of that output.
+ */
+std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity(
+    Worker & worker,
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    BuildMode buildMode);
 
 } // namespace nix

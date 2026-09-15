@@ -32,6 +32,7 @@ PackageInfos queryInstalled(EvalState & state, const std::filesystem::path & use
 
 bool createUserEnv(
     EvalState & state,
+    Builder & builder,
     PackageInfos & elems,
     const std::filesystem::path & profile,
     bool keepDerivations,
@@ -45,7 +46,7 @@ bool createUserEnv(
             drvsToBuild.push_back({*drvPath});
 
     debug("building user environment dependencies");
-    state.store->getBuilder()->buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
+    builder.buildPaths(toDerivedPaths(drvsToBuild), state.repair ? bmRepair : bmNormal);
 
     /* Construct the whole top level derivation. */
     StorePathSet references;
@@ -80,7 +81,7 @@ bool createUserEnv(
             /* This is only necessary when installing store paths, e.g.,
                `nix-env -i /nix/store/abcd...-foo'. */
             state.store->addTempRoot(*j.second);
-            state.store->getBuilder()->ensurePath(*j.second);
+            builder.ensurePath(*j.second);
 
             references.insert(*j.second);
         }
@@ -155,7 +156,7 @@ bool createUserEnv(
     debug("building user environment");
     std::vector<StorePathWithOutputs> topLevelDrvs;
     topLevelDrvs.push_back({topLevelDrv});
-    state.store->getBuilder()->buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
+    builder.buildPaths(toDerivedPaths(topLevelDrvs), state.repair ? bmRepair : bmNormal);
 
     /* Switch the current user environment to the output path. */
     auto store2 = state.store.dynamic_pointer_cast<LocalFSStore>();

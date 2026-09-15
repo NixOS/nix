@@ -751,7 +751,7 @@ void Store::substitutePaths(const StorePathSet & paths)
     for (auto & path : paths)
         if (!path.isDerivation())
             paths2.emplace_back(DerivedPath::Opaque{path});
-    auto missing = queryMissing(paths2);
+    auto missing = getBuilder()->queryMissing(paths2);
 
     if (!missing.willSubstitute.empty())
         try {

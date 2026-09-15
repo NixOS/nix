@@ -1,4 +1,5 @@
 #include "nix/store/build/derivation-goal.hh"
+#include "nix/store/build/derivation-plan-goal.hh"
 #include "nix/store/build/drv-output-substitution-goal.hh"
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-resolution-goal.hh"
@@ -85,54 +86,56 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
             co_return success(BuildResult::Success::AlreadyValid, checkResult->first);
         }
 
-        Goals waitees;
+        /* Find out whether the output can be substituted, and from
+           where. This is the planning that a dry run does; a dry run
+           right before us has done it already. */
+        auto planGoal = worker.makeDerivationPlanGoal(drvPath, drv, wantedOutput);
+        co_await await({planGoal});
+        assert(planGoal->plan);
+        nrFailed = nrNoSubstituters = 0;
 
-        /* We are first going to try to create the invalid output paths
-           through substitutes.  If that doesn't work, we'll build
-           them. */
-        if (worker.settings.useSubstitutes && drvOptions.substitutesAllowed(worker.settings)) {
+        /* The output to (re)fetch, if any: what the plan says to
+           substitute; or, when repairing or checking, the output the
+           plan found valid already, as it needs a fresh look. */
+        std::optional<UnkeyedRealisation> toSubstitute;
+        if (auto * s = std::get_if<DerivationPlanGoal::Substitute>(&*planGoal->plan))
+            toSubstitute = s->realisation;
+        else if (
+            std::holds_alternative<DerivationPlanGoal::AlreadyValid>(*planGoal->plan) && checkResult
+            && worker.settings.useSubstitutes && drvOptions.substitutesAllowed(worker.settings))
+            toSubstitute = checkResult->first;
+
+        if (toSubstitute) {
+            auto * cap = getDerivationCA(*drv);
+            Goals waitees{upcast_goal(worker.makePathSubstitutionGoal(
+                toSubstitute->outPath,
+                buildMode == bmRepair ? Repair : NoRepair,
+                cap ? std::optional{*cap} : std::nullopt))};
+            co_await await(std::move(waitees));
+
+            trace("all outputs substituted (maybe)");
+
+            if (nrFailed > 0 && nrFailed > nrNoSubstituters && !worker.settings.tryFallback) {
+                co_return failure(BuildError(
+                    BuildResult::Failure::TransientFailure,
+                    "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
+                    worker.store.printStorePath(drvPath)));
+            }
+
+            /* For a floating output, the substituted realisation is
+               what makes the output known from now on. */
             if (!checkResult) {
-                DrvOutput id{drvPath, wantedOutput};
-                auto g = worker.makeDrvOutputSubstitutionGoal(id);
-                waitees.insert(g);
-                co_await await(std::move(waitees));
-
                 if (nrFailed == 0) {
-                    // optimization depending on moved containers being empty afterwards
-                    // NOLINTNEXTLINE(bugprone-use-after-move)
-                    waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
-                    co_await await(std::move(waitees));
-
                     trace("output path substituted");
-
-                    if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id}, CheckSigs);
-                    else
-                        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
-                }
-            } else {
-                auto * cap = getDerivationCA(*drv);
-                waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(
-                    checkResult->first.outPath,
-                    buildMode == bmRepair ? Repair : NoRepair,
-                    cap ? std::optional{*cap} : std::nullopt)));
+                    worker.store.registerDrvOutput({*toSubstitute, DrvOutput{drvPath, wantedOutput}}, CheckSigs);
+                } else
+                    debug(
+                        "The output path of the derivation output '%s' could not be substituted",
+                        DrvOutput{drvPath, wantedOutput}.to_string());
             }
         }
 
-        // optimization depending on moved containers being empty afterwards
-        // NOLINTNEXTLINE(bugprone-use-after-move)
-        co_await await(std::move(waitees));
-
-        trace("all outputs substituted (maybe)");
-
         assert(!type(*drv).isImpure());
-
-        if (nrFailed > 0 && nrFailed > nrNoSubstituters && !worker.settings.tryFallback) {
-            co_return failure(BuildError(
-                BuildResult::Failure::TransientFailure,
-                "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
-                worker.store.printStorePath(drvPath)));
-        }
 
         nrFailed = nrNoSubstituters = 0;
 
@@ -419,15 +422,25 @@ asio::awaitable<BuildResult> DerivationGoal::repairClosure()
 
 std::optional<std::pair<UnkeyedRealisation, PathStatus>> DerivationGoal::checkPathValidity()
 {
-    if (type(*drv).isImpure())
+    return nix::checkPathValidity(worker, drvPath, *drv, wantedOutput, buildMode);
+}
+
+std::optional<std::pair<UnkeyedRealisation, PathStatus>> checkPathValidity(
+    Worker & worker,
+    const StorePath & drvPath,
+    const Derivation & drv,
+    const OutputName & wantedOutput,
+    BuildMode buildMode)
+{
+    if (type(drv).isImpure())
         return std::nullopt;
 
     auto drvOutput = DrvOutput{drvPath, wantedOutput};
 
     std::optional<UnkeyedRealisation> mRealisation;
 
-    if (auto * mOutput = get(drv->outputs, wantedOutput)) {
-        if (auto mPath = mOutput->path(worker.store, drv->name, wantedOutput)) {
+    if (auto * mOutput = get(drv.outputs, wantedOutput)) {
+        if (auto mPath = mOutput->path(worker.store, drv.name, wantedOutput)) {
             mRealisation = UnkeyedRealisation{
                 .outPath = std::move(*mPath),
             };

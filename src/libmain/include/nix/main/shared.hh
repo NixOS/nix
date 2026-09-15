@@ -35,8 +35,14 @@ void printGCWarning();
 
 class Store;
 struct MissingPaths;
+struct Builder;
 
-void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl = lvlInfo);
+/**
+ * Print what realising `paths` would entail. Use the same `builder` for
+ * the realisation that follows, so that it picks up from the plans
+ * this made rather than starting over.
+ */
+void printMissing(ref<Store> store, Builder & builder, const std::vector<DerivedPath> & paths, Verbosity lvl = lvlInfo);
 
 void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl = lvlInfo);
 

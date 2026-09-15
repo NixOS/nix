@@ -3,6 +3,9 @@
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
+#include "nix/store/build/derivation-plan-goal.hh"
+#include "nix/store/build/substitution-plan-goal.hh"
+#include "nix/store/nar-info.hh"
 #include "nix/util/strings.hh"
 #include <memory>
 
@@ -148,6 +151,57 @@ void Worker::repairPath(const StorePath & path)
                 },
                 bmRepair)});
     });
+}
+
+MissingPaths Worker::queryMissing(const std::vector<DerivedPath> & targets)
+{
+    MissingPaths res;
+
+    run([&]() -> asio::awaitable<void> {
+        Goals goals;
+        for (auto & target : targets)
+            goals.insert(makePlanGoal(target));
+
+        /* Failures are what we are here to find out about, so carry on
+           past them. */
+        co_await awaitTopGoals(goals, /*keepGoing=*/true);
+
+        /* Read the plans off the goals, following what each plan in
+           turn depends on. */
+        std::set<Goal *> visited;
+        auto visit = [&](this auto & self, const GoalPtr & goal) -> void {
+            if (!visited.insert(goal.get()).second)
+                return;
+            if (auto * g = dynamic_cast<SubstitutionPlanGoal *>(goal.get())) {
+                if (g->candidate) {
+                    res.willSubstitute.insert(g->storePath);
+                    res.narSize += g->candidate->info->narSize;
+                    if (auto narInfo = std::dynamic_pointer_cast<const NarInfo>(g->candidate->info))
+                        res.downloadSize += narInfo->fileSize;
+                    for (auto & p : g->referencePlans)
+                        self(p);
+                } else if (g->exitCode == Goal::ecNoSubstituters)
+                    res.unknown.insert(g->storePath);
+            } else if (auto * g = dynamic_cast<DerivationPlanGoal *>(goal.get())) {
+                if (!g->plan)
+                    return;
+                if (auto * s = std::get_if<DerivationPlanGoal::Substitute>(&*g->plan))
+                    self(s->plan);
+                else if (std::holds_alternative<DerivationPlanGoal::Build>(*g->plan)) {
+                    res.willBuild.insert(g->drvPath);
+                    for (auto & p : g->inputPlans)
+                        self(p);
+                }
+            } else if (auto * g = dynamic_cast<DerivationTrampolinePlanGoal *>(goal.get())) {
+                for (auto & p : g->subPlans)
+                    self(p);
+            }
+        };
+        for (auto & goal : goals)
+            visit(goal);
+    });
+
+    return res;
 }
 
 } // namespace nix

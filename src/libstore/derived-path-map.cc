@@ -100,4 +100,7 @@ template struct DerivedPathMap<StringSet>;
 
 template struct DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolineGoal>>>;
 
+struct DerivationTrampolinePlanGoal;
+template struct DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolinePlanGoal>>>;
+
 }; // namespace nix

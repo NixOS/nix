@@ -492,7 +492,7 @@ static void queryInstSources(
     }
 }
 
-static void printMissing(EvalState & state, PackageInfos & elems)
+static void printMissing(EvalState & state, Builder & builder, PackageInfos & elems)
 {
     std::vector<DerivedPath> targets;
     for (auto & i : elems)
@@ -508,7 +508,7 @@ static void printMissing(EvalState & state, PackageInfos & elems)
                     .path = i.queryOutPath(),
                 });
 
-    printMissing(state.store, targets);
+    printMissing(state.store, builder, targets);
 }
 
 static bool keep(PackageInfo & drv)
@@ -576,12 +576,14 @@ static void installDerivations(
                 printInfo("installing '%s'", i.queryName());
         }
 
-        printMissing(*globals.state, newElems);
+        auto builder = globals.state->store->getBuilder();
+
+        printMissing(*globals.state, *builder, newElems);
 
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, allElems, profile, envSettings.keepDerivations, lockToken))
+        if (createUserEnv(*globals.state, *builder, allElems, profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }
@@ -687,12 +689,14 @@ static void upgradeDerivations(Globals & globals, const Strings & args, UpgradeT
             }
         }
 
-        printMissing(*globals.state, newElems);
+        auto builder = globals.state->store->getBuilder();
+
+        printMissing(*globals.state, *builder, newElems);
 
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, newElems, globals.profile, envSettings.keepDerivations, lockToken))
+        if (createUserEnv(*globals.state, *builder, newElems, globals.profile, envSettings.keepDerivations, lockToken))
             break;
     }
 }
@@ -751,7 +755,13 @@ static void opSetFlag(Globals & globals, Strings opFlags, Strings opArgs)
         checkSelectorUse(selectors);
 
         /* Write the new user environment. */
-        if (createUserEnv(*globals.state, installedElems, globals.profile, envSettings.keepDerivations, lockToken))
+        if (createUserEnv(
+                *globals.state,
+                *globals.state->store->getBuilder(),
+                installedElems,
+                globals.profile,
+                envSettings.keepDerivations,
+                lockToken))
             break;
     }
 }
@@ -791,10 +801,11 @@ static void opSet(Globals & globals, Strings opFlags, Strings opArgs)
                       .path = drv.queryOutPath(),
                   }),
     };
-    printMissing(globals.state->store, paths);
+    auto builder = globals.state->store->getBuilder();
+    printMissing(globals.state->store, *builder, paths);
     if (globals.dryRun)
         return;
-    globals.state->store->getBuilder()->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
+    builder->buildPaths(paths, globals.state->repair ? bmRepair : bmNormal);
 
     debug("switching to new user environment");
     auto generation = createGeneration(*store2, globals.profile, drv.queryOutPath());
@@ -834,7 +845,13 @@ static void uninstallDerivations(Globals & globals, Strings & selectors, const s
         if (globals.dryRun)
             return;
 
-        if (createUserEnv(*globals.state, workingElems, profile, envSettings.keepDerivations, lockToken))
+        if (createUserEnv(
+                *globals.state,
+                *globals.state->store->getBuilder(),
+                workingElems,
+                profile,
+                envSettings.keepDerivations,
+                lockToken))
             break;
     }
 }

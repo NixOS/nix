@@ -1,4 +1,5 @@
 #include "nix/store/build.hh"
+#include "nix/store/build/worker.hh"
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/file-content-address.hh"
@@ -614,6 +615,8 @@ public:
      * without it being a breaking change.
      */
     void repairPath(const StorePath & path) override;
+
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 };
 
 void RemoteBuilder::copyDrvsFromEvalStore(const std::vector<DerivedPath> & paths)
@@ -742,6 +745,30 @@ void RemoteBuilder::repairPath(const StorePath & path)
     throw Unsupported("operation 'repairPath' is not supported by store '%s'", store->config.getHumanReadableURI());
 }
 
+MissingPaths RemoteBuilder::queryMissing(const std::vector<DerivedPath> & targets)
+{
+    {
+        auto conn(store->getConnection());
+        if (conn->protoVersion.number < WorkerProto::Version::Number{1, 19})
+            // Don't hold the connection handle in the fallback case
+            // to prevent a deadlock.
+            goto fallback;
+        conn->to << WorkerProto::Op::QueryMissing;
+        WorkerProto::write(*store, *conn, targets);
+        conn.processStderr();
+        MissingPaths res;
+        res.willBuild = WorkerProto::Serialise<StorePathSet>::read(*store, *conn);
+        res.willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*store, *conn);
+        res.unknown = WorkerProto::Serialise<StorePathSet>::read(*store, *conn);
+        conn->from >> res.downloadSize >> res.narSize;
+        return res;
+    }
+
+fallback:
+    /* Work it out on this side, treating the daemon as a plain store. */
+    return Worker(store, evalStore ? ref<Store>(evalStore) : store).queryMissing(targets);
+}
+
 BuildResult RemoteStore::buildDerivationWithLog(
     const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode, fun<void(std::string_view)> logLine)
 {
@@ -854,29 +881,6 @@ void RemoteStore::addSignatures(const StorePath & storePath, const std::set<Sign
     WorkerProto::write(*this, *conn, sigs);
     conn.processStderr();
     readInt(conn->from);
-}
-
-MissingPaths RemoteStore::queryMissing(const std::vector<DerivedPath> & targets)
-{
-    {
-        auto conn(getConnection());
-        if (conn->protoVersion.number < WorkerProto::Version::Number{1, 19})
-            // Don't hold the connection handle in the fallback case
-            // to prevent a deadlock.
-            goto fallback;
-        conn->to << WorkerProto::Op::QueryMissing;
-        WorkerProto::write(*this, *conn, targets);
-        conn.processStderr();
-        MissingPaths res;
-        res.willBuild = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        res.willSubstitute = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        res.unknown = WorkerProto::Serialise<StorePathSet>::read(*this, *conn);
-        conn->from >> res.downloadSize >> res.narSize;
-        return res;
-    }
-
-fallback:
-    return Store::queryMissing(targets);
 }
 
 void RemoteStore::addBuildLog(const StorePath & drvPath, std::string_view log)

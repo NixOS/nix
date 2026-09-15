@@ -1,6 +1,7 @@
 
 #include "nix/store/build/worker.hh"
 #include "nix/store/build/substitution-goal.hh"
+#include "nix/store/build/substitution-plan-goal.hh"
 #include "nix/store/nar-info.hh"
 #include "nix/store/worker-settings.hh"
 #include "nix/util/signals.hh"
@@ -65,144 +66,119 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
         throw Error(
             "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
-    auto subs = worker.getSubstituters();
+    /* Find out where to substitute the path from. */
+    std::optional<SubstitutionPlanGoal::Candidate> candidate;
 
-    bool substituterFailed = false;
-    std::optional<Error> lastStoresException = std::nullopt;
-
-    for (const auto & sub : subs) {
-        trace("trying next substituter");
-        if (lastStoresException.has_value()) {
-            logError(lastStoresException->info());
-            lastStoresException.reset();
-        }
-
-        /* The path the substituter refers to the path as. This will be
-         * different when the stores have different names. */
-        std::optional<StorePath> subPath;
-
-        /* Path info returned by the substituter's query info operation. */
-        std::shared_ptr<const ValidPathInfo> info;
-
-        if (ca) {
-            subPath = sub->makeFixedOutputPathFromCA(
-                std::string{storePath.name()}, ContentAddressWithReferences::withoutRefs(*ca));
-            if (sub->storeDir == worker.store.storeDir)
-                assert(subPath == storePath);
-        } else if (sub->storeDir != worker.store.storeDir) {
-            continue;
-        }
-
-        try {
-            info = co_await callbackToAwaitable<ref<const ValidPathInfo>>(
-                [sub, path = subPath.value_or(storePath)](auto cb) { sub->queryPathInfo(path, std::move(cb)); });
-        } catch (InvalidPath &) {
-            continue;
-        } catch (SubstituterDisabled & e) {
-            continue;
-        } catch (Error & e) {
-            lastStoresException = std::make_optional(std::move(e));
-            continue;
-        }
-
-        if (info->path != storePath) {
-            if (info->isContentAddressed(*sub) && info->references.empty()) {
-                auto info2 = std::make_shared<ValidPathInfo>(*info);
-                info2->path = storePath;
-                info = info2;
-            } else {
-                printError(
-                    "asked '%s' for '%s' but got '%s'",
-                    sub->config.getHumanReadableURI(),
-                    worker.store.printStorePath(storePath),
-                    sub->printStorePath(info->path));
-                continue;
-            }
-        }
-
-        /* Update the total expected download size. */
-        auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
-
-        maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize);
-
-        maintainExpectedDownload =
-            narInfo && narInfo->fileSize
-                ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
-                : nullptr;
-
-        worker.updateProgress();
-
-        /* Bail out early if this substituter lacks a valid
-           signature. LocalStore::addToStore() also checks for this, but
-           only after we've downloaded the path. */
-        if (!sub->config.isTrusted && worker.store.pathInfoIsUntrusted(*info)) {
-            warn(
-                "ignoring substitute for '%s' from '%s', as it's not signed by any of the keys in 'trusted-public-keys'",
-                worker.store.printStorePath(storePath),
-                sub->config.getHumanReadableURI());
-            continue;
-        }
-
-        Goals waitees;
-
-        /* To maintain the closure invariant, we first have to realise the
-           paths referenced by this one. */
-        for (auto & i : info->references)
-            if (i != storePath) /* ignore self-references */
-                waitees.insert(worker.makePathSubstitutionGoal(i));
-
-        co_await await(std::move(waitees));
-
-        if (nrFailed > 0) {
-            co_return Result{
-                nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
-                BuildResult{
-                    .inner = BuildResult::Failure{{
-                        .status = BuildResult::Failure::DependencyFailed,
-                        .msg = HintFmt(
-                            "some references of path '%s' could not be realised",
-                            worker.store.printStorePath(storePath)),
-                    }}},
-            };
-        }
-
-        SubstitutionResult res = co_await tryToRun(subPath ? *subPath : storePath, sub, info);
-        if (res == SubstitutionResult::Ok)
-            co_return Result{
-                ecSuccess,
-                BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Substituted}},
-            };
-
-        substituterFailed = substituterFailed || (res == SubstitutionResult::SubstituterFailed);
-    }
-
-    /* None left.  Terminate this goal and let someone else deal
-       with it. */
-
-    if (substituterFailed) {
-        worker.failedSubstitutions++;
-        worker.updateProgress();
-    }
-    if (lastStoresException.has_value()) {
-        if (!worker.settings.tryFallback) {
-            throw std::move(*lastStoresException);
-        } else
-            logError(lastStoresException->info());
+    if (repair && worker.store.isValidPath(storePath)) {
+        /* Refetching a path that is valid (but corrupt) is not something
+           a plan would ever include, so look directly. */
+        auto subs = worker.getSubstituters();
+        candidate = co_await SubstitutionPlanGoal::findSubstitute(worker, subs, storePath, ca);
+    } else {
+        /* This is the planning that a dry run does; a dry run right
+           before us has done it already. */
+        auto plan = worker.makeSubstitutionPlanGoal(storePath, ca);
+        co_await await({plan});
+        nrFailed = nrNoSubstituters = 0;
+        candidate = plan->candidate;
     }
 
     /* Hack: don't indicate failure if there were no substituters.
        In that case the calling derivation should just do a
        build. */
-    co_return Result{
-        substituterFailed ? ecFailed : ecNoSubstituters,
-        BuildResult{
-            .inner = BuildResult::Failure{{
-                .status = BuildResult::Failure::NoSubstituters,
-                .msg = HintFmt(
-                    "path '%s' is required, but there is no substituter that can build it",
-                    worker.store.printStorePath(storePath)),
-            }}},
-    };
+    if (!candidate)
+        co_return Result{
+            ecNoSubstituters,
+            BuildResult{
+                .inner = BuildResult::Failure{{
+                    .status = BuildResult::Failure::NoSubstituters,
+                    .msg = HintFmt(
+                        "path '%s' is required, but there is no substituter that can build it",
+                        worker.store.printStorePath(storePath)),
+                }}},
+        };
+
+    auto sub = candidate->sub;
+    auto subPath = candidate->subPath;
+    auto info = candidate->info;
+
+    /* Update the total expected download size. */
+    auto narInfo = std::dynamic_pointer_cast<const NarInfo>(info);
+
+    maintainExpectedNar = std::make_unique<MaintainCount<uint64_t>>(worker.expectedNarSize, info->narSize);
+
+    maintainExpectedDownload =
+        narInfo && narInfo->fileSize
+            ? std::make_unique<MaintainCount<uint64_t>>(worker.expectedDownloadSize, narInfo->fileSize)
+            : nullptr;
+
+    worker.updateProgress();
+
+    Goals waitees;
+
+    /* To maintain the closure invariant, we first have to realise the
+       paths referenced by this one. */
+    for (auto & i : info->references)
+        if (i != storePath) /* ignore self-references */
+            waitees.insert(worker.makePathSubstitutionGoal(i));
+
+    co_await await(std::move(waitees));
+
+    if (nrFailed > 0) {
+        co_return Result{
+            nrNoSubstituters > 0 ? ecNoSubstituters : ecFailed,
+            BuildResult{
+                .inner = BuildResult::Failure{{
+                    .status = BuildResult::Failure::DependencyFailed,
+                    .msg = HintFmt(
+                        "some references of path '%s' could not be realised", worker.store.printStorePath(storePath)),
+                }}},
+        };
+    }
+
+    switch (co_await tryToRun(subPath, sub, info)) {
+    case SubstitutionResult::Ok:
+        co_return Result{
+            ecSuccess,
+            BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Substituted}},
+        };
+
+    case SubstitutionResult::SubstituteGone:
+        /* The substitute has disappeared since it was planned. That is
+           the same as it never having existed: no substituter has the
+           path, so a derivation should just be built. */
+        co_return Result{
+            ecNoSubstituters,
+            BuildResult{
+                .inner = BuildResult::Failure{{
+                    .status = BuildResult::Failure::NoSubstituters,
+                    .msg = HintFmt(
+                        "path '%s' is required, but there is no substituter that can build it",
+                        worker.store.printStorePath(storePath)),
+                }}},
+        };
+
+    case SubstitutionResult::SubstituterFailed:
+        /* The substituter failed to provide what it said it had. That
+           is a failure of the substituter; the plan is not remade
+           around it. */
+        worker.failedSubstitutions++;
+        worker.updateProgress();
+
+        co_return Result{
+            ecFailed,
+            BuildResult{
+                .inner = BuildResult::Failure{{
+                    .status = BuildResult::Failure::TransientFailure,
+                    .msg = HintFmt(
+                        "substituter '%s' failed to provide path '%s'",
+                        sub->config.getHumanReadableURI(),
+                        worker.store.printStorePath(storePath)),
+                }}},
+        };
+    }
+
+    unreachable();
 }
 
 asio::awaitable<PathSubstitutionGoal::SubstitutionResult>

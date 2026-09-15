@@ -69,19 +69,6 @@ struct Builder;
 typedef std::map<StorePath, std::optional<ContentAddress>> StorePathCAMap;
 
 /**
- * Information about what paths will be built or substituted, returned
- * by Store::queryMissing().
- */
-struct MissingPaths
-{
-    StorePathSet willBuild;
-    StorePathSet willSubstitute;
-    StorePathSet unknown;
-    uint64_t downloadSize{0};
-    uint64_t narSize{0};
-};
-
-/**
  * Need to make this a separate class so I can get the right
  * initialization order in the constructor for `StoreConfig`.
  */
@@ -939,13 +926,6 @@ public:
         bool flipDirection = false,
         bool includeOutputs = false,
         bool includeDerivers = false);
-
-    /**
-     * Given a set of paths that are to be built, return the set of
-     * derivations that will be built, and the set of output paths that
-     * will be substituted.
-     */
-    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets);
 
     /**
      * Sort a set of paths topologically under the references

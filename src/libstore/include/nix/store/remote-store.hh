@@ -158,8 +158,6 @@ public:
 
     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
 
-    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
-
     void addBuildLog(const StorePath & drvPath, std::string_view log) override;
 
     std::optional<std::string> getVersion() override;
