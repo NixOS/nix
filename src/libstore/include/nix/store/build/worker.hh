@@ -192,7 +192,10 @@ struct DerivationTrampolineGoal;
 struct DerivationGoal;
 struct DerivationResolutionGoal;
 struct DerivationBuildingGoal;
+struct DerivationPlanGoal;
+struct DerivationTrampolinePlanGoal;
 class PathSubstitutionGoal;
+class SubstitutionPlanGoal;
 class DrvOutputSubstitutionGoal;
 
 /**
@@ -312,6 +315,13 @@ private:
     std::map<StorePath, std::weak_ptr<DerivationBuildingGoal>> derivationBuildingGoals;
     std::map<StorePath, std::weak_ptr<PathSubstitutionGoal>> substitutionGoals;
     std::map<DrvOutput, std::weak_ptr<DrvOutputSubstitutionGoal>> drvOutputSubstitutionGoals;
+
+    /**
+     * The planning goals, see @ref makePlanGoal.
+     */
+    DerivedPathMap<std::map<OutputsSpec, std::weak_ptr<DerivationTrampolinePlanGoal>>> derivationTrampolinePlanGoals;
+    std::map<StorePath, std::map<OutputName, std::weak_ptr<DerivationPlanGoal>>> derivationPlanGoals;
+    std::map<StorePath, std::weak_ptr<SubstitutionPlanGoal>> substitutionPlanGoals;
 
     /**
      * Cache for pathContentsGood().
@@ -468,6 +478,26 @@ public:
     GoalPtr makeGoal(const DerivedPath & req, BuildMode buildMode = bmNormal);
 
     /**
+     * The planning goals: they find out what realising something would
+     * take (see @ref queryMissing) without doing it. The goals made by
+     * @ref makeGoal pick up from them, so a query and a subsequent build
+     * on the same worker share that work.
+     */
+    std::shared_ptr<DerivationTrampolinePlanGoal>
+    makeDerivationTrampolinePlanGoal(ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs);
+
+    std::shared_ptr<DerivationPlanGoal>
+    makeDerivationPlanGoal(const StorePath & drvPath, ref<const Derivation> drv, const OutputName & wantedOutput);
+
+    std::shared_ptr<SubstitutionPlanGoal>
+    makeSubstitutionPlanGoal(const StorePath & storePath, std::optional<ContentAddress> ca = std::nullopt);
+
+    /**
+     * The planning counterpart of @ref makeGoal.
+     */
+    GoalPtr makePlanGoal(const DerivedPath & req);
+
+    /**
      * Remove a dead goal.
      */
     void removeGoal(GoalPtr goal);
@@ -487,9 +517,10 @@ public:
 
     /**
      * Await a set of top-level goals, cancelling the rest on the first
-     * failure unless `keep-going` is set. To be called from within
-     * @ref run.
+     * failure unless `keepGoing` (by default the `keep-going` setting)
+     * is set. To be called from within @ref run.
      */
+    asio::awaitable<void> awaitTopGoals(Goals goals, bool keepGoing);
     asio::awaitable<void> awaitTopGoals(Goals goals);
 
     /**
@@ -525,6 +556,7 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
     void ensurePath(const StorePath & path) override;
     void repairPath(const StorePath & path) override;
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 };
 
 } // namespace nix

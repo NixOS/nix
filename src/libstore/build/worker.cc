@@ -9,6 +9,8 @@
 #include "nix/store/build/derivation-building-goal.hh"
 #include "nix/store/build/derivation-trampoline-goal.hh"
 #include "nix/util/system-error.hh"
+#include "nix/store/build/derivation-plan-goal.hh"
+#include "nix/store/build/substitution-plan-goal.hh"
 #include "nix/util/signals.hh"
 #include "nix/util/finally.hh"
 #include "nix/store/globals.hh"
@@ -152,6 +154,37 @@ GoalPtr Worker::makeGoal(const DerivedPath & req, BuildMode buildMode)
         req.raw());
 }
 
+std::shared_ptr<DerivationTrampolinePlanGoal>
+Worker::makeDerivationTrampolinePlanGoal(ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs)
+{
+    return initGoalIfNeeded(
+        derivationTrampolinePlanGoals.ensureSlot(*drvReq).value[wantedOutputs], drvReq, wantedOutputs, *this);
+}
+
+std::shared_ptr<DerivationPlanGoal>
+Worker::makeDerivationPlanGoal(const StorePath & drvPath, ref<const Derivation> drv, const OutputName & wantedOutput)
+{
+    return initGoalIfNeeded(derivationPlanGoals[drvPath][wantedOutput], drvPath, std::move(drv), wantedOutput, *this);
+}
+
+std::shared_ptr<SubstitutionPlanGoal>
+Worker::makeSubstitutionPlanGoal(const StorePath & storePath, std::optional<ContentAddress> ca)
+{
+    return initGoalIfNeeded(substitutionPlanGoals[storePath], storePath, *this, std::move(ca));
+}
+
+GoalPtr Worker::makePlanGoal(const DerivedPath & req)
+{
+    return std::visit(
+        overloaded{
+            [&](const DerivedPath::Built & bfd) -> GoalPtr {
+                return makeDerivationTrampolinePlanGoal(bfd.drvPath, bfd.outputs);
+            },
+            [&](const DerivedPath::Opaque & bo) -> GoalPtr { return makeSubstitutionPlanGoal(bo.path); },
+        },
+        req.raw());
+}
+
 void Worker::removeGoal(GoalPtr goal)
 {
     /* Only remove the map entry if it is still this goal: a cancelled
@@ -182,6 +215,19 @@ void Worker::removeGoal(GoalPtr goal)
         eraseIfSame(substitutionGoals, subGoal->getStorePath());
     } else if (auto subGoal = std::dynamic_pointer_cast<DrvOutputSubstitutionGoal>(goal)) {
         eraseIfSame(drvOutputSubstitutionGoals, subGoal->id);
+    } else if (auto planGoal = std::dynamic_pointer_cast<DerivationTrampolinePlanGoal>(goal)) {
+        derivationTrampolinePlanGoals.removeSlot(*planGoal->drvReq, [&](auto & node) {
+            eraseIfSame(node.value, planGoal->wantedOutputs);
+            return !node.value.empty();
+        });
+    } else if (auto planGoal = std::dynamic_pointer_cast<DerivationPlanGoal>(goal)) {
+        if (auto it = derivationPlanGoals.find(planGoal->drvPath); it != derivationPlanGoals.end()) {
+            eraseIfSame(it->second, planGoal->wantedOutput);
+            if (it->second.empty())
+                derivationPlanGoals.erase(it);
+        }
+    } else if (auto planGoal = std::dynamic_pointer_cast<SubstitutionPlanGoal>(goal)) {
+        eraseIfSame(substitutionPlanGoals, planGoal->storePath);
     } else {
         unreachable();
     }
@@ -215,6 +261,11 @@ asio::awaitable<void> Worker::autoGCLoop()
 
 asio::awaitable<void> Worker::awaitTopGoals(Goals goals)
 {
+    co_await awaitTopGoals(std::move(goals), settings.keepGoing);
+}
+
+asio::awaitable<void> Worker::awaitTopGoals(Goals goals, bool keepGoing)
+{
     for (auto & goal : goals)
         topGoals.insert(goal);
 
@@ -225,7 +276,7 @@ asio::awaitable<void> Worker::awaitTopGoals(Goals goals)
             topGoals.erase(goal);
     });
 
-    co_await Goal::join(goals, settings.keepGoing);
+    co_await Goal::join(goals, keepGoing);
 }
 
 void Worker::lendBuildSlot()

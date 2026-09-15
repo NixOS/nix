@@ -447,11 +447,13 @@ static void main_nix_build(int argc, char ** argv)
     state->maybePrintStats();
 
     auto buildPaths = [&](const std::vector<DerivedPath> & paths) {
+        auto builder = store->getBuilder(evalStore);
+
         if (settings.printMissing)
-            printMissing(ref<Store>(store), paths);
+            printMissing(ref<Store>(store), *builder, paths);
 
         if (!dryRun)
-            store->getBuilder(evalStore)->buildPaths(paths, buildMode);
+            builder->buildPaths(paths, buildMode);
     };
 
     if (isNixShell) {
