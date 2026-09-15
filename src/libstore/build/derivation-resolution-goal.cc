@@ -162,7 +162,10 @@ asio::awaitable<BuildResult> DerivationResolutionGoal::resolve(ref<const Derivat
         };
     }
 
-    if (shouldResolve(*drv))
+    /* In a dry run the inputs were not actually realised, so there is
+       nothing to resolve against; the unresolved derivation is the one
+       reported as to be built. */
+    if (shouldResolve(*drv) && !worker.dryRun)
         resolvedDrv = co_await resolveDerivation(*drv, inputGoals);
     co_return BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::AlreadyValid}};
 }

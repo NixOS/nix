@@ -13,6 +13,7 @@
 #include "nix/store/ssh.hh"
 #include "nix/store/derivations.hh"
 #include "nix/store/build.hh"
+#include "nix/store/build/worker.hh"
 #include "nix/util/callback.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/globals.hh"
@@ -64,6 +65,12 @@ public:
     void repairPath(const StorePath & path) override
     {
         unsupported("repairPath");
+    }
+
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override
+    {
+        /* Work it out on this side, treating the remote as a plain store. */
+        return Worker(store, store, /*dryRun=*/true).queryMissing(targets);
     }
 };
 

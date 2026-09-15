@@ -6,6 +6,19 @@
 namespace nix {
 
 /**
+ * What realising a set of `DerivedPath`s would entail, as returned by
+ * `Builder::queryMissing()`.
+ */
+struct MissingPaths
+{
+    StorePathSet willBuild;
+    StorePathSet willSubstitute;
+    StorePathSet unknown;
+    uint64_t downloadSize{0};
+    uint64_t narSize{0};
+};
+
+/**
  * Abstract interface for the build scheduler entry points.
  *
  * `Worker` implements this for local scheduling, including local builds.
@@ -90,6 +103,14 @@ struct Builder
      * a substituter (if available).
      */
     virtual void repairPath(const StorePath & path) = 0;
+
+    /**
+     * A dry run of @ref buildPaths: given a set of paths that are to be
+     * realised, return the set of derivations that would be built and
+     * the set of paths that would be substituted, without actually
+     * doing either.
+     */
+    virtual MissingPaths queryMissing(const std::vector<DerivedPath> & targets) = 0;
 
     virtual ~Builder() = default;
 };

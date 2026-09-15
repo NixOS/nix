@@ -224,6 +224,14 @@ class Worker : public Builder
 public:
     const WorkerSettings & settings;
 
+    /**
+     * Whether this worker only finds out what would have to be done
+     * (see @ref queryMissing). Its goals then stop right before
+     * substituting or building anything, and record what they would
+     * have done in @ref missing instead.
+     */
+    const bool dryRun;
+
 private:
     friend struct Goal;
 
@@ -397,7 +405,7 @@ public:
     uint64_t expectedNarSize = 0;
     uint64_t doneNarSize = 0;
 
-    Worker(ref<Store> store, ref<Store> evalStore);
+    Worker(ref<Store> store, ref<Store> evalStore, bool dryRun = false);
     ~Worker();
 
     /**
@@ -472,10 +480,24 @@ public:
 
     /**
      * Await a set of top-level goals, cancelling the rest on the first
-     * failure unless `keep-going` is set. To be called from within
-     * @ref run.
+     * failure unless `keepGoing` (by default the `keep-going` setting)
+     * is set. To be called from within @ref run.
      */
+    asio::awaitable<void> awaitTopGoals(Goals goals, bool keepGoing);
     asio::awaitable<void> awaitTopGoals(Goals goals);
+
+    /**
+     * What the goals of a dry run (see @ref dryRun) found out they would
+     * have done. Strand-only.
+     */
+    MissingPaths missing;
+
+    /**
+     * In a dry run, record the paths of those of `goals` that are failed
+     * substitution goals as ones we don't know how to obtain. Does
+     * nothing otherwise.
+     */
+    void noteUnknownPaths(const Goals & goals);
 
     /**
      * Lend the build slot of a running build to the builds it requests
@@ -510,6 +532,7 @@ public:
     BuildResult buildDerivation(const StorePath & drvPath, const BasicDerivation & drv, BuildMode buildMode) override;
     void ensurePath(const StorePath & path) override;
     void repairPath(const StorePath & path) override;
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 };
 
 } // namespace nix

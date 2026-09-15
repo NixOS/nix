@@ -46,8 +46,9 @@ static std::filesystem::path currentLoadDir(Store & store)
     return std::filesystem::path{nix::settings.nixStateDir} / "current-load";
 }
 
-Worker::Worker(ref<Store> store, ref<Store> evalStore)
+Worker::Worker(ref<Store> store, ref<Store> evalStore, bool dryRun)
     : settings(nix::settings.getWorkerSettings())
+    , dryRun(dryRun)
     , buildSemaphore(ex, settings.maxBuildJobs)
     , substitutionSemaphore(ex, std::max<std::size_t>(settings.maxSubstitutionJobs, 1))
     , act(*logger, actRealise)
@@ -221,6 +222,11 @@ asio::awaitable<void> Worker::autoGCLoop()
 
 asio::awaitable<void> Worker::awaitTopGoals(Goals goals)
 {
+    co_await awaitTopGoals(std::move(goals), settings.keepGoing);
+}
+
+asio::awaitable<void> Worker::awaitTopGoals(Goals goals, bool keepGoing)
+{
     for (auto & goal : goals)
         topGoals.insert(goal);
 
@@ -231,7 +237,17 @@ asio::awaitable<void> Worker::awaitTopGoals(Goals goals)
             topGoals.erase(goal);
     });
 
-    co_await Goal::join(goals, settings.keepGoing);
+    co_await Goal::join(goals, keepGoing);
+}
+
+void Worker::noteUnknownPaths(const Goals & goals)
+{
+    if (!dryRun)
+        return;
+    for (auto & goal : goals)
+        if (goal->exitCode && *goal->exitCode != Goal::ecSuccess)
+            if (auto * sub = dynamic_cast<PathSubstitutionGoal *>(goal.get()))
+                missing.unknown.insert(sub->getStorePath());
 }
 
 void Worker::lendBuildSlot()

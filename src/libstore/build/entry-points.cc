@@ -150,4 +150,34 @@ void Worker::repairPath(const StorePath & path)
     });
 }
 
+MissingPaths Worker::queryMissing(const std::vector<DerivedPath> & targets)
+{
+    /* Dry-run goals never get to the point of substituting or building
+       anything, so they must not be shared with real goals: they get a
+       worker of their own. */
+    if (!dryRun) {
+        Worker dry(storeRef, evalStoreRef, /*dryRun=*/true);
+        dry.getSubstituters = getSubstituters;
+        return dry.queryMissing(targets);
+    }
+
+    MissingPaths res;
+
+    run([&]() -> asio::awaitable<void> {
+        Goals goals;
+        for (auto & target : targets)
+            goals.insert(makeGoal(target));
+
+        /* Failures are what we are here to find out about, so carry on
+           past them. */
+        co_await awaitTopGoals(goals, /*keepGoing=*/true);
+
+        noteUnknownPaths(goals);
+        res = std::move(missing);
+        missing = {};
+    });
+
+    return res;
+}
+
 } // namespace nix

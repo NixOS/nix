@@ -156,7 +156,7 @@ static void opRealise(Strings opFlags, Strings opArgs)
     for (auto & i : opArgs)
         paths.push_back(followLinksToStorePathWithOutputs(*store, i));
 
-    auto missing = store->queryMissing(toDerivedPaths(paths));
+    auto missing = store->getBuilder()->queryMissing(toDerivedPaths(paths));
 
     /* Filter out unknown paths from `paths`. */
     if (ignoreUnknown) {

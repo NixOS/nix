@@ -1007,7 +1007,7 @@ static void performOp(
     case WorkerProto::Op::QueryMissing: {
         auto targets = WorkerProto::Serialise<DerivedPaths>::read(*store, rconn);
         logger->startWork();
-        auto missing = store->queryMissing(targets);
+        auto missing = builder.queryMissing(targets);
         logger->stopWork();
         WorkerProto::write(*store, wconn, missing.willBuild);
         WorkerProto::write(*store, wconn, missing.willSubstitute);

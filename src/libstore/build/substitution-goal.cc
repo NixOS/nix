@@ -51,7 +51,9 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
 {
     trace("init");
 
-    worker.store.addTempRoot(storePath);
+    /* A dry run holds on to nothing. */
+    if (!worker.dryRun)
+        worker.store.addTempRoot(storePath);
 
     /* If the path already exists we're done. */
     if (!repair && worker.store.isValidPath(storePath)) {
@@ -61,7 +63,7 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
         };
     }
 
-    if (worker.store.config.getReadOnly())
+    if (!worker.dryRun && worker.store.config.getReadOnly())
         throw Error(
             "cannot substitute path '%s' - no write access to the Nix store", worker.store.printStorePath(storePath));
 
@@ -143,6 +145,16 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
             continue;
         }
 
+        if (worker.dryRun) {
+            /* This is as far as a dry run goes: we would substitute this
+               path from `sub` now. The references are still realised
+               below, as they would be for real. */
+            worker.missing.willSubstitute.insert(storePath);
+            if (narInfo)
+                worker.missing.downloadSize += narInfo->fileSize;
+            worker.missing.narSize += info->narSize;
+        }
+
         Goals waitees;
 
         /* To maintain the closure invariant, we first have to realise the
@@ -151,7 +163,8 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
             if (i != storePath) /* ignore self-references */
                 waitees.insert(worker.makePathSubstitutionGoal(i));
 
-        co_await await(std::move(waitees));
+        co_await await(waitees);
+        worker.noteUnknownPaths(waitees);
 
         if (nrFailed > 0) {
             co_return Result{
@@ -165,6 +178,12 @@ asio::awaitable<PathSubstitutionGoal::Result> PathSubstitutionGoal::substitute()
                     }}},
             };
         }
+
+        if (worker.dryRun)
+            co_return Result{
+                ecSuccess,
+                BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Substituted}},
+            };
 
         SubstitutionResult res = co_await tryToRun(subPath ? *subPath : storePath, sub, info);
         if (res == SubstitutionResult::Ok)

@@ -68,9 +68,11 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
     if (!type(*drv).hasKnownOutputPaths())
         experimentalFeatureSettings.require(Xp::CaDerivations);
 
-    for (auto & i : outputsAndOptPaths(*drv, worker.store))
-        if (i.second.second)
-            worker.store.addTempRoot(*i.second.second);
+    /* A dry run holds on to nothing. */
+    if (!worker.dryRun)
+        for (auto & i : outputsAndOptPaths(*drv, worker.store))
+            if (i.second.second)
+                worker.store.addTempRoot(*i.second.second);
 
     /* We don't yet have any safe way to cache an impure derivation at
        this step. */
@@ -87,6 +89,10 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
 
         Goals waitees;
 
+        /* The realisation of the wanted output that a substitution goal
+           was made for, if any. */
+        std::optional<UnkeyedRealisation> substituting;
+
         /* We are first going to try to create the invalid output paths
            through substitutes.  If that doesn't work, we'll build
            them. */
@@ -101,14 +107,7 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
                     // optimization depending on moved containers being empty afterwards
                     // NOLINTNEXTLINE(bugprone-use-after-move)
                     waitees.insert(upcast_goal(worker.makePathSubstitutionGoal(g->outputInfo->outPath)));
-                    co_await await(std::move(waitees));
-
-                    trace("output path substituted");
-
-                    if (nrFailed == 0)
-                        worker.store.registerDrvOutput({*g->outputInfo, id}, CheckSigs);
-                    else
-                        debug("The output path of the derivation output '%s' could not be substituted", id.to_string());
+                    substituting = *g->outputInfo;
                 }
             } else {
                 auto * cap = getDerivationCA(*drv);
@@ -116,6 +115,7 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
                     checkResult->first.outPath,
                     buildMode == bmRepair ? Repair : NoRepair,
                     cap ? std::optional{*cap} : std::nullopt)));
+                substituting = checkResult->first;
             }
         }
 
@@ -133,6 +133,22 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
                 "some substitutes for the outputs of derivation '%s' failed (usually happens due to networking issues); try '--fallback' to build derivation from source ",
                 worker.store.printStorePath(drvPath)));
         }
+
+        if (substituting && nrFailed == 0) {
+            /* This is as far as a dry run goes: the output would have
+               been substituted now. The check below would not see that,
+               since nothing was actually substituted. */
+            if (worker.dryRun)
+                co_return success(BuildResult::Success::Substituted, *substituting);
+
+            if (!checkResult) {
+                trace("output path substituted");
+                worker.store.registerDrvOutput({*substituting, DrvOutput{drvPath, wantedOutput}}, CheckSigs);
+            }
+        } else if (substituting && !checkResult)
+            debug(
+                "The output path of the derivation output '%s' could not be substituted",
+                DrvOutput{drvPath, wantedOutput}.to_string());
 
         nrFailed = nrNoSubstituters = 0;
 
@@ -235,6 +251,13 @@ asio::awaitable<BuildResult> DerivationGoal::haveDerivation(bool storeDerivation
     resolutionGoal.reset();
 
     /* Give up on substitution for the output we want, actually build this derivation */
+
+    if (worker.dryRun) {
+        /* This is as far as a dry run goes: we would build this
+           derivation now. */
+        worker.missing.willBuild.insert(drvPath);
+        co_return BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Built}};
+    }
 
     /* Project down to the `BasicDerivation` the builder consumes,
        adding the outputs of the input derivations to the input

@@ -4,6 +4,7 @@
 #include "nix/util/library-versions.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/store-api.hh"
+#include "nix/store/build.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/gc-store.hh"
 #include "nix/main/loggers.hh"
@@ -56,7 +57,7 @@ void printGCWarning()
 
 void printMissing(ref<Store> store, const std::vector<DerivedPath> & paths, Verbosity lvl)
 {
-    printMissing(store, store->queryMissing(paths), lvl);
+    printMissing(store, store->getBuilder()->queryMissing(paths), lvl);
 }
 
 void printMissing(ref<Store> store, const MissingPaths & missing, Verbosity lvl)

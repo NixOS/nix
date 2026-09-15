@@ -145,8 +145,6 @@ public:
         unsupported("addSignatures");
     }
 
-    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
-
     virtual std::optional<std::string> getBuildLogExact(const StorePath & path) override
     {
         return std::nullopt;
@@ -195,6 +193,8 @@ struct RestrictedBuilder : Builder
     void ensurePath(const StorePath & path) override;
 
     void repairPath(const StorePath & path) override;
+
+    MissingPaths queryMissing(const std::vector<DerivedPath> & targets) override;
 };
 
 ref<Store> makeRestrictedStore(ref<LocalStore::Config> config, ref<LocalStore> next, RestrictionContext & context)
@@ -370,7 +370,7 @@ RestrictedBuilder::buildPathsWithResults(const std::vector<DerivedPath> & paths,
     return results;
 }
 
-MissingPaths RestrictedStore::queryMissing(const std::vector<DerivedPath> & targets)
+MissingPaths RestrictedBuilder::queryMissing(const std::vector<DerivedPath> & targets)
 {
     /* This is slightly impure since it leaks information to the
        client about what paths will be built/substituted or are
@@ -385,7 +385,7 @@ MissingPaths RestrictedStore::queryMissing(const std::vector<DerivedPath> & targ
             unknown.insert(pathPartOfReq(req));
     }
 
-    auto res = next->queryMissing(allowed);
+    auto res = inner.queryMissing(allowed);
 
     for (auto & p : unknown)
         res.unknown.insert(p);

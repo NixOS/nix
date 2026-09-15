@@ -76,8 +76,8 @@ asio::awaitable<Goal::ExitCode> DerivationTrampolineGoal::init(asio::awaitable<R
 asio::awaitable<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveToLoadFromStore()
 {
     auto loadResult = co_await loadDerivation();
-    if (auto * failure = std::get_if<BuildResult::Failure>(&loadResult))
-        co_return Result{ecFailed, BuildResult{.inner = std::move(*failure)}};
+    if (auto * result = std::get_if<BuildResult>(&loadResult))
+        co_return Result{result->tryGetSuccess() ? ecSuccess : ecFailed, std::move(*result)};
 
     auto [drvPath, drv] = std::get<LoadedDerivation>(std::move(loadResult));
     co_return co_await haveDerivation(std::move(drvPath), std::move(drv));
@@ -111,24 +111,39 @@ asio::awaitable<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::
     } else {
         trace("need to obtain drv we want to build");
         Goals waitees{worker.makeGoal(DerivedPath::fromSingle(*drvReq))};
-        co_await await(std::move(waitees));
+        co_await await(waitees);
+        worker.noteUnknownPaths(waitees);
     }
 
     trace("outer load and build derivation");
 
     if (nrFailed != 0) {
-        co_return BuildResult::Failure{{
-            .status = BuildResult::Failure::DependencyFailed,
-            .msg = HintFmt("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)),
-        }};
+        co_return BuildResult{
+            .inner = BuildResult::Failure{{
+                .status = BuildResult::Failure::DependencyFailed,
+                .msg = HintFmt("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)),
+            }},
+        };
     }
 
-    StorePath drvPath = resolveDerivedPath(worker.store, *drvReq);
+    StorePath drvPath = StorePath::dummy;
+    try {
+        drvPath = resolveDerivedPath(worker.store, *drvReq);
+    } catch (MissingRealisation &) {
+        /* This is as far as a dry run goes for a dynamic derivation: the
+           derivation that produces it would have been built now, which is
+           what the dry run reports, and only then could we go on. */
+        if (!worker.dryRun)
+            throw;
+        co_return BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::Built}};
+    }
 
     /* `drvPath' should already be a root, but let's be on the safe
        side: if the user forgot to make it a root, we wouldn't want
        things being garbage collected while we're busy. */
-    worker.evalStore.addTempRoot(drvPath);
+    /* A dry run holds on to nothing. */
+    if (!worker.dryRun)
+        worker.evalStore.addTempRoot(drvPath);
 
     /* Get the derivation. It is probably in the eval store, but it might be in the main store:
 

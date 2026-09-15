@@ -119,7 +119,11 @@ struct DerivationTrampolineGoal : public Goal
 private:
 
     using LoadedDerivation = std::pair<StorePath, Derivation>;
-    using LoadResult = std::variant<LoadedDerivation, BuildResult::Failure>;
+    /**
+     * Either the derivation, or the goal's result if loading it already
+     * settled things (it failed, or a dry run cannot get any further).
+     */
+    using LoadResult = std::variant<LoadedDerivation, BuildResult>;
     using Result = std::pair<ExitCode, BuildResult>;
 
     asio::awaitable<ExitCode> init(asio::awaitable<Result> work);
