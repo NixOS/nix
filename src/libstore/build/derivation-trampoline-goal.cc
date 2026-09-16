@@ -179,12 +179,12 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
             auto exitCode = goal->exitCode;
             /* Note that without --keep-going waitees might be cancelled before
                we are woken up. */
-            return exitCode != ecBusy && exitCode != ecSuccess;
+            return exitCode && exitCode != ecSuccess;
         });
 
         const Goal * g = gi->get();
         assert(gi != concreteDrvGoals.end() && "expected a failing goal");
-        auto exitCode = g->exitCode;
+        auto exitCode = *g->exitCode;
         const auto * failure = g->buildResult.tryGetFailure();
         assert(failure && "failing goal does not report a failed build result");
 

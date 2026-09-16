@@ -132,7 +132,7 @@ private:
     ChildEvents childEvents;
 
 public:
-    typedef enum { ecBusy, ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
+    typedef enum { ecSuccess, ecFailed, ecNoSubstituters } ExitCode;
 
     /**
      * Backlink to the worker.
@@ -162,9 +162,11 @@ public:
     std::string name;
 
     /**
-     * Whether the goal is finished.
+     * How the goal finished, once it has: set exactly once, by @ref
+     * amDone. Not set while the goal is still running, or if it never
+     * ran or was cancelled.
      */
-    ExitCode exitCode = ecBusy;
+    std::optional<ExitCode> exitCode;
 
     /**
      * Build result.
@@ -760,7 +762,7 @@ std::coroutine_handle<> Goal::AwaitableFrameBase::FinalAwaiter::await_suspend(st
     if (c) {
         // We still have a continuation, i.e. work to do.
         // We assert that the goal is still busy.
-        assert(goal->exitCode == ecBusy);
+        assert(!goal->exitCode);
         assert(goal->top_co);              // Goal must have an active coroutine.
         assert(goal->top_co->handle == h); // The active coroutine must be us.
         assert(p.alive);                   // We must not have been destructed.
@@ -779,7 +781,7 @@ std::coroutine_handle<> Goal::AwaitableFrameBase::FinalAwaiter::await_suspend(st
     } else {
         // We have no continuation, i.e. no more work to do,
         // so the goal must not be busy anymore.
-        assert(goal->exitCode != ecBusy);
+        assert(goal->exitCode);
 
         // We reset `top_co` for good measure.
         p.goal->top_co = {};
