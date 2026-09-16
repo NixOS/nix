@@ -15,9 +15,8 @@ let
     tarballs:
     nixpkgsFor.x86_64-linux.native.callPackage ./installer {
       inherit tarballs;
-      # TODO: This is only used at build-time to fill in the tarball hashes.
-      # Maybe we should just use sha256sum for that?
-      nix = nixComponentsFor.x86_64-linux.native.nix-cli;
+      # Platform doesn't matter, we only need to fish out the fineVersion.
+      version = nixComponentsFor.x86_64-linux.native.nix-cli.version;
     };
 
   testNixVersions =
@@ -328,9 +327,8 @@ rec {
     system:
     nixpkgsFor.${system}.native.callPackage ./installer {
       tarballs = [ self.hydraJobs.binaryTarball.${system} ];
-      # TODO: This is only used at build-time to fill in the tarball hashes.
-      # Maybe we should just use sha256sum for that?
-      nix = nixComponentsFor.${system}.native.nix-cli;
+      # Platform doesn't matter, we only need to fish out the fineVersion.
+      version = nixComponentsFor.x86_64-linux.native.nix-cli.version;
     }
   );
 
