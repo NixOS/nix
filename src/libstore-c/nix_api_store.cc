@@ -309,7 +309,7 @@ StorePath * nix_add_derivation(nix_c_context * context, Store * store, nix_deriv
     if (context)
         context->last_err_code = NIX_OK;
     try {
-        /* Quite dubious that users would want this to silently suceed
+        /* Quite dubious that users would want this to silently succeed
            without actually writing the derivation if this setting is
            set, but it was that way already, so we are doing this for
            back-compat for now. */

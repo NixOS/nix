@@ -168,7 +168,7 @@ public:
     /**
      * A setting for the Nix store directory. Automatically canonicalises the
      * path and rejects the empty string. Stored as `std::string` because
-     * store directory are valid file paths on *some* OS, but not neccessarily the OS of this build of Nix.
+     * store directory are valid file paths on *some* OS, but not necessarily the OS of this build of Nix.
      *
      * (For example, consider `SSHStore` from Linux to Windows, or vice versa, the foreign path will not be a valid
      * `std::filesystem::path`.)

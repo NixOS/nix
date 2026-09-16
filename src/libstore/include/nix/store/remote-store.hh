@@ -199,7 +199,7 @@ protected:
 private:
 
     /**
-     * Same as the default implemenation of `RemoteStore::getFSAccessor`, but with a more preceise return type.
+     * Same as the default implementation of `RemoteStore::getFSAccessor`, but with a more preceise return type.
      */
     ref<RemoteFSAccessor> getRemoteFSAccessor(bool requireValidPath = true);
 

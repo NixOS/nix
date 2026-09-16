@@ -939,7 +939,7 @@ void LocalStore::autoGC(bool sync)
             return;
 
         /* Note: since gcRunning is false here, any previous GC thread has exited / is exiting so the join() should be
-         * almost instantenous. */
+         * almost instantaneous. */
         if (state->gcThread.joinable())
             state->gcThread.join();
 

@@ -201,7 +201,7 @@ private:
      * (there is no way to prevent that). This cleans up those
      * duplications.
      *
-     * @note We do not yet optomise the upper layer in the normal way
+     * @note We do not yet optimise the upper layer in the normal way
      * (hardlink) yet. We would like to, but it requires more
      * refactoring of existing code to support this sustainably.
      */
