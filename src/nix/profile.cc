@@ -364,6 +364,9 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
     void run(ref<Store> store, Installables && installables) override
     {
         ProfileManifest manifest(*getEvalState(), *profile);
+        StringSet existingNames;
+        for (auto & [name, _] : manifest.elements)
+            existingNames.insert(name);
 
         auto builtPaths = builtPathsPerInstallable(
             Installable::build2(getEvalStore(), store, Realise::Outputs, installables, bmNormal));
@@ -416,31 +419,29 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
         try {
             updateProfile(*store, manifest.build(store));
         } catch (BuildEnvFileConflictError & conflictError) {
-            // FIXME use C++20 std::ranges once macOS has it
-            //       See
-            //       https://github.com/NixOS/nix/compare/3efa476c5439f8f6c1968a6ba20a31d1239c2f04..1fe5d172ece51a619e879c4b86f603d9495cc102
-            auto findRefByFilePath = [&]<typename Iterator>(Iterator begin, Iterator end) {
-                for (auto it = begin; it != end; it++) {
+            auto findElementByFilePath = [&](const std::filesystem::path & filePath) {
+                for (auto it = manifest.elements.begin(); it != manifest.elements.end(); ++it) {
                     auto & [name, profileElement] = *it;
+                    if (!profileElement.active || profileElement.priority != conflictError.priority)
+                        continue;
                     for (auto & storePath : profileElement.storePaths) {
-                        if (conflictError.fileA.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileA, name, profileElement.toInstallables(*store));
-                        }
-                        if (conflictError.fileB.string().starts_with(store->printStorePath(storePath))) {
-                            return std::tuple(conflictError.fileB, name, profileElement.toInstallables(*store));
-                        }
+                        if (filePath.string().starts_with(store->printStorePath(storePath) + "/"))
+                            return it;
                     }
                 }
-                throw conflictError;
+                throw;
             };
-            // There are 2 conflicting files. We need to find out which one is from the already installed package and
-            // which one is the package that is the new package that is being installed.
-            // The first matching package is the one that was already installed (original).
-            auto [originalConflictingFilePath, originalEntryName, originalConflictingRefs] =
-                findRefByFilePath(manifest.elements.begin(), manifest.elements.end());
-            // The last matching package is the one that was going to be installed (new).
-            auto [newConflictingFilePath, newEntryName, newConflictingRefs] =
-                findRefByFilePath(manifest.elements.rbegin(), manifest.elements.rend());
+
+            auto originalConflictingFilePath = conflictError.fileA;
+            auto newConflictingFilePath = conflictError.fileB;
+            auto originalEntry = findElementByFilePath(originalConflictingFilePath);
+            auto newEntry = findElementByFilePath(newConflictingFilePath);
+            if (!existingNames.contains(originalEntry->first) && existingNames.contains(newEntry->first)) {
+                std::swap(originalConflictingFilePath, newConflictingFilePath);
+                std::swap(originalEntry, newEntry);
+            }
+            if (!existingNames.contains(originalEntry->first) || existingNames.contains(newEntry->first))
+                throw;
 
             throw Error(
                 "An existing package already provides the following file:\n"
@@ -466,8 +467,8 @@ struct CmdProfileAdd : InstallablesCommand, MixDefaultProfile
                 "  nix profile add %4% --priority %7%\n",
                 PathFmt(originalConflictingFilePath),
                 PathFmt(newConflictingFilePath),
-                originalEntryName,
-                concatStringsSep(" ", newConflictingRefs),
+                originalEntry->first,
+                concatStringsSep(" ", newEntry->second.toInstallables(*store)),
                 conflictError.priority,
                 conflictError.priority - 1,
                 conflictError.priority + 1);
