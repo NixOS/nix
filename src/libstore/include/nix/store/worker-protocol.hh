@@ -137,6 +137,12 @@ struct WorkerProto
     static constexpr std::string_view featureDeleteDeadSpecificReferrers = "delete-dead-specific-referrers";
 
     /**
+     * Feature for sending the daemon's accepted free-form SetOptions overrides
+     * to the client as part of ClientHandshakeInfo.
+     */
+    static constexpr std::string_view featureDaemonOptionPolicy = "daemon-option-policy";
+
+    /**
      * Feature for disabling SetOptions, which is a no-op in recursive-nix
      */
     static constexpr std::string_view featureDisableSetOptions = "disable-set-options";
@@ -301,6 +307,16 @@ struct WorkerProto::ClientHandshakeInfo
      * denying operations.
      */
     std::optional<TrustedFlag> remoteTrustsUs;
+
+    /**
+     * Rules for free-form SetOptions overrides accepted by the remote daemon.
+     *
+     * Missing when the feature was not negotiated. When present, a missing
+     * option name means that the daemon does not accept that override. Unknown
+     * rule values must be treated the same way. This does not describe the
+     * fixed, positional SetOptions fields.
+     */
+    std::optional<StringMap> daemonOptionPolicy;
 
     bool operator==(const ClientHandshakeInfo &) const = default;
 };

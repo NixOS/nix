@@ -32,6 +32,7 @@ headers = [ config_pub_h ] + files(
   'common-protocol.hh',
   'common-ssh-store-config.hh',
   'content-address.hh',
+  'daemon-option-policy.hh',
   'daemon.hh',
   'derivation-options.hh',
   'derivation/aterm.hh',

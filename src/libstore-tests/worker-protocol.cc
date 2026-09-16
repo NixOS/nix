@@ -893,6 +893,30 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
         },
     }))
 
+TEST_F(WorkerProtoTest, clientHandshakeOptionPolicy)
+{
+    for (bool negotiated : {false, true}) {
+        auto version = WorkerProto::Version{.number = {1, 38}};
+        if (negotiated)
+            version.features.insert(std::string{WorkerProto::featureDaemonOptionPolicy});
+        WorkerProto::ClientHandshakeInfo info{
+            .daemonNixVersion = "test",
+            .remoteTrustsUs = NotTrusted,
+            .daemonOptionPolicy =
+                StringMap{{"timeout", "any"}, {"builders", "empty"}, {"substituters", "substituters"}},
+        };
+        StringSink sink;
+        WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::write(store, {sink, version}, info);
+        sink << 12345;
+        StringSource source(sink.s);
+        auto decoded = WorkerProto::Serialise<WorkerProto::ClientHandshakeInfo>::read(store, {source, version});
+        if (!negotiated)
+            info.daemonOptionPolicy.reset();
+        EXPECT_EQ(decoded, info);
+        EXPECT_EQ(readInt(source), 12345);
+    }
+}
+
 TEST_F(WorkerProtoTest, handshake_log)
 {
     CharacterizationTest::writeTest("handshake-to-client.bin", [&]() -> std::string {

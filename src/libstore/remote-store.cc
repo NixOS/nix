@@ -1,3 +1,4 @@
+#include "nix/store/daemon-option-policy.hh"
 #include "nix/store/build.hh"
 #include "nix/store/path.hh"
 #include "nix/store/store-api.hh"
@@ -127,12 +128,18 @@ void RemoteStore::initConnection(Connection & conn)
         throw Error("cannot open connection to remote store '%s': %s", config.getHumanReadableURI(), e.what());
     }
 
-    if (!conn.protoVersion.features.contains(WorkerProto::featureDisableSetOptions))
-        setOptions(conn);
+    setOptions(conn);
 }
 
 void RemoteStore::setOptions(Connection & conn)
 {
+    if (conn.protoVersion.features.contains(WorkerProto::featureDisableSetOptions))
+        return;
+
+    auto options = getForwardedDaemonOptions(settings, fileTransferSettings, conn.daemonOptionPolicy);
+    for (auto & name : options.rejected)
+        warn("ignoring the client-specified setting '%s', because it is not accepted by the daemon", name);
+
     conn.to << WorkerProto::Op::SetOptions << settings.keepFailed << settings.getWorkerSettings().keepGoing
             << settings.getWorkerSettings().tryFallback << std::to_underlying(verbosity)
             << settings.getWorkerSettings().maxBuildJobs << settings.getWorkerSettings().maxSilentTime << true
@@ -140,23 +147,9 @@ void RemoteStore::setOptions(Connection & conn)
             << 0                                                                    /* obsolete print build trace */
             << settings.getLocalSettings().buildCores << settings.getWorkerSettings().useSubstitutes;
 
-    std::map<std::string, nix::Config::SettingInfo> overrides;
-    settings.getSettings(overrides, true); // libstore settings
-    fileTransferSettings.getSettings(overrides, true);
-    overrides.erase(settings.keepFailed.name);
-    overrides.erase(settings.getWorkerSettings().keepGoing.name);
-    overrides.erase(settings.getWorkerSettings().tryFallback.name);
-    overrides.erase(settings.getWorkerSettings().maxBuildJobs.name);
-    overrides.erase(settings.getWorkerSettings().maxSilentTime.name);
-    overrides.erase(settings.getLocalSettings().buildCores.name);
-    overrides.erase(settings.getWorkerSettings().useSubstitutes.name);
-    overrides.erase(loggerSettings.showTrace.name);
-    overrides.erase(experimentalFeatureSettings.experimentalFeatures.name);
-    overrides.erase(settings.useXDGBaseDirectories.name);
-    overrides.erase("plugin-files");
-    conn.to << overrides.size();
-    for (auto & i : overrides)
-        conn.to << i.first << i.second.value;
+    conn.to << options.overrides.size();
+    for (auto & [name, value] : options.overrides)
+        conn.to << name << value;
 
     auto ex = conn.processStderrReturn();
     if (ex)

@@ -1,4 +1,5 @@
 #include "nix/store/daemon.hh"
+#include "nix/store/daemon-option-policy.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/file-content-address.hh"
 #include "nix/util/signals.hh"
@@ -232,7 +233,7 @@ struct ClientSettings
     bool useSubstitutes;
     StringMap overrides;
 
-    void apply(TrustedFlag trusted)
+    void apply(TrustedFlag trusted, bool useOptionPolicy)
     {
         settings.keepFailed = keepFailed;
         settings.getWorkerSettings().keepGoing = keepGoing;
@@ -243,6 +244,8 @@ struct ClientSettings
         settings.verboseBuild = verboseBuild;
         settings.getLocalSettings().buildCores = buildCores;
         settings.getWorkerSettings().useSubstitutes = useSubstitutes;
+
+        auto optionPolicy = getDaemonOptionPolicy(settings, fileTransferSettings, trusted);
 
         for (auto & i : overrides) {
             auto & name(i.first);
@@ -295,14 +298,17 @@ struct ClientSettings
                         "Ignoring the client-specified plugin-files.\n"
                         "The client specifying plugins to the daemon never made sense, and was removed in Nix >=2.14.");
                 } else if (
-                    trusted || name == settings.getWorkerSettings().buildTimeout.name
-                    || name == settings.getWorkerSettings().maxSilentTime.name
-                    || name == settings.getWorkerSettings().pollInterval.name || name == "connect-timeout"
-                    || (name == "builders" && value == "")) {
+                    (trusted && !useOptionPolicy)
+                    || (daemonOptionIsAccepted(optionPolicy, name, value)
+                        && optionPolicy.at(name) != daemonOptionRuleSubstituters)) {
                     settings.set(name, value);
                     fileTransferSettings.set(name, value);
-                } else if (setSubstituters(settings.getWorkerSettings().substituters))
+                } else if (
+                    (!useOptionPolicy || daemonOptionIsAccepted(optionPolicy, name, value))
+                    && setSubstituters(settings.getWorkerSettings().substituters))
                     ;
+                else if (trusted)
+                    warn("ignoring the client-specified setting '%s', because it is not accepted by the daemon", name);
                 else
                     warn(
                         "ignoring the client-specified setting '%s', because it is a restricted setting and you are not a trusted user",
@@ -845,7 +851,7 @@ static void performOp(
         // FIXME: use some setting in recursive mode. Will need to use
         // non-global variables.
         if (recursive == RecursiveFlag::NotRecursive)
-            clientSettings.apply(trusted);
+            clientSettings.apply(trusted, conn.protoVersion.features.contains(WorkerProto::featureDaemonOptionPolicy));
 
         logger->stopWork();
         break;
@@ -1182,6 +1188,7 @@ void processConnection(
             // We and the underlying store both need to trust the client for
             // it to be trusted.
             .remoteTrustsUs = trusted ? store->isTrustedClient() : std::optional{NotTrusted},
+            .daemonOptionPolicy = getDaemonOptionPolicy(settings, fileTransferSettings, trusted),
         });
 
     /* Send startup error messages to the client. */
