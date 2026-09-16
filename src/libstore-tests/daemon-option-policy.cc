@@ -12,6 +12,7 @@
 #include "nix/store/filetransfer.hh"
 #include "nix/store/uds-remote-store.hh"
 #include "nix/store/remote-store-connection.hh"
+#include "nix/util/config-impl.hh"
 
 namespace nix {
 
@@ -337,8 +338,8 @@ TEST(DaemonOptionPolicy, trustedDaemonRejectsOptionOutsideAdvertisedPolicy)
     });
 
     auto requestedUseXDGBaseDirectories = oldUseXDGBaseDirectories == "false" ? "true" : "false";
-    auto handshakeInfo = sendRawOptionsToDaemon(
-        store, Trusted, {{"use-xdg-base-directories", requestedUseXDGBaseDirectories}});
+    auto handshakeInfo =
+        sendRawOptionsToDaemon(store, Trusted, {{"use-xdg-base-directories", requestedUseXDGBaseDirectories}});
     ASSERT_TRUE(handshakeInfo.daemonOptionPolicy);
     EXPECT_FALSE(handshakeInfo.daemonOptionPolicy->contains("use-xdg-base-directories"));
     EXPECT_EQ(settings.useXDGBaseDirectories.to_string(), oldUseXDGBaseDirectories);

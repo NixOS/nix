@@ -1,4 +1,5 @@
 #include "nix/store/daemon-option-policy.hh"
+#include "nix/util/config-impl.hh"
 #include "nix/store/globals.hh"
 #include "nix/store/filetransfer.hh"
 
