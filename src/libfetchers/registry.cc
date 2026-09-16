@@ -5,6 +5,7 @@
 #include "nix/util/users.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -76,7 +77,8 @@ void Registry::write(const std::filesystem::path & path)
     json["version"] = 2;
     json["flakes"] = std::move(arr);
 
-    createDirs(path.parent_path());
+    if (path.has_parent_path())
+        createDirs(path.parent_path());
     writeFile(path, json.dump(2));
 }
 
@@ -120,8 +122,7 @@ ref<Registry> getUserRegistry(const Settings & settings)
 
 ref<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry = readRegistry(settings, selfContainedHostFileOrError(p), Registry::Custom);
-    return customRegistry;
+    return readRegistry(settings, selfContainedHostFileOrError(p), Registry::Custom);
 }
 
 ref<Registry> getFlagRegistry()
