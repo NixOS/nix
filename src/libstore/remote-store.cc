@@ -747,13 +747,31 @@ ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
         ref<RemoteStore>(std::dynamic_pointer_cast<RemoteStore>(shared_from_this())), std::move(evalStore));
 }
 
-void RemoteStore::addTempRoot(const StorePath & path)
+void RemoteStore::addTempRoots(const StorePathSet & paths)
 {
-    auto conn(getConnection());
-    if (conn->tempRootsPinned.get(path))
+    if (paths.empty())
         return;
-    conn->addTempRoot(*this, &conn.daemonException, path);
-    conn->tempRootsPinned.upsert(path, true);
+
+    auto conn(getConnection());
+
+    if (conn->protoVersion.features.contains(WorkerProto::featureAddTempRoots)) {
+        StorePathSet newPaths;
+        for (auto & path : paths)
+            if (!conn->tempRootsPinned.get(path))
+                newPaths.insert(path);
+
+        if (newPaths.empty())
+            return;
+
+        conn->to << WorkerProto::Op::AddTempRoots;
+        WorkerProto::write(*this, *conn, newPaths);
+        conn.processStderr();
+        readInt(conn->from);
+
+        for (auto & path : newPaths)
+            conn->tempRootsPinned.upsert(path, true);
+    }
+    /* Note: there is no fallback for old daemons to prevent performance regressions. */
 }
 
 Roots RemoteStore::findRoots(bool censor)
