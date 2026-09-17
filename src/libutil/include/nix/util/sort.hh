@@ -179,7 +179,7 @@ Iter weaklyIncreasingSuffix(Iter begin, Iter end, const Comparator & comp = {})
  * in infinite loops/out of bounds memory accesses or other undefined behavior.
  *
  * As a quick reminder, strict weak ordering relation operator< must satisfy
- * the following properties. Keep in mind that in C++ an equvalence relation
+ * the following properties. Keep in mind that in C++ an equivalence relation
  * is specified in terms of operator< like so: a ~ b iff !(a < b) && !(b < a).
  *
  * 1. a < a === false - relation is irreflexive

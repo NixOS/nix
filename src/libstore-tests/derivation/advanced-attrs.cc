@@ -155,7 +155,7 @@ TEST_ATERM_JSON(advancedAttributes_structuredAttrs_defaults, "advanced-attribute
 #undef TEST_ATERM_JSON
 
 /**
- * Since these are both repeated and sensative opaque values, it makes
+ * Since these are both repeated and sensitive opaque values, it makes
  * sense to give them names in this file.
  */
 static SingleDerivedPath

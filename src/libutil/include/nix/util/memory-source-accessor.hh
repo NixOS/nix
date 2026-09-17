@@ -61,7 +61,7 @@ struct Opaque
  * `File<std::string>` nicely defining what a "file system object"
  * is in Nix.
  *
- * With a different type arugment, it is also can be a "skeletal"
+ * With a different type argument, it is also can be a "skeletal"
  * version is that abstract syntax for a "NAR listing".
  */
 template<typename RegularContents, bool recur>

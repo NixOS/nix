@@ -20,7 +20,7 @@ enum struct ExperimentalFeature;
 const nlohmann::json & valueAt(const nlohmann::json::object_t & map, std::string_view key);
 
 /**
- * @return A pointer to the value assiocated with `key` if `value`
+ * @return A pointer to the value associated with `key` if `value`
  * contains `key`, otherwise return  `nullptr` (not JSON `null`!).
  */
 const nlohmann::json * optionalValueAt(const nlohmann::json::object_t & value, std::string_view key);

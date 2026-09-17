@@ -77,7 +77,7 @@ public:
         const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
 
     /**
-     * Create a placehold for the output of an unknown derivation.
+     * Create a placeholder for the output of an unknown derivation.
      *
      * The derivation is not yet known because it is a dynamic
      * derivaiton --- it is itself an output of another derivation ---
