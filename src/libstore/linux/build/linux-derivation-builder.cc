@@ -11,12 +11,14 @@
 #include "nix/util/cgroup.hh"
 #include "nix/util/linux-namespaces.hh"
 #include "nix/util/file-system-at.hh"
+#include "nix/util/os-filename.hh"
 #include "nix/util/logging.hh"
 #include "nix/util/serialise.hh"
 #include "linux/fchmodat2-compat.hh"
 
 #include <algorithm>
 #include <string_view>
+#include <cassert>
 #include <cstdint>
 #include <atomic>
 
@@ -263,6 +265,20 @@ static void doBind(
 
     debug("bind mounting %1% to %2%", PathFmt(source), PathFmt(chrootRootDirPath / target));
 
+    /* A trailing slash means the destination must be a directory, which is fine for a
+       bind mount but not when we are creating a name. Call this only after walking the
+       parents, so a path escaping the chroot is still reported as such. */
+    auto requireFilename = [&]() {
+        if (!target.has_filename()) {
+            assert(target.native().back() == '/'); /* i.e. a trailing slash, given the checks above. */
+            throw Error(
+                "sandbox path %s has a trailing slash, but its source %s is not a directory",
+                PathFmt(chrootRootDirPath / target),
+                PathFmt(source));
+        }
+        return OsFilename{target.filename()};
+    };
+
     auto fallbackBindMount = [&](Descriptor sourceFd, Descriptor destFd) {
         auto selfProcSourcePath = std::filesystem::path("/proc/self/fd") / std::to_string(sourceFd);
         auto selfProcDestPath = std::filesystem::path("/proc/self/fd") / std::to_string(destFd);
@@ -375,8 +391,8 @@ static void doBind(
            since https://github.com/torvalds/linux/commit/65cfc6722361 (v2.6.39).
            See also: https://github.com/cyphar/libpathrs/issues/18 */
         auto symlinkTarget = readLinkAt(sourceFd.get(), CanonPath::root);
-        auto filename = target.filename();
         auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
+        auto filename = requireFilename();
         if (::symlinkat(symlinkTarget.data(), parentFd, filename.c_str()) == -1)
             throw SysError("creating symlink %s", PathFmt(chrootRootDirPath / target));
         /* Copy the write/access time from the source symlink. */
@@ -385,9 +401,10 @@ static void doBind(
             throw SysError("changing write time of %s", PathFmt(chrootRootDirPath / target));
     } else {
         auto [maybeParentFdOwned, parentFd, isRoot] = createDirsAndOpen(target.parent_path());
+        auto filename = requireFilename();
         /* Strictly speaking, O_NOFOLLOW is redundant because O_CREAT | O_EXCL would never follow links anyway. */
         AutoCloseFD destFd =
-            ::openat(parentFd, target.filename().c_str(), O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0666);
+            ::openat(parentFd, filename.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_NOFOLLOW | O_CLOEXEC, 0666);
         if (!destFd)
             throw SysError("creating regular file %s", PathFmt(chrootRootDirPath / target));
         bindMount(sourceFd.get(), destFd.get());
