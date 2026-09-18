@@ -272,3 +272,52 @@ printf '{ "version": 2, "elements": [ { "active": true, "attrPath": "legacyPacka
 nix build --profile "$TEST_HOME"/.nix-profile "$(nix store add-path "$TEST_ROOT"/import-profile)" --no-link
 nix profile list | grep -A4 'Name:.*hello' | grep "Store paths:.*$outPath"
 nix profile remove hello 2>&1 | grep 'removed 1 packages, kept 0 packages'
+
+# Test the names of packages added from a flake in a subdirectory (`?dir=`),
+# and that re-adding them is detected as a duplicate.
+# Regression test for https://github.com/NixOS/nix/issues/15900
+clearProfiles
+flake3Dir=$TEST_ROOT/flake3
+mkdir -p "$flake3Dir"/sub
+# shellcheck disable=SC2154
+cat > "$flake3Dir"/sub/flake.nix <<EOF
+{
+  outputs = { self }: with import ./config.nix; {
+    packages.$system = {
+      tool-a = mkDerivation { name = "tool-a"; buildCommand = "mkdir -p \$out/bin; echo a > \$out/bin/tool-a"; };
+      tool-b = mkDerivation { name = "tool-b"; buildCommand = "mkdir -p \$out/bin; echo b > \$out/bin/tool-b"; };
+      default = mkDerivation { name = "tool-c"; buildCommand = "mkdir -p \$out/bin; echo c > \$out/bin/tool-c"; };
+    };
+  };
+}
+EOF
+cp "${config_nix}" "$flake3Dir"/sub/
+profileNames() {
+    nix profile list --json | jq -r '.elements | keys[]' | sort | xargs
+}
+
+# The fragment names the package, taking precedence over `dir=`.
+nix profile add "path:$flake3Dir?dir=sub#tool-a"
+nix profile add "path:$flake3Dir?dir=sub#packages.$system.tool-b"
+[[ $(profileNames) = "tool-a tool-b" ]]
+
+# Without a fragment (i.e. `default`), the name falls back to `dir=`.
+nix profile add "path:$flake3Dir?dir=sub"
+[[ $(profileNames) = "sub tool-a tool-b" ]]
+
+# Re-adding a package is detected, including when its attribute path is spelled out in full.
+nix profile add "path:$flake3Dir?dir=sub#tool-a" 2>&1 | grep "warning: 'tool-a' is already added"
+nix profile add "path:$flake3Dir?dir=sub#packages.$system.tool-b" 2>&1 | grep "warning: 'tool-b' is already added"
+nix profile add "path:$flake3Dir?dir=sub" 2>&1 | grep "warning: 'sub' is already added"
+[[ $(profileNames) = "sub tool-a tool-b" ]]
+
+# A package stored under a name that differs from the one derived now (here,
+# the name that older versions of Nix derived from `dir=`) is still detected as
+# already added, rather than being added a second time.
+nix profile remove sub tool-b
+mkdir -p "$TEST_ROOT"/renamed-profile
+nix profile list --json | jq '.elements |= with_entries(if .key == "tool-a" then .key = "sub" else . end)' > "$TEST_ROOT"/renamed-profile/manifest.json
+nix build --profile "$TEST_HOME"/.nix-profile "$(nix store add-path "$TEST_ROOT"/renamed-profile)" --no-link
+[[ $(profileNames) = "sub" ]]
+nix profile add "path:$flake3Dir?dir=sub#tool-a" 2>&1 | grep "warning: 'sub' is already added"
+[[ $(profileNames) = "sub" ]]
