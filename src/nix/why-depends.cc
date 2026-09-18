@@ -103,8 +103,7 @@ struct CmdWhyDepends : SourceExprCommand, MixOperateOnOptions
         store->computeFSClosure({packagePath}, closure, false, false);
 
         if (!optDependencyPath.has_value() || !closure.count(*optDependencyPath)) {
-            printError("'%s' does not depend on '%s'", package->what(), dependency->what());
-            return;
+            throw Error("'%s' does not depend on '%s'", package->what(), dependency->what());
         }
 
         auto dependencyPath = *optDependencyPath;
