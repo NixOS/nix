@@ -86,6 +86,12 @@ public:
                 completeFlakeRef(completions, getStore(), prefix);
             }},
         });
+        addFlag({
+            .longName = "exclude",
+            .shortName = 'x',
+            .description = "Update all inputs except the specified ones.",
+            .handler = {&lockFlags.exclude, true},
+        });
         expectArgs({
             .label = "inputs",
             .optional = true,
@@ -96,7 +102,7 @@ public:
                         inputAttrPath = flake::NonEmptyInputAttrPath::parse(inputToUpdate);
                         if (!inputAttrPath)
                             throw UsageError(
-                                "input path to be updated cannot be zero-length; it would refer to the flake itself, not an input");
+                                "input path cannot be zero-length; it would refer to the flake itself, not an input");
                     } catch (Error & e) {
                         warn(
                             "Invalid flake input '%s'. To update a specific flake, use 'nix flake update --flake %s' instead.",
@@ -104,11 +110,11 @@ public:
                             inputToUpdate);
                         throw e;
                     }
-                    if (lockFlags.inputUpdates.contains(*inputAttrPath))
+                    if (lockFlags.inputSpec.contains(*inputAttrPath))
                         warn(
                             "Input '%s' was specified multiple times. You may have done this by accident.",
                             printInputAttrPath(*inputAttrPath));
-                    lockFlags.inputUpdates.insert(*inputAttrPath);
+                    lockFlags.inputSpec.insert(*inputAttrPath);
                 }
             }},
             .completer = {[&](AddCompletions & completions, size_t, std::string_view prefix) {
@@ -131,7 +137,7 @@ public:
     void run(nix::ref<nix::Store> store) override
     {
         fetchSettings.tarballTtl = 0;
-        auto updateAll = lockFlags.inputUpdates.empty();
+        auto updateAll = lockFlags.inputSpec.empty();
 
         lockFlags.recreateLockFile = updateAll;
         lockFlags.writeLockFile = true;
