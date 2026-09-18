@@ -208,6 +208,7 @@ struct RawInstallablesCommand : virtual Args, SourceExprCommand
 private:
 
     std::vector<std::string> rawInstallables;
+    bool all = false;
 };
 
 /**
