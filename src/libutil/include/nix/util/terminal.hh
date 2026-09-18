@@ -30,6 +30,15 @@ std::string filterANSIEscapes(
     std::string_view s, bool filterAll = false, unsigned int width = std::numeric_limits<unsigned int>::max());
 
 /**
+ * Remove all ANSI escape sequences (CSI, OSC, etc.) from a string,
+ * leaving every other byte -- including tabs, carriage returns and
+ * UTF-8 -- untouched. Unlike filterANSIEscapes(), this does not expand
+ * tabs, drop control characters or truncate, so it is safe to apply to
+ * machine-readable output such as stdout.
+ */
+std::string stripANSIEscapes(std::string_view s);
+
+/**
  * Recalculate the window size, updating a global variable.
  *
  * Used in the `SIGWINCH` signal handler on Unix, for example.
