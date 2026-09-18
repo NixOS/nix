@@ -114,6 +114,16 @@ EOF
   [[ "$got" == "$expect" ]]
 )
 
+# Test whether `--set-env-var` can set SHELL.
+(
+  expect='/bin/bash'
+  got="$(nix develop --ignore-env --set-env-var SHELL '/bin/bash' --no-write-lock-file .#hello <<EOF
+echo "\$SHELL"
+EOF
+)"
+  [[ "$got" == "$expect" ]]
+)
+
 # Check that we throw an error when `--keep-env-var` is used without `--ignore-env`.
 expectStderr 1 nix develop --keep-env-var FOO .#hello |
   grepQuiet "error: --keep-env-var does not make sense without --ignore-env"
