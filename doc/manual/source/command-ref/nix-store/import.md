@@ -18,12 +18,6 @@ If a path [refers](@docroot@/glossary.md#gloss-reference) to another path that d
 >
 > For efficient transfer of closures to remote machines over SSH, use [`nix-copy-closure`](@docroot@/command-ref/nix-copy-closure.md).
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 > **Example**
@@ -41,3 +35,9 @@ If a path [refers](@docroot@/glossary.md#gloss-reference) to another path that d
 > $ nix-store --import --store ssh://alice@itchy.example.org < hello.closure
 > ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ../env-common.md}}
