@@ -174,6 +174,24 @@ TEST_F(EvalStateTest, getBuiltin_fail)
     ASSERT_THROW(state.getBuiltin("nonexistent"), EvalError);
 }
 
+TEST_F(EvalStateTest, getDoc_namedLambdaWithoutPosition_omitsTrailingBackslash)
+{
+    Env env{.up = nullptr, .values = {}};
+    ExprInt body(0);
+    ExprLambda lambda(noPos, createSymbol("a"), &body);
+    Value value;
+
+    lambda.setName(createSymbol("puppy"));
+    value.mkLambda(&env, &lambda);
+
+    auto doc = state.getDoc(value);
+
+    ASSERT_TRUE(doc.has_value());
+    ASSERT_FALSE(doc->pos);
+    ASSERT_EQ(doc->name, std::optional<std::string>{"puppy"});
+    ASSERT_STREQ(doc->doc, "Function `puppy`");
+}
+
 class PureEvalTest : public LibExprTest
 {
 public:
