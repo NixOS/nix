@@ -19,6 +19,7 @@ headers = files(
   'markdown.hh',
   'misc-store-flags.hh',
   'network-proxy.hh',
+  'repl-completion.hh',
   'repl-interacter.hh',
   'repl.hh',
   'unix-socket-server.hh',
