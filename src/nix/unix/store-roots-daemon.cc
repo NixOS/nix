@@ -32,6 +32,8 @@ struct CmdRootsDaemon : StoreConfigCommand
 
     void run(ref<StoreConfig> storeConfig) override
     {
+        using namespace nix::unix;
+
         auto localStoreConfig = dynamic_cast<LocalStoreConfig *>(&*storeConfig);
         if (!localStoreConfig) {
             throw UsageError(
@@ -40,7 +42,7 @@ struct CmdRootsDaemon : StoreConfigCommand
 
         auto gcSocketPath = localStoreConfig->getRootsSocketPath();
 
-        unix::serveUnixSocket(
+        serveUnixSocket(
             {
                 .socketPath = gcSocketPath,
                 .socketMode = 0666,

@@ -398,6 +398,8 @@ static const std::filesystem::path procPath = "/proc";
 
 void LinuxDerivationBuilder::enterChroot()
 {
+    using namespace linux;
+
     auto & localSettings = store->getLocalSettings();
 
     /* Set the NO_NEW_PRIVS before doing seccomp/landlock setup.
@@ -421,7 +423,7 @@ void LinuxDerivationBuilder::enterChroot()
     }
 #endif
 
-    linux::setPersonality({
+    setPersonality({
         .system = drv.platform,
         .impersonateLinux26 = localSettings.impersonateLinux26,
     });
@@ -446,16 +448,18 @@ std::unique_ptr<UserLock> ChrootLinuxDerivationBuilder::getBuildUser()
 
 void ChrootLinuxDerivationBuilder::prepareUser()
 {
+    using namespace linux;
+
     if ((buildUser && buildUser->getUIDCount() != 1) || store->getLocalSettings().useCgroups) {
         experimentalFeatureSettings.require(Xp::Cgroups);
 
         /* If we're running from the daemon, then this will return the
            root cgroup of the service. Otherwise, it will return the
            current cgroup. */
-        auto cgroupFS = linux::getCgroupFS();
+        auto cgroupFS = getCgroupFS();
         if (!cgroupFS)
             throw Error("cannot determine the cgroups file system");
-        auto rootCgroupPath = *cgroupFS / linux::getRootCgroup().rel();
+        auto rootCgroupPath = *cgroupFS / getRootCgroup().rel();
         if (!pathExists(rootCgroupPath))
             throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
 
@@ -478,7 +482,7 @@ void ChrootLinuxDerivationBuilder::prepareUser()
 
             if (pathExists(cgroupFile)) {
                 auto prevCgroup = readFile(cgroupFile);
-                linux::destroyCgroup(prevCgroup);
+                destroyCgroup(prevCgroup);
             }
 
             writeFile(cgroupFile, cgroup->native());
@@ -943,8 +947,10 @@ BuilderExit ChrootLinuxDerivationBuilder::unprepareBuild()
 
 void ChrootLinuxDerivationBuilder::killSandbox(bool getStats)
 {
+    using namespace linux;
+
     if (cgroup) {
-        auto stats = linux::destroyCgroup(*cgroup);
+        auto stats = destroyCgroup(*cgroup);
         if (getStats) {
             buildResult.cpuUser = stats.cpuUser;
             buildResult.cpuSystem = stats.cpuSystem;

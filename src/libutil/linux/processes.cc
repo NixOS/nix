@@ -86,6 +86,8 @@ struct ExecChildParams
  */
 [[gnu::noinline, noreturn]] static void doExecChild(const ExecChildParams & params) noexcept
 {
+    using namespace nix::unix;
+
     Descriptor errorPipe = params.errorPipe;
 
     auto die = [&errorPipe] [[noreturn]] (int err, const char * msg) {
@@ -199,17 +201,17 @@ struct ExecChildParams
 #undef NIX_SYS_setgid
 #undef NIX_SYS_setgroups
 
-    if (unix::savedStackSize) {
+    if (savedStackSize) {
         struct ::rlimit limit;
         if (::getrlimit(RLIMIT_STACK, &limit) == 0) {
-            limit.rlim_cur = unix::savedStackSize;
+            limit.rlim_cur = savedStackSize;
             ::setrlimit(RLIMIT_STACK, &limit);
             /* TODO: Why do we ignore all errors here? */
         }
     }
 
-    /* Like unix::restoreSignals(), but safe to do in a vfork child. */
-    if (unix::savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &unix::savedSignalMask, nullptr) == -1)
+    /* Like restoreSignals(), but safe to do in a vfork child. */
+    if (savedSignalMaskIsSet && sigprocmask(SIG_SETMASK, &savedSignalMask, nullptr) == -1)
         dieWithErrno("restoring signals");
 
     if (params.lookupPath)

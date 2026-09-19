@@ -361,6 +361,8 @@ void ChrootFreeBSDDerivationBuilder::prepareSandbox()
 
 void ChrootFreeBSDDerivationBuilder::startChild()
 {
+    using namespace nix::unix;
+
     int jid;
 
     RunChildArgs args{
@@ -390,7 +392,7 @@ void ChrootFreeBSDDerivationBuilder::startChild()
         // Everything from here to the end of the block is setting up the network
         // code adapted from freebsd/sbin/ifconfig/af_inet.c, in_exec_nl
         Pid helper = startProcess([&]() {
-            unix::closeExtraFDs();
+            closeExtraFDs();
             enterChroot();
 
             struct snl_state ss = {};
@@ -466,9 +468,11 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 
 void ChrootFreeBSDDerivationBuilder::enterChroot()
 {
+    using namespace nix::unix;
+
     /* Close all other file descriptors. This must happen before
        jail_attach for FreeBSD. */
-    unix::closeExtraFDs();
+    closeExtraFDs();
 
     if (jail_attach(autoDelJail->jid) < 0) {
         throw SysError("failed to attach to jail");
