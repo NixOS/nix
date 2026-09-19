@@ -3,6 +3,7 @@ suites += {
   'deps' : [],
   'tests' : [
     'flakes.sh',
+    'git-rev.sh',
     'develop.sh',
     'edit.sh',
     'run.sh',
