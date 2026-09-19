@@ -13,6 +13,8 @@
 #include "nix/util/error.hh"
 #include "nix/util/os-string.hh"
 
+#include <span>
+
 #ifdef _WIN32
 #  define WIN32_LEAN_AND_MEAN
 #  include <windows.h>
@@ -318,6 +320,18 @@ namespace unix {
  * Good practice in child processes.
  */
 void closeExtraFDs();
+
+/**
+ * As `closeExtraFDs`, but additionally keep the descriptors in `keep` open.
+ *
+ * A child that has deliberately wired up descriptors above stderr — see
+ * `RunOptions::Redirection` — must use this, because the argument-less
+ * overload closes every descriptor above `STDERR_FILENO` and would undo
+ * that wiring immediately before the `exec`.
+ *
+ * `keep` is expected to be small; it is scanned linearly per descriptor.
+ */
+void closeExtraFDs(std::span<const Descriptor> keep);
 
 /**
  * Set the close-on-exec flag for the given file descriptor.
