@@ -1,0 +1,82 @@
+[files]
+extend-exclude = [
+  # Vendored
+  "doc/manual/theme/highlight.js",
+  # Contributor names
+  "doc/manual/source/release-notes/",
+  "maintainers/data/release-credits-handle-to-name.json",
+  # Keys
+  "maintainers/keys/",
+  "tests/installer/vagrant_insecure_key",
+]
+
+[default]
+extend-ignore-re = [
+  # Nix base32 hashes
+  "[0-9abcdfghijklmnpqrsvwxyz]{26,}",
+  # Deprecated alias
+  "--referers(-closure)?",
+]
+
+[type.allow-FODs]
+extend-glob = ["freebsd-derivation-builder.cc", "linux-derivation-builder.cc"] # plural of FOD (fixed-output derivation)
+extend-identifiers = { FODs = "FODs" }
+
+[type.allow-COMMANDs]
+extend-glob = ["cli-guideline.md"] # plural of the COMMAND placeholder in usage text
+extend-identifiers = { COMMANDs = "COMMANDs" }
+
+[type.allow-msg_controllen]
+extend-glob = ["sender.c", "smuggler.c", "unix-domain-socket.cc"] # field of `struct msghdr`
+extend-identifiers = { msg_controllen = "msg_controllen" }
+
+[type.allow-gl_pathc]
+extend-glob = ["args.cc"] # field of `glob_t`
+extend-identifiers = { gl_pathc = "gl_pathc" }
+
+[type.allow-thr]
+extend-glob = ["thread-pool.cc", "substitution-goal.cc", "substitution-goal.hh"] # std::thread variable name
+extend-identifiers = { thr = "thr" }
+
+[type.allow-ths]
+extend-glob = ["nix_api_store.cc"] # `this`-like parameter name in LambdaAdapter
+extend-identifiers = { ths = "ths" }
+
+[type.allow-abd]
+extend-glob = [
+  "url.cc",
+  "eval-fail-compareVersions-2.nix",
+  "eval-fail-compareVersions-2.err.exp",
+] # arbitrary test string (percent-encoding and compareVersions inputs)
+extend-words = { abd = "abd" }
+
+[type.allow-fo]
+extend-glob = [
+  "canon-path.cc",
+  "logging.cc",
+  "suggestions.cc",
+  "suggestions.sh",
+  "eval-okay-regex-match.nix",
+  "eval-okay-regex-split.nix",
+] # deliberately truncated "foo" in Levenshtein/path-prefix tests and regexes like `fo*`
+extend-words = { fo = "fo" }
+
+[type.allow-buil]
+extend-glob = ["completions.sh"] # `nix buil<TAB>`
+extend-words = { buil = "buil" }
+
+[type.allow-filterin]
+extend-glob = ["filter-source.nix", "path.nix"] # `$TEST_ROOT/filterin` test directory name
+extend-words = { filterin = "filterin" }
+
+[type.allow-flakeness]
+extend-glob = ["flake.cc"] # "flakeness" of an input, used in a code comment
+extend-words = { flakeness = "flakeness" }
+
+[type.allow-baZ]
+extend-glob = ["git.cc", "tree-sha1.txt", "tree-sha256.txt"] # deliberate mixed-case test input
+extend-identifiers = { baZ = "baZ" }
+
+[type.allow-Sur]
+extend-glob = ["create-darwin-volume.sh", "install-darwin-multi-user.sh"] # macOS Big Sur
+extend-words = { Sur = "Sur" }

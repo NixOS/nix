@@ -81,8 +81,8 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     Worker worker{*dummyStore, *dummyStore};
 
     // Override the substituters to use our dummy store substituter
-    ref<Store> substituerAsStore = substituter;
-    worker.getSubstituters = [substituerAsStore]() -> std::list<ref<Store>> { return {substituerAsStore}; };
+    ref<Store> substituterAsStore = substituter;
+    worker.getSubstituters = [substituterAsStore]() -> std::list<ref<Store>> { return {substituterAsStore}; };
 
     // Create a substitution goal for the path
     auto goal = worker.makePathSubstitutionGoal(pathInSubstituter);

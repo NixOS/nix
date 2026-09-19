@@ -5,7 +5,7 @@
 
 int main(int argc, char ** argv)
 {
-    auto res = nix::testMainForBuidingPre(argc, argv);
+    auto res = nix::testMainForBuildingPre(argc, argv);
     if (res)
         return res;
 

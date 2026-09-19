@@ -46,7 +46,7 @@ PATH_ENV_ROUND_TRIP(
         OS_STR("/bar"),
     }))
 
-TEST(ExecutablePath, elementyElemNormalize)
+TEST(ExecutablePath, emptyElemNormalize)
 {
     auto v = ExecutablePath::parse(PATH_VAR_SEP PATH_VAR_SEP PATH_VAR_SEP);
     EXPECT_EQ(
