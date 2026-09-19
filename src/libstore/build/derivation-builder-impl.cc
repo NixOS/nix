@@ -7,11 +7,24 @@
 #include "nix/store/restricted-store.hh"
 #include "nix/util/archive.hh"
 #include "nix/util/file-content-address.hh"
+#include "nix/util/file-descriptor.hh"
 #include "nix/util/file-system.hh"
 #include "nix/util/git.hh"
 #include "nix/util/processes.hh"
+#include "nix/util/signals.hh"
 #include "nix/util/source-accessor.hh"
 #include "nix/util/topo-sort.hh"
+#include "nix/util/url.hh"
+
+#include "nix/util/unix-domain-socket.hh"
+
+#ifdef _WIN32
+#  include <winsock2.h>
+#  include <afunix.h>
+#else
+#  include <sys/socket.h>
+#  include <sys/un.h>
+#endif
 
 namespace nix {
 
@@ -770,6 +783,16 @@ BuildingStore::~BuildingStore() = default;
 
 namespace {
 
+/** An absolute path that cannot exist, spelled for the running platform. */
+std::filesystem::path noSuchPath()
+{
+#ifdef _WIN32
+    return std::filesystem::path{"C:\\no-such-path"};
+#else
+    return std::filesystem::path{"/no-such-path"};
+#endif
+}
+
 struct LocalBuildingStore : BuildingStore
 {
     LocalStore & localStore;
@@ -801,8 +824,12 @@ struct LocalBuildingStore : BuildingStore
             [&] {
                 auto config = make_ref<LocalStore::Config>(*localStore.config);
                 config->pathInfoCacheSize = 0;
-                config->stateDir = "/no-such-path";
-                config->logDir = "/no-such-path";
+                /* A deliberately unusable location: the restricted store must not
+                   touch real state. It has to be an absolute path, and on Windows a
+                   POSIX-rooted one is not --- `is_absolute()` wants a root name as
+                   well as a root directory --- so spell it natively. */
+                config->stateDir = noSuchPath();
+                config->logDir = noSuchPath();
                 return config;
             }(),
             ref<LocalStore>(std::dynamic_pointer_cast<LocalStore>(localStore.shared_from_this())),
@@ -815,6 +842,216 @@ struct LocalBuildingStore : BuildingStore
 std::unique_ptr<BuildingStore> makeBuildingStoreFromLocalStore(LocalStore & localStore)
 {
     return std::make_unique<LocalBuildingStore>(localStore);
+}
+
+void DerivationBuilderImpl::startDaemon()
+{
+    if (usingSubmittedOutputs()) {
+        experimentalFeatureSettings.require(Xp::DynamicDerivations);
+    } else {
+        experimentalFeatureSettings.require(Xp::RecursiveNix);
+    }
+
+    auto storeForDaemon = this->store->makeRecursiveNixStore(*this);
+
+    state_.lock()->addedPaths.clear();
+
+    auto socketName = ".nix-socket";
+    std::filesystem::path socketPath = tmpDir / socketName;
+    /* Spell the path the way `StoreReference::parse` expects, rather than
+       concatenating a native path. On Windows the native form is
+       `C:\...\.nix-socket`, and `unix://C:\...` is not a parseable store URI:
+       the backslashes make `parseURL` throw, the fallback chain then reads
+       `C:\...` as an authority, and the builder's nested `nix` dies with
+       "Cannot parse Nix store". `pathToUrlPath` emits the drive letter as a
+       leading segment (giving `/C:/...`, as `store-reference` tests expect)
+       and `encodeUrlPath` escapes characters a username may contain, such as
+       a space. On Unix this yields the same `unix:///tmp/...` as before. */
+    daemonRemoteUri = "unix://" + encodeUrlPath(pathToUrlPath(tmpDirInSandbox() / socketName));
+
+    daemonSocket = createUnixDomainSocket(socketPath, 0600);
+
+    prepareDaemonSocket(socketPath);
+
+    daemon::RecursiveFlag recursiveFlag;
+    if (usingSubmittedOutputs()) {
+        recursiveFlag = daemon::RecursiveFlag::RecursiveSubmitted;
+    } else {
+        recursiveFlag = daemon::RecursiveFlag::Recursive;
+    }
+
+    daemonThread = std::thread([this, storeForDaemon, recursiveFlag]() {
+        while (true) {
+
+            /* Accept a connection. */
+            struct sockaddr_un remoteAddr;
+            /* Winsock's `accept` takes an `int *`, POSIX a `socklen_t *`. */
+#ifdef _WIN32
+            int
+#else
+            socklen_t
+#endif
+                remoteAddrLen = sizeof(remoteAddr);
+
+            /* `toSocket`/`fromSocket` are identities on Unix and the
+               `SOCKET`/`HANDLE` reinterpretation on Windows. `fromSocket` is
+               the inverse of `toSocket`; `toDescriptor` is *not*, despite the
+               name — it takes a CRT file descriptor and calls
+               `_get_osfhandle`, so handing it an accepted `SOCKET` yields
+               `INVALID_HANDLE_VALUE`. */
+            AutoCloseFD remote =
+                fromSocket(accept(toSocket(daemonSocket.get()), (struct sockaddr *) &remoteAddr, &remoteAddrLen));
+            if (!remote) {
+                /* Build the error without throwing it, so the classification
+                   below is shared. Winsock reports through `WSAGetLastError`,
+                   which writes the same thread-local slot `GetLastError` reads,
+                   so `windows::WinError`'s default capture picks it up. */
+                NativeSysError error{"accepting connection"};
+#ifdef _WIN32
+                /* Still needed: libstdc++ does not fold the Winsock codes into
+                   the generic category, so the `ec()` comparisons below cannot
+                   match them --- `WSAEINTR` is 10004, outside the `ERROR_*`
+                   range that category covers. TODO report upstream; once fixed,
+                   this arm can go. Note `WSAEWOULDBLOCK` is deliberately absent:
+                   the listener is blocking, and the Unix
+                   `resource_unavailable_try_again` case exists only because
+                   `accept` there can return `EAGAIN` on a non-blocking socket. */
+                if (error.lastError == WSAEINTR)
+                    continue;
+                if (error.lastError == WSAEINVAL || error.lastError == WSAECONNABORTED
+                    || error.lastError == WSAENOTSOCK)
+                    break;
+#endif
+                if (error.ec() == std::errc::interrupted || error.ec() == std::errc::resource_unavailable_try_again)
+                    continue;
+                if (error.ec() == std::errc::invalid_argument || error.ec() == std::errc::connection_aborted)
+                    break;
+                /* Thrown as an explicit temporary: `throw error;` is what
+                   `misc-throw-by-value-catch-by-reference` objects to, and the
+                   two are equivalent since `throw` copies regardless. */
+                throw NativeSysError{std::move(error)};
+            }
+
+#ifdef _WIN32
+            /* Sockets are the exception to "Windows handles are not inherited
+               unless marked": `socket` creates an inheritable handle unless
+               given `WSA_FLAG_NO_HANDLE_INHERIT`, and an accepted socket
+               inherits the listener's properties. Since `spawnBuilder` passes
+               `bInheritHandles = TRUE`, every inheritable handle is duplicated
+               into the child, so without this a concurrent build's builder
+               would receive this build's live connection to its restricted
+               store --- and would keep the endpoint alive after we close it. */
+            if (!SetHandleInformation(remote.get(), HANDLE_FLAG_INHERIT, 0))
+                throw windows::WinError("making daemon connection non-inheritable");
+#else
+            /* `exec` would otherwise carry the descriptor into the builder. */
+            unix::closeOnExec(remote.get());
+#endif
+
+            debug("received daemon connection");
+
+            auto doneFlag = make_ref<std::atomic_flag>();
+
+            auto workerThread =
+                std::thread([this, doneFlag, storeForDaemon, remote{std::move(remote)}, recursiveFlag]() {
+                    try {
+                        miscMethods->processDaemonConnection(
+                            storeForDaemon, FdSource(remote.get()), FdSink(remote.get()), *this, recursiveFlag);
+                        debug("terminated daemon connection");
+                    } catch (const Interrupted &) {
+                        debug("interrupted daemon connection");
+                    } catch (...) {
+                        /* Swallow all exceptions to avoid crashing the the process (exceptions that escape from the
+                         * thread trigger std::terminate()). */
+                        ignoreExceptionExceptInterrupt();
+                    }
+
+                    doneFlag->test_and_set(std::memory_order_relaxed);
+                });
+
+            daemonWorkerThreads.push_back(
+                DaemonWorkerState{
+                    .thread = std::move(workerThread),
+                    .done = std::move(doneFlag),
+                });
+
+            /* Prune threads eagerly to free up resources. Ideally we'd also limit the number of concurrent workers. */
+            for (auto it = daemonWorkerThreads.begin(), end = daemonWorkerThreads.end(); it != end;) {
+                auto & state = *it;
+                auto & thread = state.thread;
+                if (state.done->test(std::memory_order_relaxed) && thread.joinable()) {
+                    thread.join();
+                    it = daemonWorkerThreads.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+
+        debug("daemon shutting down");
+    });
+}
+
+void DerivationBuilderImpl::stopDaemon()
+{
+#ifdef _WIN32
+    if (daemonSocket && ::shutdown(toSocket(daemonSocket.get()), SD_BOTH) == SOCKET_ERROR) {
+        if (WSAGetLastError() == WSAENOTCONN) {
+            daemonSocket.close();
+        } else {
+            throw windows::WinError("shutting down daemon socket");
+        }
+    }
+#else
+    if (daemonSocket && shutdown(daemonSocket.get(), SHUT_RDWR) == -1) {
+        // According to the POSIX standard, the 'shutdown' function should
+        // return an ENOTCONN error when attempting to shut down a socket that
+        // hasn't been connected yet. This situation occurs when the 'accept'
+        // function is called on a socket without any accepted connections,
+        // leaving the socket unconnected. While Linux doesn't seem to produce
+        // an error for sockets that have only been accepted, more
+        // POSIX-compliant operating systems like OpenBSD, macOS, and others do
+        // return the ENOTCONN error. Therefore, we handle this error here to
+        // avoid raising an exception for compliant behaviour.
+        if (errno == ENOTCONN) {
+            daemonSocket.close();
+        } else {
+            throw SysError("shutting down daemon socket");
+        }
+    }
+#endif
+
+    if (daemonThread.joinable())
+        daemonThread.join();
+
+    for (auto & [thread, doneFlag] : daemonWorkerThreads)
+        thread.join();
+    daemonWorkerThreads.clear();
+
+    // release the socket.
+    daemonSocket.close();
+}
+
+void DerivationBuilderImpl::submitOutput(const SingleDerivedPath & path, const OutputName & output)
+{
+    auto submittedOutputs(this->submittedOutputs.lock());
+
+    auto * opaque = std::get_if<SingleDerivedPath::Opaque>(&path.raw());
+    if (!opaque)
+        throw Error(
+            "Attempted to submit Built path '%s' for output '%s'.\n"
+            " Only Opaque paths are supported, see https://github.com/NixOS/nix/issues/12727",
+            path.to_string(*store),
+            output);
+
+    if (submittedOutputs->contains(output))
+        throw Error(
+            "Attempted to submit duplicate output '%s' (old '%s', new '%s')",
+            output,
+            store->printStorePath(*get(*submittedOutputs, output)),
+            store->printStorePath(opaque->path));
+
+    submittedOutputs->insert_or_assign(output, opaque->path);
 }
 
 } // namespace nix
