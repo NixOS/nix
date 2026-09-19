@@ -364,6 +364,49 @@ void BaseSetting<SandboxMode>::convertToArg(Args & args, const std::string & cat
     });
 }
 
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    SandboxNetworkMode,
+    {
+        {SandboxNetworkMode::snmNone, "none"},
+        {SandboxNetworkMode::snmWfp, "wfp"},
+        {SandboxNetworkMode::snmContainer, "container"},
+    });
+
+template<>
+SandboxNetworkMode BaseSetting<SandboxNetworkMode>::parse(const std::string & str) const
+{
+    if (str == "none")
+        return snmNone;
+    else if (str == "wfp")
+        return snmWfp;
+    else if (str == "container")
+        return snmContainer;
+    else
+        throw UsageError("option '%s' has invalid value '%s'", name, str);
+}
+
+template<>
+struct BaseSetting<SandboxNetworkMode>::trait
+{
+    static constexpr bool appendable = false;
+};
+
+template<>
+std::string BaseSetting<SandboxNetworkMode>::to_string() const
+{
+    if (value == snmNone)
+        return "none";
+    else if (value == snmWfp)
+        return "wfp";
+    else if (value == snmContainer)
+        return "container";
+    else
+        unreachable();
+}
+
+/* Deliberately no `convertToArg` specialization: unlike `sandbox`, this is not
+   boolean-ish, so the generic `--sandbox-network <mode>` flag is the right shape. */
+
 void to_json(nlohmann::json & j, const ChrootPath & cp)
 {
     j = nlohmann::json{{"source", cp.source.string()}, {"optional", cp.optional}};
