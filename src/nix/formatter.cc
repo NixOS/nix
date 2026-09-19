@@ -1,6 +1,5 @@
 #include "nix/cmd/command.hh"
 #include "nix/cmd/installable-flake.hh"
-#include "nix/cmd/installable-value.hh"
 #include "nix/expr/eval.hh"
 #include "nix/util/environment-variables.hh"
 #include "nix/store/globals.hh"
@@ -30,16 +29,19 @@ struct CmdFormatter : NixMultiCommand
 static auto rCmdFormatter = registerCommand<CmdFormatter>("formatter");
 
 /** Common implementation bits for the `nix formatter` subcommands. */
-struct MixFormatter : SourceExprCommand
+struct MixFormatter : MixFlakeOptions
 {
-    Strings getDefaultFlakeAttrPaths() override
+    InstallableFlake getFormatter()
     {
-        return Strings{"formatter." + settings.thisSystem.get()};
-    }
-
-    Strings getDefaultFlakeAttrPathPrefixes() override
-    {
-        return Strings{};
+        return InstallableFlake(
+            this,
+            getEvalState(),
+            parseFlakeRef(".", absPath(getCommandBaseDir())),
+            "",
+            ExtendedOutputsSpec::Default(),
+            {"formatter." + settings.thisSystem.get()},
+            {},
+            lockFlags);
     }
 };
 
@@ -74,11 +76,10 @@ struct CmdFormatterRun : MixFormatter, MixJSON
         auto evalState = getEvalState();
         auto evalStore = getEvalStore();
 
-        auto installable_ = parseInstallable(store, ".").cast<InstallableFlake>();
-        auto & installable = InstallableValue::require(*installable_);
+        auto installable = getFormatter();
         auto app = installable.toApp(*evalState).resolve(evalStore, store);
 
-        auto maybeFlakeDir = installable_->flakeRef.input.getSourcePath();
+        auto maybeFlakeDir = installable.flakeRef.input.getSourcePath();
         assert(maybeFlakeDir.has_value());
         auto flakeDir = maybeFlakeDir.value();
 
@@ -136,8 +137,7 @@ struct CmdFormatterBuild : MixFormatter, MixOutLinkByDefault
         auto evalState = getEvalState();
         auto evalStore = getEvalStore();
 
-        auto installable_ = parseInstallable(store, ".");
-        auto & installable = InstallableValue::require(*installable_);
+        auto installable = getFormatter();
         auto unresolvedApp = installable.toApp(*evalState);
         auto app = unresolvedApp.resolve(evalStore, store);
         auto buildables = unresolvedApp.build(evalStore, store);
