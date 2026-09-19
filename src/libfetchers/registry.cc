@@ -5,6 +5,7 @@
 #include "nix/util/users.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
+#include "nix/util/memory-source-accessor.hh"
 
 #include <nlohmann/json.hpp>
 
@@ -74,7 +75,8 @@ void Registry::write(const std::filesystem::path & path)
     json["version"] = 2;
     json["flakes"] = std::move(arr);
 
-    createDirs(path.parent_path());
+    if (path.has_parent_path())
+        createDirs(path.parent_path());
     writeFile(path, json.dump(2));
 }
 
@@ -120,9 +122,21 @@ std::shared_ptr<Registry> getUserRegistry(const Settings & settings)
 
 std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std::filesystem::path & p)
 {
-    static auto customRegistry = Registry::read(
-        settings, SourcePath{getFSSourceAccessor(), CanonPath{p.string()}}.resolveSymlinks(), Registry::Custom);
-    return customRegistry;
+    if (!maybeStat(p))
+        return std::make_shared<Registry>(Registry::Custom);
+
+    try {
+        auto accessor = make_ref<MemorySourceAccessor>();
+        auto displayPrefix = p.has_parent_path() ? p.parent_path().generic_string() : ".";
+        if (displayPrefix.ends_with('/'))
+            displayPrefix.pop_back();
+        accessor->setPathDisplay(std::move(displayPrefix));
+        auto path = accessor->addFile(CanonPath{p.filename().generic_string()}, nix::readFile(p));
+        return Registry::read(settings, path, Registry::Custom);
+    } catch (Error & e) {
+        warn("cannot read flake registry '%s': %s", p.string(), e.what());
+        return std::make_shared<Registry>(Registry::Custom);
+    }
 }
 
 std::shared_ptr<Registry> getFlagRegistry()

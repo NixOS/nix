@@ -51,6 +51,7 @@ sources = files(
   'merkle-tar-adapter.cc',
   'nix_api_fetchers.cc',
   'public-key.cc',
+  'registry.cc',
 )
 
 include_dirs = [ include_directories('.') ]
