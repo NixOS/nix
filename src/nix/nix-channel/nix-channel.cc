@@ -188,7 +188,7 @@ static void update(const StringSet & channelNames)
     PosixStat st;
     if (lstat(nixDefExpr.c_str(), &st) == 0) {
         if (S_ISLNK(st.st_mode))
-            // old-skool ~/.nix-defexpr
+            // old-school ~/.nix-defexpr
             unlink(nixDefExpr);
     } else if (errno != ENOENT) {
         throw SysError("getting status of %1%", PathFmt(nixDefExpr));

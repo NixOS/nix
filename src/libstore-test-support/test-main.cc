@@ -7,7 +7,7 @@
 
 namespace nix {
 
-int testMainForBuidingPre(int argc, char ** argv)
+int testMainForBuildingPre(int argc, char ** argv)
 {
     if (argc > 1 && std::string_view(argv[1]) == "__build-remote") {
         printError("test-build-remote: not supported in libexpr unit tests");
