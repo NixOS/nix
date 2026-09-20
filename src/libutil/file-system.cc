@@ -519,9 +519,7 @@ createTempFile(const std::filesystem::path & root, const std::filesystem::path &
 
     if (!fd)
         throw SysError("creating temporary file '%s'", tmpl);
-#ifndef _WIN32
-    unix::closeOnExec(fd.get());
-#endif
+    closeOnExec(fd.get());
     return {std::move(fd), std::filesystem::path(std::move(tmpl))};
 }
 

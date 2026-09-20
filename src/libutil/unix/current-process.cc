@@ -29,9 +29,11 @@ size_t unix::savedStackSize = 0;
 
 void ensureStackSizeAtLeast(size_t stackSize)
 {
+    using namespace nix::unix;
+
     struct rlimit limit;
     if (getrlimit(RLIMIT_STACK, &limit) == 0 && static_cast<size_t>(limit.rlim_cur) < stackSize) {
-        unix::savedStackSize = limit.rlim_cur;
+        savedStackSize = limit.rlim_cur;
         if (limit.rlim_max < static_cast<rlim_t>(stackSize)) {
             if (getEnv("_NIX_TEST_NO_ENVIRONMENT_WARNINGS") != "1") {
                 logger->log(

@@ -14,16 +14,11 @@ namespace nix {
 
 namespace {
 
-/** Like `windows/processes.cc`'s version, which is file-local rather than exported. */
-void setInheritable(AutoCloseFD & fd, bool inherit)
-{
-    if (!SetHandleInformation(fd.get(), HANDLE_FLAG_INHERIT, inherit ? HANDLE_FLAG_INHERIT : 0))
-        throw windows::WinError("cannot change handle inheritability");
-}
-
 /** The builder's stdin. */
 AutoCloseFD openNullDevice()
 {
+    using namespace nix::windows;
+
     SECURITY_ATTRIBUTES sa{
         .nLength = sizeof(SECURITY_ATTRIBUTES),
         .lpSecurityDescriptor = nullptr,
@@ -32,7 +27,7 @@ AutoCloseFD openNullDevice()
     AutoCloseFD fd = CreateFileW(
         L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (!fd)
-        throw windows::WinError("cannot open NUL device for the builder's stdin");
+        throw WinError("cannot open NUL device for the builder's stdin");
     return fd;
 }
 
@@ -237,9 +232,11 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
 
 void WindowsDerivationBuilderImpl::spawnBuilder()
 {
+    using namespace nix::windows;
+
     /* The child must not inherit the side we read from. */
-    setInheritable(builderPipe.readSide, false);
-    setInheritable(builderPipe.writeSide, true);
+    setHandleInheritability(builderPipe.readSide.get(), false);
+    setHandleInheritability(builderPipe.writeSide.get(), true);
 
     AutoCloseFD stdIn = openNullDevice();
 
@@ -273,7 +270,7 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
             &startInfo,
             &procInfo)
         == 0)
-        throw windows::WinError("CreateProcessW failed for builder '%s'", drv.builder);
+        throw WinError("CreateProcessW failed for builder '%s'", drv.builder);
 
     /* Held locally until the child is fully set up, so that the failure paths
        below can tear it down without `Pid` also doing so. */
@@ -285,15 +282,15 @@ void WindowsDerivationBuilderImpl::spawnBuilder()
     Descriptor job = CreateJobObjectW(NULL, NULL);
     if (job == NULL) {
         TerminateProcess(processHandle.get(), 1);
-        throw windows::WinError("cannot create job object for builder");
+        throw WinError("cannot create job object for builder");
     }
     if (AssignProcessToJobObject(job, processHandle.get()) == FALSE) {
         TerminateProcess(processHandle.get(), 1);
-        throw windows::WinError("cannot assign builder to job object");
+        throw WinError("cannot assign builder to job object");
     }
     if (ResumeThread(thread.get()) == (DWORD) -1) {
         TerminateProcess(processHandle.get(), 1);
-        throw windows::WinError("cannot resume builder");
+        throw WinError("cannot resume builder");
     }
 
     pid = std::move(processHandle);

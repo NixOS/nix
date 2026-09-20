@@ -62,12 +62,14 @@ Pid::operator bool() const noexcept
 
 int Pid::kill(bool allowInterrupts)
 {
+    using namespace nix::windows;
+
     assert(pid.get() != INVALID_DESCRIPTOR);
 
     debug("killing process %1%", pid.get());
 
     if (!TerminateProcess(pid.get(), 1))
-        logError(windows::WinError("terminating process %1%", pid.get()).info());
+        logError(WinError("terminating process %1%", pid.get()).info());
 
     return wait(allowInterrupts);
 }
@@ -76,14 +78,16 @@ int Pid::kill(bool allowInterrupts)
 // Unix.
 int Pid::wait(bool allowInterrupts)
 {
+    using namespace nix::windows;
+
     assert(pid.get() != INVALID_DESCRIPTOR);
     DWORD status = WaitForSingleObject(pid.get(), INFINITE);
     if (status != WAIT_OBJECT_0)
-        throw windows::WinError("waiting for process %1%", pid.get());
+        throw WinError("waiting for process %1%", pid.get());
 
     DWORD exitCode = 0;
     if (GetExitCodeProcess(pid.get(), &exitCode) == FALSE)
-        throw windows::WinError("getting exit code of process %1%", pid.get());
+        throw WinError("getting exit code of process %1%", pid.get());
 
     pid.close();
     return exitCode;
@@ -119,18 +123,10 @@ std::optional<std::filesystem::path> getProgramInterpreter(const std::filesystem
     throw UnimplementedError("getProgramInterpreter unimplemented");
 }
 
-// TODO: Not sure if this is needed in the unix version but it might be useful as a member func
-void setFDInheritable(AutoCloseFD & fd, bool inherit)
-{
-    if (fd.get() != INVALID_DESCRIPTOR) {
-        if (!SetHandleInformation(fd.get(), HANDLE_FLAG_INHERIT, inherit ? HANDLE_FLAG_INHERIT : 0)) {
-            throw windows::WinError("Couldn't disable inheriting of handle");
-        }
-    }
-}
-
 AutoCloseFD nullFD()
 {
+    using namespace nix::windows;
+
     // Create null handle to discard reads / writes
     // https://stackoverflow.com/a/25609668
     // https://github.com/nix-windows/nix/blob/windows-meson/src/libutil/util.cc#L2228
@@ -143,11 +139,11 @@ AutoCloseFD nullFD()
         OPEN_EXISTING,
         0,
         NULL);
-    if (!nul.get()) {
-        throw windows::WinError("Couldn't open NUL device");
+    if (!nul) {
+        throw WinError("Couldn't open NUL device");
     }
     // Let this handle be inheritable by child processes
-    setFDInheritable(nul, true);
+    setHandleInheritability(nul.get(), true);
     return nul;
 }
 
@@ -199,10 +195,12 @@ OsString windowsEscape(const OsString & str, bool cmd)
 
 Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & options, Pipe & out)
 {
+    using namespace nix::windows;
+
     // Setup pipes.
     if (options.standardOut) {
         // Don't inherit the read end of the output pipe
-        setFDInheritable(out.readSide, false);
+        setHandleInheritability(out.readSide.get(), false);
     } else {
         out.writeSide = nullFD();
     }
@@ -252,7 +250,7 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
             &startInfo,
             &procInfo)
         == 0) {
-        throw windows::WinError("CreateProcessW failed (%1%)", os_string_to_string(cmdline));
+        throw WinError("CreateProcessW failed (%1%)", os_string_to_string(cmdline));
     }
 
     // Convert these to use RAII
@@ -265,15 +263,15 @@ Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & o
     Descriptor job = CreateJobObjectW(NULL, NULL);
     if (job == NULL) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw windows::WinError("Couldn't create job object for child process");
+        throw WinError("Couldn't create job object for child process");
     }
     if (AssignProcessToJobObject(job, procInfo.hProcess) == FALSE) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw windows::WinError("Couldn't assign child process to job object");
+        throw WinError("Couldn't assign child process to job object");
     }
     if (ResumeThread(procInfo.hThread) == (DWORD) -1) {
         TerminateProcess(procInfo.hProcess, 0);
-        throw windows::WinError("Couldn't resume child process thread");
+        throw WinError("Couldn't resume child process thread");
     }
 
     return process;

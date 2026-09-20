@@ -10,12 +10,14 @@ namespace nix {
 
 TEST(closeExtraFDs, works)
 {
+    using namespace nix::unix;
+
     Pipe pipe;
     pipe.create();
     Pid pid = startProcess([&]() {
-        unix::closeExtraFDs();
+        closeExtraFDs();
 
-        /* File descriptors should already be closed by unix::closeExtraFDs(). */
+        /* File descriptors should already be closed by `closeExtraFDs`. */
         for (int fd : {pipe.readSide.get(), pipe.writeSide.get()}) {
             if (::close(fd) == 0 || errno != EBADF)
                 _exit(1);

@@ -73,7 +73,7 @@ Pid::operator pid_t() const
 
 Pid::operator bool() const noexcept
 {
-    using namespace unix;
+    using namespace nix::unix;
 
     return pid != INVALID_PID;
 }
@@ -123,7 +123,7 @@ int Pid::kill(bool allowInterrupts)
 
 int Pid::wait(bool allowInterrupts)
 {
-    using namespace unix;
+    using namespace nix::unix;
 
     assert(pid != INVALID_PID);
     while (1) {
@@ -157,7 +157,7 @@ void Pid::setKillTimeout(std::chrono::milliseconds duration)
 
 pid_t Pid::release()
 {
-    using namespace unix;
+    using namespace nix::unix;
 
     pid_t p = pid;
     /* We use the move assignment operator rather than setting the individual fields so we aren't duplicating the
@@ -239,7 +239,7 @@ static int childEntry(void * arg)
 
 pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 {
-    using namespace unix;
+    using namespace nix::unix;
 
     auto newLogger = makeSimpleLogger().release();
     ChildWrapperFunction wrapper = [&] {
