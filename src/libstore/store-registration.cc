@@ -134,11 +134,11 @@ std::list<ref<Store>> getDefaultSubstituters()
            With that, this becomes: queue them all, then block on them
            all. */
         std::vector<std::shared_ptr<Store>> opened(refs.size());
-        ThreadPool pool;
+        ThreadPool pool{refs.size()};
         for (size_t i = 0; i < refs.size(); ++i)
-            pool.enqueue([&, i]() {
+            pool.enqueue([&storeSlot = opened[i], &storeRef = refs[i]]() {
                 try {
-                    opened[i] = openStore(StoreReference{refs[i]}).get_ptr();
+                    storeSlot = openStore(StoreReference{storeRef}).get_ptr();
                 } catch (Error & e) {
                     logWarning(e.info());
                 }
