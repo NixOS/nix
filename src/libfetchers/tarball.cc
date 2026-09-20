@@ -191,12 +191,16 @@ static DownloadTarballResult downloadTarball_(
     auto tarballCache = settings.getTarballCache();
     auto writerPool = settings.getTarballWriterPool();
     auto parseSink = merkle::makeTarSink(*writerPool);
-    auto lastModified = unpackTarfileToSink(archive, *parseSink);
+    auto unpacked = unpackTarfileToSink(archive, *parseSink);
     auto tree = parseSink->flush();
 
     act.reset();
 
     auto res(_res->lock());
+
+    auto lastModified = unpacked.lastModified;
+    if (res->lastModified && (unpacked.localTimestamps || lastModified == 0))
+        lastModified = *res->lastModified;
 
     Attrs infoAttrs;
 

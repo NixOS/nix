@@ -610,6 +610,7 @@ struct curlFileTransfer : public FileTransfer
 
             curl_easy_setopt(req, CURLOPT_FOLLOWLOCATION, 1L);
             curl_easy_setopt(req, CURLOPT_MAXREDIRS, 10);
+            curl_easy_setopt(req, CURLOPT_FILETIME, 1L);
             curl_easy_setopt(req, CURLOPT_NOSIGNAL, 1);
             curl_easy_setopt(
                 req,
@@ -867,6 +868,9 @@ struct curlFileTransfer : public FileTransfer
 
             else if (code == CURLE_OK && successfulStatuses.count(httpStatus)) {
                 result.cached = (httpStatus == HttpStatus::NotModified);
+                curl_off_t fileTime = -1;
+                if (curl_easy_getinfo(req, CURLINFO_FILETIME_T, &fileTime) == CURLE_OK && fileTime >= 0)
+                    result.lastModified = (time_t) fileTime;
                 curl_off_t dlSize = 0;
                 curl_easy_getinfo(req, CURLINFO_SIZE_DOWNLOAD_T, &dlSize);
                 act().progress(dlSize, dlSize);
