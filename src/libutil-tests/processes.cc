@@ -40,6 +40,36 @@ TEST(runProgram, worksTrivial)
     }
 }
 
+TEST(runProgram2, mergeStderrToStdout)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+
+    for (bool mergeStdoutToStderr : {false, true}) {
+        ::testing::internal::CaptureStdout();
+        ::testing::internal::CaptureStderr();
+
+        auto [status, output] = runProgram({
+            .spawnOptions =
+                {
+                    .program = *self,
+                    .args = {OS_STR("__util_test_spawn_write_to_stdout_and_stderr")},
+                },
+            .mergeStderrToStdout = mergeStdoutToStderr,
+        });
+
+        ASSERT_TRUE(statusOk(status));
+        ASSERT_THAT(output, ::testing::HasSubstr("hi"));
+        ASSERT_EQ(::testing::internal::GetCapturedStdout(), "");
+        auto capturedErr = ::testing::internal::GetCapturedStderr();
+        if (mergeStdoutToStderr)
+            ASSERT_THAT(output, ::testing::HasSubstr("there"));
+        else
+            /* Otherwise stderr is inherited. */
+            ASSERT_THAT(capturedErr, ::testing::HasSubstr("there"));
+    }
+}
+
 #ifdef _WIN32
 #  define NIX_EXECUTABLE_EXTENSION ".exe"
 /* FIXME: runProgram reports spawn errors as WinError, while other
