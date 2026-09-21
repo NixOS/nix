@@ -164,8 +164,41 @@ struct RunOptions
     bool isInteractive = false;
 };
 
+struct FdRedirection
+{
+    Descriptor from, to;
+
+#ifdef _WIN32
+    /* These are just dummy values to represent distinct file descriptors one might want
+       to redirect. On Windows we'll do equality checks on the "from"/"to" to implement
+       the same dup housekeeping semantics as on POSIX. */
+    static inline const Descriptor stdInput = reinterpret_cast<HANDLE>(static_cast<LONG_PTR>(STD_INPUT_HANDLE));
+    static inline const Descriptor stdOut = reinterpret_cast<HANDLE>(static_cast<LONG_PTR>(STD_OUTPUT_HANDLE));
+    static inline const Descriptor stdError = reinterpret_cast<HANDLE>(static_cast<LONG_PTR>(STD_ERROR_HANDLE));
+#else
+    static constexpr Descriptor stdInput = STDIN_FILENO;
+    static constexpr Descriptor stdOut = STDOUT_FILENO;
+    static constexpr Descriptor stdError = STDERR_FILENO;
+#endif
+};
+
 // Output = error code + "standard out" output stream
 std::pair<int, std::string> runProgram(RunOptions && options);
+
+/**
+ * @brief Spawn a program as a subprocess.
+ *
+ * @return Pid of the spawned process.
+ * @throws SysError if fork() or vfork() fail in the parent, ExecError if
+ * housekeeping fails with status code 1.
+ * @todo Maybe align with posix_spawn and report 127 on housekeeping errors?
+ *
+ * @param fdr Unless specified, standard in, out and error are inherited.
+ * Redirections are applied in the same order in the child housekeeping.
+ * It's the callers responsibility to ensure that the redirected file descriptors
+ * are inheritable.
+ */
+Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr);
 
 void runProgram2(const RunOptions & options);
 

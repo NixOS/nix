@@ -298,32 +298,24 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 
 #ifndef __linux__
 
-void runProgram2(const RunOptions & runOptions)
+Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fdr)
 {
-    checkInterrupt();
-
-    const auto & options = runOptions.spawnOptions;
-
-    /* Create a pipe. */
-    Pipe out;
-    if (runOptions.standardOut)
-        out.create();
-
-    ProcessOptions processOptions;
-
-    auto suspension = logger->suspendIf(runOptions.isInteractive);
-
-    /* Fork. */
-    Pid pid = startProcess(
+    return startProcess(
         [&] {
             if (options.environment)
                 replaceEnv(*options.environment);
-            if (runOptions.standardOut && dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("dupping stdout");
-            if (runOptions.mergeStderrToStdout)
-                if (dup2(STDOUT_FILENO, STDERR_FILENO) == -1)
-                    throw SysError("cannot dup stdout into stderr");
 
+            std::vector<Descriptor> keepExtraFDs;
+            for (const auto & [from, to] : fdr) {
+                /* dup2 does nothing when from == to, but we still need to clear the CLOEXEC flag. */
+                if (from == to) {
+                    if (int prev = ::fcntl(from, F_GETFD);
+                        prev == -1 || ::fcntl(from, F_SETFD, prev & ~FD_CLOEXEC) == -1)
+                        throw SysError("clearing FD_CLOEXEC");
+                } else if (::dup2(from, to) == -1)
+                    throw SysError("dupping fd %d -> %d", from, to);
+                keepExtraFDs.push_back(to);
+            }
             if (options.chdir && chdir((*options.chdir).c_str()) == -1)
                 throw SysError("chdir failed");
             if (options.gid && setgid(*options.gid) == -1)
@@ -345,7 +337,7 @@ void runProgram2(const RunOptions & runOptions)
                the FDs before or after restoreProcessContext(), but on Linux
                it's crucial that it happens *after* restoreProcessContext() call
                because that re-enters the saved mountns. */
-            unix::closeExtraFDs();
+            unix::closeExtraFDs(keepExtraFDs);
 
             if (options.lookupPath)
                 execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
@@ -356,20 +348,10 @@ void runProgram2(const RunOptions & runOptions)
 
             throw SysError("executing %s", PathFmt(options.program));
         },
-        processOptions);
-
-    out.writeSide.close();
-
-    if (runOptions.standardOut)
-        drainFD(out.readSide.get(), *runOptions.standardOut);
-
-    /* Wait for the child to finish. */
-    int status = pid.wait();
-    if (status)
-        throw ExecError(status, "program %1% %2%", PathFmt(options.program), statusToString(status));
+        {});
 }
 
-#endif // __linux__
+#endif
 
 //////////////////////////////////////////////////////////////////////
 
