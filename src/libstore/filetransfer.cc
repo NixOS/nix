@@ -536,11 +536,19 @@ struct curlFileTransfer : public FileTransfer
             return ((TransferItem *) userp)->readCallback(buffer, size, nitems);
         }
 
-        static int cloexec_callback(void *, curl_socket_t curlfd, curlsocktype purpose)
-        {
+        int cloexecCallback(curl_socket_t curlfd, curlsocktype purpose) noexcept
+        try {
             closeOnExec(fromSocket(curlfd));
             vomit("cloexec set for fd %i", curlfd);
             return CURL_SOCKOPT_OK;
+        } catch (...) {
+            callbackException = std::current_exception();
+            return CURL_SOCKOPT_ERROR;
+        }
+
+        static int cloexecCallbackWrapper(void * clientp, curl_socket_t curlfd, curlsocktype purpose) noexcept
+        {
+            return ((TransferItem *) clientp)->cloexecCallback(curlfd, purpose);
         }
 
         size_t seekCallback(curl_off_t offset, int origin) noexcept
@@ -677,7 +685,8 @@ struct curlFileTransfer : public FileTransfer
                 curl_easy_setopt(req, CURLOPT_SSL_OPTIONS, CURLSSLOPT_NATIVE_CA);
 #endif
 
-            curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexec_callback);
+            curl_easy_setopt(req, CURLOPT_SOCKOPTFUNCTION, cloexecCallbackWrapper);
+            curl_easy_setopt(req, CURLOPT_SOCKOPTDATA, this);
             curl_easy_setopt(req, CURLOPT_CONNECTTIMEOUT, fileTransfer.settings.connectTimeout.get());
 
             /* Enable TCP keepalive to detect dead connections and server closures.
