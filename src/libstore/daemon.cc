@@ -262,8 +262,10 @@ struct ClientSettings
                         if (trusted.count(ref))
                             return true;
                         if (auto * specified = std::get_if<StoreReference::Specified>(&ref.variant);
-                            specified && !hasSuffix(specified->authority, "/")) {
-                            specified->authority += "/";
+                            specified && !hasSuffix(specified->renderPath(), "/")) {
+                            if (specified->path.empty())
+                                specified->path.emplace_back();
+                            specified->path.emplace_back();
                             if (trusted.count(ref))
                                 return true;
                         }

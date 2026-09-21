@@ -2,6 +2,12 @@
 
 source common.sh
 
+for store in 'ssh:127.0.0.1' 'ssh:localhost' 'ssh-ng:[::1]'; do
+    expectStderr 1 nix store info --store "$store" > "$TEST_ROOT/store-reference-error"
+    grep -Fx "error: Failed to parse store reference: '$store'" "$TEST_ROOT/store-reference-error"
+    expect 1 grep -F 'Store URL:' "$TEST_ROOT/store-reference-error"
+done
+
 # Different versions of the Nix daemon normalize or don't normalize
 # store URLs, plus NIX_REMOTE (per the test suite) might not be using on
 # store URL in normal form, so the easiest thing to do is normalize URLs
