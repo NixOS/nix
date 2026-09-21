@@ -296,25 +296,6 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
     return pid;
 }
 
-std::string runProgram(std::filesystem::path program, bool lookupPath, const OsStrings & args, bool isInteractive)
-{
-    auto res = runProgram(
-        RunOptions{
-            .spawnOptions =
-                {
-                    .program = program,
-                    .lookupPath = lookupPath,
-                    .args = args,
-                },
-            .isInteractive = isInteractive,
-        });
-
-    if (!statusOk(res.first))
-        throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
-
-    return res.second;
-}
-
 #ifndef __linux__
 
 void runProgram2(const RunOptions & runOptions)

@@ -93,26 +93,6 @@ int Pid::wait(bool allowInterrupts)
     return exitCode;
 }
 
-// TODO: Merge this with Unix's runProgram since it's identical logic.
-std::string runProgram(std::filesystem::path program, bool lookupPath, const OsStrings & args, bool isInteractive)
-{
-    auto res = runProgram(
-        RunOptions{
-            .spawnOptions =
-                {
-                    .program = program,
-                    .lookupPath = lookupPath,
-                    .args = args,
-                },
-            .isInteractive = isInteractive,
-        });
-
-    if (!statusOk(res.first))
-        throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
-
-    return res.second;
-}
-
 std::optional<std::filesystem::path> getProgramInterpreter(const std::filesystem::path & program)
 {
     // These extensions are automatically handled by Windows and don't require an interpreter.

@@ -27,4 +27,23 @@ std::pair<int, std::string> runProgram(RunOptions && options)
     return {status, std::move(sink.s)};
 }
 
+std::string runProgram(std::filesystem::path program, bool lookupPath, const OsStrings & args, bool isInteractive)
+{
+    auto res = runProgram(
+        RunOptions{
+            .spawnOptions =
+                {
+                    .program = program,
+                    .lookupPath = lookupPath,
+                    .args = args,
+                },
+            .isInteractive = isInteractive,
+        });
+
+    if (!statusOk(res.first))
+        throw ExecError(res.first, "program %s %s", PathFmt(program), statusToString(res.first));
+
+    return res.second;
+}
+
 } // namespace nix
