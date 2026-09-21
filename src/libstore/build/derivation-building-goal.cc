@@ -1085,8 +1085,8 @@ Goal::Co DerivationBuildingGoal::buildLocally(
         if (worker.settings.postBuildHook.get() != "") {
 #ifdef _WIN32
             /* Nothing here needs `fork`: the child only sets the environment,
-               redirects stdout/stderr and execs, which `spawnProcess` already
-               does. What is missing is that `spawnProcess` is not exported,
+               redirects stdout/stderr and execs, which `spawnProgram` already
+               does. What is missing is that `spawnProgram` is not exported,
                and that the worker needs an `AsyncPipe` tied to the completion
                port rather than the plain `Pipe` this produces. Throw rather
                than silently skip the hook. */

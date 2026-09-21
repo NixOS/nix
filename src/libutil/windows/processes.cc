@@ -176,7 +176,7 @@ OsString windowsEscape(const OsString & str, bool cmd)
     return buffer + L'"';
 }
 
-Pid spawnProcess(const std::filesystem::path & realProgram, const RunOptions & runOptions, Pipe & out)
+Pid spawnProgram(const std::filesystem::path & realProgram, const RunOptions & runOptions, Pipe & out)
 {
     using namespace nix::windows;
 
@@ -272,7 +272,7 @@ void runProgram2(const RunOptions & runOptions)
 
     /* Create a pipe. */
     Pipe out;
-    // TODO: I copied this from unix but this is handled again in spawnProcess, so might be weird to split it up like
+    // TODO: I copied this from unix but this is handled again in spawnProgram, so might be weird to split it up like
     // this
     if (runOptions.standardOut)
         out.create();
@@ -283,7 +283,7 @@ void runProgram2(const RunOptions & runOptions)
 
     auto suspension = logger->suspendIf(runOptions.isInteractive);
 
-    Pid pid = spawnProcess(interpreter.has_value() ? *interpreter : realProgram, runOptions, out);
+    Pid pid = spawnProgram(interpreter.has_value() ? *interpreter : realProgram, runOptions, out);
 
     // TODO: This is identical to unix, deduplicate?
     out.writeSide.close();
