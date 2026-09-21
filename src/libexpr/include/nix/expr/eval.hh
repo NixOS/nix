@@ -512,7 +512,7 @@ private:
         Value *,
         std::hash<SourcePath>,
         std::equal_to<SourcePath>,
-        traceable_allocator<std::pair<const SourcePath, Value *>>>>
+        gc_root_allocator<std::pair<const SourcePath, Value *>>>>
         fileEvalCache;
 
     /**

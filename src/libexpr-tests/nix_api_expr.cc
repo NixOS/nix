@@ -6,6 +6,8 @@
 #include "nix/expr/tests/nix_api_expr.hh"
 #include "nix/util/tests/string_callback.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/finally.hh"
+#include "nix/expr/tests/gc.hh"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -13,6 +15,45 @@
 #include "expr-tests-config.hh"
 
 namespace nixC {
+
+#if NIX_USE_BOEHMGC
+TEST(nix_api_gc_test, last_decref_releases_root)
+{
+    ASSERT_EQ(NIX_OK, nix_libexpr_init(nullptr));
+
+    auto weak = static_cast<void **>(GC_MALLOC_ATOMIC(sizeof(void *)));
+    ASSERT_NE(nullptr, weak);
+    *weak = nullptr;
+    nix::Finally cleanup([&] {
+        GC_unregister_disappearing_link(weak);
+        GC_FREE(weak);
+    });
+
+    nix::runOnGCThread([&] {
+        auto object = GC_MALLOC(1024);
+        ASSERT_NE(nullptr, object);
+        ASSERT_EQ(NIX_OK, nix_gc_incref(nullptr, object));
+        ASSERT_EQ(NIX_OK, nix_gc_incref(nullptr, object));
+        *weak = object;
+        ASSERT_EQ(GC_SUCCESS, GC_GENERAL_REGISTER_DISAPPEARING_LINK(weak, object));
+        ASSERT_EQ(NIX_OK, nix_gc_decref(nullptr, object));
+    });
+    ASSERT_FALSE(HasFatalFailure());
+
+    nix_gc_now();
+
+    nix::runOnGCThread([&] {
+        ASSERT_NE(nullptr, *weak);
+        ASSERT_EQ(NIX_OK, nix_gc_decref(nullptr, *weak));
+    });
+    ASSERT_FALSE(HasFatalFailure());
+
+    for (int i = 0; i < 3; ++i)
+        nix_gc_now();
+
+    EXPECT_EQ(nullptr, *weak);
+}
+#endif
 
 TEST_F(nix_api_expr_test, nix_eval_state_lookup_path)
 {
