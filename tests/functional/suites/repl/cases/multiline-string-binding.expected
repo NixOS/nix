@@ -7,3 +7,16 @@ nix-repl> x = ''
 
 nix-repl> x
 "hello\n"
+
+nix-repl> x = "hello
+        > world"
+
+nix-repl> x
+"hello\nworld"
+
+nix-repl> x = ''${
+        >   "hello"
+        > }''
+
+nix-repl> x
+"hello"
