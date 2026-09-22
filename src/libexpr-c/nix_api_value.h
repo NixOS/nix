@@ -747,6 +747,19 @@ nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value)
  */
 const char * nix_get_doc_name(nix_doc * doc);
 
+/** @brief Get the number of arguments for documentation
+ * @param[in] doc the documentation object
+ * @return the arguments size
+ */
+size_t nix_get_doc_args_size(nix_doc * doc);
+
+/** @brief Get an argument of documentation by index
+ * @param[in] doc the documentation object
+ * @param[in] index the argument index
+ * @return the argument
+ */
+const char * nix_get_doc_arg_by_idx(nix_doc * doc, size_t index);
+
 /** @brief Get a documentation's content
  * @param[in] doc the documentation object
  * @return the documentation's content

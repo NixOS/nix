@@ -746,6 +746,16 @@ const char * nix_get_doc_name(nix_doc * doc)
     return nullptr;
 }
 
+size_t nix_get_doc_args_size(nix_doc * doc)
+{
+    return doc->doc.args.size();
+}
+
+const char * nix_get_doc_arg_by_idx(nix_doc * doc, size_t index)
+{
+    return strdup(doc->doc.args[index].c_str());
+}
+
 const char * nix_get_doc_content(nix_doc * doc)
 {
     return doc->doc.content;
