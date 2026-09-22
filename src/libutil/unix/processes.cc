@@ -348,7 +348,10 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
 
             throw SysError("executing %s", PathFmt(options.program));
         },
-        {});
+        {
+            /* TODO: This isn't really implemented on non-Linux. */
+            .dieWithParent = options.dieWithParent,
+        });
 }
 
 #endif
