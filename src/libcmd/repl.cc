@@ -641,7 +641,27 @@ ProcessLineResult NixRepl::processLine(std::string line)
                             + "\n\n";
             }
 
-            markdown += stripIndentation(doc->doc);
+            std::ostringstream ss;
+
+            if (doc->name) {
+                ss << "Function ";
+            } else {
+                ss << "Function `" << *doc->name << "`";
+                if (doc->pos)
+                    ss << "\\\n  … ";
+                else
+                    ss << "\\\n";
+            }
+            if (doc->pos) {
+                ss << "defined at " << doc->pos;
+            }
+            if (doc->content[0] != '\0') {
+                ss << "\n\n";
+            }
+
+            ss << doc->content;
+
+            markdown += stripIndentation(ss.view());
 
             logger->cout(trim(renderMarkdownToTerminal(markdown)));
         } else if (fallbackPos) {
