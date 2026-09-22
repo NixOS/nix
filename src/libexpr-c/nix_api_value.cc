@@ -738,6 +738,11 @@ nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value)
     NIXC_CATCH_ERRS_NULL
 }
 
+nix_pos * nix_get_doc_pos(nix_doc * doc)
+{
+    return new nix_pos{.pos = doc->doc.pos};
+}
+
 const char * nix_get_doc_name(nix_doc * doc)
 {
     auto name = doc->doc.name;

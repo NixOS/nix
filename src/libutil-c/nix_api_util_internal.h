@@ -5,6 +5,7 @@
 #include <optional>
 
 #include "nix/util/error.hh"
+#include "nix/util/position.hh"
 #include "nix_api_util.h"
 
 extern "C" {
@@ -48,6 +49,11 @@ nix_err call_nix_get_string_callback(const std::string_view str, nix_get_string_
         return def;                 \
     }
 #define NIXC_CATCH_ERRS_NULL NIXC_CATCH_ERRS_RES(nullptr)
+
+struct nix_pos
+{
+    nix::Pos pos;
+};
 
 } // extern "C"
 

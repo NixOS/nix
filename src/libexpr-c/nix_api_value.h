@@ -108,6 +108,7 @@ typedef enum {
 typedef struct nix_value nix_value;
 typedef struct EvalState EvalState;
 typedef struct nix_doc nix_doc;
+typedef struct nix_pos nix_pos;
 
 /** @deprecated Use nix_value instead */
 [[deprecated("use nix_value instead")]] typedef nix_value Value;
@@ -740,6 +741,12 @@ void nix_realised_string_free(nix_realised_string * realised_string);
  */
 nix_doc *
 nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value);
+
+/** @brief Get a documented function's position
+ * @param[in] doc the function's documentation
+ * @return the position object
+ */
+nix_pos * nix_get_doc_pos(nix_doc * doc);
 
 /** @brief Get a documentation's name
  * @param[in] doc the documentation object
