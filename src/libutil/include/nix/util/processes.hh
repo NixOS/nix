@@ -154,6 +154,8 @@ struct SpawnOptions
 #endif
     std::optional<std::filesystem::path> chdir;
     std::optional<OsStringMap> environment;
+    /** @brief (Linux-only) whether to have the process die when its parent (us) exists. */
+    bool dieWithParent = true;
 };
 
 struct RunOptions

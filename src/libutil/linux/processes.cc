@@ -340,7 +340,7 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
         .setUid = options.uid.has_value(),
         /* The default is not used, but a bit sketchy to leave zero initialised so "nobody". */
         .uid = options.uid.value_or(65534),
-        .dieWithParent = true, /* TODO: Maybe we might want to expose this in RunOptions? */
+        .dieWithParent = options.dieWithParent,
     };
 
     const auto savedErrno = errno;
