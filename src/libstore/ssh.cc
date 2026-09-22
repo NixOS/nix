@@ -6,6 +6,9 @@
 #include "nix/util/exec.hh"
 #include "nix/util/base-n.hh"
 
+#include <array>
+#include <vector>
+
 namespace nix {
 
 static std::string parsePublicHostKey(std::string_view host, std::string_view sshPublicHostKey)
@@ -131,10 +134,10 @@ bool SSHMaster::isMasterRunning()
     return res.first == 0;
 }
 
-Strings createSSHEnv()
+static OsStringMap createSSHEnv()
 {
     // Copy the environment and set SHELL=/bin/sh
-    StringMap env = getEnv();
+    OsStringMap env = getEnvOs();
 
     // SSH will invoke the "user" shell for -oLocalCommand, but that means
     // $SHELL. To keep things simple and avoid potential issues with other
@@ -142,21 +145,13 @@ Strings createSSHEnv()
     // Technically, we don't need that, and we could reinvoke ourselves to print
     // "started". Self-reinvocation is tricky with library consumers, but mostly
     // solved; refer to the development history of nixExePath in libstore/globals.cc.
-    env.insert_or_assign("SHELL", "/bin/sh");
+    env.insert_or_assign(OS_STR("SHELL"), OS_STR("/bin/sh"));
 
-    Strings r;
-    for (auto & [k, v] : env) {
-        r.push_back(k + "=" + v);
-    }
-
-    return r;
+    return env;
 }
 
 std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && command, OsStrings && extraSshArgs)
 {
-#ifdef _WIN32 // TODO re-enable on Windows, once we can fork.
-    throw UnimplementedError("cannot yet SSH on windows because spawning processes is not yet implemented");
-#else
     std::filesystem::path socketPath = startMaster();
 
     Pipe in, out;
@@ -164,52 +159,52 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
     out.create();
 
     auto conn = std::make_unique<Connection>();
-    ProcessOptions options;
-    options.dieWithParent = false;
 
     std::unique_ptr<Logger::Suspension> loggerSuspension;
     if (!fakeSSH && !useMaster) {
         loggerSuspension = std::make_unique<Logger::Suspension>(logger->suspend());
     }
 
-    conn->sshPid = startProcess(
-        [&]() {
-            restoreProcessContext();
+    OsStrings args;
+    std::filesystem::path program;
 
-            close(in.writeSide.get());
-            close(out.readSide.get());
+    if (!fakeSSH) {
+        program = OS_STR("ssh");
+        args = {string_to_os_string(hostnameAndUser), OS_STR("-x")};
+        addCommonSSHOpts(args);
+        if (!socketPath.empty())
+            args.insert(args.end(), {OS_STR("-S"), socketPath.native()});
+        if (verbosity >= lvlChatty)
+            args.push_back(OS_STR("-v"));
+        args.splice(args.end(), std::move(extraSshArgs));
+        args.push_back(OS_STR("--"));
+    } else {
+        program = command.front();
+        command.pop_front();
+    }
 
-            if (dup2(in.readSide.get(), STDIN_FILENO) == -1)
-                throw SysError("duping over stdin");
-            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("duping over stdout");
-            if (logFD != -1 && dup2(logFD, STDERR_FILENO) == -1)
-                throw SysError("duping over stderr");
+    args.splice(args.end(), std::move(command));
 
-            OsStrings args;
+    std::vector<FdRedirection> fdr = {
+        {.from = in.readSide.get(), .to = FdRedirection::stdInput},
+        {.from = out.writeSide.get(), .to = FdRedirection::stdOut},
+    };
 
-            if (!fakeSSH) {
-                args = {"ssh", hostnameAndUser.c_str(), "-x"};
-                addCommonSSHOpts(args);
-                if (!socketPath.empty())
-                    args.insert(args.end(), {"-S", socketPath.string()});
-                if (verbosity >= lvlChatty)
-                    args.push_back("-v");
-                args.splice(args.end(), std::move(extraSshArgs));
-                args.push_back("--");
-            }
+    if (logFD != INVALID_DESCRIPTOR)
+        fdr.push_back({.from = logFD, .to = FdRedirection::stdError});
 
-            args.splice(args.end(), std::move(command));
-            auto env = createSSHEnv();
-            nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
-
-            // could not exec ssh/bash
-            throw SysError("unable to execute '%s'", args.front());
+    conn->sshPid = spawnProgram(
+        {
+            .program = std::move(program),
+            .lookupPath = true,
+            .args = std::move(args),
+            .environment = createSSHEnv(),
+            .dieWithParent = false,
         },
-        options);
+        fdr);
 
-    in.readSide = INVALID_DESCRIPTOR;
-    out.writeSide = INVALID_DESCRIPTOR;
+    in.readSide.close();
+    out.writeSide.close();
 
     // Wait for the SSH connection to be established,
     // So that we don't overwrite the password prompt with our progress bar.
@@ -230,10 +225,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
     conn->in = std::move(in.writeSide);
 
     return conn;
-#endif
 }
-
-#ifndef _WIN32 // TODO re-enable on Windows, once we can fork.
 
 std::filesystem::path SSHMaster::startMaster()
 {
@@ -242,7 +234,7 @@ std::filesystem::path SSHMaster::startMaster()
 
     auto state(state_.lock());
 
-    if (state->sshMaster != INVALID_DESCRIPTOR)
+    if (state->sshMaster)
         return state->socketPath;
 
     state->socketPath = tmpDir->path() / "ssh.sock";
@@ -250,35 +242,35 @@ std::filesystem::path SSHMaster::startMaster()
     Pipe out;
     out.create();
 
-    ProcessOptions options;
-    options.dieWithParent = false;
-
     auto suspension = logger->suspend();
 
     if (isMasterRunning())
         return state->socketPath;
 
-    state->sshMaster = startProcess(
-        [&]() {
-            restoreProcessContext();
+    OsStrings args = {
+        string_to_os_string(hostnameAndUser),
+        OS_STR("-M"),
+        OS_STR("-N"),
+        OS_STR("-S"),
+        state->socketPath.native(),
+    };
+    if (verbosity >= lvlChatty)
+        args.push_back(OS_STR("-v"));
+    addCommonSSHOpts(args);
 
-            close(out.readSide.get());
-
-            if (dup2(out.writeSide.get(), STDOUT_FILENO) == -1)
-                throw SysError("duping over stdout");
-
-            OsStrings args = {"ssh", hostnameAndUser.c_str(), "-M", "-N", "-S", state->socketPath.string()};
-            if (verbosity >= lvlChatty)
-                args.push_back("-v");
-            addCommonSSHOpts(args);
-            auto env = createSSHEnv();
-            nix::execvpe(args.begin()->c_str(), stringsToCharPtrs(args).data(), stringsToCharPtrs(env).data());
-
-            throw SysError("unable to execute '%s'", args.front());
+    state->sshMaster = spawnProgram(
+        {
+            .program = OS_STR("ssh"),
+            .lookupPath = true,
+            .args = std::move(args),
+            .environment = createSSHEnv(),
+            .dieWithParent = false,
         },
-        options);
+        std::to_array<FdRedirection>({
+            {.from = out.writeSide.get(), .to = FdRedirection::stdOut},
+        }));
 
-    out.writeSide = INVALID_DESCRIPTOR;
+    out.writeSide.close();
 
     std::string reply;
     try {
@@ -293,8 +285,6 @@ std::filesystem::path SSHMaster::startMaster()
 
     return state->socketPath;
 }
-
-#endif
 
 void SSHMaster::Connection::trySetBufferSize(size_t size)
 {
