@@ -69,7 +69,6 @@ scope: {
       let
         aws-c-io = pkgs.aws-c-io.overrideAttrs (old: {
           patches = (old.patches or [ ]) ++ [ ./patches/aws-c-io-s2n-darwin.patch ];
-          cmakeFlags = old.cmakeFlags ++ [ "-DAWS_USE_SECITEM=OFF" ];
         });
         aws-c-http = pkgs.aws-c-http.override { inherit aws-c-io; };
         aws-c-auth = pkgs.aws-c-auth.override { inherit aws-c-io aws-c-http; };

@@ -1,3 +1,18 @@
+diff --git a/source/s2n/s2n_tls_channel_handler.c b/source/s2n/s2n_tls_channel_handler.c
+index d1047f8..cab5bfa 100644
+--- a/source/s2n/s2n_tls_channel_handler.c
++++ b/source/s2n/s2n_tls_channel_handler.c
+@@ -1760,10 +1760,6 @@ static struct aws_tls_ctx *s_tls_ctx_new(
+                     AWS_LS_IO_TLS, "Failed to set ca_path: %s and ca_file %s\n", s_default_ca_dir, s_default_ca_file);
+                 goto cleanup_s2n_config;
+             }
+-#    ifdef __APPLE__
+-            /* On macOS, load user root CAs from keychains */
+-            aws_tls_s2n_load_macos_keychain_root_cas(s2n_ctx->s2n_config, alloc);
+-#    endif
+         } else {
+             /* Cannot find system's trust store */
+             aws_raise_error(AWS_IO_TLS_ERROR_DEFAULT_TRUST_STORE_NOT_FOUND);
 diff --git a/source/tls_channel_handler.c b/source/tls_channel_handler.c
 index de516be..2784f5d 100644
 --- a/source/tls_channel_handler.c
