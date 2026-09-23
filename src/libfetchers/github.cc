@@ -129,12 +129,6 @@ struct GitArchiveInputScheme : InputScheme
 
         auto ref = maybeGetStrAttr(attrs, "ref");
         auto rev = maybeGetStrAttr(attrs, "rev");
-        if (ref && rev)
-            throw BadURL(
-                "input %s contains both a commit hash ('%s') and a branch/tag name ('%s')",
-                attrsToJSON(attrs),
-                *rev,
-                *ref);
 
         if (rev)
             Hash::parseAny(*rev, HashAlgorithm::SHA1);
@@ -157,15 +151,16 @@ struct GitArchiveInputScheme : InputScheme
         auto ref = input.getRef();
         auto rev = input.getRev();
         std::vector<std::string> path{owner, repo};
-        assert(!(ref && rev));
         if (ref)
             path.push_back(*ref);
-        if (rev)
+        else if (rev)
             path.push_back(rev->to_string(HashFormat::Base16, false));
         auto url = ParsedURL{
             .scheme = std::string{schemeName()},
             .path = path,
         };
+        if (ref && rev)
+            url.query.insert_or_assign("rev", rev->to_string(HashFormat::Base16, false));
         if (auto narHash = input.getNarHash())
             url.query.insert_or_assign("narHash", narHash->to_string(HashFormat::SRI, true));
         auto host = maybeGetStrAttr(input.attrs, "host");
@@ -177,20 +172,10 @@ struct GitArchiveInputScheme : InputScheme
     Input applyOverrides(const Input & _input, std::optional<std::string> ref, std::optional<Hash> rev) const override
     {
         auto input(_input);
-        if (rev && ref)
-            throw BadURL(
-                "cannot apply both a commit hash (%s) and a branch/tag name ('%s') to input '%s'",
-                rev->gitRev(),
-                *ref,
-                input.to_string());
-        if (rev) {
+        if (rev)
             input.attrs.insert_or_assign("rev", rev->gitRev());
-            input.attrs.erase("ref");
-        }
-        if (ref) {
+        if (ref)
             input.attrs.insert_or_assign("ref", *ref);
-            input.attrs.erase("rev");
-        }
         return input;
     }
 
