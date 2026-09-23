@@ -373,7 +373,7 @@ void S3BinaryCacheStore::abortMultipartUpload(std::string_view key, std::string_
         req.uri = VerbatimURL(url);
         req.method = HttpMethod::Delete;
 
-        getFileTransfer()->enqueueFileTransfer(req).get();
+        (void) getFileTransfer()->enqueueFileTransfer(req).get();
     } catch (...) {
         ignoreExceptionInDestructor();
     }
@@ -406,7 +406,7 @@ void S3BinaryCacheStore::completeMultipartUpload(
     req.data = {payload};
     req.mimeType = "text/xml";
 
-    getFileTransfer()->enqueueFileTransfer(req).get();
+    (void) getFileTransfer()->enqueueFileTransfer(req).get();
 
     debug("S3 multipart upload completed: %d parts uploaded for '%s'", partEtags.size(), key);
 }
