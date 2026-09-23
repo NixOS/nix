@@ -37,6 +37,18 @@ const InputSchemeMap & getAllInputSchemes()
     return inputSchemes();
 }
 
+std::optional<ParsedURL> getLocalRepoURL(const std::filesystem::path & path)
+{
+    for (auto & [_, inputScheme] : inputSchemes()) {
+        auto feature = inputScheme->experimentalFeature();
+        if (feature && !experimentalFeatureSettings.isEnabled(*feature))
+            continue;
+        if (auto url = inputScheme->localRepoURL(path))
+            return url;
+    }
+    return std::nullopt;
+}
+
 Input Input::fromURL(const std::string & url, bool requireTree)
 {
     return fromURL(parseURL(url), requireTree);

@@ -203,6 +203,20 @@ struct GitInputScheme : InputScheme
         return "git";
     }
 
+    std::optional<ParsedURL> localRepoURL(const std::filesystem::path & path) const override
+    {
+        if (!pathExists(path / ".git"))
+            return std::nullopt;
+        ParsedURL url{
+            .scheme = "git+file",
+            .authority = ParsedURL::Authority{},
+            .path = pathToUrlPath(path),
+        };
+        if (pathExists(path / ".git" / "shallow"))
+            url.query.insert_or_assign("shallow", "1");
+        return url;
+    }
+
     std::string schemeDescription() const override
     {
         return stripIndentation(R"(
