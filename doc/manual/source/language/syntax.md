@@ -44,6 +44,8 @@ See [String literals](string-literals.md).
   > In the case where a function translates a path literal into an absolute path string for a configuration file, it is recommended to write a string literal instead.
   > This avoids some confusion about whether files at that location will be used during evaluation.
   > It also avoids unintentional situations where some function might try to copy everything at the location into the store.
+  >
+  > See [`lint-absolute-path-literals`](@docroot@/command-ref/conf-file.md#conf-lint-absolute-path-literals) for details and enforcement.
 
   If the first component of a path is a `~`, it is interpreted such that the rest of the path were relative to the user's home directory.
   For example, `~/foo` would be equivalent to `/home/edolstra/foo` for a user whose home directory is `/home/edolstra`.
