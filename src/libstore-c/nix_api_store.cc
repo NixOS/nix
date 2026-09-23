@@ -228,12 +228,6 @@ StorePath * nix_store_path_clone(const StorePath * p)
 
 } // extern "C"
 
-template<size_t S>
-static auto to_cpp_array(const uint8_t (&r)[S])
-{
-    return reinterpret_cast<const std::array<std::byte, S> &>(r);
-}
-
 extern "C" {
 
 nix_err
@@ -258,7 +252,7 @@ StorePath * nix_store_create_from_parts(
         context->last_err_code = NIX_OK;
     try {
         // Encode the 20 raw bytes to Nix32 (base32) format
-        auto hashStr = nix::BaseNix32::encode(std::span<const std::byte>{to_cpp_array(hash->bytes)});
+        auto hashStr = nix::BaseNix32::encode(std::as_bytes(std::span(hash->bytes)));
 
         // Construct the store path basename: <hash>-<name>
         std::string baseName;
