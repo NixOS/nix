@@ -262,7 +262,7 @@ static PeerInfo getPeerInfo(int remote)
     socklen_t credLen = sizeof(cred);
     if (getsockopt(remote, SOL_LOCAL, LOCAL_PEERCRED, &cred, &credLen) == -1)
         throw SysError("getting peer credentials");
-    peer = {false, 0, true, cred.cr_uid, false, 0};
+    peer = {false, 0, true, cred.cr_uid, true, cred.cr_gid};
 
 #endif
 
