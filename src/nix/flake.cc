@@ -1171,6 +1171,7 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
 {
     bool showLegacy = false;
     bool showAllSystems = false;
+    bool foldSystems = true;
 
     CmdFlakeShow()
     {
@@ -1183,6 +1184,11 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
             .longName = "all-systems",
             .description = "Show the contents of outputs for all systems.",
             .handler = {&showAllSystems, true},
+        });
+        addFlag({
+            .longName = "no-system-folding",
+            .description = "Do not fold multiple systems into a single display.",
+            .handler = {&foldSystems, false},
         });
     }
 
@@ -1205,6 +1211,49 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
         auto state = getEvalState();
         auto flake = make_ref<flake::LockedFlake>(lockFlake());
         auto localSystem = std::string(settings.thisSystem.get());
+
+        // Whether a node is a system-category root whose direct children are system names.
+        // legacyPackages is intentionally excluded: its content may recurse without the
+        // uniform `<system>` structure that apps/checks/devShells/packages provide.
+        auto isSystemCategory = [](const std::vector<SymbolStr> & attrPathS) -> bool {
+            if (attrPathS.size() != 1)
+                return false;
+            const auto & name = attrPathS[0];
+            return name == "apps" || name == "checks" || name == "devShells" || name == "packages";
+        };
+
+        // Whether folding is enabled by the flags and the current (non-JSON) display mode.
+        auto shouldApplyFolding = [this]() -> bool { return foldSystems && !showAllSystems && !json; };
+
+        // Format a single system name, highlighting the local system with bold brackets
+        // and dimming the others.
+        auto formatSystemName = [&localSystem](const std::string & sys) -> std::string {
+            return sys == localSystem ? fmt(ANSI_BOLD "[%s]" ANSI_NORMAL, sys) : fmt(ANSI_FAINT "%s" ANSI_NORMAL, sys);
+        };
+
+        // Build the folded display label for a set of systems, e.g. "{[x86_64-linux],aarch64-linux}"
+        // where the local system is bracketed/bold and the rest are dim. Systems are shown in
+        // reverse alphabetical order (x86_64-linux before aarch64-linux).
+        auto createFoldedDisplay = [&formatSystemName](const std::vector<std::string> & systems) -> std::string {
+            std::vector<std::string> display;
+            display.reserve(systems.size());
+            for (const auto & sys : systems) {
+                display.push_back(formatSystemName(sys));
+            }
+            return fmt("{%s}", concatStringsSep(",", display));
+        };
+
+        // Return the system names of the given symbols, sorted in reverse alphabetical order.
+        // Pure: does not mutate the input.
+        auto sortedSystemNames = [&state](const std::vector<Symbol> & attrs) -> std::vector<std::string> {
+            std::vector<std::string> result;
+            result.reserve(attrs.size());
+            for (const auto & sym : attrs) {
+                result.push_back(std::string(state->symbols[sym]));
+            }
+            std::sort(result.begin(), result.end(), std::greater<>{}); // reverse alphabetical
+            return result;
+        };
 
         std::function<bool(eval_cache::AttrCursor & visitor, const AttrPath & attrPath, const Symbol & attr)>
             hasContent;
@@ -1277,27 +1326,71 @@ struct CmdFlakeShow : FlakeCommand, MixJSON
                 auto recurse = [&]() {
                     if (!json)
                         logger->cout("%s", headerPrefix);
+
+                    // Collect attributes with content
                     std::vector<Symbol> attrs;
-                    for (const auto & attr : visitor.getAttrs()) {
+                    const auto allAttrs = visitor.getAttrs();
+                    attrs.reserve(allAttrs.size());
+                    for (const auto & attr : allAttrs) {
                         if (hasContent(visitor, attrPath, attr))
                             attrs.push_back(attr);
                     }
 
-                    for (const auto & [last, attr] : markLast(attrs)) {
-                        const auto & attrName = state->symbols[attr];
-                        auto visitor2 = visitor.getAttr(attrName);
+                    // System folding: consolidate multiple system nodes under a system-category
+                    // root into a single display node. Only fold when there is more than one
+                    // system, so single-system output is unchanged.
+                    const bool applyFolding = shouldApplyFolding() && isSystemCategory(attrPathS) && attrs.size() > 1;
+
+                    if (applyFolding) {
+                        // Systems to show in the folded label (reverse alphabetical order).
+                        const auto categorySystems = sortedSystemNames(attrs);
+
+                        // Choose which system to actually descend into: prefer the local system
+                        // (so the deeper "non-local systems are omitted" rule shows real content
+                        // rather than "omitted"); fall back to the first system otherwise.
+                        Symbol chosenAttr = attrs.front();
+                        for (const auto & attr : attrs) {
+                            if (std::string(state->symbols[attr]) == localSystem) {
+                                chosenAttr = attr;
+                                break;
+                            }
+                        }
+                        const auto & chosenName = state->symbols[chosenAttr];
+
+                        auto visitor2 = visitor.getAttr(chosenName);
                         auto attrPath2(attrPath);
-                        attrPath2.push_back(attr);
+                        attrPath2.push_back(chosenAttr);
+
                         auto j2 = visit(
                             *visitor2,
                             attrPath2,
                             fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL,
                                 nextPrefix,
-                                last ? treeLast : treeConn,
-                                attrName),
-                            nextPrefix + (last ? treeNull : treeLine));
+                                treeLast,
+                                createFoldedDisplay(categorySystems)),
+                            nextPrefix + treeNull);
+                        // Folding is disabled in JSON mode (see shouldApplyFolding), so this
+                        // branch is never taken when emitting JSON; keep the guard defensive.
                         if (json)
-                            j.emplace(attrName, std::move(j2));
+                            j.emplace(chosenName, std::move(j2));
+                    } else {
+                        for (const auto & [last, attr] : markLast(attrs)) {
+                            const auto & attrName = state->symbols[attr];
+                            auto visitor2 = visitor.getAttr(attrName);
+                            auto attrPath2(attrPath);
+                            attrPath2.push_back(attr);
+
+                            auto j2 = visit(
+                                *visitor2,
+                                attrPath2,
+                                fmt(ANSI_GREEN "%s%s" ANSI_NORMAL ANSI_BOLD "%s" ANSI_NORMAL,
+                                    nextPrefix,
+                                    last ? treeLast : treeConn,
+                                    attrName),
+                                nextPrefix + (last ? treeNull : treeLine));
+                            if (json)
+                                j.emplace(attrName, std::move(j2));
+                        }
                     }
                 };
 
