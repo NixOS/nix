@@ -733,6 +733,12 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * reali
  */
 void nix_realised_string_free(nix_realised_string * realised_string);
 
+/** @brief Return whether value is a functor
+ * @param[in] value the value
+ * @return true if the value is a functor, false otherwise
+ */
+bool nix_value_is_functor(nix_c_context * context, EvalState * state, nix_value * value);
+
 /** @brief Get a value's documentation from parsed doc comments.
  * @param[out] context Optional, stores error information
  * @param[in] state Nix evaluator state

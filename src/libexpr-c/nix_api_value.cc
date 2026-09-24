@@ -722,6 +722,17 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * s, si
     return &s->storePaths[i];
 }
 
+bool nix_value_is_functor(nix_c_context * context, EvalState * state, nix_value * value)
+{
+    if (context)
+        context->last_err_code = NIX_OK;
+    try {
+        auto & v = check_value_in(value);
+        return state->state.isFunctor(v);
+    }
+    NIXC_CATCH_ERRS_RES(false)
+}
+
 nix_doc *
 nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value)
 {
@@ -729,7 +740,7 @@ nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value)
         context->last_err_code = NIX_OK;
     try {
         auto & v = check_value_in(value);
-        assert(v.type() == nix::nFunction);
+        assert(v.type() == nix::nFunction || state->state.isFunctor(v));
         auto doc = state->state.getDoc(v);
         if (doc)
             return new nix_doc{.doc = *doc};
