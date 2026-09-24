@@ -30,7 +30,6 @@ class FileTransferSettings : public Config
     void anchor() override;
 
 public:
-    FileTransferSettings();
 
     Setting<bool> enableHttp2{this, true, "http2", "Whether to enable HTTP/2 support."};
 
