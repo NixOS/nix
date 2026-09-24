@@ -466,7 +466,7 @@ void ChrootLinuxDerivationBuilder::prepareUser()
         static std::atomic<unsigned int> counter{0};
 
         cgroup = rootCgroupPath
-                 / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
+                 / (buildUser ? fmt("nix-build@%s-%d", drvPath.hashPart(), buildUser->getUID())
                               : fmt("nix-build-pid-%d-%d", getpid(), counter++));
 
         debug("using cgroup %s", PathFmt(*cgroup));
