@@ -1129,6 +1129,10 @@ void processConnection(
     std::shared_ptr<Builder> builder)
 {
 #ifndef _WIN32 // TODO need graceful async exit support on Windows?
+    // Construct before monitor so the interrupt flag is cleared only after
+    // the monitor thread has stopped and can no longer set it.
+    Finally clearInterruptFlag([] { setInterrupted(false); });
+
     auto monitor = (recursive == RecursiveFlag::NotRecursive) ? std::make_unique<MonitorFdHup>(from.fd) : nullptr;
     (void) monitor; // suppress warning
     ReceiveInterrupts receiveInterrupts;
@@ -1179,10 +1183,7 @@ void processConnection(
 
     unsigned int opCount = 0;
 
-    Finally finally([&]() {
-        setInterrupted(false);
-        printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount);
-    });
+    Finally logOpCount([&]() { printMsgUsing(prevLogger, lvlDebug, "%d operations", opCount); });
 
     conn.postHandshake(
         *store,
