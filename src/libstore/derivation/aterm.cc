@@ -172,7 +172,7 @@ static BackedStringView parseUnquotedString(StringViewStream & str)
     // Already know that it ends in an endquote from the find, no need to check again
     str.remaining.remove_prefix(end + 1);
     if (content.find('\\') != std::string_view::npos)
-        throw FormatError("unexected escape sequence in unquoted string");
+        throw FormatError("unexpected escape sequence in unquoted string");
 
     return content;
 }
