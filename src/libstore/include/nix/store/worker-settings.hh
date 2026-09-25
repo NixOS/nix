@@ -369,6 +369,31 @@ public:
               /nix/store/c5cxjywi66iwn9dcx5yvwjkvl559ay6p-bash-4.4-p23-info
               /nix/store/scz72lskj03ihkcn42ias5mlp4i4gr1k-bash-4.4-p23-man
               /nix/store/a724znygmd1cac856j3gfsyvih3lw07j-bash-4.4-p23`.
+
+            - `RESOLVED_DRV_PATH`
+              The store path of the derivation the builder actually ran.
+              For a content-addressing derivation this is the resolved
+              derivation, which may differ from `DRV_PATH` and may not
+              exist on disk.
+
+            - `DRV_NAME`
+              The name of the derivation, which the ATerm format below
+              does not record.
+
+              Example:
+              `bash-4.4-p23`
+
+            - `DRV_ATERM_FD`
+              The number of an open file descriptor from which the program
+              can read the derivation at `RESOLVED_DRV_PATH`, in the
+              [ATerm format](@docroot@/protocols/derivation-aterm.md).
+              The presence of this variable can be used to detect support.
+
+            - `BUILD_INFO_JSON_FD`
+              The number of an open file descriptor from which the program
+              can read a JSON object describing the build. Its `outputs`
+              key maps each output name of the built derivation to its
+              store path. Further keys may be added in the future.
         )"};
 };
 
