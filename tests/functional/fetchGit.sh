@@ -37,6 +37,11 @@ path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree { type = \"git\"; u
 [[ $path0 = "$path0_" ]]
 path0_=$(nix eval --impure --raw --expr "(builtins.fetchTree \"git+file://$TEST_ROOT/worktree\").outPath")
 [[ $path0 = "$path0_" ]]
+
+# Regression test for #12860: a URL-like reference and its parsed attribute set
+# must use the same defaults.
+nix eval --impure --expr "builtins.fetchTree \"git+file://$repo\" == builtins.fetchTree (builtins.parseFlakeRef \"git+file://$repo\")" | grepQuiet true
+
 export _NIX_FORCE_HTTP=1
 [[ $(tail -n 1 "$path0"/hello) = "hello" ]]
 
