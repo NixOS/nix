@@ -77,7 +77,8 @@ private:
     /**
      * The states.
      */
-    Co haveDerivation(bool storeDerivation);
+    Co<ExitCode> init(bool storeDerivation);
+    Co<BuildResult> haveDerivation(bool storeDerivation);
 
     /**
      * Return `std::nullopt` if the output is unknown, e.g. un unbuilt
@@ -94,11 +95,11 @@ private:
      */
     UnkeyedRealisation assertPathValidity();
 
-    Co repairClosure();
+    Co<BuildResult> repairClosure();
 
-    Done doneSuccess(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
+    BuildResult success(BuildResult::Success::Status status, UnkeyedRealisation builtOutput);
 
-    Done doneFailure(BuildError ex);
+    BuildResult failure(BuildError ex);
 };
 
 } // namespace nix
