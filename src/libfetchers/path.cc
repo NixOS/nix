@@ -180,6 +180,22 @@ struct PathInputScheme : InputScheme
         return {accessor, std::move(input)};
     }
 
+    std::optional<std::string> getFingerprint(Store & store, const Input & input) const override
+    {
+        if (isRelative(input).has_value())
+            return std::nullopt;
+
+        try {
+            auto absPath = getAbsPath(input);
+            auto storePath = store.maybeParseStorePath(absPath.string());
+            if (storePath && store.isValidPath(*storePath)) {
+                return fmt("path:%s", store.queryPathInfo(*storePath)->narHash.to_string(HashFormat::SRI, true));
+            }
+        } catch (Error &) {
+        }
+        return std::nullopt;
+    }
+
     std::optional<ExperimentalFeature> experimentalFeature() const override
     {
         return Xp::Flakes;
