@@ -818,8 +818,13 @@ struct GitInputScheme : InputScheme
         auto origRev = input.getRev();
 
         auto originalRef = input.getRef();
+        /* An exact revision can leave the default branch unresolved. With allRefs,
+           fetching may make the cache's initial HEAD target resolvable. Preserve
+           default-branch discovery and caching in that case, so later unpinned
+           fetches do not mistake the initial HEAD for the remote default. */
+        bool usesDefaultRef = !originalRef && (!origRev || getAllRefsAttr(input));
         bool shallow = getShallowAttr(input);
-        auto ref = originalRef ? *originalRef : getDefaultRef(settings, repoInfo, shallow);
+        auto ref = originalRef ? *originalRef : usesDefaultRef ? getDefaultRef(settings, repoInfo, shallow) : "HEAD";
         input.attrs.insert_or_assign("ref", ref);
 
         std::filesystem::path repoDir;
@@ -894,7 +899,7 @@ struct GitInputScheme : InputScheme
                 } catch (Error & e) {
                     warn("could not update mtime for file %s: %s", PathFmt(localRefFile), e.info().msg);
                 }
-                if (!originalRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
+                if (usesDefaultRef && !storeCachedHead(repoUrl.to_string(), shallow, ref))
                     warn("could not update cached head '%s' for '%s'", ref, repoInfo.locationToArg());
             }
 
