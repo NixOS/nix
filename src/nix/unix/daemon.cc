@@ -120,7 +120,8 @@ static ssize_t splice(int fd_in, void * off_in, int fd_out, void * off_out, size
 }
 #endif
 
-static unix::SelfPipe sigChldPipe;
+// The signal handler can run during static destruction; keep the pipe alive.
+static unix::SelfPipe & sigChldPipe = *new unix::SelfPipe;
 
 static void sigChldHandler(int sigNo)
 {
