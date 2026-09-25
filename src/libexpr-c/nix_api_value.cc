@@ -105,7 +105,7 @@ PrimOp * nix_alloc_primop(
     PrimOpFun fun,
     int arity,
     const char * name,
-    const char ** args,
+    const char * const * args,
     const char * doc,
     void * user_data)
 {
@@ -125,7 +125,7 @@ PrimOp * nix_alloc_primop(
                     .impl = std::bind(nix_c_primop_wrapper, fun, user_data, arity, _1, _2, _3, _4)};
         if (args)
             for (size_t i = 0; args[i]; i++)
-                p->args.emplace_back(*args);
+                p->args.emplace_back(args[i]);
         nix_gc_incref(nullptr, p);
         return (PrimOp *) p;
     }

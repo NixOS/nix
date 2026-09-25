@@ -207,7 +207,7 @@ PrimOp * nix_alloc_primop(
     PrimOpFun fun,
     int arity,
     const char * name,
-    const char ** args,
+    const char * const * args,
     const char * doc,
     void * user_data);
 
