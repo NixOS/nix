@@ -14,5 +14,10 @@
     machine.succeed("""
       su --login --command "run-test-suite" alice >&2
     """)
+    # Regression https://github.com/NixOS/nix/issues/5144
+    machine.succeed("""
+      su --login alice -c \
+        'nix-env -p /nix/var/nix/profiles/system --list-generations'
+    """)
   '';
 }
