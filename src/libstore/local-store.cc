@@ -679,7 +679,18 @@ void LocalStore::registerDrvOutputUnchecked(const Realisation & info)
     experimentalFeatureSettings.require(Xp::CaDerivations);
     retrySQLite<void>([&]() {
         auto state(_state->lock());
-        if (auto oldR = queryRealisation_(*state, info.id)) {
+        auto oldR = queryRealisation_(*state, info.id);
+        /* When the recorded output is gone (garbage collected)
+         * a differing rebuild replaces the trace instead of conflicting with it.
+         */
+        if (oldR && !info.isCompatibleWith(*oldR) && !isValidPath_(*state, oldR->outPath)) {
+            state->stmts->DeleteRealisedOutputByName.use()
+                .apply(info.id.drvPath.to_string())
+                .apply(info.id.outputName)
+                .exec();
+            oldR.reset();
+        }
+        if (oldR) {
             if (info.isCompatibleWith(*oldR)) {
                 auto combinedSignatures = oldR->signatures;
                 combinedSignatures.insert(info.signatures.begin(), info.signatures.end());
