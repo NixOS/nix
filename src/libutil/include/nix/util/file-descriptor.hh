@@ -332,6 +332,13 @@ namespace unix {
 void closeExtraFDs();
 
 /**
+ * Close all file descriptors except stdio fds (ie 0, 1, 2) and
+ * @p keepExtra.
+ * Good practice in child processes.
+ */
+void closeExtraFDs(std::span<const Descriptor> keepExtra);
+
+/**
  * A useful primitive for asynchronous poll() loops to notify about some work
  * completing that gets polled alongside other file descriptors.
  */

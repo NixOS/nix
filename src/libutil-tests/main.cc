@@ -18,6 +18,13 @@ static int spawnTrivialMain()
     return EXIT_SUCCESS;
 }
 
+static int spawnWriteToStdoutAndStderr()
+{
+    std::cout << "hi" << std::endl;
+    std::cerr << "there" << std::endl;
+    return EXIT_SUCCESS;
+}
+
 #ifndef _WIN32
 
 static int spawnTestForLeakedFDsMain()
@@ -52,6 +59,8 @@ int main(int argc, char ** argv)
 
         if (argv1 == "__util_test_spawn_trivial") {
             return spawnTrivialMain();
+        } else if (argv1 == "__util_test_spawn_write_to_stdout_and_stderr") {
+            return spawnWriteToStdoutAndStderr();
         } else if (argv1 == "__util_test_spawn_leaked_fds") {
 #ifndef _WIN32
             return spawnTestForLeakedFDsMain();

@@ -196,7 +196,7 @@ OsString WindowsDerivationBuilderImpl::makeEnvBlock()
     /* For runtime strings; fixed names use `OS_STR`, which widens at compile time. */
     auto os = [](std::string_view s) { return string_to_os_string(s); };
 
-    /* Built from scratch rather than inherited. This is why `spawnProcess` is not
+    /* Built from scratch rather than inherited. This is why `spawnProgram` is not
        used below: it merges the parent's environment. */
     env[OS_STR("NIX_BUILD_TOP")] = tmpDir.native();
     env[OS_STR("TMP")] = tmpDir.native();

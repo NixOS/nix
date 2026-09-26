@@ -49,9 +49,12 @@ std::optional<std::string> readHead(const std::filesystem::path & path)
 {
     auto [status, output] = runProgram(
         RunOptions{
-            .program = "git",
-            // FIXME: use 'HEAD' to avoid returning all refs
-            .args = {OS_STR("ls-remote"), OS_STR("--symref"), path.native()},
+            .spawnOptions =
+                {
+                    .program = "git",
+                    // FIXME: use 'HEAD' to avoid returning all refs
+                    .args = {OS_STR("ls-remote"), OS_STR("--symref"), path.native()},
+                },
             .isInteractive = true,
         });
     if (status != 0)
@@ -485,16 +488,16 @@ struct GitInputScheme : InputScheme
 
         auto result = runProgram(
             RunOptions{
-                .program = "git",
-                .args{
-                    OS_STR("-C"),
-                    repoPath->native(),
-                    OS_STR("--git-dir"),
-                    string_to_os_string(repoInfo.gitDir),
-                    OS_STR("check-ignore"),
-                    OS_STR("--quiet"),
-                    string_to_os_string(std::string(path.rel())),
-                },
+                {.program = "git",
+                 .args{
+                     OS_STR("-C"),
+                     repoPath->native(),
+                     OS_STR("--git-dir"),
+                     string_to_os_string(repoInfo.gitDir),
+                     OS_STR("check-ignore"),
+                     OS_STR("--quiet"),
+                     string_to_os_string(std::string(path.rel())),
+                 }},
             });
         auto exitCode =
 #ifndef WIN32 // TODO abstract over exit status handling on Windows

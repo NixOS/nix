@@ -40,9 +40,7 @@ private:
     void addCommonSSHOpts(OsStrings & args);
     bool isMasterRunning();
 
-#ifndef _WIN32 // TODO re-enable on Windows, once we can fork.
     std::filesystem::path startMaster();
-#endif
 
 public:
 

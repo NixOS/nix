@@ -40,6 +40,36 @@ TEST(runProgram, worksTrivial)
     }
 }
 
+TEST(runProgram2, mergeStderrToStdout)
+{
+    auto self = getSelfExe();
+    ASSERT_TRUE(self);
+
+    for (bool mergeStdoutToStderr : {false, true}) {
+        ::testing::internal::CaptureStdout();
+        ::testing::internal::CaptureStderr();
+
+        auto [status, output] = runProgram({
+            .spawnOptions =
+                {
+                    .program = *self,
+                    .args = {OS_STR("__util_test_spawn_write_to_stdout_and_stderr")},
+                },
+            .mergeStderrToStdout = mergeStdoutToStderr,
+        });
+
+        ASSERT_TRUE(statusOk(status));
+        ASSERT_THAT(output, ::testing::HasSubstr("hi"));
+        ASSERT_EQ(::testing::internal::GetCapturedStdout(), "");
+        auto capturedErr = ::testing::internal::GetCapturedStderr();
+        if (mergeStdoutToStderr)
+            ASSERT_THAT(output, ::testing::HasSubstr("there"));
+        else
+            /* Otherwise stderr is inherited. */
+            ASSERT_THAT(capturedErr, ::testing::HasSubstr("there"));
+    }
+}
+
 #ifdef _WIN32
 #  define NIX_EXECUTABLE_EXTENSION ".exe"
 /* FIXME: runProgram reports spawn errors as WinError, while other
@@ -62,9 +92,9 @@ TEST(runProgram2, nonexistent)
 {
     ASSERT_THROW(
         {
-            runProgram2({
+            runProgram2({{
                 .program = "/this/path/really/should/not/exist/for/real" NIX_EXECUTABLE_EXTENSION,
-            });
+            }});
         },
         NIX_SPAWN_EXCEPTION);
 }
@@ -85,12 +115,12 @@ TEST(runProgram2, leakedFDsAreClosed)
        enough if the read side is assigned to 3 (also the fd of the relocated pipe in
        the child on linux that gets dup3-ed into). */
     ASSERT_NO_THROW(runProgram2({
-        .program = *self,
-        .args = {"__util_test_spawn_leaked_fds"},
-        .environment = OsStringMap{{
-            "NIX_CHILD_FDS_SHOULD_BE_CLOSED",
-            fmt("%d,%d", readSide.get(), writeSide.get()),
-        }},
+        {.program = *self,
+         .args = {"__util_test_spawn_leaked_fds"},
+         .environment = OsStringMap{{
+             "NIX_CHILD_FDS_SHOULD_BE_CLOSED",
+             fmt("%d,%d", readSide.get(), writeSide.get()),
+         }}},
     }));
 }
 

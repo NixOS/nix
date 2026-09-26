@@ -73,7 +73,7 @@ LfsApiInfo getLfsApi(ParsedURL url)
         args.push_back(string_to_os_string(url.renderPath(/*encode=*/false)));
         args.push_back(OS_STR("download"));
 
-        auto [status, output] = runProgram({.program = "ssh", .args = args});
+        auto [status, output] = runProgram({{.program = "ssh", .args = args}});
 
         if (output.empty())
             throw Error(

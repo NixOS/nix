@@ -50,9 +50,12 @@ struct CmdEdit : InstallableValueCommand
 
         runProgram2(
             RunOptions{
-                .program = program,
-                .lookupPath = true,
-                .args = std::move(args),
+                .spawnOptions =
+                    {
+                        .program = program,
+                        .lookupPath = true,
+                        .args = std::move(args),
+                    },
                 .isInteractive = true,
             });
     }
