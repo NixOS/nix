@@ -3,3 +3,10 @@ x = ''
   hello
 ''
 x
+x = "hello
+world"
+x
+x = ''${
+  "hello"
+}''
+x
