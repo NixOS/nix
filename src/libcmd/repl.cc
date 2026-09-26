@@ -902,7 +902,13 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
     // Try parsing as bindings
     try {
         return state->parseReplBindings(s, basePath, staticEnv);
-    } catch (ParseError &) {
+    } catch (ParseError & e) {
+        // If the input is incomplete (e.g. `a = {` without closing `}`),
+        // signal the main loop to prompt for continuation instead of falling
+        // through to expression evaluation (which would produce a confusing
+        // "unexpected '='" error).
+        if (isIncompleteInput(e))
+            throw IncompleteReplExpr(e.msg());
     }
 
     // Try with semicolon appended (for `inherit foo` shorthand)
