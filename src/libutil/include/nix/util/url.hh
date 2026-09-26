@@ -159,24 +159,13 @@ struct ParsedURL
      *   {.scheme="https", .authority.host = "bad", .path={}}
      *   ```
      *
-     * These invariants will be checked in `to_string` and
-     * `renderAuthorityAndPath`.
+     * These invariants will be checked in `to_string`.
      */
     std::vector<std::string> path;
 
     StringMap query;
 
     std::string fragment;
-
-    /**
-     * Render just the middle part of a URL, without the `//` which
-     * indicates whether the authority is present.
-     *
-     * @note This is kind of an ad-hoc
-     * operation, but it ends up coming up with some frequency, probably
-     * due to the current design of `StoreReference` in `nix-store`.
-     */
-    std::string renderAuthorityAndPath() const;
 
     std::string to_string() const;
 

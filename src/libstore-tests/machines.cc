@@ -63,7 +63,7 @@ MATCHER_P(AuthorityMatches, authority, "")
     auto * generic = std::get_if<StoreReference::Specified>(&arg.variant);
     if (!generic)
         return false;
-    return generic->authority == authority;
+    return generic->authority && generic->authority->to_string() == authority;
 }
 
 TEST(machines, getMachinesWithNewLineSeparator)
