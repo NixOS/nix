@@ -11,6 +11,7 @@
   git,
   mercurial,
   unixtools,
+  zip,
   util-linux,
 
   nix-store,
@@ -55,6 +56,7 @@ mkMesonDerivation (
       git
       mercurial
       unixtools.script
+      zip
 
       # Explicitly splice the hostHost variant to fix LLVM tests. The nix-cli
       # has to be in PATH, but must come from the host context where it's built

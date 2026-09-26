@@ -406,6 +406,11 @@ struct FileTransferResult
      * rel="immutable"` header.
      */
     std::optional<std::string> immutableUrl;
+
+    /**
+     * TODO
+     */
+    std::optional<time_t> lastModified;
 };
 
 class Store;

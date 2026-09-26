@@ -65,6 +65,22 @@ struct TarSink
     virtual void createHardlink(const CanonPath & path, const CanonPath & target) = 0;
 };
 
-time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink);
+/**
+ * TODO
+ */
+struct UnpackedTarfileInfo
+{
+    /**
+     * TODO
+     */
+    time_t lastModified = 0;
+
+    /**
+     * TODO
+     */
+    bool localTimestamps = false;
+};
+
+UnpackedTarfileInfo unpackTarfileToSink(TarArchive & archive, TarSink & parseSink);
 
 } // namespace nix
