@@ -97,11 +97,6 @@ configdata_pub.set(
   description : 'FIXME: It\'s a bit peculiar that this needs to be exposed. The reason is that that it effects whether the settings struct in a header has a particular field. This is also odd, because it means when there is no ACL support one will just get an "unknown setting" warning from their configuration.',
 )
 
-if host_machine.system() == 'darwin'
-  sandbox = cxx.find_library('sandbox')
-  deps_private_no_pkgconfig += [ sandbox ]
-endif
-
 if host_machine.system() == 'windows'
   wsock32 = cxx.find_library('wsock32')
   deps_private_no_pkgconfig += [ wsock32 ]
