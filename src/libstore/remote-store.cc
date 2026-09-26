@@ -605,12 +605,11 @@ public:
     void ensurePath(const StorePath & path) override;
 
     /**
-     * The default instance would schedule the work on the client side, but
-     * for consistency with `buildPaths` and `buildDerivation` it should happen
-     * on the remote side.
-     *
-     * We make this fail for now so we can add implement this properly later
-     * without it being a breaking change.
+     * Does the same as `Worker::repairPath`, but schedules both steps
+     * (re-substituting the path, then rebuilding its deriver) on the remote
+     * side via `buildPathsWithResults` and `buildPaths` in repair mode, so
+     * the remote's usual restriction of repair mode to trusted clients
+     * applies.
      */
     void repairPath(const StorePath & path) override;
 };
@@ -738,7 +737,26 @@ void RemoteBuilder::ensurePath(const StorePath & path)
 
 void RemoteBuilder::repairPath(const StorePath & path)
 {
-    throw Unsupported("operation 'repairPath' is not supported by store '%s'", store->config.getHumanReadableURI());
+    /* Note: with daemons older than protocol 1.34, buildPathsWithResults()
+       falls back to buildPaths(), which throws if the substitution fails, so
+       the deriver is not rebuilt for them. */
+    auto results = buildPathsWithResults({DerivedPath::Opaque{path}}, bmRepair);
+    if (!results.empty() && results[0].tryGetSuccess())
+        return;
+
+    /* Since substituting the path didn't work, if we have a valid
+       deriver, then rebuild the deriver. */
+    auto info = store->queryPathInfo(path);
+    if (info->deriver && store->isValidPath(*info->deriver))
+        buildPaths(
+            {DerivedPath::Built{
+                .drvPath = makeConstantStorePathRef(*info->deriver),
+                // FIXME: Should just build the specific output we need.
+                .outputs = OutputsSpec::All{},
+            }},
+            bmRepair);
+    else
+        throw Error("cannot repair path '%s'", store->printStorePath(path));
 }
 
 ref<Builder> RemoteStore::getBuilder(std::shared_ptr<Store> evalStore)
