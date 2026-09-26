@@ -215,39 +215,66 @@ printf World > "$flake1Dir"/who
 cp -r "$flake1Dir" "$flake2Dir"
 printf World2 > "$flake2Dir"/who
 
-nix profile add "$flake1Dir"
-[[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
-expect 1 nix profile add "$flake2Dir"
-diff -u <(
-    nix --offline profile install "$flake2Dir" 2>&1 1> /dev/null \
-        | grep -vE "^warning: " \
-        | grep -vE "^error \(ignored\): " \
-        | grep -vE "^waiting for " \
-        || true
-) <(cat << EOF
+for oldFlakeDir in "$flake1Dir" "$flake2Dir"; do
+    newFlakeDir=$flake1Dir
+    if [[ $oldFlakeDir == "$flake1Dir" ]]; then
+        newFlakeDir=$flake2Dir
+    fi
+    clearProfiles
+    nix profile add "$oldFlakeDir"
+    oldOutPath=$(nix build --no-link --print-out-paths "$oldFlakeDir#default.out")
+    newOutPath=$(nix build --no-link --print-out-paths "$newFlakeDir#default.out")
+    profileBefore=$(readlink -f "$TEST_HOME/.nix-profile")
+    conflictOutput=$(expectStderr 1 nix --offline profile install "$newFlakeDir")
+    diff -u <(
+        echo "$conflictOutput" \
+            | grep -vE "^warning: " \
+            | grep -vE "^error \(ignored\): " \
+            | grep -vE "^waiting for "
+    ) <(cat << EOF
 error: An existing package already provides the following file:
 
-         "$(nix build --no-link --print-out-paths "${flake1Dir}""#default.out")/bin/hello"
+         "${oldOutPath}/bin/hello"
 
        This is the conflicting file from the new package:
 
-         "$(nix build --no-link --print-out-paths "${flake2Dir}""#default.out")/bin/hello"
+         "${newOutPath}/bin/hello"
 
        To remove the existing package:
 
-         nix profile remove flake1
+         nix profile remove ${oldFlakeDir##*/}
 
        The new package can also be added next to the existing one by assigning a different priority.
        The conflicting packages have a priority of 5.
        To prioritise the new package:
 
-         nix profile add path:${flake2Dir}#packages.${system}.default --priority 4
+         nix profile add path:${newFlakeDir}#packages.${system}.default --priority 4
 
        To prioritise the existing package:
 
-         nix profile add path:${flake2Dir}#packages.${system}.default --priority 6
+         nix profile add path:${newFlakeDir}#packages.${system}.default --priority 6
 EOF
-)
+    )
+    [[ $(readlink -f "$TEST_HOME/.nix-profile") == "$profileBefore" ]]
+    [[ $(readlink -f "$TEST_HOME/.nix-profile/bin/hello") == "$oldOutPath/bin/hello" ]]
+done
+
+for firstFlakeDir in "$flake1Dir" "$flake2Dir"; do
+    secondFlakeDir=$flake1Dir
+    if [[ $firstFlakeDir == "$flake1Dir" ]]; then
+        secondFlakeDir=$flake2Dir
+    fi
+    clearProfiles
+    conflictOutput=$(expectStderr 1 nix --offline profile add "$firstFlakeDir" "$secondFlakeDir")
+    echo "$conflictOutput" | grep -F 'Unable to build profile. There is a conflict for the following files:'
+    echo "$conflictOutput" | grep -F "\"$oldOutPath/bin/hello\""
+    echo "$conflictOutput" | grep -F "\"$newOutPath/bin/hello\""
+    echo "$conflictOutput" | grepQuietInverse 'existing package'
+    echo "$conflictOutput" | grepQuietInverse 'nix profile remove'
+    [[ ! -e "$TEST_HOME/.nix-profile" ]]
+done
+
+nix profile add "$flake1Dir"
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
 nix profile add "$flake2Dir" --priority 100
 [[ $("$TEST_HOME"/.nix-profile/bin/hello) = "Hello World" ]]
