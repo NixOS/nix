@@ -125,10 +125,11 @@ static DownloadTarballResult downloadTarball_(
             throw Error("tarball %s does not exist.", PathFmt(localPath));
         }
         if (is_directory(localPath)) {
-            if (exists(localPath / ".git")) {
+            if (auto repoURL = getLocalRepoURL(localPath)) {
                 throw Error(
-                    "tarball %s is a git repository, not a tarball. Please use `git+file` as the scheme.",
-                    PathFmt(localPath));
+                    "tarball %s is a repository, not a tarball. Please use `%s` as the scheme.",
+                    PathFmt(localPath),
+                    repoURL->scheme);
             }
             throw Error("tarball %s is a directory, not a file.", PathFmt(localPath));
         }

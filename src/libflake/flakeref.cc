@@ -115,7 +115,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
     if (baseDir) {
         /* Check if 'url' is a path (either absolute or relative
            to 'baseDir'). If so, search upward to the root of the
-           repo (i.e. the directory containing .git). */
+           repo. */
 
         path = absPath(path, get(baseDir), true);
 
@@ -146,7 +146,7 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                     if (pathExists(path / "flake.nix")) {
                         found = true;
                         break;
-                    } else if (pathExists(path / ".git"))
+                    } else if (fetchers::getLocalRepoURL(path))
                         throw Error(
                             "path %s is not part of a flake (neither it nor its parent directories contain a 'flake.nix' file)",
                             PathFmt(path));
@@ -168,14 +168,11 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
             std::string subdir;
 
             while (flakeRoot.parent_path() != flakeRoot) {
-                if (pathExists(flakeRoot / ".git")) {
-                    auto parsedURL = ParsedURL{
-                        .scheme = "git+file",
-                        .authority = ParsedURL::Authority{},
-                        .path = pathToUrlPath(flakeRoot),
-                        .query = query,
-                        .fragment = fragment,
-                    };
+                if (auto repoURL = fetchers::getLocalRepoURL(flakeRoot)) {
+                    auto parsedURL = std::move(*repoURL);
+                    auto schemeQuery = std::move(parsedURL.query);
+                    parsedURL.query = query;
+                    parsedURL.fragment = fragment;
 
                     if (subdir != "") {
                         if (parsedURL.query.count("dir"))
@@ -183,8 +180,8 @@ std::pair<FlakeRef, std::string> parsePathFlakeRefWithFragment(
                         parsedURL.query.insert_or_assign("dir", subdir);
                     }
 
-                    if (pathExists(flakeRoot / ".git" / "shallow"))
-                        parsedURL.query.insert_or_assign("shallow", "1");
+                    for (auto & [name, value] : schemeQuery)
+                        parsedURL.query.insert_or_assign(name, value);
 
                     return fromParsedURL(std::move(parsedURL), isFlake);
                 }
