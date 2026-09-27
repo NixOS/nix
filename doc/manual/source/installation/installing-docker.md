@@ -25,7 +25,7 @@ The official Docker image is created using `pkgs.dockerTools.buildLayeredImage`
 base your custom Docker image on it as you would do with any other Docker
 image.
 
-The Docker image is also not based on any other image and includes minimal set
+The Docker image is not based on any other image and includes a minimal set
 of runtime dependencies that are required to use Nix:
 
  - pkgs.nix
