@@ -216,7 +216,7 @@ public:
         void push(BindingsCursor cursor) noexcept
         {
             cursorHeap.push_back(cursor);
-            std::ranges::make_heap(cursorHeap, comp);
+            std::ranges::push_heap(cursorHeap, comp);
         }
 
         [[nodiscard]] BindingsCursor pop() noexcept
