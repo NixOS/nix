@@ -75,7 +75,7 @@ This command provides an interactive environment for evaluating Nix
 expressions. (REPL stands for 'read–eval–print loop'.)
 
 On startup, it loads the Nix expressions named *files* and adds them
-into the lexical scope. You can load addition files using the `:l
+into the lexical scope. You can load additional files using the `:l
 <filename>` command, or reload all files using `:r`.
 
 )""
