@@ -26,21 +26,8 @@ base your custom Docker image on it as you would do with any other Docker
 image.
 
 The Docker image is not based on any other image and includes a minimal set
-of runtime dependencies that are required to use Nix:
+of runtime dependencies that are required to use Nix.
 
- - pkgs.nix
- - pkgs.bashInteractive
- - pkgs.coreutils-full
- - pkgs.gnutar
- - pkgs.gzip
- - pkgs.gnugrep
- - pkgs.which
- - pkgs.curl
- - pkgs.less
- - pkgs.wget
- - pkgs.man
- - pkgs.cacert.out
- - pkgs.findutils
 
 # Docker image with the latest development version of Nix
 
