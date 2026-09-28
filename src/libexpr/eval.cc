@@ -2963,8 +2963,11 @@ bool EvalState::eqValues(Value & v1, Value & v2, const PosIdx pos, std::string_v
     /* !!! Hack to support some old broken code that relies on pointer
        equality tests between sets.  (Specifically, builderDefs calls
        uniqList on a list of sets.)  Will remove this eventually. */
-    if (&v1 == &v2)
+    if (&v1 == &v2) {
+        if (!settings.functionPointerEquality && v1.type() == nFunction)
+            return false;
         return true;
+    }
 
     // Special case type-compatibility between float and int
     if (v1.type() == nInt && v2.type() == nFloat)
