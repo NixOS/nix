@@ -33,6 +33,13 @@ let
         export PATH=$PATH:$pkg/bin
       done
 
+      # Mimic the structured attrs behavior of nixpkgs stdenv for `$out` and all other outputs.
+      if [ -n "''${NIX_ATTRS_SH_FILE:-}" ]; then
+        for o in "''${!outputs[@]}"; do
+          export "''${o}=''${outputs[$o]}"
+        done
+      fi
+
       declare -a arr1=(1 2 "3 4" 5)
       declare -a arr2=(x $'\n' $'x\ny')
       fun() {

@@ -44,7 +44,7 @@ if ! isTestOnNixOS; then
   export NIX_DAEMON_SOCKET_PATH=$TEST_ROOT/dSocket
   unset NIX_USER_CONF_FILES
   export _NIX_TEST_SHARED=$TEST_ROOT/shared
-  if [[ -n $NIX_STORE ]]; then
+  if [[ -n ${NIX_STORE:-} ]]; then
       export _NIX_TEST_NO_SANDBOX=1
   fi
   export _NIX_IN_TEST=$TEST_ROOT/shared

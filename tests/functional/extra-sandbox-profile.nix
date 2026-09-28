@@ -5,7 +5,7 @@ with import ./config.nix;
 mkDerivation {
   name = "simple";
   __sandboxProfile = ''
-    # Allow writing any file in the filesystem
+    ; Allow writing any file in the filesystem
     (allow file*)
   '';
   inherit seed;
