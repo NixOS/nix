@@ -119,6 +119,22 @@ let
         extraQemuOpts = "-cpu Haswell-v1";
       };
     };
+
+    # Docs on cloud-init quirks: https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/cloud-init/README.Alpine?ref_type=heads
+    "alpine-3-23" = {
+      "x86_64-linux" = {
+        image = import <nix/fetchurl.nix> {
+          url = "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/alpine-3.23.6-x86_64-bios-cloudinit-r0.qcow2";
+          hash = "sha512-+F0E0lvjkmC273NNkY1+X2lpdf7uuuMuQtkBL6dmnWBX8gEZ0bq2fihWJIttnJaCTcaEMpT5IoSGrZ4IvBfVpg==";
+        };
+        shell = "/bin/sh";
+        postBoot = "touch ~/.profile";
+        installScripts = {
+          # Multi-user installer doesn't support non-bash shells or OpenRC.
+          inherit (installScripts) install-default install-both-profile-links install-force-no-daemon;
+        };
+      };
+    };
   };
 
   makeTest =
@@ -149,6 +165,7 @@ let
 
         image_type=$(qemu-img info $image | sed 's/file format: \(.*\)/\1/; t; d')
         qemu-img create -b $image -F "$image_type" -f qcow2 ./disk.qcow2
+        qemu-img resize ./disk.qcow2 +2G
         ssh-keygen -t ed25519 -f ./id_test
 
         # Configure our test user via cloud-init to get passwordless sudo and
@@ -159,9 +176,13 @@ let
         #cloud-config
         users:
         - name: user
-          shell: /bin/bash
+          shell: ${image.shell or "/bin/bash"}
           sudo: ALL=(ALL) NOPASSWD:ALL
-          lock_passwd: true
+          doas:
+           - permit nopass user as root
+          # Workaround for alpine that refuses ssh connections with locked accounts even with keys.
+          hashed_passwd: '*'
+          lock_passwd: false
           ssh_authorized_keys:
           - $(cat ./id_test.pub)
         EOF
@@ -207,7 +228,18 @@ let
         scp -P $ssh_port $ssh_opts $binaryTarball/nix-*.tar.xz user@localhost:nix.tar.xz
 
         echo "Running installer..."
-        $ssh "set -eux; $installScript"
+        $ssh <<EOF
+          set -eux;
+
+          # TODO: The installer should probably autodetect instead of requiring manually specifying this.
+          if command -v sudo; then
+            export NIX_BECOME=sudo
+          elif command -v doas; then
+            export NIX_BECOME=doas
+          fi
+
+          $installScript
+        EOF
 
         echo "Copying the mock channel"
         ssh -p $ssh_port $ssh_opts user@localhost "mkdir channel"
@@ -221,7 +253,7 @@ let
           nix --extra-experimental-features nix-command store info
 
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "${system}"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
-          [[ \$(cat \$out) = foobar ]]
+          [ "\$(cat \$out)" = foobar ]
 
           export NIX_CONFIG="substituters = "
           \$(which nix-channel) --add file://\$HOME/channel myChannel
@@ -238,8 +270,8 @@ in
 builtins.mapAttrs (
   imageName: imageForSystems:
   lib.concatMapAttrs (system: image: {
-    ${system} = builtins.mapAttrs (
-      testName: test: makeTest { inherit imageName testName system; }
-    ) installScripts;
+    ${system} = builtins.mapAttrs (testName: test: makeTest { inherit imageName testName system; }) (
+      image.installScripts or installScripts
+    );
   }) imageForSystems
 ) images
