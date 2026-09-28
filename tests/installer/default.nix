@@ -158,6 +158,7 @@ let
       }
       ''
         shopt -s nullglob
+        set -eu
 
         echo "Unpacking Vagrant box $image..."
         tar xvf $image
@@ -223,13 +224,13 @@ let
 
         echo "Testing Nix installation..."
         $ssh <<EOF
-          set -ex
-
           # FIXME: get rid of this; ideally ssh should just work.
           source ~/.bash_profile || true
           source ~/.bash_login || true
           source ~/.profile || true
           source /etc/bashrc || true
+
+          set -eux
 
           nix-env --version
           nix --extra-experimental-features nix-command store info
@@ -237,15 +238,9 @@ let
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]
 
-          if pgrep nix-daemon; then
-            MAYBESUDO="sudo"
-          else
-            MAYBESUDO=""
-          fi
-
-
-          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
-          $MAYBESUDO \$(which nix-channel) --update
+          export NIX_CONFIG="substituters = "
+          \$(which nix-channel) --add file://\$HOME/channel myChannel
+          \$(which nix-channel) --update
           [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
