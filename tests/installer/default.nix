@@ -145,6 +145,7 @@ let
       }
       ''
         shopt -s nullglob
+        set -eu
 
         image_type=$(qemu-img info $image | sed 's/file format: \(.*\)/\1/; t; d')
         qemu-img create -b $image -F "$image_type" -f qcow2 ./disk.qcow2
@@ -214,7 +215,7 @@ let
 
         echo "Testing Nix installation..."
         $ssh <<EOF
-          set -ex
+          set -eux
 
           nix-env --version
           nix --extra-experimental-features nix-command store info
@@ -222,15 +223,9 @@ let
           out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "${system}"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
           [[ \$(cat \$out) = foobar ]]
 
-          if pgrep nix-daemon; then
-            MAYBESUDO="sudo --preserve-env=NIX_CONFIG"
-          else
-            MAYBESUDO=""
-          fi
-
           export NIX_CONFIG="substituters = "
-          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
-          $MAYBESUDO \$(which nix-channel) --update
+          \$(which nix-channel) --add file://\$HOME/channel myChannel
+          \$(which nix-channel) --update
           [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
         EOF
 
