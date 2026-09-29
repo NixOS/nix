@@ -225,6 +225,11 @@ parser_library = static_library(
   ],
 )
 
+perf_trampoline = static_library(
+'perf-trampoline',
+files('asm-trampoline-aarch64.S'),
+)
+
 this_library = library(
   'nixexpr',
   sources,
@@ -235,7 +240,7 @@ this_library = library(
   dependencies : deps_public + deps_private + deps_other,
   include_directories : include_dirs,
   link_args : linker_export_flags,
-  link_whole : [ parser_library ],
+  link_whole : [ parser_library, perf_trampoline ],
   prelink : true, # For C++ static initializers
   install : true,
   cpp_pch : do_pch ? [ 'pch/precompiled-headers.hh' ] : [],
