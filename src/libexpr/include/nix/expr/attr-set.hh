@@ -118,7 +118,7 @@ private:
     /**
      * Maximum length of the Bindings layer chains.
      */
-    static constexpr unsigned maxLayers = 8;
+    static constexpr unsigned maxLayers = 16;
 
 public:
     size_type size() const
