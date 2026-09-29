@@ -1,7 +1,7 @@
 #include "nix/expr/eval-profiler-settings.hh"
 #include "nix/util/configuration.hh"
-#include "nix/util/config-impl.hh"
-#include "nix/util/abstract-setting-to-json.hh"
+#include "nix/util/config-impl.hh"              // IWYU pragma: keep
+#include "nix/util/abstract-setting-to-json.hh" // IWYU pragma: keep
 
 #include <nlohmann/json.hpp>
 

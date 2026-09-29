@@ -20,6 +20,10 @@ class EvalState;
 struct ExprLambda;
 struct Value;
 
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
+extern "C" void * _Perf_frame_func_start; // from asm
+// NOLINTNEXTLINE(bugprone-reserved-identifier)
+extern "C" void * _Perf_frame_func_end; // from asm
 
 extern "C" void *_Perf_frame_func_start; // start of the template of the perf trampoline
 extern "C" void *_Perf_frame_func_end; // start of the template of the perf trampoline
@@ -87,11 +91,11 @@ private:
             if (err != 0) { throw std::runtime_error("perf map: mprotect failled"); }
             trampolines_left = TRAMPOLINES_PER_ALLOC;
         } else {
-            current = (char*) current + TRAMPOLINE_SIZE;
-            trampolines_left--;
+            current = (char *) current + TRAMPOLINE_SIZE;
         }
-    assert(current != nullptr);
-    return (PerfFrame) current;
+        trampolines_left--;
+        assert(current != nullptr);
+        return (PerfFrame) current;
     }
     PerfFrame new_func(std::string name) {
         if (file.fail()) {

@@ -225,10 +225,14 @@ parser_library = static_library(
   ],
 )
 
-perf_trampoline = static_library(
-'perf-trampoline',
-files('asm-trampoline-aarch64.S'),
-)
+if host_machine.cpu_family() == 'aarch64'
+  perf_trampoline_asm = files('asm-trampoline-aarch64.S')
+elif host_machine.cpu_family() == 'x86_64'
+  perf_trampoline_asm = files('asm-trampoline-x86_64.S')
+else
+  perf_trampoline_asm = files('')
+endif
+perf_trampoline = static_library('perf-trampoline', perf_trampoline_asm)
 
 this_library = library(
   'nixexpr',
