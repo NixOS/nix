@@ -33,19 +33,6 @@ public:
     {
         return unitTestData / std::string(testStem);
     }
-
-    /**
-     * We set these in tests rather than the regular globals so we don't have
-     * to worry about race conditions if the tests run concurrently.
-     */
-    ExperimentalFeatureSettings mockXpSettings;
-
-private:
-
-    void SetUp() override
-    {
-        mockXpSettings.set("experimental-features", "git-hashing");
-    }
 };
 
 TEST(GitMode, gitMode_directory)
@@ -90,8 +77,8 @@ TEST_F(GitTest, blob_read)
     readTest("hello-world-blob.bin", [&](const auto & encoded) {
         StringSource in{encoded};
         StringSink out;
-        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Blob);
-        auto size = parseBlob(in, mockXpSettings);
+        ASSERT_EQ(parseObjectType(in), ObjectType::Blob);
+        auto size = parseBlob(in);
         in.drainInto(out, size);
 
         auto expected = readFile(goldenMaster("hello-world.bin"));
@@ -109,7 +96,7 @@ TEST_F(GitTest, blob_read_large_size)
     blobHeader.push_back('\0'); // null terminator expected by parseBlob
 
     StringSource in{blobHeader};
-    auto size = git::parseBlob(in, mockXpSettings);
+    auto size = git::parseBlob(in);
 
     ASSERT_EQ(size, largeSize);
 }
@@ -120,7 +107,7 @@ TEST_F(GitTest, blob_write)
     writeTest("hello-world-blob.bin", [&]() {
         auto decoded = readFile(goldenMaster("hello-world.bin"));
         StringSink s;
-        dumpBlobPrefix(decoded.size(), s, mockXpSettings);
+        dumpBlobPrefix(decoded.size(), s);
         s(decoded);
         return s.s;
     });
@@ -206,14 +193,14 @@ static const git::Tree treeSha256 = {
     },
 };
 
-static auto mkTreeReadTest(HashAlgorithm hashAlgo, git::Tree tree, const ExperimentalFeatureSettings & mockXpSettings)
+static auto mkTreeReadTest(HashAlgorithm hashAlgo, git::Tree tree)
 {
     using namespace git;
-    return [hashAlgo, tree, mockXpSettings](const auto & encoded) {
+    return [hashAlgo, tree](const auto & encoded) {
         StringSource in{encoded};
         TestDirectorySink out;
-        ASSERT_EQ(parseObjectType(in, mockXpSettings), ObjectType::Tree);
-        parseTree(out, in, hashAlgo, mockXpSettings);
+        ASSERT_EQ(parseObjectType(in), ObjectType::Tree);
+        parseTree(out, in, hashAlgo);
 
         ASSERT_EQ(out.entries, tree);
     };
@@ -221,12 +208,12 @@ static auto mkTreeReadTest(HashAlgorithm hashAlgo, git::Tree tree, const Experim
 
 TEST_F(GitTest, tree_sha1_read)
 {
-    readTest("tree-sha1.bin", mkTreeReadTest(HashAlgorithm::SHA1, treeSha1, mockXpSettings));
+    readTest("tree-sha1.bin", mkTreeReadTest(HashAlgorithm::SHA1, treeSha1));
 }
 
 TEST_F(GitTest, tree_sha256_read)
 {
-    readTest("tree-sha256.bin", mkTreeReadTest(HashAlgorithm::SHA256, treeSha256, mockXpSettings));
+    readTest("tree-sha256.bin", mkTreeReadTest(HashAlgorithm::SHA256, treeSha256));
 }
 
 TEST_F(GitTest, tree_sha1_write)
@@ -234,7 +221,7 @@ TEST_F(GitTest, tree_sha1_write)
     using namespace git;
     writeTest("tree-sha1.bin", [&]() {
         StringSink s;
-        dumpTree(treeSha1, s, mockXpSettings);
+        dumpTree(treeSha1, s);
         return s.s;
     });
 }
@@ -244,7 +231,7 @@ TEST_F(GitTest, tree_sha256_write)
     using namespace git;
     writeTest("tree-sha256.bin", [&]() {
         StringSink s;
-        dumpTree(treeSha256, s, mockXpSettings);
+        dumpTree(treeSha256, s);
         return s.s;
     });
 }
@@ -268,7 +255,7 @@ TEST_F(GitTest, both_roundrip)
             StringSink s;
             HashSink hashSink{hashAlgo};
             TeeSink s2{s, hashSink};
-            auto mode = dump(path, s2, dumpHook, defaultPathFilter, mockXpSettings);
+            auto mode = dump(path, s2, dumpHook, defaultPathFilter);
             auto hash = hashSink.finish().hash;
             cas.insert_or_assign(hash, std::move(s.s));
             return TreeEntry{
@@ -304,12 +291,12 @@ TEST_F(GitTest, both_roundrip)
 
         parseToFile = [&](merkle::TreeEntry entry) -> MemorySourceAccessor::File {
             StringSource in{cas[entry.hash]};
-            auto type = parseObjectType(in, mockXpSettings);
+            auto type = parseObjectType(in);
 
             switch (type) {
             case ObjectType::Blob: {
                 StringSink content;
-                auto size = parseBlob(in, mockXpSettings);
+                auto size = parseBlob(in);
                 in.drainInto(content, size);
                 if (entry.mode == merkle::Mode::Symlink) {
                     return MemorySourceAccessor::File::Symlink{std::move(content.s)};
@@ -322,7 +309,7 @@ TEST_F(GitTest, both_roundrip)
             }
             case ObjectType::Tree: {
                 RecursiveDirSink dirSink{parseToFile};
-                parseTree(dirSink, in, hashAlgo, mockXpSettings);
+                parseTree(dirSink, in, hashAlgo);
                 return std::move(dirSink.dir);
             }
             default:
