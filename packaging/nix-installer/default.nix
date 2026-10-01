@@ -1,6 +1,5 @@
-# `NixOS/nix-installer` built with *this* Nix closure embedded, so
-# Hydra/CI can dogfood the Rust installer without the (removed)
-# `--nix-package-url` knob.
+# `NixOS/nix-installer` built with *this* Nix closure embedded.
+
 {
   lib,
   stdenv,
