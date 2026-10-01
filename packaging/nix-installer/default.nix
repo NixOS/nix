@@ -37,10 +37,6 @@ let
       # binary must run before `/nix/store` exists.
       NIX_LDFLAGS = "-dead_strip_dylibs";
     };
-
-    postInstall = ''
-      install -m755 nix-installer.sh $out/bin/nix-installer.sh
-    '';
   };
 in
 
@@ -80,8 +76,5 @@ runCommand "nix-installer-${tarball.passthru.nixVersion}"
       --nix-version ${tarball.passthru.nixVersion} \
       --output $out/bin/nix-installer
 
-    install -m755 ${bare}/bin/nix-installer.sh $out/bin/nix-installer.sh
-
     echo "file binary-dist $out/bin/nix-installer" >> $out/nix-support/hydra-build-products
-    echo "file binary-dist $out/bin/nix-installer.sh" >> $out/nix-support/hydra-build-products
   ''
