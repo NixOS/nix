@@ -292,13 +292,14 @@ rec {
   # with the closure of 'nix' package, and the second half of
   # the installation script.
   binaryTarball = forAllSystems (
-    system: nixComponentsFor.${system}.native.callPackage ./binary-tarball.nix { }
+    system: nixComponentsFor.${system}.native.callPackage ./installer/binary-tarball.nix { }
   );
 
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (
     system:
     forAllCrossSystems (
-      crossSystem: nixComponentsFor.${system}.cross.${crossSystem}.callPackage ./binary-tarball.nix { }
+      crossSystem:
+      nixComponentsFor.${system}.cross.${crossSystem}.callPackage ./installer/binary-tarball.nix { }
     )
   );
 
