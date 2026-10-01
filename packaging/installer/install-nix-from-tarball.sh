@@ -206,7 +206,7 @@ if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
     exit 1
 fi
 
-# shellcheck source=./nix-profile.sh.in
+# shellcheck source=../../scripts/nix-profile.sh.in
 . "$nix/etc/profile.d/nix.sh"
 
 NIX_LINK="$HOME/.nix-profile"
