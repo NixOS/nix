@@ -43,3 +43,15 @@ nix flake metadata --json "hg+file://$flake2Dir"
 
 nix build -o "$TEST_ROOT/result" "hg+file://$flake2Dir" --no-registries --no-allow-dirty
 nix build -o "$TEST_ROOT/result" "hg+file://$flake2Dir" --no-use-registries --no-allow-dirty
+
+[[ $(nix flake metadata --json "$flake2Dir" | jq -r .resolvedUrl) = "hg+file://$flake2Dir" ]]
+echo untracked > "$flake2Dir/untracked"
+storePath=$(nix flake metadata --json "$flake2Dir" | jq -r .path)
+[[ -e $storePath/flake.nix ]]
+[[ ! -e $storePath/untracked ]]
+[[ ! -e $storePath/.hg ]]
+
+mkdir -p "$flake2Dir/sub"
+writeSimpleFlake "$flake2Dir/sub"
+hg add "$flake2Dir/sub/flake.nix"
+[[ $(_NIX_TEST_BARF_ON_UNCACHEABLE='' nix flake metadata --json "$flake2Dir/sub" | jq -r .resolvedUrl) = "hg+file://$flake2Dir?dir=sub" ]]

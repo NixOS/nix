@@ -69,10 +69,22 @@ struct MercurialInputScheme : InputScheme
         return "hg";
     }
 
+    std::optional<ParsedURL> localRepoURL(const std::filesystem::path & path) const override
+    {
+        if (!pathExists(path / ".hg"))
+            return std::nullopt;
+        return ParsedURL{
+            .scheme = "hg+file",
+            .authority = ParsedURL::Authority{},
+            .path = pathToUrlPath(path),
+        };
+    }
+
     std::string schemeDescription() const override
     {
-        // TODO
-        return "";
+        return stripIndentation(R"(
+          Fetch a Mercurial tree and copy it to the Nix store.
+        )");
     }
 
     const std::map<std::string, AttributeInfo> & allowedAttrs() const override
