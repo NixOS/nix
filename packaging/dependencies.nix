@@ -99,8 +99,9 @@ scope: {
       });
 
   # TODO Hack until https://github.com/NixOS/nixpkgs/issues/45462 is fixed.
+  # TODO Boost 1.91 has a regression in boost.url :(
   boost =
-    (pkgs.boost.override {
+    (pkgs.boost189.override {
       extraB2Args = [
         "--with-container"
         "--with-context"
