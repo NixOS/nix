@@ -13,7 +13,7 @@ let
 
   installScriptFor =
     tarballs:
-    nixpkgsFor.x86_64-linux.native.callPackage ./installer {
+    nixpkgsFor.x86_64-linux.native.callPackage ./scripted-installer {
       inherit tarballs;
       # Platform doesn't matter, we only need to fish out the fineVersion.
       version = nixComponentsFor.x86_64-linux.native.nix-cli.version;
@@ -292,14 +292,15 @@ rec {
   # with the closure of 'nix' package, and the second half of
   # the installation script.
   binaryTarball = forAllSystems (
-    system: nixComponentsFor.${system}.native.callPackage ./installer/binary-tarball.nix { }
+    system: nixComponentsFor.${system}.native.callPackage ./scripted-installer/binary-tarball.nix { }
   );
 
   binaryTarballCross = lib.genAttrs [ "x86_64-linux" ] (
     system:
     forAllCrossSystems (
       crossSystem:
-      nixComponentsFor.${system}.cross.${crossSystem}.callPackage ./installer/binary-tarball.nix { }
+      nixComponentsFor.${system}.cross.${crossSystem}.callPackage ./scripted-installer/binary-tarball.nix
+        { }
     )
   );
 
@@ -326,28 +327,30 @@ rec {
   # because those get taken from the --tarball-url-prefix argument.
   installerScriptForGHA = forAllSystems (
     system:
-    nixpkgsFor.${system}.native.callPackage ./installer {
+    nixpkgsFor.${system}.native.callPackage ./scripted-installer {
       tarballs = [ self.hydraJobs.binaryTarball.${system} ];
       # Platform doesn't matter, we only need to fish out the fineVersion.
       version = nixComponentsFor.x86_64-linux.native.nix-cli.version;
     }
   );
 
-  # `NixOS/nix-installer` with this revision's Nix closure embedded.
-  rustInstaller = lib.genAttrs (linux64BitSystems ++ [ "aarch64-darwin" ]) (
+  /**
+    `NixOS/nix-installer` with this revision's Nix closure embedded.
+  */
+  nixInstaller = lib.genAttrs (linux64BitSystems ++ [ "aarch64-darwin" ]) (
     system:
     let
       components = nixComponentsFor.${system}.native;
       pkgs = components._pkgs;
       # Embed the native (glibc) Nix even though the Linux installer
       # binary is static/musl.
-      tarball = pkgs.callPackage ./rust-installer/tarball.nix {
-        # TODO: Shouldn't this be nix-cli?
+      tarball = pkgs.callPackage ./nix-installer/tarball.nix {
+        # Not nix-cli because we want manual pages too.
         nix = components.nix-everything;
       };
       builder = if pkgs.stdenv.hostPlatform.isLinux then pkgs.pkgsStatic else pkgs;
     in
-    builder.callPackage ./rust-installer {
+    builder.callPackage ./nix-installer {
       inherit tarball;
     }
   );
