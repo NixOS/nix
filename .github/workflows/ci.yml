@@ -170,19 +170,19 @@ jobs:
           - scenario: on ubuntu
             runs-on: ubuntu-24.04
             os: linux
-            rust-installer: false
+            nix-installer: false
           - scenario: on macos
             runs-on: macos-14
             os: darwin
-            rust-installer: false
+            nix-installer: false
           - scenario: on ubuntu (rust)
             runs-on: ubuntu-24.04
             os: linux
-            rust-installer: true
+            nix-installer: true
           - scenario: on macos (rust)
             runs-on: macos-14
             os: darwin
-            rust-installer: true
+            nix-installer: true
     name: installer test ${{ matrix.scenario }}
     runs-on: ${{ matrix.runs-on }}
     steps:
@@ -198,12 +198,12 @@ jobs:
       id: installer-tarball-url
       run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
     - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
-      if: ${{ !matrix.rust-installer }}
+      if: ${{ !matrix.nix-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
         install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
-    - name: Run rust installer
-      if: ${{ matrix.rust-installer }}
+    - name: Run nix-installer
+      if: ${{ matrix.nix-installer }}
       run: |
         chmod +x out/nix-installer
         ./out/nix-installer install --no-confirm
