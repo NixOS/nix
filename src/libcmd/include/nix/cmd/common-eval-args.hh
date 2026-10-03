@@ -87,4 +87,21 @@ private:
  */
 SourcePath lookupFileArg(EvalState & state, std::string_view s, const std::filesystem::path * baseDir = nullptr);
 
+/**
+ * Fetch a tree reference (as accepted by the `--tree` CLI flag and by
+ * [`builtins.fetchTree`](@docroot@/language/builtins.md#builtins-fetchTree))
+ * into the store and return a `SourcePath` that can be passed to
+ * `EvalState::evalFile`.
+ *
+ * This is the implementation shared between the new CLI's `--tree`
+ * flag (in `SourceExprCommand`) and the legacy `nix-build` /
+ * `nix-instantiate` commands.
+ *
+ * Requires the `fetch-tree` experimental feature.
+ *
+ * @param baseDir Base directory used to resolve relative path
+ * references (typically the command base directory).
+ */
+SourcePath fetchTreeArg(EvalState & state, std::string_view treeRef, const std::filesystem::path & baseDir);
+
 } // namespace nix
