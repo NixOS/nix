@@ -17,6 +17,14 @@ let
     nix-channel --add file://$HOME/channel myChannel
     nix-channel --update
     [[ $(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
+
+    bad_mtime=$( find /nix/store/ -mindepth 1 ! -path /nix/store/.links \
+                 -exec sh -c '[ "$(stat -c %Y "{}")" -ne 1 ]' \; -print -quit )
+    if [ -n "$bad_mtime" ]; then
+      echo "bad filesystem object mtime after install:"
+      stat "$bad_mtime"
+      exit 1
+    fi
   '';
 
   installCases = {
