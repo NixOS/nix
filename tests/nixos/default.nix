@@ -224,4 +224,18 @@ in
     name = lib.mkForce "upgrade-nix-from-latest";
     upgrade-nix.oldNix = pkgs.nixVersions.latest;
   };
+
+  binfmt-misc = runNixOSTest ./binfmt-misc.nix;
+
+  binfmt-misc-old-kernel = runNixOSTest {
+    imports = [ ./binfmt-misc.nix ];
+    name = lib.mkForce "binfmt-misc-old-kernel";
+    oldKernel = true;
+  };
+
+  binfmt-misc-unpriv-daemon = runNixOSTest {
+    imports = [ ./binfmt-misc.nix ];
+    name = lib.mkForce "binfmt-misc-unpriv-daemon";
+    unprivDaemon = true;
+  };
 }

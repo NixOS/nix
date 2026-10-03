@@ -26,6 +26,13 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     bool usingUserNamespace = true;
 
     /**
+     * On Linux, whether we need a new binfmt_misc instance in the child user
+     * namespace, and if so what binfmt_misc registrations to set up in the new
+     * binfmt_misc instance.
+     */
+    std::optional<StringSet> binfmtMisc;
+
+    /**
      * The cgroup of the builder, if any.
      */
     std::optional<std::filesystem::path> cgroup;
@@ -33,12 +40,7 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     ChrootLinuxDerivationBuilder(
         std::shared_ptr<BuildingStore> store,
         std::shared_ptr<DerivationBuilderCallbacks> miscMethods,
-        DerivationBuilderParams params)
-        : UnixDerivationBuilderImpl{store, miscMethods, params}
-        , ChrootDerivationBuilder{store, miscMethods, params}
-        , LinuxDerivationBuilder{store, miscMethods, params}
-    {
-    }
+        DerivationBuilderParams params);
 
     uid_t sandboxUid();
 
@@ -61,6 +63,12 @@ struct ChrootLinuxDerivationBuilder : ChrootDerivationBuilder, LinuxDerivationBu
     void killSandbox(bool getStats) override;
 
     void addDependencyImpl(const StorePath & path) override;
+
+private:
+
+    bool needDoubleUserns();
+
+    void setUserDoubleUserns();
 };
 
 } // namespace nix
