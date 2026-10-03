@@ -6,7 +6,11 @@ For more in-depth information you are kindly referred to subsequent chapters.
 1. Install Nix:
 
    ```console
-   $ curl -L https://nixos.org/nix/install | sh
+   # For multi-user install
+   $ bash <(curl -L https://nixos.org/nix/install) --daemon
+
+   # For single-user install
+   $ bash <(curl -L https://nixos.org/nix/install) --no-daemon
    ```
 
    The install script will use `sudo`, so make sure you have sufficient rights.
