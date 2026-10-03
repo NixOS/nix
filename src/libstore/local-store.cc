@@ -559,9 +559,17 @@ void LocalStore::openDB(State & state, bool create)
             SQLiteError::throw_(db, "querying journal mode");
         prevMode = std::string((const char *) sqlite3_column_text(stmt, 0));
     }
-    if (prevMode != mode
-        && sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
-        SQLiteError::throw_(db, "setting journal mode");
+    /* Switching a database to WAL mode needs an exclusive lock, and
+       SQLite reports SQLITE_BUSY at once, without waiting for the busy
+       timeout, while another connection has the database open. That
+       happens when several processes open a new store at the same time:
+       they all hold only a shared big-lock and all switch the new
+       database to WAL. Retry like any other busy statement. */
+    if (prevMode != mode)
+        retrySQLite<void>([&]() {
+            if (sqlite3_exec(db, ("pragma main.journal_mode = " + mode + ";").c_str(), 0, 0, 0) != SQLITE_OK)
+                SQLiteError::throw_(db, "setting journal mode");
+        });
 
     if (mode == "wal") {
         /* persist the WAL files when the db connection is closed. This allows
