@@ -5,10 +5,31 @@
 }:
 
 let
+  commonCheck = ''
+    export NIX_CONFIG="substituters = "
 
-  installScripts = {
+    nix-env --version
+
+    nix --extra-experimental-features nix-command store info
+    nix-store --verify --check-contents
+    nix store verify --all --extra-experimental-features nix-command --no-trust
+
+    nix-channel --add file://$HOME/channel myChannel
+    nix-channel --update
+    [[ $(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
+
+    bad_mtime=$( find /nix/store/ -mindepth 1 ! -path /nix/store/.links \
+                 -exec sh -c '[ "$(stat -c %Y "{}")" -ne 1 ]' \; -print -quit )
+    if [ -n "$bad_mtime" ]; then
+      echo "bad filesystem object mtime after install:"
+      stat "$bad_mtime"
+      exit 1
+    fi
+  '';
+
+  installCases = {
     install-default = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-channel-add
@@ -16,7 +37,7 @@ let
     };
 
     install-both-profile-links = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
@@ -27,7 +48,7 @@ let
     };
 
     install-force-no-daemon = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-daemon --no-channel-add
@@ -35,7 +56,7 @@ let
     };
 
     install-force-daemon = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --daemon --no-channel-add
@@ -58,7 +79,12 @@ let
   disableSELinux = "sudo setenforce 0";
 
   images = {
-    "ubuntu-22-04" = {
+    # Images are named such that the DrvName logic that extracts the derivation
+    # name for logs doesn't treat the everything after the `-` as the version.
+    # That's accomplished by adding `v` after the dash. This makes logs more
+    # legible.
+
+    "ubuntu-v22_04" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://cloud-images.ubuntu.com/releases/jammy/release-20260913/ubuntu-22.04-server-cloudimg-amd64-disk-kvm.img";
@@ -67,7 +93,7 @@ let
       };
     };
 
-    "ubuntu-24-04" = {
+    "ubuntu-v24_04" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://cloud-images.ubuntu.com/releases/noble/release-20260911/ubuntu-24.04-server-cloudimg-amd64.img";
@@ -76,7 +102,7 @@ let
       };
     };
 
-    "fedora-44" = {
+    "fedora-v44" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2";
@@ -86,7 +112,7 @@ let
       };
     };
 
-    "rocky-8" = {
+    "rocky-v8" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/8/images/x86_64/Rocky-8-GenericCloud-Base-8.10-20240528.0.x86_64.qcow2";
@@ -96,7 +122,7 @@ let
       };
     };
 
-    "rocky-9" = {
+    "rocky-v9" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2";
@@ -108,7 +134,7 @@ let
       };
     };
 
-    "rocky-10" = {
+    "rocky-v10" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2";
@@ -121,7 +147,7 @@ let
     };
 
     # Docs on cloud-init quirks: https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/cloud-init/README.Alpine?ref_type=heads
-    "alpine-3-23" = {
+    "alpine-v3_23" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/alpine-3.23.6-x86_64-bios-cloudinit-r0.qcow2";
@@ -129,9 +155,9 @@ let
         };
         shell = "/bin/sh";
         postBoot = "touch ~/.profile";
-        installScripts = {
+        installCases = {
           # Multi-user installer doesn't support non-bash shells or OpenRC.
-          inherit (installScripts) install-default install-both-profile-links install-force-no-daemon;
+          inherit (installCases) install-default install-both-profile-links install-force-no-daemon;
         };
       };
     };
@@ -145,6 +171,7 @@ let
     }:
     let
       image = images.${imageName}.${system};
+      test = installCases.${testName};
     in
     with nixpkgsFor.${system}.native;
     runCommand "installer-test-${imageName}-${testName}"
@@ -156,7 +183,8 @@ let
         ];
         image = image.image;
         postBoot = image.postBoot or "";
-        installScript = installScripts.${testName}.script;
+        installScript = test.install;
+        checkScript = commonCheck + (test.check or "");
         binaryTarball = binaryTarballs.${system};
       }
       ''
@@ -221,7 +249,7 @@ let
 
         if [[ -n $postBoot ]]; then
           echo "Running post-boot commands..."
-          $ssh "set -ex; $postBoot"
+          $ssh "set -eux; $postBoot"
         fi
 
         echo "Copying installer..."
@@ -229,7 +257,7 @@ let
 
         echo "Running installer..."
         $ssh <<EOF
-          set -eux;
+          set -eux
 
           # TODO: The installer should probably autodetect instead of requiring manually specifying this.
           if command -v sudo; then
@@ -241,24 +269,13 @@ let
           $installScript
         EOF
 
-        echo "Copying the mock channel"
-        ssh -p $ssh_port $ssh_opts user@localhost "mkdir channel"
-        scp -P $ssh_port $ssh_opts ${mockChannel pkgs}/channel/nixexprs.tar.bz2 user@localhost:channel/
+        echo "Copying the mock channel..."
+        scp -r -P $ssh_port $ssh_opts ${mockChannel pkgs}/channel user@localhost:./
 
         echo "Testing Nix installation..."
         $ssh <<EOF
           set -eux
-
-          nix-env --version
-          nix --extra-experimental-features nix-command store info
-
-          out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "${system}"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
-          [ "\$(cat \$out)" = foobar ]
-
-          export NIX_CONFIG="substituters = "
-          \$(which nix-channel) --add file://\$HOME/channel myChannel
-          \$(which nix-channel) --update
-          [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
+          $checkScript
         EOF
 
         echo "Done!"
@@ -271,7 +288,7 @@ builtins.mapAttrs (
   imageName: imageForSystems:
   lib.concatMapAttrs (system: image: {
     ${system} = builtins.mapAttrs (testName: test: makeTest { inherit imageName testName system; }) (
-      image.installScripts or installScripts
+      image.installCases or installCases
     );
   }) imageForSystems
 ) images
