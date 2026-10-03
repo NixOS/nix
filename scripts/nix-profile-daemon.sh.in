@@ -1,13 +1,22 @@
+# If you are making changes to this file, make sure to make an identical change
+# in `nix-profile.sh.in`, unless there is a very good reason not to.
+#
 # Only execute this file once per shell.
 # This file is tested by tests/installer/default.nix.
 if [ -n "${__ETC_PROFILE_NIX_SOURCED:-}" ]; then return; fi
 export __ETC_PROFILE_NIX_SOURCED=1
 
-NIX_LINK=$HOME/.nix-profile
+# Set up the per-user profile.
+
+if [ -n "${NIX_STATE_HOME-}" ]; then
+    NIX_LINK="$NIX_STATE_HOME/profile"
+else
+    NIX_LINK="$HOME/.nix-profile"
+fi
 if [ -n "${XDG_STATE_HOME-}" ]; then
     NIX_LINK_NEW="$XDG_STATE_HOME/nix/profile"
 else
-    NIX_LINK_NEW=$HOME/.local/state/nix/profile
+    NIX_LINK_NEW="$HOME/.local/state/nix/profile"
 fi
 if [ -e "$NIX_LINK_NEW" ]; then
     if [ -t 2 ] && [ -e "$NIX_LINK" ]; then
@@ -49,6 +58,10 @@ elif [ -e /etc/ssl/certs/ca-bundle.crt ]; then # Old NixOS
     export NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
 elif [ -e /etc/pki/tls/certs/ca-bundle.crt ]; then # Fedora, CentOS
     export NIX_SSL_CERT_FILE=/etc/pki/tls/certs/ca-bundle.crt
+elif [ -e "$NIX_LINK/etc/ssl/certs/ca-bundle.crt" ]; then # fall back to cacert in Nix profile
+    export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ssl/certs/ca-bundle.crt"
+elif [ -e "$NIX_LINK/etc/ca-bundle.crt" ]; then # old cacert in Nix profile
+    export NIX_SSL_CERT_FILE="$NIX_LINK/etc/ca-bundle.crt"
 else
   # Fall back to what is in the nix profiles, favouring whatever is defined last.
   check_nix_profiles() {
@@ -66,6 +79,13 @@ else
   }
   check_nix_profiles
   unset -f check_nix_profiles
+fi
+
+# Only use MANPATH if it is already set. In general `man` will just simply
+# pick up `.nix-profile/share/man` because is it close to `.nix-profile/bin`
+# which is in the $PATH. For more info, run `manpath -d`.
+if [ -n "${MANPATH-}" ]; then
+    export MANPATH="$NIX_LINK/share/man:$MANPATH"
 fi
 
 export PATH="$NIX_LINK/bin:@localstatedir@/nix/profiles/default/bin:$PATH"
