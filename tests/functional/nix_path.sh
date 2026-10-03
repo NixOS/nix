@@ -43,6 +43,19 @@ done
 # shellcheck disable=SC2091
 ( ! $(nix-instantiate --find-file test) )
 
+# XXX: we can't manipulate $NIX_STATE_DIR contents on NixOS
+# TODO: port to NixOS somehow; ideally we'd run the test suite in a non-NixOS VM
+if [[ ! isTestOnNixOS ]]; then
+    mkdir -p $NIX_STATE_DIR/profiles/per-user/root/channels/nixpkgs
+    # check that the default values are set
+    [[ $(nix-instantiate --eval -E 'with builtins; length nixPath') = 2 ]]
+    # setting anything overrides the default paths
+    # this ensures we can force an empty search path
+    [[ $(NIX_PATH= nix-instantiate --eval -E 'with builtins; length nixPath') = 0 ]]
+    [[ $(nix-instantiate --nix-path "" --eval -E 'with builtins; length nixPath') = 0 ]]
+    [[ $(nix-instantiate -I "" --eval -E 'with builtins; length nixPath') = 1 ]]
+fi
+
 echo "nix-path = test=$TEST_ROOT/from-nix-path-file" >> "$test_nix_conf"
 
 # Use nix.conf in absence of NIX_PATH
