@@ -837,6 +837,9 @@ install_from_extracted_nix() {
         _sudo "to copy the basic Nix files to the new store at $NIX_ROOT/store" \
               cp -RPp ./store/* "$NIX_ROOT/store/"
 
+        _sudo "to chown the $NIX_ROOT/store contents" \
+              chown -hR 0:0 "$NIX_ROOT"/store/*
+
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
 
