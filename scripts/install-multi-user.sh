@@ -842,6 +842,9 @@ install_from_extracted_nix() {
                   cp -RP --preserve=ownership,timestamps ./store/* "$NIX_ROOT/store/"
         fi
 
+        _sudo "to chown the $NIX_ROOT/store contents" \
+              chown -hR 0:0 "$NIX_ROOT"/store/*
+
         _sudo "to make the new store non-writable at $NIX_ROOT/store" \
               chmod -R ugo-w "$NIX_ROOT/store/"
 
