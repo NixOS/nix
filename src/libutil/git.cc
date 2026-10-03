@@ -34,10 +34,8 @@ static std::string getString(Source & source, int n)
     return v;
 }
 
-uint64_t parseBlob(Source & source, const ExperimentalFeatureSettings & xpSettings)
+uint64_t parseBlob(Source & source)
 {
-    xpSettings.require(Xp::GitHashing);
-
     auto sizeStr = getStringUntil(source, 0);
     auto size = string2Int<uint64_t>(sizeStr);
     if (!size)
@@ -45,14 +43,8 @@ uint64_t parseBlob(Source & source, const ExperimentalFeatureSettings & xpSettin
     return *size;
 }
 
-void parseTree(
-    merkle::DirectorySink & sink,
-    Source & source,
-    HashAlgorithm hashAlgo,
-    const ExperimentalFeatureSettings & xpSettings)
+void parseTree(merkle::DirectorySink & sink, Source & source, HashAlgorithm hashAlgo)
 {
-    xpSettings.require(Xp::GitHashing);
-
     auto sizeStr = getStringUntil(source, 0);
     auto leftOpt = string2Int<uint64_t>(sizeStr);
     if (!leftOpt)
@@ -93,10 +85,8 @@ void parseTree(
     }
 }
 
-ObjectType parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings)
+ObjectType parseObjectType(Source & source)
 {
-    xpSettings.require(Xp::GitHashing);
-
     auto type = getString(source, 5);
 
     if (type == "blob ") {
@@ -127,18 +117,16 @@ std::optional<Mode> convertMode(SourceAccessor::Type type)
     }
 }
 
-void dumpBlobPrefix(uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
+void dumpBlobPrefix(uint64_t size, Sink & sink)
 {
     using namespace std::string_literals;
-    xpSettings.require(Xp::GitHashing);
     auto s = fmt("blob %d\0"s, std::to_string(size));
     sink(s);
 }
 
-void dumpTree(const Tree & entries, Sink & sink, const ExperimentalFeatureSettings & xpSettings)
+void dumpTree(const Tree & entries, Sink & sink)
 {
     using namespace std::string_literals;
-    xpSettings.require(Xp::GitHashing);
 
     std::string v1;
 
@@ -161,18 +149,13 @@ void dumpTree(const Tree & entries, Sink & sink, const ExperimentalFeatureSettin
     sink(v1);
 }
 
-Mode dump(
-    const SourcePath & path,
-    Sink & sink,
-    fun<DumpHook> hook,
-    PathFilter & filter,
-    const ExperimentalFeatureSettings & xpSettings)
+Mode dump(const SourcePath & path, Sink & sink, fun<DumpHook> hook, PathFilter & filter)
 {
     auto st = path.lstat();
 
     switch (st.type) {
     case SourceAccessor::tRegular: {
-        path.readFile(sink, [&](uint64_t size) { dumpBlobPrefix(size, sink, xpSettings); });
+        path.readFile(sink, [&](uint64_t size) { dumpBlobPrefix(size, sink); });
         return st.isExecutable ? Mode::Executable : Mode::Regular;
     }
 
@@ -191,13 +174,13 @@ Mode dump(
 
             entries.insert_or_assign(std::move(name2), std::move(entry));
         }
-        dumpTree(entries, sink, xpSettings);
+        dumpTree(entries, sink);
         return Mode::Directory;
     }
 
     case SourceAccessor::tSymlink: {
         auto target = path.readLink();
-        dumpBlobPrefix(target.size(), sink, xpSettings);
+        dumpBlobPrefix(target.size(), sink);
         sink(target);
         return Mode::Symlink;
     }
