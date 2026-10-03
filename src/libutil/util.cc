@@ -150,12 +150,10 @@ std::optional<N> string2Int(const std::string_view s)
 }
 
 // Explicitly instantiated in one place for faster compilation
-template std::optional<unsigned char> string2Int<unsigned char>(const std::string_view s);
 template std::optional<unsigned short> string2Int<unsigned short>(const std::string_view s);
 template std::optional<unsigned int> string2Int<unsigned int>(const std::string_view s);
 template std::optional<unsigned long> string2Int<unsigned long>(const std::string_view s);
 template std::optional<unsigned long long> string2Int<unsigned long long>(const std::string_view s);
-template std::optional<signed char> string2Int<signed char>(const std::string_view s);
 template std::optional<signed short> string2Int<signed short>(const std::string_view s);
 template std::optional<signed int> string2Int<signed int>(const std::string_view s);
 template std::optional<signed long> string2Int<signed long>(const std::string_view s);

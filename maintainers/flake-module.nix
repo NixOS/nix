@@ -90,6 +90,8 @@
               ''^tests/functional/lang/eval-fail-url-literal\.nix$''
               ''^tests/functional/lang/eval-okay-url-literal-warn\.nix$''
               ''^tests/functional/lang/eval-okay-url-literal-default\.nix$''
+
+              ''^tests/functional/lang/eval-okay-arithmetic\.nix''
             ];
           };
           clang-format = {
