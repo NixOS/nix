@@ -59,6 +59,8 @@ cat >flake.nix <<EOF
     formatter = { };
     nixosConfigurations = { };
     nixosModules = { };
+    modules.nixos = { };
+    configurations.nixos = { }; # empty kind, no entries to check
   };
 }
 EOF
@@ -67,6 +69,28 @@ nix eval --impure --expr '
 let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
 in
 assert show_output == { };
+true
+'
+
+# Test that modules.<kind>.<name> and configurations.<kind>.<name> are shown with correct types
+cat >flake.nix <<EOF
+{
+  outputs = inputs: {
+    modules.nixos.moduleA = { a = 1; };
+    modules."home-manager".moduleB = { b = 2; };
+    configurations.nixos.myMachine = { system = "x86_64-linux"; };
+    configurations.darwin.myMac = { system = "aarch64-darwin"; };
+  };
+}
+EOF
+nix flake show --json --all-systems > show-output.json
+nix eval --impure --expr '
+let show_output = builtins.fromJSON (builtins.readFile ./show-output.json);
+in
+assert show_output.modules.nixos.moduleA.type == "module";
+assert show_output.modules."home-manager".moduleB.type == "module";
+assert show_output.configurations.nixos.myMachine.type == "configuration";
+assert show_output.configurations.darwin.myMac.type == "configuration";
 true
 '
 
