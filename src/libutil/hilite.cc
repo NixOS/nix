@@ -1,5 +1,7 @@
 #include "nix/util/hilite.hh"
 
+#include <algorithm>
+
 namespace nix {
 
 std::string
