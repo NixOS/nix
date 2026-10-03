@@ -58,7 +58,12 @@ let
   disableSELinux = "sudo setenforce 0";
 
   images = {
-    "ubuntu-22-04" = {
+    # Images are named such that the DrvName logic that extracts the derivation
+    # name for logs doesn't treat the everything after the `-` as the version.
+    # That's accomplished by adding `v` after the dash. This makes logs more
+    # legible.
+
+    "ubuntu-v22_04" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://cloud-images.ubuntu.com/releases/jammy/release-20260913/ubuntu-22.04-server-cloudimg-amd64-disk-kvm.img";
@@ -67,7 +72,7 @@ let
       };
     };
 
-    "ubuntu-24-04" = {
+    "ubuntu-v24_04" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://cloud-images.ubuntu.com/releases/noble/release-20260911/ubuntu-24.04-server-cloudimg-amd64.img";
@@ -76,7 +81,7 @@ let
       };
     };
 
-    "fedora-44" = {
+    "fedora-v44" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2";
@@ -86,7 +91,7 @@ let
       };
     };
 
-    "rocky-8" = {
+    "rocky-v8" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/8/images/x86_64/Rocky-8-GenericCloud-Base-8.10-20240528.0.x86_64.qcow2";
@@ -96,7 +101,7 @@ let
       };
     };
 
-    "rocky-9" = {
+    "rocky-v9" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base-9.8-20260525.0.x86_64.qcow2";
@@ -108,7 +113,7 @@ let
       };
     };
 
-    "rocky-10" = {
+    "rocky-v10" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl.rockylinux.org/pub/rocky/10/images/x86_64/Rocky-10-GenericCloud-Base-10.2-20260525.0.x86_64.qcow2";
@@ -121,7 +126,7 @@ let
     };
 
     # Docs on cloud-init quirks: https://gitlab.alpinelinux.org/alpine/aports/-/blob/master/community/cloud-init/README.Alpine?ref_type=heads
-    "alpine-3-23" = {
+    "alpine-v3_23" = {
       "x86_64-linux" = {
         image = import <nix/fetchurl.nix> {
           url = "https://dl-cdn.alpinelinux.org/alpine/v3.23/releases/cloud/alpine-3.23.6-x86_64-bios-cloudinit-r0.qcow2";
