@@ -14,10 +14,40 @@ class EvalCache;
 class AttrCursor;
 } // namespace eval_cache
 
+/**
+ * Where the main program name came from.
+ * Used to produce a better error message when the binary does not exist.
+ */
+enum class MainProgramNameProvenance : uint8_t {
+    Unset,           ///< app-type outputs where the program path is given directly
+    MetaMainProgram, ///< explicitly specified via meta.mainProgram
+    Pname,           ///< inferred from pname attribute
+    Name,            ///< inferred from derivation name
+};
+
+/**
+ * Return the Nix attribute name that this provenance corresponds to,
+ * for use in diagnostic messages.
+ */
+inline std::string_view showMainProgramNameProvenance(MainProgramNameProvenance p)
+{
+    switch (p) {
+        case MainProgramNameProvenance::Unset: return "";
+        case MainProgramNameProvenance::MetaMainProgram: return "meta.mainProgram";
+        case MainProgramNameProvenance::Pname: return "pname";
+        case MainProgramNameProvenance::Name: return "name";
+    }
+}
+
 struct App
 {
     std::vector<DerivedPath> context;
     std::filesystem::path program;
+    MainProgramNameProvenance mainProgramNameProvenance = MainProgramNameProvenance::Unset;
+    /**
+     * The derivation name (e.g. "hello-2.12.1"), used in diagnostics.
+     */
+    std::string derivationName;
     // FIXME: add args, sandbox settings, metadata, ...
 };
 
