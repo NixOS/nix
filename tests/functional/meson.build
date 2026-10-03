@@ -160,6 +160,7 @@ suites = [
       'recursive.sh',
       'referrers.sh',
       'remote-store.sh',
+      'repair-daemon.sh',
       'repair.sh',
       'repl.sh',
       'restricted.sh',
