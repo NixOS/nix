@@ -146,7 +146,26 @@ nix_err nix_store_real_path(
     nix_c_context * context, Store * store, StorePath * path, nix_get_string_callback callback, void * user_data);
 
 // nix_err nix_store_ensure(Store*, const char*);
-// nix_err nix_store_build_paths(Store*);
+/**
+ * @breif Builds a series of opaque Nix store paths
+ *
+ * Blocking, calls the callback per num_store_paths once each path is built.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] store Nix Store reference
+ * @param[in] store_paths Pointer to the store paths
+ * @param[in] num_store_paths Number of elements in store_paths
+ * @param[in] callback called for each built output
+ * @return NIX_OF if the paths are valid, actual build results are provided to the callback in JSON form.
+ */
+nix_err nix_store_build_paths(
+    nix_c_context * context,
+    Store * store,
+    const StorePath ** store_paths,
+    unsigned int num_store_paths,
+    void (*callback)(void * userdata, const char * path, const char * result),
+    void * userdata);
+
 /**
  * @brief Realise a Nix store path
  *
