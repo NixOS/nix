@@ -19,6 +19,8 @@ SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD
         sshPublicHostKey.get(),
         useMaster,
         compress,
+        sshServerAliveInterval,
+        sshServerAliveCountMax,
         logFD,
     };
 }
