@@ -61,6 +61,21 @@ let
         mv ./nix-* nix
         ./nix/install --daemon --no-channel-add
       '';
+
+      check = ''
+        [ "$(stat -c '%a %U:%G' /nix/store)" = "1775 root:nixbld" ] || {
+          echo "/nix/store is not 1775 root:nixbld:"
+          stat /nix/store
+          exit 1
+        }
+
+        bad_ownership=$(find /nix/store/ -mindepth 1 ! \( -user root -group root \) -print -quit)
+        if [ -n "$bad_ownership" ]; then
+          echo "bad store object ownership in the store after install:"
+          stat "$bad_ownership"
+          exit 1
+        fi
+      '';
     };
 
     # TODO: Also port over tests from NixOS/nix-installer as applicable and add smoke tests for
