@@ -27,68 +27,6 @@ md5sum`.
 
 [Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
-# Options
-
-- `--flat`
-
-  Print the cryptographic hash of the contents of each regular file *path*.
-  That is, instead of computing
-  the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
-  just [directly hash](@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
-  This requires *path* to resolve to a regular file rather than directory.
-  The result is identical to that produced by the GNU commands
-  `md5sum` and `sha1sum`.
-
-- `--base16`
-
-  Print the hash in a hexadecimal representation (default).
-
-- `--base32`
-
-  Print the hash in [Nix32](@docroot@/protocols/nix32.md) representation rather than hexadecimal.
-  This representation is more compact and can be used in Nix
-  expressions (such as in calls to `fetchurl`).
-
-- `--base64`
-
-  Similar to `--base32`, but print the hash in a [Base64](https://en.wikipedia.org/wiki/Base64) representation,
-  which is more compact than the Nix32 one.
-
-- `--sri`
-
-  Print the hash in [SRI](@docroot@/glossary.md#gloss-sri) format with Base64 encoding.
-  The type of hash algorithm will be prepended to the hash string,
-  followed by a hyphen (-) and the Base64 hash body.
-
-- `--truncate`
-
-  Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits.
-
-- `--type` *hashAlgo*
-
-  Use the specified cryptographic hash algorithm, which can be one of
-  `blake3`, `md5`, `sha1`, `sha256`, and `sha512`.
-
-- `--to-base16`
-
-  Don’t hash anything, but convert the [Nix32](@docroot@/protocols/nix32.md) hash representation
-  *hash* to hexadecimal.
-
-- `--to-base32`
-
-  Don’t hash anything, but convert the hexadecimal hash representation
-  *hash* to [Nix32](@docroot@/protocols/nix32.md).
-
-- `--to-base64`
-
-  Don’t hash anything, but convert the hexadecimal hash representation
-  *hash* to Base64.
-
-- `--to-sri`
-
-  Don’t hash anything, but convert the hexadecimal hash representation
-  *hash* to SRI.
-
 # Examples
 
 Computing the same hash as `nix-prefetch-url`:
@@ -152,3 +90,65 @@ sha1-5P2Lpfe76upazon+ECVVNs1g2rY=
 $ nix-hash --to-base16 sha1-5P2Lpfe76upazon+ECVVNs1g2rY=
 e4fd8ba5f7bbeaea5ace89fe10255536cd60dab6
 ```
+
+# Options
+
+- `--flat`
+
+  Print the cryptographic hash of the contents of each regular file *path*.
+  That is, instead of computing
+  the hash of the [Nix Archive (NAR)](@docroot@/store/file-system-object/content-address.md#serial-nix-archive) of *path*,
+  just [directly hash](@docroot@/store/file-system-object/content-address.md#serial-flat) *path* as is.
+  This requires *path* to resolve to a regular file rather than directory.
+  The result is identical to that produced by the GNU commands
+  `md5sum` and `sha1sum`.
+
+- `--base16`
+
+  Print the hash in a hexadecimal representation (default).
+
+- `--base32`
+
+  Print the hash in [Nix32](@docroot@/protocols/nix32.md) representation rather than hexadecimal.
+  This representation is more compact and can be used in Nix
+  expressions (such as in calls to `fetchurl`).
+
+- `--base64`
+
+  Similar to `--base32`, but print the hash in a [Base64](https://en.wikipedia.org/wiki/Base64) representation,
+  which is more compact than the Nix32 one.
+
+- `--sri`
+
+  Print the hash in [SRI](@docroot@/glossary.md#gloss-sri) format with Base64 encoding.
+  The type of hash algorithm will be prepended to the hash string,
+  followed by a hyphen (-) and the Base64 hash body.
+
+- `--truncate`
+
+  Truncate hashes longer than 160 bits (such as SHA-256) to 160 bits.
+
+- `--type` *hashAlgo*
+
+  Use the specified cryptographic hash algorithm, which can be one of
+  `blake3`, `md5`, `sha1`, `sha256`, and `sha512`.
+
+- `--to-base16`
+
+  Don’t hash anything, but convert the [Nix32](@docroot@/protocols/nix32.md) hash representation
+  *hash* to hexadecimal.
+
+- `--to-base32`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to [Nix32](@docroot@/protocols/nix32.md).
+
+- `--to-base64`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to Base64.
+
+- `--to-sri`
+
+  Don’t hash anything, but convert the hexadecimal hash representation
+  *hash* to SRI.

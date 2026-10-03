@@ -25,12 +25,6 @@ This command is different from [`nix-store --dump`](./dump.md), which produces a
 
 [Nix Archive]: @docroot@/store/file-system-object/content-address.md#serial-nix-archive
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 > **Example**
@@ -51,3 +45,9 @@ This command is different from [`nix-store --dump`](./dump.md), which produces a
 > [bob@scratchy]$ $hello/bin/hello
 > Hello, world!
 > ```
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ../env-common.md}}

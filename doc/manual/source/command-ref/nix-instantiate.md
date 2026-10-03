@@ -28,6 +28,81 @@ of the resulting store derivations are printed on standard output.
 If *files* is the character `-`, then a Nix expression will be read from
 standard input.
 
+# Examples
+
+Instantiate [store derivation]s from a Nix expression, and build them using `nix-store`:
+
+```console
+$ nix-instantiate test.nix (instantiate)
+/nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
+
+$ nix-store --realise $(nix-instantiate test.nix) (build)
+...
+/nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
+
+$ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
+dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
+...
+```
+
+You can also give a Nix expression on the command line:
+
+```console
+$ nix-instantiate --expr 'with import <nixpkgs> { }; hello'
+/nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
+```
+
+This is equivalent to:
+
+```console
+$ nix-instantiate '<nixpkgs>' --attr hello
+```
+
+Parsing and evaluating Nix expressions:
+
+```console
+$ nix-instantiate --parse --expr '1 + 2'
+1 + 2
+```
+
+```console
+$ nix-instantiate --eval --expr '1 + 2'
+3
+```
+
+```console
+$ nix-instantiate --eval --xml --expr '1 + 2'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <int value="3" />
+</expr>
+```
+
+The difference between non-strict and strict evaluation:
+
+```console
+$ nix-instantiate --eval --xml --expr '{ x = {}; }'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr column="3" line="1" name="x">
+      <unevaluated />
+    </attr>
+  </attrs>
+</expr>
+
+$ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
+<?xml version='1.0' encoding='utf-8'?>
+<expr>
+  <attrs>
+    <attr column="3" line="1" name="x">
+      <attrs>
+      </attrs>
+    </attr>
+  </attrs>
+</expr>
+```
+
 # Options
 
 - `--add-root` *path*
@@ -130,78 +205,3 @@ standard input.
 {{#include ./opt-common.md}}
 
 {{#include ./env-common.md}}
-
-# Examples
-
-Instantiate [store derivation]s from a Nix expression, and build them using `nix-store`:
-
-```console
-$ nix-instantiate test.nix (instantiate)
-/nix/store/cigxbmvy6dzix98dxxh9b6shg7ar5bvs-perl-BerkeleyDB-0.26.drv
-
-$ nix-store --realise $(nix-instantiate test.nix) (build)
-...
-/nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26 (output path)
-
-$ ls -l /nix/store/qhqk4n8ci095g3sdp93x7rgwyh9rdvgk-perl-BerkeleyDB-0.26
-dr-xr-xr-x    2 eelco    users        4096 1970-01-01 01:00 lib
-...
-```
-
-You can also give a Nix expression on the command line:
-
-```console
-$ nix-instantiate --expr 'with import <nixpkgs> { }; hello'
-/nix/store/j8s4zyv75a724q38cb0r87rlczaiag4y-hello-2.8.drv
-```
-
-This is equivalent to:
-
-```console
-$ nix-instantiate '<nixpkgs>' --attr hello
-```
-
-Parsing and evaluating Nix expressions:
-
-```console
-$ nix-instantiate --parse --expr '1 + 2'
-1 + 2
-```
-
-```console
-$ nix-instantiate --eval --expr '1 + 2'
-3
-```
-
-```console
-$ nix-instantiate --eval --xml --expr '1 + 2'
-<?xml version='1.0' encoding='utf-8'?>
-<expr>
-  <int value="3" />
-</expr>
-```
-
-The difference between non-strict and strict evaluation:
-
-```console
-$ nix-instantiate --eval --xml --expr '{ x = {}; }'
-<?xml version='1.0' encoding='utf-8'?>
-<expr>
-  <attrs>
-    <attr column="3" line="1" name="x">
-      <unevaluated />
-    </attr>
-  </attrs>
-</expr>
-
-$ nix-instantiate --eval --xml --strict --expr '{ x = {}; }'
-<?xml version='1.0' encoding='utf-8'?>
-<expr>
-  <attrs>
-    <attr column="3" line="1" name="x">
-      <attrs>
-      </attrs>
-    </attr>
-  </attrs>
-</expr>
-```

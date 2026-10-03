@@ -73,16 +73,6 @@ This command has the following operations:
   Revert channels to the state before the last call to `nix-channel --update`.
   Optionally, you can specify a specific channel *generation* number to restore.
 
-{{#include ./opt-common.md}}
-
-{{#include ./env-common.md}}
-
-# Files
-
-`nix-channel` operates on the following files.
-
-{{#include ./files/channels.md}}
-
 # Examples
 
 Subscribe to the Nixpkgs channel and run `hello` from the GNU Hello package:
@@ -115,3 +105,13 @@ Remove a channel:
 $ nix-channel --remove nixpkgs
 $ nix-channel --list
 ```
+
+{{#include ./opt-common.md}}
+
+{{#include ./env-common.md}}
+
+# Files
+
+`nix-channel` operates on the following files.
+
+{{#include ./files/channels.md}}
