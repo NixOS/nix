@@ -1,0 +1,9 @@
+warning:
+         … while evaluating derivation 'eval-okay-derivation-outputs-string'
+
+         warning: setting the 'outputs' attribute to a space-separated string is deprecated, and may be disallowed in future versions of Nix. Set it to a list of strings instead.
+         at /pwd/lang/eval-okay-derivation-outputs-string.nix:6:3:
+              5|   builder = "/dontcare";
+              6|   outputs = "out dev";
+               |   ^
+              7| }).out
