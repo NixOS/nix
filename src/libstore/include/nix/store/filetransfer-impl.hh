@@ -9,11 +9,66 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <random>
+#include <string>
+
+#include "nix/store/filetransfer.hh"
 
 namespace nix {
+
+/**
+ * The netrc file curl should read credentials from, together with the lease
+ * that keeps a resolver-provided one alive.
+ */
+struct NetrcFile
+{
+    std::filesystem::path path;
+
+    /**
+     * Holds the resolver's materialisation open. Null when `path` came from
+     * the `netrc-file` setting, which nothing needs to keep alive.
+     */
+    std::shared_ptr<SecretFile> lease;
+};
+
+/**
+ * Pick the netrc file for one transfer.
+ *
+ * A resolver owning the transfer is asked first, so a broker can hand back
+ * credentials scoped to the host being contacted rather than the whole of
+ * the user's netrc. Without a resolver, or when it holds no netrc, the
+ * `netrc-file` setting applies exactly as before. curl treats a nonexistent
+ * path as "no netrc", so the unconfigured case needs no handling here.
+ *
+ * @throws Error if the resolver answers with an inline secret, which curl
+ * has no way to consume.
+ */
+NetrcFile resolveNetrcFile(
+    const FileTransferContext & context, const FileTransferSettings & settings, const FileTransferRequest & request);
+
+/**
+ * The netrc contents for a consumer that cannot be handed a file, such as a
+ * sandboxed build that has to carry the bytes across a fork.
+ *
+ * Precedence matches resolveNetrcFile(): the resolver first, then the
+ * `netrc-file` setting, then nothing at all. Unlike the file case there is
+ * no host to scope by, since one netrc has to serve every URL the consumer
+ * goes on to try.
+ *
+ * An engaged empty string is an explicit empty override. `std::nullopt`
+ * means that neither the resolver nor the configured file supplied data.
+ *
+ * @throws Error if the resolver answers with a materialised file, which
+ * cannot be passed on as data.
+ */
+std::optional<std::string> resolveNetrcData(
+    const std::shared_ptr<SecretResolver> & secretResolver,
+    const FileTransferSettings & settings,
+    const SecretPurpose & purpose);
 
 /**
  * Clamped exponential growth: base * 2^(attempt-1), capped at ceil.

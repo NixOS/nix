@@ -301,7 +301,7 @@ static void fetchTree(
     }
 
     if (!state.settings.pureEval && !input.isDirect() && experimentalFeatureSettings.isEnabled(Xp::Flakes))
-        input = lookupInRegistries(state.fetchSettings, *state.store, input, fetchers::UseRegistries::Limited).first;
+        input = lookupInRegistries(state.fetchContext, *state.store, input, fetchers::UseRegistries::Limited).first;
 
     if (state.settings.pureEval && !input.isLocked(state.fetchSettings)) {
         if (input.getNarHash())
@@ -327,7 +327,7 @@ static void fetchTree(
     }
 
     auto cachedInput =
-        state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+        state.inputCache->getAccessor(state.fetchContext, *state.store, input, fetchers::UseRegistries::No);
 
     auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
 
@@ -587,11 +587,11 @@ fetch(EvalState & state, Value * const * args, Value & v, const std::string & wh
             attrs.emplace("narHash", expectedHash->to_string(HashFormat::SRI, true));
         auto input = fetchers::Input::fromAttrs(std::move(attrs));
         auto cachedInput =
-            state.inputCache->getAccessor(state.fetchSettings, *state.store, input, fetchers::UseRegistries::No);
+            state.inputCache->getAccessor(state.fetchContext, *state.store, input, fetchers::UseRegistries::No);
         auto storePath = state.mountInput(cachedInput.lockedInput, input, cachedInput.accessor);
         state.mkStorePathString(storePath, v);
     } else {
-        auto storePath = fetchers::downloadFile(*state.store, state.fetchSettings, *url, name).storePath;
+        auto storePath = fetchers::downloadFile(*state.store, state.fetchContext, *url, name).storePath;
         if (expectedHash) {
             auto hash = hashPath(
                             {state.store->requireStoreObjectAccessor(storePath)},

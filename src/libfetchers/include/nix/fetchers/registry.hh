@@ -54,7 +54,7 @@ std::shared_ptr<Registry> getCustomRegistry(const Settings & settings, const std
 
 std::filesystem::path getUserRegistryPath();
 
-Registries getRegistries(const Settings & settings, Store & store);
+Registries getRegistries(const FetchContext & context, Store & store);
 
 void overrideRegistry(const Input & from, const Input & to, const Attrs & extraAttrs);
 
@@ -69,6 +69,6 @@ enum class UseRegistries : int {
  * use the registries for which the filter function returns true.
  */
 std::pair<Input, Attrs>
-lookupInRegistries(const Settings & settings, Store & store, const Input & input, UseRegistries useRegistries);
+lookupInRegistries(const FetchContext & context, Store & store, const Input & input, UseRegistries useRegistries);
 
 } // namespace nix::fetchers

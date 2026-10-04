@@ -65,7 +65,7 @@ struct CmdVerify : StorePathsCommand
     {
         std::vector<ref<Store>> substituters;
         for (auto & s : substituterUris)
-            substituters.push_back(openStore(StoreReference{s}));
+            substituters.push_back(openStore(store->getSecretContext(), StoreReference{s}));
 
         auto publicKeys = getDefaultPublicKeys();
 

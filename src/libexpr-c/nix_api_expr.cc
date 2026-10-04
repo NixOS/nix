@@ -171,8 +171,8 @@ EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder
     try {
         auto fetchSettings = std::make_unique<nix::fetchers::Settings>(std::move(builder->fetchSettings));
         auto settings = std::make_unique<nix::EvalSettings>(std::move(builder->settings));
-        auto ownedState =
-            std::make_shared<nix::EvalState>(builder->lookupPath, builder->store, *fetchSettings, *settings);
+        auto ownedState = std::make_shared<nix::EvalState>(
+            builder->lookupPath, builder->store, nix::fetchers::FetchContext{*fetchSettings, {}}, *settings);
         auto & stateRef = *ownedState;
         void * p = ::operator new(sizeof(EvalState), static_cast<std::align_val_t>(alignof(EvalState)));
         return new (p) EvalState{stateRef, std::move(fetchSettings), std::move(settings), std::move(ownedState)};

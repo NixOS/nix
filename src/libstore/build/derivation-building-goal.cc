@@ -910,7 +910,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                      * daemon thread. Ideally we should reuse the same
                      * Worker to share scheduling state.
                      */
-                    Worker freshWorker{goal.worker.store, goal.worker.evalStore};
+                    Worker freshWorker{goal.worker.store, goal.worker.evalStore, {}};
                     auto builder = makeRestrictedBuilder(freshWorker, context);
                     daemon::processConnection(
                         store, std::move(from), std::move(to), NotTrusted, recursiveFlag, builder.get_ptr());
@@ -956,6 +956,7 @@ Goal::Co DerivationBuildingGoal::buildLocally(
                 .defaultPathsInChroot = std::move(defaultPathsInChroot),
                 .systemFeatures = worker.store.config.systemFeatures.get(),
                 .desugaredEnv = std::move(desugaredEnv),
+                .secretResolver = worker.buildContext.secretResolver,
             };
 
             /* If we have to wait and retry (see below), then `builder` will

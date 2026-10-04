@@ -244,10 +244,11 @@ EvalMemory::EvalMemory()
 EvalState::EvalState(
     const LookupPath & lookupPathFromArguments,
     ref<Store> store,
-    const fetchers::Settings & fetchSettings,
+    const fetchers::FetchContext & fetchContext,
     const EvalSettings & settings,
     std::shared_ptr<Store> buildStore)
-    : fetchSettings{fetchSettings}
+    : fetchContext{fetchContext}
+    , fetchSettings{this->fetchContext.settings}
     , settings{settings}
     , symbols(StaticEvalSymbols::staticSymbolTable())
     , repair(NoRepair)
@@ -3369,7 +3370,7 @@ EvalState::resolveLookupPathPath(const LookupPath::Path & value0, bool initAcces
 
     if (EvalSettings::isPseudoUrl(value)) {
         try {
-            auto accessor = fetchers::downloadTarball(*store, fetchSettings, EvalSettings::resolvePseudoUrl(value));
+            auto accessor = fetchers::downloadTarball(*store, fetchContext, EvalSettings::resolvePseudoUrl(value));
             auto storePath = fetchToStore(fetchSettings, *store, SourcePath(accessor), FetchMode::Copy);
             return finish(this->storePath(storePath));
         } catch (Error & e) {

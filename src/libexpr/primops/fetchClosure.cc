@@ -196,7 +196,9 @@ static void prim_fetchClosure(EvalState & state, CallSite callSite, Value * cons
     if (!storeRef.params.empty())
         throw Error({.msg = HintFmt("'fetchClosure' does not support URL query parameters (in '%s')", *fromStoreUrl)});
 
-    auto fromStore = openStore(std::move(storeRef));
+    /* Only http(s) stores get here, so propagate the evaluator's credential
+       authority to the store that performs the transfer. */
+    auto fromStore = openStore(SecretContext{.secretResolver = state.fetchContext.secretResolver}, std::move(storeRef));
 
     if (toPath)
         runFetchClosureWithRewrite(state, *fromStore, *fromPath, *toPath, v);

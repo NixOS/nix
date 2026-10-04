@@ -78,7 +78,7 @@ TEST_F(WorkerSubstitutionTest, singleStoreObject)
     ASSERT_FALSE(dummyStore->isValidPath(pathInSubstituter));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{*dummyStore, *dummyStore, {}};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituerAsStore = substituter;
@@ -150,7 +150,7 @@ TEST_F(WorkerSubstitutionTest, singleRootStoreObjectWithSingleDepStoreObject)
     ASSERT_FALSE(dummyStore->isValidPath(mainPath));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{*dummyStore, *dummyStore, {}};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;
@@ -236,7 +236,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutput)
     ASSERT_FALSE(dummyStore->queryRealisation(drvOutput));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{*dummyStore, *dummyStore, {}};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;
@@ -405,7 +405,7 @@ TEST_F(WorkerSubstitutionTest, floatingDerivationOutputWithDepDrv)
     ASSERT_FALSE(dummyStore->queryRealisation(resolvedRootDrvOutput));
 
     // Create a worker with our custom substituter
-    Worker worker{*dummyStore, *dummyStore};
+    Worker worker{*dummyStore, *dummyStore, {}};
 
     // Override the substituters to use our dummy store substituter
     ref<Store> substituterAsStore = substituter;

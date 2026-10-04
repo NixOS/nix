@@ -249,7 +249,7 @@ static void showHelp(std::vector<std::string> subcommand, NixArgs & toplevel)
     auto statePtr = std::make_shared<EvalState>(
         LookupPath{},
         openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
-        fetchSettings,
+        fetchers::FetchContext{fetchSettings, {}},
         evalSettings);
     auto & state = *statePtr;
 
@@ -458,7 +458,7 @@ void mainWrapped(int argc, char ** argv)
         auto statePtr = std::make_shared<EvalState>(
             LookupPath{},
             openStore(StoreReference{.variant = StoreReference::Specified{.scheme = "dummy"}}),
-            fetchSettings,
+            fetchers::FetchContext{fetchSettings, {}},
             evalSettings);
         auto & state = *statePtr;
         auto builtinsJson = nlohmann::json::object();

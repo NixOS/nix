@@ -75,9 +75,10 @@ struct HookInstance;
 class LocalBuilder : public Builder
 {
 public:
-    LocalBuilder(ref<Store> store, ref<Store> evalStore)
+    LocalBuilder(ref<Store> store, ref<Store> evalStore, SecretContext context)
         : store(store)
-        , evalStore(evalStore) {};
+        , evalStore(evalStore)
+        , context(std::move(context)) {};
 
     /* Builder interface — see `Builder` for documentation. */
 
@@ -95,11 +96,12 @@ private:
      */
     inline std::shared_ptr<Worker> getWorker()
     {
-        return std::make_shared<Worker>(*store, *evalStore);
+        return std::make_shared<Worker>(*store, *evalStore, context);
     }
 
     ref<Store> store;
     ref<Store> evalStore;
+    SecretContext context;
 };
 
 /**
@@ -235,6 +237,9 @@ public:
     Store & store;
     Store & evalStore;
 
+    /** Dependencies scoped to the current LocalBuilder operation. */
+    const SecretContext buildContext;
+
     const WorkerSettings & settings;
 
     /**
@@ -269,7 +274,7 @@ public:
      */
     bool tryBuildHook = true;
 
-    Worker(Store & store, Store & evalStore);
+    Worker(Store & store, Store & evalStore, SecretContext buildContext);
     ~Worker();
 
     /**

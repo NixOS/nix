@@ -1,3 +1,4 @@
+#include "nix/util/sync.hh"
 #include "nix/store/store-registration.hh"
 #include "nix/store/store-open.hh"
 #include "nix/store/local-store.hh"
@@ -7,24 +8,40 @@
 #include "nix/util/thread-pool.hh"
 
 #include <filesystem>
+#include <optional>
 
 namespace nix {
 
+ref<Store> openStore(const SecretContext & context)
+{
+    return openStore(context, StoreReference{settings.storeUri.get()});
+}
+
 ref<Store> openStore()
 {
-    return openStore(StoreReference{settings.storeUri.get()});
+    return openStore(SecretContext{});
+}
+
+ref<Store> openStore(const SecretContext & context, const std::string & uri, const Store::Config::Params & extraParams)
+{
+    return openStore(context, StoreReference::parse(uri, extraParams));
 }
 
 ref<Store> openStore(const std::string & uri, const Store::Config::Params & extraParams)
 {
-    return openStore(StoreReference::parse(uri, extraParams));
+    return openStore(SecretContext{}, uri, extraParams);
+}
+
+ref<Store> openStore(const SecretContext & context, StoreReference && storeURI)
+{
+    auto store = resolveStoreConfig(std::move(storeURI))->openStore(context);
+    store->init();
+    return store;
 }
 
 ref<Store> openStore(StoreReference && storeURI)
 {
-    auto store = resolveStoreConfig(std::move(storeURI))->openStore();
-    store->init();
-    return store;
+    return openStore(SecretContext{}, std::move(storeURI));
 }
 
 ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
@@ -52,7 +69,7 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
                     {
                     }
 
-                    ref<Store> openStore() const override
+                    ref<Store> openStore(const SecretContext & context) const override
                     {
                         unreachable();
                     }
@@ -112,50 +129,75 @@ ref<StoreConfig> resolveStoreConfig(StoreReference && storeURI)
     return storeConfig;
 }
 
+std::list<ref<Store>> getDefaultSubstituters(const SecretContext & context)
+{
+    /* Opening substituters is expensive, so preserve the process-wide cache
+       for the process-wide, resolver-free context. A resolver belongs to one
+       operation and must be released with it, so neither it nor stores that
+       retain it may be placed in this static cache. */
+    using Cache = std::optional<std::list<ref<Store>>>;
+
+    static Sync<Cache> cache;
+
+    if (!context.secretResolver) {
+        auto cached(cache.lock());
+        if (cached->has_value())
+            return cached->value();
+    }
+
+    /* Opening a store can do network I/O (a binary cache fetches
+       `nix-cache-info` in `init()`), so build the list without the lock
+       held. A concurrent caller may do the same work; the first to install
+       its result wins and the rest is discarded. */
+    std::set<StoreReference> done;
+    std::vector<StoreReference> refs;
+    for (const auto & ref : settings.getWorkerSettings().substituters.get())
+        if (done.insert(ref).second)
+            refs.push_back(ref);
+
+    /* Open them all at once. Opening an HTTP cache means fetching
+       its `nix-cache-info`, and an unreachable one takes a connect
+       timeout (or a few) to fail, so opening one after the other
+       makes the wait the sum of those rather than the longest. One
+       slot per reference keeps the order deterministic for the
+       sort below.
+
+       TODO: a thread per store is overkill for what is purely
+       waiting on network requests. The file transfer already has
+       its own thread; all that is missing is an async `openStore`.
+       With that, this becomes: queue them all, then block on them
+       all. */
+    std::vector<std::shared_ptr<Store>> opened(refs.size());
+    ThreadPool pool{refs.size()};
+    for (size_t i = 0; i < refs.size(); ++i)
+        pool.enqueue([&context, &storeSlot = opened[i], &storeRef = refs[i]]() {
+            try {
+                storeSlot = openStore(context, StoreReference{storeRef}).get_ptr();
+            } catch (Error & e) {
+                logWarning(e.info());
+            }
+        });
+    pool.process();
+
+    std::list<ref<Store>> stores;
+    for (auto & store : opened)
+        if (store)
+            stores.push_back(ref<Store>(store));
+
+    stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
+
+    if (context.secretResolver)
+        return stores;
+
+    auto cached(cache.lock());
+    if (!cached->has_value())
+        cached->emplace(std::move(stores));
+    return cached->value();
+}
+
 std::list<ref<Store>> getDefaultSubstituters()
 {
-    static auto stores([]() {
-        std::set<StoreReference> done;
-        std::vector<StoreReference> refs;
-        for (const auto & ref : settings.getWorkerSettings().substituters.get())
-            if (done.insert(ref).second)
-                refs.push_back(ref);
-
-        /* Open them all at once. Opening an HTTP cache means fetching
-           its `nix-cache-info`, and an unreachable one takes a connect
-           timeout (or a few) to fail, so opening one after the other
-           makes the wait the sum of those rather than the longest. One
-           slot per reference keeps the order deterministic for the
-           sort below.
-
-           TODO: a thread per store is overkill for what is purely
-           waiting on network requests. The file transfer already has
-           its own thread; all that is missing is an async `openStore`.
-           With that, this becomes: queue them all, then block on them
-           all. */
-        std::vector<std::shared_ptr<Store>> opened(refs.size());
-        ThreadPool pool{refs.size()};
-        for (size_t i = 0; i < refs.size(); ++i)
-            pool.enqueue([&storeSlot = opened[i], &storeRef = refs[i]]() {
-                try {
-                    storeSlot = openStore(StoreReference{storeRef}).get_ptr();
-                } catch (Error & e) {
-                    logWarning(e.info());
-                }
-            });
-        pool.process();
-
-        std::list<ref<Store>> stores;
-        for (auto & store : opened)
-            if (store)
-                stores.push_back(ref<Store>(store));
-
-        stores.sort([](ref<Store> & a, ref<Store> & b) { return a->config.priority < b->config.priority; });
-
-        return stores;
-    }());
-
-    return stores;
+    return getDefaultSubstituters(SecretContext{});
 }
 
 Implementations::Map & Implementations::registered()

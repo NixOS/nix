@@ -4,21 +4,83 @@
 #include "nix/util/archive.hh"
 #include "nix/util/compression.hh"
 #include "nix/util/file-system.hh"
+#include "nix/util/util.hh"
 
 namespace nix {
 
-static void builtinFetchurl(const BuiltinBuilderContext & ctx)
+namespace {
+
+/**
+ * The netrc that the parent process copied into the sandbox, served to this
+ * fetch's transfers.
+ *
+ * A build has no broker to lease from, so the lease here is plain ownership:
+ * the file is written once, shared by every transfer of the fetch, and
+ * unlinked once the last of them lets go of it.
+ */
+class SandboxNetrcFile : public SecretFile
 {
-    /* Make the host's netrc data available. Too bad curl requires
-       this to be stored in a file. It would be nice if we could just
-       pass a pointer to the data. */
-    if (ctx.netrcData != "") {
-        fileTransferSettings.netrcFile = ctx.tmpDirInSandbox / "netrc";
-        writeFile(fileTransferSettings.netrcFile.get(), ctx.netrcData, 0600);
+public:
+    SandboxNetrcFile(std::filesystem::path path, std::string_view data)
+        : filePath(std::move(path))
+    {
+        writeFile(filePath, data, 0600);
     }
 
+    ~SandboxNetrcFile() override
+    {
+        try {
+            deletePath(filePath);
+        } catch (...) {
+            ignoreExceptionInDestructor();
+        }
+    }
+
+    const std::filesystem::path & path() const noexcept override
+    {
+        return filePath;
+    }
+
+private:
+    std::filesystem::path filePath;
+};
+
+class SandboxNetrcResolver : public SecretResolver
+{
+public:
+    SandboxNetrcResolver(std::filesystem::path path, std::string_view data)
+        : netrc(make_ref<SandboxNetrcFile>(std::move(path), data))
+    {
+    }
+
+    std::optional<ResolvedSecret> resolve(const SecretRequest & request) override
+    {
+        if (request.name != "netrc")
+            return std::nullopt;
+        if (request.representation != SecretRepresentation::MaterialisedFile)
+            throw Error("the sandboxed netrc can only be served as a file");
+        return ResolvedSecret{.value = netrc};
+    }
+
+private:
+    ref<SecretFile> netrc;
+};
+
+} // namespace
+
+static void builtinFetchurl(const BuiltinBuilderContext & ctx)
+{
+    /* Make the host's netrc data available to this fetch's transfers. Too
+       bad curl requires this to be stored in a file. It would be nice if we
+       could just pass a pointer to the data. */
+    FileTransferContext transferContext;
+    if (ctx.netrcData)
+        transferContext.secretResolver =
+            std::make_shared<SandboxNetrcResolver>(ctx.tmpDirInSandbox / "netrc", *ctx.netrcData);
+
+    /* Same for the CA bundle: the sandbox has no certificates of its own,
+       so every request below is pointed at the parent's copy. */
     auto caFilePath = ctx.tmpDirInSandbox / "ca-certificates.crt";
-    fileTransferSettings.caFile = std::optional<AbsolutePath>{caFilePath};
     writeFile(caFilePath, ctx.caFileData, 0600);
 
     auto out = get(ctx.drv.outputs, "out");
@@ -41,6 +103,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
         auto source = sinkToSource([&](Sink & sink) {
             FileTransferRequest request(VerbatimURL{url});
             request.decompress = false;
+            request.caFile = caFilePath;
 
 #if NIX_WITH_AWS_AUTH
             // Use pre-resolved credentials if available
@@ -56,7 +119,7 @@ static void builtinFetchurl(const BuiltinBuilderContext & ctx)
 
             auto decompressor = makeDecompressionSink(
                 unpack && hasSuffix(mainUrl, ".xz") ? CompressionAlgo::xz : CompressionAlgo::none, sink);
-            fileTransfer->download(std::move(request), *decompressor);
+            fileTransfer->download(transferContext, std::move(request), *decompressor);
             decompressor->finish();
         });
 

@@ -14,7 +14,7 @@ struct BuiltinBuilderContext
 {
     const BasicDerivation & drv;
     std::map<std::string, std::string> outputs;
-    std::string netrcData;
+    std::optional<std::string> netrcData;
     std::string caFileData;
     Strings hashedMirrors;
     std::filesystem::path tmpDirInSandbox;

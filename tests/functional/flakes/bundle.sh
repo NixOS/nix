@@ -17,6 +17,7 @@ cat <<EOF > flake.nix
         default = simple;
       };
       packages.$system.default = import ./simple.nix;
+      packages.$system.functionPackage = {}: import ./simple.nix;
       apps.$system.default = {
         type = "app";
         program = "\${import ./simple.nix}/hello";
@@ -29,6 +30,7 @@ nix build .#
 nix bundle --bundler .# .#
 nix bundle --bundler .#bundlers."$system".default .#packages."$system".default
 nix bundle --bundler .#bundlers."$system".simple  .#packages."$system".default
+nix bundle --bundler .#bundlers."$system".simple  .#packages."$system".functionPackage
 
 nix bundle --bundler .#bundlers."$system".default .#apps."$system".default
 nix bundle --bundler .#bundlers."$system".simple  .#apps."$system".default

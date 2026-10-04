@@ -14,6 +14,7 @@
 #include "nix/store/build/derivation-env-desugar.hh"
 #include "nix/util/terminal.hh"
 #include "nix/store/filetransfer.hh"
+#include "nix/store/filetransfer-impl.hh"
 
 #include <sys/un.h>
 #include <fcntl.h>
@@ -531,13 +532,31 @@ std::optional<AwsCredentials> UnixDerivationBuilderImpl::preResolveAwsCredential
 }
 #endif
 
-void UnixDerivationBuilderImpl::startChild()
+UnixDerivationBuilderImpl::RunChildArgs UnixDerivationBuilderImpl::makeRunChildArgs()
 {
-    RunChildArgs args{
+    return RunChildArgs{
+        /* Only builtin:fetchurl reads a netrc, and only the parent can ask a
+           resolver for one: the child must not talk to a broker, and by the
+           time it could the sandbox may have taken the file away.
+
+           The lookup is left unscoped by host. One netrc has to serve the
+           derivation's URL and every hashed mirror tried ahead of it, so
+           narrowing it to a single machine would break those fallbacks. */
+        .netrcData = drv.isBuiltin() && drv.builder == "builtin:fetchurl"
+                         ? resolveNetrcData(
+                               secretResolver,
+                               fileTransferSettings,
+                               SecretPurpose{.consumer = "builtin:fetchurl", .operation = "build"})
+                         : std::nullopt,
 #if NIX_WITH_AWS_AUTH
         .awsCredentials = preResolveAwsCredentials(),
 #endif
     };
+}
+
+void UnixDerivationBuilderImpl::startChild()
+{
+    auto args = makeRunChildArgs();
 
     pid = startProcess([this, args = std::move(args)]() {
         openSlave();
@@ -858,6 +877,7 @@ void UnixDerivationBuilderImpl::runChild(RunChildArgs args)
            different uid and/or in a sandbox). */
         BuiltinBuilderContext ctx{
             .drv = drv,
+            .netrcData = std::move(args.netrcData),
             .hashedMirrors = settings.getLocalSettings().hashedMirrors,
             .tmpDirInSandbox = tmpDirInSandbox(),
 #if NIX_WITH_AWS_AUTH
@@ -866,11 +886,6 @@ void UnixDerivationBuilderImpl::runChild(RunChildArgs args)
         };
 
         if (drv.isBuiltin() && drv.builder == "builtin:fetchurl") {
-            try {
-                ctx.netrcData = readFile(fileTransferSettings.netrcFile.get());
-            } catch (SystemError &) {
-            }
-
             if (auto & caFile = fileTransferSettings.caFile.get())
                 try {
                     ctx.caFileData = readFile(*caFile);

@@ -183,7 +183,7 @@ TEST_F(GitTest, submodulePeriodSupport)
     auto store = [] {
         auto cfg = make_ref<DummyStoreConfig>(StoreReference::Params{});
         cfg->readOnly = false;
-        return cfg->openStore();
+        return cfg->openStore(SecretContext{});
     }();
 
     auto settings = fetchers::Settings{};
@@ -194,7 +194,7 @@ TEST_F(GitTest, submodulePeriodSupport)
         {"ref", "main"},
     });
 
-    auto [accessor, i] = input.getAccessor(settings, *store);
+    auto [accessor, i] = input.getAccessor(FetchContext{settings, {}}, *store);
 
     ASSERT_EQ(accessor->readFile(CanonPath("deps/sub/lib.txt")), "hello from submodule\n");
 }

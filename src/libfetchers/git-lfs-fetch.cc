@@ -25,6 +25,7 @@ namespace nix::lfs {
 static void downloadToSink(
     const std::string & url,
     const std::optional<std::string> & authHeader,
+    const FileTransferContext & context,
     Sink & sink,
     std::string sha256Expected,
     size_t sizeExpected)
@@ -38,7 +39,7 @@ static void downloadToSink(
     HashSink hashSink(HashAlgorithm::SHA256);
     TeeSink teeSink(hashSink, sink);
 
-    getFileTransfer()->download(std::move(request), teeSink);
+    getFileTransfer()->download(context, std::move(request), teeSink);
 
     auto hashResult = hashSink.finish();
 
@@ -210,10 +211,11 @@ static std::optional<Pointer> parseLfsPointer(std::string_view content, std::str
     return std::make_optional(Pointer{oid, std::stoul(size)});
 }
 
-Fetch::Fetch(git_repository * repo, git_oid rev)
+Fetch::Fetch(git_repository * repo, git_oid rev, std::shared_ptr<nix::SecretResolver> secretResolver)
 {
     this->repo = repo;
     this->rev = rev;
+    this->secretResolver = std::move(secretResolver);
 
     const auto remoteUrl = lfs::getLfsEndpointUrl(repo);
 
@@ -260,7 +262,8 @@ std::vector<nlohmann::json> Fetch::fetchUrls(const std::vector<Pointer> & pointe
     StringSource source{payload};
     request.data = {source};
 
-    FileTransferResult result = getFileTransfer()->upload(request);
+    FileTransferResult result =
+        getFileTransfer()->upload(FileTransferContext{.secretResolver = secretResolver}, request);
     auto responseString = result.data;
 
     std::vector<nlohmann::json> objects;
@@ -360,7 +363,7 @@ void Fetch::fetch(
         auto [tempFile, tempPath] = createTempFile(cachePath.parent_path(), {});
         AutoDelete tempDeleter(tempPath);
         FdSink tempSink(tempFile.get());
-        downloadToSink(ourl, authHeader, tempSink, sha256, size);
+        downloadToSink(ourl, authHeader, FileTransferContext{.secretResolver = secretResolver}, tempSink, sha256, size);
         tempSink.flush();
 
         std::filesystem::rename(tempPath, cachePath);

@@ -27,7 +27,9 @@ struct GetDerivationsEnv
             settings.nixPath = {};
             return settings;
         }())
-        , statePtr(std::make_shared<EvalState>(LookupPath{}, store, fetchSettings, evalSettings, nullptr))
+        , statePtr(
+              std::make_shared<EvalState>(
+                  LookupPath{}, store, fetchers::FetchContext{fetchSettings, {}}, evalSettings, nullptr))
         , state(*statePtr)
     {
         autoArgs = state.buildBindings(0).finish();

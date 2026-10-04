@@ -4,6 +4,9 @@
 
 namespace nix {
 
+static_assert(requires(RemoteStore & store, std::shared_ptr<Store> evalStore) { store.getBuilder(evalStore); });
+static_assert(requires(UDSRemoteStore & store, std::shared_ptr<Store> evalStore) { store.getBuilder(evalStore); });
+
 TEST(UDSRemoteStore, storeDir_absolutePath)
 {
     std::filesystem::path storeDir =

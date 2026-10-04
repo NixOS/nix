@@ -365,11 +365,7 @@ void ChrootFreeBSDDerivationBuilder::startChild()
 
     int jid;
 
-    RunChildArgs args{
-#if NIX_WITH_AWS_AUTH
-        .awsCredentials = preResolveAwsCredentials(),
-#endif
-    };
+    auto args = makeRunChildArgs();
 
     if (derivationType.isSandboxed()) {
         jid = jail_setv(
