@@ -1,3 +1,4 @@
+#include "cli-config-private.hh"
 #include <cstring>
 #include <iostream>
 #include <filesystem>
@@ -493,8 +494,8 @@ static void main_nix_build(int argc, char ** argv)
 
             } catch (Error & e) {
                 logError(e.info());
-                notice("uses bash from your environment");
-                shell = "bash";
+                notice("falling back to '%s' as the interactive shell", FALLBACK_BASH);
+                shell = FALLBACK_BASH;
             }
         }
 
