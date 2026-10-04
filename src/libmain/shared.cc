@@ -381,7 +381,7 @@ RunPager::RunPager()
         return;
 
 /* TODO re-enable on Windows, once a child can be given our pipe as its
-   stdin: `RunOptions` has no `standardIn`, and `spawnProcess` hardcodes a
+   stdin: `RunOptions` has no `standardIn`, and `spawnProgram` hardcodes a
    null one. Printing unpaged beats failing the command. */
 #ifdef _WIN32
     return;

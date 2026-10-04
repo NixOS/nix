@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <span>
+#include <algorithm>
 #include <atomic>
 
 #include "util-unix-config-private.hh"
@@ -105,16 +106,39 @@ static int unix_close_range(unsigned int first, unsigned int last, int flags)
 
 void unix::closeExtraFDs()
 {
-    constexpr int MAX_KEPT_FD = 2;
-    static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == MAX_KEPT_FD);
+    closeExtraFDs(/*keepExtra=*/{});
+}
+
+void unix::closeExtraFDs(std::span<const Descriptor> keepExtra)
+{
+    /* Just some sanity compile-time checks. */
+    static constexpr Descriptor maxKeptStdio = 2;
+    static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == maxKeptStdio);
+
+    auto maxKeptIt = std::max_element(keepExtra.begin(), keepExtra.end());
+    Descriptor maxKept = STDERR_FILENO;
+
+    if (maxKeptIt != keepExtra.end())
+        maxKept = std::max(maxKept, *maxKeptIt);
+
+    auto finish = [&] -> void {
+        /* We closed everything in one go already. */
+        if (keepExtra.empty())
+            return;
+
+        /* Otherwise, clean up remaining holes. */
+        for (Descriptor fd = maxKeptStdio + 1; fd < maxKept; ++fd)
+            if (!std::ranges::contains(keepExtra, fd))
+                ::close(fd); /* ignore result */
+    };
 
 #if defined(__linux__) || defined(__FreeBSD__)
     // first try to close_range everything we don't care about. if this
     // returns an error with these parameters we're running on a kernel
     // that does not implement close_range (i.e. pre 5.9) and fall back
     // to the old method. we should remove that though, in some future.
-    if (unix_close_range(MAX_KEPT_FD + 1, ~0U, 0) == 0) {
-        return;
+    if (unix_close_range(maxKept + 1, ~0U, 0) == 0) {
+        return finish();
     }
 #endif
 
@@ -123,22 +147,24 @@ void unix::closeExtraFDs()
         for (auto & s : DirectoryIterator{"/proc/self/fd"}) {
             checkInterrupt();
             auto fd = std::stoi(s.path().filename());
-            if (fd > MAX_KEPT_FD) {
+            if (fd > maxKept) {
                 debug("closing leaked FD %d", fd);
                 close(fd);
             }
         }
-        return;
+        return finish();
     } catch (SysError &) {
     }
 #endif
 
-    int maxFD = 0;
+    Descriptor maxFD = 0;
 #if HAVE_SYSCONF
     maxFD = sysconf(_SC_OPEN_MAX);
 #endif
-    for (int fd = MAX_KEPT_FD + 1; fd < maxFD; ++fd)
-        close(fd); /* ignore result */
+    for (Descriptor fd = maxKept + 1; fd < maxFD; ++fd)
+        ::close(fd); /* ignore result */
+
+    finish();
 }
 
 void closeOnExec(Descriptor fd)

@@ -22,7 +22,12 @@ static RunOptions hgOptions(OsStrings args)
     // Set HGPLAIN: this means we get consistent output from hg and avoids leakage from a user or system .hgrc.
     env[OS_STR("HGPLAIN")] = OS_STR("");
 
-    return {.program = "hg", .lookupPath = true, .args = std::move(args), .environment = env};
+    return {{
+        .program = "hg",
+        .lookupPath = true,
+        .args = std::move(args),
+        .environment = env,
+    }};
 }
 
 // runProgram wrapper that uses hgOptions instead of stock RunOptions.

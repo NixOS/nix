@@ -45,14 +45,16 @@ static void handleDiffHook(
     try {
         auto diffRes = runProgram(
             RunOptions{
-                .program = diffHook,
-                .lookupPath = true,
-                .args = {tryA, tryB, drvPath, tmpDir},
+                .spawnOptions =
+                    {.program = diffHook,
+                     .lookupPath = true,
+                     .args = {tryA, tryB, drvPath, tmpDir},
 #ifndef _WIN32
-                .uid = uid,
-                .gid = gid,
+                     .uid = uid,
+                     .gid = gid,
 #endif
-                .chdir = "/"});
+                     .chdir = "/"},
+            });
         if (!statusOk(diffRes.first))
             throw ExecError(diffRes.first, "diff-hook program %s %s", PathFmt(diffHook), statusToString(diffRes.first));
 
