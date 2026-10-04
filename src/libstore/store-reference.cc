@@ -8,42 +8,38 @@
 
 #include <boost/url/ipv6_address.hpp>
 #include <nlohmann/json.hpp>
+#include <regex>
 
 namespace nix {
 
 static bool isNonUriPath(const std::string & spec)
 {
+    static const std::regex schemeRegex("^[a-zA-Z][a-zA-Z0-9+.-]*:");
     return
         // is not a URL
         spec.find("://") == std::string::npos
         // Has at least one path separator, and so isn't a single word that
         // might be special like "auto"
-        && OsPathTrait<char>::findPathSep(spec) != std::string::npos;
+        && OsPathTrait<char>::findPathSep(spec) != std::string::npos
+        && (std::filesystem::path{spec}.is_absolute() || !std::regex_search(spec, schemeRegex));
 }
 
 std::string StoreReference::render(bool withParams) const
 {
-    std::string res;
-
-    std::visit(
+    auto query = withParams ? params : Params{};
+    auto suffix = query.empty() ? "" : "?" + encodeQuery(query);
+    return std::visit(
         overloaded{
-            [&](const StoreReference::Auto &) { res = "auto"; },
-            [&](const StoreReference::Daemon &) { res = "daemon"; },
-            [&](const StoreReference::Local &) { res = "local"; },
+            [&](const StoreReference::Auto &) { return "auto" + suffix; },
+            [&](const StoreReference::Daemon &) { return "daemon" + suffix; },
+            [&](const StoreReference::Local &) { return "local" + suffix; },
             [&](const StoreReference::Specified & g) {
-                res = g.scheme;
-                res += "://";
-                res += g.authority;
+                auto url = g;
+                url.query = query;
+                return url.to_string();
             },
         },
         variant);
-
-    if (withParams && !params.empty()) {
-        res += "?";
-        res += encodeQuery(params);
-    }
-
-    return res;
 }
 
 namespace {
@@ -57,15 +53,13 @@ struct SchemeAndAuthorityWithPath
 } // namespace
 
 /**
- * Return the 'scheme' and remove the '://' or ':' separator.
+ * Return the 'scheme' and remove the '://' separator.
  */
 static std::optional<SchemeAndAuthorityWithPath> splitSchemePrefixTo(std::string_view string)
 {
     auto scheme = splitPrefixTo(string, ':');
-    if (!scheme)
+    if (!scheme || !splitPrefix(string, "//"))
         return std::nullopt;
-
-    splitPrefix(string, "//");
     return SchemeAndAuthorityWithPath{.scheme = *scheme, .authority = string};
 }
 
@@ -75,13 +69,12 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
     try {
         auto parsedUri = parseURL(uri, /*lenient=*/true);
         params.insert(parsedUri.query.begin(), parsedUri.query.end());
+        parsedUri.query.clear();
+        if (parsedUri.path.size() == 1 && parsedUri.path.front().empty())
+            parsedUri.path.clear();
 
         return {
-            .variant =
-                Specified{
-                    .scheme = std::move(parsedUri.scheme),
-                    .authority = parsedUri.renderAuthorityAndPath(),
-                },
+            .variant = std::move(parsedUri),
             .params = std::move(params),
         };
     } catch (BadURL &) {
@@ -97,14 +90,14 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
             if (params.empty())
                 return {.variant = Daemon{}};
             return {
-                .variant = Specified{.scheme = "unix", .authority = ""},
+                .variant = Specified{.scheme = "unix", .authority = ParsedURL::Authority{}},
                 .params = std::move(params),
             };
         } else if (baseURI == "local") {
             if (params.empty())
                 return {.variant = Local{}};
             return {
-                .variant = Specified{.scheme = "local", .authority = ""},
+                .variant = Specified{.scheme = "local", .authority = ParsedURL::Authority{}},
                 .params = std::move(params),
             };
         } else if (isNonUriPath(baseURI)) {
@@ -112,7 +105,8 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                 .variant =
                     Specified{
                         .scheme = "local",
-                        .authority = encodeUrlPath(pathToUrlPath(absPath(std::filesystem::path{baseURI}))),
+                        .authority = ParsedURL::Authority{},
+                        .path = pathToUrlPath(absPath(std::filesystem::path{baseURI})),
                     },
                 .params = std::move(params),
             };
@@ -161,7 +155,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
                     .variant =
                         Specified{
                             .scheme = std::string(schemeAndAuthority->scheme),
-                            .authority = fixedAuthority,
+                            .authority = ParsedURL::Authority::parse(fixedAuthority),
                         },
                     .params = std::move(params),
                 };
@@ -169,7 +163,7 @@ StoreReference StoreReference::parse(const std::string & uri, const StoreReferen
         }
     }
 
-    throw UsageError("Cannot parse Nix store '%s'", uri);
+    throw UsageError("Failed to parse store reference: '%s'", uri);
 }
 
 /* Split URI into protocol+hierarchy part and its parameter set. */
