@@ -196,7 +196,8 @@ typedef void (*PrimOpFun)(
  * @param[in] fun callback
  * @param[in] arity expected number of function arguments
  * @param[in] name function name
- * @param[in] args array of argument names, NULL-terminated
+ * @param[in] args optional, NULL-terminated array of argument names, used for documentation.
+ * If non-empty, it must contain exactly `arity` names.
  * @param[in] doc optional, documentation for this primop
  * @param[in] user_data optional, arbitrary data, passed to the callback when it's called
  * @return primop, or null in case of errors
@@ -207,7 +208,7 @@ PrimOp * nix_alloc_primop(
     PrimOpFun fun,
     int arity,
     const char * name,
-    const char ** args,
+    const char * const * args,
     const char * doc,
     void * user_data);
 
