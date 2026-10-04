@@ -2150,7 +2150,11 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
 
     for (auto & [i_pos, i] : es) {
         Value & vTmp = *vTmpP++;
-        i->eval(state, env, vTmp, "in an operand of '+'");
+        std::string_view evalErrorCtx =
+            forceString ? "while evaluating a string interpolation"
+            : (!first && firstType == nPath) ? "while evaluating a path segment"
+            : "in an operand of '+'";
+        i->eval(state, env, vTmp, evalErrorCtx);
 
         /* If the first element is a path, then the result will also
            be a path, we don't copy anything (yet - that's done later,
@@ -2196,8 +2200,12 @@ void ExprConcatStrings::eval(EvalState & state, Env & env, Value & v)
             /* skip canonization of first path, which would only be not
             canonized in the first place if it's coming from a ./${foo} type
             path */
+            std::string_view traceContext =
+                firstType == nPath ? "while evaluating a path segment"
+                : forceString ? "while evaluating a string interpolation"
+                : "in an operand of '+'";
             auto part = state.coerceToString(
-                i_pos, vTmp, context, "while evaluating a path segment", false, firstType == nString, !first);
+                i_pos, vTmp, context, traceContext, false, firstType == nString, !first);
             sSize += part->size();
             strings.emplace_back(std::move(part));
         }
