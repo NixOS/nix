@@ -1,0 +1,19 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> xs = [
+        >   1
+        >   2
+        > ]
+
+nix-repl> xs
+[
+  1
+  2
+]
+
+nix-repl> xs = [
+        > ];
+
+nix-repl> xs
+[ ]

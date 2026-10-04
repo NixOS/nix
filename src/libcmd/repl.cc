@@ -898,11 +898,14 @@ Expr * NixRepl::parseString(std::string s)
 ExprAttrs * NixRepl::parseReplBindings(std::string s)
 {
     auto basePath = state->rootPath(".");
+    std::optional<ParseError> incompleteError;
 
     // Try parsing as bindings
     try {
         return state->parseReplBindings(s, basePath, staticEnv);
-    } catch (ParseError &) {
+    } catch (ParseError & e) {
+        if (isIncompleteInput(e))
+            incompleteError = e;
     }
 
     // Try with semicolon appended (for `inherit foo` shorthand)
@@ -910,6 +913,14 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
     try {
         return state->parseReplBindings(s + ";", s, basePath, staticEnv);
     } catch (ParseError & e) {
+        if (incompleteError && e.info().pos && incompleteError->info().pos
+            && *e.info().pos == *incompleteError->info().pos) {
+            try {
+                parseString(s);
+            } catch (ParseError &) {
+                throw IncompleteReplExpr(incompleteError->msg());
+            }
+        }
         if (isIncompleteInput(e))
             throw IncompleteReplExpr(e.msg());
         // Semicolon retry also failed; not valid binding syntax.
