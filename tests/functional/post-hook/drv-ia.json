@@ -1,0 +1,36 @@
+{
+  "derivations": {
+    "HASH-post-hook-drv.drv": {
+      "args": [
+        "-c",
+        "echo $deps > $out"
+      ],
+      "builder": "SHELL",
+      "env": {
+        "PATH": "COREUTILS",
+        "builder": "SHELL",
+        "deps": "/nix/store/HASH-dependencies-top",
+        "name": "post-hook-drv",
+        "out": "/nix/store/HASH-post-hook-drv",
+        "outputs": "out",
+        "system": "SYSTEM",
+        "testSalt": "SALT"
+      },
+      "inputs": {
+        "drvs": {},
+        "srcs": [
+          "HASH-dependencies-top"
+        ]
+      },
+      "name": "post-hook-drv",
+      "outputs": {
+        "out": {
+          "path": "HASH-post-hook-drv"
+        }
+      },
+      "system": "SYSTEM",
+      "version": 4
+    }
+  },
+  "version": 4
+}

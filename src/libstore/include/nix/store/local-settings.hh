@@ -566,8 +566,29 @@ public:
 
           The hook is passed the derivation path and, if sandboxes are
           enabled, the sandbox directory. It can then modify the sandbox and
-          send a series of commands to modify various settings to stdout. The
-          currently recognized commands are:
+          send a series of commands to modify various settings to stdout.
+
+          The following environment variables are available to the hook:
+
+            - `DRV_PATH`
+              The store path of the derivation that caused the build.
+
+            - `RESOLVED_DRV_PATH`
+              The store path of the derivation the builder will run. For a
+              content-addressing derivation this is the resolved derivation,
+              which may differ from `DRV_PATH` and may not exist on disk.
+
+            - `DRV_NAME`
+              The name of the derivation, which the ATerm format below does
+              not record.
+
+            - `DRV_ATERM_FD`
+              The number of an open file descriptor from which the program
+              can read the derivation at `RESOLVED_DRV_PATH`, in the
+              [ATerm format](@docroot@/protocols/derivation-aterm.md).
+              The presence of this variable can be used to detect support.
+
+          The currently recognized commands are:
 
             - `extra-sandbox-paths`\
               Pass a list of files and directories to be included in the
