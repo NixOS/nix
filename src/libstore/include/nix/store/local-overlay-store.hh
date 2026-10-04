@@ -142,6 +142,11 @@ private:
 
     /**
      * Check lower store if upper DB does not have.
+     *
+     * In addition, copy up metadata for lower store objects (and their
+     * closure). (I.e. Optimistically cache in the upper DB.) The
+     * returned info is the upper store's own, so that its DB id is
+     * the upper DB's.
      */
     void queryPathInfoUncached(
         const StorePath & path, Callback<std::shared_ptr<const ValidPathInfo>> callback) noexcept override;
@@ -153,6 +158,12 @@ private:
      * closure). (I.e. Optimistically cache in the upper DB.)
      */
     bool isValidPathUncached(const StorePath & path) override;
+
+    /**
+     * Register a lower store object (and its closure) in the upper
+     * DB.
+     */
+    void registerLowerPath(const ValidPathInfo & info);
 
     /**
      * Check the lower store and upper DB.
