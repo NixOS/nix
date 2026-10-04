@@ -73,6 +73,11 @@ struct nix_realised_string
     std::vector<StorePath> storePaths;
 };
 
+struct nix_doc
+{
+    nix::EvalState::Doc doc;
+};
+
 } // extern "C"
 
 // Shared helpers for validating nix_value [in] parameters across libexpr-c translation units.
