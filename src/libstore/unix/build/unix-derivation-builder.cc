@@ -292,8 +292,12 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
            after the build, we discard the redirected outputs
            corresponding to the valid outputs, and rewrite the
            contents of the new outputs to replace the dummy strings
-           with the actual hashes. */
-        auto scratchPath = !status.known ? makeFallbackPath(outputName)
+           with the actual hashes.
+
+           Floating outputs always build under the placeholder: their
+           content may depend on $out beyond rewritable self references. */
+        const bool floating = !derivationType.hasKnownOutputPaths() && !derivationType.isImpure();
+        auto scratchPath = !status.known || floating ? makeFallbackPath(outputName)
                            : !needsHashRewrite()
                                /* Can always use original path in sandbox */
                                ? status.known->path
@@ -314,7 +318,7 @@ std::optional<Descriptor> UnixDerivationBuilderImpl::startBuild()
         inputRewrites[hashPlaceholder(outputName)] = store->printStorePath(scratchPath);
 
         /* Additional tasks if we know the final path a priori. */
-        if (!status.known)
+        if (!status.known || floating)
             continue;
         auto fixedFinalPath = status.known->path;
 
