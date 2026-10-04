@@ -49,6 +49,34 @@ properties:
     description: |
       System CPU time the build took, in microseconds.
 
+  memoryPeak:
+    type: integer
+    minimum: 0
+    title: Peak memory
+    description: |
+      Peak memory usage of the build, in bytes.
+
+  ioReadBytes:
+    type: integer
+    minimum: 0
+    title: Bytes read
+    description: |
+      Bytes the build read from block devices.
+
+  ioWriteBytes:
+    type: integer
+    minimum: 0
+    title: Bytes written
+    description: |
+      Bytes the build wrote to block devices.
+
+  oomKills:
+    type: integer
+    minimum: 0
+    title: Out-of-memory kill count
+    description: |
+      How many processes of the build the kernel killed for running out of memory.
+
 "$defs":
   success:
     type: object

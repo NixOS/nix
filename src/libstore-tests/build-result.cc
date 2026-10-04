@@ -90,6 +90,24 @@ INSTANTIATE_TEST_SUITE_P(
                 .cpuUser = std::chrono::seconds(500),
                 .cpuSystem = std::chrono::seconds(604),
             },
+        },
+        std::pair{
+            "out-of-memory",
+            BuildResult{
+                .inner{BuildResult::Failure{{
+                    .status = BuildResult::Failure::PermanentFailure,
+                    .msg = HintFmt("builder was killed"),
+                }}},
+                .timesBuilt = 1,
+                .startTime = 30,
+                .stopTime = 50,
+                .cpuUser = std::chrono::seconds(500),
+                .cpuSystem = std::chrono::seconds(604),
+                .memoryPeak = 1073741824,
+                .ioReadBytes = 4096,
+                .ioWriteBytes = 8192,
+                .oomKills = 1,
+            },
         }));
 
 } // namespace nix

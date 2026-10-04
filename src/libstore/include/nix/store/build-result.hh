@@ -193,6 +193,13 @@ struct BuildResult
      */
     std::optional<std::chrono::microseconds> cpuUser, cpuSystem;
 
+    /**
+     * Peak memory usage and bytes read from and written to block
+     * devices by the build, and how many of its processes were killed
+     * for running out of memory.
+     */
+    std::optional<uint64_t> memoryPeak, ioReadBytes, ioWriteBytes, oomKills;
+
     bool operator==(const BuildResult &) const noexcept;
     std::strong_ordering operator<=>(const BuildResult &) const noexcept;
 };
