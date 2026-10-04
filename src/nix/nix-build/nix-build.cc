@@ -523,6 +523,20 @@ static void main_nix_build(int argc, char ** argv)
                 pathsToBuild.push_back(DerivedPath::fromSingle(input));
         }
 
+        /* The derivation's source inputs are realised below on the build store
+           as bare Opaque paths, which buildPaths() won't copy from the eval
+           store (it only copies a derivation's sources when it builds that
+           derivation). Copy any that exist only in the eval store, e.g. a dirty
+           working tree, or realisation fails with no substituter. */
+        if (store != evalStore) {
+            RealisedPath::Set inputSrcs;
+            for (const auto & input : drv.inputs)
+                if (const auto * op = std::get_if<SingleDerivedPath::Opaque>(&input.raw()))
+                    if (evalStore->isValidPath(op->path))
+                        inputSrcs.insert(op->path);
+            copyClosure(*evalStore, *store, inputSrcs);
+        }
+
         buildPaths(pathsToBuild);
 
         if (dryRun)

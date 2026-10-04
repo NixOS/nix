@@ -54,3 +54,11 @@ ls "$NIX_STORE_DIR"/*dependencies-top/foobar
 # Can't write .drv by default
 (! nix-instantiate dependencies.nix --eval-store "dummy://")
 nix-instantiate dependencies.nix --eval-store "dummy://?read-only=false"
+
+clearStore
+rm -rf "$eval_store"
+
+# Regression: `src` is ingested into the eval store during evaluation, so
+# nix-shell must copy it to the build store before it can realise it.
+NIX_BUILD_SHELL="$BASH" nix-shell --eval-store "$eval_store" --run true \
+    -E 'with import ./config.nix; mkDerivation { name = "eval-store-shell-src"; src = ./config.nix; buildCommand = ":"; }'
