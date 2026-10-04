@@ -372,6 +372,26 @@ EvalState::EvalState(
         for (auto & i : lookupPath.elements)
             resolveLookupPathPath(i.path, true);
 
+    /* Also allow access to local paths named in `allowed-uris`, matching what fetchers can access. */
+    if (auto rootFS2 = rootFS.dynamic_pointer_cast<AllowListSourceAccessor>()) {
+        for (auto & uri : settings.allowedUris.get()) {
+            // A trailing slash means descendants only, which allowPrefix can't express, so skip it.
+            if (uri.empty() || uri.back() == '/')
+                continue;
+            std::filesystem::path path(uri);
+            if (path.is_absolute()) {
+                rootFS2->allowPrefix(CanonPath(path.string()));
+                continue;
+            }
+            try {
+                ParsedURL parsed = parseURL(uri);
+                if (parsed.scheme == "file")
+                    rootFS2->allowPrefix(CanonPath(urlPathToPath(parsed.path).string()));
+            } catch (BadURL &) {
+            }
+        }
+    }
+
     corepkgsFS->addFile(
         CanonPath("fetchurl.nix"),
         {
