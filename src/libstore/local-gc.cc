@@ -3,10 +3,11 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/local-gc.hh"
+#include "local-gc-private.hh"
 #include <filesystem>
 #include <boost/regex.hpp>
 
-#if !defined(__linux__)
+#if !defined(__linux__) && !defined(__APPLE__)
 // For shelling out to lsof
 #  include "store-config-private.hh"
 #  include "nix/util/environment-variables.hh"
@@ -15,16 +16,7 @@
 
 namespace nix {
 
-/**
- * Key is a mere string because cannot has path with macOS's libc++
- */
-typedef boost::unordered_flat_map<
-    std::string,
-    boost::unordered_flat_set<std::string, StringViewHash, std::equal_to<>>,
-    StringViewHash,
-    std::equal_to<>>
-    UncheckedRoots;
-
+#ifdef __linux__
 static void readProcLink(const std::filesystem::path & file, UncheckedRoots & roots)
 {
     std::filesystem::path buf;
@@ -39,12 +31,7 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
     if (buf.is_absolute())
         roots[buf.string()].emplace(file.string());
 }
-
-static std::string quoteRegexChars(const std::string & raw)
-{
-    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
-    return boost::regex_replace(raw, specialRegex, R"(\\$&)");
-}
+#endif
 
 #ifdef __linux__
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
@@ -62,12 +49,15 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
 {
     UncheckedRoots unchecked;
 
+#ifdef __APPLE__
+    findDarwinRuntimeRoots(config, unchecked);
+#elif defined(__linux__)
     auto procDir = AutoCloseDir{opendir("/proc")};
     if (procDir) {
         struct dirent * ent;
         static const auto digitsRegex = boost::regex(R"(^\d+$)");
         static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = boost::regex(quoteRegexChars(config.storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        auto storePathRegex = makeStorePathRegex(config);
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (boost::regex_match(ent->d_name, digitsRegex)) {
@@ -120,10 +110,11 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
             throw SysError("iterating /proc");
     }
 
-#if !defined(__linux__)
-    // lsof is really slow on OS X. This actually causes the gc-concurrent.sh test to fail.
-    // See: https://github.com/NixOS/nix/issues/3011
-    // Because of this we disable lsof when running the tests.
+    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
+    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
+    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
+#else
+    // lsof can be prohibitively slow, so allow tests to disable it.
     if (getEnv("_NIX_TEST_NO_LSOF") != "1") {
         try {
             boost::regex lsofRegex(R"(^n(/.*)$)");
@@ -138,12 +129,6 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
             /* lsof not installed, lsof failed */
         }
     }
-#endif
-
-#ifdef __linux__
-    readFileRoots("/proc/sys/kernel/modprobe", unchecked);
-    readFileRoots("/proc/sys/kernel/fbsplash", unchecked);
-    readFileRoots("/proc/sys/kernel/poweroff_cmd", unchecked);
 #endif
 
     Roots roots;
