@@ -1,0 +1,11 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> enable = true
+
+nix-repl> message = if enable
+        >   then "true"
+        >   else "false"
+
+nix-repl> message
+"true"
