@@ -664,7 +664,7 @@ SingleDrvOutputs DerivationBuilderImpl::registerOutputs(LocalStore & localStore)
 
     /* Apply output checks. This includes checking of the wanted vs got
        hash of fixed-outputs. */
-    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos, finalOutputs);
 
     if (buildMode == bmCheck) {
         return {};
@@ -726,7 +726,7 @@ SingleDrvOutputs DerivationBuilderImpl::checkSubmittedOutputs(LocalStore & local
 
     // checkOutputs only performs checks that make sense for both submitting and non-submitting derivations,
     // more verification steps needed afterward
-    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos);
+    checkOutputs(localStore, drvPath, drv, drvOptions.outputChecks, infos, *submittedOutputs);
 
     for (auto & [outputName, output] : drv.outputs) {
         // For some reason cannot be moved to checkOutputs, needs debugging
