@@ -23,7 +23,7 @@ std::string DerivationResolutionGoal::key()
     return "dc$" + std::string(drvPath.name()) + "$" + worker.store.printStorePath(drvPath);
 }
 
-Goal::BasicCo<DerivationResolutionGoal::InputsGoalMap>
+Goal::Co<DerivationResolutionGoal::InputsGoalMap>
 DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildMode)
 {
     Goals waitees;
@@ -72,28 +72,12 @@ DerivationResolutionGoal::realiseInputs(const Derivation & drv, BuildMode buildM
 
     co_await await(std::move(waitees));
 
-    if (nrFailed != 0) {
-        auto msg =
-            fmt("Cannot build '%s'.\n"
-                "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
-                Magenta(worker.store.printStorePath(drvPath)),
-                nrFailed,
-                nrFailed == 1 ? "dependency" : "dependencies");
-        msg += showKnownOutputs(worker.store, drv);
-        co_return doneFailure(
-            ecFailed,
-            BuildResult::Failure{{
-                .status = BuildResult::Failure::DependencyFailed,
-                .msg = HintFmt(msg),
-            }});
-    }
-
     trace("all inputs realised");
 
     co_return inputGoals;
 }
 
-Goal::BasicCo<decltype(DerivationResolutionGoal::resolvedDrv)>
+Goal::Co<decltype(DerivationResolutionGoal::resolvedDrv)>
 DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const InputsGoalMap & inputGoals)
 {
     experimentalFeatureSettings.require(Xp::CaDerivations);
@@ -152,12 +136,35 @@ DerivationResolutionGoal::resolveDerivation(const Derivation & drv, const Inputs
     co_return std::make_unique<std::pair<StorePath, BasicDerivation>>(std::move(pathResolved), std::move(*attempt));
 }
 
-Goal::Co DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
+Goal::Co<Goal::ExitCode> DerivationResolutionGoal::init(ref<const Derivation> drv, BuildMode buildMode)
+{
+    buildResult = co_await resolve(std::move(drv), buildMode);
+    co_return buildResult.tryGetSuccess() ? ecSuccess : ecFailed;
+}
+
+Goal::Co<BuildResult> DerivationResolutionGoal::resolve(ref<const Derivation> drv, BuildMode buildMode)
 {
     auto inputGoals = co_await realiseInputs(*drv, buildMode);
+
+    if (nrFailed != 0) {
+        auto msg =
+            fmt("Cannot build '%s'.\n"
+                "Reason: " ANSI_RED "%d %s failed" ANSI_NORMAL ".",
+                Magenta(worker.store.printStorePath(drvPath)),
+                nrFailed,
+                nrFailed == 1 ? "dependency" : "dependencies");
+        msg += showKnownOutputs(worker.store, *drv);
+        co_return BuildResult{
+            .inner = BuildResult::Failure{{
+                .status = BuildResult::Failure::DependencyFailed,
+                .msg = HintFmt(msg),
+            }},
+        };
+    }
+
     if (shouldResolve(*drv))
         resolvedDrv = co_await resolveDerivation(*drv, inputGoals);
-    co_return amDone(ecSuccess);
+    co_return BuildResult{.inner = BuildResult::Success{.status = BuildResult::Success::AlreadyValid}};
 }
 
 } // namespace nix

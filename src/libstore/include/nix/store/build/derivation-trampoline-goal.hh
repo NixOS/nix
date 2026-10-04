@@ -118,10 +118,14 @@ struct DerivationTrampolineGoal : public Goal
 
 private:
 
-    BasicCo<std::pair<StorePath, Derivation>> loadDerivation();
+    using LoadedDerivation = std::pair<StorePath, Derivation>;
+    using LoadResult = std::variant<LoadedDerivation, BuildResult::Failure>;
+    using Result = std::pair<ExitCode, BuildResult>;
 
-    Co haveToLoadFromStore();
-    Co haveDerivation(StorePath drvPath, Derivation drv);
+    Co<ExitCode> init(Co<Result> work);
+    Co<LoadResult> loadDerivation();
+    Co<Result> haveToLoadFromStore();
+    Co<Result> haveDerivation(StorePath drvPath, Derivation drv);
 
     BuildMode buildMode;
 
