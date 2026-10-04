@@ -8,6 +8,7 @@
 #include <boost/iterator/function_output_iterator.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <functional>
 #include <ranges>
 #include <optional>
@@ -83,12 +84,23 @@ private:
     size_type numAttrs = 0;
 
     /**
-     * Number of attributes with unique names in the layer chain.
+     * Number of attributes with unique names in the layer chain -- the
+     * *real* size, whereas @ref numAttrs is just this layer's own count.
      *
-     * This is the *real* user-facing size of bindings, whereas @ref numAttrs is
-     * an implementation detail of the data structure.
+     * Computed lazily (0 = not yet computed, see @ref size /
+     * @ref computeChainSize): many layered accumulators are only ever read
+     * via get() and never need this. 0 is never a real chain size, since
+     * layering only happens between two non-empty Bindings.
+     *
+     * Atomic (relaxed) rather than a plain `mutable`: the computed value is
+     * deterministic, so concurrent writers racing to compute and store it
+     * would always agree on the value, but a plain non-atomic write would
+     * still be a data race (undefined behavior) under any future
+     * multi-threaded evaluator. Relaxed ordering is enough since no other
+     * memory access needs to be ordered against this one -- it's a pure
+     * function of already-fixed data, not a synchronization point.
      */
-    size_type numAttrsInChain = 0;
+    mutable std::atomic<size_type> numAttrsInChain{0};
 
     /**
      * Length of the layers list.
@@ -121,19 +133,12 @@ private:
     static constexpr unsigned maxLayers = 16;
 
     /**
-     * If this Bindings got "layered" on top of another we need to recalculate
-     * the number of unique attributes in the chain.
-     *
-     * This is done by either iterating over the base "layer" and the newly added
-     * attributes and counting duplicates. If the base "layer" is big this approach
-     * is inefficient and we fall back to doing per-element binary search in the base
-     * "layer".
+     * Lazily compute and memoize numAttrsInChain for a layered Bindings --
+     * see its doc comment. Only ever called from @ref size / @ref empty,
+     * on demand.
      */
-    void computeChainSize() noexcept
+    void computeChainSize() const noexcept
     {
-        if (!baseLayer)
-            return;
-
         auto & base = *baseLayer;
         auto ownAttrs = std::span(attrs, numAttrs);
 
@@ -142,11 +147,7 @@ private:
         /* If the base bindings is smaller than the newly added attributes
            iterate using std::set_intersection to run in O(|base| + |attrs|) =
            O(|attrs|). Otherwise use an O(|attrs| * log(|base|)) per-attr binary
-           search to check for duplicates. Note that if we are in this code path then
-           |attrs| <= bindingsUpdateLayerRhsSizeThreshold, which 16 by default. We are
-           optimizing for the case when a small attribute set gets "layered" on top of
-           a much larger one. When attrsets are already small it's fine to do a linear
-           scan, but we should avoid expensive iterations over large "base" attrsets. */
+           search to check for duplicates. */
         if (ownAttrs.size() > base.size()) {
             std::set_intersection(
                 base.begin(),
@@ -155,24 +156,30 @@ private:
                 ownAttrs.end(),
                 boost::make_function_output_iterator([&]([[maybe_unused]] auto && _) { ++duplicates; }));
         } else {
-            for (const auto & attr : ownAttrs) {
+            for (const auto & attr : ownAttrs)
                 if (base.get(attr.name))
                     ++duplicates;
-            }
         }
 
-        numAttrsInChain = base.numAttrsInChain + ownAttrs.size() - duplicates;
+        numAttrsInChain.store(base.size() + ownAttrs.size() - duplicates, std::memory_order_relaxed);
     }
 
 public:
     size_type size() const
     {
-        return numAttrsInChain;
+        if (baseLayer && numAttrsInChain.load(std::memory_order_relaxed) == 0)
+            computeChainSize();
+        return numAttrsInChain.load(std::memory_order_relaxed);
     }
 
     bool empty() const
     {
-        return size() == 0;
+        /* A layered chain is never empty (layering only happens between
+           two non-empty Bindings), so this avoids forcing size()'s
+           computation on every `//` for the long-lived "prev" accumulator. */
+        if (baseLayer)
+            return false;
+        return numAttrsInChain.load(std::memory_order_relaxed) == 0;
     }
 
     class iterator
@@ -392,7 +399,10 @@ public:
     void push_back(const Attr & attr)
     {
         attrs[numAttrs++] = attr;
-        numAttrsInChain = numAttrs;
+        // layerOnTopOf runs before push_back for a layered Bindings, so
+        // numAttrsInChain is already reset to the "not computed" sentinel.
+        if (!baseLayer)
+            numAttrsInChain.store(numAttrs, std::memory_order_relaxed);
     }
 
     /**
@@ -543,6 +553,8 @@ public:
     {
         bindings->baseLayer = &base;
         bindings->numLayers = base.numLayers + 1;
+        // Reset to the "not computed" sentinel now that it's layered.
+        bindings->numAttrsInChain.store(0, std::memory_order_relaxed);
     }
 
     Value & alloc(Symbol name, PosIdx pos = noPos);
@@ -552,13 +564,11 @@ public:
     const Bindings * finish()
     {
         bindings->sort();
-        bindings->computeChainSize();
         return bindings;
     }
 
     const Bindings * alreadySorted()
     {
-        bindings->computeChainSize();
         return bindings;
     }
 
