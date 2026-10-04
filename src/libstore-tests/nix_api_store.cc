@@ -279,15 +279,15 @@ struct LambdaAdapter
     F fun;
 
     template<typename... Args>
-    static inline auto call(LambdaAdapter<F> * ths, Args... args)
+    static inline auto call(LambdaAdapter<F> * self, Args... args)
     {
-        return ths->fun(args...);
+        return self->fun(args...);
     }
 
     template<typename... Args>
-    static auto call_void(void * ths, Args... args)
+    static auto call_void(void * self, Args... args)
     {
-        return call(static_cast<LambdaAdapter<F> *>(ths), args...);
+        return call(static_cast<LambdaAdapter<F> *>(self), args...);
     }
 };
 

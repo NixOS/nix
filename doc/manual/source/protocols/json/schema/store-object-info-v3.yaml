@@ -18,7 +18,7 @@ description: |
 
   Firstly, "impure" fields, which contain non-intrinsic information about the store object, may or may not be included.
 
-  Second, binary cache stores have extra non-intrinsic infomation about the store objects they contain.
+  Second, binary cache stores have extra non-intrinsic information about the store objects they contain.
 
   Thirdly, [`nix path-info --json --closure-size`](@docroot@/command-ref/new-cli/nix3-path-info.html#opt-closure-size) can compute some extra information about not just the single store object in question, but the store object and its [closure](@docroot@/glossary.md#gloss-closure).
 
