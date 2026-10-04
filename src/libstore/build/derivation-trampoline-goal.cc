@@ -190,16 +190,15 @@ Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveDerivat
             return exitCode && exitCode != ecSuccess;
         });
 
-        const Goal * g = gi->get();
         assert(gi != concreteDrvGoals.end() && "expected a failing goal");
+        const Goal * g = gi->get();
         auto exitCode = *g->exitCode;
-        const auto * failure = g->buildResult.tryGetFailure();
-        assert(failure && "failing goal does not report a failed build result");
+        assert(g->buildResult.tryGetFailure() && "failing goal does not report a failed build result");
 
         /* Report the exit status of *some* failing goal. This might not be strictly
            correct, since multiple subgoals can fail independently, but this should be
            a good enough heuristic without --keep-going. */
-        co_return Result{exitCode, BuildResult{.inner = *failure}};
+        co_return Result{exitCode, g->buildResult};
     }
 
     SingleDrvOutputs outputs;
@@ -212,8 +211,6 @@ Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveDerivat
 
     for (const auto & success : successes)
         std::ranges::copy(success.builtOutputs, std::inserter(outputs, outputs.end()));
-
-    auto statuses = successes | std::views::transform(&BuildResult::Success::status);
 
     /* Aggregate the status code. If some outputs we already valid, but we had
        to build/substitute the other ones, report it as the smallest common
@@ -239,16 +236,18 @@ Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveDerivat
         return toPriority(a) < toPriority(b);
     };
 
-    co_return Result{
-        ecSuccess,
-        BuildResult{
-            .inner =
-                BuildResult::Success{
-                    .status = std::ranges::min(statuses, compareSuccesses),
-                    .builtOutputs = std::move(outputs),
-                },
-        },
+    /* Store statistics for the goal that did the most work (build time and CPU usage). Daemon clients receive them
+       from `Worker::buildDerivation`. */
+    const auto & mostWork = *std::ranges::min_element(concreteDrvGoals, compareSuccesses, [](const GoalPtr & goal) {
+        return goal->buildResult.tryGetSuccess()->status;
+    });
+
+    auto result = mostWork->buildResult;
+    result.inner = BuildResult::Success{
+        .status = mostWork->buildResult.tryGetSuccess()->status,
+        .builtOutputs = std::move(outputs),
     };
+    co_return Result{ecSuccess, std::move(result)};
 }
 
 } // namespace nix
