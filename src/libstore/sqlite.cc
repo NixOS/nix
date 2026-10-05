@@ -3,6 +3,7 @@
 #include "nix/util/util.hh"
 #include "nix/util/url.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/sync.hh"
 
 #ifdef __linux__
 #  include <sys/vfs.h>
@@ -10,6 +11,7 @@
 
 #include <sqlite3.h>
 
+#include <set>
 #include <thread>
 
 namespace nix {
@@ -72,20 +74,36 @@ SQLite::SQLite(const std::filesystem::path & path, Settings && settings)
     // https://github.com/openzfs/zfs/issues/14290#issuecomment-3074672917.
     // Remove this workaround when a fix is widely installed, perhaps 2027? Candidate:
     // https://github.com/search?q=repo%3Aopenzfs%2Fzfs+%22Linux%3A+zfs_putpage%3A+complete+async+page+writeback+immediately%22&type=commits
+    //
+    // Note: we only do this the first time that this process opens
+    // the database. Closing a file descriptor drops all POSIX locks
+    // that the process holds on that file, including the lock on
+    // db.sqlite-shm held by SQLite on behalf of other connections to
+    // the same database. Another process could then conclude that
+    // it's the only user of the database and truncate
+    // db.sqlite-shm, causing us to crash with SIGBUS.
+    //
+    // We hold the lock on `shmFilesSynced` until the file descriptor
+    // has been closed, so that a concurrent open of the same database
+    // in another thread cannot create a SQLite connection (and thus
+    // acquire POSIX locks on db.sqlite-shm) while we still have the
+    // file open.
 #ifdef __linux__
-    try {
-        auto shmFile = path;
-        shmFile += "-shm";
-        AutoCloseFD fd = open(shmFile.string().c_str(), O_RDWR | O_CLOEXEC);
-        if (fd) {
-            struct statfs fs;
-            if (fstatfs(fd.get(), &fs))
-                throw SysError("statfs() on %s", PathFmt(shmFile));
-            if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
-                throw SysError("fsync() on %s", PathFmt(shmFile));
+    static Sync<std::set<std::filesystem::path>> shmFilesSynced;
+    {
+        auto shmFilesSynced_(shmFilesSynced.lock());
+        if (shmFilesSynced_->insert(path).second) {
+            auto shmFile = path;
+            shmFile += "-shm";
+            AutoCloseFD fd = open(shmFile.string().c_str(), O_RDWR | O_CLOEXEC);
+            if (fd) {
+                struct statfs fs;
+                if (fstatfs(fd.get(), &fs))
+                    throw SysError("statfs() on %s", PathFmt(shmFile));
+                if (fs.f_type == /* ZFS_SUPER_MAGIC */ 801189825 && fdatasync(fd.get()) != 0)
+                    throw SysError("fsync() on %s", PathFmt(shmFile));
+            }
         }
-    } catch (...) {
-        throw;
     }
 #endif
 
