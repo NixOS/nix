@@ -144,16 +144,16 @@ bool SSHMaster::isMasterRunning()
 
 static OsStringMap createSSHEnv()
 {
-    // Copy the environment and set SHELL=/bin/sh
+    // Copy the environment and set SHELL to the configured sh
     OsStringMap env = getEnvOs();
 
     // SSH will invoke the "user" shell for -oLocalCommand, but that means
     // $SHELL. To keep things simple and avoid potential issues with other
-    // shells, we set it to /bin/sh.
+    // shells, we set it to the configured POSIX shell.
     // Technically, we don't need that, and we could reinvoke ourselves to print
     // "started". Self-reinvocation is tricky with library consumers, but mostly
     // solved; refer to the development history of nixExePath in libstore/globals.cc.
-    env.insert_or_assign(OS_STR("SHELL"), OS_STR("/bin/sh"));
+    env.insert_or_assign(OS_STR("SHELL"), shProgram().native());
 
     return env;
 }
