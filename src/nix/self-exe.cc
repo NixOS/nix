@@ -73,11 +73,14 @@ void runNixBin2(
     try {
         runProgram2(
             RunOptions{
-                .program = *selfProgramPath,
-                .lookupPath = false,
-                .args = args,
-                .argv0 = binaryName,
-                .environment = std::move(environment),
+                .spawnOptions =
+                    {
+                        .program = *selfProgramPath,
+                        .lookupPath = false,
+                        .args = args,
+                        .argv0 = binaryName,
+                        .environment = std::move(environment),
+                    },
                 .standardOut = standardOut,
                 .isInteractive = isInteractive,
             });
