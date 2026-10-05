@@ -100,6 +100,23 @@ TEST_P(MalformedATermTest, throwsFormatError)
         << drv;
 }
 
+/**
+ * An `inputDrvs` key names the derivation whose outputs are depended
+ * on, so it must be a derivation path. This is `simple-derivation.drv`
+ * with the `.drv` dropped from that key.
+ */
+TEST_F(DerivationTest, BadATerm_inputDrvNotDerivation)
+{
+    ASSERT_THROW(
+        derivation::parse(
+            *store,
+            readFile(goldenMaster("bad-input-drv-not-derivation.drv")),
+            "simple-derivation",
+            derivation::defaultSupportWindowsStoreDir,
+            mockXpSettings),
+        FormatError);
+}
+
 class RoundtripATermTest : public DerivationTest, public ::testing::WithParamInterface<std::string_view>
 {};
 
