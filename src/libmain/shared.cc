@@ -391,6 +391,8 @@ RunPager::RunPager()
     Pipe toPager;
     toPager.create();
 
+    const auto & sh = shProgram();
+
     pid = startProcess([&]() {
         if (dup2(toPager.readSide.get(), STDIN_FILENO) == -1)
             throw SysError("dupping stdin");
@@ -398,7 +400,7 @@ RunPager::RunPager()
             setEnv("LESS", "FRSXMK");
         restoreProcessContext();
         if (pager)
-            execl("/bin/sh", "sh", "-c", pager, nullptr);
+            execl(sh.c_str(), "sh", "-c", pager, nullptr);
         execlp("pager", "pager", nullptr);
         execlp("less", "less", nullptr);
         execlp("more", "more", nullptr);
