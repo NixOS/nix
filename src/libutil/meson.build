@@ -144,6 +144,16 @@ deps_public += nlohmann_json
 
 cxx = meson.get_compiler('cpp')
 
+fs = import('fs')
+
+sh_program = get_option('sh-program')
+if host_machine.system() != 'windows' and not fs.is_absolute(sh_program)
+  # sh_program is exec'd directly and handed to ssh as $SHELL,
+  # neither of which does a PATH lookup. It's only meaningful on Linux.
+  error('sh-program must be an absolute path, got \'' + sh_program + '\'')
+endif
+configdata_priv.set_quoted('SH_PROGRAM', sh_program)
+
 config_priv_h = configure_file(
   configuration : configdata_priv,
   output : 'util-config-private.hh',

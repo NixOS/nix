@@ -130,6 +130,12 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options = Pro
 #endif
 
 /**
+ * The POSIX shell used to run command strings with `-c` (build-time
+ * configurable via the `sh-program` option; always an absolute path).
+ */
+const std::filesystem::path & shProgram();
+
+/**
  * Run a program and return its stdout in a string (i.e., like the
  * shell backtick operator).
  */
