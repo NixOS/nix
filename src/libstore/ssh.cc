@@ -136,7 +136,7 @@ bool SSHMaster::isMasterRunning()
 
     auto res = runProgram(
         RunOptions{
-            .spawnOptions = {.program = SSH_PROGRAM, .args = std::move(args)},
+            .spawnOptions = {.program = sshProgram(), .args = std::move(args)},
             .mergeStderrToStdout = true,
         });
     return res.first == 0;
@@ -177,7 +177,7 @@ std::unique_ptr<SSHMaster::Connection> SSHMaster::startCommand(OsStrings && comm
     std::filesystem::path program;
 
     if (!fakeSSH) {
-        program = SSH_PROGRAM;
+        program = sshProgram();
         args = {string_to_os_string(hostnameAndUser), OS_STR("-x")};
         addCommonSSHOpts(args);
         if (!socketPath.empty())
@@ -268,7 +268,7 @@ std::filesystem::path SSHMaster::startMaster()
 
     state->sshMaster = spawnProgram(
         {
-            .program = SSH_PROGRAM,
+            .program = sshProgram(),
             .lookupPath = true,
             .args = std::move(args),
             .environment = createSSHEnv(),
