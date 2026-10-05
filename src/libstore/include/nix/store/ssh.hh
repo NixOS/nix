@@ -9,6 +9,13 @@
 
 namespace nix {
 
+/**
+ * The ssh program used for all ssh invocations (build-time configurable
+ * via the `ssh-program` option; either a name resolved via PATH or an
+ * absolute path).
+ */
+const std::filesystem::path & sshProgram();
+
 OsStrings getNixSshOpts();
 
 class SSHMaster

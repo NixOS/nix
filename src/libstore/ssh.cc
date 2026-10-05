@@ -59,6 +59,12 @@ static void checkValidAuthority(const ParsedURL::Authority & authority)
     }
 }
 
+const std::filesystem::path & sshProgram()
+{
+    static const std::filesystem::path program = SSH_PROGRAM;
+    return program;
+}
+
 OsStrings getNixSshOpts()
 {
     std::string sshOpts = getEnv("NIX_SSHOPTS").value_or("");
