@@ -44,8 +44,7 @@ inline std::optional<Mode> decodeMode(RawMode m)
  *
  * @throws if prefix not recognized
  */
-ObjectType
-parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+ObjectType parseObjectType(Source & source);
 
 /**
  * Read the size of the blob
@@ -53,16 +52,12 @@ parseObjectType(Source & source, const ExperimentalFeatureSettings & xpSettings 
  * The caller should then call `Source::drainInto` or similar with that
  * size.
  */
-uint64_t parseBlob(Source & source, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+uint64_t parseBlob(Source & source);
 
 /**
  * @param hashAlgo must be `HashAlgo::SHA1` or `HashAlgo::SHA256` for now.
  */
-void parseTree(
-    merkle::DirectorySink & sink,
-    Source & source,
-    HashAlgorithm hashAlgo,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+void parseTree(merkle::DirectorySink & sink, Source & source, HashAlgorithm hashAlgo);
 
 /**
  * Convert a `SourceAccessor::Type` to a `Mode`.
@@ -71,17 +66,13 @@ std::optional<Mode> convertMode(SourceAccessor::Type type);
 
 /**
  * Dumps a single file to a sink
- *
- * @param xpSettings for testing purposes
  */
-void dumpBlobPrefix(
-    uint64_t size, Sink & sink, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+void dumpBlobPrefix(uint64_t size, Sink & sink);
 
 /**
  * Dumps a representation of a git tree to a sink
  */
-void dumpTree(
-    const Tree & entries, Sink & sink, const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+void dumpTree(const Tree & entries, Sink & sink);
 
 /**
  * Callback for processing a child with `dump`
@@ -94,12 +85,7 @@ void dumpTree(
  */
 using DumpHook = TreeEntry(const SourcePath & path);
 
-Mode dump(
-    const SourcePath & path,
-    Sink & sink,
-    fun<DumpHook> hook,
-    PathFilter & filter = defaultPathFilter,
-    const ExperimentalFeatureSettings & xpSettings = experimentalFeatureSettings);
+Mode dump(const SourcePath & path, Sink & sink, fun<DumpHook> hook, PathFilter & filter = defaultPathFilter);
 
 /**
  * Recursively dumps path, hashing as we go.
