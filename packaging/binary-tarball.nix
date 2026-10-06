@@ -69,10 +69,11 @@ runCommand "nix-binary-tarball-${version}" env ''
   fn=$out/$dir.tar.xz
   mkdir -p $out/nix-support
   echo "file binary-dist $fn" >> $out/nix-support/hydra-build-products
+  # Store mtime is 1 second into the epoch.
   tar cf - \
     --sort=name \
     --owner=0 --group=0 --mode=u+rw,uga+r \
-    --mtime='1970-01-01' \
+    --mtime='@1' \
     --absolute-names \
     --hard-dereference \
     --transform "s,$TMPDIR/install,$dir/install," \
