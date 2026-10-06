@@ -5,6 +5,7 @@
 #include "nix/main/common-args.hh"
 #include "nix/store/store-api.hh"
 #include "nix/store/derivations.hh"
+#include "nix/store/derivation/cbor.hh"
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
@@ -14,9 +15,15 @@ namespace nix {
 struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
 {
     bool recursive = false;
+    bool cbor = false;
 
     CmdShowDerivation()
     {
+        addFlag({
+            .longName = "cbor",
+            .description = "Write derivations in CBOR format version 1.",
+            .handler = {&cbor, true},
+        });
         addFlag({
             .longName = "recursive",
             .shortName = 'r',
@@ -46,10 +53,24 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
     {
         auto drvPaths = Installable::toDerivations(store, installables, true);
 
+        if (cbor && !recursive && drvPaths.size() == 1) {
+            writeFull(STDOUT_FILENO, derivation::toCbor(store->readDerivation(*drvPaths.begin())));
+            return;
+        }
+
         if (recursive) {
             StorePathSet closure;
             store->computeFSClosure(drvPaths, closure);
             drvPaths = std::move(closure);
+        }
+
+        if (cbor) {
+            std::map<StorePath, Derivation> drvs;
+            for (auto & drvPath : drvPaths)
+                if (drvPath.isDerivation())
+                    drvs.emplace(drvPath, store->readDerivation(drvPath));
+            writeFull(STDOUT_FILENO, derivation::toCbor(drvs));
+            return;
         }
 
         json jsonRoot = json::object();

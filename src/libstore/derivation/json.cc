@@ -1,4 +1,5 @@
 #include "nix/store/derivations.hh"
+#include "structured.hh"
 #include "nix/store/derivation/full-inputs.hh"
 #include "nix/store/store-api.hh"
 #include "nix/util/json-utils.hh"
@@ -104,192 +105,96 @@ nix::DerivationOutput adl_serializer<nix::DerivationOutput>::from_json(
     }
 }
 
-static void inputsToJson(json & res, const nix::StorePathSet & inputs)
+namespace {
+
+struct JsonWriter
 {
-    res = nlohmann::json::array();
-    for (auto & input : inputs)
-        res.emplace_back(input);
-}
+    json & object;
 
-static void inputsToJson(json & res, const nix::derivation::FullInputs & inputs)
+    void value(const char * key, const json & value)
+    {
+        object[key] = value;
+    }
+
+    void bytes(const char * key, const std::string & value)
+    {
+        object[key] = value;
+    }
+
+    void byteStrings(const char * key, const nix::Strings & value)
+    {
+        object[key] = value;
+    }
+
+    void byteMap(const char * key, const nix::StringPairs & value)
+    {
+        object[key] = value;
+    }
+
+    void attrs(const char * key, const nix::StructuredAttrs & value)
+    {
+        object[key] = value.structuredAttrs;
+    }
+};
+
+struct JsonReader
 {
-    using namespace nix;
-    res = nlohmann::json::object();
+    const json::object_t & object;
 
-    inputsToJson(res["srcs"], inputs.srcs);
+    const json & value(const char * key)
+    {
+        return nix::valueAt(object, key);
+    }
 
-    auto doInput = [&](this const auto & doInput, const auto & inputNode) -> nlohmann::json {
-        auto value = nlohmann::json::object();
-        value["outputs"] = inputNode.value;
-        {
-            auto next = nlohmann::json::object();
-            for (auto & [outputId, childNode] : inputNode.childMap)
-                next[outputId] = doInput(childNode);
-            value["dynamicOutputs"] = std::move(next);
-        }
-        return value;
-    };
+    std::string bytes(const char * key)
+    {
+        return nix::getString(value(key));
+    }
 
-    auto & inputDrvsObj = res["drvs"];
-    inputDrvsObj = nlohmann::json::object();
-    for (auto & [inputDrv, inputNode] : inputs.drvs.map)
-        inputDrvsObj[inputDrv.to_string()] = doInput(inputNode);
-}
+    nix::Strings byteStrings(const char * key)
+    {
+        return nix::getStringList(value(key));
+    }
 
-static void inputsToJson(json & res, const std::set<nix::SingleDerivedPath> & inputs)
-{
-    using namespace nix::derivation;
-    inputsToJson(res, FullInputs::fromSet(inputs));
-}
+    nix::StringPairs byteMap(const char * key)
+    {
+        return nix::getStringMap(value(key));
+    }
+
+    std::optional<nix::StructuredAttrs> attrs(const char * key)
+    {
+        if (auto value = nix::get(object, key))
+            return nix::StructuredAttrs{*value};
+        return std::nullopt;
+    }
+};
+
+} // namespace
 
 template<typename Inputs>
 void adl_serializer<nix::derivation::Derivation<Inputs>>::to_json(
-    json & res, const nix::derivation::Derivation<Inputs> & d)
+    json & res, const nix::derivation::Derivation<Inputs> & drv)
 {
-    using namespace nix;
-    res = nlohmann::json::object();
-
-    res["name"] = d.name;
-    res["version"] = expectedJsonVersionDerivation;
-
-    {
-        nlohmann::json & outputsObj = res["outputs"];
-        outputsObj = nlohmann::json::object();
-        for (auto & [outputName, output] : d.outputs)
-            outputsObj[outputName] = output;
-    }
-
-    inputsToJson(res["inputs"], d.inputs);
-
-    res["system"] = d.platform;
-    res["builder"] = d.builder;
-    res["args"] = d.args;
-    res["env"] = d.env;
-
-    if (d.structuredAttrs)
-        res["structuredAttrs"] = d.structuredAttrs->structuredAttrs;
-}
-
-template<typename Inputs>
-static Inputs inputsFromJson(const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings);
-
-template<>
-nix::StorePathSet inputsFromJson<nix::StorePathSet>(const json & inputsJson, const nix::ExperimentalFeatureSettings &)
-{
-    using namespace nix;
-    StorePathSet inputSrcs;
-    for (auto & input : getArray(inputsJson))
-        inputSrcs.insert(input);
-    return inputSrcs;
-}
-
-template<>
-nix::derivation::FullInputs inputsFromJson<nix::derivation::FullInputs>(
-    const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
-{
-    using namespace nix;
-    using namespace derivation;
-
-    auto inputsObj = getObject(inputsJson);
-    FullInputs inputs;
-
-    try {
-        for (auto & input : getArray(valueAt(inputsObj, "srcs")))
-            inputs.srcs.insert(input);
-    } catch (Error & e) {
-        e.addTrace({}, "while reading key 'srcs'");
-        throw;
-    }
-
-    try {
-        auto doInput = [&](this const auto & doInput, const auto & _json) -> DerivedPathMap<StringSet>::ChildNode {
-            auto & json = getObject(_json);
-            DerivedPathMap<StringSet>::ChildNode node;
-            node.value = getStringSet(valueAt(json, "outputs"));
-            for (auto & [outputId, childNode] : getObject(valueAt(json, "dynamicOutputs"))) {
-                xpSettings.require(
-                    Xp::DynamicDerivations, [&] { return fmt("dynamic output '%s' in JSON", outputId); });
-                node.childMap[outputId] = doInput(childNode);
-            }
-            return node;
-        };
-        for (auto & [inputDrvPath, inputOutputs] : getObject(valueAt(inputsObj, "drvs")))
-            inputs.drvs.map[StorePath{inputDrvPath}] = doInput(inputOutputs);
-    } catch (Error & e) {
-        e.addTrace({}, "while reading key 'drvs'");
-        throw;
-    }
-
-    return inputs;
-}
-
-template<>
-std::set<nix::SingleDerivedPath> inputsFromJson<std::set<nix::SingleDerivedPath>>(
-    const json & inputsJson, const nix::ExperimentalFeatureSettings & xpSettings)
-{
-    using namespace nix::derivation;
-    return inputsFromJson<FullInputs>(inputsJson, xpSettings).toSet();
+    res = json::object();
+    res["version"] = nix::expectedJsonVersionDerivation;
+    JsonWriter writer{res};
+    nix::derivation::structured::write(drv, writer);
 }
 
 template<typename Inputs>
 nix::derivation::Derivation<Inputs> adl_serializer<nix::derivation::Derivation<Inputs>>::from_json(
-    const json & _json, const nix::ExperimentalFeatureSettings & xpSettings)
+    const json & object, const nix::ExperimentalFeatureSettings & xpSettings)
 {
     using namespace nix;
-    using namespace derivation;
-
-    auto & json = getObject(_json);
-    {
-        auto version = getUnsigned(valueAt(json, "version"));
-        if (version != expectedJsonVersionDerivation)
-            throw Error(
-                "Unsupported derivation JSON format version %d, only format version %d is currently supported.",
-                version,
-                expectedJsonVersionDerivation);
-    }
-
-    return derivation::Derivation<Inputs>{
-        .outputs =
-            [&] {
-                Outputs<> outputs;
-                try {
-                    for (auto & [outputName, output] : getObject(valueAt(json, "outputs")))
-                        outputs.insert_or_assign(
-                            outputName, adl_serializer<DerivationOutput>::from_json(output, xpSettings));
-                } catch (Error & e) {
-                    e.addTrace({}, "while reading key 'outputs'");
-                    throw;
-                }
-                return outputs;
-            }(),
-        .inputs =
-            [&] {
-                try {
-                    return inputsFromJson<Inputs>(valueAt(json, "inputs"), xpSettings);
-                } catch (Error & e) {
-                    e.addTrace({}, "while reading key 'inputs'");
-                    throw;
-                }
-            }(),
-        .platform = getString(valueAt(json, "system")),
-        .builder = getString(valueAt(json, "builder")),
-        .args = getStringList(valueAt(json, "args")),
-        .env =
-            [&] {
-                try {
-                    return getStringMap(valueAt(json, "env"));
-                } catch (Error & e) {
-                    e.addTrace({}, "while reading key 'env'");
-                    throw;
-                }
-            }(),
-        .structuredAttrs = [&]() -> std::optional<StructuredAttrs> {
-            if (auto structuredAttrs = get(json, "structuredAttrs"))
-                return StructuredAttrs{*structuredAttrs};
-            return std::nullopt;
-        }(),
-        .name = getString(valueAt(json, "name")),
-    };
+    auto & fields = getObject(object);
+    auto version = getUnsigned(valueAt(fields, "version"));
+    if (version != expectedJsonVersionDerivation)
+        throw Error(
+            "Unsupported derivation JSON format version %d, only format version %d is currently supported.",
+            version,
+            expectedJsonVersionDerivation);
+    JsonReader reader{fields};
+    return derivation::structured::read<Inputs>(reader, xpSettings);
 }
 
 template struct adl_serializer<nix::BasicDerivation>;
