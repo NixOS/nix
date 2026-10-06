@@ -1,6 +1,7 @@
 {
   lib,
   binaryTarballs,
+  nixInstallers,
   nixpkgsFor,
 }:
 
@@ -30,41 +31,55 @@ let
   installCases = {
     install-default = {
       install = ''
-        tar -xf ./nix.tar.xz
-        mv ./nix-* nix
-        ./nix/install --no-channel-add
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --no-channel-add
       '';
     };
 
     install-both-profile-links = {
       install = ''
-        tar -xf ./nix.tar.xz
-        mv ./nix-* nix
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
         ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
         mkdir -p $HOME/.local/state/nix
         ln -s $HOME/.local/state/nix/profiles/b-profile $HOME/.local/state/nix/profile
-        ./nix/install --no-channel-add
+        ./scripted-installer/install --no-channel-add
       '';
     };
 
     install-force-no-daemon = {
       install = ''
-        tar -xf ./nix.tar.xz
-        mv ./nix-* nix
-        ./nix/install --no-daemon --no-channel-add
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --no-daemon --no-channel-add
       '';
     };
 
     install-force-daemon = {
       install = ''
-        tar -xf ./nix.tar.xz
-        mv ./nix-* nix
-        ./nix/install --daemon --no-channel-add
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
       '';
     };
 
-    # TODO: Also port over tests from NixOS/nix-installer as applicable and add smoke tests for
-    # NixOS/nix-installer + refactor to support different installer flavors.
+    nix-installer-default = {
+      install = ''
+        chmod u+x ./nix-installer
+        RUST_BACKTRACE="full" ./nix-installer install --no-confirm --logger pretty
+      '';
+    };
+
+    nix-installer-over-scripted-daemon = {
+      install = ''
+        mkdir scripted-installer
+        tar --strip-components=1 -xf ./nix.tar.xz -C scripted-installer
+        ./scripted-installer/install --daemon --no-channel-add
+        chmod u+x ./nix-installer
+        RUST_BACKTRACE="full" ./nix-installer install --no-confirm --logger pretty
+      '';
+    };
   };
 
   mockChannel =
@@ -157,6 +172,7 @@ let
         postBoot = "touch ~/.profile";
         installCases = {
           # Multi-user installer doesn't support non-bash shells or OpenRC.
+          # nix-installer also doesn't work with doas.
           inherit (installCases) install-default install-both-profile-links install-force-no-daemon;
         };
       };
@@ -180,12 +196,14 @@ let
           qemu_kvm
           openssh
           cdrkit
+          colorized-logs
         ];
         image = image.image;
         postBoot = image.postBoot or "";
         installScript = test.install;
         checkScript = commonCheck + (test.check or "");
         binaryTarball = binaryTarballs.${system};
+        nixInstaller = nixInstallers.${system};
       }
       ''
         shopt -s nullglob
@@ -226,7 +244,7 @@ let
           -drive file=./seed.img,media=cdrom \
           -netdev user,id=net0,restrict=yes,hostfwd=tcp::$ssh_port-:22 -device virtio-net-pci,netdev=net0 \
           -run-with exit-with-parent=on \
-          $extra_qemu_opts &
+          $extra_qemu_opts > >(ansi2txt) &
 
         qemu_pid=$!
 
@@ -254,6 +272,7 @@ let
 
         echo "Copying installer..."
         scp -P $ssh_port $ssh_opts $binaryTarball/nix-*.tar.xz user@localhost:nix.tar.xz
+        scp -P $ssh_port $ssh_opts $nixInstaller/bin/nix-installer user@localhost:nix-installer
 
         echo "Running installer..."
         $ssh <<EOF

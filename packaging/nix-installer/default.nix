@@ -11,12 +11,14 @@
 }:
 
 let
-  installerVersion = "2.34.6";
+  installerVersion = "2.36.0pre";
   src = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix-installer";
-    tag = installerVersion;
-    hash = "sha256-aTaz8EtHexvke7tGr5MfeKy9g7AraIAFN+dPApm+fds=";
+    # Don't forget to bump this after release branch-off.
+    # TODO: Document this stuff in release-process.md.
+    rev = "fb0541d1785dcd5e252cbe05d08c6cba64da751f";
+    hash = "sha256-ZOZwGzo6P70ymfzwYwe+36KLLWwevBNEEUf1CW1nCqw=";
   };
 
   # Bare binary: no Nix closure yet.  Appended below via `pack`, so the
@@ -28,7 +30,7 @@ let
 
     inherit src;
 
-    cargoHash = "sha256-/mNXkeZVuYsqd0TiUa7bzSP4xpKh0Fqga9EpasPbrzU=";
+    cargoHash = "sha256-oNDsyjFCC7B9TovJqdZoXQwr7dtdFdUNltXOgv0aPLk=";
 
     doCheck = false;
 
