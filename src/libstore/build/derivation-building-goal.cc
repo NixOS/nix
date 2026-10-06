@@ -271,9 +271,7 @@ static BuildError reject(const LocalBuildRejection & rejection, std::string_view
     return BuildError(BuildResult::Failure::InputRejected, std::move(msg));
 }
 
-/* At least one of the output paths could not be
-   produced using a substitute.  So we have to build instead. */
-Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
+Goal::Co<void> DerivationBuildingGoal::realiseInputs()
 {
     Goals waitees;
 
@@ -304,6 +302,13 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
     co_await await(std::move(waitees));
 
     trace("all inputs realised");
+}
+
+/* At least one of the output paths could not be
+   produced using a substitute.  So we have to build instead. */
+Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
+{
+    co_await realiseInputs();
 
     if (nrFailed != 0) {
         auto msg =
