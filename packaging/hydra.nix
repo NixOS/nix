@@ -481,6 +481,7 @@ rec {
       */
       installer = import ../tests/installer {
         binaryTarballs = self.hydraJobs.binaryTarball;
+        nixInstallers = self.hydraJobs.nixInstaller;
         inherit nixpkgsFor;
         inherit lib;
       };
