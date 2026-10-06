@@ -26,5 +26,5 @@ option(
   'bash-program',
   type : 'string',
   value : 'bash',
-  description : 'the bash used as the fallback interactive shell for nix develop / nix-shell when bashInteractive from nixpkgs is unavailable (a name resolved via PATH, or an absolute path)',
+  description : 'the bash used as the fallback interactive shell for nix develop / nix-shell when bashInteractive from nixpkgs is unavailable, and for nix shell when $SHELL is unset (a name resolved via PATH, or an absolute path)',
 )

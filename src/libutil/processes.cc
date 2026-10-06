@@ -2,9 +2,17 @@
 #include "nix/util/serialise.hh"
 #include "nix/util/signals.hh"
 
+#include "util-config-private.hh"
+
 namespace nix {
 
 void ExecError::anchor() {}
+
+const std::filesystem::path & shProgram()
+{
+    static const std::filesystem::path program = SH_PROGRAM;
+    return program;
+}
 
 Pid & Pid::operator=(Pid && other) noexcept
 {
