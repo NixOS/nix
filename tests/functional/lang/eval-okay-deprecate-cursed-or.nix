@@ -3,6 +3,7 @@ let
   cursed0 = builtins.length (let or = 1; in [ (x: x) or ]);
   cursed1 = let or = 1; in (x: x * 2) (x: x + 1) or;
   cursed2 = let or = 1; in { a = 2; }.a or (x: x) or;
+  cursed3 = let or = 1; in (x: x) "%s" or;
 
   # These are uses of `or` as an identifier that are not cursed
   allowed0 = let or = (x: x); in map or [];
