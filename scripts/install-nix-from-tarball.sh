@@ -173,6 +173,10 @@ for i in $(cd "$self/store" >/dev/null && echo ./*); do
         mv "$i_tmp" "$dest/store/$i"
         chmod -w "$dest/store/$i"
     fi
+    # BusyBox tar is bad at preserving mtime because it doesn't seem to do the correct
+    # thing of doing a final fixup pass for fixing parent directory permissions and doesn't
+    # handle symlinks at all. So we can set the correct mtime here.
+    find "$dest/store/$i" -depth -exec touch -hmd "@1" {} +
 done
 echo "" >&2
 

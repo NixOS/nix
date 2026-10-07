@@ -4,10 +4,31 @@
 }:
 
 let
+  commonCheck = ''
+    export NIX_CONFIG="substituters = "
 
-  installScripts = {
+    nix-env --version
+
+    nix --extra-experimental-features nix-command store info
+    nix-store --verify --check-contents
+    nix store verify --all --extra-experimental-features nix-command --no-trust
+
+    nix-channel --add file://$HOME/channel myChannel
+    nix-channel --update
+    [[ $(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
+
+    bad_mtime=$( find /nix/store/ -mindepth 1 ! -path /nix/store/.links \
+                 -exec sh -c '[ "$(stat -c %Y "{}")" -ne 1 ]' \; -print -quit )
+    if [ -n "$bad_mtime" ]; then
+      echo "bad filesystem object mtime after install:"
+      stat "$bad_mtime"
+      exit 1
+    fi
+  '';
+
+  installCases = {
     install-default = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-channel-add
@@ -15,7 +36,7 @@ let
     };
 
     install-both-profile-links = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ln -s $HOME/.local/state/nix/profiles/a-profile $HOME/.nix-profile
@@ -26,7 +47,7 @@ let
     };
 
     install-force-no-daemon = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --no-daemon --no-channel-add
@@ -34,7 +55,7 @@ let
     };
 
     install-force-daemon = {
-      script = ''
+      install = ''
         tar -xf ./nix.tar.xz
         mv ./nix-* nix
         ./nix/install --daemon --no-channel-add
@@ -136,13 +157,13 @@ let
       postBoot = disableSELinux;
       extraQemuOpts = "-cpu Westmere-v2";
     };
-
   };
 
   makeTest =
     imageName: testName:
     let
       image = images.${imageName};
+      test = installCases.${testName};
     in
     with nixpkgsFor.${image.system}.native;
     runCommand "installer-test-${imageName}-${testName}"
@@ -153,11 +174,13 @@ let
         ];
         image = image.image;
         postBoot = image.postBoot or "";
-        installScript = installScripts.${testName}.script;
-        binaryTarball = binaryTarballs.${system};
+        installScript = test.install;
+        checkScript = commonCheck + (test.check or "");
+        binaryTarball = binaryTarballs.${image.system};
       }
       ''
         shopt -s nullglob
+        set -eu
 
         echo "Unpacking Vagrant box $image..."
         tar xvf $image
@@ -207,7 +230,7 @@ let
 
         if [[ -n $postBoot ]]; then
           echo "Running post-boot commands..."
-          $ssh "set -ex; $postBoot"
+          $ssh "set -eux; $postBoot"
         fi
 
         echo "Copying installer..."
@@ -223,30 +246,14 @@ let
 
         echo "Testing Nix installation..."
         $ssh <<EOF
-          set -ex
-
           # FIXME: get rid of this; ideally ssh should just work.
           source ~/.bash_profile || true
           source ~/.bash_login || true
           source ~/.profile || true
           source /etc/bashrc || true
 
-          nix-env --version
-          nix --extra-experimental-features nix-command store info
-
-          out=\$(nix-build --no-substitute -E 'derivation { name = "foo"; system = "x86_64-linux"; builder = "/bin/sh"; args = ["-c" "echo foobar > \$out"]; }')
-          [[ \$(cat \$out) = foobar ]]
-
-          if pgrep nix-daemon; then
-            MAYBESUDO="sudo"
-          else
-            MAYBESUDO=""
-          fi
-
-
-          $MAYBESUDO \$(which nix-channel) --add file://\$HOME/channel myChannel
-          $MAYBESUDO \$(which nix-channel) --update
-          [[ \$(nix-instantiate --eval --expr 'builtins.readFile <myChannel/someFile>') = '"someContent"' ]]
+          set -eux
+          $checkScript
         EOF
 
         echo "Done!"
@@ -256,5 +263,5 @@ let
 in
 
 builtins.mapAttrs (imageName: image: {
-  ${image.system} = builtins.mapAttrs (testName: test: makeTest imageName testName) installScripts;
+  ${image.system} = builtins.mapAttrs (testName: test: makeTest imageName testName) installCases;
 }) images
