@@ -9,7 +9,7 @@ namespace nix {
 
 DerivationTrampolineGoal::DerivationTrampolineGoal(
     ref<const SingleDerivedPath> drvReq, const OutputsSpec & wantedOutputs, Worker & worker, BuildMode buildMode)
-    : Goal(worker, haveToLoadFromStore())
+    : Goal(worker, init(haveToLoadFromStore()))
     , drvReq(drvReq)
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
@@ -23,7 +23,7 @@ DerivationTrampolineGoal::DerivationTrampolineGoal(
     const Derivation & drv,
     Worker & worker,
     BuildMode buildMode)
-    : Goal(worker, haveDerivation(drvPath, drv))
+    : Goal(worker, init(haveDerivation(drvPath, drv)))
     , drvReq(makeConstantStorePathRef(drvPath))
     , wantedOutputs(wantedOutputs)
     , buildMode(buildMode)
@@ -66,14 +66,24 @@ std::string DerivationTrampolineGoal::key()
     }.to_string(worker.store);
 }
 
-Goal::Co DerivationTrampolineGoal::haveToLoadFromStore()
+Goal::Co<Goal::ExitCode> DerivationTrampolineGoal::init(Co<Result> work)
 {
-    auto [drvPath, drv] = co_await loadDerivation();
-    co_await haveDerivation(std::move(drvPath), std::move(drv));
-    unreachable(); /* Keep in mind that we *still* end coroutines early. */
+    auto result = co_await std::move(work);
+    buildResult = std::move(result.second);
+    co_return result.first;
 }
 
-Goal::BasicCo<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDerivation()
+Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveToLoadFromStore()
+{
+    auto loadResult = co_await loadDerivation();
+    if (auto * failure = std::get_if<BuildResult::Failure>(&loadResult))
+        co_return Result{ecFailed, BuildResult{.inner = std::move(*failure)}};
+
+    auto [drvPath, drv] = std::get<LoadedDerivation>(std::move(loadResult));
+    co_return co_await haveDerivation(std::move(drvPath), std::move(drv));
+}
+
+Goal::Co<DerivationTrampolineGoal::LoadResult> DerivationTrampolineGoal::loadDerivation()
 {
     trace("need to load derivation from file");
 
@@ -107,12 +117,10 @@ Goal::BasicCo<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDe
     trace("outer load and build derivation");
 
     if (nrFailed != 0) {
-        co_return doneFailure(
-            ecFailed,
-            BuildResult::Failure{{
-                .status = BuildResult::Failure::DependencyFailed,
-                .msg = HintFmt("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)),
-            }});
+        co_return BuildResult::Failure{{
+            .status = BuildResult::Failure::DependencyFailed,
+            .msg = HintFmt("failed to obtain derivation of '%s'", drvReq->to_string(worker.store)),
+        }};
     }
 
     StorePath drvPath = resolveDerivedPath(worker.store, *drvReq);
@@ -138,7 +146,7 @@ Goal::BasicCo<std::pair<StorePath, Derivation>> DerivationTrampolineGoal::loadDe
     co_return std::pair{std::move(drvPath), std::move(drv)};
 }
 
-Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
+Goal::Co<DerivationTrampolineGoal::Result> DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation drv)
 {
     trace("have derivation, will kick off derivations goals per wanted output");
 
@@ -191,7 +199,7 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         /* Report the exit status of *some* failing goal. This might not be strictly
            correct, since multiple subgoals can fail independently, but this should be
            a good enough heuristic without --keep-going. */
-        co_return doneFailure(exitCode, *failure);
+        co_return Result{exitCode, BuildResult{.inner = *failure}};
     }
 
     SingleDrvOutputs outputs;
@@ -231,10 +239,16 @@ Goal::Co DerivationTrampolineGoal::haveDerivation(StorePath drvPath, Derivation 
         return toPriority(a) < toPriority(b);
     };
 
-    co_return doneSuccess({
-        .status = std::ranges::min(statuses, compareSuccesses),
-        .builtOutputs = std::move(outputs),
-    });
+    co_return Result{
+        ecSuccess,
+        BuildResult{
+            .inner =
+                BuildResult::Success{
+                    .status = std::ranges::min(statuses, compareSuccesses),
+                    .builtOutputs = std::move(outputs),
+                },
+        },
+    };
 }
 
 } // namespace nix
