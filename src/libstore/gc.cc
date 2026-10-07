@@ -464,7 +464,17 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
 
                 debug("GC roots server accepted new client");
 
-                /* Process the connection in a separate thread. */
+                /* Process the connection in a separate thread. Hold
+                   the `connections` lock while starting the thread
+                   and registering it, so that the thread's cleanup
+                   handler (which removes it from `connections`)
+                   can't run before it has been inserted. Otherwise
+                   a client that disconnects immediately would leave
+                   a stale entry, and a later client that gets the
+                   same fd number would cause a duplicate key insert,
+                   destroying a joinable std::thread and thus calling
+                   std::terminate(). */
+                auto conn(connections.lock());
                 auto fdClient_ = fdClient.get();
                 std::thread clientThread([&, fdClient = std::move(fdClient)]() {
                     Finally cleanup([&]() {
@@ -514,7 +524,8 @@ void LocalStore::collectGarbage(const GCOptions & options, GCResults & results)
                     }
                 });
 
-                connections.lock()->insert({fdClient_, std::move(clientThread)});
+                auto [it, inserted] = conn->insert({fdClient_, std::move(clientThread)});
+                assert(inserted);
             }
         }
     });
