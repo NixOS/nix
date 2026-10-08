@@ -200,8 +200,8 @@ public:
     }
 
     template<typename... Args>
-    HintFmt(boost::format && fmt, const Args &... args)
-        : fmt(std::move(fmt))
+    HintFmt(boost::format && f, const Args &... args)
+        : fmt(std::move(f))
     {
         static_assert(!(std::is_same_v<std::remove_cvref_t<Args>, std::filesystem::path> || ...));
         setExceptions(fmt);
