@@ -22,8 +22,8 @@ class NotDeterministic final : public CloneableError<NotDeterministic, BuildErro
     void anchor() override;
 
 public:
-    NotDeterministic(auto &&... args)
-        : CloneableError(BuildResult::Failure::NotDeterministic, args...)
+    NotDeterministic(FormatString fs, const auto &... args)
+        : CloneableError(BuildResult::Failure::NotDeterministic, fs, args...)
     {
         isNonDeterministic = true;
     }

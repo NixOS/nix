@@ -7,6 +7,17 @@
 
 namespace nix {
 
+/* No constructor takes a `std::string` or a `const char *`. `is_convertible`
+   does not evaluate a `consteval` constructor, so a run-time
+   `std::string_view` is rejected only where it is passed. */
+static_assert(!std::is_convertible_v<std::string, FormatString>);
+static_assert(!std::is_convertible_v<const char *, FormatString>);
+
+TEST(FormatString, keepsEmbeddedNul)
+{
+    ASSERT_EQ(fmt("a %s\0b", "x"), std::string("a x\0b", 5));
+}
+
 TEST(fmt, singleStringIsLiteral)
 {
     /* A run-time string that is not a valid format string, and would
@@ -30,6 +41,11 @@ TEST(fmt, singleStringIsLiteral)
     logger->coutStyled(data);
     ASSERT_EQ(capture.getStdout(), data + "\n" + data + "\n");
 
+    auto sysErrorMessage = data + ": " ANSI_WARNING + std::string(strerror(ENOENT)) + ANSI_NORMAL;
+    ASSERT_EQ(SysError(ENOENT, data).info().msg.str(), sysErrorMessage);
+    errno = ENOENT;
+    ASSERT_EQ(SysError(data).info().msg.str(), sysErrorMessage);
+
     /* As an argument, it is printed as is too. */
     ASSERT_EQ(HintFmt("<%s>", Uncolored(data)).str(), "<" + data + ">");
 }
@@ -37,11 +53,17 @@ TEST(fmt, singleStringIsLiteral)
 TEST(fmt, formatStringWithoutArgumentsIsLiteral)
 {
     ASSERT_EQ(fmt("100%% %s"), "100%% %s");
+    ASSERT_EQ(fmt(FormatString("100%% %s")), "100%% %s");
 }
 
 TEST(fmt, tooFewArguments)
 {
     ASSERT_EQ(fmt("%s %s", "a"), "a ");
+}
+
+TEST(HintFmt, formatStringWithoutArgumentsIsLiteral)
+{
+    ASSERT_EQ(HintFmt(FormatString("100%% %s")).str(), "100%% %s");
 }
 
 TEST(HintFmt, percentStringWithoutArgs)

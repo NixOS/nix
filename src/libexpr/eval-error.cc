@@ -70,11 +70,10 @@ EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, HintFmt hint)
 
 template<class T>
 template<typename... Args>
-EvalErrorBuilder<T> &
-EvalErrorBuilder<T>::addTrace(PosIdx pos, std::string_view formatString, const Args &... formatArgs)
+EvalErrorBuilder<T> & EvalErrorBuilder<T>::addTrace(PosIdx pos, FormatString formatString, const Args &... formatArgs)
 {
 
-    addTrace(error.state.positions[pos], HintFmt(std::string(formatString), formatArgs...));
+    addTrace(error.state.positions[pos], HintFmt(formatString, formatArgs...));
     return *this;
 }
 

@@ -256,18 +256,17 @@ TEST_F(GitUtilsTest, duplicateTreeEntries)
     };
 
     auto writeTreeToPackfile = [&](std::span<const std::tuple<std::string, git::Mode, Hash>> entries) -> Hash {
-        using namespace std::string_literals;
         std::string tree;
 
         for (const auto & [name, mode, hash] : entries) {
-            tree += fmt("%o %s\0"s, std::to_underlying(mode), name);
+            tree += fmt("%o %s\0", std::to_underlying(mode), name);
             tree += std::string_view(reinterpret_cast<const char *>(hash.hash), hash.hashSize);
         }
 
         writeObjectPackHeader(/*OBJ_TREE=*/2, tree.size());
         packSink(compressObject(tree));
         HashSink treeHashSink(HashAlgorithm::SHA1);
-        treeHashSink(fmt("tree %d\0"s, tree.size()));
+        treeHashSink(fmt("tree %d\0", tree.size()));
         treeHashSink(tree);
         return treeHashSink.finish().hash;
     };

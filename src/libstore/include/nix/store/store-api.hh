@@ -877,7 +877,8 @@ public:
         auto accessor = getFSAccessor(path, requireValidPath);
         if (!accessor) {
             throw InvalidPath(
-                requireValidPath ? "path '%1%' is not a valid store path" : "store path '%1%' does not exist",
+                requireValidPath ? FormatString("path '%1%' is not a valid store path")
+                                 : FormatString("store path '%1%' does not exist"),
                 printStorePath(path));
         }
         return ref<SourceAccessor>{accessor};

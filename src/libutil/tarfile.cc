@@ -41,7 +41,7 @@ int callback_close(struct archive *, void * self) noexcept
 constexpr auto defaultBufferSize = std::size_t{65536};
 } // namespace
 
-void TarArchive::check(int err, const std::string & reason, bool warningsAreFatal)
+void TarArchive::check(int err, FormatString reason, bool warningsAreFatal)
 {
     if (err == ARCHIVE_EOF)
         throw EndOfFile("reached end of archive");
