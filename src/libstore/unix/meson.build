@@ -1,4 +1,5 @@
 sources += files(
+  'build/build-remote.cc',
   'build/child.cc',
   'build/chroot.cc',
   'build/external-derivation-builder.cc',
