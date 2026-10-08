@@ -775,10 +775,6 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
         }
     }
 
-    if (pathInfoCache)
-        pathInfoCache->lock()->upsert(
-            info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
-
     return id;
 }
 
@@ -1040,6 +1036,14 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
             topoSortResult);
 
         txn.commit();
+
+        /* Cache what's in the database, not `infos`: it lacks fields
+           like the registration time. */
+        if (pathInfoCache) {
+            auto cache(pathInfoCache->lock());
+            for (auto & [path, _] : infos)
+                cache->upsert(path, PathInfoCacheValue{.value = queryPathInfoInternal(*state, path)});
+        }
     });
 }
 
@@ -1657,6 +1661,9 @@ void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signa
         updatePathInfo(*state, *info);
 
         txn.commit();
+
+        if (pathInfoCache)
+            pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
     });
 }
 

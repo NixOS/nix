@@ -229,6 +229,86 @@ INSTANTIATE_TEST_SUITE_P(
         return std::string(printHashAlgo(std::get<HashAlgorithm>(info.param)));
     });
 
+/* Tests that the path info cache agrees with the database. */
+class LocalStorePathInfoCacheTest : public ::testing::Test
+{
+protected:
+    AutoDelete tempStoreDir;
+    std::shared_ptr<LocalStore> store;
+
+    void SetUp() override
+    {
+        tempStoreDir = canonPath(createTempDir(), /*resolveSymlinks=*/true);
+        store = openStore();
+    }
+
+    void TearDown() override
+    {
+        store.reset();
+        tempStoreDir.deletePath();
+    }
+
+    /* A fresh store object has an empty cache, so it sees what the
+       database actually contains. */
+    std::shared_ptr<LocalStore> openStore()
+    {
+        auto config = std::make_shared<LocalStoreConfig>(tempStoreDir.path(), StoreConfig::Params{});
+        return std::make_shared<LocalStore>(ref{config});
+    }
+
+    ValidPathInfo makeInfo(const StorePath & path)
+    {
+        ValidPathInfo info{path, UnkeyedValidPathInfo(*store, Hash::dummy)};
+        info.narSize = 1;
+        return info;
+    }
+
+    const StorePath path{"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-foo"};
+};
+
+TEST_F(LocalStorePathInfoCacheTest, rollbackLeavesNoCachedHit)
+{
+    auto info = makeInfo(path);
+    info.references.insert(StorePath{"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-missing"});
+    EXPECT_THROW(store->registerValidPaths({{path, info}}), InvalidPath);
+    EXPECT_FALSE(openStore()->isValidPath(path));
+    EXPECT_FALSE(store->isValidPath(path));
+}
+
+TEST_F(LocalStorePathInfoCacheTest, registrationClearsCachedMiss)
+{
+    EXPECT_THROW(store->queryPathInfo(path), InvalidPath);
+    /* Registered by "another process", then re-registered by us. */
+    openStore()->registerValidPaths({{path, makeInfo(path)}});
+    store->registerValidPaths({{path, makeInfo(path)}});
+    EXPECT_TRUE(store->isValidPath(path));
+}
+
+TEST_F(LocalStorePathInfoCacheTest, cachedInfoMatchesDatabase)
+{
+    store->registerValidPaths({{path, makeInfo(path)}});
+    EXPECT_EQ(store->queryPathInfo(path)->registrationTime, openStore()->queryPathInfo(path)->registrationTime);
+}
+
+TEST_F(LocalStorePathInfoCacheTest, signatureUpdatesAreVisible)
+{
+    auto sig1 = Signature::parse(
+        "key1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
+    auto sig2 = Signature::parse(
+        "key2:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==");
+
+    auto info = makeInfo(path);
+    store->registerValidPaths({{path, info}});
+    EXPECT_TRUE(store->queryPathInfo(path)->sigs.empty());
+
+    info.sigs.insert(sig1);
+    store->registerValidPaths({{path, info}});
+    EXPECT_EQ(store->queryPathInfo(path)->sigs, std::set<Signature>{sig1});
+
+    store->addSignatures(path, {sig2});
+    EXPECT_EQ(store->queryPathInfo(path)->sigs, (std::set<Signature>{sig1, sig2}));
+}
+
 #endif
 
 } // namespace nix
