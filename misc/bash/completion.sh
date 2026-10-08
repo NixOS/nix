@@ -1,8 +1,11 @@
 # shellcheck shell=bash
 function _complete_nix {
     local -a words
-    local cword cur
-    _get_comp_words_by_ref -n ':=&' words cword cur
+    # shellcheck disable=SC2034 # prev is set by _init_completion
+    local cword cur prev
+    # This does filename completion after redirections (like `< foo`),
+    # and removes redirections from `words`.
+    _init_completion -n ':=&' || return
     local have_type
     while IFS= read -r line; do
         local completion=${line%%	*}
