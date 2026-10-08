@@ -6,11 +6,8 @@
 #include <memory>
 #include <tuple>
 
-#ifdef __APPLE__
-#  include <sys/time.h>
-#endif
-
 #include "nix/store/machines.hh"
+#include "nix/store/machine-selection.hh"
 #include "nix/main/shared.hh"
 #include "nix/main/plugin.hh"
 #include "nix/store/pathlocks.hh"
@@ -31,19 +28,6 @@
 namespace nix {
 
 static void handleAlarm(int sig) {}
-
-std::string escapeUri(std::string uri)
-{
-    std::replace(uri.begin(), uri.end(), '/', '_');
-    return uri;
-}
-
-static std::filesystem::path currentLoad;
-
-static AutoCloseFD openSlotLock(const Machine & m, uint64_t slot)
-{
-    return openLockFile(currentLoad / fmt("%s-%d", escapeUri(m.storeUri.render()), slot), true);
-}
 
 static bool allSupportedLocally(Store & store, const StringSet & requiredFeatures)
 {
@@ -106,12 +90,7 @@ static int main_build_remote(int argc, char ** argv)
 
         auto store = openStore();
 
-        /* It would be more appropriate to use $XDG_RUNTIME_DIR, since
-           that gets cleared on reboot, but it wouldn't work on macOS. */
-        if (auto localStore = store.dynamic_pointer_cast<LocalFSStore>())
-            currentLoad = localStore->config.stateDir.get() / "current-load";
-        else
-            currentLoad = std::filesystem::path{settings.nixStateDir} / "current-load";
+        auto currentLoad = getCurrentLoadDir(*store);
 
         std::shared_ptr<Store> sshStore;
         AutoCloseFD bestSlotLock;
@@ -156,58 +135,11 @@ static int main_build_remote(int argc, char ** argv)
 
             while (true) {
                 bestSlotLock = -1;
-                AutoCloseFD lock = openLockFile(currentLoad / "main-lock", true);
-                lockFile(lock.get(), ltWrite, true);
 
-                bool rightType = false;
+                auto selection = acquireMachineSlot(currentLoad, machines, neededSystem, requiredFeatures);
 
-                Machine * bestMachine = nullptr;
-                uint64_t bestLoad = 0;
-                for (auto & m : machines) {
-                    debug("considering building on remote machine '%s'", m.storeUri.render());
-
-                    if (m.enabled && m.systemSupported(neededSystem) && m.allSupported(requiredFeatures)
-                        && m.mandatoryMet(requiredFeatures)) {
-                        rightType = true;
-                        AutoCloseFD free;
-                        uint64_t load = 0;
-                        for (uint64_t slot = 0; slot < m.maxJobs; ++slot) {
-                            auto slotLock = openSlotLock(m, slot);
-                            if (lockFile(slotLock.get(), ltWrite, false)) {
-                                if (!free) {
-                                    free = std::move(slotLock);
-                                }
-                            } else {
-                                ++load;
-                            }
-                        }
-                        if (!free) {
-                            continue;
-                        }
-                        bool best = false;
-                        if (!bestSlotLock) {
-                            best = true;
-                        } else if (load / m.speedFactor < bestLoad / bestMachine->speedFactor) {
-                            best = true;
-                        } else if (load / m.speedFactor == bestLoad / bestMachine->speedFactor) {
-                            if (m.speedFactor > bestMachine->speedFactor) {
-                                best = true;
-                            } else if (m.speedFactor == bestMachine->speedFactor) {
-                                if (load < bestLoad) {
-                                    best = true;
-                                }
-                            }
-                        }
-                        if (best) {
-                            bestLoad = load;
-                            bestSlotLock = std::move(free);
-                            bestMachine = &m;
-                        }
-                    }
-                }
-
-                if (!bestSlotLock) {
-                    if (rightType && !canBuildLocally)
+                if (auto * noMachine = std::get_if<NoMachine>(&selection)) {
+                    if (*noMachine == NoMachine::AllBusy && !canBuildLocally)
                         std::cerr << "# postpone\n";
                     else {
                         // build the hint template.
@@ -243,13 +175,9 @@ static int main_build_remote(int argc, char ** argv)
                     break;
                 }
 
-#ifdef __APPLE__
-                futimes(bestSlotLock.get(), NULL);
-#else
-                futimens(bestSlotLock.get(), NULL);
-#endif
-
-                lock = -1;
+                auto & acquired = std::get<AcquiredMachine>(selection);
+                auto * bestMachine = acquired.machine;
+                bestSlotLock = std::move(acquired.slotLock);
 
                 try {
                     storeUri = bestMachine->storeUri.render();
@@ -287,21 +215,7 @@ static int main_build_remote(int argc, char ** argv)
 
         auto wantedOutputs = readStrings<StringSet>(source);
 
-        AutoCloseFD uploadLock;
-        {
-            auto setUpdateLock = [&](auto && fileName) {
-                uploadLock = openLockFile(currentLoad / (escapeUri(fileName) + ".upload-lock"), true);
-            };
-            try {
-                setUpdateLock(storeUri);
-            } catch (SystemError & e) {
-                if (!e.is(std::errc::filename_too_long))
-                    throw;
-                // Try again hashing the store URL so we have a shorter path
-                auto h = hashString(HashAlgorithm::MD5, storeUri);
-                setUpdateLock(h.to_string(HashFormat::Base64, false));
-            }
-        }
+        AutoCloseFD uploadLock = openUploadLock(currentLoad, storeUri);
 
         {
             Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
