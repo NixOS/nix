@@ -51,6 +51,7 @@ sources = files(
   'file-descriptor.cc',
   'file-system-at.cc',
   'file-system.cc',
+  'fmt.cc',
   'fun.cc',
   'git.cc',
   'hash.cc',
