@@ -7,6 +7,6 @@ namespace nix {
 /**
  * Common initialisation performed in child processes.
  */
-void commonChildInit();
+[[gnu::visibility("hidden")]] void commonChildInit();
 
 } // namespace nix

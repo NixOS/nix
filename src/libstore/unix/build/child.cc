@@ -1,6 +1,7 @@
-#include "nix/store/build/child.hh"
 #include "nix/util/current-process.hh"
 #include "nix/util/logging.hh"
+
+#include "child-impl.hh"
 
 #include <fcntl.h>
 #include <unistd.h>
