@@ -238,8 +238,11 @@ struct BrotliDecompressionSink : ChunkedCompressionSink
         while (!finished && (!data.data() || avail_in)) {
             checkInterrupt();
 
-            if (!BrotliDecoderDecompressStream(state, &avail_in, &next_in, &avail_out, &next_out, nullptr))
+            auto result = BrotliDecoderDecompressStream(state, &avail_in, &next_in, &avail_out, &next_out, nullptr);
+            if (result == BROTLI_DECODER_RESULT_ERROR)
                 throw CompressionError("error while decompressing brotli file");
+            if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT && !data.data())
+                throw CompressionError("truncated brotli file");
 
             if (avail_out < sizeof(outbuf) || avail_in == 0) {
                 nextSink({(char *) outbuf, sizeof(outbuf) - avail_out});

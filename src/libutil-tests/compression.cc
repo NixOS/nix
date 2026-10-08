@@ -45,6 +45,22 @@ TEST_P(CompressionDecompressionTest, invalidDecompression)
         decompress(GetParam(), "this is a string that does not qualify as valid compressed data"), CompressionError);
 }
 
+TEST(decompress, truncatedBrotli)
+{
+    auto compressed = compress(CompressionAlgo::brotli, "hello world");
+    for (size_t size : {size_t{0}, compressed.size() / 2, compressed.size() - 1}) {
+        SCOPED_TRACE(size);
+        auto truncated = std::string_view(compressed).substr(0, size);
+        ASSERT_THROW(decompress(CompressionAlgo::brotli, truncated), CompressionError);
+
+        StringSink output;
+        auto sink = makeDecompressionSink(CompressionAlgo::brotli, output);
+        for (size_t i = 0; i < truncated.size(); ++i)
+            (*sink)(truncated.substr(i, 1));
+        ASSERT_THROW(sink->finish(), CompressionError);
+    }
+}
+
 TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
 {
     StringSink strSink;
