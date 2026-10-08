@@ -166,6 +166,13 @@ struct SpawnOptions
      * Implemented on best-effort basis and ignored if not implemented.
      */
     bool dieWithParent = true;
+    bool setSid = false;
+    /**
+     * @brief (Linux-only) whether to restore the mount ns in the child.
+     * Only set this to false if the child process needs a writable store.
+     * Ignored on non-Linux because it's irrelevant.
+     */
+    bool restoreMounts = true;
 };
 
 struct RunOptions
