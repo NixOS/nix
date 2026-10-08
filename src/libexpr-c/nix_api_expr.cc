@@ -164,6 +164,29 @@ nix_err nix_eval_state_builder_set_setting(
     NIXC_CATCH_ERRS
 }
 
+nix_err nix_eval_state_builder_set_realise_hook(
+    nix_c_context * context, nix_eval_state_builder * builder, nix_realise_hook hook, void * user_data)
+{
+    nix_clear_err(context);
+    try {
+        builder->settings.realiseHook =
+            [hook, user_data, store = builder->store](const std::vector<nix::DerivedPath::Built> & drvs) {
+                std::vector<std::string> owned;
+                owned.reserve(drvs.size());
+                for (auto & drv : drvs)
+                    owned.push_back(drv.to_string(*store));
+                std::vector<const char *> paths;
+                paths.reserve(owned.size());
+                for (auto & path : owned)
+                    paths.push_back(path.c_str());
+                nix_c_context hookContext;
+                if (hook(user_data, &hookContext, paths.data(), paths.size()) != NIX_OK)
+                    throw nix::Error("%s", hookContext.last_err.value_or("import from derivation failed"));
+            };
+    }
+    NIXC_CATCH_ERRS
+}
+
 EvalState * nix_eval_state_build(nix_c_context * context, nix_eval_state_builder * builder)
 {
     if (context)

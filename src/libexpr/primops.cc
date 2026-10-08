@@ -140,9 +140,12 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             std::rethrow_exception(*failed);
 
     try {
-        buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
+        if (settings.realiseHook)
+            settings.realiseHook(drvs);
+        else
+            buildStore->getBuilder(store)->buildPaths(buildReqs, bmNormal);
     } catch (Error &) {
-        if (drvs.size() == 1)
+        if (drvs.size() == 1 && !settings.realiseHook)
             failedRealisations->insert_or_assign(drvs.front().drvPath->getBaseStorePath(), std::current_exception());
         throw;
     }
