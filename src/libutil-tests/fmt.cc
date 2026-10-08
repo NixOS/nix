@@ -1,5 +1,6 @@
 #include "nix/util/error.hh"
 #include "nix/util/fmt.hh"
+#include "nix/util/tests/capture-logging.hh"
 
 #include <gtest/gtest.h>
 
@@ -85,6 +86,20 @@ TEST(Error, addTraceSingleStringIsLiteral)
     Error e("x");
     e.addTrace(nullptr, std::string_view(data));
     ASSERT_EQ(e.info().traces.front().hint.str(), data);
+}
+
+TEST(warn, messageWithoutArgumentsIsLiteral)
+{
+    testing::CaptureLogging capture;
+    warn("100% %s %%");
+    ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " 100% %s %%\n");
+}
+
+TEST(warn, tooFewArguments)
+{
+    testing::CaptureLogging capture;
+    warn("%s %s", "a");
+    ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " a \n");
 }
 
 TEST(SysError, formatsMessage)
