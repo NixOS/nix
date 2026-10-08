@@ -4,6 +4,12 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#ifdef __linux__
+#  include <cerrno>
+#  include <sys/syscall.h>
+#  include <unistd.h>
+#endif
+
 namespace nix {
 
 /* ----------------------------------------------------------------------------
@@ -103,6 +109,14 @@ TEST(runProgram2, nonexistent)
 
 TEST(runProgram2, leakedFDsAreClosed)
 {
+#  if defined(__linux__) && !defined(__GLIBC__)
+    /* Without glibc's closefrom(), doExecChild() only closes leaked FDs via
+       close_range, which is best-effort. Skip when it's unavailable, e.g. under
+       the enosys test run. */
+    if (::syscall(SYS_close_range, ~0u, ~0u, 0) == -1 && errno == ENOSYS)
+        GTEST_SKIP() << "close_range is unavailable and there is no closefrom()";
+#  endif
+
     auto self = getSelfExe();
     ASSERT_TRUE(self);
     int fds[2];
