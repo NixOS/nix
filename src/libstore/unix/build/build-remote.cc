@@ -48,11 +48,6 @@ void serveBuildHook(
     auto machines = Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
     debug("got %d remote builders", machines.size());
 
-    if (machines.empty()) {
-        reply(toParent, "# decline-permanently");
-        return;
-    }
-
     std::optional<StorePath> drvPath;
     std::string storeUri;
 
@@ -70,6 +65,13 @@ void serveBuildHook(
         auto neededSystem = readString(from);
         drvPath = store->parseStorePath(readString(from));
         auto requiredFeatures = readStrings<StringSet>(from);
+
+        /* Read the request first, or the parent's write can fail with
+           EPIPE. */
+        if (machines.empty()) {
+            reply(toParent, "# decline-permanently");
+            return;
+        }
 
         /* It would be possible to build locally after some builds clear out,
            so don't show the warning now: */

@@ -1233,9 +1233,14 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
     if (worker.settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
         return rpDecline;
 
-    if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>(
-            worker.settings.buildHook, std::chrono::milliseconds(worker.settings.buildHookKillTimeout));
+    if (!worker.hook) {
+        auto timeout = std::chrono::milliseconds(worker.settings.buildHookKillTimeout);
+        /* Only a configured hook runs as a program. Compare by value:
+           `loadConfFile` resets `isOverridden()`. */
+        worker.hook = worker.settings.buildHook.isDefault()
+                          ? HookInstance::builtin(worker.store.config, timeout)
+                          : HookInstance::external(worker.settings.buildHook, timeout);
+    }
 
     try {
 

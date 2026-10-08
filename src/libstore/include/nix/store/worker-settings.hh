@@ -122,10 +122,9 @@ public:
         {"nix", "__build-remote"},
         "build-hook",
         R"(
-          The path to the helper program that executes remote builds.
+          The program that performs remote builds, speaking the build-hook protocol over `stdio` with the Nix that requested them.
 
-          Nix communicates with the build hook over `stdio` using a custom protocol to request builds that cannot be performed directly by the Nix daemon.
-          The default value is the internal Nix binary that implements remote building.
+          With the default value Nix runs its own implementation in a forked child of the building process (on platforms other than Linux and macOS, as `nix __build-remote`); an explicit `build-hook = nix __build-remote` selects the same. Any other value is run as a separate program.
 
           > **Important**
           >
