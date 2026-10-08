@@ -51,6 +51,7 @@ sources = files(
   'error_traces.cc',
   'eval-cache.cc',
   'eval.cc',
+  'import-from-derivation.cc',
   'json.cc',
   'lazy-fetcher-attr.cc',
   'main.cc',
