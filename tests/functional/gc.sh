@@ -20,6 +20,15 @@ if nix-store --gc --print-dead | grep -E "$outPath"$; then false; fi
 
 nix-store --gc --print-dead
 
+# Query modes must not delete anything, not even entries that aren't store paths.
+if isDaemonNewer "2.36pre"; then
+    touch "$NIX_STORE_DIR/not-a-store-path"
+    nix-store --gc --print-dead
+    nix-store --gc --print-live
+    nix store gc --dry-run
+    test -e "$NIX_STORE_DIR/not-a-store-path"
+fi
+
 inUse=$(readLink "$outPath/reference-to-input-2")
 if nix-store --delete "$inUse"; then false; fi
 test -e "$inUse"
