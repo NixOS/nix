@@ -99,7 +99,7 @@ TEST_F(nix_api_expr_test, nix_eval_state_builder_set_setting)
 {
     // Test whether setting eval settings via the C-api actually apply.
 
-    // Presence of builtins.currentSystem is used as an indicater whether pure-eval is used or not.
+    // Presence of builtins.currentSystem is used as an indicator whether pure-eval is used or not.
     auto hasCurrentSystem = [&](EvalState * es) {
         Value * v = nix_alloc_value(ctx, es);
         nix_expr_eval_from_string(ctx, es, "builtins ? currentSystem", ".", v);

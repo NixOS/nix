@@ -71,7 +71,7 @@ void parseTree(merkle::DirectorySink & sink, Source & source, HashAlgorithm hash
         left -= 1;
 
         const auto hashSize = regularHashSize(hashAlgo);
-        std::string hashs = getString(source, hashSize);
+        std::string hashStr = getString(source, hashSize);
         left -= hashSize;
 
         if (!(hashAlgo == HashAlgorithm::SHA1 || hashAlgo == HashAlgorithm::SHA256)) {
@@ -79,7 +79,7 @@ void parseTree(merkle::DirectorySink & sink, Source & source, HashAlgorithm hash
         }
 
         Hash hash(hashAlgo);
-        std::copy(hashs.begin(), hashs.end(), hash.hash);
+        std::copy(hashStr.begin(), hashStr.end(), hash.hash);
 
         sink.insertChild(name, TreeEntry{.mode = mode, .hash = hash});
     }

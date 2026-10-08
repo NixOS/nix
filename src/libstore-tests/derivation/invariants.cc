@@ -300,7 +300,7 @@ TEST_F(FillInOutputPathsTest, preservesDeferredWithInputDrvs)
     EXPECT_EQ(drv, drvBefore);
 }
 
-TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeffered)
+TEST_F(FillInOutputPathsTest, throwsOnPatWhenShouldBeDeferred)
 {
     using nlohmann::json;
 
