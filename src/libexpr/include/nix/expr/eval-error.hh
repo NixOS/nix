@@ -35,9 +35,15 @@ public:
     {
     }
 
-    template<typename... Args>
-    explicit EvalBaseError(EvalState & state, const std::string & formatString, const Args &... formatArgs)
-        : CloneableError(formatString, formatArgs...)
+    explicit EvalBaseError(EvalState & state, const std::string & msg)
+        : CloneableError(msg)
+        , state(state)
+    {
+    }
+
+    template<typename Arg, typename... Args>
+    explicit EvalBaseError(EvalState & state, FormatString formatString, const Arg & arg, const Args &... formatArgs)
+        : CloneableError(formatString, arg, formatArgs...)
         , state(state)
     {
     }
@@ -94,9 +100,8 @@ public:
      */
     const Value * const v;
 
-    template<typename... Args>
-    explicit InfiniteRecursionError(EvalState & state, const Value * v, const Args &... args)
-        : CloneableError(state, args...)
+    explicit InfiniteRecursionError(EvalState & state, const Value * v, const std::string & msg)
+        : CloneableError(state, msg)
         , v(v)
     {
     }
@@ -148,9 +153,8 @@ class EvalErrorBuilder final
 {
     friend class EvalState;
 
-    template<typename... Args>
-    explicit EvalErrorBuilder(EvalState & state, const Args &... args)
-        : error(T(state, args...))
+    explicit EvalErrorBuilder(T && error)
+        : error(std::move(error))
     {
     }
 
@@ -177,7 +181,7 @@ public:
 
     template<typename... Args>
     [[nodiscard, gnu::noinline]] EvalErrorBuilder<T> &
-    addTrace(PosIdx pos, std::string_view formatString, const Args &... formatArgs);
+    addTrace(PosIdx pos, FormatString formatString, const Args &... formatArgs);
 
     /**
      * Delete the `EvalErrorBuilder` and throw the underlying exception.

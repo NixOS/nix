@@ -695,9 +695,9 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     buildResult.startTime = time(nullptr); // inexact
 
     auto msg =
-        fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
-            : buildMode == bmCheck ? "checking outputs of '%s'"
-                                   : "building '%s'",
+        fmt(buildMode == bmRepair  ? FormatString("repairing outputs of '%s'")
+            : buildMode == bmCheck ? FormatString("checking outputs of '%s'")
+                                   : FormatString("building '%s'"),
             worker.store.printStorePath(drvPath));
     msg += fmt(" on '%s'", machineName);
 
@@ -881,9 +881,9 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
 
     auto started = [&]() {
         auto msg =
-            fmt(buildMode == bmRepair  ? "repairing outputs of '%s'"
-                : buildMode == bmCheck ? "checking outputs of '%s'"
-                                       : "building '%s'",
+            fmt(buildMode == bmRepair  ? FormatString("repairing outputs of '%s'")
+                : buildMode == bmCheck ? FormatString("checking outputs of '%s'")
+                                       : FormatString("building '%s'"),
                 worker.store.printStorePath(drvPath));
         buildLog = std::make_unique<BuildLog>(
             worker.settings.logLines,

@@ -229,8 +229,8 @@ public:
     int status;
 
     template<typename... Args>
-    ExecError(int status, Args &&... args)
-        : CloneableError(std::forward<Args>(args)...)
+    ExecError(int status, FormatString fs, const Args &... args)
+        : CloneableError(fs, args...)
         , status(status)
     {
     }

@@ -10,6 +10,14 @@ namespace nix {
    substitute or throw if it were interpreted as one. */
 static const std::string data = "100% %s %1%";
 
+static_assert(!std::is_convertible_v<std::string, FormatString>);
+static_assert(!std::is_convertible_v<const char *, FormatString>);
+
+TEST(FormatString, keepsEmbeddedNul)
+{
+    ASSERT_EQ(fmt("a %s\0b", "x"), std::string("a x\0b", 5));
+}
+
 TEST(fmt, singleStringIsLiteral)
 {
     ASSERT_EQ(fmt(data), data);
@@ -30,6 +38,11 @@ TEST(fmt, tooFewArguments)
 TEST(HintFmt, singleStringIsLiteral)
 {
     ASSERT_EQ(HintFmt(data).str(), data);
+}
+
+TEST(HintFmt, formatStringWithoutArgumentsIsLiteral)
+{
+    ASSERT_EQ(HintFmt(FormatString("100%% %s")).str(), "100%% %s");
 }
 
 TEST(HintFmt, argumentKeepsPercentSigns)
@@ -107,6 +120,14 @@ TEST(SysError, formatsMessage)
     ASSERT_EQ(
         SysError(ENOENT, "open %s", Uncolored("a")).info().msg.str(),
         "open a: " ANSI_WARNING + std::string(strerror(ENOENT)) + ANSI_NORMAL);
+}
+
+TEST(SysError, singleStringIsLiteral)
+{
+    auto expected = data + ": " ANSI_WARNING + std::string(strerror(ENOENT)) + ANSI_NORMAL;
+    ASSERT_EQ(SysError(ENOENT, data).info().msg.str(), expected);
+    errno = ENOENT;
+    ASSERT_EQ(SysError(data).info().msg.str(), expected);
 }
 
 } // namespace nix

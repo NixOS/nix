@@ -17,11 +17,11 @@ public:
     std::string_view raw;
 
     template<typename... Args>
-    BadNixStringContextElem(std::string_view raw_, Args &&... args)
+    BadNixStringContextElem(std::string_view raw_, FormatString fs, const Args &... args)
         : CloneableError("")
     {
         raw = raw_;
-        auto hf = HintFmt(std::forward<Args>(args)...);
+        auto hf = HintFmt(fs, args...);
         err.msg = HintFmt("Bad String Context element: %1%: %2%", Uncolored(hf.str()), raw);
     }
 };

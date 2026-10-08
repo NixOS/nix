@@ -188,10 +188,15 @@ public:
 
     virtual void writeToStdout(std::string_view s);
 
-    template<typename... Args>
-    inline void cout(const Args &... args)
+    inline void cout(std::string_view s)
     {
-        writeToStdout(fmt(args...));
+        writeToStdout(s);
+    }
+
+    template<typename Arg, typename... Args>
+    inline void cout(FormatString fs, const Arg & arg, const Args &... args)
+    {
+        writeToStdout(fmt(fs, arg, args...));
     }
 
     /**
@@ -200,10 +205,15 @@ public:
      */
     void writeStyledToStdout(std::string_view s);
 
-    template<typename... Args>
-    inline void coutStyled(const Args &... args)
+    inline void coutStyled(std::string_view s)
     {
-        writeStyledToStdout(fmt(args...));
+        writeStyledToStdout(s);
+    }
+
+    template<typename Arg, typename... Args>
+    inline void coutStyled(FormatString fs, const Arg & arg, const Args &... args)
+    {
+        writeStyledToStdout(fmt(fs, arg, args...));
     }
 
     virtual std::optional<char> ask(std::string_view s)
@@ -387,7 +397,7 @@ extern Verbosity verbosity;
  * Formats like `fmt`: a message without arguments is printed literally.
  */
 template<typename... Args>
-inline void warn(const std::string & fs, const Args &... args)
+inline void warn(FormatString fs, const Args &... args)
 {
     logger->warn(fmt(fs, args...));
 }

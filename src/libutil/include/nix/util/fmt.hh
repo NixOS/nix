@@ -35,6 +35,49 @@ inline void formatHelper(F & f, const T & x, const Args &... args)
 }
 
 /**
+ * A `boost::format` format string that is a compile-time constant.
+ *
+ * The converting constructor is `consteval`. A string that is computed at
+ * run time does not convert, so the compiler rejects code that uses data as a
+ * format string. Such data can contain `%`, which `boost::format` interprets.
+ *
+ * A function that forwards a format string must take this type itself. The
+ * conversion is checked where the literal is written, and a function
+ * parameter is not a constant expression.
+ *
+ * To pick one of several literals, convert each one, as in
+ * `cond ? FormatString("a %s") : FormatString("b %s")`. A conditional
+ * expression on bare literals gives a `const char *`, which does not convert.
+ *
+ * For a format string that is assembled at run time, use
+ * `HintFmt::fromFormatString`.
+ */
+class FormatString
+{
+    std::string_view s;
+
+public:
+    /**
+     * The length comes from the array type, so a literal can contain `\0`.
+     */
+    template<size_t N>
+    consteval FormatString(const char (&s)[N])
+        : s(s, N - 1)
+    {
+    }
+
+    consteval FormatString(std::string_view s)
+        : s(s)
+    {
+    }
+
+    std::string str() const
+    {
+        return std::string(s);
+    }
+};
+
+/**
  * Set the correct exceptions for `fmt`.
  */
 inline void setExceptions(boost::format & fmt)
@@ -79,12 +122,21 @@ inline std::string fmt(const char * s)
     return s;
 }
 
-template<typename... Args>
-inline std::string fmt(const std::string & fs, const Args &... args)
+/**
+ * Without arguments, the format string is returned unchanged, as for the
+ * other single-argument overloads.
+ */
+inline std::string fmt(FormatString fs)
 {
-    boost::format f(fs);
+    return fs.str();
+}
+
+template<typename T, typename... Args>
+inline std::string fmt(FormatString fs, const T & arg, const Args &... args)
+{
+    boost::format f(fs.str());
     setExceptions(f);
-    formatHelper(f, args...);
+    formatHelper(f, arg, args...);
     return f.str();
 }
 
@@ -186,12 +238,18 @@ public:
     }
 
     /**
-     * Interpolate the given arguments into the format string.
+     * Interpolate the given arguments into the format string. Without
+     * arguments, print the format string literally, like the `std::string`
+     * constructor.
      */
     template<typename... Args>
-    HintFmt(const std::string & format, const Args &... args)
-        : HintFmt(boost::format(format), args...)
+    HintFmt(FormatString format, const Args &... args)
+        : HintFmt(boost::format(sizeof...(Args) == 0 ? std::string("%s") : format.str()))
     {
+        if constexpr (sizeof...(Args) == 0)
+            *this % Uncolored(format.str());
+        else
+            formatHelper(*this, args...);
     }
 
     HintFmt(const HintFmt & hf)

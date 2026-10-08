@@ -159,21 +159,36 @@ public:
     BaseError & operator=(const BaseError &) = default;
     BaseError & operator=(BaseError &&) noexcept = default;
 
-    template<typename... Args>
-    BaseError(unsigned int status, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .status = status}
+    BaseError(unsigned int status, const std::string & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .status = status}
     {
     }
 
-    template<typename... Args>
-    explicit BaseError(const std::string & fs, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(fs, std::forward<Args>(args)...), .pos = {}}
+    template<typename T, typename... Args>
+    BaseError(unsigned int status, FormatString fs, const T & arg, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .status = status}
     {
     }
 
-    template<typename... Args>
-    BaseError(const Suggestions & sug, Args &&... args)
-        : err{.level = lvlError, .msg = HintFmt(std::forward<Args>(args)...), .pos = {}, .suggestions = sug}
+    explicit BaseError(const std::string & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}}
+    {
+    }
+
+    template<typename T, typename... Args>
+    explicit BaseError(FormatString fs, const T & arg, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}}
+    {
+    }
+
+    BaseError(const Suggestions & sug, const std::string & msg)
+        : err{.level = lvlError, .msg = HintFmt(msg), .pos = {}, .suggestions = sug}
+    {
+    }
+
+    template<typename T, typename... Args>
+    BaseError(const Suggestions & sug, FormatString fs, const T & arg, const Args &... args)
+        : err{.level = lvlError, .msg = HintFmt(fs, arg, args...), .pos = {}, .suggestions = sug}
     {
     }
 
@@ -238,10 +253,21 @@ public:
      * @param fs Format string, see `HintFmt`
      * @param args Format string arguments.
      */
-    template<typename... Args>
-    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view fs, Args &&... args)
+    template<typename Arg, typename... Args>
+    void addTrace(std::shared_ptr<const Pos> && pos, FormatString fs, const Arg & arg, const Args &... args)
     {
-        addTrace(std::move(pos), HintFmt(std::string(fs), std::forward<Args>(args)...));
+        addTrace(std::move(pos), HintFmt(fs, arg, args...));
+    }
+
+    /**
+     * Prepends an item to the error trace, as is usual for extra context.
+     *
+     * @param pos Nullable source position to put in trace item
+     * @param msg Message, printed literally
+     */
+    void addTrace(std::shared_ptr<const Pos> && pos, std::string_view msg)
+    {
+        addTrace(std::move(pos), HintFmt(std::string(msg)));
     }
 
     /**
