@@ -44,7 +44,6 @@ TEST(fmt, tooFewArguments)
     ASSERT_EQ(fmt("%s %s", "a"), "a ");
 }
 
-#if 0
 TEST(HintFmt, percentStringWithoutArgs)
 {
 
@@ -74,9 +73,13 @@ TEST(HintFmt, tooManyArguments)
 
     ASSERT_STREQ(
         HintFmt("what about this %1% %2%", "%3%", "one", "two").str().c_str(),
-        "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_YELLOW "one" ANSI_NORMAL);
+        "what about this " ANSI_WARNING "%3%" ANSI_NORMAL " " ANSI_WARNING "one" ANSI_NORMAL);
 }
-#endif
+
+TEST(Error, tooFewArguments)
+{
+    ASSERT_EQ(Error("%s %s", Uncolored("a")).info().msg.str(), "a ");
+}
 
 TEST(SysError, formatsMessage)
 {
