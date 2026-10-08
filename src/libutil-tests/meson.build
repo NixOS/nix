@@ -75,6 +75,7 @@ sources = files(
   'position.cc',
   'processes.cc',
   'ref.cc',
+  'serialise-async.cc',
   'serialise.cc',
   'sort.cc',
   'source-accessor.cc',
