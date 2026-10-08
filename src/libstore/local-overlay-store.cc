@@ -33,6 +33,7 @@ StoreReference LocalOverlayStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
+                .authority = ParsedURL::Authority{},
             },
     };
 }

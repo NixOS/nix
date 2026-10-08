@@ -149,7 +149,7 @@ StoreReference LegacySSHStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
-                .authority = authority.to_string(),
+                .authority = authority,
             },
         .params = getQueryParams(),
     };
