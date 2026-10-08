@@ -44,11 +44,72 @@ TEST_P(CompressionDecompressionTest, invalidDecompression)
         decompress(GetParam(), "this is a string that does not qualify as valid compressed data"), CompressionError);
 }
 
+/* Completely empty input is treated as an empty stream rather than a
+   truncated one, for every algorithm. */
+TEST_P(CompressionDecompressionTest, emptyInputDecompressesToEmpty)
+{
+    ASSERT_EQ(decompress(GetParam(), ""), "");
+
+    StringSink output;
+    auto sink = makeDecompressionSink(GetParam(), output);
+    sink->finish();
+    ASSERT_EQ(output.s, "");
+}
+
+TEST_P(CompressionDecompressionTest, truncatedInputIsRejected)
+{
+    if (GetParam() == CompressionAlgo::none)
+        GTEST_SKIP();
+
+    auto compressed = compress(GetParam(), "hello world");
+    for (size_t size : {size_t{1}, compressed.size() / 2, compressed.size() - 1}) {
+        SCOPED_TRACE(size);
+        auto truncated = std::string_view(compressed).substr(0, size);
+        ASSERT_THROW(decompress(GetParam(), truncated), Error);
+
+        StringSink output;
+        auto sink = makeDecompressionSink(GetParam(), output);
+        ASSERT_THROW(
+            {
+                for (size_t i = 0; i < truncated.size(); ++i)
+                    (*sink)(truncated.substr(i, 1));
+                sink->finish();
+            },
+            Error);
+    }
+}
+
+TEST(decompress, brotliWaitsForInputUntilFinish)
+{
+    const std::string input = "hello world";
+    auto compressed = compress(CompressionAlgo::brotli, input);
+    for (size_t size = 1; size <= compressed.size(); ++size) {
+        SCOPED_TRACE(size);
+        StringSink output;
+        auto sink = makeDecompressionSink(CompressionAlgo::brotli, output);
+        auto buffered = dynamic_cast<BufferedSink *>(sink.get());
+        ASSERT_NE(buffered, nullptr);
+        for (size_t i = 0; i < size; ++i) {
+            ASSERT_NO_THROW({
+                (*sink)(std::string_view(compressed).substr(i, 1));
+                // Deliver each byte to the decoder instead of buffering it until finish().
+                buffered->flush();
+            });
+        }
+        if (size < compressed.size()) {
+            ASSERT_THROW(sink->finish(), CompressionError);
+        } else {
+            ASSERT_NO_THROW(sink->finish());
+            ASSERT_EQ(output.s, input);
+        }
+    }
+}
+
 TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
 {
     StringSink strSink;
-    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
-    auto sink = makeCompressionSink(CompressionAlgo::bzip2, *decompressionSink);
+    auto decompressionSink = makeDecompressionSink(GetParam(), strSink);
+    auto sink = makeCompressionSink(GetParam(), *decompressionSink);
 
     (*sink)(dummyInput);
     sink->finish();
