@@ -81,6 +81,20 @@ TEST(Error, tooFewArguments)
     ASSERT_EQ(Error("%s %s", Uncolored("a")).info().msg.str(), "a ");
 }
 
+TEST(warn, messageWithoutArgumentsIsLiteral)
+{
+    testing::CaptureLogging capture;
+    warn("100% %s %%");
+    ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " 100% %s %%\n");
+}
+
+TEST(warn, tooFewArguments)
+{
+    testing::CaptureLogging capture;
+    warn("%s %s", "a");
+    ASSERT_EQ(capture.get(), ANSI_WARNING "warning:" ANSI_NORMAL " a \n");
+}
+
 TEST(SysError, formatsMessage)
 {
     ASSERT_EQ(

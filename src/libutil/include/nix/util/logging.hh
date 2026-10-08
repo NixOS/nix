@@ -383,13 +383,13 @@ extern Verbosity verbosity;
 
 /**
  * if verbosity >= lvlWarn, print a message with a yellow 'warning:' prefix.
+ *
+ * Formats like `fmt`: a message without arguments is printed literally.
  */
 template<typename... Args>
 inline void warn(const std::string & fs, const Args &... args)
 {
-    boost::format f(fs);
-    formatHelper(f, args...);
-    logger->warn(f.str());
+    logger->warn(fmt(fs, args...));
 }
 
 #define warnOnce(haveWarned, args...) \
