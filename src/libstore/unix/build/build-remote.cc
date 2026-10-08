@@ -1,0 +1,307 @@
+#include <algorithm>
+#include <memory>
+#include <ranges>
+#include <set>
+
+#include <signal.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include "nix/store/build/build-remote.hh"
+#include "nix/store/build.hh"
+#include "nix/store/build-result.hh"
+#include "nix/store/derivations.hh"
+#include "nix/store/derivation/full-inputs.hh"
+#include "nix/store/globals.hh"
+#include "nix/store/local-store.hh"
+#include "nix/store/machine-selection.hh"
+#include "nix/store/machines.hh"
+#include "nix/util/experimental-features.hh"
+#include "nix/util/strings.hh"
+
+namespace nix {
+
+static void handleAlarm(int sig) {}
+
+static bool allSupportedLocally(Store & store, const StringSet & requiredFeatures)
+{
+    for (auto & feature : requiredFeatures)
+        if (!store.config.systemFeatures.get().count(feature))
+            return false;
+    return true;
+}
+
+/* Unbuffered: the parent is waiting for it. */
+static void reply(Descriptor toParent, std::string_view line)
+{
+    writeFull(toParent, std::string{line} + "\n");
+}
+
+void serveBuildHook(
+    ref<Store> store, unsigned int maxBuildJobs, Source & from, Descriptor toParent, Descriptor sshErrorFd)
+{
+    auto currentLoad = getCurrentLoadDir(*store);
+
+    std::shared_ptr<Store> sshStore;
+    AutoCloseFD bestSlotLock;
+
+    auto machines = Machine::parseConfig({settings.thisSystem}, settings.getWorkerSettings().builders);
+    debug("got %d remote builders", machines.size());
+
+    if (machines.empty()) {
+        reply(toParent, "# decline-permanently");
+        return;
+    }
+
+    std::optional<StorePath> drvPath;
+    std::string storeUri;
+
+    while (true) {
+
+        try {
+            auto s = readString(from);
+            if (s != "try")
+                return;
+        } catch (EndOfFile &) {
+            return;
+        }
+
+        auto amWilling = readInt(from);
+        auto neededSystem = readString(from);
+        drvPath = store->parseStorePath(readString(from));
+        auto requiredFeatures = readStrings<StringSet>(from);
+
+        /* It would be possible to build locally after some builds clear out,
+           so don't show the warning now: */
+        bool couldBuildLocally =
+            maxBuildJobs > 0
+            && (neededSystem == settings.thisSystem || settings.extraPlatforms.get().count(neededSystem) > 0)
+            && allSupportedLocally(*store, requiredFeatures);
+        /* It's possible to build this locally right now: */
+        bool canBuildLocally = amWilling && couldBuildLocally;
+
+        /* Error ignored here, will be caught later */
+        mkdir(currentLoad.c_str(), 0777);
+
+        while (true) {
+            bestSlotLock = -1;
+
+            auto selection = acquireMachineSlot(currentLoad, machines, neededSystem, requiredFeatures);
+
+            if (auto * noMachine = std::get_if<NoMachine>(&selection)) {
+                if (*noMachine == NoMachine::AllBusy && !canBuildLocally)
+                    reply(toParent, "# postpone");
+                else {
+                    // build the hint template.
+                    std::string errorText =
+                        "Failed to find a machine for remote build!\n"
+                        "derivation: %s\nrequired (system, features): (%s, [%s])";
+                    errorText += "\n%s available machines:";
+                    errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+
+                    for (unsigned int i = 0; i < machines.size(); ++i)
+                        errorText += "\n([%s], %s, [%s], [%s])";
+
+                    // add the template values.
+                    std::string drvstr;
+                    if (drvPath.has_value())
+                        drvstr = drvPath->to_string();
+                    else
+                        drvstr = "<unknown>";
+
+                    auto error = HintFmt::fromFormatString(errorText);
+                    error % drvstr % neededSystem % concatStringsSep<StringSet>(", ", requiredFeatures)
+                        % machines.size();
+
+                    for (auto & m : machines)
+                        error % concatStringsSep<StringSet>(", ", m.systemTypes) % m.maxJobs
+                            % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+                            % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+
+                    printMsg(couldBuildLocally ? lvlChatty : lvlWarn, error.str());
+
+                    reply(toParent, "# decline");
+                }
+                break;
+            }
+
+            auto & acquired = std::get<AcquiredMachine>(selection);
+            auto * bestMachine = acquired.machine;
+            bestSlotLock = std::move(acquired.slotLock);
+
+            try {
+                storeUri = bestMachine->storeUri.render();
+
+                Activity act(*logger, lvlTalkative, actUnknown, fmt("connecting to '%s'", storeUri));
+
+                sshStore = bestMachine->openStore();
+                sshStore->connect();
+            } catch (std::exception & e) {
+                auto msg = chomp(drainFD(sshErrorFd, {.block = false}));
+                printError("cannot build on '%s': %s%s", storeUri, e.what(), msg.empty() ? "" : ": " + msg);
+                bestMachine->enabled = false;
+                continue;
+            }
+
+            goto connected;
+        }
+    }
+
+connected:
+    close(sshErrorFd);
+
+    assert(sshStore);
+
+    reply(toParent, "# accept\n" + storeUri);
+
+    /* The other side of the build hook protocol is Nix itself, so
+       these are always printed in canonical form. */
+    auto inputs = [&] {
+        StorePathSet res;
+        for (auto & i : readStrings<StringSet>(from))
+            res.insert(store->parseStorePathCanonical(i));
+        return res;
+    }();
+
+    auto wantedOutputs = readStrings<StringSet>(from);
+
+    AutoCloseFD uploadLock = openUploadLock(currentLoad, storeUri);
+
+    {
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("waiting for the upload lock to '%s'", storeUri));
+
+        auto old = signal(SIGALRM, handleAlarm);
+        alarm(15 * 60);
+        if (!lockFile(uploadLock.get(), ltWrite, true))
+            printError("somebody is hogging the upload lock for '%s', continuing...");
+        alarm(0);
+        signal(SIGALRM, old);
+    }
+
+    auto substitute = settings.getWorkerSettings().buildersUseSubstitutes ? Substitute : NoSubstitute;
+
+    {
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying dependencies to '%s'", storeUri));
+        copyPaths(*store, *sshStore, inputs, NoRepair, NoCheckSigs, substitute);
+    }
+
+    uploadLock = -1;
+
+    auto drv = store->readDerivation(*drvPath);
+
+    std::optional<BuildResult> optResult;
+
+    // If we don't know whether we are trusted (e.g. `ssh://`
+    // stores), we assume we are. This is necessary for backwards
+    // compat.
+    bool trustedOrLegacy = ({
+        std::optional trusted = sshStore->isTrustedClient();
+        !trusted || *trusted;
+    });
+
+    // See the very large comment in `case WorkerProto::Op::BuildDerivation:` in
+    // `src/libstore/daemon.cc` that explains the trust model here.
+    //
+    // This condition mirrors that: that code enforces the "rules" outlined there;
+    // we do the best we can given those "rules".
+    if (trustedOrLegacy || type(drv).isCA()) {
+        // Check if there are any derivation inputs
+        bool hasInputDrvs = std::ranges::any_of(drv.inputs, [](const auto & input) {
+            return std::holds_alternative<SingleDerivedPath::Built>(input.raw());
+        });
+
+        BasicDerivation resolvedDrv{
+            .outputs = drv.outputs,
+            // Hijack the inputs paths of the derivation to include
+            // all the paths that come from the `inputDrvs` set. We
+            // don't do that for the derivations whose `inputDrvs`
+            // is empty because:
+            //
+            // 1. It's not needed
+            //
+            // 2. Changing the `inputSrcs` set changes the
+            //    associated output ids, which break CA derivations
+            .inputs =
+                hasInputDrvs ? inputs : [&] {
+                    StorePathSet srcs;
+                    for (auto & input : drv.inputs)
+                        if (auto * op = std::get_if<SingleDerivedPath::Opaque>(&input.raw()))
+                            srcs.insert(op->path);
+                    return srcs;
+                }(),
+            .platform = drv.platform,
+            .builder = drv.builder,
+            .args = drv.args,
+            .env = drv.env,
+            .structuredAttrs = drv.structuredAttrs,
+            .name = drv.name,
+        };
+        optResult = sshStore->getBuilder()->buildDerivation(*drvPath, resolvedDrv);
+        auto & result = *optResult;
+        if (auto * failureP = result.tryGetFailure()) {
+            if (settings.keepFailed) {
+                warn(
+                    "The failed build directory was kept on the remote builder due to `--keep-failed`.%s",
+                    (settings.thisSystem == drv.platform || settings.extraPlatforms.get().count(drv.platform) > 0)
+                        ? " You can re-run the command with `--builders ''` to disable remote building for this invocation."
+                        : "");
+            }
+            throw Error(
+                "build of '%s' on '%s' failed: %s", store->printStorePath(*drvPath), storeUri, failureP->message());
+        }
+    } else {
+        copyClosure(*store, *sshStore, StorePathSet{*drvPath}, NoRepair, NoCheckSigs, substitute);
+        auto res = sshStore->getBuilder()->buildPathsWithResults({DerivedPath::Built{
+            .drvPath = makeConstantStorePathRef(*drvPath),
+            .outputs = OutputsSpec::All{},
+        }});
+        // One path to build should produce exactly one build result
+        assert(res.size() == 1);
+        optResult = std::move(res[0]);
+    }
+
+    std::set<Realisation> missingRealisations;
+    StorePathSet missingPaths;
+    if (experimentalFeatureSettings.isEnabled(Xp::CaDerivations) && !type(drv).hasKnownOutputPaths()) {
+        for (auto & outputName : wantedOutputs) {
+            auto thisOutputId = DrvOutput{*drvPath, outputName};
+            if (!store->queryRealisation(thisOutputId)) {
+                debug("missing output %s", outputName);
+                assert(optResult);
+                auto & result = *optResult;
+                if (auto * successP = result.tryGetSuccess()) {
+                    auto & success = *successP;
+                    auto i = success.builtOutputs.find(outputName);
+                    assert(i != success.builtOutputs.end());
+                    auto & newRealisation = i->second;
+                    missingRealisations.insert({newRealisation, thisOutputId});
+                    missingPaths.insert(newRealisation.outPath);
+                }
+            }
+        }
+    } else {
+        auto outputPaths = outputsAndOptPaths(drv, *store);
+        for (auto & [outputName, hopefullyOutputPath] : outputPaths) {
+            assert(hopefullyOutputPath.second);
+            if (!store->isValidPath(*hopefullyOutputPath.second))
+                missingPaths.insert(*hopefullyOutputPath.second);
+        }
+    }
+
+    if (!missingPaths.empty()) {
+        Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
+        if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
+            for (auto & path : missingPaths)
+                localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+        copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
+    }
+    // XXX: Should be done as part of `copyPaths`
+    for (auto & realisation : missingRealisations) {
+        // Should hold, because if the feature isn't enabled the set
+        // of missing realisations should be empty
+        experimentalFeatureSettings.require(Xp::CaDerivations);
+        store->registerDrvOutput(realisation, NoCheckSigs);
+    }
+}
+
+} // namespace nix
