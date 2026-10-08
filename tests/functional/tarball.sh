@@ -64,6 +64,19 @@ test_tarball '' cat
 test_tarball .xz xz
 test_tarball .gz gzip
 
+zipball=$TEST_ROOT/tarball.zip
+(cd "$TEST_ROOT" && zip -q -X -r "$zipball" tarball)
+touch -d '@1100000000' "$zipball"
+[[ $(nix eval --impure --expr "(fetchTree \"file://$zipball\").lastModified") = 1100000000 ]]
+nix-build -o "$TEST_ROOT"/result -E "import (fetchTree \"file://$zipball\")"
+
+tarball=$TEST_ROOT/tarball.tar
+touch -d '@1100000000' "$tarball"
+[[ $(nix eval --impure --refresh --expr "(fetchTree \"file://$tarball\").lastModified") = 1000000000 ]]
+(cd "$TEST_ROOT" && tar --mtime=@0 --owner=0 --group=0 --numeric-owner --sort=name -cf "$TEST_ROOT/tarball-notime.tar" tarball)
+touch -d '@1100000000' "$TEST_ROOT/tarball-notime.tar"
+[[ $(nix eval --impure --expr "(fetchTree \"file://$TEST_ROOT/tarball-notime.tar\").lastModified") = 1100000000 ]]
+
 # Test hard links.
 # All entries in tree.tar.gz refer to the same file, and all have the same inode when unpacked by GNU tar.
 # We don't preserve the hard links, because that's an optimization we think is not worth the complexity,

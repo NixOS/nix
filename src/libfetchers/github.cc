@@ -309,7 +309,7 @@ struct GitArchiveInputScheme : InputScheme
         auto tarballCache = settings.getTarballCache();
         auto writerPool = settings.getTarballWriterPool();
         auto parseSink = merkle::makeTarSink(*writerPool);
-        auto lastModified = unpackTarfileToSink(archive, *parseSink);
+        auto lastModified = unpackTarfileToSink(archive, *parseSink).lastModified;
         auto tree = parseSink->flush();
 
         act.reset();

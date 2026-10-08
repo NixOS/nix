@@ -207,9 +207,9 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
     extract_archive(archive, destDir);
 }
 
-time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
+UnpackedTarfileInfo unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
 {
-    time_t lastModified = 0;
+    UnpackedTarfileInfo info;
 
     /* Only allocate the buffer once. Use the heap because 131 KiB is a bit too
        much for the stack. */
@@ -230,7 +230,8 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         else
             archive.check(r);
 
-        lastModified = std::max(lastModified, archive_entry_mtime(entry));
+        info.lastModified = std::max(info.lastModified, archive_entry_mtime(entry));
+        info.localTimestamps = (archive_format(archive.archive) & ARCHIVE_FORMAT_BASE_MASK) == ARCHIVE_FORMAT_ZIP;
 
         if (auto target = archive_entry_hardlink(entry)) {
             parseSink.createHardlink(cpath, CanonPath(target));
@@ -275,7 +276,7 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
         }
     }
 
-    return lastModified;
+    return info;
 }
 
 } // namespace nix
