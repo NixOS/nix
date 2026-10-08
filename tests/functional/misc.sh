@@ -13,6 +13,10 @@ source common.sh
 # Can we ask for the version number?
 nix-env --version | grep -F "${_NIX_TEST_CLIENT_VERSION:-$version}"
 
+# Even when the store can't be opened.
+nix-store --store invalid:// --version | grep -F "${_NIX_TEST_CLIENT_VERSION:-$version}"
+NIX_REMOTE=invalid:// nix-store --version | grep -F "${_NIX_TEST_CLIENT_VERSION:-$version}"
+
 nix_env=$(type -P nix-env)
 # shellcheck disable=SC2123
 (PATH=""; ! $nix_env --help 2>&1 ) | grepQuiet -F "The 'man' command was not found, but it is needed for 'nix-env' and some other 'nix-*' commands' help text. Perhaps you could install the 'man' command?"
