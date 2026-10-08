@@ -391,7 +391,8 @@ filterBySelector(EvalState & state, const PackageInfos & allElems, const Strings
                 for (const auto & drvName : prefixHits) {
                     suggestionMessage += fmt("\n%s", drvName);
                 }
-                throw Error("selector '%1%' matches no derivations" + suggestionMessage, selector.fullName);
+                throw Error(
+                    "selector '%1%' matches no derivations%2%", selector.fullName, Uncolored(suggestionMessage));
             }
         }
     }
