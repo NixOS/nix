@@ -315,6 +315,7 @@ EvalState::EvalState(
     , debugRepl(nullptr)
     , debugStop(false)
     , trylevel(0)
+    , failedRealisations(make_ref<decltype(failedRealisations)::element_type>())
     , importResolutionCache(make_ref<decltype(importResolutionCache)::element_type>())
     , fileEvalCache(make_ref<decltype(fileEvalCache)::element_type>())
     , positionToDocComment(make_ref<decltype(positionToDocComment)::element_type>())
@@ -1194,6 +1195,7 @@ void EvalState::evalFile(const SourcePath & path, Value & v, bool mustBeTrivial)
 
 void EvalState::resetFileCache()
 {
+    failedRealisations->clear();
     importResolutionCache->clear();
     fileEvalCache->clear();
     inputCache->clear();
