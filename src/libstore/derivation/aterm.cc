@@ -38,14 +38,14 @@ struct StringViewStream
 
     int peek() const
     {
-        return remaining.empty() ? EOF : remaining[0];
+        return remaining.empty() ? EOF : (unsigned char) remaining[0];
     }
 
     int get()
     {
         if (remaining.empty())
             return EOF;
-        char c = remaining[0];
+        unsigned char c = remaining[0];
         remaining.remove_prefix(1);
         return c;
     }
