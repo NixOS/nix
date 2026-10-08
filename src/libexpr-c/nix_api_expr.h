@@ -245,6 +245,35 @@ nix_err nix_eval_state_builder_set_setting(
     nix_c_context * context, nix_eval_state_builder * builder, const char * key, const char * value);
 
 /**
+ * @brief Callback that realises the derivations of an import from derivation
+ * @ingroup libexpr_init
+ *
+ * @param[in] user_data The pointer passed to nix_eval_state_builder_set_realise_hook().
+ * @param[out] context Stores the error message when the realisation fails.
+ * @param[in] derived_paths Derived paths in the form `/nix/store/<hash>-<name>.drv^out1,out2`.
+ * @param[in] count The number of entries in derived_paths.
+ * @return NIX_OK once the outputs and their closure are valid in the store, an error code otherwise.
+ */
+typedef nix_err (*nix_realise_hook)(
+    void * user_data, nix_c_context * context, const char ** derived_paths, size_t count);
+
+/**
+ * @brief Let the embedder realise the derivations of an import from derivation
+ * @ingroup libexpr_init
+ *
+ * The hook replaces the build through the store. The evaluator state keeps the hook, so
+ * user_data must stay valid as long as the state built from this builder.
+ *
+ * @param[out] context Optional, stores error information
+ * @param[in] builder The builder to modify.
+ * @param[in] hook The callback that realises the derivations.
+ * @param[in] user_data Passed to the hook unchanged.
+ * @return NIX_OK if successful, an error code otherwise.
+ */
+nix_err nix_eval_state_builder_set_realise_hook(
+    nix_c_context * context, nix_eval_state_builder * builder, nix_realise_hook hook, void * user_data);
+
+/**
  * @brief Create a new Nix language evaluator state
  * @ingroup libexpr_init
  *

@@ -199,7 +199,10 @@ StringMap EvalState::realiseContext(const NixStringContext & context, StorePathS
             warn("built '%1%' during evaluation due to an import from derivation", drvs.begin()->to_string(*store));
     }
 
-    realiseDerivationsForImportFromDerivation(drvs);
+    if (settings.realiseHook)
+        settings.realiseHook(drvs);
+    else
+        realiseDerivationsForImportFromDerivation(drvs);
 
     StorePathSet outputsToCopyAndAllow;
 

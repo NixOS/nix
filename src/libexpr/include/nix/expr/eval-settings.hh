@@ -3,6 +3,7 @@
 
 #include "nix/expr/diagnose.hh"
 #include "nix/expr/eval-profiler-settings.hh"
+#include "nix/store/derived-path.hh"
 #include "nix/util/configuration.hh"
 #include "nix/util/source-path.hh"
 
@@ -100,6 +101,15 @@ public:
     LookupPathHooks lookupPathHooks;
 
     std::vector<PrimOp> extraPrimOps;
+
+    /**
+     * Realises the derivations of an import from derivation instead of
+     * `buildPaths`. On return, the outputs and their closure must be valid in
+     * the evaluation store. Throws `Error` on failure.
+     */
+    using RealiseHook = std::function<void(const std::vector<DerivedPath::Built> &)>;
+
+    RealiseHook realiseHook;
 
     Setting<bool> enableNativeCode{this, false, "allow-unsafe-native-code-during-evaluation", R"(
         Enable built-in functions that allow executing native code.
