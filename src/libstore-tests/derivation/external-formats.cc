@@ -55,6 +55,17 @@ TEST_F(DerivationTest, NonUtf8Bytes)
     ASSERT_EQ(derivation::unparse(drv, *store, derivation::defaultSupportWindowsStoreDir), aterm);
 }
 
+TEST_F(DerivationTest, TruncatedATerm)
+{
+    for (std::string_view aterm : {"", "D", "Derive(", "Derive([", "Derive([(\"out\",\"", "Derive([(\"out\",\"\xff"}) {
+        ASSERT_THROW(
+            derivation::parse(
+                *store, std::string{aterm}, "u6", derivation::defaultSupportWindowsStoreDir, mockXpSettings),
+            Error)
+            << aterm;
+    }
+}
+
 /**
  * A fixed-output derivation states its output path, but that path is a
  * function of the content address, so a stated path that disagrees is
