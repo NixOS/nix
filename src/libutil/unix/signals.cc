@@ -7,6 +7,7 @@
 
 #include "unix/signals-private.hh"
 
+#include <atomic>
 #include <thread>
 
 namespace nix {
@@ -49,15 +50,36 @@ struct SignalCallbacks
 
 InterruptCallback::~InterruptCallback() {}
 
-/* Required to avoid static initialization order fiasco. This allows global
-   objects to safely register callbacks. */
-static Sync<SignalCallbacks> & getSignalCallbacks()
+using SignalCallbacksSync = Sync<SignalCallbacks>;
+
+static std::atomic<SignalCallbacksSync *> signalCallbacksRegistry{nullptr};
+
+/* Avoid a function-local static's initialization guard: another thread could
+   be initializing the registry when the process forks. */
+static SignalCallbacksSync & getSignalCallbacks()
 {
-    /* Intentionally leak, according to the Construct On First Use Idiom.
-       An alternative is to use the Nifty Counter Idiom, but
-       SignalCallbacks' destructor is not very important. */
-    static Sync<SignalCallbacks> * _signalCallbacks = new Sync<SignalCallbacks>();
-    return *_signalCallbacks;
+    auto * current = signalCallbacksRegistry.load(std::memory_order_acquire);
+    if (current)
+        return *current;
+
+    auto * fresh = new SignalCallbacksSync();
+    if (!signalCallbacksRegistry.compare_exchange_strong(
+            current, fresh, std::memory_order_release, std::memory_order_acquire))
+        delete fresh;
+    else
+        current = fresh;
+
+    return *current;
+}
+
+void unix::resetSignalCallbacksAfterFork()
+{
+    /* The inherited mutex may be locked and the map mid-update. Even destroying
+       callback captures could touch locks or threads that are unusable here.
+       Leave this state untouched until exit or exec reclaims it, and create a
+       fresh registry on first use. This abandons only the child's copy; repeated
+       forks do not accumulate discarded registries in the parent. */
+    signalCallbacksRegistry.store(nullptr, std::memory_order_release);
 }
 
 static void triggerSignalCallbacks(SignalType type)
@@ -192,11 +214,13 @@ namespace {
 /* RAII helper to automatically deregister a callback. */
 struct InterruptCallbackImpl : InterruptCallback
 {
+    SignalCallbacksSync * registry;
     SignalType type;
     SignalCallbacks::Token token;
 
-    InterruptCallbackImpl(SignalType type, SignalCallbacks::Token token)
-        : type(type)
+    InterruptCallbackImpl(SignalCallbacksSync * registry, SignalType type, SignalCallbacks::Token token)
+        : registry(registry)
+        , type(type)
         , token(token)
     {
     }
@@ -208,8 +232,15 @@ struct InterruptCallbackImpl : InterruptCallback
 
     ~InterruptCallbackImpl() override
     {
-        auto signalCallbacks(getSignalCallbacks().lock());
-        signalCallbacks->callbacks[type].erase(token);
+        /* A handle inherited across a fork belongs to discarded parent state,
+           whose mutex may be permanently locked. Published registries are never
+           freed, so their addresses identify registrations' owning processes
+           without address reuse confusing an inherited handle with a new one. */
+        if (registry != signalCallbacksRegistry.load(std::memory_order_acquire))
+            return;
+
+        auto callbacks(registry->lock());
+        callbacks->callbacks[type].erase(token);
     }
 };
 
@@ -217,10 +248,11 @@ struct InterruptCallbackImpl : InterruptCallback
 
 std::unique_ptr<InterruptCallback> createSignalCallback(SignalType type, fun<void()> callback)
 {
-    auto signalCallbacks(getSignalCallbacks().lock());
-    auto token = signalCallbacks->nextToken++;
-    signalCallbacks->callbacks[type].emplace(token, callback);
-    return std::make_unique<InterruptCallbackImpl>(type, token);
+    auto & registry = getSignalCallbacks();
+    auto callbacks(registry.lock());
+    auto token = callbacks->nextToken++;
+    callbacks->callbacks[type].emplace(token, callback);
+    return std::make_unique<InterruptCallbackImpl>(&registry, type, token);
 }
 
 std::unique_ptr<InterruptCallback> createInterruptCallback(fun<void()> callback)
