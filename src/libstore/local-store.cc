@@ -775,10 +775,6 @@ uint64_t LocalStore::addValidPath(State & state, const ValidPathInfo & info)
         }
     }
 
-    if (pathInfoCache)
-        pathInfoCache->lock()->upsert(
-            info.path, PathInfoCacheValue{.value = std::make_shared<const ValidPathInfo>(info)});
-
     return id;
 }
 
@@ -1022,7 +1018,7 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
            error if a cycle is detected and roll back the
            transaction.  Cycles can only occur when a derivation
            has multiple outputs. */
-        auto topoSortResult = topoSort(paths, [&](const StorePath & path) {
+        const auto topoSortResult = topoSort(paths, [&](const StorePath & path) {
             auto i = infos.find(path);
             return i == infos.end() ? StorePathSet() : i->second.references;
         });
@@ -1036,10 +1032,18 @@ void LocalStore::registerValidPaths(const ValidPathInfos & infos)
                         printStorePath(cycle.path),
                         printStorePath(cycle.parent));
                 },
-                [](auto &) { /* Success, continue */ }},
+                [](const std::vector<StorePath> &) { /* Success, continue */ }},
             topoSortResult);
 
         txn.commit();
+
+        /* Cache what's in the database, not `infos`: it lacks fields
+           like the registration time. */
+        if (pathInfoCache) {
+            auto cache(pathInfoCache->lock());
+            for (auto & [path, _] : infos)
+                cache->upsert(path, PathInfoCacheValue{.value = queryPathInfoInternal(*state, path)});
+        }
     });
 }
 
@@ -1657,6 +1661,9 @@ void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signa
         updatePathInfo(*state, *info);
 
         txn.commit();
+
+        if (pathInfoCache)
+            pathInfoCache->lock()->upsert(storePath, PathInfoCacheValue{.value = info});
     });
 }
 
