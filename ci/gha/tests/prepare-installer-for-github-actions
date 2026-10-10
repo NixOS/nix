@@ -5,7 +5,7 @@ set -euo pipefail
 nix build -L \
   ".#installerScriptForGHA" \
   ".#binaryTarball" \
-  ".#rustInstaller"
+  ".#nixInstaller"
 
 mkdir -p out
 cp ./result/install "out/install"

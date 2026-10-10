@@ -1,6 +1,5 @@
-# `NixOS/nix-installer` built with *this* Nix closure embedded, so
-# Hydra/CI can dogfood the Rust installer without the (removed)
-# `--nix-package-url` knob.
+# `NixOS/nix-installer` built with *this* Nix closure embedded.
+
 {
   lib,
   stdenv,
@@ -12,12 +11,14 @@
 }:
 
 let
-  installerVersion = "2.34.6";
+  installerVersion = "2.36.0pre";
   src = fetchFromGitHub {
     owner = "NixOS";
     repo = "nix-installer";
-    tag = installerVersion;
-    hash = "sha256-aTaz8EtHexvke7tGr5MfeKy9g7AraIAFN+dPApm+fds=";
+    # Don't forget to bump this after release branch-off.
+    # TODO: Document this stuff in release-process.md.
+    rev = "fb0541d1785dcd5e252cbe05d08c6cba64da751f";
+    hash = "sha256-ZOZwGzo6P70ymfzwYwe+36KLLWwevBNEEUf1CW1nCqw=";
   };
 
   # Bare binary: no Nix closure yet.  Appended below via `pack`, so the
@@ -29,7 +30,7 @@ let
 
     inherit src;
 
-    cargoHash = "sha256-/mNXkeZVuYsqd0TiUa7bzSP4xpKh0Fqga9EpasPbrzU=";
+    cargoHash = "sha256-oNDsyjFCC7B9TovJqdZoXQwr7dtdFdUNltXOgv0aPLk=";
 
     doCheck = false;
 
@@ -38,10 +39,6 @@ let
       # binary must run before `/nix/store` exists.
       NIX_LDFLAGS = "-dead_strip_dylibs";
     };
-
-    postInstall = ''
-      install -m755 nix-installer.sh $out/bin/nix-installer.sh
-    '';
   };
 in
 
@@ -81,8 +78,5 @@ runCommand "nix-installer-${tarball.passthru.nixVersion}"
       --nix-version ${tarball.passthru.nixVersion} \
       --output $out/bin/nix-installer
 
-    install -m755 ${bare}/bin/nix-installer.sh $out/bin/nix-installer.sh
-
     echo "file binary-dist $out/bin/nix-installer" >> $out/nix-support/hydra-build-products
-    echo "file binary-dist $out/bin/nix-installer.sh" >> $out/nix-support/hydra-build-products
   ''

@@ -1,0 +1,401 @@
+#!/bin/sh
+# shellcheck shell=dash
+
+# If you need an offline install, or you'd prefer to run the binary directly, head to
+# https://releases.nixos.org/?prefix=nix/nix-@nixVersion@ then pick the platform
+# most appropriate for your deployment target.
+#
+# This is just a little script that selects and downloads the right `nix-installer`. It does
+# platform detection, downloads the installer, and runs it; that's it.
+#
+# It runs on Unix shells like {a,ba,da,k,z}sh. It uses the common `local`
+# extension. Note: Most shells limit `local` to 1 var per line, contra bash.
+
+# This script is based off https://github.com/rust-lang/rustup/blob/2d429e8e172d5854b6dd7244ecbb0dc3da88a678/rustup-init.sh
+# which is licensed under the MIT license.
+# nix-installer specific modifications are covered by LGPL v2.1 license (same as Nix):
+# https://github.com/NixOS/nix-installer/blob/main/LICENSE
+
+# Copyright (c) 2016 The Rust Project Developers
+#
+# Permission is hereby granted, free of charge, to any
+# person obtaining a copy of this software and associated
+# documentation files (the "Software"), to deal in the
+# Software without restriction, including without
+# limitation the rights to use, copy, modify, merge,
+# publish, distribute, sublicense, and/or sell copies of
+# the Software, and to permit persons to whom the Software
+# is furnished to do so, subject to the following
+# conditions:
+#
+# The above copyright notice and this permission notice
+# shall be included in all copies or substantial portions
+# of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+# ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+# TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+# PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+# SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+# OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+# IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+# DEALINGS IN THE SOFTWARE.
+
+# Some versions of ksh have no `local` keyword. Alias it to `typeset`, but
+# beware this makes variables global with f()-style function syntax in ksh93.
+# mksh has this alias by default.
+has_local() {
+  # shellcheck disable=SC2034  # deliberately unused
+  local _has_local
+}
+
+has_local 2>/dev/null || alias local=typeset
+
+is_zsh() {
+  [ -n "${ZSH_VERSION-}" ]
+}
+
+set -u
+
+NIX_INSTALLER_BINARY_ROOT="${NIX_INSTALLER_BINARY_ROOT:-https://releases.nixos.org/nix/nix-@nixVersion@}"
+
+main() {
+  downloader --check
+  need_cmd uname
+  need_cmd mktemp
+  need_cmd chmod
+  need_cmd mkdir
+  need_cmd rm
+  need_cmd rmdir
+
+  get_architecture || return 1
+  local _arch="$RETVAL"
+  assert_nz "$_arch" "arch"
+
+  case "$_arch" in
+    x86_64-linux)
+        _hash=@nixInstallerHash_x86_64-linux@
+        ;;
+    aarch64-linux)
+        _hash=@nixInstallerHash_aarch64-linux@
+        ;;
+    aarch64-darwin)
+        _hash=@nixInstallerHash_aarch64-darwin@
+        ;;
+    x86_64-darwin)
+        err "Intel Macs are no longer supported by the Nix ecosystem starting from Nix 2.36 and Nixpkgs 26.11" 1>&2
+        exit 1
+        ;;
+    *)
+        err "nix-installer does not support this platform" 1>&2
+        exit 1
+        ;;
+  esac
+
+  local _url="${NIX_INSTALLER_OVERRIDE_URL-${NIX_INSTALLER_BINARY_ROOT}/nix-installer-${_arch}}"
+
+  local _dir
+  if ! _dir="$(ensure mktemp -d)"; then
+    # Because the previous command ran in a subshell, we must manually
+    # propagate exit status.
+    exit 1
+  fi
+  local _file="${_dir}/nix-installer"
+
+  local _ansi_escapes_are_valid=false
+  if [ -t 2 ]; then
+    if [ "${TERM+set}" = 'set' ]; then
+      case "$TERM" in
+      xterm* | rxvt* | urxvt* | linux* | vt*)
+        _ansi_escapes_are_valid=true
+        ;;
+      esac
+    fi
+  fi
+
+  # check if we have to use /dev/tty to prompt the user
+  local need_tty=yes
+  for arg in "$@"; do
+    case "$arg" in
+    --no-confirm)
+      need_tty=no
+      ;;
+    *)
+      continue
+      ;;
+    esac
+  done
+  if [ "${NIX_INSTALLER_NO_CONFIRM-}" ]; then
+    need_tty=no
+  fi
+
+  say 'downloading installer'
+
+  ensure mkdir -p "$_dir"
+  ensure downloader "$_url" "$_file" "$_arch"
+
+  if command -v sha256sum > /dev/null 2>&1; then
+    _hash2="$(sha256sum -b "$_file" | cut -c1-64)"
+  elif command -v shasum > /dev/null 2>&1; then
+    _hash2="$(shasum -a 256 -b "$_file" | cut -c1-64)"
+  elif command -v openssl > /dev/null 2>&1; then
+    _hash2="$(openssl dgst -r -sha256 "$_file" | cut -c1-64)"
+  else
+    err "Cannot verify the SHA-256 hash of '$_url'; you need one of 'shasum', 'sha256sum', or 'openssl'" 1>&2
+    exit 1
+  fi
+
+  if [ "$_hash" != "$_hash2" ]; then
+    err "SHA-256 hash mismatch in '$_url'; expected $_hash, got $_hash2" 1>&2
+    exit 1
+  fi
+
+  ensure chmod u+x "$_file"
+  if [ ! -x "$_file" ]; then
+    err "Cannot execute $_file (likely because of mounting /tmp as noexec)." 1>&2
+    err "Please copy the file to a location where you can execute binaries and run ./nix-installer." 1>&2
+    exit 1
+  fi
+
+  if [ "$need_tty" = "yes" ] && [ ! -t 0 ]; then
+    # The installer is going to want to ask for confirmation by
+    # reading stdin.  This script was piped into `sh` though and
+    # doesn't have stdin to pass to its children. Instead we're going
+    # to explicitly connect /dev/tty to the installer's stdin.
+    if [ ! -t 1 ]; then
+      err "Unable to run interactively. Run with --no-confirm to accept defaults, --help for additional options"
+      exit 1
+    fi
+
+    ignore "$_file" "$@" </dev/tty
+  else
+    ignore "$_file" "$@"
+  fi
+
+  local _retval=$?
+
+  ignore rm "$_file"
+  ignore rmdir "$_dir"
+
+  return "$_retval"
+}
+
+get_architecture() {
+  local _ostype _cputype _arch
+  _ostype="$(uname -s)"
+  _cputype="$(uname -m)"
+
+  case "$_ostype" in
+  Linux)
+    _ostype=linux
+    ;;
+
+  Darwin)
+    _ostype=darwin
+    ;;
+
+  *)
+    err "unrecognized OS type: $_ostype"
+    exit 1
+    ;;
+
+  esac
+
+  case "$_cputype" in
+  aarch64 | arm64)
+    _cputype=aarch64
+    ;;
+
+  x86_64 | x86-64 | x64 | amd64)
+    _cputype=x86_64
+    ;;
+
+  *)
+    err "unknown CPU type: $_cputype"
+    ;;
+
+  esac
+
+  _arch="${_cputype}-${_ostype}"
+
+  RETVAL="$_arch"
+}
+
+__print() {
+  if $_ansi_escapes_are_valid; then
+    printf '\33[1m%s:\33[0m %s\n' "$1" "$2" >&2
+  else
+    printf '%s: %s\n' "$1" "$2" >&2
+  fi
+}
+
+warn() {
+  __print 'warn' "$1" >&2
+}
+
+say() {
+  __print 'info' "$1" >&2
+}
+
+# NOTE: you are required to exit yourself
+# we don't do it here because of multiline errors
+err() {
+  __print 'error' "$1" >&2
+}
+
+need_cmd() {
+  if ! check_cmd "$1"; then
+    err "need '$1' (command not found)"
+    exit 1
+  fi
+}
+
+check_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+assert_nz() {
+  if [ -z "$1" ]; then
+    err "assert_nz $2"
+    exit 1
+  fi
+}
+
+# Run a command that should never fail. If the command fails execution
+# will immediately terminate with an error showing the failing
+# command.
+ensure() {
+  if ! "$@"; then
+    err "command failed: $*"
+    exit 1
+  fi
+}
+
+# This is just for indicating that commands' results are being
+# intentionally ignored. Usually, because it's being executed
+# as part of error handling.
+ignore() {
+  "$@"
+}
+
+# This wraps curl or wget. Try curl first, if not installed,
+# use wget instead.
+downloader() {
+  # zsh does not split words by default, Required for curl retry arguments below.
+  is_zsh && setopt local_options shwordsplit
+
+  local _dld
+  local _err
+  local _status
+  local _retry
+  if check_cmd curl; then
+    # Check if we have a broken snap curl
+    # https://github.com/boukendesho/curl-snap/issues/1
+    _curl_path=$(command -v curl)
+    if echo "$_curl_path" | grep "/snap/" >/dev/null 2>&1; then
+      if check_cmd wget; then
+        _dld=wget
+      else
+        err "curl installed with snap cannot be used to install Nix"
+        err "due to missing permissions. Please uninstall it and"
+        err "reinstall curl with a different package manager (e.g., apt)."
+        err "See https://github.com/boukendesho/curl-snap/issues/1"
+        exit 1
+      fi
+    else
+      _dld=curl
+    fi
+  elif check_cmd wget; then
+    _dld=wget
+  else
+    _dld='curl or wget' # to be used in error message of need_cmd
+  fi
+
+  if [ "$1" = --check ]; then
+    need_cmd "$_dld"
+  elif [ "$_dld" = curl ]; then
+    check_curl_for_retry_support
+    _retry="$RETVAL"
+    # shellcheck disable=SC2086
+    _err=$(curl $_retry -sSfL "$1" -o "$2" 2>&1)
+    _status=$?
+    if [ -n "$_err" ]; then
+      warn "$_err"
+      if echo "$_err" | grep -q 404$; then
+        err "installer for platform '$3' not found, this may be unsupported"
+        exit 1
+      fi
+    fi
+    return $_status
+  elif [ "$_dld" = wget ]; then
+    _err=$(wget "$1" -O "$2" 2>&1)
+    _status=$?
+    if [ -n "$_err" ]; then
+      warn "$_err"
+      if echo "$_err" | grep -q ' 404 Not Found$'; then
+        err "installer for platform '$3' not found, this may be unsupported"
+        exit 1
+      fi
+    fi
+    return $_status
+  else
+    err "Unknown downloader" # should not reach here
+    exit 1
+  fi
+}
+
+check_help_for() {
+  local _arch
+  local _cmd
+  local _arg
+  _arch="$1"
+  shift
+  _cmd="$1"
+  shift
+
+  local _category
+  if "$_cmd" --help | grep -q '"--help all"'; then
+    _category="all"
+  else
+    _category=""
+  fi
+
+  for _arg in "$@"; do
+    if ! "$_cmd" --help "$_category" | grep -q -- "$_arg"; then
+      return 1
+    fi
+  done
+
+  true # not strictly needed
+}
+
+# Check if curl supports the --retry flag, then pass it to the curl invocation.
+# Note that --speed-limit and --speed-time were in the very first commit of curl.
+# So this should be pretty much ubiquitously safe.
+check_curl_for_retry_support() {
+  local _retry_part=""
+  local _continue_part=""
+  local _speed_limit_part=""
+
+  # "unspecified" is for arch, allows for possibility old OS using macports, homebrew, etc.
+  if check_help_for "notspecified" "curl" "--retry"; then
+    _retry_part="--retry 3"
+
+    if check_help_for "notspecified" "curl" "--continue-at"; then
+      # "-C -" tells curl to automatically find where to resume the download when retrying.
+      _continue_part="--continue-at -"
+    fi
+
+    if check_help_for "notspecified" "curl" "--speed-limit" &&
+      check_help_for "notspecified" "curl" "--speed-time"; then
+      # 250000 is approximately 20% of the bandwidth of typical DSL
+      # these limits mean users below these limits will see failures.
+      _speed_limit_part="--speed-limit 250000 --speed-time 15"
+    fi
+  fi
+
+  RETVAL="$_retry_part $_continue_part $_speed_limit_part"
+}
+
+main "$@" || exit 1
