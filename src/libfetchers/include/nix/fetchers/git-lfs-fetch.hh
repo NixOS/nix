@@ -32,6 +32,9 @@ struct Fetch
 
     // derived from git remote url
     nix::ParsedURL url;
+    // Cache HTTP credentials after the first authenticated LFS request.
+    mutable bool credentialHelperTried = false;
+    mutable std::optional<std::string> credentialAuthHeader;
 
     Fetch(git_repository * repo, git_oid rev);
     bool shouldFetch(const CanonPath & path) const;
