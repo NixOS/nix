@@ -463,11 +463,8 @@ void ChrootLinuxDerivationBuilder::prepareUser()
         if (!pathExists(rootCgroupPath))
             throw Error("expected cgroup directory %s", PathFmt(rootCgroupPath));
 
-        static std::atomic<unsigned int> counter{0};
-
-        cgroup = rootCgroupPath
-                 / (buildUser ? fmt("nix-build-uid-%d", buildUser->getUID())
-                              : fmt("nix-build-pid-%d-%d", getpid(), counter++));
+        auto owner = buildUser ? std::to_string(buildUser->getUID()) : std::to_string(getpid());
+        cgroup = rootCgroupPath / fmt("nix-build@%s-%s", drvPath.hashPart(), owner);
 
         debug("using cgroup %s", PathFmt(*cgroup));
 
