@@ -1,3 +1,7 @@
 # COM: nested attribute path
 a.b.c = 1;
 a.b
+# COM: previously added attrs are not merged
+a.z.a = 20
+a
+:p a
