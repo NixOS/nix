@@ -77,6 +77,19 @@ static std::optional<std::string> fdPath(int fd)
 }
 #  endif
 
+/* Whether `fd` is the `-shm` file of a store database. */
+static bool fdIsStoreWALIndex(int fd)
+{
+#  ifdef __linux__
+    std::error_code ec;
+    auto target = std::filesystem::read_symlink(std::filesystem::path("/proc/self/fd") / std::to_string(fd), ec);
+    return !ec && hasSuffix(target.string(), "/db.sqlite-shm");
+#  else
+    auto path = fdPath(fd);
+    return path && hasSuffix(*path, "/db.sqlite-shm");
+#  endif
+}
+
 /* Close inherited descriptors except the protocol's, SQLite's and
    `extra`. Others would hold the parent's PathLocks; SQLite's
    per-process lock state still refers to its own. */
@@ -212,6 +225,12 @@ std::unique_ptr<HookInstance> HookInstance::builtin(const StoreConfig & storeCon
 #  ifdef __linux__
         savedNsFds = moveSavedMountNamespaceFds(6);
 #  endif
+
+        /* Our SQLite connection reuses the parent's WAL index descriptor;
+           the dup2()s below must not overwrite it. */
+        for (int fd : {4, 5})
+            if (fdIsStoreWALIndex(fd))
+                throw Error("descriptor %d is the store's SQLite WAL index; cannot fork the build hook", fd);
 
         hook->redirectChildFds();
 
