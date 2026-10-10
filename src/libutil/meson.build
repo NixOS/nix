@@ -193,6 +193,7 @@ sources = [ config_priv_h ] + files(
   'json-utils.cc',
   'library-versions.cc',
   'logging.cc',
+  'logical-path.cc',
   'memory-source-accessor.cc',
   'memory-source-accessor/json.cc',
   'mounted-source-accessor.cc',
@@ -221,6 +222,7 @@ sources = [ config_priv_h ] + files(
   'url.cc',
   'users.cc',
   'util.cc',
+  'wtf8.cc',
   'xml-writer.cc',
 )
 

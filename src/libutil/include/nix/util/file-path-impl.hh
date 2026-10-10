@@ -89,16 +89,68 @@ struct WindowsPathTrait
         return p1 == String::npos ? p2 : p2 == String::npos ? p1 : std::max(p1, p2);
     }
 
+    static inline bool isDriveLetter(CharT c)
+    {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    }
+
+    /**
+     * Given `from` positioned just past a UNC prefix, return the offset one
+     * past the share name in `\\server\share...`.
+     *
+     * A UNC path naming a server but no share has no directory to be
+     * relative to, so all of what is present is the root name. Reporting
+     * anything shorter would let canonicalisation treat `\\server` as a
+     * directory and resolve `..` through it into a different share.
+     */
+    static size_t uncRootEnd(StringView path, size_t from)
+    {
+        size_t afterServer = findPathSep(path, from);
+        if (afterServer == StringView::npos)
+            return path.size();
+        size_t afterShare = findPathSep(path, afterServer + 1);
+        return afterShare == StringView::npos ? path.size() : afterShare;
+    }
+
+    /**
+     * Length of the root name: the leading portion that names a volume and
+     * is not itself a directory anything can be relative to.
+     *
+     * Covers the forms documented at
+     * https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats
+     * -- traditional DOS drives, UNC shares, and the extended-length and
+     * device namespaces, including `\\?\UNC\`.
+     */
     static size_t rootNameLen(StringView path)
     {
-        if (path.size() >= 2 && path[1] == ':') {
-            char driveLetter = path[0];
-            if ((driveLetter >= 'A' && driveLetter <= 'Z') || (driveLetter >= 'a' && driveLetter <= 'z'))
-                return 2;
+        /* `X:` -- traditional DOS drive. */
+        if (path.size() >= 2 && path[1] == ':' && isDriveLetter(path[0]))
+            return 2;
+
+        /* Everything remaining begins with two separators. `//` is accepted
+           alongside `\\`, consistent with `isPathSep` and the rest of this
+           trait. */
+        if (!(path.size() >= 3 && isPathSep(path[0]) && isPathSep(path[1])))
+            return 0;
+
+        /* `\\?\` (extended-length) and `\\.\` (device) namespaces. */
+        if ((path[2] == '?' || path[2] == '.') && path.size() >= 4 && isPathSep(path[3])) {
+            /* `\\?\X:` */
+            if (path.size() >= 6 && path[5] == ':' && isDriveLetter(path[4]))
+                return 6;
+
+            /* `\\?\UNC\server\share`. The literal is case-insensitive. */
+            if (path.size() >= 8 && (path[4] == 'U' || path[4] == 'u') && (path[5] == 'N' || path[5] == 'n')
+                && (path[6] == 'C' || path[6] == 'c') && isPathSep(path[7]))
+                return uncRootEnd(path, 8);
+
+            /* A device name, which runs to the next separator. */
+            size_t end = findPathSep(path, 4);
+            return end == StringView::npos ? path.size() : end;
         }
-        /* TODO: This needs to also handle UNC paths.
-         * https://learn.microsoft.com/en-us/dotnet/standard/io/file-path-formats#unc-paths */
-        return 0;
+
+        /* `\\server\share` */
+        return uncRootEnd(path, 2);
     }
 };
 
