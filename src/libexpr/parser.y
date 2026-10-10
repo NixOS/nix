@@ -120,20 +120,8 @@ YY_DECL;
 using namespace nix;
 
 #define CUR_POS state->at(yylhs.location)
-
-void parser::BisonParser::error(const location_type &loc_, const std::string &error)
-{
-    auto loc = loc_;
-    if (std::string_view(error).starts_with("syntax error, unexpected end of file")) {
-        loc.beginOffset = loc.endOffset;
-    }
-    throw ParseError({
-        .msg = HintFmt(error),
-        .pos = state->positions[state->at(loc)]
-    });
-}
-
 #define SET_DOC_POS(lambda, pos) setDocPosition(state->lexerState, lambda, state->at(pos))
+
 static void setDocPosition(const LexerState & lexerState, ExprLambda * lambda, PosIdx start) {
     auto it = lexerState.positionToDocComment.find(start);
     if (it != lexerState.positionToDocComment.end()) {

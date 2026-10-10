@@ -174,11 +174,6 @@ static std::ostream & showDebugTrace(std::ostream & out, const PosTable & positi
  */
 MakeError(IncompleteReplExpr, Error);
 
-static bool isIncompleteInput(const ParseError & e)
-{
-    return e.msg().find("unexpected end of file") != std::string::npos;
-}
-
 void IncompleteReplExpr::anchor() {}
 
 static bool isFirstRepl = true;
@@ -889,8 +884,8 @@ Expr * NixRepl::parseString(std::string s)
     try {
         return state->parseExprFromString(std::move(s), state->rootPath("."), staticEnv);
     } catch (ParseError & e) {
-        if (isIncompleteInput(e))
-            throw IncompleteReplExpr(e.msg());
+        if (e.isIncomplete())
+            throw IncompleteReplExpr(e.message());
         throw;
     }
 }
@@ -904,7 +899,7 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
     try {
         return state->parseReplBindings(s, basePath, staticEnv);
     } catch (ParseError & e) {
-        if (isIncompleteInput(e))
+        if (e.isIncomplete())
             incompleteError = e;
     }
 
@@ -921,8 +916,8 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
                 throw IncompleteReplExpr(incompleteError->msg());
             }
         }
-        if (isIncompleteInput(e))
-            throw IncompleteReplExpr(e.msg());
+        if (e.isIncomplete())
+            throw IncompleteReplExpr(e.message());
         // Semicolon retry also failed; not valid binding syntax.
         return nullptr;
     }
