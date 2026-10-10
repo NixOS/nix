@@ -73,6 +73,26 @@ main() {
   local _arch="$RETVAL"
   assert_nz "$_arch" "arch"
 
+  case "$_arch" in
+    x86_64-linux)
+        _hash=@nixInstallerHash_x86_64-linux@
+        ;;
+    aarch64-linux)
+        _hash=@nixInstallerHash_aarch64-linux@
+        ;;
+    aarch64-darwin)
+        _hash=@nixInstallerHash_aarch64-darwin@
+        ;;
+    x86_64-darwin)
+        err "Intel Macs are no longer supported by the Nix ecosystem starting from Nix 2.36 and Nixpkgs 26.11" 1>&2
+        exit 1
+        ;;
+    *)
+        err "nix-installer does not support this platform" 1>&2
+        exit 1
+        ;;
+  esac
+
   local _url="${NIX_INSTALLER_OVERRIDE_URL-${NIX_INSTALLER_BINARY_ROOT}/nix-installer-${_arch}}"
 
   local _dir
@@ -114,6 +134,23 @@ main() {
 
   ensure mkdir -p "$_dir"
   ensure downloader "$_url" "$_file" "$_arch"
+
+  if command -v sha256sum > /dev/null 2>&1; then
+    _hash2="$(sha256sum -b "$_file" | cut -c1-64)"
+  elif command -v shasum > /dev/null 2>&1; then
+    _hash2="$(shasum -a 256 -b "$_file" | cut -c1-64)"
+  elif command -v openssl > /dev/null 2>&1; then
+    _hash2="$(openssl dgst -r -sha256 "$_file" | cut -c1-64)"
+  else
+    err "Cannot verify the SHA-256 hash of '$_url'; you need one of 'shasum', 'sha256sum', or 'openssl'" 1>&2
+    exit 1
+  fi
+
+  if [ "$_hash" != "$_hash2" ]; then
+    err "SHA-256 hash mismatch in '$_url'; expected $_hash, got $_hash2" 1>&2
+    exit 1
+  fi
+
   ensure chmod u+x "$_file"
   if [ ! -x "$_file" ]; then
     err "Cannot execute $_file (likely because of mounting /tmp as noexec)." 1>&2
