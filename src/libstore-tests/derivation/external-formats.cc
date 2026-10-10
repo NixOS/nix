@@ -36,6 +36,37 @@ TEST_F(DerivationTest, UnterminatedString)
 }
 
 /**
+ * Strings are bytes: `builtins.readFile` can put 0xFF into any field,
+ * and 0xFF read through a signed `char` is `EOF`.
+ */
+TEST_F(DerivationTest, NonUtf8Bytes)
+{
+    const std::string aterm =
+        "Derive([(\"out\",\"/nix/store/7mjal1rkzwzrgppbvidx6gf2bls2hvb5-u6\",\"\",\"\")],[],[],\"a\xff"
+        "b\x80\",\"/bin/sh\",[],[(\"builder\",\"/bin/sh\"),(\"name\",\"u6\"),"
+        "(\"out\",\"/nix/store/7mjal1rkzwzrgppbvidx6gf2bls2hvb5-u6\"),(\"system\",\"a\xff"
+        "b\x80\")])";
+    auto drv =
+        derivation::parse(*store, std::string{aterm}, "u6", derivation::defaultSupportWindowsStoreDir, mockXpSettings);
+    ASSERT_EQ(
+        drv.platform,
+        "a\xff"
+        "b\x80");
+    ASSERT_EQ(derivation::unparse(drv, *store, derivation::defaultSupportWindowsStoreDir), aterm);
+}
+
+TEST_F(DerivationTest, TruncatedATerm)
+{
+    for (std::string_view aterm : {"", "D", "Derive(", "Derive([", "Derive([(\"out\",\"", "Derive([(\"out\",\"\xff"}) {
+        ASSERT_THROW(
+            derivation::parse(
+                *store, std::string{aterm}, "u6", derivation::defaultSupportWindowsStoreDir, mockXpSettings),
+            Error)
+            << aterm;
+    }
+}
+
+/**
  * A fixed-output derivation states its output path, but that path is a
  * function of the content address, so a stated path that disagrees is
  * rejected rather than silently kept.
