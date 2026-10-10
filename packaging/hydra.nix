@@ -355,6 +355,19 @@ rec {
     }
   );
 
+  nixInstallerScript = nixpkgsFor.x86_64-linux.native.callPackage ./nix-installer/script.nix {
+    nixInstallers = [
+      # Native
+      self.hydraJobs.nixInstaller."x86_64-linux"
+      self.hydraJobs.nixInstaller."aarch64-linux"
+      self.hydraJobs.nixInstaller."aarch64-darwin"
+      # TODO: We don't do cross yet.
+    ];
+
+    # Platform doesn't matter, we only need to fish out the fineVersion.
+    version = nixComponentsFor.x86_64-linux.native.nix-cli.version;
+  };
+
   /**
     Docker image with Nix inside.
   */
