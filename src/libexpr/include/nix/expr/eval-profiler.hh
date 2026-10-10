@@ -18,6 +18,10 @@ namespace nix {
 class EvalState;
 class PosIdx;
 struct Value;
+class PerfTrampolineStore;
+PerfTrampolineStore * makePerfTrampolineStore();
+
+
 
 class EvalProfiler
 {
@@ -29,7 +33,7 @@ public:
 
     static constexpr std::size_t numHooks = Hook::postFunctionCall + 1;
     using Hooks = std::bitset<numHooks>;
-
+    PerfTrampolineStore *perfTrampolineStore;
 private:
     std::optional<Hooks> neededHooks;
 
@@ -112,5 +116,7 @@ public:
 };
 
 ref<EvalProfiler> makeSampleStackProfiler(EvalState & state, std::filesystem::path profileFile, uint64_t frequency);
+
+
 
 } // namespace nix
