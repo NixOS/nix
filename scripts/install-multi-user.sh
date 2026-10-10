@@ -149,6 +149,22 @@ EOF
         fi
     done
 
+    local fish_profile="$HOME/.config/fish/$PROFILE_FISH_SUFFIX"
+    if [ -e "$fish_profile" ] || [ -L "$fish_profile" ]; then
+        step=$((step + 1))
+        cat <<EOF
+$step. Check $fish_profile for a previous Nix installation.
+
+If it was added by a previous Nix installation, remove it:
+
+  rm "$fish_profile"
+
+Fish loads this file instead of the system-wide nix.fish, which can
+prevent a new multi-user installation from working in Fish.
+
+EOF
+    fi
+
     step=$((step + 1))
     cat <<EOF
 $step. Delete the files Nix added to your system:
