@@ -139,10 +139,12 @@ TEST(string2Int, emptyString)
 TEST(string2Int, trivialConversions)
 {
     ASSERT_EQ(string2Int<int>("1"), 1);
-
     ASSERT_EQ(string2Int<int>("0"), 0);
-
     ASSERT_EQ(string2Int<int>("-100"), -100);
+    ASSERT_EQ(string2Int<int>("007"), 7);
+    ASSERT_EQ(string2Int<int>("019"), 19);
+    ASSERT_EQ(string2Int<int>("+012"), 12);
+    ASSERT_EQ(string2Int<int>("-013"), -13);
 }
 
 /* ----------------------------------------------------------------------------

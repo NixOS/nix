@@ -14,6 +14,7 @@
 #include <bit>
 #include <optional>
 #include <ranges>
+#include <concepts>
 
 namespace nix {
 
@@ -94,8 +95,24 @@ std::string rewriteStrings(
 /**
  * Parse a string into an integer.
  */
-template<class N>
+template<std::integral N>
 std::optional<N> string2Int(const std::string_view s);
+
+/* Guess what these overloads would do? If you gussed "8" parses as uint8_t(56) then
+   congratulations. Needless to say, these overloads are deleted and are gigantic footguns. */
+
+#define NIX_DELETE_STRING2INT_OVERLOAD(T) \
+    template<>                            \
+    std::optional<T> string2Int(const std::string_view s) = delete;
+
+NIX_DELETE_STRING2INT_OVERLOAD(char)
+NIX_DELETE_STRING2INT_OVERLOAD(signed char)
+NIX_DELETE_STRING2INT_OVERLOAD(unsigned char)
+NIX_DELETE_STRING2INT_OVERLOAD(wchar_t)
+NIX_DELETE_STRING2INT_OVERLOAD(char16_t)
+NIX_DELETE_STRING2INT_OVERLOAD(char32_t)
+
+#undef NIX_DELETE_STRING2INT_OVERLOAD
 
 /**
  * Like string2Int(), but support an optional suffix 'K', 'M', 'G' or

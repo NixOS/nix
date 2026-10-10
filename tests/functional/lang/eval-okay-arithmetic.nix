@@ -19,6 +19,7 @@ let {
   body = sum [
     (sum (range 1 50))
     (123 + 456)
+    (011) # Literals with leading zeros are fine and are always decimal.
     (0 + -10 + -(-11) + -x)
     (10 - 7 - -2)
     (10 - (6 - -1))
@@ -30,6 +31,12 @@ let {
     (builtins.bitAnd 12 10) # 0b1100 & 0b1010 =  8
     (builtins.bitOr 12 10) # 0b1100 | 0b1010 = 14
     (builtins.bitXor 12 10) # 0b1100 ^ 0b1010 =  6
+
+    # It's possible to override operators.
+    ( let __sub = builtins.add; in 1 - 2 )
+    ( let __mul = builtins.div; in 2 * 2 )
+    ( let __div = builtins.mul; in 2 / 2 )
+    ( let __lessThan = x: y: builtins.lessThan y x; in if 3 < 7 then err else 1 )
 
     (if 3 < 7 then 1 else err)
     (if 7 < 3 then err else 1)
