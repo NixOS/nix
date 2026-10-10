@@ -137,7 +137,7 @@ rewriteStrings(std::string s, const StringMap & rewrites, std::set<uint64_t> * m
     return s;
 }
 
-template<class N>
+template<std::integral N>
 std::optional<N> string2Int(const std::string_view s)
 {
     if (s.substr(0, 1) == "-" && !std::numeric_limits<N>::is_signed)

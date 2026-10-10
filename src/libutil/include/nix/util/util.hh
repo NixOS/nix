@@ -14,6 +14,7 @@
 #include <bit>
 #include <optional>
 #include <ranges>
+#include <concepts>
 
 namespace nix {
 
@@ -94,7 +95,7 @@ std::string rewriteStrings(
 /**
  * Parse a string into an integer.
  */
-template<class N>
+template<std::integral N>
 std::optional<N> string2Int(const std::string_view s);
 
 /* Guess what these overloads would do? If you gussed "8" parses as uint8_t(56) then
