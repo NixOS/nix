@@ -179,6 +179,13 @@ static bool isIncompleteInput(const ParseError & e)
     return e.msg().find("unexpected end of file") != std::string::npos;
 }
 
+static bool isIncompleteReplBinding(const ParseError & e)
+{
+    // A bare expression such as `x` is incomplete as a binding because the
+    // binding parser expects `=`, but it is complete as an expression.
+    return isIncompleteInput(e) && e.msg().find("'='") == std::string::npos;
+}
+
 void IncompleteReplExpr::anchor() {}
 
 static bool isFirstRepl = true;
@@ -901,11 +908,13 @@ Expr * NixRepl::parseString(std::string s)
 ExprAttrs * NixRepl::parseReplBindings(std::string s)
 {
     auto basePath = state->rootPath(".");
+    bool originalInputIncomplete = false;
 
     // Try parsing as bindings
     try {
         return state->parseReplBindings(s, basePath, staticEnv);
-    } catch (ParseError &) {
+    } catch (ParseError & e) {
+        originalInputIncomplete = isIncompleteReplBinding(e);
     }
 
     // Try with semicolon appended (for `inherit foo` shorthand)
@@ -913,7 +922,7 @@ ExprAttrs * NixRepl::parseReplBindings(std::string s)
     try {
         return state->parseReplBindings(s + ";", s, basePath, staticEnv);
     } catch (ParseError & e) {
-        if (isIncompleteInput(e))
+        if (originalInputIncomplete || isIncompleteInput(e))
             throw IncompleteReplExpr(e.msg());
         // Semicolon retry also failed; not valid binding syntax.
         return nullptr;
