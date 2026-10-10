@@ -1,0 +1,64 @@
+Nix <nix version>
+Type :? for help.
+
+nix-repl> a = { b = ; }
+error: syntax error, unexpected '=', expecting end of file
+       at «string»:1:3:
+            1| a = { b = ; }
+             |   ^
+
+nix-repl> 1 + 1
+2
+
+nix-repl> xs = [ ; ]
+error: syntax error, unexpected '=', expecting end of file
+       at «string»:1:4:
+            1| xs = [ ; ]
+             |    ^
+
+nix-repl> 2 + 2
+4
+
+nix-repl> a = {
+        >   b = ;
+error: syntax error, unexpected '=', expecting end of file
+       at «string»:1:3:
+            1| a = {
+             |   ^
+            2|   b = ;
+
+nix-repl> 3 + 3
+6
+
+nix-repl> 1 + ;
+error: syntax error, unexpected ';'
+       at «string»:1:5:
+            1| 1 + ;
+             |     ^
+
+nix-repl> 4 + 4
+8
+
+nix-repl> missingVariable
+error: undefined variable 'missingVariable'
+       at «string»:1:1:
+            1| missingVariable
+             | ^
+
+nix-repl> 5 + 5
+10
+
+nix-repl> "a string"
+"a string"
+
+nix-repl> 6 + 6
+12
+
+nix-repl> a = 1; a = 2
+error: syntax error, unexpected '=', expecting end of file
+       at «string»:1:3:
+            1| a = 1; a = 2
+             |   ^
+
+nix-repl> 7 + 7
+14
