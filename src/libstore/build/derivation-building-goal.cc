@@ -18,6 +18,7 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
+#include "nix/store/machines.hh"
 #include "nix/util/current-process.hh"
 
 #include <chrono>
@@ -1237,9 +1238,22 @@ HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath
         auto timeout = std::chrono::milliseconds(worker.settings.buildHookKillTimeout);
         /* Only a configured hook runs as a program. Compare by value:
            `loadConfFile` resets `isOverridden()`. */
-        worker.hook = worker.settings.buildHook.isDefault()
-                          ? HookInstance::builtin(worker.store.config, timeout)
-                          : HookInstance::external(worker.settings.buildHook, timeout);
+        if (!worker.settings.buildHook.isDefault())
+            worker.hook = HookInstance::external(worker.settings.buildHook, timeout);
+        else {
+            /* No builders: the hook would decline permanently. */
+            bool haveMachines = true;
+            try {
+                haveMachines = !Machine::parseConfig({settings.thisSystem}, worker.settings.builders).empty();
+            } catch (Error &) {
+                /* the hook reports it */
+            }
+            if (!haveMachines) {
+                worker.tryBuildHook = false;
+                return rpDecline;
+            }
+            worker.hook = HookInstance::builtin(worker.store.config, timeout);
+        }
     }
 
     try {
