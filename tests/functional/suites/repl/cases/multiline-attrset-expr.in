@@ -1,0 +1,4 @@
+# COM: Multi-line attribute set expression (not binding) should still trigger continuation (issue #16310)
+{
+  x = 1;
+}

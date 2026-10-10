@@ -1,0 +1,5 @@
+# COM: Multi-line attribute set in binding should trigger continuation (issue #16310)
+a = {
+  b = 1;
+}
+a
