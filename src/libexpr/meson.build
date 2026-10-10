@@ -212,6 +212,7 @@ parser_library = static_library(
   parser_tab,
   lexer_tab,
   'lexer-helpers.cc',
+  'parser.cc',
   cpp_args : parser_library_cpp_args,
   dependencies : deps_public + deps_private + deps_public_no_pkgconfig + deps_private_no_pkgconfig,
   include_directories : include_dirs,
