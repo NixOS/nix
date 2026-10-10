@@ -58,7 +58,6 @@ is_zsh() {
 
 set -u
 
-# If NIX_INSTALLER_FORCE_ALLOW_HTTP is unset or empty, default it.
 NIX_INSTALLER_BINARY_ROOT="${NIX_INSTALLER_BINARY_ROOT:-https://releases.nixos.org/nix/nix-@nixVersion@}"
 
 main() {
@@ -74,14 +73,7 @@ main() {
   local _arch="$RETVAL"
   assert_nz "$_arch" "arch"
 
-  local _ext=""
-  case "$_arch" in
-  *windows*)
-    _ext=".exe"
-    ;;
-  esac
-
-  local _url="${NIX_INSTALLER_OVERRIDE_URL-${NIX_INSTALLER_BINARY_ROOT}/nix-installer-${_arch}${_ext}}"
+  local _url="${NIX_INSTALLER_OVERRIDE_URL-${NIX_INSTALLER_BINARY_ROOT}/nix-installer-${_arch}}"
 
   local _dir
   if ! _dir="$(ensure mktemp -d)"; then
@@ -89,7 +81,7 @@ main() {
     # propagate exit status.
     exit 1
   fi
-  local _file="${_dir}/nix-installer${_ext}"
+  local _file="${_dir}/nix-installer"
 
   local _ansi_escapes_are_valid=false
   if [ -t 2 ]; then
@@ -125,7 +117,7 @@ main() {
   ensure chmod u+x "$_file"
   if [ ! -x "$_file" ]; then
     err "Cannot execute $_file (likely because of mounting /tmp as noexec)." 1>&2
-    err "Please copy the file to a location where you can execute binaries and run ./nix-installer${_ext}." 1>&2
+    err "Please copy the file to a location where you can execute binaries and run ./nix-installer." 1>&2
     exit 1
   fi
 
@@ -152,85 +144,13 @@ main() {
   return "$_retval"
 }
 
-get_current_exe() {
-  # Returns the executable used for system architecture detection
-  # This is only run on Linux
-  local _current_exe
-  if test -L /proc/self/exe; then
-    _current_exe=/proc/self/exe
-  else
-    warn "Unable to find /proc/self/exe. System architecture detection might be inaccurate."
-    if test -n "$SHELL"; then
-      _current_exe=$SHELL
-    else
-      need_cmd /bin/sh
-      _current_exe=/bin/sh
-    fi
-    warn "Falling back to $_current_exe."
-  fi
-  echo "$_current_exe"
-}
-
 get_architecture() {
   local _ostype _cputype _arch
   _ostype="$(uname -s)"
   _cputype="$(uname -m)"
 
-  if [ "$_ostype" = Linux ]; then
-    if [ "$(uname -o)" = Android ]; then
-      _ostype=Android
-    fi
-  fi
-
-  if [ "$_ostype" = Darwin ]; then
-    # Darwin `uname -m` can lie due to Rosetta shenanigans. If you manage to
-    # invoke a native shell binary and then a native uname binary, you can
-    # get the real answer, but that's hard to ensure, so instead we use
-    # `sysctl` (which doesn't lie) to check for the actual architecture.
-    if [ "$_cputype" = i386 ]; then
-      # Handling i386 compatibility mode in older macOS versions (<10.15)
-      # running on x86_64-based Macs.
-      # Starting from 10.15, macOS explicitly bans all i386 binaries from running.
-      # See: <https://support.apple.com/en-us/HT208436>
-
-      # Avoid `sysctl: unknown oid` stderr output and/or non-zero exit code.
-      if (sysctl hw.optional.x86_64 2>/dev/null || true) | grep -q ': 1'; then
-        _cputype=x86_64
-      fi
-    elif [ "$_cputype" = x86_64 ]; then
-      # Handling x86-64 compatibility mode (a.k.a. Rosetta 2)
-      # in newer macOS versions (>=11) running on arm64-based Macs.
-      # Rosetta 2 is built exclusively for x86-64 and cannot run i386 binaries.
-
-      # Avoid `sysctl: unknown oid` stderr output and/or non-zero exit code.
-      if (sysctl hw.optional.arm64 2>/dev/null || true) | grep -q ': 1'; then
-        _cputype=arm64
-      fi
-    fi
-  fi
-
-  if [ "$_ostype" = SunOS ]; then
-    # Both Solaris and illumos presently announce as "SunOS" in "uname -s"
-    # so use "uname -o" to disambiguate.  We use the full path to the
-    # system uname in case the user has coreutils uname first in PATH,
-    # which has historically sometimes printed the wrong value here.
-    if [ "$(/usr/bin/uname -o)" = illumos ]; then
-      _ostype=illumos
-    fi
-
-    # illumos systems have multi-arch userlands, and "uname -m" reports the
-    # machine hardware name; e.g., "i86pc" on both 32- and 64-bit x86
-    # systems.  Check for the native (widest) instruction set on the
-    # running kernel:
-    if [ "$_cputype" = i86pc ]; then
-      _cputype="$(isainfo -n)"
-    fi
-  fi
-
-  local _current_exe
   case "$_ostype" in
   Linux)
-    _current_exe=$(get_current_exe)
     _ostype=linux
     ;;
 
