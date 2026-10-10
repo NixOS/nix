@@ -77,12 +77,6 @@ Expr * parseExprFromBuf(
     const ref<SourceAccessor> rootFS);
 
 /**
- * Puts the lexer in REPL bindings mode before the first token. This causes
- * the parser to accept REPL bindings (attribute definitions).
- */
-void setReplBindingsMode(yyscan_t scanner);
-
-/**
  * Parse REPL bindings from a buffer.
  * Returns ExprAttrs with bindings to add to scope.
  */
@@ -579,6 +573,7 @@ formal
 
 #include "nix/expr/eval.hh"
 
+#include "lexer-helpers.hh"
 
 namespace nix {
 
@@ -654,7 +649,7 @@ ExprAttrs * parseReplBindingsFromBuf(
     Finally _destroy([&] { yylex_destroy(scanner); });
 
     yy_scan_buffer(text, length, scanner);
-    setReplBindingsMode(scanner);
+    lexer::internal::setReplBindingsMode(scanner);
     Parser parser(scanner, &state);
     parser.parse();
 
