@@ -53,6 +53,7 @@ let
       binaryTarballCross
       installerScript
       nixInstaller
+      nixInstallerScript
       dockerImage
       ;
 
