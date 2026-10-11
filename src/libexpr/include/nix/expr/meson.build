@@ -27,6 +27,7 @@ headers = [ config_pub_h ] + files(
   'json-to-value.hh',
   'nixexpr.hh',
   'parser-state.hh',
+  'parser.hh',
   'primops.hh',
   'print-ambiguous.hh',
   'print-options.hh',
