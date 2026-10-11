@@ -1,1 +1,1 @@
-2236
+{ add = 579; bitAnd = 8; bitOr = 14; bitXor = 6; divLeftAssoc = 228; ge_3_3 = 1; ge_3_7 = 1; ge_7_3 = 1; gt_3_3 = 1; gt_3_7 = 1; gt_7_3 = 1; le_3_3 = 1; le_3_7 = 1; le_7_3 = 1; leadingZero = 11; lt_3_3 = 1; lt_3_7 = 1; lt_7_3 = 1; mul = 60; negation = -11; overrideDiv = 4; overrideLessThan = 1; overrideMul = 1; overrideSub = 3; precedence = 20; precedenceEq = 1; precedenceGe = 1; precedenceLt = 1; stringLt = 1; stringLtEqual = 1; stringLtPrefix = 1; subAdd = 11; subLeftAssoc = 5; subParens = 3; sumRange = 1275; }
