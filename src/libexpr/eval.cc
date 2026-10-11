@@ -1,5 +1,8 @@
 #include "nix/expr/eval.hh"
 #include "nix/expr/eval-error.hh"
+#include "nix/expr/eval-profiler-settings.hh"
+#include "nix/expr/eval-profiler.hh"
+#include "nix/expr/eval-perf-trampoline.hh"
 #include "nix/expr/eval-settings.hh"
 #include "nix/expr/primops.hh"
 #include "nix/expr/print-options.hh"
@@ -388,6 +391,9 @@ EvalState::EvalState(
     case EvalProfilerMode::flamegraph:
         profiler.addProfiler(
             makeSampleStackProfiler(*this, settings.evalProfileFile.get(), settings.evalProfilerFrequency));
+        break;
+    case EvalProfilerMode::perf_trampoline:
+        profiler.perfTrampolineStore = makePerfTrampolineStore();
         break;
     case EvalProfilerMode::disabled:
         break;
@@ -1693,8 +1699,11 @@ void EvalState::callFunction(Value & fun, std::span<Value * const> args, Value &
                                      "while calling %s",
                                      lambda.name ? concatStrings("'", symbols[lambda.name], "'") : "anonymous lambda")
                                : nullptr;
-
+                if (settings.evalProfilerMode == EvalProfilerMode::perf_trampoline) {
+                    nix::callTrampoline(profiler.perfTrampolineStore , *this , env2, vCur, lambda);
+                } else {
                 lambda.body->eval(*this, env2, vCur);
+                }
             } catch (Error & e) {
                 if (loggerSettings.showTrace.get()) {
                     addErrorTrace(
