@@ -611,7 +611,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
                 .name = primOp.name,
                 .arity = primOp.arity,
                 .args = primOp.args,
-                .doc = primOp.doc->c_str(),
+                .content = primOp.doc->c_str(),
             };
     }
     if (v.isLambda()) {
@@ -630,22 +630,6 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             docStr = exprLambda->docComment.getInnerText(positions);
         }
 
-        if (name.empty()) {
-            s << "Function ";
-        } else {
-            s << "Function `" << name << "`";
-            if (pos)
-                s << "\\\n  … ";
-            else
-                s << "\\\n";
-        }
-        if (pos) {
-            s << "defined at " << pos;
-        }
-        if (!docStr.empty()) {
-            s << "\n\n";
-        }
-
         s << docStr;
 
         return Doc{
@@ -655,7 +639,7 @@ std::optional<EvalState::Doc> EvalState::getDoc(Value & v)
             .args = {},
             /* N.B. Can't use StringData here, because that would lead to an interior pointer.
                NOTE: memory leak when compiled without GC. */
-            .doc = makeImmutableString(s.view()),
+            .content = makeImmutableString(s.view()),
         };
     }
     if (isFunctor(v)) {
