@@ -309,6 +309,12 @@ TEST_F(LocalStorePathInfoCacheTest, signatureUpdatesAreVisible)
     EXPECT_EQ(store->queryPathInfo(path)->sigs, (std::set<Signature>{sig1, sig2}));
 }
 
+TEST_F(LocalStorePathInfoCacheTest, addSignaturesToInvalidPath)
+{
+    EXPECT_THROW(store->addSignatures(path, {}), InvalidPath);
+    EXPECT_FALSE(store->isValidPath(path));
+}
+
 #endif
 
 } // namespace nix

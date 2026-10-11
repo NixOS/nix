@@ -1655,6 +1655,8 @@ void LocalStore::addSignatures(const StorePath & storePath, const std::set<Signa
         SQLiteTxn txn(state->db);
 
         auto info = std::const_pointer_cast<ValidPathInfo>(queryPathInfoInternal(*state, storePath));
+        if (!info)
+            throw InvalidPath("path '%s' is not valid", printStorePath(storePath));
 
         info->sigs.insert(sigs.begin(), sigs.end());
 
