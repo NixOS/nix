@@ -432,6 +432,10 @@ static void performOp(
             bool repairBool;
             conn.from >> repairBool;
             auto repair = RepairFlag{repairBool};
+            /* Repairing is not atomic, so disallowed for "untrusted"
+               clients. */
+            if (repair && !trusted)
+                throw Error("you are not privileged to repair paths");
 
             logger->startWork();
             auto pathInfo = [&]() {
@@ -513,6 +517,10 @@ static void performOp(
     case WorkerProto::Op::AddMultipleToStore: {
         bool repair, dontCheckSigs;
         conn.from >> repair >> dontCheckSigs;
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients. */
+        if (repair && !trusted)
+            throw Error("you are not privileged to repair store paths");
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
 
@@ -944,6 +952,10 @@ static void performOp(
         info.sigs = readStrings<StringSet>(conn.from);
         info.ca = ContentAddress::parseOpt(readString(conn.from));
         conn.from >> repair >> dontCheckSigs;
+        /* Repairing is not atomic, so disallowed for "untrusted"
+           clients. */
+        if (repair && !trusted)
+            throw Error("you are not privileged to repair store paths");
         if (!trusted && dontCheckSigs)
             dontCheckSigs = false;
         if (!trusted)
