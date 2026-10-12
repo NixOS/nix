@@ -16,7 +16,7 @@ Bindings * EvalState::allocBindings(size_t capacity)
         throw Error("attribute set of size %d is too big", capacity);
     nrAttrsets++;
     nrAttrsInAttrsets += capacity;
-    return new (allocBytes(sizeof(Bindings) + sizeof(Attr) * capacity)) Bindings((Bindings::size_t) capacity);
+    return new (allocBytes<Attr, sizeof(Bindings)>(capacity)) Bindings((Bindings::size_t) capacity);
 }
 
 Value & BindingsBuilder::alloc(Symbol name, PosIdx pos)
