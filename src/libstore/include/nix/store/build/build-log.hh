@@ -31,6 +31,8 @@ private:
     std::string currentLogLine;
     size_t currentLogLinePos = 0; // to handle carriage return
 
+    bool pendingCR = false; // defer '\r' so "\r\n" is treated as a line terminator
+
     void flushLine();
 
 public:
