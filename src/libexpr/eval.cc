@@ -87,9 +87,7 @@ static const char * makeImmutableString(std::string_view s)
 
 StringData & StringData::alloc(EvalMemory & mem, size_t size)
 {
-    void * t = mem.allocBytes(sizeof(StringData) + size + 1);
-    if (!t)
-        throw std::bad_alloc();
+    void * t = mem.allocBytes<char, sizeof(StringData) + 1>(size);
     auto res = new (t) StringData(size);
     return *res;
 }
@@ -909,7 +907,7 @@ Value::StringWithContext::Context::fromBuilder(const NixStringContext & context,
     if (context.empty())
         return nullptr;
 
-    auto ctx = new (mem.allocBytes(sizeof(Context) + context.size() * sizeof(value_type))) Context(context.size());
+    auto ctx = new (mem.allocBytes<value_type, sizeof(Context)>(context.size())) Context(context.size());
     std::ranges::transform(
         context, ctx->elems, [&](const NixStringContextElem & elt) { return &StringData::make(mem, elt.to_string()); });
     return ctx;
@@ -965,7 +963,7 @@ void Value::mkPath(const SourcePath & path, EvalMemory & mem)
 
 ListBuilder::ListBuilder(EvalMemory & mem, size_t size)
     : size(size)
-    , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes(size * sizeof(Value *)))
+    , elems(size <= 2 ? inlineElems : (Value **) mem.allocBytes<Value *>(size))
 {
 }
 
