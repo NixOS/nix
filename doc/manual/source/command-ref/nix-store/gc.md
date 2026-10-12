@@ -50,12 +50,6 @@ configuration file.
 By default, the collector prints the total number of freed bytes when it
 finishes (or when it is interrupted).
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 To delete all unreachable paths, just do:
@@ -73,3 +67,9 @@ To delete at least 100 MiBs of unreachable paths:
 $ nix-store --gc --max-freed $((100 * 1024 * 1024))
 ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ../env-common.md}}

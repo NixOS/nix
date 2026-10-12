@@ -16,14 +16,6 @@ environment in the Nix store.
 
 Switching will fail if the specified generation does not exist.
 
-{{#include ./opt-common.md}}
-
-{{#include ../opt-common.md}}
-
-{{#include ./env-common.md}}
-
-{{#include ../env-common.md}}
-
 # Examples
 
 ```console
@@ -31,3 +23,11 @@ $ nix-env --switch-generation 42
 switching from generation 50 to 42
 ```
 
+
+{{#include ./opt-common.md}}
+
+{{#include ../opt-common.md}}
+
+{{#include ./env-common.md}}
+
+{{#include ../env-common.md}}
