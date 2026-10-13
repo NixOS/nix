@@ -10,7 +10,7 @@ error:
 
        … while evaluating attribute '__impure' of derivation 'foo'
          at /pwd/lang/eval-fail-derivationStrict-17.nix:6:3:
-            5|   outputs = "out";
+            5|   outputs = [ "out" ];
             6|   __impure = "true";
              |   ^
             7| }
