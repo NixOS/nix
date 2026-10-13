@@ -3635,7 +3635,7 @@ static void prim_mapAttrs(EvalState & state, CallSite callSite, Value * const * 
         Value * vName = Value::toPtr(state.symbols[i.name]);
         Value * vFun2 = state.allocValue();
         vFun2->mkApp(args[0], vName);
-        attrs.alloc(i.name).mkApp(vFun2, i.value);
+        attrs.alloc(i.name, i.pos).mkApp(vFun2, i.value);
     }
 
     v.mkAttrs(attrs.alreadySorted());
