@@ -1,0 +1,1 @@
+Derive([("out","/nix/store/HASH-post-hook-drv","","")],[],["/nix/store/HASH-dependencies-top"],"SYSTEM","SHELL",["-c","echo $deps > $out"],[("PATH","COREUTILS"),("builder","SHELL"),("deps","/nix/store/HASH-dependencies-top"),("name","post-hook-drv"),("out","/nix/store/HASH-post-hook-drv"),("outputs","out"),("system","SYSTEM"),("testSalt","SALT")])
