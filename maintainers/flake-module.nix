@@ -114,6 +114,8 @@
           zizmor = {
             enable = true;
           };
+          # Configured in `.typos.toml`
+          typos.enable = true;
         };
       };
     };

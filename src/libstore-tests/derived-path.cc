@@ -192,7 +192,7 @@ TEST_JSON(DerivedPath, multi_opaque, DerivedPath::Opaque{StorePath{"g1w7hy3qg1w7
 
 TEST_JSON(
     DerivedPath,
-    mutli_built,
+    multi_built,
     (DerivedPath::Built{
         .drvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Opaque{
             StorePath{"g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-foo.drv"}}),

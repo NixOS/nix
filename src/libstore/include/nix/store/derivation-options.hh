@@ -243,7 +243,7 @@ namespace derivation {
 
 /**
  * This is the counterpart of `Derivation::tryResolve`. In particular,
- * it takes the same sort of callback, which is used to reolve
+ * it takes the same sort of callback, which is used to resolve
  * non-constant deriving paths.
  *
  * We need this function when resolving a derivation, and we will use

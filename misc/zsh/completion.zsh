@@ -7,16 +7,16 @@ function _nix() {
   IFS=$'\n'
   local res=($(NIX_GET_COMPLETIONS=$((CURRENT - 1)) "$input[@]" 2>/dev/null))
   IFS="$ifs_bk"
-  local tpe="${${res[1]}%%>	*}"
+  local type="${${res[1]}%%>	*}"
   local -a suggestions
   declare -a suggestions
   for suggestion in ${res:1}; do
     suggestions+=("${suggestion%%	*}")
   done
   local -a args
-  if [[ "$tpe" == filenames ]]; then
+  if [[ "$type" == filenames ]]; then
     args+=('-f')
-  elif [[ "$tpe" == attrs ]]; then
+  elif [[ "$type" == attrs ]]; then
     args+=('-S' '')
   fi
   compadd -J nix "${args[@]}" -a suggestions
