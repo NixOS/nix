@@ -28,7 +28,7 @@ let
     fi
   '';
 
-  installCases = {
+  installCases = rec {
     install-default = {
       install = ''
         mkdir scripted-installer
@@ -84,6 +84,8 @@ let
         chmod u+x ./nix-installer
         RUST_BACKTRACE="full" ./nix-installer install --no-confirm --logger pretty
       '';
+
+      inherit (install-force-daemon) check;
     };
 
     nix-installer-over-scripted-daemon = {
@@ -94,6 +96,8 @@ let
         chmod u+x ./nix-installer
         RUST_BACKTRACE="full" ./nix-installer install --no-confirm --logger pretty
       '';
+
+      inherit (install-force-daemon) check;
     };
   };
 
