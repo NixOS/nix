@@ -122,9 +122,9 @@ struct DarwinDerivationBuilder : DerivationBuilderImpl
                 }
 
                 /* Only open a new allow form once we know this path will actually
-                * contribute a selector. Opening it before resolving the path
-                * leaves an unqualified (allow ...) form behind when an optional
-                * path is missing, and an unqualified allow form render the sandbox useless. */
+                 * contribute a selector. Opening it before resolving the path
+                 * leaves an unqualified (allow ...) form behind when an optional
+                 * path is missing, and an unqualified allow form render the sandbox useless. */
                 if (sandboxProfile.length() >= breakpoint) {
                     debug("Sandbox break: %d %d", sandboxProfile.length(), breakpoint);
                     sandboxProfile += ")\n(allow file-read* file-write* process-exec\n";
