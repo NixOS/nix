@@ -11,6 +11,12 @@ needLocalStore "“--eval-store” doesn't achieve much with the daemon"
 
 eval_store=$TEST_ROOT/eval-store
 
+# The build store has not seen the .drv files yet. queryMissing must read
+# them from the eval store instead of reporting them as unknown.
+out=$(nix build -f dependencies.nix --eval-store "$eval_store" --dry-run 2>&1)
+[[ $out != *"don't know how to build"* ]]
+[[ $out == *"will be built"* ]]
+
 nix build -f dependencies.nix --eval-store "$eval_store" -o "$TEST_ROOT/result"
 [[ -e $TEST_ROOT/result/foobar ]]
 if [[ -z "${NIX_TESTS_CA_BY_DEFAULT:-}" ]]; then
