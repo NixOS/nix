@@ -38,14 +38,15 @@ struct StringViewStream
 
     int peek() const
     {
-        return remaining.empty() ? EOF : remaining[0];
+        return remaining.empty() ? EOF : static_cast<unsigned char>(remaining[0]);
     }
 
     int get()
     {
         if (remaining.empty())
             return EOF;
-        char c = remaining[0];
+        // Keep every byte value distinct from EOF, including 0xff.
+        unsigned char c = remaining[0];
         remaining.remove_prefix(1);
         return c;
     }
