@@ -47,9 +47,11 @@ ParsedURL::Authority ParsedURL::Authority::parse(std::string_view encodedAuthori
         throw BadURL("port '%s' is invalid", parsed->port());
     }();
 
+    // Decode explicitly: Boost.URL's host_address() can append NUL bytes
+    // when decoding an IPv6 zone identifier containing "%25".
     return {
         .hostType = hostType,
-        .host = parsed->host_address(),
+        .host = percentDecode(std::string_view(parsed->encoded_host_address())),
         .user = parsed->has_userinfo() ? parsed->user() : std::optional<std::string>{},
         .password = parsed->has_password() ? parsed->password() : std::optional<std::string>{},
         .port = port,
