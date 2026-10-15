@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #ifdef __FreeBSD__
+#  include <mutex>
 #  include <sys/param.h>
 #  include <sys/mount.h>
 #endif
@@ -276,15 +277,20 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     // Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
 #ifdef __FreeBSD__
+    // getmntinfo uses non thread safe static state
+    static std::mutex getmntinfoMutex;
     std::set<std::filesystem::path> mountedPaths;
-    struct statfs * mntbuf;
-    int count;
-    if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
-        throw SysError("getmntinfo");
-    }
+    {
+        std::lock_guard<std::mutex> guard(getmntinfoMutex);
+        struct statfs * mntbuf;
+        int count;
+        if ((count = getmntinfo(&mntbuf, MNT_WAIT)) < 0) {
+            throw SysError("getmntinfo");
+        }
 
-    for (int i = 0; i < count; i++) {
-        mountedPaths.emplace(mntbuf[i].f_mntonname);
+        for (int i = 0; i < count; i++) {
+            mountedPaths.emplace(mntbuf[i].f_mntonname);
+        }
     }
 #endif
     bytesFreed = 0;
