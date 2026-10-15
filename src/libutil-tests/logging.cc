@@ -366,6 +366,11 @@ namespace nix {
     }
 #endif
 
+TEST(HintFmt, hintFmtArgument)
+{
+    ASSERT_EQ(HintFmt("outer %1%", HintFmt("inner %1%", "arg")).str(), "outer inner " ANSI_MAGENTA "arg" ANSI_NORMAL);
+}
+
 namespace {
 
 class DeterministicActivityIdLogger : public Logger
