@@ -278,6 +278,11 @@ void recursiveSync(const std::filesystem::path & path);
  */
 void deletePath(const std::filesystem::path & path);
 
+/**
+ * @param[out] bytesFreed Estimation of how many bytes of disk space have
+ *                        been reclaimed. Initialised to zero internally, so
+ *                        the caller doesn't need to initialise it.
+ */
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed);
 
 /**
