@@ -213,6 +213,8 @@ void LocalOverlayStore::collectGarbage(const GCOptions & options, GCResults & re
 
 void LocalOverlayStore::deleteStorePath(const std::filesystem::path & path, uint64_t & bytesFreed, bool isKnownPath)
 {
+    bytesFreed = 0;
+
     if (path.parent_path() != config->realStoreDir.get()) {
         warn("local-overlay: unexpected gc path %s", PathFmt(path));
         return;
