@@ -255,7 +255,7 @@ void deletePath(const std::filesystem::path & path)
 
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
-    // Activity act(*logger, lvlDebug, "recursively deleting path '%1%'", path);
+    bytesFreed = 0;
 #ifdef __FreeBSD__
     std::set<std::filesystem::path> mountedPaths;
     struct statfs * mntbuf;
@@ -268,7 +268,6 @@ void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
         mountedPaths.emplace(mntbuf[i].f_mntonname);
     }
 #endif
-    bytesFreed = 0;
     _deletePath(path, bytesFreed MOUNTEDPATHS_ARG);
 }
 
