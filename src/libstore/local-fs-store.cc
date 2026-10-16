@@ -47,6 +47,7 @@ public:
         , store(store)
         , requireValidPath(requireValidPath)
     {
+        setPathDisplay(store->storeDir);
     }
 
     void requireStoreObject(const StorePath & storePath)
@@ -132,7 +133,9 @@ public:
 
     std::string showPath(const CanonPath & path) override
     {
-        return accessor->showPath(path);
+        if (path.isRoot())
+            return displayPrefix;
+        return displayPrefix + path.abs();
     }
 
     std::optional<std::filesystem::path> getPhysicalPath(const CanonPath & path) override
