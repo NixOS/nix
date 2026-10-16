@@ -1,0 +1,11 @@
+error:
+       … while evaluating the error message passed to builtins.addErrorContext, another error occurred: secondary
+
+       … while calling the 'throw' builtin
+         at /pwd/lang/eval-fail-addErrorContext-message-throws.nix:3:47:
+            2| # error from the `value` argument.
+            3| builtins.addErrorContext (throw "secondary") (throw "important")
+             |                                               ^
+            4|
+
+       error: important

@@ -1,0 +1,16 @@
+error:
+       … while calling the 'tryEval' builtin
+         at /pwd/lang/eval-fail-tryEval-addErrorContext-type-error.nix:4:1:
+            3| # catches.
+            4| builtins.tryEval (builtins.addErrorContext (throw "x") (1 + "a"))
+             | ^
+            5|
+
+       … while evaluating the error message passed to builtins.addErrorContext, another error occurred: x
+
+       error: cannot add a string to an integer
+       at /pwd/lang/eval-fail-tryEval-addErrorContext-type-error.nix:4:61:
+            3| # catches.
+            4| builtins.tryEval (builtins.addErrorContext (throw "x") (1 + "a"))
+             |                                                             ^
+            5|
