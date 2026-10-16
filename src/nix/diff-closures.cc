@@ -7,6 +7,8 @@
 
 #include "nix/util/strings.hh"
 
+#include <nlohmann/json.hpp>
+
 namespace nix {
 
 namespace {
@@ -15,6 +17,15 @@ struct Info
 {
     std::string outputName;
 };
+
+struct PackageDiff
+{
+    StringSet removedVersions;
+    StringSet addedVersions;
+    int64_t sizeDelta;
+};
+
+using ClosureDiffs = std::map<std::string, PackageDiff>;
 
 } // namespace
 
@@ -60,9 +71,12 @@ std::string showVersions(const StringSet & versions)
     return concatStringsSep(", ", versions2);
 }
 
-void printClosureDiff(
-    ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent)
+namespace {
+
+ClosureDiffs getClosureDiff(ref<Store> store, const StorePath & beforePath, const StorePath & afterPath)
 {
+    ClosureDiffs result;
+
     auto beforeClosure = getClosureInfo(store, beforePath);
     auto afterClosure = getClosureInfo(store, afterPath);
 
@@ -89,12 +103,10 @@ void printClosureDiff(
         auto sizeDelta = (int64_t) afterSize - (int64_t) beforeSize;
         auto showDelta = std::abs(sizeDelta) >= 8 * 1024;
 
-        StringSet removed, unchanged;
+        StringSet removed;
         for (auto & [version, _] : beforeVersions)
             if (!afterVersions.count(version))
                 removed.insert(version);
-            else
-                unchanged.insert(version);
 
         StringSet added;
         for (auto & [version, _] : afterVersions)
@@ -102,17 +114,58 @@ void printClosureDiff(
                 added.insert(version);
 
         if (showDelta || !removed.empty() || !added.empty()) {
-            std::vector<std::string> items;
-            if (!removed.empty() || !added.empty())
-                items.push_back(fmt("%s → %s", showVersions(removed), showVersions(added)));
-            if (showDelta)
-                items.push_back(fmt("%s%s" ANSI_NORMAL, sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, renderSize(sizeDelta)));
-            logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
+            result.emplace(
+                name,
+                PackageDiff{
+                    .removedVersions = std::move(removed),
+                    .addedVersions = std::move(added),
+                    .sizeDelta = sizeDelta,
+                });
         }
+    }
+    return result;
+}
+
+nlohmann::json closureDiffToJSON(const ClosureDiffs & diffs)
+{
+    auto packages = nlohmann::json::object();
+
+    for (const auto & [name, diff] : diffs) {
+        packages[name] = {
+            {"sizeDelta", diff.sizeDelta},
+            {"versionsAfter", diff.addedVersions},
+            {"versionsBefore", diff.removedVersions},
+        };
+    }
+
+    return {
+        {"packages", std::move(packages)},
+        {"version", 1},
+    };
+}
+
+void renderClosureDiff(const ClosureDiffs & diffs, std::string_view indent)
+{
+    for (const auto & [name, diff] : diffs) {
+        std::vector<std::string> items;
+        if (!diff.removedVersions.empty() || !diff.addedVersions.empty())
+            items.push_back(fmt("%s → %s", showVersions(diff.removedVersions), showVersions(diff.addedVersions)));
+        if (std::abs(diff.sizeDelta) >= 8 * 1024)
+            items.push_back(
+                fmt("%s%s" ANSI_NORMAL, diff.sizeDelta > 0 ? ANSI_RED : ANSI_GREEN, renderSize(diff.sizeDelta)));
+        logger->cout("%s%s: %s", indent, name, concatStringsSep(", ", items));
     }
 }
 
-struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
+} // namespace
+
+void printClosureDiff(
+    ref<Store> store, const StorePath & beforePath, const StorePath & afterPath, std::string_view indent)
+{
+    renderClosureDiff(getClosureDiff(store, beforePath, afterPath), indent);
+}
+
+struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions, MixJSON
 {
     std::string _before, _after;
 
@@ -140,7 +193,11 @@ struct CmdDiffClosures : SourceExprCommand, MixOperateOnOptions
         auto beforePath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, before);
         auto after = parseInstallable(store, _after);
         auto afterPath = Installable::toStorePath(getEvalStore(), store, Realise::Outputs, operateOn, after);
-        printClosureDiff(store, beforePath, afterPath, "");
+        auto diff = getClosureDiff(store, beforePath, afterPath);
+        if (json)
+            printJSON(closureDiffToJSON(diff));
+        else
+            renderClosureDiff(diff, "");
     }
 };
 

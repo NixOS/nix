@@ -48,4 +48,36 @@ libfoo: 1.2, 1.3 → 1.4
 leaves open the possibility that there are other versions (e.g. `1.1`)
 that exist in both closures.
 
+## JSON output
+
+With `--json`, the output is a JSON object suitable for automatic
+processing:
+
+```json
+{
+  "packages": {
+    "dolphin": {
+      "sizeDelta": 14234,
+      "versionsAfter": ["20.08.2"],
+      "versionsBefore": ["20.08.1"]
+    }
+  },
+  "version": 1
+}
+```
+
+The top-level `version` field identifies the JSON format version.
+
+The `packages` object contains the packages that would be shown in the
+regular output. For every package, `versionsBefore` contains the versions
+only present in the *before* closure, and `versionsAfter` contains the
+versions only present in the *after* closure. Versions present in both
+closures are omitted from both arrays. An empty version is represented by
+an empty string.
+
+`sizeDelta` is the exact difference in NAR size in bytes: the size in the
+*after* closure minus the size in the *before* closure. Unlike the regular
+output, JSON reports the exact size difference even when it is below the
+8 KiB display threshold.
+
 )""
