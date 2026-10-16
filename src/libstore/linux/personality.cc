@@ -33,9 +33,11 @@ void setPersonality(PersonalityArgs args)
 
     /* Disable address space randomization for improved
        determinism. */
-    int cur = personality(0xffffffff);
-    if (cur != -1)
-        personality(cur | ADDR_NO_RANDOMIZE);
+    if (args.disableASLR) {
+        int cur = personality(0xffffffff);
+        if (cur != -1)
+            personality(cur | ADDR_NO_RANDOMIZE);
+    }
 }
 
 } // namespace nix::linux
