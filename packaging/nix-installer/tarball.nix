@@ -1,5 +1,5 @@
-# Zstd-compressed Nix closure in the layout expected by
-# `NixOS/nix-installer` (`include_bytes!` at build time).
+# Zstd-compressed Nix closure in the layout expected to be embedded into
+# nix-installer binary.
 {
   lib,
   stdenv,
