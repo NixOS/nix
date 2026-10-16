@@ -120,6 +120,13 @@ public:
         return callWithAccessorForPath(
             path, [](SourceAccessor & accessor, const CanonPath & path) { return accessor.readLink(path); });
     }
+
+    std::string showPath(const CanonPath & path) override
+    {
+        if (path.isRoot())
+            return displayPrefix;
+        return displayPrefix + path.abs();
+    }
 };
 
 } // namespace
