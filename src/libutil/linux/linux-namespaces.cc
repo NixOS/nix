@@ -5,6 +5,7 @@
 
 #include "linux-namespaces-private.hh"
 
+#include <fcntl.h>
 #include <mutex>
 #include <sys/resource.h>
 
@@ -94,6 +95,25 @@ bool mountAndPidNamespacesSupported()
 AutoCloseFD fdSavedMountNamespace;
 AutoCloseFD fdSavedRoot;
 bool havePrivateMountNs = false;
+
+std::vector<int> moveSavedMountNamespaceFds(int minFd)
+{
+    std::vector<int> fds;
+    if (!havePrivateMountNs)
+        return fds;
+    for (auto * fd : {&fdSavedMountNamespace, &fdSavedRoot}) {
+        if (!*fd)
+            continue;
+        if (fd->get() < minFd) {
+            int moved = fcntl(fd->get(), F_DUPFD_CLOEXEC, minFd);
+            if (moved == -1)
+                throw SysError("moving saved mount namespace descriptor");
+            *fd = AutoCloseFD(moved);
+        }
+        fds.push_back(fd->get());
+    }
+    return fds;
+}
 
 /* Save the current mount namespace so restoreMountNamespace() can return
    to it later. Ignored if called more than once. */

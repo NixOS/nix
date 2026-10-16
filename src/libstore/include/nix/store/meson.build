@@ -63,6 +63,7 @@ headers = [ config_pub_h ] + files(
   'local-settings.hh',
   'local-store.hh',
   'log-store.hh',
+  'machine-selection.hh',
   'machines.hh',
   'make-content-addressed.hh',
   'names.hh',
