@@ -94,6 +94,8 @@ void SourceAccessor::setPathDisplay(std::string displayPrefix, std::string displ
 
 std::string SourceAccessor::showPath(const CanonPath & path)
 {
+    if (path.isRoot() && !displayPrefix.empty())
+        return displayPrefix + displaySuffix;
     return displayPrefix + path.abs() + displaySuffix;
 }
 
