@@ -425,7 +425,6 @@ void LinuxDerivationBuilder::enterChroot()
 
     setPersonality({
         .system = drv.platform,
-        .impersonateLinux26 = localSettings.impersonateLinux26,
         /* For improved determinism. This assumes that we don't care about security benefits it provides,
            which might not be exactly true in case of FODs that download content the internet. */
         .disableASLR = true,

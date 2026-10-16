@@ -351,13 +351,6 @@ public:
         )"};
 #endif
 
-    Setting<bool> impersonateLinux26{
-        this,
-        false,
-        "impersonate-linux-26",
-        "Whether to impersonate a Linux 2.6 machine on newer kernels.",
-        {"build-impersonate-linux-26"}};
-
     Setting<SandboxMode> sandboxMode{
         this,
 #if defined(__linux__) || defined(__FreeBSD__)
