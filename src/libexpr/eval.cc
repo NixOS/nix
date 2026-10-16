@@ -1996,7 +1996,10 @@ void ExprOpUpdate::eval(EvalState & state, Value & v, Value & v1, Value & v2)
 
     /* Layer attrs2 on attrs1 whenever it's cheaper than a full copy: attrs2
        smaller than attrs1 (the common `prev // overlay` pattern), or under
-       the absolute threshold. threshold == 0 disables both checks. */
+       the absolute threshold. The relative-size check doesn't read
+       `threshold` at all, so without the explicit `threshold != 0 &&` guard
+       it would keep layering even when the setting's documented "0 disables
+       this optimization completely" contract says it shouldn't. */
     auto threshold = state.settings.bindingsUpdateLayerRhsSizeThreshold.get();
     bool shouldLayer = threshold != 0 && !bindings1.isLayerListFull()
                        && (bindings2.size() <= threshold || bindings2.size() < bindings1.size());
