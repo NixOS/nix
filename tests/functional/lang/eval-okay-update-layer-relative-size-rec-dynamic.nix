@@ -1,12 +1,5 @@
-# Regression test for the relative-size `//` layering trigger and the
-# raised `maxLayers` (8->16): each overlay is deliberately bigger than
-# the absolute threshold (16), so layering can only happen via the
-# relative-size comparison this adds, and folding enough of them chains
-# the layer depth past the *old* cap of 8 into the newly-reachable 9-16
-# range. Combined with `rec` self-reference and a dynamic attr name,
-# since neither is exercised by the pre-existing
-# eval-okay-regrettable-rec-attrset-merge.nix (that test merges via
-# dotted-attrpath splicing, not `//`, and never reaches this code path).
+# test //-layering with sizes and chains beyond the thresholds as well
+# as dynamic+rec attrsets
 let
   mkOverlay =
     i:
