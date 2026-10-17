@@ -117,8 +117,8 @@ static std::vector<std::string> expandBuilderLines(const std::string & builders)
                     continue;
                 }
 
-                const auto entrys = expandBuilderLines(text);
-                result.insert(end(result), begin(entrys), end(entrys));
+                const auto entries = expandBuilderLines(text);
+                result.insert(end(result), begin(entries), end(entries));
             } else {
                 result.emplace_back(entry);
             }

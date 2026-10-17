@@ -294,13 +294,13 @@ TEST_F(PrimOpTest, isListFalse)
     ASSERT_THAT(v, IsFalse());
 }
 
-TEST_F(PrimOpTest, elemtAt)
+TEST_F(PrimOpTest, elemAt)
 {
     auto v = eval("builtins.elemAt [0 1 2 3] 3");
     ASSERT_THAT(v, IsIntEq(3));
 }
 
-TEST_F(PrimOpTest, elemtAtOutOfBounds)
+TEST_F(PrimOpTest, elemAtOutOfBounds)
 {
     ASSERT_THROW(eval("builtins.elemAt [0 1 2 3] 5"), Error);
     ASSERT_THROW(eval("builtins.elemAt [0] 4294967296"), Error);
