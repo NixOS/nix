@@ -1,5 +1,5 @@
 #include "unix-derivation-builder-impl.hh"
-#include "nix/store/build/child.hh"
+#include "child-impl.hh"
 
 namespace nix {
 

@@ -339,6 +339,9 @@ Pid spawnProgram(const SpawnOptions & options, std::span<const FdRedirection> fd
                because that re-enters the saved mountns. */
             unix::closeExtraFDs(keepExtraFDs);
 
+            if (options.setSid && ::setsid() == -1)
+                throw SysError("creating a new session");
+
             if (options.lookupPath)
                 execvp(options.program.c_str(), stringsToCharPtrs(args_).data());
             // This allows you to refer to a program with a pathname relative

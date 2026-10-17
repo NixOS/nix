@@ -6,7 +6,6 @@
 #include "nix/util/processes.hh"
 #include "nix/store/builtins.hh"
 #include "nix/util/util.hh"
-#include "nix/store/build/child.hh"
 #include "nix/util/unix-domain-socket.hh"
 #include "nix/store/restricted-store.hh"
 #include "nix/store/user-lock.hh"
@@ -44,7 +43,7 @@
 
 #include "store-config-private.hh"
 #include "build/derivation-check.hh"
-
+#include "unix/build/child-impl.hh"
 #include "unix-derivation-builder-impl.hh"
 
 #ifdef __linux__
