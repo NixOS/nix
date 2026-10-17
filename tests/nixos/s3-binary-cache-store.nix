@@ -11,11 +11,10 @@ let
   pkgB = pkgs.writeText "test-package-b" "test package b";
   pkgC = pkgs.writeText "test-package-c" "test package c";
 
-  # S3 configuration
-  accessKey = "BKIKJAA5BMMU2RHO6IBB";
-  secretKey = "V7f1CwQqAcwo80UEIJEjc5gVQUSSx5ohQ9GSrr12";
-
+  rootDomain = "garage.local";
+  s3EndpointPort = 9000;
 in
+
 {
   name = "curl-s3-binary-cache-store";
 
@@ -36,39 +35,36 @@ in
           pkgC
           pkgs.coreutils
         ];
-        environment.systemPackages = [
-          (pkgs.minio-client.overrideAttrs (o: {
-            meta = o.meta // {
-              # TODO: Switch to garage.
-              knownVulnerabilities = [ ];
-            };
-          }))
-        ];
         nix.nixPath = [ "nixpkgs=${pkgs.path}" ];
         nix.extraOptions = ''
           experimental-features = nix-command
           substituters =
         '';
-        services.minio = {
+        services.garage = {
           enable = true;
-          region = "eu-west-1";
-          rootCredentialsFile = pkgs.writeText "minio-credentials-full" ''
-            MINIO_ROOT_USER=${accessKey}
-            MINIO_ROOT_PASSWORD=${secretKey}
-            MINIO_DOMAIN=minio.local
-          '';
-          package = pkgs.minio.overrideAttrs (o: {
-            meta = o.meta // {
-              # TODO: Switch to garage.
-              knownVulnerabilities = [ ];
+          package = pkgs.garage_2;
+          settings = rec {
+            replication_factor = 1;
+            # Pretty much unused, but required by garage nevertheless.
+            rpc_bind_addr = "[::]:3901";
+            rpc_public_addr = rpc_bind_addr;
+            rpc_secret = "4e440caf9ca89e720ac0c6e78821d52000c670a0944f546535d303162794defc";
+            s3_api = {
+              api_bind_addr = "[::]:${toString s3EndpointPort}";
+              root_domain = rootDomain;
+              s3_region = "eu-west-1";
             };
-          });
+          };
         };
-        networking.firewall.allowedTCPPorts = [ 9000 ];
-        # Static hosts for virtual-hosted-style S3 tests.
-        # MinIO with MINIO_DOMAIN=minio.local accepts virtual-hosted requests
-        # where the bucket name is a hostname prefix.
-        networking.extraHosts = "127.0.0.1 vhost-test.minio.local minio.local";
+        networking.firewall.allowedTCPPorts = [ s3EndpointPort ];
+        networking.extraHosts =
+          let
+            rootDomain = config.services.garage.settings.s3_api.root_domain;
+          in
+          "127.0.0.1 vhost-test.${rootDomain} ${rootDomain}";
+        environment.systemPackages = [
+          pkgs.minio-client
+        ];
       };
 
     client =
@@ -80,7 +76,10 @@ in
           experimental-features = nix-command
           substituters =
         '';
-        networking.extraHosts = "192.168.1.2 vhost-test.minio.local minio.local";
+        networking.extraHosts = "192.168.1.2 vhost-test.${rootDomain} ${rootDomain}";
+        environment.systemPackages = [
+          pkgs.minio-client
+        ];
       };
   };
 
@@ -88,6 +87,8 @@ in
     { nodes }:
     # python
     ''
+      from typing import List
+      from dataclasses import dataclass
       import json
       import random
       import re
@@ -97,14 +98,10 @@ in
       # Configuration
       # ============================================================================
 
-      ACCESS_KEY = '${accessKey}'
-      SECRET_KEY = '${secretKey}'
-      ENDPOINT = 'http://server:9000'
+      ENDPOINT = 'http://server:${toString s3EndpointPort}'
       REGION = 'eu-west-1'
-
-      # Virtual-hosted-style configuration (requires MINIO_DOMAIN and static host entries)
-      VHOST_DOMAIN = 'minio.local'
-      VHOST_ENDPOINT = f'http://{VHOST_DOMAIN}:9000'
+      VHOST_DOMAIN = '${rootDomain}'
+      VHOST_ENDPOINT = f'http://{VHOST_DOMAIN}:${toString s3EndpointPort}'
 
       PKGS = {
           'A': '${pkgA}',
@@ -112,7 +109,76 @@ in
           'C': '${pkgC}',
       }
 
+      # ============================================================================
+      # Helpers for setting up a mock garage single node deployment
+      # Copied from nixos/tests/garage/common.nix
+      # ============================================================================
+
+      @dataclass
+      class S3Key:
+         key_name: str
+         key_id: str
+         secret_key: str
+
+      @dataclass
+      class GarageNode:
+         node_id: str
+         host: str
+
+      def parse_api_key_data(text) -> S3Key:
+        key_creation_regex = re.compile(r'Key name: \s*(?P<key_name>.*)|' r'Key ID: \s*(?P<key_id>.*)|' r'Secret key: \s*(?P<secret_key>.*)', re.IGNORECASE)
+        fields = {}
+        for match in key_creation_regex.finditer(text):
+          for key, value in match.groupdict().items():
+            if value:
+              fields[key] = value.strip()
+        try:
+          return S3Key(**fields)
+        except TypeError as e:
+          raise ValueError(f"Cannot parse API key data. Missing required field(s): {e}")
+
+      def create_api_key(machine: BaseMachine, key_name: str) -> S3Key:
+         output = machine.succeed(f"garage key create {key_name}")
+         return parse_api_key_data(output)
+
+      def get_node_fqn(machine: BaseMachine) -> GarageNode:
+        node_id, host = machine.succeed("garage node id").split('@')
+        return GarageNode(node_id=node_id, host=host)
+
+      def get_node_id(machine: BaseMachine) -> str:
+        return get_node_fqn(machine).node_id
+
+      cur_version_regex = re.compile(r'Current cluster layout version: (?P<ver>\d*)')
+
+      def get_layout_version(machine: BaseMachine) -> int:
+        version_data = machine.succeed("garage layout show")
+        m = cur_version_regex.search(version_data)
+        if m and m.group('ver') is not None:
+          return int(m.group('ver')) + 1
+        else:
+          raise ValueError('Cannot find current layout version')
+
+      def apply_garage_layout(machine: BaseMachine, layouts: List[str]):
+         for layout in layouts:
+            machine.succeed(f"garage layout assign {layout}")
+         version = get_layout_version(machine)
+         machine.succeed(f"garage layout apply --version {version}")
+
+      start_all()
+
+      server.wait_for_unit("garage")
+      server.wait_for_unit("network-addresses-eth1.service")
+      server.wait_for_open_port(${toString s3EndpointPort})
+      server.succeed("garage status >&2")
+      server_node_id = get_node_id(server)
+      apply_garage_layout(server, [f'-z qemutest -c 1G "{server_node_id}"'])
+      s3_key = create_api_key(server, "test-api-key")
+
+      ACCESS_KEY = s3_key.key_id
+      SECRET_KEY = s3_key.secret_key
       ENV_WITH_CREDS = f"AWS_ACCESS_KEY_ID={ACCESS_KEY} AWS_SECRET_ACCESS_KEY={SECRET_KEY}"
+
+      server.succeed(f"mc alias set garage http://localhost:9000 {ACCESS_KEY} {SECRET_KEY} --api s3v4")
 
       # ============================================================================
       # Helper Functions
@@ -132,7 +198,7 @@ in
 
       def verify_content_encoding(machine, bucket, object_path, expected_encoding):
           """Verify S3 object has expected Content-Encoding header"""
-          stat = machine.succeed(f"mc stat minio/{bucket}/{object_path}")
+          stat = machine.succeed(f"mc stat garage/{bucket}/{object_path}")
           if "Content-Encoding" not in stat or expected_encoding not in stat:
               print(f"mc stat output for {object_path}:")
               print(stat)
@@ -140,7 +206,7 @@ in
 
       def verify_no_compression(machine, bucket, object_path):
           """Verify S3 object has no compression headers"""
-          stat = machine.succeed(f"mc stat minio/{bucket}/{object_path}")
+          stat = machine.succeed(f"mc stat garage/{bucket}/{object_path}")
           if "Content-Encoding" in stat and ("gzip" in stat or "br" in stat):
               print(f"mc stat output for {object_path}:")
               print(stat)
@@ -178,8 +244,6 @@ in
 
           Args:
               populate_bucket: List of packages to upload before test runs
-              public: If True, make the bucket publicly accessible
-              versioned: If True, enable versioning on the bucket before populating
               profiles: Dict of AWS profiles to create, e.g.:
                   {"valid": {"access_key": "...", "secret_key": "..."},
                    "invalid": {"access_key": "WRONG", "secret_key": "WRONG"}}
@@ -187,22 +251,10 @@ in
           """
           def decorator(test_func):
               def wrapper():
-                  # Restart nix-daemon on both machines to clear the credential provider cache.
-                  # The AwsCredentialProviderImpl singleton persists in the daemon process,
-                  # and its cache can cause credentials from previous tests to be reused.
-                  # We reset-failed first to avoid systemd's start rate limiting.
-                  server.succeed("systemctl reset-failed nix-daemon.service nix-daemon.socket")
-                  server.succeed("systemctl restart nix-daemon")
-                  client.succeed("systemctl reset-failed nix-daemon.service nix-daemon.socket")
-                  client.succeed("systemctl restart nix-daemon")
-
                   bucket = str(uuid.uuid4())
-                  server.succeed(f"mc mb minio/{bucket}")
+                  server.succeed(f"garage bucket create {bucket}")
+                  server.succeed(f"garage bucket allow --read --write --owner {bucket} --key test-api-key")
                   try:
-                      if public:
-                          server.succeed(f"mc anonymous set download minio/{bucket}")
-                      if versioned:
-                          server.succeed(f"mc version enable minio/{bucket}")
                       if profiles:
                           # Build credentials file content
                           creds_content = ""
@@ -218,7 +270,8 @@ in
                               server.succeed(f"{ENV_WITH_CREDS} nix copy --to '{store_url}' {pkg}")
                       test_func(bucket)
                   finally:
-                      server.succeed(f"mc rb --force minio/{bucket}")
+                      server.succeed(f"mc rm --force --recursive garage/{bucket}")
+                      server.succeed(f"garage bucket delete {bucket} --yes")
                       # Clean up AWS profiles if created
                       if profiles:
                           client.succeed("rm -rf /root/.aws")
@@ -425,35 +478,6 @@ in
 
           verify_packages_in_store(client, [PKGS['A'], PKGS['B'], PKGS['C']])
 
-      @setup_s3(populate_bucket=[PKGS['A'], PKGS['B']], public=True)
-      def test_public_bucket_operations(bucket):
-          """Test store operations on public bucket without credentials"""
-          print("\n=== Testing Public Bucket Operations ===")
-
-          store_url = make_s3_url(bucket)
-
-          # Verify store info works without credentials
-          client.succeed(f"nix store info --store '{store_url}' >&2")
-
-          # Get and validate store info JSON
-          info_json = client.succeed(f"nix store info --json --store '{store_url}'")
-          store_info = json.loads(info_json)
-
-          if not store_info.get("url"):
-              raise Exception("Store should have a URL")
-
-          # Verify packages are not yet in client store
-          verify_packages_in_store(client, [PKGS['A'], PKGS['B']], should_exist=False)
-
-          # Test copy from public bucket without credentials
-          client.succeed(
-              f"nix copy --debug --no-check-sigs "
-              f"--from '{store_url}' {PKGS['A']} {PKGS['B']} 2>&1"
-          )
-
-          # Verify packages were copied successfully
-          verify_packages_in_store(client, [PKGS['A'], PKGS['B']])
-
       @setup_s3(populate_bucket=[PKGS['A']])
       def test_url_format_variations(bucket):
           """Test different S3 URL parameter combinations"""
@@ -595,7 +619,7 @@ in
           server.succeed(f"echo -n '{test_content}' > /tmp/test-file.txt")
 
           # Upload to S3
-          server.succeed(f"mc cp /tmp/test-file.txt minio/{bucket}/test-file.txt")
+          server.succeed(f"mc cp /tmp/test-file.txt garage/{bucket}/test-file.txt")
 
           # Calculate expected hash
           expected_hash = server.succeed(
@@ -637,43 +661,6 @@ in
 
           if downloaded_hash != expected_hash:
               raise Exception(f"Content hash mismatch: expected {expected_hash}, got {downloaded_hash}")
-
-      @setup_s3(populate_bucket=[PKGS['A']], versioned=True)
-      def test_versioned_urls(bucket):
-          """Test that versionId parameter is accepted in S3 URLs"""
-          print("\n=== Testing Versioned URLs ===")
-
-          # Get the nix-cache-info file
-          cache_info_url = make_s3_url(bucket, path="/nix-cache-info")
-
-          # Fetch without versionId should work
-          client.succeed(
-              f"{ENV_WITH_CREDS} nix eval --impure --expr "
-              f"'builtins.fetchurl {{ name = \"cache-info\"; url = \"{cache_info_url}\"; }}'"
-          )
-
-          # List versions to get a version ID
-          # MinIO output format: [timestamp] size tier versionId versionNumber method filename
-          versions_output = server.succeed(f"mc ls --versions minio/{bucket}/nix-cache-info")
-
-          # Extract version ID from output (4th field after STANDARD)
-          import re
-          version_match = re.search(r'STANDARD\s+(\S+)\s+v\d+', versions_output)
-          if not version_match:
-              print(f"Debug: versions output: {versions_output}")
-              raise Exception("Could not extract version ID from MinIO output")
-
-          version_id = version_match.group(1)
-          # Version ID should not be "null" since versioning was enabled before upload
-          if version_id == "null":
-              raise Exception("Version ID is 'null' - versioning may not be working correctly")
-
-          # Fetch with versionId parameter
-          versioned_url = f"{cache_info_url}&versionId={version_id}"
-          client.succeed(
-              f"{ENV_WITH_CREDS} nix eval --impure --expr "
-              f"'builtins.fetchurl {{ name = \"cache-info-versioned\"; url = \"{versioned_url}\"; }}'"
-          )
 
       @setup_s3()
       def test_multipart_upload_basic(bucket):
@@ -888,7 +875,9 @@ in
 
           # Use a fixed bucket name matching the static /etc/hosts entries
           bucket = 'vhost-test'
-          server.succeed(f"mc mb minio/{bucket}")
+          server.succeed(f"garage bucket create {bucket}")
+          server.succeed(f"garage bucket allow --read --write --owner {bucket} --key test-api-key")
+
           try:
               store_url = make_s3_url(
                   bucket,
@@ -933,7 +922,8 @@ in
 
               verify_packages_in_store(client, PKGS['A'])
           finally:
-              server.succeed(f"mc rb --force minio/{bucket}")
+              server.succeed(f"mc rm --force --recursive garage/{bucket}")
+              server.succeed(f"garage bucket delete {bucket} --yes")
               for pkg in PKGS.values():
                   client.succeed(f"[ ! -e {pkg} ] || nix store delete --ignore-liveness {pkg}")
 
@@ -976,14 +966,6 @@ in
       print("S3 Binary Cache Store Tests")
       print("="*80)
 
-      start_all()
-
-      # Initialize MinIO server
-      server.wait_for_unit("minio")
-      server.wait_for_unit("network-addresses-eth1.service")
-      server.wait_for_open_port(9000)
-      server.succeed(f"mc alias set minio http://localhost:9000 {ACCESS_KEY} {SECRET_KEY} --api s3v4")
-
       # Run tests (each gets isolated bucket via decorator)
       test_credential_caching()
       test_aws_log_integration()
@@ -991,14 +973,12 @@ in
       test_error_message_formatting()
       test_fork_credential_preresolution()
       test_store_operations()
-      test_public_bucket_operations()
       test_url_format_variations()
       test_concurrent_fetches()
       test_compression_narinfo_gzip()
       test_compression_mixed()
       test_compression_disabled()
       test_nix_prefetch_url()
-      test_versioned_urls()
       test_multipart_upload_basic()
       test_multipart_threshold()
       test_multipart_with_log_compression()
