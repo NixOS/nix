@@ -100,6 +100,16 @@ GTEST_BRIEF=1 GTEST_FILTER='ErrorTraceTest.*' meson test nix-expr-tests -v
 
 for short but comprensive output.
 
+### Unit tests requiring root
+
+In `nix-util-tests`, suites beginning with `Root` require root and are excluded by default.
+To run them on macOS:
+
+```bash
+nix build .#nix-util-tests
+sudo ./result/bin/nix-util-tests --gtest_filter='Root*'
+```
+
 ### Debugging tests
 
 For debugging, it is useful to combine the third option above with Meson's [`--gdb`](https://mesonbuild.com/Unit-tests.html#other-test-options) flag:
