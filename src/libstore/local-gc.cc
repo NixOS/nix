@@ -3,6 +3,7 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/signals.hh"
 #include "nix/store/local-gc.hh"
+#include "nix/util/regex-combinators.hh"
 #include <filesystem>
 #include <boost/regex.hpp>
 
@@ -40,12 +41,6 @@ static void readProcLink(const std::filesystem::path & file, UncheckedRoots & ro
         roots[buf.string()].emplace(file.string());
 }
 
-static std::string quoteRegexChars(const std::string & raw)
-{
-    static auto specialRegex = boost::regex(R"([.^$\\*+?()\[\]{}|])");
-    return boost::regex_replace(raw, specialRegex, R"(\\$&)");
-}
-
 #ifdef __linux__
 static void readFileRoots(const std::filesystem::path & path, UncheckedRoots & roots)
 {
@@ -67,7 +62,8 @@ Roots findRuntimeRootsUnchecked(const StoreDirConfig & config)
         struct dirent * ent;
         static const auto digitsRegex = boost::regex(R"(^\d+$)");
         static const auto mapRegex = boost::regex(R"(^\s*\S+\s+\S+\s+\S+\s+\S+\s+\S+\s+(/\S+)\s*$)");
-        auto storePathRegex = boost::regex(quoteRegexChars(config.storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
+        auto storePathRegex =
+            boost::regex(regex::quoteRegexChars(config.storeDir) + R"(/[0-9a-z]+[0-9a-zA-Z\+\-\._\?=]*)");
         while (errno = 0, ent = readdir(procDir.get())) {
             checkInterrupt();
             if (boost::regex_match(ent->d_name, digitsRegex)) {

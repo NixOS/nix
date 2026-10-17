@@ -31,4 +31,15 @@ static inline std::string list(std::string_view a)
     return ss.str();
 }
 
+static inline std::string quoteRegexChars(std::string_view raw)
+{
+    std::string res;
+    for (char c : raw) {
+        if (std::string_view(".^$\\*+?()[]{}|").find(c) != std::string_view::npos)
+            res += '\\';
+        res += c;
+    }
+    return res;
+}
+
 } // namespace nix::regex

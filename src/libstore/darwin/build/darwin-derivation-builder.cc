@@ -1,5 +1,6 @@
 #include "unix-derivation-builder-impl.hh"
 #include "darwin-derivation-builder.hh"
+#include "nix/util/regex-combinators.hh"
 
 #include <spawn.h>
 #include <sys/sysctl.h>
@@ -103,10 +104,17 @@ void DarwinDerivationBuilder::setUser()
            without file-write* allowed, access() incorrectly returns EPERM */
         sandboxProfile += "(allow file-read* file-write* process-exec\n";
 
-        // We create multiple allow lists, to avoid exceeding a limit in the darwin sandbox interpreter.
+        // We match store paths by regex, since the darwin sandbox limits all literal and subpath strings to 64 KiB.
         // See https://github.com/NixOS/nix/issues/4119
-        // We split our allow groups approximately at half the actual limit, 1 << 16
-        const size_t breakpoint = sandboxProfile.length() + (1 << 14);
+        // A regex is limited to 1023 bytes, and one with a (/|$) tail would count as subpath strings.
+        auto storePathRegex = [storeDir = regex::quoteRegexChars(store->storeDir)](const std::string & alternatives) {
+            return fmt("^%s/(%s)(/.*)?$", storeDir, alternatives);
+        };
+        std::string alternatives;
+        auto allowStorePaths = [&]() {
+            sandboxProfile += fmt("\t(regex #\"%s\")\n", storePathRegex(alternatives));
+            alternatives.clear();
+        };
         for (auto & i : pathsInChroot) {
 
             if (i.first != i.second.source)
@@ -123,20 +131,23 @@ void DarwinDerivationBuilder::setUser()
                 throw SysError("getting attributes of required path '%s", path);
             }
 
-            /* Only open a new allow form once we know this path will actually
-             * contribute a selector. Opening it before resolving the path
-             * leaves an unqualified (allow ...) form behind when an optional
-             * path is missing, and an unqualified allow form render the sandbox useless. */
-            if (sandboxProfile.length() >= breakpoint) {
-                debug("Sandbox break: %d %d", sandboxProfile.length(), breakpoint);
-                sandboxProfile += ")\n(allow file-read* file-write* process-exec\n";
-            }
-
-            if (S_ISDIR(optSt->st_mode))
+            if (auto storePath = store->maybeParseStorePath(path);
+                storePath && store->printStorePath(*storePath) == path) {
+                auto pattern = regex::quoteRegexChars(storePath->to_string());
+                if (!alternatives.empty()) {
+                    if (storePathRegex(alternatives + "|" + pattern).size() > 1023)
+                        allowStorePaths();
+                    else
+                        alternatives += '|';
+                }
+                alternatives += pattern;
+            } else if (S_ISDIR(optSt->st_mode))
                 sandboxProfile += fmt("\t(subpath \"%s\")\n", path);
             else
                 sandboxProfile += fmt("\t(literal \"%s\")\n", path);
         }
+        if (!alternatives.empty())
+            allowStorePaths();
         sandboxProfile += ")\n";
 
         /* Allow file-read* on full directory hierarchy to self. Allows realpath() */
