@@ -68,6 +68,10 @@ int main(int argc, char ** argv)
         }
     }
 
+    // Preserve environment filters; command-line flags are parsed below.
+    if (std::getenv("GTEST_FILTER") == nullptr)
+        GTEST_FLAG_SET(filter, "-Root*");
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

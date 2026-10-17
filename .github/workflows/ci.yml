@@ -110,6 +110,15 @@ jobs:
         nix build --file ci/gha/tests/wrapper.nix componentTests -L \
           --arg withInstrumentation ${{ matrix.instrumented }} \
           --argstr stdenv "${{ matrix.stdenv }}"
+    - name: Run root unit tests
+      # Root* unit tests are currently only defined for Darwin.
+      if: matrix.os == 'darwin'
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix nixComponentsInstrumented.nix-util-tests -L \
+          --arg withInstrumentation ${{ matrix.instrumented }} \
+          --argstr stdenv "${{ matrix.stdenv }}" \
+          --out-link result-root-tests
+        sudo -n ./result-root-tests/bin/nix-util-tests --gtest_filter='Root*'
     - name: Run VM tests
       run: |
         nix build --file ci/gha/tests/wrapper.nix vmTests -L \

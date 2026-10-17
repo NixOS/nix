@@ -201,7 +201,14 @@ static void _deletePath(
     if (S_ISDIR(st.st_mode)) {
         /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
-        if ((st.st_mode & PERM_MASK) != PERM_MASK)
+        bool needsPermissionChange = (st.st_mode & PERM_MASK) != PERM_MASK;
+#ifdef __APPLE__
+        /* Root can traverse and remove read-only directories on Darwin. Avoid
+           chmod: App Management can deny changing a launched app bundle's mode
+           even when deleting the bundle is allowed. */
+        needsPermissionChange = needsPermissionChange && geteuid() != 0;
+#endif
+        if (needsPermissionChange)
             try {
                 unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
             } catch (SysError & e) {
