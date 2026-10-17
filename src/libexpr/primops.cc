@@ -2542,6 +2542,59 @@ static RegisterPrimOp primop_readDir({
     .impl = prim_readDir,
 });
 
+/* Retrieve the derivation from a derivation output string context. */
+static void prim_derivationOf(EvalState & state, CallSite callSite, Value * const * args, Value & v)
+{
+    constexpr auto errorCtx = "while evaluating the argument passed to builtins.derivationOf";
+    NixStringContext context;
+    auto output = state.coerceToString(noPos, *args[0], context, errorCtx, false, false);
+    Value outputValue;
+    outputValue.mkString(*output, context, state.mem);
+    auto [derivedPath, outputString] = state.coerceToSingleDerivedPathUnchecked(noPos, outputValue, errorCtx);
+
+    std::visit(
+        overloaded{
+            [&](const SingleDerivedPath::Opaque & path) {
+                state
+                    .error<EvalError>(
+                        "string '%s' refers to the opaque store path '%s', whose deriver is not recorded in the string context",
+                        outputString,
+                        state.store->printStorePath(path.path))
+                    .atPos(noPos)
+                    .debugThrow();
+            },
+            [&](const SingleDerivedPath::Built & built) { state.mkSingleDerivedPathString(*built.drvPath, v); },
+        },
+        derivedPath.raw());
+}
+
+static RegisterPrimOp primop_derivationOf({
+    .name = "__derivationOf",
+    .args = {"output"},
+    .doc = R"(
+      Return the derivation that produces *output*.
+
+      *output* must be coercible to a string whose [string context](./string-context.md) contains exactly one derivation output.
+      A derivation or one of its outputs can be passed directly, for example `builtins.derivationOf pkg` or `builtins.derivationOf pkg.dev`.
+      The result is a derivation reference suitable for use with [`builtins.outputOf`](#builtins-outputOf).
+
+      This function only uses the deriver recorded in the string context. It
+      does not query the Nix store for a deriver. Consequently, it throws an
+      error when *output* is an opaque store path or otherwise does not have a
+      known deriver in its string context.
+
+      `derivationOf` is roughly the inverse of `outputOf`, except that the
+      output name is discarded:
+
+      ```nix
+      builtins.derivationOf (builtins.outputOf drv "out")
+      ```
+
+      returns `drv`.
+    )",
+    .impl = prim_derivationOf,
+});
+
 /* Extend single element string context with another output. */
 static void prim_outputOf(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {

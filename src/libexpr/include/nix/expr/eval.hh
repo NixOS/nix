@@ -853,7 +853,8 @@ public:
     StorePath coerceToStorePath(const PosIdx pos, Value & v, NixStringContext & context, std::string_view errorCtx);
 
     /**
-     * Part of `coerceToSingleDerivedPath()` without any store IO which is exposed for unit testing only.
+     * Part of `coerceToSingleDerivedPath()` without any store IO.
+     * Validates the string context without checking that the string matches the path it describes.
      */
     std::pair<SingleDerivedPath, std::string_view> coerceToSingleDerivedPathUnchecked(
         const PosIdx pos,
