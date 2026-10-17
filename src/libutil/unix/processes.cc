@@ -7,6 +7,8 @@
 #include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 
+#include "unix/signals-private.hh"
+
 #include <cerrno>
 #include <filesystem>
 #include <cstdlib>
@@ -243,6 +245,8 @@ pid_t startProcess(fun<void()> processMain, const ProcessOptions & options)
 
     auto newLogger = makeSimpleLogger().release();
     ChildWrapperFunction wrapper = [&] {
+        unix::resetSignalCallbacksAfterFork();
+
         /* Set a simple logger, while leaking (not destroying)
            the parent logger. We don't want to run the parent
            logger's destructor since that will crash (e.g. when
