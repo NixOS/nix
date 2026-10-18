@@ -10,6 +10,23 @@ isTestOnNixOS() {
   [[ "${isTestOnNixOS:-}" == 1 ]]
 }
 
+isTrustedByAmbientStore() {
+  trusted=$(nix store info --json | jq '.trusted')
+
+  case $trusted in
+    "false")
+        return 1
+        ;;
+    "true")
+        return 0
+        ;;
+    *)
+        # Just a sanity check. Always a boolean
+        die "invalid .trusted value from 'nix store info'"
+        ;;
+  esac
+}
+
 die() {
   echo "unexpected fatal error: $*" >&2
   exit 1
