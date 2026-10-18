@@ -9,10 +9,6 @@
 #include "nix/util/util.hh"
 #include "nix/util/file-descriptor.hh"
 
-namespace boost::context {
-struct stack_context;
-}
-
 namespace nix {
 
 /**

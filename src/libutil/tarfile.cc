@@ -125,6 +125,12 @@ TarArchive::TarArchive(Source & source, bool raw, std::optional<CompressionAlgo>
         "Failed to open archive (%s)");
 }
 
+#ifndef _WIN32
+#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func
+#else
+#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func##_w
+#endif
+
 TarArchive::TarArchive(const std::filesystem::path & path)
     : archive{archive_read_new()}
     , buffer(defaultBufferSize)
@@ -132,25 +138,21 @@ TarArchive::TarArchive(const std::filesystem::path & path)
     archive_read_support_filter_all(archive);
     enableSupportedFormats(archive);
     archive_read_set_option(archive, NULL, "mac-ext", NULL);
-    check(archive_read_open_filename(archive, path.string().c_str(), 16384), "failed to open archive: %s");
+    check(
+        NIX_LIBARCHIVE_NATIVE_PATH_FUNC(archive_read_open_filename)(archive, path.c_str(), 16384),
+        "failed to open archive: %s");
 }
 
 void TarArchive::close()
 {
-    check(archive_read_close(this->archive), "Failed to close archive (%s)");
+    check(archive_read_close(archive), "Failed to close archive (%s)");
 }
 
 TarArchive::~TarArchive()
 {
-    if (this->archive)
-        archive_read_free(this->archive);
+    if (archive)
+        archive_read_free(archive);
 }
-
-#ifndef _WIN32
-#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func
-#else
-#  define NIX_LIBARCHIVE_NATIVE_PATH_FUNC(func) func##_w
-#endif
 
 static void extract_archive(TarArchive & archive, const std::filesystem::path & destDir)
 {
