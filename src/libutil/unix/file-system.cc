@@ -156,7 +156,8 @@ static void _deletePath(
     Descriptor parentfd,
     const std::filesystem::path & path,
     uint64_t & bytesFreed,
-    std::exception_ptr & ex MOUNTEDPATHS_PARAM)
+    std::exception_ptr & ex,
+    bool forceDontChmod MOUNTEDPATHS_PARAM)
 {
     checkInterrupt();
 #ifdef __FreeBSD__
@@ -199,15 +200,9 @@ static void _deletePath(
     }
 
     if (S_ISDIR(st.st_mode)) {
-        /* Make the directory accessible. */
         const auto PERM_MASK = S_IRUSR | S_IWUSR | S_IXUSR;
-        bool needsPermissionChange = (st.st_mode & PERM_MASK) != PERM_MASK;
-#ifdef __APPLE__
-        /* Root can traverse and remove read-only directories on Darwin. Avoid
-           chmod: App Management can deny changing a launched app bundle's mode
-           even when deleting the bundle is allowed. */
-        needsPermissionChange = needsPermissionChange && geteuid() != 0;
-#endif
+        const bool needsPermissionChange = !forceDontChmod && ((st.st_mode & PERM_MASK) != PERM_MASK);
+        /* Make the directory accessible, but only if we really need to. */
         if (needsPermissionChange)
             try {
                 unix::fchmodatTryNoFollow(parentfd, name, st.st_mode | PERM_MASK);
@@ -231,7 +226,7 @@ static void _deletePath(
             std::string childName = dirent->d_name;
             if (childName == "." || childName == "..")
                 continue;
-            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex MOUNTEDPATHS_ARG);
+            _deletePath(dirfd(dir.get()), path / childName, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
         }
         if (errno)
             throw SysError("reading directory %1%", PathFmt(path));
@@ -267,7 +262,20 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
 
     std::exception_ptr ex;
 
-    _deletePath(dirfd.get(), path, bytesFreed, ex MOUNTEDPATHS_ARG);
+    /* Whether directories don't need to be made writable/readable/traversable
+       for them be emptied. In the future we can also skip that when we have
+       CAP_DAC_OVERRIDE on Linux. */
+    bool forceDontChmod = false;
+
+#ifdef __APPLE__
+    /* Root can traverse and recursively remove unreadable, non-executable and
+       non-writable directories on Darwin. App Management can deny changing a
+       launched app bundle's mode even when deleting the bundle is allowed. */
+    if (::geteuid() == 0)
+        forceDontChmod = true;
+#endif
+
+    _deletePath(dirfd.get(), path, bytesFreed, ex, forceDontChmod MOUNTEDPATHS_ARG);
 
     if (ex)
         std::rethrow_exception(ex);
