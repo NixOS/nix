@@ -107,14 +107,22 @@ jobs:
       if: matrix.os == 'linux'
     - name: Run component tests
       run: |
-        nix build --file ci/gha/tests/wrapper.nix componentTests -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}"
+        NIX_BUILD_FLAGS="--arg withInstrumentation $INSTRUMENTED --argstr stdenv $STDENV"
+        nix build --file ci/gha/tests/wrapper.nix componentTests -L $NIX_BUILD_FLAGS
+        echo "NIX_BUILD_FLAGS=$NIX_BUILD_FLAGS" >> "$GITHUB_ENV"
+      env:
+        # Sanitizers + coverage
+        INSTRUMENTED: ${{ matrix.instrumented }}
+        STDENV: ${{ matrix.stdenv }}
+    - name: Run root unit tests
+      # Root* unit tests are currently only defined for Darwin.
+      if: matrix.os == 'darwin'
+      run: |
+        nix build --file ci/gha/tests/wrapper.nix nixComponentsInstrumented.nix-util-tests -L $NIX_BUILD_FLAGS --out-link result-root-tests
+        sudo -n ./result-root-tests/bin/nix-util-tests --gtest_filter='Root*'
     - name: Run VM tests
       run: |
-        nix build --file ci/gha/tests/wrapper.nix vmTests -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}"
+        nix build --file ci/gha/tests/wrapper.nix vmTests -L $NIX_BUILD_FLAGS
       if: ${{ matrix.os == 'linux' }}
     - name: Run flake checks and prepare the installer tarball
       run: |
@@ -123,10 +131,7 @@ jobs:
       if: ${{ matrix.primary }}
     - name: Collect code coverage
       run: |
-        nix build --file ci/gha/tests/wrapper.nix codeCoverage.coverageReports -L \
-          --arg withInstrumentation ${{ matrix.instrumented }} \
-          --argstr stdenv "${{ matrix.stdenv }}" \
-          --out-link coverage-reports
+        nix build --file ci/gha/tests/wrapper.nix codeCoverage.coverageReports -L $NIX_BUILD_FLAGS --out-link coverage-reports
         cat coverage-reports/index.txt >> $GITHUB_STEP_SUMMARY
       if: ${{ matrix.instrumented }}
     - name: Upload coverage reports
