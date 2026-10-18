@@ -81,6 +81,7 @@ suites = [
       'completions.sh',
       'compression-levels.sh',
       'config.sh',
+      'daemon-fork-signal.sh',
       'db-migration.sh',
       'delete-no-keep.sh',
       'dependencies.sh',
