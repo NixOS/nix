@@ -313,6 +313,69 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessor(const Settings & settin
     }
 }
 
+static ref<SourceAccessor>
+storeObjectAccessor(const Settings & settings, Store & store, const Input & input, const StorePath & storePath)
+{
+    auto accessor = store.requireStoreObjectAccessor(storePath);
+
+    accessor->fingerprint = input.getFingerprint(store);
+
+    // Store a cache entry for the tree so later fetches
+    // can reuse the existing nar instead of copying the unpacked
+    // input back into the store on every evaluation.
+    if (accessor->fingerprint) {
+        settings.getCache()->upsert(
+            makeSourcePathToHashCacheKey(
+                *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
+            {{"hash", store.queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)}});
+    }
+
+    accessor->setPathDisplay("«" + input.to_string() + "»");
+
+    return accessor;
+}
+
+std::pair<StorePath, nlohmann::json> callFetchHook(
+    const Settings & settings, Store & store, nlohmann::json request, const std::optional<StorePath> & expectedPath)
+{
+    if (expectedPath)
+        request["storePath"] = store.printStorePath(*expectedPath);
+
+    auto response = nlohmann::json::parse(settings.fetchHook(request.dump()));
+    auto storePath = store.parseStorePath(getString(valueAt(getObject(response), "storePath")));
+    if (expectedPath && storePath != *expectedPath)
+        throw Error(
+            "the fetch hook returned '%s', expected '%s'",
+            store.printStorePath(storePath),
+            store.printStorePath(*expectedPath));
+    store.addTempRoot(storePath);
+    if (!store.isValidPath(storePath))
+        throw Error("the fetch hook returned '%s', which is not valid in the store", store.printStorePath(storePath));
+    return {std::move(storePath), std::move(response)};
+}
+
+static std::pair<ref<SourceAccessor>, Input>
+fetchThroughHook(const Settings & settings, Store & store, const Input & input)
+{
+    auto args = input.toAttrs();
+    args.erase("__final");
+    std::optional<StorePath> expectedPath;
+    if (input.getNarHash())
+        expectedPath = input.computeStorePath(store);
+
+    auto [storePath, response] = callFetchHook(
+        settings, store, nlohmann::json{{"builtin", "fetchTree"}, {"args", attrsToJSON(args)}}, expectedPath);
+
+    auto result = input;
+    if (auto attrs = optionalValueAt(getObject(response), "attrs")) {
+        result = Input::fromAttrs(jsonToAttrs(*attrs));
+        if (input.isFinal())
+            result.attrs.insert_or_assign("__final", Explicit<bool>(true));
+    }
+
+    return {storeObjectAccessor(settings, store, result, storePath), std::move(result)};
+}
+
 std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings & settings, Store & store) const
 {
     // FIXME: cache the accessor
@@ -341,27 +404,14 @@ std::pair<ref<SourceAccessor>, Input> Input::getAccessorUnchecked(const Settings
 
             debug("using substituted/cached input '%s' in '%s'", to_string(), store.printStorePath(storePath));
 
-            auto accessor = store.requireStoreObjectAccessor(storePath);
-
-            accessor->fingerprint = getFingerprint(store);
-
-            // Store a cache entry for the substituted tree so later fetches
-            // can reuse the existing nar instead of copying the unpacked
-            // input back into the store on every evaluation.
-            if (accessor->fingerprint) {
-                settings.getCache()->upsert(
-                    makeSourcePathToHashCacheKey(
-                        *accessor->fingerprint, ContentAddressMethod::Raw::NixArchive, CanonPath::root),
-                    {{"hash", store.queryPathInfo(storePath)->narHash.to_string(HashFormat::SRI, true)}});
-            }
-
-            accessor->setPathDisplay("«" + to_string() + "»");
-
-            return {accessor, *this};
+            return {storeObjectAccessor(settings, store, *this, storePath), *this};
         } catch (Error & e) {
             debug("substitution of input '%s' failed: %s", to_string(), e.what());
         }
     }
+
+    if (settings.fetchHook && scheme->schemeName() != "path")
+        return fetchThroughHook(settings, store, *this);
 
     /* Acquire a path lock on this input. Note that fetching the same input in parallel is supposed to be safe (it's up
      * to the fetchers to guarantee this), so this is merely intended to avoid work duplication. Note that we don't need
