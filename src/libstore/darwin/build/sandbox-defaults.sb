@@ -52,6 +52,7 @@ R""(
     (begin
       (allow network* (remote ip "localhost:*"))
       (allow network-inbound (local ip "*:*")) ; required to bind and listen
+      (allow network-outbound (require-all (local ip) (require-not (remote ip)))) ; sendfile is checked without a remote address set
 
       ; Allow access to /etc/resolv.conf (which is a symlink to
       ; /private/var/run/resolv.conf).
