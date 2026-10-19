@@ -1,39 +1,45 @@
 #pragma once
 ///@file
 
-#include "nix/util/canon-path.hh"
 #include "nix/util/compression-algo.hh"
-#include "nix/util/serialise.hh"
-#include <archive.h>
+
+#include <exception>
+
+struct archive;
 
 namespace nix {
 
+struct Source;
+struct Sink;
+class CanonPath;
+
 struct TarArchive
 {
-    struct archive * archive;
+    ::archive * archive;
     Source * source;
     std::vector<unsigned char> buffer;
+    /* Exception encountered when reading the source. */
+    std::exception_ptr readException;
 
     void check(int err, const std::string & reason = "failed to extract archive (%s)", bool warningsAreFatal = true);
 
     explicit TarArchive(const std::filesystem::path & path);
 
-    /// @brief Create a generic archive from source.
-    /// @param source - Input byte stream.
-    /// @param raw - Whether to enable raw file support. For more info look in docs:
-    /// https://manpages.debian.org/stretch/libarchive-dev/archive_read_format.3.en.html
-    /// @param compressionMethod - Primary compression method to use. std::nullopt means 'all'.
+    /**
+     * @brief Create a generic archive from source.
+     *
+     * @param source Input byte stream.
+     * @param raw Whether to enable raw file support. Used to decompress arbitrary streams.
+     * @param compressionMethod Primary compression method to use. std::nullopt means 'all'.
+     */
     TarArchive(Source & source, bool raw = false, std::optional<CompressionAlgo> compressionMethod = std::nullopt);
-
-    /// Disable copy constructor. Explicitly default move assignment/constructor.
     TarArchive(const TarArchive &) = delete;
     TarArchive & operator=(const TarArchive &) = delete;
-    TarArchive(TarArchive &&) = default;
-    TarArchive & operator=(TarArchive &&) = default;
+    TarArchive(TarArchive &&) = delete;
+    TarArchive & operator=(TarArchive &&) = delete;
+    ~TarArchive();
 
     void close();
-
-    ~TarArchive();
 };
 
 void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem::path & destDir);
@@ -50,7 +56,7 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
  */
 struct TarSink
 {
-    virtual ~TarSink() = default;
+    virtual ~TarSink();
 
     virtual void createDirectory(const CanonPath & path) = 0;
 
@@ -63,6 +69,24 @@ struct TarSink
      * encountered file relative to the root.
      */
     virtual void createHardlink(const CanonPath & path, const CanonPath & target) = 0;
+};
+
+/**
+ * A TarSink which just ignores all writes.
+ */
+struct NullTarSink : TarSink
+{
+    NullTarSink() {}
+
+    ~NullTarSink();
+
+    void createDirectory(const CanonPath & path) override {}
+
+    void createRegularFile(const CanonPath & path, bool isExecutable, fun<void(Sink &)> callback) override;
+
+    void createSymlink(const CanonPath & path, const std::string & target) override {}
+
+    void createHardlink(const CanonPath & path, const CanonPath & target) override {}
 };
 
 time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink);
