@@ -10,12 +10,12 @@ namespace nix {
 
 namespace {
 
-int callback_open(struct archive *, void * self)
+int callback_open(struct archive *, void * self) noexcept
 {
     return ARCHIVE_OK;
 }
 
-ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer)
+ssize_t callback_read(struct archive * archive, void * _self, const void ** buffer) noexcept
 {
     auto self = (TarArchive *) _self;
     *buffer = self->buffer.data();
@@ -32,7 +32,7 @@ ssize_t callback_read(struct archive * archive, void * _self, const void ** buff
     }
 }
 
-int callback_close(struct archive *, void * self)
+int callback_close(struct archive *, void * self) noexcept
 {
     return ARCHIVE_OK;
 }
