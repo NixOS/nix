@@ -135,6 +135,10 @@ Each value is an attribute set with these attributes, each present only when the
   For an output of a derivation that is itself an output, the store path is the [innermost constant store path](@docroot@/store/derivation/index.md#deriving-path-encoding-higher-order) of the deriving path, and the element is the list of output names from there outward.
   For example, `[ "out" "lib" ]` is output `lib` of the derivation that is output `out` of the derivation at the store path.
 
+  The elements of `outputs` are in lexicographic order of their output names: first by the first name, then by the second, and so on, with an element that is a prefix of another first.
+  A single output name counts as a list of that one name.
+  For example: `[ "a" [ "a" "out" ] "b" [ "b" "lib" "out" ] ]`.
+
 ## Inspecting string contexts
 
 Most basically, [`builtins.hasContext`] will tell whether a string has a non-empty context.

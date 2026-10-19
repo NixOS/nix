@@ -52,4 +52,26 @@ in
   oneNameList = builtins.getContext (withContext {
     outputs = [ [ "out" ] ];
   });
+
+  # Chains that differ in length and name, where lexicographic order and
+  # shortest-first order disagree.
+  sorted = builtins.getContext (withContext {
+    outputs = [
+      "out"
+      [
+        "out"
+        "lib"
+      ]
+      "b"
+      [
+        "a"
+        "z"
+        "y"
+      ]
+      [
+        "a"
+        "z"
+      ]
+    ];
+  });
 }

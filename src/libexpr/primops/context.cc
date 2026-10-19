@@ -189,13 +189,16 @@ static void prim_getContext(EvalState & state, CallSite callSite, Value * const 
 
     auto sPath = state.symbols.create("path");
     auto sAllOutputs = state.symbols.create("allOutputs");
-    for (const auto & info : contextInfos) {
+    for (auto & info : contextInfos) {
         auto infoAttrs = state.buildBindings(3);
         if (info.second.path)
             infoAttrs.alloc(sPath).mkBool(true);
         if (info.second.allOutputs)
             infoAttrs.alloc(sAllOutputs).mkBool(true);
         if (!info.second.outputs.empty()) {
+            /* The order of `std::vector` is lexicographic, as is
+               `builtins.lessThan` on lists. */
+            std::ranges::sort(info.second.outputs);
             auto list = state.buildList(info.second.outputs.size());
             for (const auto & [i, output] : enumerate(info.second.outputs)) {
                 auto & elem = *(list[i] = state.allocValue());
