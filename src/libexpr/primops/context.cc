@@ -166,7 +166,8 @@ static void prim_getContext(EvalState & state, CallSite callSite, Value * const 
     {
         bool path = false;
         bool allOutputs = false;
-        Strings outputs;
+        /* Each referenced output as its `outputChain()`. */
+        std::vector<std::vector<OutputName>> outputs;
     };
 
     NixStringContext context;
@@ -177,10 +178,7 @@ static void prim_getContext(EvalState & state, CallSite callSite, Value * const 
             overloaded{
                 [&](NixStringContextElem::DrvDeep && d) { contextInfos[std::move(d.drvPath)].allOutputs = true; },
                 [&](NixStringContextElem::Built && b) {
-                    // FIXME should eventually show string context as is, no
-                    // resolving here.
-                    auto drvPath = resolveDerivedPath(*state.store, *b.drvPath);
-                    contextInfos[std::move(drvPath)].outputs.emplace_back(std::move(b.output));
+                    contextInfos[b.getBaseStorePath()].outputs.push_back(b.outputChain());
                 },
                 [&](NixStringContextElem::Opaque && o) { contextInfos[std::move(o.path)].path = true; },
             },
@@ -199,8 +197,17 @@ static void prim_getContext(EvalState & state, CallSite callSite, Value * const 
             infoAttrs.alloc(sAllOutputs).mkBool(true);
         if (!info.second.outputs.empty()) {
             auto list = state.buildList(info.second.outputs.size());
-            for (const auto & [i, output] : enumerate(info.second.outputs))
-                (list[i] = state.allocValue())->mkString(output, state.mem);
+            for (const auto & [i, output] : enumerate(info.second.outputs)) {
+                auto & elem = *(list[i] = state.allocValue());
+                if (output.size() == 1)
+                    elem.mkString(output[0], state.mem);
+                else {
+                    auto chain = state.buildList(output.size());
+                    for (const auto & [j, name] : enumerate(output))
+                        (chain[j] = state.allocValue())->mkString(name, state.mem);
+                    elem.mkList(chain);
+                }
+            }
             infoAttrs.alloc(state.s.outputs).mkList(list);
         }
         attrs.alloc(state.store->printStorePath(info.first)).mkAttrs(infoAttrs);
@@ -230,14 +237,59 @@ static RegisterPrimOp primop_getContext(
     )",
      .impl = prim_getContext});
 
-/* Parse an element of the `outputs` list of the derivation at `drvPath`. */
+/* Parse the element at `index` of the `outputs` list of the derivation at `drvPath`. */
 static NixStringContextElem::Built
-parseOutputContextElem(EvalState & state, const StorePath & drvPath, Value & output, PosIdx pos)
+parseOutputContextElem(EvalState & state, const StorePath & drvPath, size_t index, Value & output, PosIdx pos)
 {
-    auto outputName = state.forceStringNoCtx(output, pos, "while evaluating an output name within a string context");
+    state.forceValue(output, pos);
+    Value * const outputPtr = &output;
+    std::span<Value * const> outputValues(&outputPtr, 1);
+    std::optional<ListView> chain;
+    if (output.type() == nList)
+        outputValues = chain.emplace(output.listView()).span();
+    else if (output.type() != nString)
+        state
+            .error<TypeError>(
+                "expected a string or a list of strings but found %s in the outputs of string context '%s'",
+                showType(output),
+                state.store->printStorePath(drvPath))
+            .atPos(pos)
+            .debugThrow();
+    if (outputValues.empty())
+        state
+            .error<EvalError>(
+                "expected a non-empty list of outputs, but the output at index %d is %s, suggesting a reference to the derivation itself, instead of an actual output. To represent a reference to a store derivation, use %s instead of %s.",
+                index,
+                "[ ]",
+                "path = true",
+                "outputs")
+            .atPos(pos)
+            .debugThrow();
+    std::vector<std::string_view> outputNames;
+    for (auto outputValue : outputValues)
+        outputNames.push_back(
+            state.forceStringNoCtx(*outputValue, pos, "while evaluating an output name within a string context"));
+
+    ref<const SingleDerivedPath> outputDrvPath = makeConstantStorePathRef(drvPath);
+    for (auto outputName : std::span(outputNames).first(outputNames.size() - 1))
+        outputDrvPath = make_ref<const SingleDerivedPath>(SingleDerivedPath::Built{
+            .drvPath = outputDrvPath,
+            .output = std::string{outputName},
+        });
+    if (outputNames.size() > 1)
+        try {
+            experimentalFeatureSettings.require(
+                Xp::DynamicDerivations, "nested output selection is a dynamic derivations feature");
+        } catch (Error & e) {
+            e.addTrace(
+                state.positions[pos],
+                "while evaluating the outputs of string context '%s'",
+                state.store->printStorePath(drvPath));
+            throw;
+        }
     return {
-        .drvPath = makeConstantStorePathRef(drvPath),
-        .output = std::string{outputName},
+        .drvPath = outputDrvPath,
+        .output = std::string{outputNames.back()},
     };
 }
 
@@ -294,8 +346,8 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
                     .atPos(i.pos)
                     .debugThrow();
             }
-            for (auto elem : attr->value->listView())
-                context.emplace(parseOutputContextElem(state, namePath, *elem, attr->pos));
+            for (auto [index, elem] : enumerate(attr->value->listView()))
+                context.emplace(parseOutputContextElem(state, namePath, index, *elem, attr->pos));
         }
     }
 
@@ -309,6 +361,8 @@ static RegisterPrimOp primop_appendContext(
       Return *s* with the [string context](@docroot@/language/string-context.md) elements described by *context* added to its own.
 
       *context* must be a string context in its [Nix language representation](@docroot@/language/string-context.md#nix-language-representation), as [`builtins.getContext`](#builtins-getContext) returns.
+      A list of one output name is the same as that name.
+      A nested output requires the [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations) experimental feature.
 
       Unless Nix runs in read-only mode, the store paths must exist in the store or be substitutable.
     )",

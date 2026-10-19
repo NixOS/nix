@@ -71,6 +71,27 @@ String context elements come in different forms:
     > }
     > ```
 
+    With the experimental feature [`dynamic-derivations`](@docroot@/development/experimental-features.md#xp-feature-dynamic-derivations), the derivation of an output string context element can itself be an output of another derivation.
+
+    > **Example**
+    >
+    > This example also requires the experimental feature `ca-derivations`.
+    > Here `producer` is a content-addressing derivation with `outputHashMode = "text"`, whose output `out` is a derivation with an output `lib`.
+    >
+    > ```nix
+    > builtins.getContext (builtins.outputOf producer.outPath "lib")
+    > ```
+    > evaluates to
+    > ```nix
+    > {
+    >   "/nix/store/…-hello.drv.drv" = {
+    >     outputs = [ [ "out" "lib" ] ];
+    >   };
+    > }
+    > ```
+    >
+    > where the key is `producer.drvPath`.
+
     [`builtins.outputOf`]: ./builtins.md#builtins-outputOf
 
 - [*derivation deep*]{#string-context-element-derivation-deep}
@@ -111,6 +132,8 @@ Each value is an attribute set with these attributes, each present only when the
 - `allOutputs = true`: a [derivation deep](#string-context-element-derivation-deep) element.
   The store path is a derivation.
 - `outputs`: a list of the names of the outputs of the derivation at the store path that are [output](#string-context-output) elements.
+  For an output of a derivation that is itself an output, the store path is the [innermost constant store path](@docroot@/store/derivation/index.md#deriving-path-encoding-higher-order) of the deriving path, and the element is the list of output names from there outward.
+  For example, `[ "out" "lib" ]` is output `lib` of the derivation that is output `out` of the derivation at the store path.
 
 ## Inspecting string contexts
 

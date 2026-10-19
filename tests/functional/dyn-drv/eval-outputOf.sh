@@ -78,3 +78,12 @@ testDynamicHello
 
 # inner dynamic derivation is content-addressed
 NIX_TESTS_CA_BY_DEFAULT=1 testDynamicHello
+
+# `getContext` shows the context of a nested `outputOf` as the output
+# names from the innermost constant store path outward.
+# shellcheck disable=SC2016
+nix eval --impure --expr \
+    'with (import ./text-hashed-output.nix);
+     assert builtins.getContext (builtins.outputOf producingDrv.outPath "out")
+       == { ${builtins.unsafeDiscardStringContext producingDrv.drvPath} = { outputs = [ [ "out" "out" ] ]; }; };
+     null'
