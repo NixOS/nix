@@ -35,8 +35,8 @@ struct TarArchive
     TarArchive(Source & source, bool raw = false, std::optional<CompressionAlgo> compressionMethod = std::nullopt);
     TarArchive(const TarArchive &) = delete;
     TarArchive & operator=(const TarArchive &) = delete;
-    TarArchive(TarArchive &&) = default;
-    TarArchive & operator=(TarArchive &&) = default;
+    TarArchive(TarArchive &&) = delete;
+    TarArchive & operator=(TarArchive &&) = delete;
     ~TarArchive();
 
     void close();
