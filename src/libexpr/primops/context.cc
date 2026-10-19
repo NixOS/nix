@@ -160,25 +160,6 @@ static RegisterPrimOp primop_addDrvOutputDependencies(
     )",
      .impl = prim_addDrvOutputDependencies});
 
-/* Extract the context of a string as a structured Nix value.
-
-   The context is represented as an attribute set whose keys are the
-   paths in the context set and whose values are attribute sets with
-   the following keys:
-     path: True if the relevant path is in the context as a plain store
-           path (i.e. the kind of context you get when interpolating
-           a Nix path (e.g. ./.) into a string). False if missing.
-     allOutputs: True if the relevant path is a derivation and it is
-                  in the context as a drv file with all of its outputs
-                  (i.e. the kind of context you get when referencing
-                  .drvPath of some derivation). False if missing.
-     outputs: If a non-empty list, the relevant path is a derivation
-              and the provided outputs are referenced in the context
-              (i.e. the kind of context you get when referencing
-              .outPath of some derivation). Empty list if missing.
-   Note that for a given path any combination of the above attributes
-   may be present.
-*/
 static void prim_getContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     struct ContextInfo
@@ -232,10 +213,7 @@ static RegisterPrimOp primop_getContext(
     {.name = "__getContext",
      .args = {"s"},
      .doc = R"(
-      Return the string context of *s*.
-
-      The string context tracks references to derivations within a string.
-      It is represented as an attribute set of [store derivation](@docroot@/glossary.md#gloss-store-derivation) paths mapping to output names.
+      Return the [string context](@docroot@/language/string-context.md) of *s*, in its [Nix language representation](@docroot@/language/string-context.md#nix-language-representation).
 
       Using [string interpolation](@docroot@/language/string-interpolation.md) on a derivation adds that derivation to the string context.
       For example,
@@ -252,11 +230,6 @@ static RegisterPrimOp primop_getContext(
     )",
      .impl = prim_getContext});
 
-/* Append the given context to a given string.
-
-   See the commentary above getContext for details of the
-   context representation.
-*/
 static void prim_appendContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
@@ -325,6 +298,16 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
     v.mkString(orig, context, state.mem);
 }
 
-static RegisterPrimOp primop_appendContext({.name = "__appendContext", .arity = 2, .impl = prim_appendContext});
+static RegisterPrimOp primop_appendContext(
+    {.name = "__appendContext",
+     .args = {"s", "context"},
+     .doc = R"(
+      Return *s* with the [string context](@docroot@/language/string-context.md) elements described by *context* added to its own.
+
+      *context* must be a string context in its [Nix language representation](@docroot@/language/string-context.md#nix-language-representation), as [`builtins.getContext`](#builtins-getContext) returns.
+
+      Unless Nix runs in read-only mode, the store paths must exist in the store or be substitutable.
+    )",
+     .impl = prim_appendContext});
 
 } // namespace nix

@@ -102,12 +102,22 @@ String context elements come in different forms:
   [`builtins.addDrvOutputDependencies`]: ./builtins.md#builtins-addDrvOutputDependencies
   [`builtins.unsafeDiscardOutputDependency`]: ./builtins.md#builtins-unsafeDiscardOutputDependency
 
+## Nix language representation
+
+[`builtins.getContext`] and [`builtins.appendContext`] represent a string context as an [attribute set] whose keys are store paths.
+Each value is an attribute set with these attributes, each present only when the context has an element of that kind for the store path:
+
+- `path = true`: a [constant](#string-context-constant) element.
+- `allOutputs = true`: a [derivation deep](#string-context-element-derivation-deep) element.
+  The store path is a derivation.
+- `outputs`: a list of the names of the outputs of the derivation at the store path that are [output](#string-context-output) elements.
+
 ## Inspecting string contexts
 
 Most basically, [`builtins.hasContext`] will tell whether a string has a non-empty context.
 
 When more granular information is needed, [`builtins.getContext`] can be used.
-It creates an [attribute set] representing the string context, which can be inspected as usual.
+It creates the [Nix language representation](#nix-language-representation) of the string context, which can be inspected as usual.
 
 [`builtins.hasContext`]: ./builtins.md#builtins-hasContext
 [`builtins.getContext`]: ./builtins.md#builtins-getContext
@@ -123,7 +133,7 @@ The "unsafe" marker is only there to remind that Nix normally guarantees that de
 ## Constructing string contexts
 
 [`builtins.appendContext`] will create a copy of a string, but with additional string context elements.
-The context is specified explicitly by an [attribute set] in the format that [`builtins.hasContext`] produces.
+The context is specified explicitly in its [Nix language representation](#nix-language-representation).
 A string with arbitrary contexts can be made like this:
 
 1. Create a string with the desired string context elements.
