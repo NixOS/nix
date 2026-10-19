@@ -1,7 +1,6 @@
 #include <archive.h>
 #include <archive_entry.h>
 
-#include "nix/util/finally.hh"
 #include "nix/util/serialise.hh"
 #include "nix/util/tarfile.hh"
 #include "nix/util/file-system.hh"
@@ -25,9 +24,11 @@ ssize_t callback_read(struct archive * archive, void * _self, const void ** buff
         return self->source->read((char *) self->buffer.data(), self->buffer.size());
     } catch (EndOfFile &) {
         return 0;
-    } catch (std::exception & err) {
-        archive_set_error(archive, EIO, "Source threw exception: %s", err.what());
-        return -1;
+    } catch (...) {
+        /* This will also propagate boost::context::detail::forced_unwind if we happen to switch
+           coroutine stacks inside read above. */
+        self->readException = std::current_exception();
+        return ARCHIVE_FAILED;
     }
 }
 
@@ -45,8 +46,12 @@ void TarArchive::check(int err, const std::string & reason, bool warningsAreFata
         throw EndOfFile("reached end of archive");
     else if (err == ARCHIVE_WARN && !warningsAreFatal)
         warn(reason, archive_error_string(archive));
-    else if (err != ARCHIVE_OK)
+    else if (err != ARCHIVE_OK) {
+        auto exception = std::exchange(readException, nullptr);
+        if (exception)
+            std::rethrow_exception(exception);
         throw Error(reason, archive_error_string(archive));
+    }
 }
 
 static void enableSupportedFormats(struct archive * archive)
@@ -278,6 +283,16 @@ time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink)
     }
 
     return lastModified;
+}
+
+TarSink::~TarSink() {}
+
+NullTarSink::~NullTarSink() {}
+
+void NullTarSink::createRegularFile(const CanonPath & path, bool isExecutable, fun<void(Sink &)> callback)
+{
+    NullSink sink;
+    callback(sink);
 }
 
 } // namespace nix

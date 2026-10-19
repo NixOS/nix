@@ -3,6 +3,8 @@
 
 #include "nix/util/compression-algo.hh"
 
+#include <exception>
+
 struct archive;
 
 namespace nix {
@@ -16,6 +18,8 @@ struct TarArchive
     ::archive * archive;
     Source * source;
     std::vector<unsigned char> buffer;
+    /* Exception encountered when reading the source. */
+    std::exception_ptr readException;
 
     void check(int err, const std::string & reason = "failed to extract archive (%s)", bool warningsAreFatal = true);
 
@@ -52,7 +56,7 @@ void unpackTarfile(const std::filesystem::path & tarFile, const std::filesystem:
  */
 struct TarSink
 {
-    virtual ~TarSink() = default;
+    virtual ~TarSink();
 
     virtual void createDirectory(const CanonPath & path) = 0;
 
@@ -65,6 +69,24 @@ struct TarSink
      * encountered file relative to the root.
      */
     virtual void createHardlink(const CanonPath & path, const CanonPath & target) = 0;
+};
+
+/**
+ * A TarSink which just ignores all writes.
+ */
+struct NullTarSink : TarSink
+{
+    NullTarSink() {}
+
+    ~NullTarSink();
+
+    void createDirectory(const CanonPath & path) override {}
+
+    void createRegularFile(const CanonPath & path, bool isExecutable, fun<void(Sink &)> callback) override;
+
+    void createSymlink(const CanonPath & path, const std::string & target) override {}
+
+    void createHardlink(const CanonPath & path, const CanonPath & target) override {}
 };
 
 time_t unpackTarfileToSink(TarArchive & archive, TarSink & parseSink);

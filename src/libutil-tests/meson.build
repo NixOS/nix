@@ -74,6 +74,7 @@ sources = files(
   'spawn.cc',
   'strings.cc',
   'suggestions.cc',
+  'tarfile.cc',
   'terminal.cc',
   'topo-sort.cc',
   'url.cc',
