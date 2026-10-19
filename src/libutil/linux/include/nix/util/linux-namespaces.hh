@@ -2,6 +2,7 @@
 ///@file
 
 #include <filesystem>
+#include <vector>
 
 namespace nix {
 
@@ -24,6 +25,12 @@ void remountReadOnlyWritable(const std::filesystem::path & path);
  * one. Ignored if `tryEnterPrivateMountNamespace()` never succeeded.
  */
 void restoreMountNamespace();
+
+/**
+ * Move the descriptors used to return to the parent mount namespace to
+ * `minFd` or above, and return them. Empty if we never left it.
+ */
+std::vector<int> moveSavedMountNamespaceFds(int minFd);
 
 /**
  * Cause this thread to try to not share any FS attributes with the main

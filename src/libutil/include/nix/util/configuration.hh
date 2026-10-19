@@ -408,6 +408,15 @@ public:
         return value != v2;
     }
 
+    /**
+     * Whether `value` equals the constructor's default. Unlike
+     * `isOverridden()`, not reset by `Config::resetOverridden()`.
+     */
+    bool isDefault() const
+    {
+        return value == defaultValue;
+    }
+
     template<typename U>
     void operator=(const U & v)
     {
