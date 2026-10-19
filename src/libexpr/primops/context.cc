@@ -230,6 +230,17 @@ static RegisterPrimOp primop_getContext(
     )",
      .impl = prim_getContext});
 
+/* Parse an element of the `outputs` list of the derivation at `drvPath`. */
+static NixStringContextElem::Built
+parseOutputContextElem(EvalState & state, const StorePath & drvPath, Value & output, PosIdx pos)
+{
+    auto outputName = state.forceStringNoCtx(output, pos, "while evaluating an output name within a string context");
+    return {
+        .drvPath = makeConstantStorePathRef(drvPath),
+        .output = std::string{outputName},
+    };
+}
+
 static void prim_appendContext(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     NixStringContext context;
@@ -283,15 +294,8 @@ static void prim_appendContext(EvalState & state, CallSite callSite, Value * con
                     .atPos(i.pos)
                     .debugThrow();
             }
-            for (auto elem : attr->value->listView()) {
-                auto outputName =
-                    state.forceStringNoCtx(*elem, attr->pos, "while evaluating an output name within a string context");
-                context.emplace(
-                    NixStringContextElem::Built{
-                        .drvPath = makeConstantStorePathRef(namePath),
-                        .output = std::string{outputName},
-                    });
-            }
+            for (auto elem : attr->value->listView())
+                context.emplace(parseOutputContextElem(state, namePath, *elem, attr->pos));
         }
     }
 
