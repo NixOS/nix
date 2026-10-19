@@ -92,6 +92,20 @@ TEST_F(DerivedPathTest, built_built_xp)
         MissingExperimentalFeature);
 }
 
+TEST_F(DerivedPathTest, outputChain)
+{
+    ExperimentalFeatureSettings mockXpSettings;
+    mockXpSettings.set("experimental-features", "dynamic-derivations ca-derivations");
+
+    auto built = SingleDerivedPath::parse(*store, "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv^foo");
+    ASSERT_EQ(std::get<SingleDerivedPath::Built>(built.raw()).outputChain(), (std::vector<OutputName>{"foo"}));
+
+    auto nested = SingleDerivedPath::parse(
+        *store, "/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-x.drv^foo^bar^baz", mockXpSettings);
+    ASSERT_EQ(
+        std::get<SingleDerivedPath::Built>(nested.raw()).outputChain(), (std::vector<OutputName>{"foo", "bar", "baz"}));
+}
+
 /* TODO: Disabled due to the following error:
 
        path '00000000000000000000000000000000-0^0' is not a valid store path:
