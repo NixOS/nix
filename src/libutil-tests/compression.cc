@@ -119,6 +119,15 @@ TEST_P(CompressionDecompressionTest, roundtripsWithSourceAndSink)
     ASSERT_EQ(strSink.s.c_str(), dummyInput);
 }
 
+TEST(DecompressionSink, abandonCoroutine)
+{
+    StringSink strSink;
+    auto decompressionSink = makeDecompressionSink(CompressionAlgo::bzip2, strSink);
+    (*decompressionSink)("BZh");
+    /* Abandon the coroutine. It will be unwound via forced_unwind. */
+    decompressionSink.reset();
+}
+
 INSTANTIATE_TEST_SUITE_P(
     CompressionDecompression,
     CompressionDecompressionTest,
