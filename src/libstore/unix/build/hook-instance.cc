@@ -1,6 +1,5 @@
 #include "nix/util/config-global.hh"
 #include "nix/store/build/hook-instance.hh"
-#include "nix/store/build/child.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
 
@@ -29,7 +28,6 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
     }
 
     Strings args;
-    args.push_back(buildHook.filename().string());
 
     for (auto & arg : buildHookArgs)
         args.push_back(arg);
@@ -46,32 +44,35 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
     builderOut.create();
 
     /* Fork the hook. */
-    pid = startProcess([&]() {
-        if (dup2(fromHook.writeSide.get(), STDERR_FILENO) == -1)
-            throw SysError("cannot pipe standard error into log file");
-
-        commonChildInit();
-
-        if (chdir("/") == -1)
-            throw SysError("changing into /");
-
-        /* Dup the communication pipes. */
-        if (dup2(toHook.readSide.get(), STDIN_FILENO) == -1)
-            throw SysError("dupping to-hook read side");
-
-        /* Use fd 4 for the builder's stdout/stderr. */
-        if (dup2(builderOut.writeSide.get(), 4) == -1)
-            throw SysError("dupping builder's stdout/stderr");
-
-        /* Hack: pass the read side of that fd to allow build-remote
-           to read SSH error messages. */
-        if (dup2(builderOut.readSide.get(), 5) == -1)
-            throw SysError("dupping builder's stdout/stderr");
-
-        execv(requireCString(buildHook.native()), stringsToCharPtrs(args).data());
-
-        throw SysError("executing %s", PathFmt(buildHook));
-    });
+    pid = spawnProgram(
+        {
+            .program = buildHook,
+            .lookupPath = false,
+            .args = args,
+            .chdir = "/",
+            /* Put the child in a separate session (and thus a separate
+               process group) so that it has no controlling terminal (meaning
+               that e.g. ssh cannot open /dev/tty) and it doesn't receive
+               terminal signals. */
+            .setSid = true,
+            /* Build hook needs a writable store seemingly because it opens the default one?
+               How is building in chroot stores supposed to work? */
+            .restoreMounts = false,
+        },
+        std::to_array<FdRedirection>({
+            /* These are the pipes for talking with the hook. */
+            {.from = toHook.readSide.get(), .to = FdRedirection::stdInput},
+            {.from = fromHook.writeSide.get(), .to = FdRedirection::stdOut},
+            /* Merge stderr to stdout. */
+            {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
+            /* TODO: Can these redirections form a cycle? Do we need to dup them
+               (potentially) out of the way first? */
+            /* Use fd 4 for the builder's stdout/stderr. */
+            {.from = builderOut.writeSide.get(), .to = 4},
+            /* Hack: pass the read side of that fd to allow build-remote
+               to read SSH error messages. */
+            {.from = builderOut.readSide.get(), .to = 5},
+        }));
 
     using namespace std::chrono_literals;
 
