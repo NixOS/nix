@@ -266,13 +266,13 @@ rec {
             # override nixDependencies easily.
             libgit2 = self.callPackage (
               { pkgs, fetchFromGitHub }:
-              pkgs.libgit2.overrideAttrs {
+              pkgs.libgit2.overrideAttrs rec {
                 version = "2.0.0-rc.1";
                 src = fetchFromGitHub {
                   owner = "libgit2";
                   repo = "libgit2";
-                  rev = "ae45d0d168f7e8dbfdb8c623589cb51caac96ab3";
-                  hash = "sha256-3sbqHm37SOwBeFgtjI2DLN6kx1F7G2N1m6rRIkqDXNI=";
+                  tag = "v${version}";
+                  hash = "sha256-J3e9BGk0L3Fd1wLW0B969T5IzK0km6rnVLLNqAGFuTE=";
                 };
               }
             ) { };
