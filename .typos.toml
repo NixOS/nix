@@ -16,6 +16,7 @@ extend-ignore-re = [
   "[0-9abcdfghijklmnpqrsvwxyz]{26,}",
   # Deprecated alias
   "--referers(-closure)?",
+  "(#|//)\\s*typos:ignore-next-line\\n.*",
 ]
 
 [type.allow-FODs]
