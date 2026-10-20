@@ -39,10 +39,10 @@ TEST(readString, roundTrip)
 
 TEST(readString, bogusLengthDoesNotPreallocate)
 {
-    // 1 TiB length prefix followed by EOF: must fail on the read, not by
-    // allocating (and zeroing) the announced size up front.
+    // Overly large string reads must not allocate up-front. We send the length-prefix
+    // that's larger than available address space.
     StringSink sink;
-    sink << (uint64_t(1) << 40);
+    sink << (sizeof(void *) == 8 ? uint64_t(1) << 40 : (uint64_t(1) << 32) - 1);
     StringSource source(sink.s);
     EXPECT_THROW(readString(source), EndOfFile);
 }
