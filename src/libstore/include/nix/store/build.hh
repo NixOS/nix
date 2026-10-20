@@ -82,6 +82,10 @@ struct Builder
      * Ensure that a path is valid.  If it is not currently valid, it
      * may be made valid by running a substitute (if defined for the
      * path).
+     *
+     * The path is registered as a temporary GC root first, whether or
+     * not it was already valid, so that a concurrent garbage collection
+     * cannot delete it while the caller is still using it.
      */
     virtual void ensurePath(const StorePath & path) = 0;
 

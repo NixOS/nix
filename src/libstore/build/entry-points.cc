@@ -24,6 +24,12 @@ BuildResult LocalBuilder::buildDerivation(const StorePath & drvPath, const Basic
     return getWorker()->buildDerivation(drvPath, drv, buildMode);
 }
 
+/**
+ * Register `path` as a temporary GC root, then return if it is already valid;
+ * otherwise substitute it, throwing if that fails. Registering the root before
+ * the validity check means a concurrent garbage collection cannot delete the
+ * path between the check and the caller's use of it.
+ */
 void LocalBuilder::ensurePath(const StorePath & path)
 {
     /* Protect existing paths too, before checking validity so that GC cannot
