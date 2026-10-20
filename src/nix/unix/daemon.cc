@@ -519,7 +519,7 @@ static void runDaemon(
                 // If --force-untrusted is passed, we cannot forward the connection and
                 // must process it ourselves (before delegating to the next store) to
                 // force untrusting the client.
-                processOps |= !forceTrustClientOpt || *forceTrustClientOpt != NotTrusted;
+                processOps |= forceTrustClientOpt == NotTrusted;
 
                 if (!processOps && (remoteStore = store.dynamic_pointer_cast<RemoteStore>()))
                     forwardStdioConnection(*remoteStore);
