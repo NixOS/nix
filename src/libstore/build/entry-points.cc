@@ -26,6 +26,10 @@ BuildResult LocalBuilder::buildDerivation(const StorePath & drvPath, const Basic
 
 void LocalBuilder::ensurePath(const StorePath & path)
 {
+    /* Protect existing paths too, before checking validity so that GC cannot
+       delete the path between the check and registering the root. */
+    store->addTempRoot(path);
+
     /* If the path is already valid, we're done. */
     if (store->isValidPath(path))
         return;
