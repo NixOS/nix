@@ -45,6 +45,13 @@ expectStderr 1 nix-instantiate --eval --abort-on-warn -E 'builtins.warn "Hello" 
 # shellcheck disable=SC2016 # The ${} in this is Nix, not shell
 NIX_ABORT_ON_WARN=1 expectStderr 1 nix-instantiate --eval -E 'builtins.addErrorContext "while doing ${"something"} interesting" (builtins.warn "Hello" 123)' | grepQuiet "while doing something interesting"
 
+# Verify importing directories with trailing relative segments does not crash resolveExprPath / CanonPath
+mkdir -p "$TEST_ROOT/home-import-test"
+echo '"success"' > "$TEST_ROOT/home-import-test/default.nix"
+HOME="$TEST_ROOT/home-import-test" nix-instantiate --eval --strict --impure -E 'import ~/.' | grepQuiet success
+HOME="$TEST_ROOT/home-import-test" nix-instantiate --eval --strict --impure -E 'import ~/./.' | grepQuiet success
+HOME="$TEST_ROOT" nix-instantiate --eval --strict --impure -E 'import ~/home-import-test/.' | grepQuiet success
+
 set +x
 
 badDiff=0
