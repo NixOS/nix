@@ -37,11 +37,6 @@ struct CmdShowDerivation : InstallablesCommand, MixPrintJSON
             ;
     }
 
-    Category category() override
-    {
-        return catUtility;
-    }
-
     void run(ref<Store> store, Installables && installables) override
     {
         auto drvPaths = Installable::toDerivations(store, installables, true);
