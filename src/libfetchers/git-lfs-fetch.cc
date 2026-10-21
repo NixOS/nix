@@ -29,7 +29,7 @@ static void downloadToSink(
     std::string sha256Expected,
     size_t sizeExpected)
 {
-    FileTransferRequest request(parseURL(url));
+    FileTransferRequest request(VerbatimURL{url});
     Headers headers;
     if (authHeader.has_value())
         headers.push_back({"Authorization", *authHeader});
