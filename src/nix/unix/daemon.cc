@@ -412,6 +412,9 @@ static void daemonLoop(
                     // counterproductive.
                     OS_STR("--log-format"),
                     OS_STR("raw"),
+                    // With a forking acceptor daemon we always used to process ops.
+                    // The same is achieved via --process-ops.
+                    OS_STR("--process-ops"),
                 };
 
                 args.append_range(workerVerbosityFlags);
@@ -602,7 +605,6 @@ static int main_nix_daemon(int argc, char ** argv)
             } else if (*arg == "--default-trust") {
                 isTrustedOpt = std::nullopt;
             } else if (*arg == "--process-ops") {
-                experimentalFeatureSettings.require(Xp::MountedSSHStore);
                 processOps = true;
             } else
                 return false;
@@ -676,7 +678,6 @@ struct CmdDaemon : StoreConfigCommand
               This is useful for the `mounted-ssh://` store where some actions need to be performed on the remote end but as connected user, and not as the user of the underlying daemon on the remote end.
             )",
             .handler = {[&]() { processOps = true; }},
-            .experimentalFeature = Xp::MountedSSHStore,
         });
     }
 
