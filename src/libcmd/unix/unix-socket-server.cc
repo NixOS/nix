@@ -130,7 +130,7 @@ PeerInfo getPeerInfo(Descriptor remote)
                     throw SysError("accepting connection");
                 }
 
-                handler(std::move(remote), [&]() { listeningSockets.clear(); });
+                handler(std::move(remote));
             }
 
         } catch (AbortServeSocket &) {

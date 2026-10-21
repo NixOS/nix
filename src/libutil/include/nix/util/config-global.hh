@@ -22,7 +22,7 @@ public:
 
     nlohmann::json toJSON() override;
 
-    std::string toKeyValue() override;
+    std::string toKeyValue(bool overriddenOnly = false) override;
 
     void convertToArgs(Args & args, const std::string & category) override;
 

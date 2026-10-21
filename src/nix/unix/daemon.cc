@@ -254,9 +254,6 @@ static void daemonLoop(
     using namespace nix::unix;
     using namespace nix::daemon;
 
-    if (chdir("/") == -1)
-        throw SysError("cannot change current directory");
-
     sigChldPipe.create();
 
     // Get rid of children automatically; don't let them become zombies.
@@ -318,6 +315,40 @@ static void daemonLoop(
        someone is intentionally crashing the daemon to brute-force ASLR. */
     static constexpr unsigned crashLimit = 64;
 
+    /* We only want overrides from the cli, the nix.conf state will get picked up
+       immediately without needing to restart the daemon acceptor process (us). */
+    const OsString workerConfig = globalConfig.toKeyValue(/*overriddenOnly=*/true);
+
+    /* Path to ourselves, for starting a daemon worker for handling each connection. */
+    std::optional<std::filesystem::path> selfProgramPath;
+
+#if defined(__linux__) || defined(__CYGWIN__) || defined(__gnu_hurd__)
+    /* When /proc/self/exe is available, execute it directly. */
+    selfProgramPath = "/proc/self/exe";
+#else
+    selfProgramPath = getSelfExe();
+    if (!selfProgramPath)
+        throw Error("can't figure out the path to current executable for starting a daemon worker");
+
+    /* Just a sanity check. We shouldn't depend on the working directory. */
+    if (!selfProgramPath->is_absolute())
+        throw Error("path to the current executable %1% is unexpectedly not absolute", PathFmt(*selfProgramPath));
+#endif
+
+    OsStringMap workerEnv = getEnvOs();
+    /* This will include the store reference for the worker to use. Don't use storeConfig.getReference()!
+       It doesn't actually roundtrip. Note that a relative path shorthand will be resolved by StoreReference::parse
+       called during option parsing (quite janky). */
+    workerEnv[OS_STR("NIX_CONFIG")] = workerConfig;
+
+    /* lvlInfo is the default used by nix-daemon (or anything using RegisterLegacyCommand for that matter). */
+    std::vector<OsString> workerVerbosityFlags = [&]() -> std::vector<OsString> {
+        if (verbosity > lvlInfo)
+            return {OS_STR("-") + OsString((std::to_underlying(verbosity) - std::to_underlying(lvlInfo)), OS_STR('v'))};
+        /* Doesn't seem worth the trouble to support smaller verbosity than the default. */
+        return {};
+    }();
+
     try {
         serveUnixSocket(
             {
@@ -351,7 +382,8 @@ static void daemonLoop(
                         }
                     },
             },
-            [&](AutoCloseFD remote, std::function<void()> closeListeners) {
+            [&](AutoCloseFD remote) {
+                /* Listening sockets are already marked CLOEXEC by the accept loop in serveUnixSocket. */
                 closeOnExec(remote.get());
 
                 PeerInfo peer;
@@ -372,43 +404,42 @@ static void daemonLoop(
                     peer.pid ? std::to_string(*peer.pid) : "<unknown>",
                     userName.value_or("<unknown>"));
 
-                // Fork a child to handle the connection.
-                ProcessOptions options;
-                options.errorPrefix = "unexpected Nix daemon error: ";
-                options.dieWithParent = false;
-                options.runExitHandlers = true;
-                startProcess(
-                    [&, storeConfig, closeListeners = std::move(closeListeners)]() {
-                        setInterrupted(false);
+                OsStrings args = {
+                    OS_STR("--stdio"),
+                    trusted ? OS_STR("--force-trusted") : OS_STR("--force-untrusted"),
+                    // Log format is not a setting. The worker doesn't log much
+                    // to its own stderr and using anything other than "raw" is
+                    // counterproductive.
+                    OS_STR("--log-format"),
+                    OS_STR("raw"),
+                };
 
-                        closeListeners();
+                args.append_range(workerVerbosityFlags);
 
+                /* Re-exec ourselves as a worker process to handle the connection.
+                   By spawning a child that re-execs ourselves we get fresh ASLR entropy which is good
+                   for security. Also Apple frameworks don't play well with fork-without-exec, as do several of
+                   our dependencies like libcurl. */
+                spawnProgram(
+                    {
+                        .program = *selfProgramPath,
+                        .lookupPath = false,
+                        .args = std::move(args),
+                        // For debugging, stuff the pid into argv[0]. The cli considers everything after the last
+                        // dot to be the "extension". (Ab)use that feature.
+                        .argv0 = fmt("nix-daemon.worker%s", peer.pid ? fmt("-%d", *peer.pid) : ""),
+                        .chdir = OS_STR("/"),
+                        .environment = workerEnv,
+                        // So that daemon sessions don't die if we (the acceptor) are restarted.
+                        .dieWithParent = false,
                         // Background the daemon.
-                        if (setsid() == -1)
-                            throw SysError("creating a new session");
-
-                        // Restore normal handling of SIGCHLD.
-                        setSigChldAction(false);
-
-                        // For debugging, stuff the pid into argv[1].
-                        if (peer.pid && savedArgv[1]) {
-                            auto processName = std::to_string(*peer.pid);
-                            strncpy(savedArgv[1], processName.c_str(), strlen(savedArgv[1]));
-                        }
-
-                        // Handle the connection.
-                        auto store = storeConfig->openStore();
-                        store->init();
-                        processConnection(
-                            std::move(store),
-                            FdSource(remote.get()),
-                            FdSink(remote.get()),
-                            trusted,
-                            RecursiveFlag::NotRecursive);
-
-                        exit(0);
+                        .setSid = true,
                     },
-                    options);
+                    std::to_array<FdRedirection>({
+                        {.from = remote.get(), .to = FdRedirection::stdInput},
+                        {.from = remote.get(), .to = FdRedirection::stdOut},
+                    }))
+                    .release();
             });
     } catch (Interrupted & e) {
         return;
