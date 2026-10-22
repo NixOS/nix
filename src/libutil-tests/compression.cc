@@ -1,4 +1,5 @@
 #include "nix/util/compression.hh"
+#include "nix/util/error.hh"
 #include <gtest/gtest.h>
 #include <zstd.h>
 
@@ -126,6 +127,35 @@ TEST(DecompressionSink, abandonCoroutine)
     (*decompressionSink)("BZh");
     /* Abandon the coroutine. It will be unwound via forced_unwind. */
     decompressionSink.reset();
+}
+
+TEST_P(CompressionDecompressionTest, failingSink)
+{
+    /* Like a full disk: every write fails, including the ones made while the compression sink is being destroyed. */
+    struct FailingSink : Sink
+    {
+        void operator()(std::string_view data) override
+        {
+            throw SysError(ENOSPC, "write of %d bytes", data.size());
+        }
+    };
+
+    /* Make the input incompressible enough to produce output before finish(). */
+    std::string input(1024 * 1024, 0);
+    uint32_t x = 1;
+    for (auto & c : input) {
+        x = x * 1664525 + 1013904223;
+        c = x >> 24;
+    }
+
+    FailingSink failingSink;
+    ASSERT_THROW(
+        {
+            auto sink = makeCompressionSink(GetParam(), failingSink);
+            (*sink)(input);
+            sink->finish();
+        },
+        SysError);
 }
 
 INSTANTIATE_TEST_SUITE_P(
