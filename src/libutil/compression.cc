@@ -160,8 +160,14 @@ struct ArchiveCompressionSink : CompressionSink
         if (err == ARCHIVE_EOF)
             throw EndOfFile("reached end of archive");
         else if (err != ARCHIVE_OK) {
-            if (writeException)
-                std::rethrow_exception(writeException);
+            if (writeException) {
+                try {
+                    std::rethrow_exception(writeException);
+                } catch (const BaseError & e) {
+                    /* Throw a copy of the exception. */
+                    e.throwClone();
+                }
+            }
             throw Error(reason, archive_error_string(this->archive));
         }
     }
