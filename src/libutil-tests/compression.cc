@@ -1,7 +1,14 @@
 #include "nix/util/compression.hh"
 #include "nix/util/error.hh"
+#include "nix/util/config.hh"
+
 #include <gtest/gtest.h>
 #include <zstd.h>
+#include <boost/context/detail/exception.hpp>
+
+#include <random>
+#include <cstdint>
+#include <algorithm>
 
 namespace nix {
 
@@ -141,12 +148,15 @@ TEST_P(CompressionDecompressionTest, failingSink)
     };
 
     /* Make the input incompressible enough to produce output before finish(). */
+    using Ranqd1 = std::linear_congruential_engine<
+        std::uint32_t,
+        /*a=*/1664525,
+        /*c=*/1013904223,
+        0>;
+
     std::string input(1024 * 1024, 0);
-    uint32_t x = 1;
-    for (auto & c : input) {
-        x = x * 1664525 + 1013904223;
-        c = x >> 24;
-    }
+    Ranqd1 engine;
+    std::generate_n(input.begin(), input.size(), [&]() -> unsigned char { return engine() >> 24; });
 
     FailingSink failingSink;
     ASSERT_THROW(
@@ -157,6 +167,60 @@ TEST_P(CompressionDecompressionTest, failingSink)
         },
         SysError);
 }
+
+TEST_P(CompressionDecompressionTest, compressionSource)
+{
+    auto source = sinkToSource([](Sink & sink) {
+        auto compressionSink = makeCompressionSink(GetParam(), sink);
+        std::mt19937 engine;
+        engine.seed(13);
+        for (int i = 0; i < 1024 * 1024; ++i) {
+            char c = static_cast<unsigned char>(engine());
+            (*compressionSink)(std::string_view(&c, 1));
+        }
+        compressionSink->finish();
+    });
+
+    StringSink sink;
+    source->drainInto(sink);
+    ASSERT_FALSE(sink.s.empty());
+}
+
+#if !NIX_ASAN_ENABLED
+
+TEST(CompressionSink, abandonedCompressionSource)
+{
+    bool caught = false;
+    auto source = sinkToSource([&](Sink & sink) {
+        auto compressionSink = makeCompressionSink(CompressionAlgo::bzip2, sink);
+        std::mt19937 engine;
+        engine.seed(67);
+        try {
+            /* Feed just enough to emit a frame. */
+            while (true) {
+                char c = static_cast<unsigned char>(engine());
+                (*compressionSink)(std::string_view(&c, 1));
+            }
+        } catch (boost::context::detail::forced_unwind & e) {
+            caught = true;
+            throw;
+        }
+        /* Will never be reached. */
+        unreachable();
+    });
+
+    /* Read just the bzip2 magic. */
+    std::array<char, 3> magic;
+    source->read(magic.data(), magic.size());
+    ASSERT_EQ(std::string_view(magic), "BZh");
+    ASSERT_FALSE(caught);
+
+    /* Drop the coroutine on the floor. */
+    source.reset();
+    ASSERT_TRUE(caught);
+}
+
+#endif
 
 INSTANTIATE_TEST_SUITE_P(
     CompressionDecompression,
