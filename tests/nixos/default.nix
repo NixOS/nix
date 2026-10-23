@@ -180,7 +180,7 @@ in
 
   ca-fd-leak = runNixOSTest ./ca-fd-leak;
 
-  content-encoding = runNixOSTest ./content-encoding.nix;
+  httpBinaryCache = runNixOSTest ./http-binary-cache.nix;
 
   functional_user = runNixOSTest ./functional/as-user.nix;
 
@@ -201,8 +201,6 @@ in
   cgroups = runNixOSTest ./cgroups;
 
   fetchurl = runNixOSTest ./fetchurl.nix;
-
-  fetchersSubstitute = runNixOSTest ./fetchers-substitute.nix;
 
   chrootStore = runNixOSTest ./chroot-store.nix;
 
