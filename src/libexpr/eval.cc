@@ -28,7 +28,7 @@
 #include "nix/fetchers/input-cache.hh"
 #include "nix/util/current-process.hh"
 
-#include "parser-tab.hh"
+#include "nix/expr/parser.hh"
 
 #include <algorithm>
 #include <cstddef>
