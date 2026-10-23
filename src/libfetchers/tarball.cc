@@ -135,7 +135,18 @@ static DownloadTarballResult downloadTarball_(
         }
     }
 
-    Cache::Key cacheKey{"tarball", {{"url", urlS}}};
+    /* Cache entries are keyed on the normalised URL, so that equivalent
+       spellings of the same URL (e.g. differently ordered query
+       parameters) share an entry. */
+    auto normaliseUrl = [](const std::string & s) {
+        try {
+            return parseURL(s, /*lenient=*/true).to_string();
+        } catch (BadURL &) {
+            return s;
+        }
+    };
+
+    Cache::Key cacheKey{"tarball", {{"url", url.to_string()}}};
 
     auto cached = settings.getCache()->lookupExpired(cacheKey);
 
@@ -215,7 +226,7 @@ static DownloadTarballResult downloadTarball_(
 
     /* Insert a cache entry for every URL in the redirect chain. */
     for (auto & url : res->urls) {
-        cacheKey.second.insert_or_assign("url", url);
+        cacheKey.second.insert_or_assign("url", normaliseUrl(url));
         settings.getCache()->upsert(cacheKey, infoAttrs);
     }
 
