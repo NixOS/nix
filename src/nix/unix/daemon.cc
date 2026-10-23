@@ -242,7 +242,7 @@ static std::pair<TrustedFlag, std::optional<std::string>> authPeer(const unix::P
  * socket.
  *
  * @param storeConfig The store configuration to use for opening stores.
- * @param forceTrustClientOpt If present, force trusting or not trusted
+ * @param forceTrustClientOpt If present, force trusting or not trusting
  * the client. Otherwise, decide based on the authentication settings
  * and user credentials (from the unix domain socket).
  */
