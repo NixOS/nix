@@ -2,9 +2,6 @@
 
 source common.sh
 
-# Only needed to be enabled in the client.
-enableFeatures "daemon-trust-override mounted-ssh-store"
-
 # The whole matrix of ways to override stdio trust.
 cases=(
   ""
