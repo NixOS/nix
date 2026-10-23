@@ -107,6 +107,8 @@ typedef enum {
 // forward declarations
 typedef struct nix_value nix_value;
 typedef struct EvalState EvalState;
+typedef struct nix_doc nix_doc;
+typedef struct nix_pos nix_pos;
 
 /** @deprecated Use nix_value instead */
 [[deprecated("use nix_value instead")]] typedef nix_value Value;
@@ -730,6 +732,52 @@ const StorePath * nix_realised_string_get_store_path(nix_realised_string * reali
  * @param[in] realised_string
  */
 void nix_realised_string_free(nix_realised_string * realised_string);
+
+/** @brief Return whether value is a functor
+ * @param[in] value the value
+ * @return true if the value is a functor, false otherwise
+ */
+bool nix_value_is_functor(nix_c_context * context, EvalState * state, nix_value * value);
+
+/** @brief Get a value's documentation from parsed doc comments.
+ * @param[out] context Optional, stores error information
+ * @param[in] state Nix evaluator state
+ * @param[in] value Nix value to get the documentation of
+ * @return the documentation
+ */
+nix_doc *
+nix_get_value_doc(nix_c_context * context, EvalState * state, nix_value * value);
+
+/** @brief Get a documented function's position
+ * @param[in] doc the function's documentation
+ * @return the position object
+ */
+nix_pos * nix_get_doc_pos(nix_doc * doc);
+
+/** @brief Get a documentation's name
+ * @param[in] doc the documentation object
+ * @return the documentation's name
+ */
+const char * nix_get_doc_name(nix_doc * doc);
+
+/** @brief Get the number of arguments for documentation
+ * @param[in] doc the documentation object
+ * @return the arguments size
+ */
+size_t nix_get_doc_args_size(nix_doc * doc);
+
+/** @brief Get an argument of documentation by index
+ * @param[in] doc the documentation object
+ * @param[in] index the argument index
+ * @return the argument
+ */
+const char * nix_get_doc_arg_by_idx(nix_doc * doc, size_t index);
+
+/** @brief Get a documentation's content
+ * @param[in] doc the documentation object
+ * @return the documentation's content
+ */
+const char * nix_get_doc_content(nix_doc * doc);
 
 // cffi end
 #ifdef __cplusplus

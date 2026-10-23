@@ -175,4 +175,22 @@ nix_err nix_set_verbosity(nix_c_context * context, nix_verbosity level)
     NIXC_CATCH_ERRS
 }
 
+uint32_t nix_get_pos_line(nix_pos * pos)
+{
+    return pos->pos.line;
+}
+
+uint32_t nix_get_pos_column(nix_pos * pos)
+{
+    return pos->pos.column;
+}
+
+const char * nix_get_pos_source_path(nix_pos * pos)
+{
+    auto path = pos->pos.getSourcePath();
+    if (path)
+        return strdup(path->to_string().c_str());
+    return nullptr;
+}
+
 } // extern "C"
