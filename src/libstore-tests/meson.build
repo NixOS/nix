@@ -36,6 +36,7 @@ sources = files(
   'build-result.cc',
   'common-protocol.cc',
   'content-address.cc',
+  'content-stats.cc',
   'daemon.cc',
   'derivation/advanced-attrs.cc',
   'derivation/external-formats.cc',

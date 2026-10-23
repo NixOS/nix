@@ -893,6 +893,18 @@ VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
         },
     }))
 
+VERSIONED_CHARACTERIZATION_TEST_NO_JSON(
+    WorkerProtoTest,
+    contentStatsOptions,
+    "content-stats-options",
+    defaultVersion,
+    (std::tuple<ContentStatsOptions, ContentStatsOptions>{
+        // histograms = false (default).
+        ContentStatsOptions{},
+        // histograms = true.
+        ContentStatsOptions{.histograms = true},
+    }))
+
 TEST_F(WorkerProtoTest, handshake_log)
 {
     CharacterizationTest::writeTest("handshake-to-client.bin", [&]() -> std::string {

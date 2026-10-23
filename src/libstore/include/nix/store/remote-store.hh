@@ -142,6 +142,8 @@ public:
 
     void optimiseStore() override;
 
+    std::optional<nlohmann::json> queryStoreStats(ContentStatsOptions opts) override;
+
     bool verifyStore(bool checkContents, RepairFlag repair) override;
 
     void addSignatures(const StorePath & storePath, const std::set<Signature> & sigs) override;
