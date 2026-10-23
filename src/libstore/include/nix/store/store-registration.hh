@@ -36,12 +36,7 @@ struct StoreFactory
      */
     std::optional<ExperimentalFeature> experimentalFeature;
 
-    /**
-     * The `authorityPath` parameter is `<authority>/<path>`, or really
-     * whatever comes after `<scheme>://` and before `?<query-params>`.
-     */
-    fun<ref<StoreConfig>(std::string_view scheme, std::string_view authorityPath, const Store::Config::Params & params)>
-        parseConfig;
+    fun<ref<StoreConfig>(const ParsedURL & uri, const Store::Config::Params & params)> parseConfig;
 
     /**
      * Just for dumping the defaults. Kind of awkward this exists,
@@ -64,19 +59,26 @@ struct Implementations
             .doc = TConfig::doc(),
             .uriSchemes = TConfig::uriSchemes(),
             .experimentalFeature = TConfig::experimentalFeature(),
-            .parseConfig = ([](auto scheme, auto uri, auto & params) -> ref<StoreConfig> {
-                if constexpr (std::is_constructible_v<TConfig, std::filesystem::path, StoreConfig::Params>) {
-                    auto path =
-                        uri.empty()
-                            ? std::filesystem::path{}
-                            : canonPath(urlPathToPath(splitString<std::vector<std::string>>(percentDecode(uri), "/")));
-                    return make_ref<TConfig>(std::move(path), params);
-                } else if constexpr (std::is_constructible_v<TConfig, ParsedURL, StoreConfig::Params>) {
-                    return make_ref<TConfig>(parseURL(concatStrings(scheme, "://", uri)), params);
+            .parseConfig = ([](const ParsedURL & uri, const auto & params) -> ref<StoreConfig> {
+                if constexpr (std::is_constructible_v<TConfig, ParsedURL, StoreConfig::Params>) {
+                    return make_ref<TConfig>(uri, params);
                 } else if constexpr (std::is_constructible_v<TConfig, ParsedURL::Authority, StoreConfig::Params>) {
-                    return make_ref<TConfig>(ParsedURL::Authority::parse(uri), params);
+                    if (!uri.authority || !uri.renderPath().empty())
+                        throw UsageError("Failed to parse store reference: '%s'", uri.to_string());
+                    return make_ref<TConfig>(*uri.authority, params);
                 } else {
-                    return make_ref<TConfig>(scheme, uri, params);
+                    auto authorityPath = uri.authority ? uri.authority->to_string() : "";
+                    authorityPath += uri.renderPath(true);
+                    if constexpr (std::is_constructible_v<TConfig, std::filesystem::path, StoreConfig::Params>) {
+                        auto path =
+                            authorityPath.empty()
+                                ? std::filesystem::path{}
+                                : canonPath(urlPathToPath(
+                                      splitString<std::vector<std::string>>(percentDecode(authorityPath), "/")));
+                        return make_ref<TConfig>(std::move(path), params);
+                    } else {
+                        return make_ref<TConfig>(uri.scheme, authorityPath, params);
+                    }
                 }
             }),
             .getConfig = ([]() -> ref<StoreConfig> { return make_ref<TConfig>(Store::Config::Params{}); }),

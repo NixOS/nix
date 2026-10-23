@@ -488,6 +488,7 @@ StoreReference LocalStoreConfig::getReference() const
         .variant =
             StoreReference::Specified{
                 .scheme = *uriSchemes().begin(),
+                .authority = ParsedURL::Authority{},
                 /* TODO: Add the rootDir here as the authority? */
             },
         .params = std::move(params),
