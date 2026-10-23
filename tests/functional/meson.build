@@ -86,6 +86,7 @@ suites = [
       'dependencies.sh',
       'derivation-advanced-attributes.sh',
       'derivation-json.sh',
+      'diff-closures.sh',
       'dump-db.sh',
       'eval-store.sh',
       'eval.sh',
