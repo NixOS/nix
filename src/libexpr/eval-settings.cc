@@ -84,7 +84,8 @@ Strings EvalSettings::getDefaultNixPath()
 {
     Strings res;
     auto add = [&](const std::filesystem::path & p, const std::string & s = std::string()) {
-        if (std::filesystem::exists(p)) {
+        std::error_code ec;
+        if (std::filesystem::exists(p, ec)) {
             if (s.empty()) {
                 res.push_back(p.string());
             } else {

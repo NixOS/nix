@@ -78,4 +78,10 @@ if ! isTestOnNixOS; then
     mv "$TEST_HOME"/.local/state/nix/profiles "$TEST_ROOT"/var/nix/profiles/per-user/root
     drvPath2=$(nix-instantiate '<nixpkgs>')
     [[ "$drvPath" = "$drvPath2" ]]
+
+    if [[ $(id -u) -ne 0 ]]; then
+        chmod 0 "$TEST_ROOT"/var/nix/profiles/per-user/root
+        [[ $(nix-instantiate --eval --expr 1) = 1 ]]
+        chmod 755 "$TEST_ROOT"/var/nix/profiles/per-user/root
+    fi
 fi

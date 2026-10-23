@@ -99,6 +99,8 @@ struct ArchiveCompressionSink : CompressionSink
 {
     Sink & nextSink;
     struct archive * archive;
+    /* Exception thrown by `nextSink`. Once set, no more data is written to `nextSink`. */
+    std::exception_ptr writeException;
 
     ArchiveCompressionSink(
         Sink & nextSink, CompressionAlgo method, bool parallel, int level = COMPRESSION_LEVEL_DEFAULT)
@@ -157,8 +159,17 @@ struct ArchiveCompressionSink : CompressionSink
     {
         if (err == ARCHIVE_EOF)
             throw EndOfFile("reached end of archive");
-        else if (err != ARCHIVE_OK)
+        else if (err != ARCHIVE_OK) {
+            if (writeException) {
+                try {
+                    std::rethrow_exception(writeException);
+                } catch (const BaseError & e) {
+                    /* Throw a copy of the exception. */
+                    e.throwClone();
+                }
+            }
             throw Error(reason, archive_error_string(this->archive));
+        }
     }
 
     void writeUnbuffered(std::string_view data) override
@@ -178,11 +189,21 @@ private:
         archive_entry_free(ae);
     }
 
-    static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length)
+    /* Exceptions must not propagate through libarchive. Also, `archive_write_free()` in the destructor flushes
+       pending output through this callback, which must not throw. So we record the exception and rethrow it in
+       `check()`. */
+    static ssize_t callback_write(struct archive * archive, void * _self, const void * buffer, size_t length) noexcept
     {
         auto self = (ArchiveCompressionSink *) _self;
-        self->nextSink({(const char *) buffer, length});
-        return length;
+        if (self->writeException)
+            return ARCHIVE_FATAL;
+        try {
+            self->nextSink({(const char *) buffer, length});
+            return length;
+        } catch (...) {
+            self->writeException = std::current_exception();
+            return ARCHIVE_FATAL;
+        }
     }
 };
 
