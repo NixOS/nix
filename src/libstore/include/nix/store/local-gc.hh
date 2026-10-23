@@ -1,6 +1,4 @@
 #include "nix/store/gc-store.hh"
-#include <boost/unordered/unordered_flat_map.hpp>
-#include <boost/unordered/unordered_flat_set.hpp>
 
 namespace nix {
 
