@@ -193,6 +193,17 @@ struct LockFlags
     bool commitLockFile = false;
 
     /**
+     * Overwrite the generated commit message when committing the lockfile.
+     * This also overwrites the commitLockFileSummary from the configuration.
+     */
+    std::optional<string> commitLockFileMessage = std::nullopt;
+
+    /**
+     * When the generated commit message is overwritten, still append the generated summay
+     */
+    bool commitLockFileMessageIncludeSummary = false;
+
+    /**
      * The path to a lock file to read instead of the `flake.lock` file in the top-level flake
      */
     std::optional<SourcePath> referenceLockFilePath;
