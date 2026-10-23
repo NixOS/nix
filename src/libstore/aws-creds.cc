@@ -425,7 +425,23 @@ AwsCredentialProviderImpl::createProviderForProfile(const std::string & profile,
             profileDisplayName);
     }
 
-    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
+    auto chain = Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderChain(chainConfig, allocator);
+    if (!chain)
+        return nullptr;
+
+    // Wrap the chain in a caching provider, like aws-c-auth's own default chain
+    // does. Without this, every GetCredentials call re-runs the whole chain,
+    // including HTTP round trips to IMDS/ECS/STS — i.e. once per substitution.
+    // The cached provider refreshes after the TTL or 5 minutes before the
+    // credentials' expiration timestamp, whichever comes first; the TTL only
+    // matters for credentials without an expiration (e.g. static env/profile
+    // credentials). 15 minutes matches DEFAULT_CREDENTIAL_PROVIDER_REFRESH_MS
+    // in aws-c-auth's default chain.
+    Aws::Crt::Auth::CredentialsProviderCachedConfig cachedConfig;
+    cachedConfig.Provider = std::move(chain);
+    cachedConfig.CachedCredentialTTL = std::chrono::minutes(15);
+
+    return Aws::Crt::Auth::CredentialsProvider::CreateCredentialsProviderCached(cachedConfig, allocator);
 }
 
 AwsCredentials AwsCredentialProviderImpl::getCredentialsRaw(const std::string & profile, const std::string & region)
