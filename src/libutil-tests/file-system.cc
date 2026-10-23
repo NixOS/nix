@@ -437,4 +437,110 @@ TEST_F(MovePathTest, symlinkReplacesRegular)
 
 #endif
 
+/* ----------------------------------------------------------------------------
+ * deletePath
+ * --------------------------------------------------------------------------*/
+
+class DeletePathTest : public ::testing::Test
+{
+protected:
+    std::filesystem::path tmpDir;
+    nix::AutoDelete delTmpDir;
+
+private:
+    void SetUp() override
+    {
+        tmpDir = createTempDir();
+        delTmpDir = {tmpDir, /*recursive=*/true};
+    }
+
+    void TearDown() override
+    {
+        delTmpDir.deletePath();
+    }
+};
+
+TEST_F(DeletePathTest, readOnlyFile)
+{
+    auto file = tmpDir / OS_STR("read-only");
+    writeFile(file, "contents");
+    /* On Windows this sets `FILE_ATTRIBUTE_READONLY`, which blocks deletion
+       outright until it is cleared. On Unix it only drops the write bit, which
+       does not, because unlinking needs write permission on the directory
+       rather than on the file. Either way the file has to go. */
+    nix::chmod(file, 0444);
+
+    deletePath(file);
+    ASSERT_FALSE(pathExists(file));
+}
+
+TEST_F(DeletePathTest, treeOfReadOnlyFiles)
+{
+    /* Read-only entries at three depths, so the recursive walk has to relax
+       each one as it reaches it rather than only the top. */
+    auto root = tmpDir / OS_STR("tree");
+    auto mid = root / OS_STR("a");
+    auto leaf = mid / OS_STR("b");
+    createDirs(leaf);
+    for (auto & file : {root / OS_STR("f0"), mid / OS_STR("f1"), leaf / OS_STR("f2")}) {
+        writeFile(file, "contents");
+        nix::chmod(file, 0444);
+    }
+
+    deletePath(root);
+    ASSERT_FALSE(pathExists(root));
+}
+
+TEST_F(DeletePathTest, reportsBytesFreed)
+{
+    auto file = tmpDir / OS_STR("sized");
+    std::string contents(4096, 'x');
+    writeFile(file, contents);
+
+    uint64_t bytesFreed = 0;
+    deletePath(file, bytesFreed);
+    ASSERT_FALSE(pathExists(file));
+    ASSERT_EQ(bytesFreed, contents.size());
+}
+
+TEST_F(DeletePathTest, nonexistentIsNoop)
+{
+    ASSERT_NO_THROW(deletePath(tmpDir / OS_STR("nonexistent")));
+}
+
+#ifdef _WIN32
+
+TEST_F(DeletePathTest, emptyPathIsNoop)
+{
+    /* The `std::filesystem::remove_all` this replaced treated an empty path as
+       a no-op, and callers still depend on that -- `nix-fetchers-tests` reaches
+       here with one while tearing down a skipped test.
+
+       Windows-only, because the Unix implementation asserts `is_absolute()`
+       instead, so on a debug build the same call aborts rather than returning.
+       That asymmetry predates this change; the test pins the behaviour on the
+       side that guarantees it. */
+    ASSERT_NO_THROW(deletePath(std::filesystem::path{}));
+}
+
+#endif
+
+#ifndef _WIN32
+
+TEST_F(DeletePathTest, nonWritableDirectory)
+{
+    /* The walk has to add write permission to the directory before it can
+       unlink what is inside it. `FILE_ATTRIBUTE_READONLY` is not honoured on
+       Windows directories, so this case is Unix-only. */
+    auto dir = tmpDir / "locked";
+    createDir(dir, 0755);
+    writeFile(dir / "file", "contents");
+    nix::chmod(dir, 0500);
+
+    deletePath(dir);
+    ASSERT_FALSE(pathExists(dir));
+}
+
+#endif
+
 } // namespace nix
