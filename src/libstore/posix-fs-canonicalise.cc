@@ -212,6 +212,7 @@ class CanonicalisingRestoreHooks : public RestoreSinkHooks
 #if NIX_SUPPORT_ACL
     const StringSet & ignoredAcls;
 #endif
+    bool symlinkPermissionsUnsupported = false;
 
     void canonicaliseTimestampAndPermissions(Descriptor fd, mode_t mode)
     {
@@ -268,6 +269,19 @@ public:
             {.tv_sec = 0, .tv_nsec = UTIME_OMIT}, /* Leave alone. tv_sec is ignored. */
             {.tv_sec = mtimeStore, .tv_nsec = 0},
         };
+
+        /* What other OS-ses definitely don't support symlink permissions? */
+#  ifndef __linux__
+        if (!symlinkPermissionsUnsupported && ::fchmodat(parentFd, name.rel_c_str(), 0777, AT_SYMLINK_NOFOLLOW) == -1) {
+            if (errno == EOPNOTSUPP) {
+                symlinkPermissionsUnsupported = true;
+            } else {
+                throw SysError([&]() {
+                    return HintFmt("setting permissions on %1%", PathFmt(descriptorToPath(parentFd) / name.rel()));
+                });
+            }
+        }
+#  endif
 
         if (::utimensat(parentFd, name.rel_c_str(), times, AT_SYMLINK_NOFOLLOW) == -1)
             throw SysError([&]() {
