@@ -68,6 +68,11 @@ struct AuthorizationSettings : Config
           You can also specify groups by prefixing names with `@`.
           For instance, `@wheel` means all users in the `wheel` group.
 
+          This is only respected when set in a nix.conf that is already trusted, such as /etc/nix/nix.conf.
+          Setting this in the local nix.conf in an untrusted user's home will have no effect.
+
+          Often, it is better to add a privileged setting directly to /etc/nix/nix.conf (such as `extra-substituters`) rather than to add your username to `trusted-users`.
+
           > **Warning**
           >
           > Adding a user to `trusted-users` is essentially equivalent to giving that user root access to the system.
