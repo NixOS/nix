@@ -77,15 +77,18 @@ static void removeChannel(const std::string & name)
     readChannels();
     channels.erase(name);
     writeChannels();
-
-    runNixBin(
-        "nix-env",
-        {
-            OS_STR("--profile"),
-            profile.native(),
-            OS_STR("--uninstall"),
-            string_to_os_string(name),
-        });
+    if (std::filesystem::exists(profile))
+        try {
+            runNixBin(
+                "nix-env",
+                {
+                    OS_STR("--profile"),
+                    profile.native(),
+                    OS_STR("--uninstall"),
+                    string_to_os_string(name),
+                });
+        } catch (ExecError & e) {
+        }
 }
 
 static std::filesystem::path nixDefExpr;
