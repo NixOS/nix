@@ -279,3 +279,10 @@ nix-shell "$TEST_ROOT"/shell-ellipsis.nix --run "true"
 # `nix develop` should also work with fixed-output derivations
 # shellcheck disable=SC2016
 nix develop -f "$shellDotNix" fixed -c bash -c '[[ $FOO == "was a fixed-output derivation" ]]'
+
+# Without <nixpkgs> in the search path, nix-shell notes that it uses the
+# fallback shell instead of printing the lookup error. (Whether the fallback
+# shell then starts depends on the build's bash-program, so it is not checked.)
+output=$(env -u NIX_PATH nix-shell --option nix-path "" "$shellDotNix" -A shellDrv --run true 2>&1 || true)
+[[ "$output" == *"since <nixpkgs> is not in the search path"* ]]
+[[ "$output" != *"was not found in the Nix search path"* ]]
