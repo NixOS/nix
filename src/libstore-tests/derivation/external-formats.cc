@@ -70,6 +70,41 @@ TEST_F(DynDerivationTest, BadATerm_oldVersionDynDeps)
         FormatError);
 }
 
+/**
+ * Builds a dynamic-derivation ATerm whose single `inputDrvs` entry is
+ * nested `depth` levels deep.
+ */
+static std::string nestedDynDepsATerm(size_t depth)
+{
+    std::string node;
+    for (size_t i = 0; i < depth; ++i)
+        node += "([],[(\"out\",";
+    node += "[\"out\"]";
+    for (size_t i = 0; i < depth; ++i)
+        node += ")])";
+    return "DrvWithVersion(\"xp-dyn-drv\",[],[(\"/nix/store/g1w7hy3qg1w7hy3qg1w7hy3qg1w7hy3q-dep.drv\"," + node
+           + ")],[],\"x86_64-linux\",\"foo\",[],[])";
+}
+
+TEST_F(DynDerivationTest, ATerm_nestedDynDeps)
+{
+    ASSERT_NO_THROW(
+        derivation::parse(
+            *store, nestedDynDepsATerm(16), "nested", derivation::defaultSupportWindowsStoreDir, mockXpSettings));
+}
+
+/**
+ * Nesting deep enough to overflow the stack of an unbounded recursive
+ * parser must be rejected with a parse error instead.
+ */
+TEST_F(DynDerivationTest, BadATerm_deeplyNestedDynDeps)
+{
+    ASSERT_THROW(
+        derivation::parse(
+            *store, nestedDynDepsATerm(100000), "nested", derivation::defaultSupportWindowsStoreDir, mockXpSettings),
+        FormatError);
+}
+
 #define MAKE_OUTPUT_JSON_TEST_P(FIXTURE)                                       \
     TEST_P(FIXTURE, from_json)                                                 \
     {                                                                          \
