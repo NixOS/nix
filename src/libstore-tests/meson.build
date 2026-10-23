@@ -38,6 +38,7 @@ sources = files(
   'content-address.cc',
   'daemon.cc',
   'derivation/advanced-attrs.cc',
+  'derivation/cbor.cc',
   'derivation/external-formats.cc',
   'derivation/full-inputs.cc',
   'derivation/invariants.cc',
