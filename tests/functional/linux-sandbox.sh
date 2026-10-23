@@ -33,6 +33,13 @@ nix store cat "$outPath"/foobar | grep FOOBAR
 # Test --check without hash rewriting.
 nix-sandbox-build dependencies.nix --check
 
+export DRV_ATERM_FD=99
+export HOOK_DEST=$TEST_ROOT/pre-hook-dest
+mkdir -p "$HOOK_DEST"
+nix-sandbox-build dependencies.nix --check --pre-build-hook "$PWD/build-hook-dump-drv.sh"
+nix derivation show --aterm-stdin "$(< "$HOOK_DEST/name")" < "$HOOK_DEST/drv.aterm" > /dev/null
+unset DRV_ATERM_FD HOOK_DEST
+
 # Test that sandboxed builds with --check and -K can move .check directory to store
 nix-sandbox-build check.nix -A nondeterministic
 

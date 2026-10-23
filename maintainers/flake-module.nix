@@ -102,6 +102,7 @@
               # We don't want to format test data
               # ''tests/(?!nixos/).*\.nix''
               "^src/[^/]*-tests/data/.*$"
+              "^tests/functional/post-hook/.*$"
 
               # Don't format vendored code
               ''^doc/manual/redirects\.js$''
