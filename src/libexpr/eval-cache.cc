@@ -462,6 +462,10 @@ Value & AttrCursor::forceValue()
 
     try {
         root->state.forceValue(v, noPos);
+    } catch (InvalidPathError &) {
+        /* The evaluation cache does not store `InvalidPathError`. The validity of store paths can trigger this error.
+           The flake is irrelevant. */
+        throw;
     } catch (EvalError &) {
         debug("setting '%s' to failed", getAttrPathStr());
         if (root->db)

@@ -112,6 +112,12 @@ struct EvalCommand : virtual StoreCommand, MixEvalArgs
 
     ~EvalCommand();
 
+    /**
+     * Run the command. Cached evaluation failures can make the command fail. Evaluate the failed attribute again to
+     * show the original error.
+     */
+    void run() override;
+
     ref<Store> getEvalStore();
 
     ref<EvalState> getEvalState();
