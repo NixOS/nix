@@ -5,11 +5,6 @@
 
 #include "nix/util/archive.hh"
 #include "nix/util/memory-source-accessor.hh"
-// Needed for template specialisations. This is not good! When we
-// overhaul how store configs work, this should be fixed.
-#include "nix/util/args.hh"
-#include "nix/util/config-impl.hh"
-#include "nix/util/abstract-setting-to-json.hh"
 
 namespace nix {
 

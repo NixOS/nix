@@ -32,10 +32,8 @@ PeerInfo getPeerInfo(Descriptor remote);
  * for handling it (e.g., forking a child process, spawning a thread, etc.).
  *
  * @param socket The accepted connection file descriptor.
- * @param closeListeners A callback to close the listening sockets.
- *   Useful in forked child processes to release the bound sockets.
  */
-using UnixSocketHandler = fun<void(AutoCloseFD socket, std::function<void()> closeListeners)>;
+using UnixSocketHandler = fun<void(AutoCloseFD socket)>;
 
 /**
  * Options for the serve loop.

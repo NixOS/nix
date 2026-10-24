@@ -7,7 +7,7 @@ RequiresMountsFor=@localstatedir@/nix/db
 ConditionPathIsReadWrite=@localstatedir@/nix/daemon-socket
 
 [Service]
-ExecStart=@@bindir@/nix-daemon nix-daemon --daemon
+ExecStart=@@bindir@/nix-daemon nix-daemon
 KillMode=process
 LimitNOFILE=1048576
 TasksMax=1048576

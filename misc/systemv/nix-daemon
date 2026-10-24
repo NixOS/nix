@@ -23,7 +23,6 @@
 NIX_DAEMON_BIN=/usr/bin/nix-daemon
 #NIX_DAEMON_USER="root"
 NIX_DAEMON_USER="nix-daemon"
-NIX_DAEMON_OPTS="--daemon"
 
 umask 0022
 
@@ -57,7 +56,7 @@ start() {
 
     printf '%s' "$(gettext 'Starting nix daemon... ')"
 
-    daemonize -u $NIX_DAEMON_USER -p ${PIDFILE} $NIX_DAEMON_BIN $NIX_DAEMON_OPTS
+    daemonize -u $NIX_DAEMON_USER -p ${PIDFILE} $NIX_DAEMON_BIN
     RETVAL=$?
     echo
     [ $RETVAL -eq 0 ] && touch ${LOCKFILE}
