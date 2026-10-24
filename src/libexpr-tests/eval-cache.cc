@@ -129,7 +129,7 @@ TEST_F(EvalCacheTest, cachedStringWithAnInvalidContextPathIsEvaluatedAgain)
 
 TEST_F(EvalCacheTest, concurrentCachesOfOneFlakeAllWrite)
 {
-    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-5");
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-3");
     Value vRoot = eval(R"({ a = "1"; b = "2"; c = "3"; })");
 
     makeCache(fp, vRoot)->getRoot()->getAttr("a")->getString();
@@ -147,6 +147,40 @@ TEST_F(EvalCacheTest, concurrentCachesOfOneFlakeAllWrite)
     EXPECT_EQ(third->getRoot()->getAttr("b")->getString(), "2");
     EXPECT_EQ(third->getRoot()->getAttr("c")->getString(), "3");
     EXPECT_EQ(rootLoads, 0) << "every evaluator's writes reached the shared cache file";
+}
+
+TEST_F(EvalCacheTest, cachedDeterministicEvalErrorIsReportedWithoutLoadingFlakeRootAndRethrownByForce)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-4");
+    Value vRoot = eval(R"({ x = throw "boom"; })");
+
+    EXPECT_THROW(makeCache(fp, vRoot)->getRoot()->getAttr("x")->getString(), ThrownError);
+
+    rootLoads = 0;
+    try {
+        makeCache(fp, vRoot)->getRoot()->getAttr("x")->getString();
+        FAIL() << "expected a cached failure";
+    } catch (CachedEvalError & e) {
+        EXPECT_EQ(rootLoads, 0);
+        EXPECT_THROW(e.force(), ThrownError);
+    }
+}
+
+TEST_F(EvalCacheTest, failedEvaluationWithInvalidStorePathInStringContextIsNotCachedAndIsRetried)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-5");
+    auto collected = counting->addText("collected");
+    auto path = store->printStorePath(collected);
+    Value vBroken = eval(fmt(
+        R"(let s = builtins.appendContext "%s" { "%s" = { path = true; }; }; in builtins.seq s { x = builtins.readFile s; })",
+        path,
+        path));
+    Value vFixed = eval(R"({ x = "ok"; })");
+
+    counting->contents.erase(collected);
+    counting->clearPathInfoCache();
+    EXPECT_THROW(makeCache(fp, vBroken)->getRoot()->getAttr("x")->getString(), InvalidPathError);
+    EXPECT_EQ(makeCache(fp, vFixed)->getRoot()->getAttr("x")->getString(), "ok");
 }
 
 } // namespace nix
