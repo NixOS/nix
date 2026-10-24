@@ -158,6 +158,50 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
     return t;
 }
 
+std::string stripANSIEscapes(std::string_view s)
+{
+    std::string t;
+    t.reserve(s.size());
+    auto i = s.begin();
+
+    while (i != s.end()) {
+        if (*i == '\e') {
+            i++;
+            if (i != s.end() && *i == '[') {
+                // CSI: parameter bytes, then intermediate bytes, then a final byte.
+                i++;
+                while (i != s.end() && *i >= 0x30 && *i <= 0x3f)
+                    i++;
+                while (i != s.end() && *i >= 0x20 && *i <= 0x2f)
+                    i++;
+                if (i != s.end() && *i >= 0x40 && *i <= 0x7e)
+                    i++;
+            } else if (i != s.end() && *i == ']') {
+                // OSC: terminated by ST (ESC '\') or BEL ('\a').
+                i++;
+                while (i != s.end() && *i != '\e' && *i != '\a')
+                    i++;
+                if (i != s.end()) {
+                    char v = *i;
+                    i++;
+                    if (i != s.end() && v == '\e' && *i == '\\')
+                        i++;
+                }
+            } else {
+                // Other escape: eat one byte in the 0x40-0x5f range, if present.
+                if (i != s.end() && *i >= 0x40 && *i <= 0x5f)
+                    i++;
+            }
+        } else {
+            // Copy every non-escape byte verbatim, including tabs, carriage
+            // returns and UTF-8 sequences.
+            t += *i++;
+        }
+    }
+
+    return t;
+}
+
 //////////////////////////////////////////////////////////////////////
 
 // Note: this object intentionally leaks to avoid a destructor ordering issue (specifically, ~ProgressBar() calling
