@@ -50,6 +50,7 @@ sources = files(
   'input.cc',
   'merkle-tar-adapter.cc',
   'nix_api_fetchers.cc',
+  'path-fingerprint.cc',
   'public-key.cc',
 )
 
