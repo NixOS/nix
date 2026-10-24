@@ -22,6 +22,85 @@ The paths *paths* may also be symlinks from outside of the Nix store, to
 the Nix store. In that case, the query is applied to the target of the
 symlink.
 
+# Examples
+
+Print the closure (runtime dependencies) of the `svn` program in the
+current user environment:
+
+```console
+$ nix-store --query --requisites $(which svn)
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
+...
+```
+
+Print the build-time dependencies of `svn`:
+
+```console
+$ nix-store --query --requisites $(nix-store --query --deriver $(which svn))
+/nix/store/y6qa66l9h0pw161crnlk6y16rdrcljx4-grep-2.5.1.tar.bz2.drv
+/nix/store/z716h753s97jhnzvfank2srqbljswpgm-gcc-wrapper.sh
+/nix/store/f39x0q73rjdyvzm93y9wrkfr6x39lb7f-glibc-2.3.4.drv
+... lots of other paths ...
+```
+
+The difference with the previous example is that we ask the closure of
+the derivation (`-qd`), not the closure of the output path that contains
+`svn`.
+
+Show the build-time dependencies as a tree:
+
+```console
+$ nix-store --query --tree $(nix-store --query --deriver $(which svn))
+/nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
++---/nix/store/vxnmkc8l8d2ijjha4xwhkfgx9vvc3q4c-builder.sh
++---/nix/store/rn9776dy82n5qrgz7xbcl1iw4vfkcrkk-bash-3.0.drv
+|   +---/nix/store/x9j20hz6bln1crzn55qifk0bbsm8v5ac-bash
+|   +---/nix/store/ajnn1mcm45wjvn0rlc22gvx2cwhjnazx-builder.sh
+...
+```
+
+Show all paths that depend on the same OpenSSL library as `svn`:
+
+```console
+$ nix-store --query --referrers $(nix-store --query --binding openssl $(nix-store --query --deriver $(which svn)))
+/nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
+/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
+/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
+/nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5
+```
+
+Show all paths that directly or indirectly depend on the Glibc (C
+library) used by `svn`:
+
+```console
+$ nix-store --query --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
+/nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
+/nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
+...
+```
+
+Note that `ldd` is a command that prints out the dynamic libraries used
+by an ELF executable.
+
+Make a picture of the runtime dependency graph of the current user
+environment:
+
+```console
+$ nix-store --query --graph ~/.nix-profile | dot -Tps > graph.ps
+$ gv graph.ps
+```
+
+Show every garbage collector root that points to a store path that
+depends on `svn`:
+
+```console
+$ nix-store --query --roots $(which svn)
+/nix/var/nix/profiles/default-81-link
+/nix/var/nix/profiles/default-82-link
+/home/eelco/.local/state/nix/profiles/profile-97-link
+```
+
 # Common query options
 
 - `--use-output` / `-u`
@@ -167,82 +246,3 @@ symlink.
 {{#include ../opt-common.md}}
 
 {{#include ../env-common.md}}
-
-# Examples
-
-Print the closure (runtime dependencies) of the `svn` program in the
-current user environment:
-
-```console
-$ nix-store --query --requisites $(which svn)
-/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
-/nix/store/9lz9yc6zgmc0vlqmn2ipcpkjlmbi51vv-glibc-2.3.4
-...
-```
-
-Print the build-time dependencies of `svn`:
-
-```console
-$ nix-store --query --requisites $(nix-store --query --deriver $(which svn))
-/nix/store/y6qa66l9h0pw161crnlk6y16rdrcljx4-grep-2.5.1.tar.bz2.drv
-/nix/store/z716h753s97jhnzvfank2srqbljswpgm-gcc-wrapper.sh
-/nix/store/f39x0q73rjdyvzm93y9wrkfr6x39lb7f-glibc-2.3.4.drv
-... lots of other paths ...
-```
-
-The difference with the previous example is that we ask the closure of
-the derivation (`-qd`), not the closure of the output path that contains
-`svn`.
-
-Show the build-time dependencies as a tree:
-
-```console
-$ nix-store --query --tree $(nix-store --query --deriver $(which svn))
-/nix/store/7i5082kfb6yjbqdbiwdhhza0am2xvh6c-subversion-1.1.4.drv
-+---/nix/store/vxnmkc8l8d2ijjha4xwhkfgx9vvc3q4c-builder.sh
-+---/nix/store/rn9776dy82n5qrgz7xbcl1iw4vfkcrkk-bash-3.0.drv
-|   +---/nix/store/x9j20hz6bln1crzn55qifk0bbsm8v5ac-bash
-|   +---/nix/store/ajnn1mcm45wjvn0rlc22gvx2cwhjnazx-builder.sh
-...
-```
-
-Show all paths that depend on the same OpenSSL library as `svn`:
-
-```console
-$ nix-store --query --referrers $(nix-store --query --binding openssl $(nix-store --query --deriver $(which svn)))
-/nix/store/23ny9l9wixx21632y2wi4p585qhva1q8-sylpheed-1.0.0
-/nix/store/5mbglq5ldqld8sj57273aljwkfvj22mc-subversion-1.1.4
-/nix/store/dpmvp969yhdqs7lm2r1a3gng7pyq6vy4-subversion-1.1.3
-/nix/store/l51240xqsgg8a7yrbqdx1rfzyv6l26fx-lynx-2.8.5
-```
-
-Show all paths that directly or indirectly depend on the Glibc (C
-library) used by `svn`:
-
-```console
-$ nix-store --query --referrers-closure $(ldd $(which svn) | grep /libc.so | awk '{print $3}')
-/nix/store/034a6h4vpz9kds5r6kzb9lhh81mscw43-libgnomeprintui-2.8.2
-/nix/store/15l3yi0d45prm7a82pcrknxdh6nzmxza-gawk-3.1.4
-...
-```
-
-Note that `ldd` is a command that prints out the dynamic libraries used
-by an ELF executable.
-
-Make a picture of the runtime dependency graph of the current user
-environment:
-
-```console
-$ nix-store --query --graph ~/.nix-profile | dot -Tps > graph.ps
-$ gv graph.ps
-```
-
-Show every garbage collector root that points to a store path that
-depends on `svn`:
-
-```console
-$ nix-store --query --roots $(which svn)
-/nix/var/nix/profiles/default-81-link
-/nix/var/nix/profiles/default-82-link
-/home/eelco/.local/state/nix/profiles/profile-97-link
-```
