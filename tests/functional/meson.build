@@ -121,6 +121,7 @@ suites = [
       'hash-path.sh',
       'help.sh',
       'import-from-derivation.sh',
+      'import-verbose.sh',
       'impure-derivations.sh',
       'impure-env.sh',
       'impure-eval.sh',
