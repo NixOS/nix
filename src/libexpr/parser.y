@@ -445,7 +445,11 @@ path_start
             .pos = state->positions[CUR_POS]
         });
     });
-    auto path(getHome().string() + std::string($1.p + 1, $1.l - 1));
+
+    auto path = CanonPath(concatStrings(getHome().string(), std::string_view($1.p + 1, $1.l - 1))).abs();
+    if (literal.size() > 1 && literal.back() == '/')
+        path += '/';
+
     $$ = state->exprs.add<ExprPath>(state->exprs.alloc, state->rootFS, path);
   }
   ;
