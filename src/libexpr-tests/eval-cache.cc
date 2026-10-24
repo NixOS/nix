@@ -95,4 +95,33 @@ TEST_F(EvalCacheTest, cachedStringContextIsValidatedInOneBatch)
     EXPECT_EQ(counting->validityChecks.size(), 0);
 }
 
+TEST_F(EvalCacheTest, concurrentCachesOfOneFlakeAllWrite)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-5");
+    Value vRoot = eval(R"({ a = "1"; b = "2"; c = "3"; })");
+    unsigned rootLoads = 0;
+    auto makeCountingCache = [&]() {
+        return make_ref<EvalCache>(std::cref(fp), state, [&]() {
+            rootLoads++;
+            return &vRoot;
+        });
+    };
+
+    makeCountingCache()->getRoot()->getAttr("a")->getString();
+
+    auto second = makeCountingCache();
+    {
+        auto first = makeCountingCache();
+        EXPECT_EQ(second->getRoot()->getAttr("a")->getString(), "1");
+        EXPECT_EQ(first->getRoot()->getAttr("b")->getString(), "2");
+    }
+    EXPECT_EQ(second->getRoot()->getAttr("c")->getString(), "3");
+
+    rootLoads = 0;
+    auto third = makeCountingCache();
+    EXPECT_EQ(third->getRoot()->getAttr("b")->getString(), "2");
+    EXPECT_EQ(third->getRoot()->getAttr("c")->getString(), "3");
+    EXPECT_EQ(rootLoads, 0) << "every evaluator's writes reached the shared cache file";
+}
+
 } // namespace nix
