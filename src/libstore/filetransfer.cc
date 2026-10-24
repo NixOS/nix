@@ -205,15 +205,42 @@ struct curlFileTransfer : public FileTransfer
         bool hasContentEncoding:1 = false;
 
         /**
+         * Whether progress callback has been invoked and the progress needs to
+         * be updated.
+         */
+        bool needsProgressUpdate:1 = false;
+
+        /**
          * Server-provided minimum retry delay, parsed from the `Retry-After`
          * response header. Reset on each new HTTP status line, and consumed
          * (cleared) by maybeRetry() so it applies to at most one retry attempt.
          */
         std::optional<uint32_t> retryAfterMs;
 
+        /**
+         * When dataCallback is specified, this tracks the amount of bytes funneled to it.
+         */
         curl_off_t writtenToSink = 0;
 
+        /**
+         * Current expected download/upload size.
+         */
+        curl_off_t progressExpected = 0;
+
+        /**
+         * Completed download/upload size.
+         */
+        curl_off_t progressDone = 0;
+
+        /**
+         * When the transfer has been initiated.
+         */
         std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+
+        /**
+         * Last time the act().progress(...) was invoked.
+         */
+        std::chrono::steady_clock::time_point lastProgressUpdate = {};
 
         inline static const std::set<long> successfulStatuses{
             static_cast<long>(HttpStatus::Ok),
@@ -486,15 +513,18 @@ struct curlFileTransfer : public FileTransfer
 
         int progressCallback(curl_off_t dltotal, curl_off_t dlnow) noexcept
         try {
-            act().progress(dlnow, dltotal);
+            /* Only need to update progress when something changed. */
+            needsProgressUpdate |= (std::tie(dltotal, dlnow) != std::tie(progressExpected, progressDone));
+            progressExpected = dltotal;
+            progressDone = dlnow;
             return getInterrupted();
         } catch (nix::Interrupted &) {
             assert(getInterrupted());
             return 1;
         } catch (...) {
-            /* Something unexpected has happened like logger throwing an exception. */
-            callbackException = std::current_exception();
-            return 1;
+            /* Something really bad happened. Crash, nothing should ever throw anything other than
+               nix::Interrupted. */
+            unreachable();
         }
 
         static int progressCallbackWrapper(
@@ -1103,11 +1133,29 @@ struct curlFileTransfer : public FileTransfer
                 }
             }
 
+            const auto now = std::chrono::steady_clock::now();
+
+            /* Update progress information, with rate limiting. The items map is bounded in
+               size. */
+            for (const auto & [req, item] : items) {
+                if (!item->needsProgressUpdate)
+                    continue;
+
+                /* Limit progress frequency to 10Hz at most. Should be plenty enough to be responsive
+                   and not overwhelm the logger. */
+                static constexpr auto progressRateLimit = std::chrono::milliseconds(100);
+                if (now - item->lastProgressUpdate <= progressRateLimit)
+                    continue;
+
+                item->act().progress(item->progressDone, item->progressExpected);
+                item->lastProgressUpdate = now;
+                item->needsProgressUpdate = false;
+            }
+
             nextWakeup = std::chrono::steady_clock::time_point();
 
             std::vector<std::shared_ptr<TransferItem>> incoming;
             std::vector<std::weak_ptr<Item>> unpause;
-            auto now = std::chrono::steady_clock::now();
             bool haveWork;
 
             {
