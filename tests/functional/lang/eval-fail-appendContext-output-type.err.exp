@@ -1,0 +1,13 @@
+error:
+       … while calling the 'appendContext' builtin
+         at /pwd/lang/eval-fail-appendContext-output-type.nix:1:1:
+            1| builtins.appendContext "" {
+             | ^
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+
+       error: expected a string or a list of strings but found a set in the outputs of string context '/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv'
+       at /pwd/lang/eval-fail-appendContext-output-type.nix:3:5:
+            2|   "/nix/store/arhvjaf6zmlyn8vh8fgn55rpwnxq0n7l-a.drv" = {
+            3|     outputs = [ { } ];
+             |     ^
+            4|   };
