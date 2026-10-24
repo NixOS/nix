@@ -10,30 +10,6 @@
 
 namespace nix::eval_cache {
 
-void CachedEvalError::anchor() {}
-
-CachedEvalError::CachedEvalError(ref<AttrCursor> cursor, Symbol attr)
-    : CloneableError(cursor->root->state, "cached failure of attribute '%s'", cursor->getAttrPathStr(attr))
-    , cursor(cursor)
-    , attr(attr)
-{
-}
-
-void CachedEvalError::force()
-{
-    auto & v = cursor->forceValue();
-
-    if (v.type() == nAttrs) {
-        auto a = v.attrs()->get(this->attr);
-
-        state.forceValue(*a->value, a->pos);
-    }
-
-    // Shouldn't happen.
-    throw EvalError(
-        state, "evaluation of cached failed attribute '%s' unexpectedly succeeded", cursor->getAttrPathStr(attr));
-}
-
 static const char * schema = R"sql(
 create table if not exists Attributes (
     parent      integer not null,
@@ -288,20 +264,6 @@ struct AttrDb
         });
     }
 
-    AttrId setFailed(AttrKey key)
-    {
-        return doSQLite([&](State & state) {
-            state.insertAttribute.use()
-                .apply(key.first)
-                .apply(symbols[key.second])
-                .apply(AttrType::Failed)
-                .apply(0, false)
-                .exec();
-
-            return state.db.getLastInsertedRowId();
-        });
-    }
-
     std::optional<std::pair<AttrId, AttrValue>> getAttr(AttrKey key)
     {
         auto state(_state->lock());
@@ -342,7 +304,7 @@ struct AttrDb
         case AttrType::Misc:
             return {{rowId, misc_t()}};
         case AttrType::Failed:
-            return {{rowId, failed_t()}};
+            return {};
         default:
             throw Error("unexpected type in evaluation cache");
         }
@@ -422,8 +384,6 @@ void AttrCursor::fetchCachedValue()
 {
     if (!cachedValue)
         cachedValue = root->db->getAttr(getKey());
-    if (cachedValue && std::get_if<failed_t>(&cachedValue->second) && parent)
-        throw CachedEvalError(parent->first, parent->second);
 }
 
 AttrPath AttrCursor::getAttrPath() const
@@ -459,14 +419,7 @@ Value & AttrCursor::forceValue()
 
     auto & v = getValue();
 
-    try {
-        root->state.forceValue(v, noPos);
-    } catch (EvalError &) {
-        debug("setting '%s' to failed", getAttrPathStr());
-        if (root->db)
-            cachedValue = {root->db->setFailed(getKey()), failed_t()};
-        throw;
-    }
+    root->state.forceValue(v, noPos);
 
     if (root->db && (!cachedValue || std::get_if<placeholder_t>(&cachedValue->second))) {
         if (v.type() == nString) {
@@ -517,8 +470,6 @@ std::shared_ptr<AttrCursor> AttrCursor::maybeGetAttr(Symbol name)
                 if (attr) {
                     if (std::get_if<missing_t>(&attr->second))
                         return nullptr;
-                    else if (std::get_if<failed_t>(&attr->second))
-                        throw CachedEvalError(ref(shared_from_this()), name);
                     else
                         return std::make_shared<AttrCursor>(
                             root, std::make_pair(ref(shared_from_this()), name), nullptr, std::move(attr));

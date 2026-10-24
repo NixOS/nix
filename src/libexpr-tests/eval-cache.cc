@@ -124,4 +124,15 @@ TEST_F(EvalCacheTest, concurrentCachesOfOneFlakeAllWrite)
     EXPECT_EQ(rootLoads, 0) << "every evaluator's writes reached the shared cache file";
 }
 
+TEST_F(EvalCacheTest, failedAttributeIsEvaluatedAgain)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-6");
+    Value vBroken = eval(R"({ x = throw "boom"; })");
+    Value vFixed = eval(R"({ x = "ok"; })");
+
+    EXPECT_THROW(makeCache(fp, vBroken)->getRoot()->getAttr("x")->getString(), EvalError);
+    EXPECT_THROW(makeCache(fp, vBroken)->getRoot()->getAttr("x")->getString(), EvalError);
+    EXPECT_EQ(makeCache(fp, vFixed)->getRoot()->getAttr("x")->getString(), "ok");
+}
+
 } // namespace nix

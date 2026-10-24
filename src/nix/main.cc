@@ -20,7 +20,6 @@
 #include "nix/util/terminal.hh"
 #include "nix/util/users.hh"
 #include "nix/cmd/network-proxy.hh"
-#include "nix/expr/eval-cache.hh"
 #include "nix/flake/flake.hh"
 #include "nix/flake/settings.hh"
 
@@ -588,14 +587,7 @@ void mainWrapped(int argc, char ** argv)
         evalSettings.pureEval = false;
     }
 
-    try {
-        args.command->second->run();
-    } catch (eval_cache::CachedEvalError & e) {
-        /* Evaluate the original attribute that resulted in this
-           cached error so that we can show the original error to the
-           user. */
-        e.force();
-    }
+    args.command->second->run();
 }
 
 } // namespace nix
