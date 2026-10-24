@@ -19,6 +19,8 @@
 #include "nix/store/local-store.hh" // TODO remove, along with remaining downcasts
 #include "nix/store/outputs-query.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/finally.hh"
 
 #include <chrono>
 #include <algorithm>
@@ -532,7 +534,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                     .builtOutputs = checkPathValidity(initialOutputs).second,
                 }};
 
-            switch (tryBuildHook(drvOptions)) {
+            switch (co_await tryBuildHook(drvOptions)) {
             case rpAccept:
                 /* Yes, it has started doing so.  Wait until we get
                    EOF from the hook. */
@@ -564,7 +566,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::tryToBuild()
                 if (valid)
                     break;
 
-                switch (tryBuildHook(drvOptions)) {
+                switch (co_await tryBuildHook(drvOptions)) {
                 case rpAccept:
                     /* Yes, it has started doing so.  Wait until we get
                        EOF from the hook. */
@@ -647,20 +649,13 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
 #ifdef _WIN32 // TODO enable build hook on Windows
     unreachable();
 #else
-    std::unique_ptr<HookInstance> hook = std::move(worker.hook);
+    std::unique_ptr<HookInstance> hook = std::move(hookAccepted);
+    assert(hook);
+    std::string machineName = std::move(hookMachineName);
 
     /* Set up callback so childTerminated is called if the hook is
        destroyed (e.g., during failure cascades). */
     hook->onKillChild = [this]() { worker.childTerminated(this); };
-
-    std::string machineName = [&hook]() {
-        try {
-            return readLine(hook->fromHook.readSide.get());
-        } catch (Error & e) {
-            e.addTrace({}, "while reading the machine name from the build hook");
-            throw;
-        }
-    }();
 
     CommonProto::WriteConn conn{hook->sink};
 
@@ -712,7 +707,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
     mcRunningBuilds = std::make_unique<MaintainCount<uint64_t>>(worker.runningBuilds);
     worker.updateProgress();
 
-    std::string currentHookLine;
+    std::string currentHookLine = std::move(hook->partialLine);
     uint64_t logSize = 0;
 
     while (true) {
@@ -1203,74 +1198,108 @@ BuildError DerivationBuildingGoal::fixupBuilderFailureErrorMessage(BuilderFailur
     return BuildError{e.status, msg};
 }
 
-HookReply DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
+Goal::Co<HookReply> DerivationBuildingGoal::tryBuildHook(const DerivationOptions<StorePath> & drvOptions)
 {
 #ifdef _WIN32 // TODO enable build hook on Windows
-    return rpDecline;
+    co_return rpDecline;
 #else
+    /* Wait before the checks below: the goal holding the hook may hear `decline-permanently`. */
+    while (worker.hookBusy) {
+        worker.waitForHook(shared_from_this());
+        co_await Suspend{};
+    }
+
     /* This should use `worker.evalStore`, but per #13179 the build hook
        doesn't work with eval store anyways. */
     if (worker.settings.buildHook.get().empty() || !worker.tryBuildHook || !worker.store.isValidPath(drvPath))
-        return rpDecline;
+        co_return rpDecline;
 
-    if (!worker.hook)
-        worker.hook = std::make_unique<HookInstance>(
+    std::unique_ptr<HookInstance> hook = std::move(worker.hook);
+    if (!hook)
+        hook = HookInstance::external(
             worker.settings.buildHook, std::chrono::milliseconds(worker.settings.buildHookKillTimeout));
 
+    worker.hookBusy = true;
+    Finally release([&]() { worker.releaseHook(); });
+
     try {
-
-        /* Send the request to the hook. */
-        worker.hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0)
-                          << drv->platform << worker.store.printStorePath(drvPath)
-                          << drvOptions.getRequiredSystemFeatures(*drv);
-        worker.hook->sink.flush();
-
-        /* Read the first line of input, which should be a word indicating
-           whether the hook wishes to perform the build. */
-        std::string reply;
-        while (true) {
-            auto s = [&]() {
-                try {
-                    return readLine(worker.hook->fromHook.readSide.get());
-                } catch (Error & e) {
-                    e.addTrace({}, "while reading the response from the build hook");
-                    throw;
-                }
-            }();
-            if (handleJSONLogMessage(s, worker.act, worker.hook->activities, "the build hook", true))
-                ;
-            else if (s.substr(0, 2) == "# ") {
-                reply = s.substr(2);
-                break;
-            } else {
-                s += "\n";
-                writeToStderr(s);
-            }
-        }
-
-        debug("hook reply is '%1%'", reply);
-
-        if (reply == "decline")
-            return rpDecline;
-        else if (reply == "decline-permanently") {
-            worker.tryBuildHook = false;
-            worker.hook = 0;
-            return rpDecline;
-        } else if (reply == "postpone")
-            return rpPostpone;
-        else if (reply != "accept")
-            throw Error("bad hook reply '%s'", reply);
-
+        hook->sink << "try" << (worker.getNrLocalBuilds() < worker.settings.maxBuildJobs ? 1 : 0) << drv->platform
+                   << worker.store.printStorePath(drvPath) << drvOptions.getRequiredSystemFeatures(*drv);
+        hook->sink.flush();
     } catch (SystemError & e) {
-        if (e.is(std::errc::broken_pipe)) {
-            printError("build hook died unexpectedly: %s", chomp(drainFD(worker.hook->fromHook.readSide.get())));
-            worker.hook = 0;
-            return rpDecline;
-        } else
+        if (!e.is(std::errc::broken_pipe))
             throw;
+        /* Don't block: the pipe stays open until `hook` is destroyed. */
+        printError("build hook died unexpectedly: %s", chomp(drainFD(hook->fromHook.readSide.get(), {.block = false})));
+        co_return rpDecline;
     }
 
-    return rpAccept;
+    hook->onKillChild = [this]() { worker.childTerminated(this); };
+    worker.childStarted(shared_from_this(), {hook->fromHook.readSide.get()}, false, false);
+
+    std::optional<std::string> reply;
+    std::optional<std::string> machineName;
+    std::string line = std::move(hook->partialLine);
+    bool eof = false;
+
+    auto done = [&]() { return eof || (reply && (*reply != "accept" || machineName)); };
+
+    while (!done()) {
+        auto event = co_await WaitForChildEvent{};
+        if (auto * output = std::get_if<ChildOutput>(&event)) {
+            for (auto c : output->data) {
+                if (c != '\n') {
+                    line += c;
+                    continue;
+                }
+                if (reply && *reply == "accept" && !machineName)
+                    machineName = line;
+                else if (handleJSONLogMessage(line, worker.act, hook->activities, "the build hook", true))
+                    ;
+                else if (!reply && line.starts_with("# "))
+                    reply = line.substr(2);
+                else
+                    writeToStderr(line + "\n");
+                line.clear();
+            }
+        } else
+            /* EOF. A timeout cannot happen: we did not ask for one. */
+            eof = true;
+    }
+
+    /* No other event is pending: `iterate` queues one per descriptor per round,
+       EOF on a later round. A second would trip `Suspend`'s assertion. */
+    hook->partialLine = std::move(line);
+    worker.childTerminated(this);
+
+    if (eof) {
+        try {
+            throw EndOfFile("unexpected EOF reading a line");
+        } catch (EndOfFile & e) {
+            e.addTrace({}, "while reading the response from the build hook");
+            throw;
+        }
+    }
+
+    debug("hook reply is '%1%'", *reply);
+
+    if (*reply == "decline" || *reply == "postpone") {
+        hook->onKillChild = nullptr;
+        worker.hook = std::move(hook);
+        co_return *reply == "decline" ? rpDecline : rpPostpone;
+    }
+    if (*reply == "decline-permanently") {
+        hook->onKillChild = nullptr;
+        worker.tryBuildHook = false;
+        assert(!worker.hook);
+        co_return rpDecline;
+    }
+    if (*reply != "accept")
+        throw Error("bad hook reply '%s'", *reply);
+
+    hookAccepted = std::move(hook);
+    hookMachineName = std::move(*machineName);
+    co_return rpAccept;
 #endif
 }
 

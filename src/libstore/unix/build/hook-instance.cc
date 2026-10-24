@@ -8,7 +8,34 @@
 
 namespace nix {
 
-HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds timeout)
+HookInstance::HookInstance()
+{
+    /* Create a pipe to get the output of the child. */
+    fromHook.create();
+
+    /* Create the communication pipes. */
+    toHook.create();
+
+    /* Create a pipe to get the output of the builder. */
+    builderOut.create();
+}
+
+void HookInstance::adopt(pid_t childPid, std::chrono::milliseconds timeout)
+{
+    pid = childPid;
+
+    /* Give custom build hooks the chance to cleanup. */
+    pid.setKillSignal(SIGTERM);
+    pid.setKillTimeout(timeout);
+
+    pid.setSeparatePG(true);
+    fromHook.writeSide = -1;
+    toHook.readSide = -1;
+
+    sink = FdSink(toHook.writeSide.get());
+}
+
+std::unique_ptr<HookInstance> HookInstance::external(const Strings & _buildHook, std::chrono::milliseconds timeout)
 {
     debug("starting build hook '%s'", concatStringsSep(" ", _buildHook));
 
@@ -34,17 +61,10 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
 
     args.push_back(std::to_string(std::to_underlying(verbosity)));
 
-    /* Create a pipe to get the output of the child. */
-    fromHook.create();
-
-    /* Create the communication pipes. */
-    toHook.create();
-
-    /* Create a pipe to get the output of the builder. */
-    builderOut.create();
+    auto hook = std::unique_ptr<HookInstance>(new HookInstance());
 
     /* Fork the hook. */
-    pid = spawnProgram(
+    Pid childPid = spawnProgram(
         {
             .program = buildHook,
             .lookupPath = false,
@@ -61,35 +81,28 @@ HookInstance::HookInstance(const Strings & _buildHook, std::chrono::milliseconds
         },
         std::to_array<FdRedirection>({
             /* These are the pipes for talking with the hook. */
-            {.from = toHook.readSide.get(), .to = FdRedirection::stdInput},
-            {.from = fromHook.writeSide.get(), .to = FdRedirection::stdOut},
+            {.from = hook->toHook.readSide.get(), .to = FdRedirection::stdInput},
+            {.from = hook->fromHook.writeSide.get(), .to = FdRedirection::stdOut},
             /* Merge stderr to stdout. */
             {.from = FdRedirection::stdOut, .to = FdRedirection::stdError},
             /* TODO: Can these redirections form a cycle? Do we need to dup them
                (potentially) out of the way first? */
             /* Use fd 4 for the builder's stdout/stderr. */
-            {.from = builderOut.writeSide.get(), .to = 4},
+            {.from = hook->builderOut.writeSide.get(), .to = 4},
             /* Hack: pass the read side of that fd to allow build-remote
                to read SSH error messages. */
-            {.from = builderOut.readSide.get(), .to = 5},
+            {.from = hook->builderOut.readSide.get(), .to = 5},
         }));
 
-    using namespace std::chrono_literals;
+    hook->adopt(childPid.release(), timeout);
 
-    /* Give custom build hooks the chance to cleanup. */
-    pid.setKillSignal(SIGTERM);
-    pid.setKillTimeout(timeout);
+    std::map<std::string, Config::SettingInfo> settingsToSend;
+    globalConfig.getSettings(settingsToSend);
+    for (auto & setting : settingsToSend)
+        hook->sink << 1 << setting.first << setting.second.value;
+    hook->sink << 0;
 
-    pid.setSeparatePG(true);
-    fromHook.writeSide = -1;
-    toHook.readSide = -1;
-
-    sink = FdSink(toHook.writeSide.get());
-    std::map<std::string, Config::SettingInfo> settings;
-    globalConfig.getSettings(settings);
-    for (auto & setting : settings)
-        sink << 1 << setting.first << setting.second.value;
-    sink << 0;
+    return hook;
 }
 
 HookInstance::~HookInstance()

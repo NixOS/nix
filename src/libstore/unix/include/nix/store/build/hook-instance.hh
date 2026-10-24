@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <functional>
+#include <memory>
 
 namespace nix {
 
@@ -15,8 +16,8 @@ namespace nix {
  * owned by a `Goal`. This is for efficiency: rather than starting the
  * hook every time we want to ask whether we can run a remote build
  * (which can be very often), we reuse a hook process for answering
- * those queries until it accepts a build.  So if there are N
- * derivations to be built, at most N hooks will be started.
+ * those queries until it accepts a build. One goal at a time asks it;
+ * others wait in `Worker::wantingHook`.
  */
 struct HookInstance
 {
@@ -44,15 +45,23 @@ struct HookInstance
 
     std::map<ActivityId, Activity> activities;
 
+    std::string partialLine;
+
     /**
      * Callback to run when the hook process is killed in the destructor.
      * Used to call `Worker::childTerminated`.
      */
     std::function<void()> onKillChild;
 
-    HookInstance(const Strings & buildHook, std::chrono::milliseconds timeout);
+    static std::unique_ptr<HookInstance> external(const Strings & buildHook, std::chrono::milliseconds timeout);
 
     ~HookInstance();
+
+private:
+
+    HookInstance();
+
+    void adopt(pid_t childPid, std::chrono::milliseconds timeout);
 };
 
 } // namespace nix

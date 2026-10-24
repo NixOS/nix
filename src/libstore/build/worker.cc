@@ -270,6 +270,21 @@ void Worker::waitForAWhile(GoalPtr goal)
     addToWeakGoals(waitingForAWhile, goal);
 }
 
+void Worker::waitForHook(GoalPtr goal)
+{
+    goal->trace("wait for the build hook");
+    addToWeakGoals(wantingHook, goal);
+}
+
+void Worker::releaseHook()
+{
+    hookBusy = false;
+    for (auto & i : wantingHook)
+        if (auto goal = i.lock())
+            wakeUp(goal);
+    wantingHook.clear();
+}
+
 void Worker::waitForCompletion(GoalPtr goal)
 {
     goal->trace("waiting for completion callback");

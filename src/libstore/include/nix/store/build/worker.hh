@@ -135,6 +135,9 @@ private:
      */
     WeakGoals wantingToSubstitute;
 
+    /** All are woken: a single one may no longer want the hook, and would never release it. */
+    WeakGoals wantingHook;
+
     /**
      * Child processes currently running.
      */
@@ -249,8 +252,11 @@ public:
     fun<std::list<ref<Store>>()> getSubstituters;
 
 #ifndef _WIN32 // TODO Enable building on Windows
+    /** Kept for the next goal. A goal awaiting the hook's reply owns it meanwhile. */
     std::unique_ptr<HookInstance> hook;
 #endif
+
+    bool hookBusy = false;
 
     uint64_t expectedBuilds = 0;
     uint64_t doneBuilds = 0;
@@ -384,6 +390,10 @@ public:
      * to wait for multiple locks in the main select() loop.
      */
     void waitForAWhile(GoalPtr goal);
+
+    void waitForHook(GoalPtr goal);
+
+    void releaseHook();
 
     /**
      * Wait until explicitly resumed by Waker::enqueue.
