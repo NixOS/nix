@@ -127,4 +127,26 @@ TEST_F(EvalCacheTest, cachedStringWithAnInvalidContextPathIsEvaluatedAgain)
     EXPECT_EQ(rootLoads, 1);
 }
 
+TEST_F(EvalCacheTest, concurrentCachesOfOneFlakeAllWrite)
+{
+    auto fp = hashString(HashAlgorithm::SHA256, "eval-cache-test-5");
+    Value vRoot = eval(R"({ a = "1"; b = "2"; c = "3"; })");
+
+    makeCache(fp, vRoot)->getRoot()->getAttr("a")->getString();
+
+    auto second = makeCache(fp, vRoot);
+    {
+        auto first = makeCache(fp, vRoot);
+        EXPECT_EQ(second->getRoot()->getAttr("a")->getString(), "1");
+        EXPECT_EQ(first->getRoot()->getAttr("b")->getString(), "2");
+    }
+    EXPECT_EQ(second->getRoot()->getAttr("c")->getString(), "3");
+
+    rootLoads = 0;
+    auto third = makeCache(fp, vRoot);
+    EXPECT_EQ(third->getRoot()->getAttr("b")->getString(), "2");
+    EXPECT_EQ(third->getRoot()->getAttr("c")->getString(), "3");
+    EXPECT_EQ(rootLoads, 0) << "every evaluator's writes reached the shared cache file";
+}
+
 } // namespace nix
