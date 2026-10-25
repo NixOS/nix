@@ -7,6 +7,7 @@
 #include "nix/cmd/common-eval-args.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
 #include "nix/util/os-string.hh"
+#include "nix/util/strings.hh"
 #include "nix/util/users.hh"
 #include "nix/fetchers/tarball.hh"
 #include "self-exe.hh"
@@ -154,11 +155,30 @@ static void update(const StringSet & channelNames)
 
             if (!unpacked) {
                 // Download the channel tarball.
-                try {
-                    result = fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.xz", "nixexprs.tar.xz");
-                } catch (FileTransferError & e) {
-                    result =
-                        fetchers::downloadFile(*store, fetchSettings, url + "/nixexprs.tar.bz2", "nixexprs.tar.bz2");
+
+                std::list<std::string> preferences = {"nixexprs.tar.zst", "nixexprs.tar.xz", "nixexprs.tar.bz2"};
+                std::list<std::string> downloadErrors;
+                bool downloaded = false;
+
+                for (const auto & preference : preferences) {
+                    try {
+                        result = fetchers::downloadFile(*store, fetchSettings, url + "/" + preference, preference);
+                        downloaded = true;
+                        break;
+                    } catch (FileTransferError & e) {
+                        debug(
+                            "could not download '%s/%s' channel tarball: %s", url, preference, Uncolored(e.message()));
+                        downloadErrors.push_back(e.message());
+                    }
+                }
+
+                if (!downloaded) {
+                    throw Error(
+                        "%s",
+                        Uncolored(
+                            fmt("%s: %s",
+                                "no channel tarball could be downloaded successfully",
+                                concatStringsSep("\n\t", downloadErrors))));
                 }
             }
             // Regardless of where it came from, add the expression representing this channel to accumulated expression
