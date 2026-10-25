@@ -361,7 +361,7 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
 
         auto res = make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
         /* The remote has already temprooted the path for us. */
-        conn->tempRootsPinned.upsert(res->path, true);
+        conn->tempRootsPinned.upsert(res->path, {});
         return res;
     } else {
         if (repair)
@@ -463,7 +463,7 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
     }
 
     /* If the calls above succeeded, the remote has registered the path as a temproot for us. */
-    conn->tempRootsPinned.upsert(info.path, true);
+    conn->tempRootsPinned.upsert(info.path, {});
 }
 
 void RemoteStore::addMultipleToStore(
@@ -510,7 +510,7 @@ void RemoteStore::addMultipleToStore(
     conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
     /* The remote has pinned the paths for us if the call above succeeded. */
     for (const auto & path : processedPaths)
-        conn->tempRootsPinned.upsert(path, true);
+        conn->tempRootsPinned.upsert(path, {});
 }
 
 void RemoteStore::registerDrvOutputUnchecked(const Realisation & info)
@@ -780,7 +780,7 @@ void RemoteStore::addTempRoots(const StorePathSet & paths)
         readInt(conn->from);
 
         for (auto & path : newPaths)
-            conn->tempRootsPinned.upsert(path, true);
+            conn->tempRootsPinned.upsert(path, {});
     }
     /* Note: there is no fallback for old daemons to prevent performance regressions. */
 }
@@ -792,7 +792,7 @@ void RemoteStore::addTempRoot(const StorePath & path)
     if (conn->tempRootsPinned.get(path))
         return;
     conn->addTempRoot(*this, &conn.daemonException, path);
-    conn->tempRootsPinned.upsert(path, true);
+    conn->tempRootsPinned.upsert(path, {});
 }
 
 Roots RemoteStore::findRoots(bool censor)
