@@ -202,7 +202,7 @@ jobs:
     - name: Looking up the installer tarball URL
       id: installer-tarball-url
       run: echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-    - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+    - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
       if: ${{ !matrix.nix-installer }}
       with:
         install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
@@ -273,7 +273,7 @@ jobs:
         id: installer-tarball-url
         run: |
           echo "installer-url=file://$GITHUB_WORKSPACE/out" >> "$GITHUB_OUTPUT"
-      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
         with:
           install_url: ${{ format('{0}/install', steps.installer-tarball-url.outputs.installer-url) }}
           install_options: ${{ format('--tarball-url-prefix {0}', steps.installer-tarball-url.outputs.installer-url) }}
