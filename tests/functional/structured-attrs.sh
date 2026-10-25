@@ -15,6 +15,19 @@ export NIX_BUILD_SHELL=$SHELL
 env NIX_PATH=nixpkgs=shell.nix nix-shell structured-attrs-shell.nix \
     --run 'test "3" = "$(jq ".my.list|length" < $NIX_ATTRS_JSON_FILE)"'
 
+# https://github.com/NixOS/nix/issues/16603
+# shellcheck disable=SC2016
+output=$(env NIX_PATH=nixpkgs=shell.nix nix-shell --pure -I nixpkgs=shell.nix -E '
+  with import <nixpkgs> {};
+  stdenv.mkDerivation {
+    name = "test-percent";
+    __structuredAttrs = true;
+    testAttr = "printf %s";
+    buildCommand = "touch $out";
+  }
+' --run 'echo "$testAttr - SUCCESS"')
+[ "$output" = "printf %s - SUCCESS" ]
+
 # shellcheck disable=SC2016
 nix develop -f structured-attrs-shell.nix -c bash -c 'test "3" = "$(jq ".my.list|length" < $NIX_ATTRS_JSON_FILE)"'
 
