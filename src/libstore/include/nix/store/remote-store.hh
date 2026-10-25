@@ -130,6 +130,8 @@ public:
 
     void addTempRoots(const StorePathSet & paths) override;
 
+    void addTempRoot(const StorePath & path) override;
+
     Roots findRoots(bool censor) override;
 
     void collectGarbage(const GCOptions & options, GCResults & results) override;

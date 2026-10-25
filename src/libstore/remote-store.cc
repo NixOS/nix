@@ -774,6 +774,16 @@ void RemoteStore::addTempRoots(const StorePathSet & paths)
     /* Note: there is no fallback for old daemons to prevent performance regressions. */
 }
 
+void RemoteStore::addTempRoot(const StorePath & path)
+{
+    /* Unlike the best-effort-implemented addTempRoots, addTempRoot is always supported. */
+    auto conn(getConnection());
+    if (conn->tempRootsPinned.get(path))
+        return;
+    conn->addTempRoot(*this, &conn.daemonException, path);
+    conn->tempRootsPinned.upsert(path, true);
+}
+
 Roots RemoteStore::findRoots(bool censor)
 {
     auto conn(getConnection());
