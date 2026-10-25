@@ -29,7 +29,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
         extra_nix_config:
@@ -45,7 +45,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/install-nix-action
+      - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
         with:
           dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
           extra_nix_config: experimental-features = nix-command flakes
@@ -95,7 +95,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -158,7 +158,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -234,7 +234,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
@@ -294,7 +294,7 @@ jobs:
       with:
         fetch-depth: 0
         persist-credentials: false
-    - uses: ./.github/actions/install-nix-action
+    - uses: ./.github/actions/install-nix-action # zizmor: ignore[self-repository]
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         dogfood: ${{ github.event_name == 'workflow_dispatch' && inputs.dogfood || github.event_name != 'workflow_dispatch' }}
