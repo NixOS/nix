@@ -359,7 +359,10 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
             conn.withFramedSink([&](Sink & sink) { dump.drainInto(sink); });
         }
 
-        return make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
+        auto res = make_ref<ValidPathInfo>(WorkerProto::Serialise<ValidPathInfo>::read(*this, *conn));
+        /* The remote has already temprooted the path for us. */
+        conn->tempRootsPinned.upsert(res->path, true);
+        return res;
     } else {
         if (repair)
             throw Error("repairing is not supported when building through the Nix daemon protocol < 1.25");
@@ -458,6 +461,9 @@ void RemoteStore::addToStore(const ValidPathInfo & info, Source & source, Repair
         copyNAR(source, conn->to);
         conn.processStderr(0, nullptr);
     }
+
+    /* If the calls above succeeded, the remote has registered the path as a temproot for us. */
+    conn->tempRootsPinned.upsert(info.path, true);
 }
 
 void RemoteStore::addMultipleToStore(
