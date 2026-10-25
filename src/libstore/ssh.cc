@@ -226,6 +226,12 @@ SSHMaster::startCommand(OsStrings && command, OsStrings && extraSshArgs, bool aw
         fdr);
 
 #ifndef _WIN32
+    /* With `localhost` the child is the daemon itself. SIGTERM gives it time
+       to stop its build, which nothing else does on macOS. */
+    if (fakeSSH) {
+        conn->sshPid.setKillSignal(SIGTERM);
+        conn->sshPid.setKillTimeout(std::chrono::seconds(10));
+    }
     /* Kill the whole group, so that a `ProxyCommand` does not keep the connection open. */
     if (batchMode)
         conn->sshPid.setSeparatePG(true);
