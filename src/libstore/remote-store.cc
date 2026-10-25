@@ -482,6 +482,7 @@ void RemoteStore::addMultipleToStore(
         bytesExpected += pathInfo.narSize;
     }
     act.setExpected(actCopyPath, bytesExpected);
+    std::vector<StorePath> processedPaths;
 
     auto source = sinkToSource([&](Sink & sink) {
         size_t nrTotal = pathsToCopy.size();
@@ -500,12 +501,16 @@ void RemoteStore::addMultipleToStore(
                 },
                 pathInfo);
             pathSource->drainInto(sink);
+            processedPaths.push_back(pathInfo.path);
             pathsToCopy.pop_back();
         }
     });
 
     conn->to << WorkerProto::Op::AddMultipleToStore << repair << !checkSigs;
     conn.withFramedSink([&](Sink & sink) { source->drainInto(sink); });
+    /* The remote has pinned the paths for us if the call above succeeded. */
+    for (const auto & path : processedPaths)
+        conn->tempRootsPinned.upsert(path, true);
 }
 
 void RemoteStore::registerDrvOutputUnchecked(const Realisation & info)
