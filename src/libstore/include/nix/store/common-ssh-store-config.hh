@@ -48,9 +48,9 @@ public:
      * Small wrapper around `SSHMaster::SSHMaster` that gets most
      * arguments from this configuration.
      *
-     * See that constructor for details on the remaining two arguments.
+     * See that constructor for details on the remaining arguments.
      */
-    SSHMaster createSSHMaster(bool useMaster, Descriptor logFD = INVALID_DESCRIPTOR) const;
+    SSHMaster createSSHMaster(bool useMaster, Descriptor logFD = INVALID_DESCRIPTOR, bool batchMode = false) const;
 };
 
 } // namespace nix

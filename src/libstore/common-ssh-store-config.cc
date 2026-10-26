@@ -11,7 +11,7 @@ CommonSSHStoreConfig::CommonSSHStoreConfig(const ParsedURL::Authority & authorit
 
 void CommonSSHStoreConfig::anchor() {}
 
-SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD) const
+SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD, bool batchMode) const
 {
     return {
         authority,
@@ -20,6 +20,7 @@ SSHMaster CommonSSHStoreConfig::createSSHMaster(bool useMaster, Descriptor logFD
         useMaster,
         compress,
         logFD,
+        batchMode,
     };
 }
 
