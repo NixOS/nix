@@ -90,13 +90,8 @@ void UDSRemoteStore::Connection::closeWrite()
 
 ref<RemoteStore::Connection> UDSRemoteStore::openConnection()
 {
-    auto conn = make_ref<Connection>();
-
     /* Connect to a daemon that does the privileged work for us. */
-    conn->fd = nix::connect(config->path);
-
-    conn->from.fd = conn->fd.get();
-    conn->to.fd = conn->fd.get();
+    auto conn = make_ref<Connection>(nix::connect(config->path));
 
     conn->startTime = std::chrono::steady_clock::now();
 

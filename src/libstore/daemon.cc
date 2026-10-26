@@ -1182,10 +1182,10 @@ void processConnection(
     if (conn.protoVersion.number < WorkerProto::minimum.number)
         throw Error("the Nix client version is too old");
 
-    conn.to = std::move(to);
-    conn.from = std::move(from);
+    conn.toFd = std::move(to);
+    conn.fromFd = std::move(from);
 
-    auto tunnelLogger = new TunnelLogger(conn.to, conn.protoVersion);
+    auto tunnelLogger = new TunnelLogger(conn.toFd, conn.protoVersion);
     auto prevLogger = logger;
     // FIXME
     if (recursive == RecursiveFlag::NotRecursive) {

@@ -77,6 +77,23 @@ protected:
     public:
         std::unique_ptr<SSHMaster::Connection> sshConn;
 
+        Connection(std::unique_ptr<SSHMaster::Connection> sshConn)
+            : RemoteStore::Connection(
+                  std::make_unique<FdSink>(sshConn->in.get()), std::make_unique<FdSource>(sshConn->out.get()))
+            , sshConn(std::move(sshConn))
+        {
+        }
+
+        Descriptor fromFd() const override
+        {
+            return sshConn->out.get();
+        }
+
+        Descriptor toFd() const override
+        {
+            return sshConn->in.get();
+        }
+
         void closeWrite() override
         {
             sshConn->in.close();
@@ -223,7 +240,6 @@ ref<Store> MountedSSHStore::Config::openStore() const
 
 ref<RemoteStore::Connection> SSHStore::openConnection()
 {
-    auto conn = make_ref<Connection>();
     Strings command = config->remoteProgram.get();
     command.push_back("--stdio");
     if (config->remoteStore.get() != "") {
@@ -231,10 +247,8 @@ ref<RemoteStore::Connection> SSHStore::openConnection()
         command.push_back(config->remoteStore.get());
     }
     command.insert(command.end(), extraRemoteProgramArgs.begin(), extraRemoteProgramArgs.end());
-    conn->sshConn = master.startCommand(toOsStrings(std::move(command)));
-    conn->to = FdSink(conn->sshConn->in.get());
-    conn->from = FdSource(conn->sshConn->out.get());
-    return conn;
+
+    return make_ref<Connection>(master.startCommand(toOsStrings(std::move(command))));
 }
 
 static RegisterStoreImplementation<SSHStore::Config> regSSHStore;

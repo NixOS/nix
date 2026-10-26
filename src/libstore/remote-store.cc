@@ -53,7 +53,8 @@ RemoteStore::RemoteStore(const Config & config)
                       throw;
                   }
                   /* Track the connection FD for shutdownConnections() */
-                  connectionFds.lock()->insert(conn->from.fd);
+                  if (auto fd = conn->fromFd(); fd != INVALID_DESCRIPTOR)
+                      connectionFds.lock()->insert(fd);
                   return conn;
               },
               [this](const ref<Connection> & r) {
@@ -89,10 +90,12 @@ void RemoteStore::initConnection(Connection & conn)
 {
     /* Send the magic greeting, check for the reply. */
     try {
-        conn.from.endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
+        if (auto * fdSource = dynamic_cast<FdSource *>(&conn.from))
+            fdSource->endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
 
         StringSink saved;
         TeeSource tee(conn.from, saved);
+        bool protocolMismatch = false;
         try {
             // The following features aren't in the `latest` constant because it is
             // shared with the daemon, which only adds the features under certain conditions.
@@ -106,8 +109,12 @@ void RemoteStore::initConnection(Connection & conn)
             if (conn.protoVersion.number < WorkerProto::minimum.number)
                 throw Error("the Nix daemon version is too old");
         } catch (SerialisationError & e) {
-            /* In case the other side is waiting for our input, close
-               it. */
+            protocolMismatch = true;
+        }
+        if (protocolMismatch) {
+            /* In case the other side is waiting for our input, close it.
+               Not in the `catch`: on an asynchronous connection the drain
+               suspends the coroutine, and exception state is per thread. */
             conn.closeWrite();
             {
                 NullSink nullSink;
@@ -393,7 +400,8 @@ ref<const ValidPathInfo> RemoteStore::addCAToStore(
                      << (fim == FileIngestionMethod::NixArchive ? 1 : 0) << printHashAlgo(hashAlgo);
 
             try {
-                conn->to.written = 0;
+                if (auto fdSink = dynamic_cast<FdSink *>(&conn->to))
+                    fdSink->written = 0;
                 connections->incCapacity();
                 {
                     Finally cleanup([&]() { connections->decCapacity(); });

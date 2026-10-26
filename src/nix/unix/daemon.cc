@@ -485,8 +485,8 @@ static void daemonLoop(
 static void forwardStdioConnection(RemoteStore & store)
 {
     auto conn = store.openConnectionWrapper();
-    int from = conn->from.fd;
-    int to = conn->to.fd;
+    int from = conn->fromFd();
+    int to = conn->toFd();
 
     Socket fromSock = toSocket(from), stdinSock = toSocket(getStandardInput());
     auto nfds = std::max(fromSock, stdinSock) + 1;

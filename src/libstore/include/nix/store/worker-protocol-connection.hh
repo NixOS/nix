@@ -3,6 +3,7 @@
 
 #include "nix/store/worker-protocol.hh"
 #include "nix/store/store-api.hh"
+#include "nix/util/logging.hh"
 
 namespace nix {
 
@@ -11,17 +12,23 @@ struct WorkerProto::BasicConnection
     /**
      * Send with this.
      */
-    FdSink to;
+    BufferedSink & to;
 
     /**
      * Receive with this.
      */
-    FdSource from;
+    BufferedSource & from;
 
     /**
      * The protocol version agreed by both sides.
      */
     WorkerProto::Version protoVersion;
+
+    BasicConnection(BufferedSink & to, BufferedSource & from)
+        : to(to)
+        , from(from)
+    {
+    }
 
     /**
      * Coercion to `WorkerProto::ReadConn`. This makes it easy to use the
@@ -58,6 +65,13 @@ struct WorkerProto::BasicConnection
 
 struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 {
+    using BasicConnection::BasicConnection;
+
+    /**
+     * If null, `processStderr` uses the global `logger` at the time of the call.
+     */
+    Logger * messageLogger = nullptr;
+
     /**
      * Flush to direction
      */
@@ -124,6 +138,21 @@ struct WorkerProto::BasicClientConnection : WorkerProto::BasicConnection
 
 struct WorkerProto::BasicServerConnection : WorkerProto::BasicConnection
 {
+    /**
+     * Bound by the base before they are constructed, which is safe as it only takes their addresses.
+     */
+    FdSink toFd;
+    FdSource fromFd;
+
+    BasicServerConnection()
+        : BasicConnection(toFd, fromFd)
+    {
+    }
+
+    /* `to` and `from` refer into this object. */
+    BasicServerConnection(const BasicServerConnection &) = delete;
+    BasicServerConnection(BasicServerConnection &&) = delete;
+
     /**
      * Establishes connection, negotiating version.
      *
