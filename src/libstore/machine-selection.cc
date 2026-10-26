@@ -12,6 +12,7 @@
 #include "nix/store/globals.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/util/hash.hh"
+#include "nix/util/strings.hh"
 
 namespace nix {
 
@@ -59,7 +60,8 @@ std::variant<AcquiredMachine, NoMachine> acquireMachineSlot(
     const std::filesystem::path & currentLoadDir,
     Machines & machines,
     const std::string & neededSystem,
-    const StringSet & requiredFeatures)
+    const StringSet & requiredFeatures,
+    const std::set<const Machine *> & skip)
 {
     AutoCloseFD lock = openLockFile(currentLoadDir / "main-lock", true);
     lockFile(lock.get(), ltWrite, true);
@@ -72,6 +74,8 @@ std::variant<AcquiredMachine, NoMachine> acquireMachineSlot(
 
     for (auto & m : machines) {
         debug("considering building on remote machine '%s'", m.storeUri.render());
+        if (skip.contains(&m))
+            continue;
 
         if (!machineIsCandidate(m, neededSystem, requiredFeatures))
             continue;
@@ -115,6 +119,33 @@ std::variant<AcquiredMachine, NoMachine> acquireMachineSlot(
         .machine = bestMachine,
         .slotLock = std::move(bestSlotLock),
     };
+}
+
+std::string noMachineAvailableMessage(
+    const Machines & machines,
+    std::string_view drvPath,
+    const std::string & neededSystem,
+    const StringSet & requiredFeatures)
+{
+    // build the hint template.
+    std::string errorText =
+        "Failed to find a machine for remote build!\n"
+        "derivation: %s\nrequired (system, features): (%s, [%s])";
+    errorText += "\n%s available machines:";
+    errorText += "\n(systems, maxjobs, supportedFeatures, mandatoryFeatures)";
+
+    for (unsigned int i = 0; i < machines.size(); ++i)
+        errorText += "\n([%s], %s, [%s], [%s])";
+
+    auto error = HintFmt::fromFormatString(errorText);
+    error % drvPath % neededSystem % concatStringsSep<StringSet>(", ", requiredFeatures) % machines.size();
+
+    for (auto & m : machines)
+        error % concatStringsSep<StringSet>(", ", m.systemTypes) % m.maxJobs
+            % concatStringsSep<StringSet>(", ", m.supportedFeatures)
+            % concatStringsSep<StringSet>(", ", m.mandatoryFeatures);
+
+    return error.str();
 }
 
 AutoCloseFD openUploadLock(const std::filesystem::path & currentLoadDir, std::string_view storeUri)

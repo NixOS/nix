@@ -73,6 +73,13 @@ std::variant<AcquiredMachine, NoMachine> acquireMachineSlot(
     const std::filesystem::path & currentLoadDir,
     Machines & machines,
     const std::string & neededSystem,
+    const StringSet & requiredFeatures,
+    const std::set<const Machine *> & skip = {});
+
+std::string noMachineAvailableMessage(
+    const Machines & machines,
+    std::string_view drvPath,
+    const std::string & neededSystem,
     const StringSet & requiredFeatures);
 
 /**
