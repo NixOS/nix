@@ -10,6 +10,7 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
+#include "nix/util/async.hh"
 
 #include <functional>
 #include <future>
@@ -216,12 +217,18 @@ private:
 
     public:
         void enqueue(WeakGoalPtr goal);
+
+        /** Makes `waitForInput` return without waking a goal. Safe from any thread. */
+        void wake();
     };
 
     /**
      * This is behind a ref, so that other threads can take a weak_ptr to it.
      */
     ref<Waker> wakerState;
+
+    /** Declared after `wakerState` so that it is destroyed first. */
+    std::unique_ptr<InterruptCallback> interruptCallback;
 
 public:
 
@@ -237,6 +244,9 @@ public:
 #ifdef _WIN32
     AutoCloseFD ioport;
 #endif
+
+    /** The event loop behind `waitForInput` and the remote builds' coroutines. Worker thread only. */
+    asio::io_context ioContext;
 
     Store & store;
     Store & evalStore;

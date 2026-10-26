@@ -15,6 +15,13 @@
 #include "nix/util/signals.hh"
 #include "nix/store/globals.hh"
 
+#include <list>
+
+#ifndef _WIN32
+#  include <boost/asio/posix/stream_descriptor.hpp>
+#  include <fcntl.h>
+#endif
+
 namespace nix {
 
 Worker::Worker(Store & store, Store & evalStore)
@@ -41,15 +48,34 @@ Worker::Worker(Store & store, Store & evalStore)
     nrLocalBuilds = 0;
     nrSubstitutions = 0;
     lastWokenUp = steady_time_point::min();
+
+    /* asio restarts its wait on `EINTR`, so wake the loop on an interrupt. */
+    interruptCallback = createInterruptCallback([waker = std::weak_ptr<Waker>(wakerState.get_ptr())]() {
+        if (auto w = waker.lock())
+            w->wake();
+    });
 }
 
 Worker::~Worker()
 {
+    interruptCallback.reset();
+
     /* Explicitly get rid of all strong pointers now.  After this all
        goals that refer to this worker should be gone.  (Otherwise we
        are in trouble, since goals may call childTerminated() etc. in
        their destructors). */
     topGoals.clear();
+
+    try {
+        PushActivity keepActivity(getCurActivity());
+        ioContext.restart();
+        ioContext.run_for(std::chrono::seconds(5));
+        if (!ioContext.stopped())
+            printError(
+                "some remote builds were still in flight when the worker went away; abandoning their connections");
+    } catch (...) {
+        ignoreExceptionInDestructor();
+    }
 
     assert(expectedSubstitutions == 0);
     assert(expectedDownloadSize == 0);
@@ -463,11 +489,74 @@ void Worker::waitForInput()
     }
 #endif
 
-    state.poll(
-#ifdef _WIN32
-        ioport.get(),
+#ifndef _WIN32
+    /* asio does not expose its reactor's descriptor, so each `pollStatus` entry
+       gets a one-shot `async_wait`. FIXME: keep one per `Child`, not per wait. */
+    {
+        struct Watched
+        {
+            asio::posix::stream_descriptor descriptor;
+            Descriptor fd;
+            int flags;
+
+            Watched(asio::io_context & ctx, Descriptor fd, int flags)
+                : descriptor(ctx, fd)
+                , fd(fd)
+                , flags(flags)
+            {
+            }
+
+            Watched(const Watched &) = delete;
+            Watched(Watched &&) = delete;
+
+            ~Watched()
+            {
+                if (descriptor.is_open()) {
+                    boost::system::error_code ec;
+                    descriptor.cancel(ec);
+                    descriptor.release();
+                }
+            }
+        };
+
+        /* asio may set `O_NONBLOCK`, which `release()` keeps, but readers of these pipes expect to block. */
+        std::list<Watched> watched;
+        for (auto & entry : state.pollStatus) {
+            int flags = fcntl(entry.fd, F_GETFL);
+            if (flags == -1)
+                throw SysError("getting the flags of descriptor %d", entry.fd);
+            watched.emplace_back(ioContext, entry.fd, flags);
+            watched.back().descriptor.async_wait(
+                asio::posix::stream_descriptor::wait_read, [](const boost::system::error_code &) {});
+        }
+
+        /* Resumed coroutines set the current activity; keep the worker's. */
+        PushActivity keepActivity(getCurActivity());
+
+        ioContext.restart();
+        if (useTimeout)
+            ioContext.run_one_for(std::chrono::seconds(timeout));
+        else
+            ioContext.run_one();
+        /* Bounded, so that a copy over a fast pipe cannot starve the children's pipes and timeouts. */
+        for (unsigned int n = 0; n < 64 && ioContext.poll_one(); ++n)
+            ;
+
+        for (auto & w : watched) {
+            w.descriptor.cancel();
+            w.descriptor.release();
+            if (!(w.flags & O_NONBLOCK) && fcntl(w.fd, F_SETFL, w.flags) == -1)
+                throw SysError("restoring the flags of descriptor %d", w.fd);
+        }
+        /* Drain the cancelled waits' handlers. A leftover one ends the next wait early: one extra loop turn. */
+        for (std::size_t n = 0; n < watched.size() + 64 && ioContext.poll_one(); ++n)
+            ;
+    }
+
+    state.poll(std::optional{0u});
+#else
+    state.poll(ioport.get(), useTimeout ? (std::optional{timeout * 1000}) : std::nullopt);
 #endif
-        useTimeout ? (std::optional{timeout * 1000}) : std::nullopt);
 
     auto after = steady_time_point::clock::now();
 
@@ -553,6 +642,11 @@ void Worker::Waker::wakeAll(Worker & worker)
 void Worker::Waker::enqueue(WeakGoalPtr goal)
 {
     wakeupQueue_.lock()->push(goal);
+    wake();
+}
+
+void Worker::Waker::wake()
+{
 #ifdef _WIN32
     PostQueuedCompletionStatus(
         ioport, /*dwNumberOfBytesTransferred=*/0, /*dwCompletionKey=*/0, /*lpOverlapped=*/nullptr);
