@@ -281,12 +281,6 @@ static void _deletePath(const std::filesystem::path & path, uint64_t & bytesFree
         std::rethrow_exception(ex);
 }
 
-void deletePath(const std::filesystem::path & path)
-{
-    uint64_t dummy;
-    deletePath(path, dummy);
-}
-
 void deletePath(const std::filesystem::path & path, uint64_t & bytesFreed)
 {
     bytesFreed = 0;
