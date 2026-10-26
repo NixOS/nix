@@ -651,7 +651,7 @@ Goal::Co<DerivationBuildingGoal::Result> DerivationBuildingGoal::buildWithHook(
 
     /* Set up callback so childTerminated is called if the hook is
        destroyed (e.g., during failure cascades). */
-    hook->onKillChild = [this]() { worker.childTerminated(this, JobCategory::Build); };
+    hook->onKillChild = [this]() { worker.childTerminated(this); };
 
     std::string machineName = [&hook]() {
         try {
@@ -933,7 +933,7 @@ Goal::Co<DerivationBuildingGoal::LocalBuildOutcome> DerivationBuildingGoal::buil
 
                 void childTerminated() override
                 {
-                    goal.worker.childTerminated(&goal, JobCategory::Build);
+                    goal.worker.childTerminated(&goal);
                 }
 
                 void openLogFile() override

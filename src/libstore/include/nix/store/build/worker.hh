@@ -57,6 +57,8 @@ struct Child
     std::set<MuxablePipePollState::CommChannel> channels;
     bool respectTimeouts;
     bool inBuildSlot;
+    /** Recorded at the start: the goal's destructor may unregister the child, when the virtual is gone. */
+    JobCategory jobCategory{};
     /**
      * Time we last got output on stdout/stderr
      */
@@ -365,19 +367,9 @@ public:
     /**
      * Unregisters a running child process.
      *
-     * This overload requires `goal` to point to a fully constructed,
-     * valid goal object, as it calls `goal->jobCategory()`.
+     * `goal` is never dereferenced, so this is safe to call from its destructor.
      */
     void childTerminated(Goal * goal);
-
-    /**
-     * Unregisters a running child process, like the other overload.
-     *
-     * This overload only uses `goal` as a pointer for comparison with
-     * weak goal references, so it is safe to call from destructors
-     * where the goal object may be partially destroyed.
-     */
-    void childTerminated(Goal * goal, JobCategory jobCategory);
 
     /**
      * Put `goal` to sleep until a build slot becomes available (which

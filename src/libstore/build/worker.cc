@@ -202,9 +202,10 @@ void Worker::childStarted(
     child.timeStarted = child.lastOutput = steady_time_point::clock::now();
     child.inBuildSlot = inBuildSlot;
     child.respectTimeouts = respectTimeouts;
+    child.jobCategory = goal->jobCategory();
     children.emplace_back(child);
     if (inBuildSlot) {
-        switch (goal->jobCategory()) {
+        switch (child.jobCategory) {
         case JobCategory::Substitution:
             nrSubstitutions++;
             break;
@@ -221,18 +222,13 @@ void Worker::childStarted(
 
 void Worker::childTerminated(Goal * goal)
 {
-    childTerminated(goal, goal->jobCategory());
-}
-
-void Worker::childTerminated(Goal * goal, JobCategory jobCategory)
-{
     // FIXME: Inefficient. Make children a map from Goal -> Child instead.
     auto i = std::find_if(children.begin(), children.end(), [&](const Child & child) { return child.goal2 == goal; });
     if (i == children.end())
         return;
 
     if (i->inBuildSlot) {
-        switch (jobCategory) {
+        switch (i->jobCategory) {
         case JobCategory::Substitution:
             assert(nrSubstitutions > 0);
             nrSubstitutions--;
