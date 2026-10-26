@@ -8,6 +8,16 @@ semi-transparent way. For example, if you perform a build for a
 `aarch64-darwin` on an `i686-linux` machine, Nix can automatically
 forward the build to a `aarch64-darwin` machine, if one is available.
 
+For an `ssh-ng` machine, the process that runs the build (the Nix
+daemon, in a multi-user installation) selects the machine, copies the
+inputs over `ssh`, waits for the build and copies the outputs back,
+while its other builds keep running. `ssh` runs non-interactively, so a
+machine that needs a password or passphrase prompt counts as
+unreachable and is skipped for that build. Other machine types are
+built on through a separate `nix __build-remote` process. A program set
+in [`build-hook`](@docroot@/command-ref/conf-file.md#conf-build-hook)
+replaces all of this with its own logic.
+
 ## Requirements
 
 For a local machine to forward a build to a remote machine, the remote machine must:
