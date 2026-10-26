@@ -1,3 +1,5 @@
+#include <chrono>
+#include <future>
 #include <thread>
 
 #include <nlohmann/json.hpp>
@@ -11,6 +13,10 @@
 #include "nix/store/build-result.hh"
 #include "nix/store/tests/protocol.hh"
 #include "nix/util/tests/characterization.hh"
+#ifndef _WIN32
+#  include "nix/util/serialise-async.hh"
+#  include <boost/asio/use_future.hpp>
+#endif
 
 namespace nix {
 
@@ -1004,6 +1010,45 @@ TEST_F(WorkerProtoTest, handshake_client_truncated_replay_throws)
         }
     });
 }
+
+#ifndef _WIN32
+TEST_F(WorkerProtoTest, handshake_over_async_streams)
+{
+    Pipe toClient, toServer;
+    toClient.create();
+    toServer.create();
+
+    asio::io_context ctx;
+    auto clientResult = asio::spawn(
+        ctx,
+        [&](asio::yield_context yield) {
+            AsyncFdSink out(ctx, yield, std::move(toServer.writeSide));
+            AsyncFdSource in(ctx, yield, std::move(toClient.readSide));
+            auto version = WorkerProto::BasicClientConnection::handshake(out, in, defaultVersion);
+            out.flush();
+            return version;
+        },
+        asio::use_future);
+
+    auto serverResult = asio::spawn(
+        ctx,
+        [&](asio::yield_context yield) {
+            AsyncFdSink out(ctx, yield, std::move(toClient.writeSide));
+            AsyncFdSource in(ctx, yield, std::move(toServer.readSide));
+            WorkerProto::BasicServerConnection::handshake(out, in, defaultVersion);
+            out.flush();
+        },
+        asio::use_future);
+
+    /* A stream that blocked instead of suspending would deadlock here. */
+    ctx.run_for(std::chrono::seconds(5));
+    ASSERT_EQ(clientResult.wait_for(std::chrono::seconds(0)), std::future_status::ready)
+        << "the handshake did not finish within five seconds";
+    ASSERT_EQ(serverResult.wait_for(std::chrono::seconds(0)), std::future_status::ready);
+    serverResult.get();
+    EXPECT_EQ(clientResult.get(), defaultVersion);
+}
+#endif
 
 TEST_F(WorkerProtoTest, handshake_client_corrupted_throws)
 {

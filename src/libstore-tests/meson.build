@@ -97,6 +97,9 @@ if build_unit_tests
     ),
     dependency('gtest', main : true),
     dependency('gmock'),
+    # `worker-protocol.cc` runs a stackful coroutine; Boost is not in the
+    # `nix-store` pkg-config file, so link Boost.Context here.
+    dependency('boost', modules : [ 'context' ], include_type : 'system'),
   ]
 
   configdata = configuration_data()
