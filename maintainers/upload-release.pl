@@ -297,6 +297,10 @@ unless ($opt->skip_s3) {
     };
     warn "$@" if $@;
     downloadFile("installerScript", "1");
+    downloadFile("nixInstaller.x86_64-linux", "1", "nix-installer-x86_64-linux");
+    downloadFile("nixInstaller.aarch64-linux", "1", "nix-installer-aarch64-linux");
+    downloadFile("nixInstaller.aarch64-darwin", "1", "nix-installer-aarch64-darwin");
+    downloadFile("nixInstallerScript", "1");
 
     # Upload nix-fallback-paths.nix.
     write_file("$tmpDir/fallback-paths.nix",
@@ -321,7 +325,7 @@ unless ($opt->skip_s3) {
             my $configuration = ();
             $configuration->{content_type} = "application/octet-stream";
 
-            if ($fn =~ /.sha256|install|\.nix$/) {
+            if ($fn =~ /.sha256|install$|nix-installer$|\.nix$/) {
                 $configuration->{content_type} = "text/plain";
             }
 
@@ -334,6 +338,13 @@ unless ($opt->skip_s3) {
     $channelsBucket->add_key(
         "nix-latest/install", "",
         { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/install" })
+        or die $channelsBucket->err . ": " . $channelsBucket->errstr
+        if $isLatest;
+
+    # Same for "nix-installer" symlink.
+    $channelsBucket->add_key(
+        "nix-latest/nix-installer", "",
+        { "x-amz-website-redirect-location" => "https://releases.nixos.org/$releaseDir/nix-installer" })
         or die $channelsBucket->err . ": " . $channelsBucket->errstr
         if $isLatest;
 }

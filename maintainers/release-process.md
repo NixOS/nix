@@ -81,6 +81,13 @@ release:
   $ git push --set-upstream origin $VERSION-maintenance
   ```
 
+* Take a detour to create a minor release branch of `NixOS/nix-installer` as described
+  in [`docs/releasing.md`](https://github.com/NixOS/nix-installer/blob/main/docs/releasing.md).
+  Once you are done, update the installer in `packaging/nix-installer/default.nix`.
+  If updating from a stable nix-installer version, you can use `nix-update` to ease to process.
+
+* Commit the update to `nix-installer` and push to the release branch.
+
 * Create two jobsets for the release branch on Hydra:
 
   `maintenance-$VERSION` runs the full `hydraJobs` CI matrix.
