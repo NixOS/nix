@@ -4,6 +4,7 @@ sources += files(
   'build/chroot.cc',
   'build/external-derivation-builder.cc',
   'build/hook-instance.cc',
+  'build/remote-machine-build.cc',
   'build/unix-derivation-builder.cc',
   'pathlocks.cc',
   'user-lock.cc',

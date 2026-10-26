@@ -11,6 +11,7 @@
 #include "nix/store/realisation.hh"
 #include "nix/util/muxable-pipe.hh"
 #include "nix/util/async.hh"
+#include "nix/store/machines.hh"
 
 #include <functional>
 #include <future>
@@ -188,6 +189,8 @@ private:
      */
     std::map<StorePath, bool> pathContentsGoodCache;
 
+    std::optional<Machines> remoteMachines_;
+
     class Waker
     {
 #ifndef _WIN32
@@ -287,6 +290,9 @@ public:
      * it answers with "decline-permanently", we don't try again.
      */
     bool tryBuildHook = true;
+
+    /** Parsed from `builders` on first use. Throws if it does not parse. */
+    Machines & remoteMachines();
 
     Worker(Store & store, Store & evalStore);
     ~Worker();

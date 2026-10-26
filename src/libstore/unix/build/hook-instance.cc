@@ -1,9 +1,15 @@
 #include "nix/util/config-global.hh"
 #include "nix/store/build/hook-instance.hh"
+#include "nix/store/globals.hh"
 #include "nix/util/strings.hh"
 #include "nix/util/executable-path.hh"
+#include "nix/util/current-process.hh"
+#include "nix/util/environment-variables.hh"
+#include "nix/util/util.hh"
 
 #include <chrono>
+#include <filesystem>
+#include <optional>
 #include <utility>
 
 namespace nix {
@@ -44,15 +50,32 @@ std::unique_ptr<HookInstance> HookInstance::external(const Strings & _buildHook,
     if (buildHookArgs.empty())
         throw Error("'build-hook' setting is empty");
 
+    /* For the default hook, prefer the `nix` in `NIX_BIN_DIR` or next to
+       this program over the one on `PATH`. */
+    std::optional<std::filesystem::path> selfNix;
+    if (buildHookArgs == Strings{"nix", "__build-remote"}) {
+        if (auto binDir = getEnvNonEmpty("NIX_BIN_DIR"))
+            selfNix = std::filesystem::path{*binDir} / "nix";
+        else if (auto self = getSelfExe()) {
+            std::error_code ec;
+            auto nix = self->parent_path() / "nix";
+            if (std::filesystem::exists(nix, ec))
+                selfNix = nix;
+        }
+    }
+
     std::filesystem::path buildHook = buildHookArgs.front();
     buildHookArgs.pop_front();
 
-    try {
-        buildHook = ExecutablePath::load().findPath(buildHook);
-    } catch (ExecutableLookupError & e) {
-        e.addTrace(nullptr, "while resolving the 'build-hook' setting'");
-        throw;
-    }
+    if (selfNix)
+        buildHook = *selfNix;
+    else
+        try {
+            buildHook = ExecutablePath::load().findPath(buildHook);
+        } catch (ExecutableLookupError & e) {
+            e.addTrace(nullptr, "while resolving the 'build-hook' setting'");
+            throw;
+        }
 
     Strings args;
 

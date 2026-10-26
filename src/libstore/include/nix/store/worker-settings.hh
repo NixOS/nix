@@ -122,10 +122,11 @@ public:
         {"nix", "__build-remote"},
         "build-hook",
         R"(
-          The path to the helper program that executes remote builds.
+          The program that performs remote builds, speaking the build-hook protocol with Nix over `stdio`.
 
-          Nix communicates with the build hook over `stdio` using a custom protocol to request builds that cannot be performed directly by the Nix daemon.
-          The default value is the internal Nix binary that implements remote building.
+          With the default value, Nix builds on [`ssh-ng`](@docroot@/store/types/ssh-store.md) machines itself, without a hook process, and keeps running its other builds meanwhile.
+          For other machines it runs `nix __build-remote` as a separate process (the `nix` in `NIX_BIN_DIR`, else the one next to the running program, else the one on `PATH`).
+          Any other value, including an absolute path to `nix __build-remote`, is run as the hook for every remote build; Nix keeps running its other builds while it waits for the hook's reply.
 
           > **Important**
           >

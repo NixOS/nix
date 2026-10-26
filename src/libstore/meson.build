@@ -108,11 +108,17 @@ boost = dependency(
   'boost',
   modules : [
     'container',
+    # Stackful coroutines (`asio::spawn`) for in-process remote builds.
+    # `nix-util` depends on it too, but not through its pkg-config file.
+    'context',
     # Shouldn't list, because can header-only, and Meson currently looks for libs
     #'regex',
     'url',
   ],
   include_type : 'system',
+  # The same floor as nix-util's. The in-process remote builder needs at
+  # least 1.80 for `asio::spawn` with completion tokens and cancellation.
+  version : '>=1.87.0',
 )
 # boost is a public dependency, but not a pkg-config dependency unfortunately.
 deps_public_no_pkgconfig += boost

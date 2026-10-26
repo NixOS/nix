@@ -10,6 +10,7 @@
 #include "nix/store/pathlocks.hh"
 #include "nix/store/build/goal.hh"
 #include "nix/store/build/build-log.hh"
+#include "nix/store/machine-selection.hh"
 
 namespace nix {
 
@@ -97,6 +98,31 @@ private:
 #ifndef _WIN32
     std::unique_ptr<HookInstance> hookAccepted;
     std::string hookMachineName;
+
+    /** Skipped by this build only. Shared with the coroutine, which can outlive the goal. */
+    std::shared_ptr<std::set<const Machine *>> unreachableMachines = std::make_shared<std::set<const Machine *>>();
+#endif
+
+    /** `machine` is the reserved slot, empty when the hook program answered. */
+    struct RemoteReply
+    {
+        HookReply reply = rpDecline;
+        std::optional<AcquiredMachine> machine;
+    };
+
+    /** Asks the hook program if `build-hook` is not the default, else the worker's own remote builder. */
+    Co<RemoteReply> tryRemoteBuilder(const DerivationOptions<StorePath> & drvOptions);
+
+#ifndef _WIN32
+    RemoteReply selectRemoteMachine(const DerivationOptions<StorePath> & drvOptions);
+
+    /** Returns `std::nullopt` if no machine could be reached. */
+    Co<std::optional<Result>> buildRemotely(
+        AcquiredMachine machine,
+        const DerivationOptions<StorePath> & drvOptions,
+        const StorePathSet & inputPaths,
+        std::map<std::string, InitialOutput> & initialOutputs,
+        PathLocks outputLocks);
 #endif
 
     BuildError logLimitExceeded();

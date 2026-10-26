@@ -386,7 +386,7 @@ void Worker::run(const Goals & _topGoals)
         if (!children.empty() || !waitingForAWhile.empty() || !waitingForCompletion.empty())
             waitForInput();
         else if (awake.empty() && 0U == settings.maxBuildJobs) {
-            if (Machine::parseConfig({nix::settings.thisSystem}, nix::settings.getWorkerSettings().builders).empty())
+            if (remoteMachines().empty())
                 throw Error(
                     "Unable to start any build; either increase '--max-jobs' or enable remote builds.\n"
                     "\n"
@@ -615,6 +615,13 @@ void Worker::waitForInput()
         }
         waitingForAWhile.clear();
     }
+}
+
+Machines & Worker::remoteMachines()
+{
+    if (!remoteMachines_)
+        remoteMachines_ = Machine::parseConfig({nix::settings.thisSystem}, settings.builders);
+    return *remoteMachines_;
 }
 
 std::weak_ptr<Worker::Waker> Worker::getCrossThreadWaker()
