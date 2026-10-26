@@ -90,6 +90,7 @@ void RemoteStore::initConnection(Connection & conn)
 {
     /* Send the magic greeting, check for the reply. */
     try {
+        /* `SSHStore` sets this on its `AsyncFdSource` itself. */
         if (auto * fdSource = dynamic_cast<FdSource *>(&conn.from))
             fdSource->endOfFileError = "Nix daemon disconnected unexpectedly (maybe it crashed?)";
 

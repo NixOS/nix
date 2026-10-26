@@ -5,6 +5,7 @@
 #include "nix/store/store-api.hh"
 #include "nix/store/local-fs-store.hh"
 #include "nix/store/remote-store.hh"
+#include "nix/util/serialise-async.hh"
 
 namespace nix {
 
@@ -41,6 +42,12 @@ public:
     static std::string doc();
 
     ref<Store> openStore() const override;
+
+    /**
+     * For use only from the coroutine that `yield` belongs to.
+     */
+    ref<Store> openStoreAsync(
+        asio::io_context & ctx, asio::yield_context yield, std::shared_ptr<Logger> messageLogger = nullptr) const;
 
     StoreReference getReference() const override;
 };
