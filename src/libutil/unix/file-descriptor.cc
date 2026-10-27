@@ -4,6 +4,7 @@
 #include "nix/util/serialise.hh"
 
 #include <fcntl.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <span>
 
