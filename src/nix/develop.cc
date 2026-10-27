@@ -302,8 +302,8 @@ static StorePath getDerivationEnvironment(ref<Store> store, ref<Store> evalStore
 
     // `get-env.sh` will write its JSON output to an arbitrary output
     // path, so return the first non-empty output path.
-    for (auto & [_0, path] : deepQueryDerivationOutputMap(*evalStore, shellDrvPath)) {
-        auto accessor = evalStore->requireStoreObjectAccessor(path);
+    for (auto & [_0, path] : deepQueryDerivationOutputMap(*store, shellDrvPath, &*evalStore)) {
+        auto accessor = store->requireStoreObjectAccessor(path);
         if (auto st = accessor->maybeLstat(CanonPath::root); st && st->fileSize.value_or(0))
             return path;
     }
