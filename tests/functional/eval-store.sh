@@ -51,6 +51,11 @@ rm -rf "$eval_store"
 ls "$NIX_STORE_DIR"/*dependencies-top/foobar
 (! ls "$eval_store"/nix/store/*dependencies-top/foobar)
 
+clearStore
+rm -rf "$eval_store"
+
+[[ $(nix develop -f ./shell.nix shellDrv --eval-store "$eval_store" -c printenv VAR_FROM_NIX) = bar ]]
+
 # Can't write .drv by default
 (! nix-instantiate dependencies.nix --eval-store "dummy://")
 nix-instantiate dependencies.nix --eval-store "dummy://?read-only=false"
