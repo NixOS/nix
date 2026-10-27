@@ -448,7 +448,22 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
         enum BuildHookState { stBegin, stExtraChrootDirs };
 
         auto state = stBegin;
-        auto lines = runProgram(localSettings.preBuildHook.get(), false, getPreBuildHookArgs());
+        std::string lines;
+        try {
+            lines = runProgram(localSettings.preBuildHook.get(), false, getPreBuildHookArgs());
+        } catch (ExecError & e) {
+            throw BuildError(
+                BuildResult::Failure::MiscFailure,
+                "pre-build hook '%s' %s",
+                localSettings.preBuildHook.get(),
+                statusToString(e.status));
+        } catch (Error & e) {
+            throw BuildError(
+                BuildResult::Failure::MiscFailure,
+                "executing pre-build hook '%s': %s",
+                localSettings.preBuildHook.get(),
+                e.message());
+        }
         auto lastPos = std::string::size_type{0};
         for (auto nlPos = lines.find('\n'); nlPos != std::string::npos; nlPos = lines.find('\n', lastPos)) {
             auto line = lines.substr(lastPos, nlPos - lastPos);
@@ -457,7 +472,7 @@ PathsInChroot UnixDerivationBuilderImpl::getPathsInSandbox()
                 if (line == "extra-sandbox-paths" || line == "extra-chroot-dirs") {
                     state = stExtraChrootDirs;
                 } else {
-                    throw Error("unknown pre-build hook command '%1%'", line);
+                    throw BuildError(BuildResult::Failure::MiscFailure, "unknown pre-build hook command '%s'", line);
                 }
             } else if (state == stExtraChrootDirs) {
                 if (line == "") {
@@ -480,6 +495,9 @@ void UnixDerivationBuilderImpl::prepareSandbox()
 {
     if (drvOptions.useUidRange(drv))
         throw Error("feature 'uid-range' is not supported on this platform");
+
+    if (localSettings.preBuildHook != "")
+        getPathsInSandbox();
 }
 
 void UnixDerivationBuilderImpl::openSlave()
