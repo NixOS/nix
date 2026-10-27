@@ -3639,20 +3639,36 @@ static RegisterPrimOp primop_functionArgs({
     .impl = prim_functionArgs,
 });
 
-/*  */
+static void buildIndexedCalls(EvalState & state, Value * fun, const Bindings * inputAttrs, BindingsBuilder & attrs)
+{
+    if (inputAttrs->empty())
+        return;
+
+    if (inputAttrs->isLayered()) {
+        auto flattened = state.buildBindings(inputAttrs->size());
+        for (auto & i : *inputAttrs)
+            flattened.insert(i.name, i.value, i.pos);
+        inputAttrs = flattened.alreadySorted();
+    }
+
+    auto * descriptor = state.mem.allocIndexedCallDescriptor();
+    descriptor->fun = fun;
+    descriptor->original = inputAttrs;
+
+    Bindings::size_type index = 0;
+    for (auto & i : *inputAttrs) {
+        attrs.alloc(i.name).mkIndexedCall(descriptor, index);
+        index++;
+    }
+}
+
 static void prim_mapAttrs(EvalState & state, CallSite callSite, Value * const * args, Value & v)
 {
     state.forceAttrs(*args[1], noPos, "while evaluating the second argument passed to builtins.mapAttrs");
 
-    auto attrs = state.buildBindings(args[1]->attrs()->size());
-
-    for (auto & i : *args[1]->attrs()) {
-        Value * vName = Value::toPtr(state.symbols[i.name]);
-        Value * vFun2 = state.allocValue();
-        vFun2->mkApp(args[0], vName);
-        attrs.alloc(i.name).mkApp(vFun2, i.value);
-    }
-
+    auto * inputAttrs = args[1]->attrs();
+    auto attrs = state.buildBindings(inputAttrs->size());
+    buildIndexedCalls(state, args[0], inputAttrs, attrs);
     v.mkAttrs(attrs.alreadySorted());
 }
 
@@ -3714,18 +3730,15 @@ static void prim_zipAttrsWith(EvalState & state, CallSite callSite, Value * cons
         }
     }
 
-    auto attrs = state.buildBindings(attrsSeen.size());
-
+    auto zipped = state.buildBindings(attrsSeen.size());
     for (auto & [sym, elem] : attrsSeen) {
-        auto name = Value::toPtr(state.symbols[sym]);
-        auto call1 = state.allocValue();
-        call1->mkApp(args[0], name);
-        auto call2 = state.allocValue();
-        auto arg = state.allocValue();
-        arg->mkList(*elem.list);
-        call2->mkApp(call1, arg);
-        attrs.insert(sym, call2);
+        auto * listValue = state.allocValue();
+        listValue->mkList(*elem.list);
+        zipped.insert(sym, listValue);
     }
+
+    auto attrs = state.buildBindings(attrsSeen.size());
+    buildIndexedCalls(state, args[0], zipped.alreadySorted(), attrs);
 
     v.mkAttrs(attrs.alreadySorted());
 }
