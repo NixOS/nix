@@ -47,6 +47,7 @@ sources = files(
   'executable-path.cc',
   'file-content-address.cc',
   'file-descriptor.cc',
+  'file-path-impl.cc',
   'file-system-at.cc',
   'file-system.cc',
   'fun.cc',
@@ -56,6 +57,7 @@ sources = files(
   'json-utils.cc',
   'local-keys.cc',
   'logging.cc',
+  'logical-path.cc',
   'lru-cache.cc',
   'main.cc',
   'memo.cc',
@@ -79,6 +81,7 @@ sources = files(
   'topo-sort.cc',
   'url.cc',
   'util.cc',
+  'wtf8.cc',
   'xml-writer.cc',
 )
 
