@@ -3,6 +3,7 @@
 #include "nix/util/signals.hh"
 
 #include <fcntl.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 #include <span>
 
