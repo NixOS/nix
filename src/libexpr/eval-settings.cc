@@ -114,12 +114,12 @@ bool EvalSettings::isPseudoUrl(std::string_view s)
            || scheme == "s3" || scheme == "ssh";
 }
 
-std::string EvalSettings::resolvePseudoUrl(std::string_view url)
+std::vector<std::string> EvalSettings::resolvePseudoUrl(std::string_view url)
 {
     if (hasPrefix(url, "channel:"))
-        return "https://channels.nixos.org/" + std::string(url.substr(8)) + "/nixexprs.tar.xz";
+        return {"https://channels.nixos.org/" + std::string(url.substr(8)) + "/nixexprs.tar.xz"};
     else
-        return std::string(url);
+        return {std::string(url)};
 }
 
 const std::string & EvalSettings::getCurrentSystem() const
