@@ -35,6 +35,7 @@ headers = [ config_pub_h ] + files(
   'daemon.hh',
   'derivation-options.hh',
   'derivation/aterm.hh',
+  'derivation/cbor.hh',
   'derivation/full-inputs.hh',
   'derivation/masked.hh',
   'derivation/output.hh',
