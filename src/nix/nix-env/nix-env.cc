@@ -16,6 +16,7 @@
 #include "nix/store/local-fs-store.hh"
 #include "user-env.hh"
 #include "nix/expr/value-to-json.hh"
+#include "nix/expr/value-to-xml.hh"
 #include "nix/util/xml-writer.hh"
 #include "nix/cmd/legacy.hh"
 #include "nix/expr/eval-settings.hh" // for defexpr
@@ -1223,6 +1224,11 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                 }
                 if (printMeta) {
                     StringSet metaNames = i.queryMetaNames();
+                    auto printMetaAsXML = [&](XMLAttrs & attrs, Value * v) {
+                        XMLOpenElement m(xml, "meta", attrs);
+                        NixStringContext context;
+                        printValueAsXML(*globals.state, true, false, *v, xml, context, noPos);
+                    };
                     for (auto & j : metaNames) {
                         XMLAttrs attrs2;
                         attrs2["name"] = j;
@@ -1247,26 +1253,26 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
                                 attrs2["value"] = v->boolean() ? "true" : "false";
                                 xml.writeEmptyElement("meta", attrs2);
                             } else if (v->type() == nList) {
-                                attrs2["type"] = "strings";
-                                XMLOpenElement m(xml, "meta", attrs2);
+                                bool isListOfOnlyStrings = true;
                                 for (auto elem : v->listView()) {
-                                    if (elem->type() != nString)
-                                        continue;
-                                    XMLAttrs attrs3;
-                                    attrs3["value"] = elem->string_view();
-                                    xml.writeEmptyElement("string", attrs3);
+                                    if (elem->type() != nString) {
+                                        isListOfOnlyStrings = false;
+                                        break;
+                                    }
+                                }
+                                if (isListOfOnlyStrings) {
+                                    attrs2["type"] = "strings";
+                                    XMLOpenElement m(xml, "meta", attrs2);
+                                    for (auto elem : v->listView()) {
+                                        XMLAttrs attrs3;
+                                        attrs3["value"] = elem->string_view();
+                                        xml.writeEmptyElement("string", attrs3);
+                                    }
+                                } else {
+                                    printMetaAsXML(attrs2, v);
                                 }
                             } else if (v->type() == nAttrs) {
-                                attrs2["type"] = "strings";
-                                XMLOpenElement m(xml, "meta", attrs2);
-                                for (auto & i : *v->attrs()) {
-                                    if (i.value->type() != nString)
-                                        continue;
-                                    XMLAttrs attrs3;
-                                    attrs3["type"] = globals.state->symbols[i.name];
-                                    attrs3["value"] = i.value->string_view();
-                                    xml.writeEmptyElement("string", attrs3);
-                                }
+                                printMetaAsXML(attrs2, v);
                             }
                         }
                     }
