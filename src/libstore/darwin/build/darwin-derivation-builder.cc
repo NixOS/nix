@@ -34,6 +34,21 @@ struct IpcsCommand
 
 namespace nix {
 
+/* Quote a string as an SBPL string literal. Escapes two characters: `\` which escapes
+   the next character and `"` which ends the literal when they are not escaped.
+   This keeps derivation-defined `__impureHostDeps` and other settings from injecting profile rules. */
+static std::string sbplQuote(std::string_view s)
+{
+    std::string res = "\"";
+    for (auto c : s) {
+        if (c == '"' || c == '\\')
+            res += '\\';
+        res += c;
+    }
+    res += '"';
+    return res;
+}
+
 void DarwinDerivationBuilder::prepareSandbox()
 {
     pathsInChroot = getPathsInSandbox();
@@ -96,7 +111,7 @@ void DarwinDerivationBuilder::setUser()
         /* Add the output paths we'll use at build-time to the chroot */
         sandboxProfile += "(allow file-read* file-write* process-exec\n";
         for (auto & [_, path] : scratchOutputs)
-            sandboxProfile += fmt("\t(subpath \"%s\")\n", store->printStorePath(path));
+            sandboxProfile += fmt("\t(subpath %s)\n", sbplQuote(store->printStorePath(path)));
 
         sandboxProfile += ")\n";
 
@@ -142,8 +157,8 @@ void DarwinDerivationBuilder::setUser()
             /* For future: One additional trick we can pull here is to reduce the path to a
                (prefix "$storePrefix/<hash>-"), which is shorter than either a subpath, or
                a literal value. It should be safe as hashes are unique. */
-            std::string profileRule =
-                S_ISDIR(optSt->st_mode) ? fmt("\t\t(subpath \"%s\")\n", path) : fmt("\t\t(literal \"%s\")\n", path);
+            std::string profileRule = S_ISDIR(optSt->st_mode) ? fmt("\t\t(subpath %s)\n", sbplQuote(path))
+                                                              : fmt("\t\t(literal %s)\n", sbplQuote(path));
 
             /* Legitimate derivation input paths are already lexically canonical. */
             if (store->isInStore(path)) {
@@ -167,9 +182,9 @@ void DarwinDerivationBuilder::setUser()
             const auto prefix = storePrefix + bucket;
             sandboxProfile +=
                 fmt("(allow file-read* file-write* process-exec\n"
-                    "\t(require-all (prefix \"%s\")\n"
+                    "\t(require-all (prefix %s)\n"
                     "\t\t(require-any\n%s)))\n",
-                    prefix,
+                    sbplQuote(prefix),
                     filters);
         }
 
@@ -177,7 +192,7 @@ void DarwinDerivationBuilder::setUser()
         sandboxProfile += "(allow file-read*\n";
         assert(!ancestry.empty()); /* Just to be safe. */
         for (auto & i : ancestry) {
-            sandboxProfile += fmt("\t(literal \"%s\")\n", i);
+            sandboxProfile += fmt("\t(literal %s)\n", sbplQuote(i));
         }
         sandboxProfile += ")\n";
 
