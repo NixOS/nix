@@ -58,11 +58,7 @@ MixCommonArgs::MixCommonArgs(const std::string & programName)
         .completer =
             [](AddCompletions & completions, size_t index, std::string_view prefix) {
                 if (index == 0) {
-                    std::map<std::string, Config::SettingInfo> settings;
-                    globalConfig.getSettings(settings);
-                    for (auto & s : settings)
-                        if (hasPrefix(s.first, prefix))
-                            completions.add(s.first, fmt("Set the `%s` setting.", s.first));
+                    completeSettings(completions, index, prefix);
                 }
             },
     });
