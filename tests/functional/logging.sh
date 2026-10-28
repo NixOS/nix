@@ -38,6 +38,18 @@ nix-build -E \
     'with import '"${config_nix}"'; mkDerivation { name = "gap"; builder = '"$builder"'; }' \
     --no-out-link 2>&1 | grepQuiet 'x y'
 
+# `nix log` keeps the colors a build printed only on a terminal, or when forced
+cat > "$builder" <<'EOF'
+#!/bin/sh
+printf '\033[31mred\033[0m\tdone\033[1Cnow\n'
+mkdir $out
+EOF
+outp="$(nix-build -E \
+    'with import '"${config_nix}"'; mkDerivation { name = "colored"; builder = '"$builder"'; }' \
+    --no-out-link)"
+[[ "$(nix log "$outp")" = $'red\tdone now' ]]
+(( $(CLICOLOR_FORCE=1 nix log "$outp" | grep -c $'\x1b') > 0 ))
+
 if isDaemonNewer "2.26"; then
     # Build works despite ill-formed structured build log entries.
     expectStderr 0 nix build -f ./logging/unusual-logging.nix --no-link | grepQuiet -i 'warning: unable to handle a JSON message from the derivation builder:'

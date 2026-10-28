@@ -207,9 +207,11 @@ std::string stripANSIEscapes(std::string_view s)
     auto i = s.begin();
 
     while (i != s.end()) {
-        if (*i == '\e')
-            eatEscape(i, s.end());
-        else
+        if (*i == '\e') {
+            auto e = eatEscape(i, s.end());
+            if (e.size() > 2 && e[1] == '[' && e.back() == 'C')
+                t.append(cursorForwardCount(e), ' ');
+        } else
             t += *i++;
     }
 
