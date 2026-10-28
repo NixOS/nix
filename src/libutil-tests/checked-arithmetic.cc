@@ -1,3 +1,4 @@
+#include <exception> // IWYU pragma: keep (Needed by rapidcheck on Darwin and FreeBSD)
 #include <cstdint>
 #include <gtest/gtest.h>
 #include <limits>

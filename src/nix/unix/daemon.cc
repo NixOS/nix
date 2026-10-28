@@ -18,6 +18,7 @@
 #include "nix/store/daemon.hh"
 #include "man-pages.hh"
 #include "nix/util/socket.hh"
+#include "nix/util/current-process.hh"
 
 #include <algorithm>
 #include <climits>

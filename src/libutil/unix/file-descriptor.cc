@@ -1,10 +1,15 @@
 #include "nix/util/file-system.hh"
 #include "nix/util/file-system-at.hh"
 #include "nix/util/signals.hh"
+#include "nix/util/util.hh"
 
+#ifdef __APPLE__
+#  include <libproc.h> /* For closeExtraFDs. */
+#endif
 #include <fcntl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
 #include <span>
 #include <algorithm>
 #include <atomic>
@@ -116,6 +121,25 @@ void unix::closeExtraFDs(std::span<const Descriptor> keepExtra)
     static constexpr Descriptor maxKeptStdio = 2;
     static_assert(std::max({STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO}) == maxKeptStdio);
 
+    /* The logic here is a bit convoluted and platform-dependent.
+     * Keep in mind that this function is free to assume that it's the only thread running
+     * in the process (it's usually called right after fork()-ing).
+     *
+     * - First, figure out the lower bound of the [maxKept + 1, ...) range we can close in
+     *   one go. We always keep stdio file descriptors.
+     *
+     * - Attempt platform-specific ways to close the above:
+     *   On Linux (>= 5.9) and FreeBSD, we try close_range syscall.
+     *   If that doesn't work, try /proc/self/fd/ iteration.
+     *   On Darwin, we use libproc to list all open FDs.
+     *
+     * - If none of the above works, do the silliest possible thing and attempt
+     *   closing all FDs below _SC_OPEN_MAX. Keep in mind that it's huge for the
+     *   daemon process, so we really should use something more optimised.
+     *
+     * - Then go through the [3, maxKept] range and close all the holes.
+     */
+
     auto maxKeptIt = std::max_element(keepExtra.begin(), keepExtra.end());
     Descriptor maxKept = STDERR_FILENO;
 
@@ -134,27 +158,45 @@ void unix::closeExtraFDs(std::span<const Descriptor> keepExtra)
     };
 
 #if defined(__linux__) || defined(__FreeBSD__)
-    // first try to close_range everything we don't care about. if this
-    // returns an error with these parameters we're running on a kernel
-    // that does not implement close_range (i.e. pre 5.9) and fall back
-    // to the old method. we should remove that though, in some future.
-    if (unix_close_range(maxKept + 1, ~0U, 0) == 0) {
+    if (unix_close_range(maxKept + 1, ~0U, 0) == 0)
         return finish();
-    }
 #endif
 
-#ifdef __linux__
+    /* Platform-specific ways of listing open FDs. */
+#if defined(__linux__) || defined(__APPLE__)
     try {
-        for (auto & s : DirectoryIterator{"/proc/self/fd"}) {
-            checkInterrupt();
-            auto fd = std::stoi(s.path().filename());
-            if (fd > maxKept) {
-                debug("closing leaked FD %d", fd);
-                close(fd);
-            }
+#  ifdef __linux__
+        /* XXX: Is it ok to close while readdir()-ing? Seems like it's not. */
+        for (const auto & s : DirectoryIterator{"/proc/self/fd/"}) {
+            auto fd = string2Int<int>(s.path().filename().native());
+            if (!fd)
+                continue;
+            if (*fd > maxKept)
+                ::close(*fd); /* ignore result */
         }
+#  elifdef __APPLE__
+        const auto pid = ::getpid();
+        errno = 0;
+        /* We are the only thread now, so the needed size shouldn't change. The kernel also leaves a bit
+           of slack for the needed space. */
+        int bufSize = ::proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nullptr, 0);
+        /* libproc wrapper converts -1 to 0. */
+        if (bufSize <= 0 && errno != 0)
+            throw SysError("listing open file descriptors");
+        std::vector<::proc_fdinfo> fds;
+        fds.resize(bufSize / sizeof(::proc_fdinfo));
+        errno = 0;
+        bufSize = ::proc_pidinfo(pid, PROC_PIDLISTFDS, 0, fds.data(), fds.size() * sizeof(::proc_fdinfo));
+        if (bufSize <= 0 && errno != 0)
+            throw SysError("listing open file descriptors");
+        fds.resize(bufSize / sizeof(::proc_fdinfo));
+        for (const auto & fdinfo : fds)
+            if (fdinfo.proc_fd > maxKept)
+                ::close(fdinfo.proc_fd); /* ignore result */
+#  endif
         return finish();
-    } catch (SysError &) {
+    } catch (const SystemError & e) {
+        /* Try the last resort fallback. */
     }
 #endif
 
