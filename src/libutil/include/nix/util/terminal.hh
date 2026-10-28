@@ -61,6 +61,12 @@ std::string filterANSIEscapes(
     std::string_view s, bool filterAll = false, unsigned int width = std::numeric_limits<unsigned int>::max());
 
 /**
+ * Remove all ANSI escape sequences, leaving the rest of the string,
+ * including tabs and carriage returns, unchanged.
+ */
+std::string stripANSIEscapes(std::string_view s);
+
+/**
  * Recalculate the window size, updating a global variable.
  *
  * Used in the `SIGWINCH` signal handler on Unix, for example.
