@@ -1077,7 +1077,7 @@ static void opQuery(Globals & globals, Strings opFlags, Strings opArgs)
         return;
     }
 
-    bool tty = shouldANSI();
+    bool tty = shouldANSI(StandardOutputStream::Stdout);
     RunPager pager;
 
     Table table;
