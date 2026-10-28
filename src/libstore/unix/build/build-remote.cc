@@ -292,7 +292,7 @@ connected:
         Activity act(*logger, lvlTalkative, actUnknown, fmt("copying outputs from '%s'", storeUri));
         if (auto localStore = store.dynamic_pointer_cast<LocalStore>())
             for (auto & path : missingPaths)
-                localStore->locksHeld.insert(store->printStorePath(path)); /* FIXME: ugly */
+                localStore->locksHeld.lock()->insert(store->printStorePath(path)); /* FIXME: ugly */
         copyPaths(*sshStore, *store, missingPaths, NoRepair, NoCheckSigs, NoSubstitute);
     }
     // XXX: Should be done as part of `copyPaths`
