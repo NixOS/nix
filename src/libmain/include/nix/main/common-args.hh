@@ -44,7 +44,7 @@ struct MixDryRun : virtual Args
  */
 struct MixPrintJSON : virtual Args
 {
-    bool outputPretty = shouldANSI(StandardOutputStream::Stdout);
+    bool outputPretty = isTTY(getStandardOutput());
 
     MixPrintJSON()
     {
