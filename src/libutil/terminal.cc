@@ -2,6 +2,7 @@
 #include "nix/util/environment-variables.hh"
 #include "nix/util/sync.hh"
 #include "nix/util/error.hh"
+#include "nix/util/file-descriptor.hh"
 
 #ifdef _WIN32
 #  include <io.h>
@@ -75,7 +76,8 @@ bool isTTY(Descriptor fd)
 
 bool isOutputARealTerminal(StandardOutputStream fileno)
 {
-    return isatty(int(fileno)) && getEnv("TERM").value_or("dumb") != "dumb";
+    return isTTY(fileno == StandardOutputStream::Stdout ? getStandardOutput() : getStandardError())
+           && getEnv("TERM").value_or("dumb") != "dumb";
 }
 
 bool shouldANSI(StandardOutputStream fileno)
