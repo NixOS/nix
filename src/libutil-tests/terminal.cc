@@ -42,6 +42,17 @@ TEST(filterANSIEscapes, expandsTabs)
     ASSERT_EQ(filterANSIEscapes(s, true), "foo     bar     baz");
 }
 
+TEST(filterANSIEscapes, cursorForwardBecomesSpaces)
+{
+    // Wine draws a space as hide cursor, erase in line, cursor forward 1,
+    // show cursor.
+    ASSERT_EQ(filterANSIEscapes("x\e[?25l\e[K\e[1C\e[?25hy", true), "x y");
+    ASSERT_EQ(filterANSIEscapes("x\e[Cy", true), "x y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true), "x   y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", false), "x   y");
+    ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true, 3), "x  ");
+}
+
 TEST(filterANSIEscapes, utf8)
 {
     ASSERT_EQ(filterANSIEscapes("foobar", true, 5), "fooba");

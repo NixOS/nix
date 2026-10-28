@@ -106,6 +106,10 @@ struct Escape
 {
     std::string_view seq;
     /**
+     * The bytes between `[` and the final byte of a CSI sequence.
+     */
+    std::string_view csiParams;
+    /**
      * The final byte of a complete CSI sequence, e.g. `m` for SGR.
      */
     std::optional<char> csiFinal;
@@ -116,16 +120,18 @@ struct Escape
 static Escape eatEscape(std::string_view::const_iterator & i, std::string_view::const_iterator end)
 {
     auto start = i++;
+    std::string_view csiParams;
     std::optional<char> csiFinal;
 
     if (i != end && *i == '[') {
-        i++;
+        auto paramsStart = ++i;
         // eat parameter bytes
         while (i != end && *i >= 0x30 && *i <= 0x3f)
             i++;
         // eat intermediate bytes
         while (i != end && *i >= 0x20 && *i <= 0x2f)
             i++;
+        csiParams = {paramsStart, i};
         // eat final byte
         if (i != end && *i >= 0x40 && *i <= 0x7e)
             csiFinal = *i++;
@@ -151,7 +157,18 @@ static Escape eatEscape(std::string_view::const_iterator & i, std::string_view::
             i++;
     }
 
-    return {{start, i}, csiFinal};
+    return {{start, i}, csiParams, csiFinal};
+}
+
+static unsigned int cursorForwardCount(std::string_view params)
+{
+    unsigned int n = 0;
+    for (char c : params) {
+        if (c < '0' || c > '9')
+            return 1;
+        n = std::min(n * 10 + (c - '0'), 1000u);
+    }
+    return std::max(n, 1u);
 }
 
 std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int width)
@@ -167,6 +184,15 @@ std::string filterANSIEscapes(std::string_view s, bool filterAll, unsigned int w
 
             if (!filterAll && e.csiFinal == 'm')
                 t += e.seq;
+            else if (e.csiFinal == 'C') {
+                // Cursor forward: some programs (e.g. Wine) move over a cell
+                // instead of printing a space, so keep the gap as spaces.
+                for (auto n = cursorForwardCount(e.csiParams); n > 0; --n) {
+                    if (++w > (size_t) width)
+                        return t;
+                    t += ' ';
+                }
+            }
         }
 
         else if (*i == '\t') {
