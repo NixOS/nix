@@ -82,6 +82,7 @@ headers = [ config_pub_h ] + files(
   'regex-combinators.hh',
   'repair-flag.hh',
   'result.hh',
+  'serialise-async.hh',
   'serialise.hh',
   'signals.hh',
   'signature/local-keys.hh',
