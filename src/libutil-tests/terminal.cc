@@ -51,6 +51,7 @@ TEST(filterANSIEscapes, cursorForwardBecomesSpaces)
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true), "x   y");
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", false), "x   y");
     ASSERT_EQ(filterANSIEscapes("x\e[3Cy", true, 3), "x  ");
+    ASSERT_EQ(stripANSIEscapes("x\e[3C\ty"), "x   \ty");
 }
 
 TEST(filterANSIEscapes, utf8)

@@ -2,6 +2,7 @@
 #include "nix/cmd/get-build-log.hh"
 #include "nix/main/shared.hh"
 #include "nix/store/globals.hh"
+#include "nix/util/terminal.hh"
 
 namespace nix {
 
@@ -39,9 +40,13 @@ struct CmdLog : InstallableCommand
             b.path.raw());
         auto path = resolveDerivedPath(*store, *oneUp);
 
+        // Decided before the pager takes over stdout.
+        bool color = shouldANSI(StandardOutputStream::Stdout);
         RunPager pager;
         auto log = fetchBuildLog(store, path, installable->what());
         logger->stop();
+        if (!color)
+            log = stripANSIEscapes(log);
         writeFull(getStandardOutput(), log);
     }
 };
