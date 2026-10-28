@@ -43,14 +43,16 @@ nlohmann::json GlobalConfig::toJSON()
     return res;
 }
 
-std::string GlobalConfig::toKeyValue()
+std::string GlobalConfig::toKeyValue(bool overriddenOnly)
 {
     std::string res;
     std::map<std::string, Config::SettingInfo> settings;
-    globalConfig.getSettings(settings);
-    for (const auto & s : settings)
-        if (!s.second.excludedFromFullSerialisation)
-            res += fmt("%s = %s\n", s.first, s.second.value);
+    globalConfig.getSettings(settings, overriddenOnly);
+    for (const auto & [name, data] : settings) {
+        assert(!data.value.contains('\n')); /* Just to be safe. */
+        if (overriddenOnly || !data.excludedFromFullSerialisation)
+            res += fmt("%s = %s\n", name, data.value);
+    }
     return res;
 }
 
