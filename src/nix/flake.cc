@@ -1043,7 +1043,7 @@ struct CmdFlakeNew : CmdFlakeInitCommon
 
     CmdFlakeNew()
     {
-        expectArgs({.label = "dest-dir", .handler = {&destDir}, .completer = completePath});
+        expectArg("dest-dir", &destDir);
     }
 };
 

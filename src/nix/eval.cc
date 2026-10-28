@@ -37,6 +37,7 @@ struct CmdEval : MixJSON, InstallableValueCommand, MixReadOnlyOption
             .description = "Write a string or attrset of strings to *path*.",
             .labels = {"path"},
             .handler = {&writeTo},
+            .completer = completePath,
         });
     }
 
